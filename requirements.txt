@@ -1,0 +1,22 @@
+# Core - Windows UI Automation
+pywinauto>=0.6.8
+comtypes>=1.2.0
+
+# Screenshot & Image
+Pillow>=10.0.0
+
+# AI Vision
+anthropic>=0.30.0
+
+# YAML & Config
+PyYAML>=6.0
+pydantic>=2.0
+
+# Reporting
+Jinja2>=3.1.0
+
+# CLI & Utilities
+colorama>=0.4.6
+
+# Testing (dev)
+pytest>=7.0

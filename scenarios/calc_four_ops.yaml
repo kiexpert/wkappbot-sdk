@@ -1,0 +1,213 @@
+scenario:
+  name: "Calculator Four Operations Test"
+  description: "Test all four basic arithmetic operations: +, -, *, /"
+  version: "1.0"
+
+config:
+  timeout: 10
+  screenshot_on_step: false
+  screenshot_on_failure: true
+  continue_on_error: true
+  retry_count: 2
+  retry_delay: 1.0
+
+app:
+  launch: "calc.exe"
+  wait_for_window:
+    title_contains: "계산기"
+    timeout: 5
+
+steps:
+  # === Test 1: Addition (15 + 27 = 42) ===
+  - name: "[Addition] Clear calculator"
+    action: press_key
+    params:
+      key: "escape"
+
+  - name: "[Addition] Type 15"
+    action: type_text
+    params:
+      text: "15"
+
+  - name: "[Addition] Click Plus"
+    target:
+      strategy: accessibility
+      automation_id: "plusButton"
+    action: click
+
+  - name: "[Addition] Type 27"
+    action: type_text
+    params:
+      text: "27"
+
+  - name: "[Addition] Click Equals"
+    target:
+      strategy: accessibility
+      automation_id: "equalButton"
+    action: click
+
+  - name: "[Addition] Wait for result"
+    action: wait
+    params:
+      seconds: 0.3
+
+  - name: "[Addition] Verify 15 + 27 = 42"
+    target:
+      strategy: accessibility
+      automation_id: "CalculatorResults"
+    action: assert
+    params:
+      type: text_contains
+      expected: "42"
+
+  - name: "[Addition] Screenshot"
+    action: screenshot
+    params:
+      filename: "addition_result.png"
+
+  # === Test 2: Subtraction (100 - 37 = 63) ===
+  - name: "[Subtraction] Clear calculator"
+    action: press_key
+    params:
+      key: "escape"
+
+  - name: "[Subtraction] Type 100"
+    action: type_text
+    params:
+      text: "100"
+
+  - name: "[Subtraction] Click Minus"
+    target:
+      strategy: accessibility
+      automation_id: "minusButton"
+    action: click
+
+  - name: "[Subtraction] Type 37"
+    action: type_text
+    params:
+      text: "37"
+
+  - name: "[Subtraction] Click Equals"
+    target:
+      strategy: accessibility
+      automation_id: "equalButton"
+    action: click
+
+  - name: "[Subtraction] Wait for result"
+    action: wait
+    params:
+      seconds: 0.3
+
+  - name: "[Subtraction] Verify 100 - 37 = 63"
+    target:
+      strategy: accessibility
+      automation_id: "CalculatorResults"
+    action: assert
+    params:
+      type: text_contains
+      expected: "63"
+
+  - name: "[Subtraction] Screenshot"
+    action: screenshot
+    params:
+      filename: "subtraction_result.png"
+
+  # === Test 3: Multiplication (12 * 8 = 96) ===
+  - name: "[Multiplication] Clear calculator"
+    action: press_key
+    params:
+      key: "escape"
+
+  - name: "[Multiplication] Type 12"
+    action: type_text
+    params:
+      text: "12"
+
+  - name: "[Multiplication] Click Multiply"
+    target:
+      strategy: accessibility
+      automation_id: "multiplyButton"
+    action: click
+
+  - name: "[Multiplication] Type 8"
+    action: type_text
+    params:
+      text: "8"
+
+  - name: "[Multiplication] Click Equals"
+    target:
+      strategy: accessibility
+      automation_id: "equalButton"
+    action: click
+
+  - name: "[Multiplication] Wait for result"
+    action: wait
+    params:
+      seconds: 0.3
+
+  - name: "[Multiplication] Verify 12 * 8 = 96"
+    target:
+      strategy: accessibility
+      automation_id: "CalculatorResults"
+    action: assert
+    params:
+      type: text_contains
+      expected: "96"
+
+  - name: "[Multiplication] Screenshot"
+    action: screenshot
+    params:
+      filename: "multiplication_result.png"
+
+  # === Test 4: Division (144 / 12 = 12) ===
+  - name: "[Division] Clear calculator"
+    action: press_key
+    params:
+      key: "escape"
+
+  - name: "[Division] Type 144"
+    action: type_text
+    params:
+      text: "144"
+
+  - name: "[Division] Click Divide"
+    target:
+      strategy: accessibility
+      automation_id: "divideButton"
+    action: click
+
+  - name: "[Division] Type 12"
+    action: type_text
+    params:
+      text: "12"
+
+  - name: "[Division] Click Equals"
+    target:
+      strategy: accessibility
+      automation_id: "equalButton"
+    action: click
+
+  - name: "[Division] Wait for result"
+    action: wait
+    params:
+      seconds: 0.3
+
+  - name: "[Division] Verify 144 / 12 = 12"
+    target:
+      strategy: accessibility
+      automation_id: "CalculatorResults"
+    action: assert
+    params:
+      type: text_contains
+      expected: "12"
+
+  - name: "[Division] Screenshot"
+    action: screenshot
+    params:
+      filename: "division_result.png"
+
+teardown:
+  - name: "Close Calculator"
+    action: hotkey
+    params:
+      keys: ["alt", "f4"]

@@ -1,0 +1,152 @@
+namespace WKAppBot.Core.Scenario;
+
+/// <summary>
+/// Root scenario document parsed from YAML.
+/// </summary>
+public sealed class ScenarioDocument
+{
+    public ScenarioMeta Scenario { get; set; } = new();
+    public ScenarioConfig Config { get; set; } = new();
+    public AppConfig App { get; set; } = new();
+    public Dictionary<string, string> Variables { get; set; } = new();
+    public List<StepDefinition> Steps { get; set; } = new();
+    public List<StepDefinition>? Teardown { get; set; }
+}
+
+public sealed class ScenarioMeta
+{
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+    public string? Version { get; set; }
+}
+
+public sealed class ScenarioConfig
+{
+    public double Timeout { get; set; } = 10.0;
+    public bool ScreenshotOnStep { get; set; } = true;
+    public bool ScreenshotOnFailure { get; set; } = true;
+    public bool ContinueOnError { get; set; } = false;
+    public int RetryCount { get; set; } = 2;
+    public double RetryDelay { get; set; } = 1.0;
+
+    // ── Smart Focus ("위치확보") ─────────────────────────────
+    /// <summary>
+    /// Enable focus check before SendInput actions. Default: true.
+    /// When true, EnsureFocus is called before mouse/keyboard SendInput.
+    /// </summary>
+    public bool FocusCheck { get; set; } = true;
+
+    /// <summary>
+    /// Total timeout (seconds) for focus recovery before failing a step.
+    /// Phase 1 (smart recovery): first half. Phase 2 (user alert): second half.
+    /// </summary>
+    public double FocusTimeout { get; set; } = 5.0;
+
+    /// <summary>
+    /// Delay between focus recovery retries (seconds).
+    /// </summary>
+    public double FocusRetryDelay { get; set; } = 0.3;
+
+    /// <summary>
+    /// Alert delay before forceful focus grab (seconds).
+    /// When focus is lost, beep + wait this long before forcing focus.
+    /// Gives user time to finish their input. 0 = force immediately.
+    /// </summary>
+    public double FocusAlertDelay { get; set; } = 3.0;
+
+    /// <summary>
+    /// Prefer focusless input methods (UIA Invoke/Value) over SendInput.
+    /// Default: true — minimizes disruption to user's work.
+    /// </summary>
+    public bool PreferFocusless { get; set; } = true;
+
+    // ── Vision Cache ("경험치 축적") ────────────────────────
+    /// <summary>
+    /// Enable Vision API fallback when UIA can't find elements.
+    /// Default: false (opt-in — API costs money).
+    /// </summary>
+    public bool VisionEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Directory for Vision cache database (relative to working dir).
+    /// </summary>
+    public string VisionCacheDir { get; set; } = "data/vision_cache/entries";
+
+    /// <summary>
+    /// Cache TTL in days. Entries older than this are considered stale.
+    /// </summary>
+    public int VisionCacheTtlDays { get; set; } = 7;
+
+    /// <summary>
+    /// Minimum confidence threshold for Vision API results.
+    /// Results below this are discarded.
+    /// </summary>
+    public double VisionConfidenceThreshold { get; set; } = 0.7;
+
+    /// <summary>
+    /// Vision model to use.
+    /// Future: "simple" model first → Claude as fallback.
+    /// Current: Claude only.
+    /// </summary>
+    public string VisionModel { get; set; } = "claude-sonnet-4-20250514";
+}
+
+public sealed class AppConfig
+{
+    public string Launch { get; set; } = "";
+    public WaitForWindowConfig? WaitForWindow { get; set; }
+}
+
+public sealed class WaitForWindowConfig
+{
+    public string? TitleContains { get; set; }
+    public string? ClassName { get; set; }
+    public double Timeout { get; set; } = 10.0;
+}
+
+public sealed class StepDefinition
+{
+    public string Name { get; set; } = "";
+    public string Action { get; set; } = "";
+    public TargetDefinition? Target { get; set; }
+    public StepParams? Params { get; set; }
+}
+
+public sealed class TargetDefinition
+{
+    public string Strategy { get; set; } = "auto";
+    public string? AutomationId { get; set; }
+    public string? Name { get; set; }
+    public string? ControlType { get; set; }
+    public string? Description { get; set; }
+    public int? X { get; set; }
+    public int? Y { get; set; }
+}
+
+/// <summary>
+/// Flexible params bag - holds all possible action parameters.
+/// Each action uses only the fields it needs.
+/// </summary>
+public sealed class StepParams
+{
+    // type_text
+    public string? Text { get; set; }
+
+    // press_key / hotkey
+    public string? Key { get; set; }
+    public List<string>? Keys { get; set; }
+
+    // wait
+    public double? Seconds { get; set; }
+
+    // assert
+    public string? Type { get; set; }
+    public string? Expected { get; set; }
+
+    // screenshot
+    public string? Filename { get; set; }
+
+    // scroll
+    public string? Direction { get; set; }
+    public int? Amount { get; set; }
+}

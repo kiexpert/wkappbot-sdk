@@ -1,0 +1,91 @@
+scenario:
+  name: "Calculator PoC - Basic Addition"
+  description: "Launch Windows Calculator, compute 15 + 27, verify result is 42"
+  version: "1.0"
+
+config:
+  timeout: 10
+  screenshot_on_step: true
+  continue_on_error: false
+  retry_count: 2
+  retry_delay: 1.0
+
+app:
+  launch: "calc.exe"
+  wait_for_window:
+    title_contains: "계산기"
+    timeout: 5
+
+variables:
+  num1: "15"
+  num2: "27"
+  expected: "42"
+
+steps:
+  - name: "Switch to Standard mode"
+    action: hotkey
+    params:
+      keys: ["alt", "1"]
+
+  - name: "Wait for mode switch"
+    action: wait
+    params:
+      seconds: 0.5
+
+  - name: "Clear calculator"
+    action: press_key
+    params:
+      key: "escape"
+
+  - name: "Type first number"
+    action: type_text
+    params:
+      text: "${num1}"
+
+  - name: "Click Plus button"
+    target:
+      strategy: auto
+      name: "더하기"
+      automation_id: "plusButton"
+      control_type: "Button"
+      description: "The plus (+) addition button"
+    action: click
+
+  - name: "Type second number"
+    action: type_text
+    params:
+      text: "${num2}"
+
+  - name: "Click Equals button"
+    target:
+      strategy: auto
+      name: "같음"
+      automation_id: "equalButton"
+      control_type: "Button"
+      description: "The equals (=) button"
+    action: click
+
+  - name: "Wait for result"
+    action: wait
+    params:
+      seconds: 0.3
+
+  - name: "Verify result"
+    target:
+      strategy: accessibility
+      automation_id: "CalculatorResults"
+    action: assert
+    params:
+      type: "text_contains"
+      expected: "${expected}"
+
+  - name: "Capture result screenshot"
+    action: screenshot
+    params:
+      filename: "calc_result.png"
+
+teardown:
+  - name: "Close Calculator"
+    action: hotkey
+    params:
+      keys: ["alt", "f4"]
