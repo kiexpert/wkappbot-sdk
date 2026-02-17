@@ -29,7 +29,7 @@ W:/GitHub/WKAppBot/
 ├── csharp/                          # C# .NET 8.0 구현 (메인)
 │   ├── WKAppBot.sln
 │   └── src/
-│       ├── WKAppBot.CLI/              # CLI 진입점 (run/validate/inspect/focus/watch/capture)
+│       ├── WKAppBot.CLI/              # CLI 진입점 (run/validate/inspect/focus/watch/capture/hts-stress)
 │       │   └── Program.cs
 │       ├── WKAppBot.Core/             # 핵심 로직
 │       │   ├── Runner/
@@ -45,10 +45,10 @@ W:/GitHub/WKAppBot/
 │       │   │   └── NativeMethods.cs     # P/Invoke 선언 (user32, gdi32, shcore) + SmartSetForegroundWindow
 │       │   ├── Window/
 │       │   │   ├── WindowFinder.cs      # 윈도우 탐색/포커스/계층경로 + SmartBringToFront
-│       │   │   ├── HtsInterop.cs        # HTS 전용 MDI 조작
+│       │   │   ├── HtsInterop.cs        # HTS MDI 스트레스 테스트 (3패턴: repeat/memory/ctx-only)
 │       │   │   └── ControlMap.cs        # 컨트롤 매핑
 │       │   ├── Accessibility/
-│       │   │   └── UiaLocator.cs        # FlaUI UIA 요소 탐색/조작/트리덤프
+│       │   │   └── UiaLocator.cs        # FlaUI UIA 요소 탐색/조작/트리덤프 + PatternMatcher
 │       │   └── Input/
 │       │       ├── MouseInput.cs        # SendInput 마우스 (절대좌표)
 │       │       ├── KeyboardInput.cs     # SendInput 키보드 + VK 매핑
@@ -103,7 +103,24 @@ wkappbot inspect <window-title> [--depth N]
 wkappbot focus [--title <text>] [--delay N] [--depth N] [--win32] [-b]
 wkappbot watch [--duration N] [--live] [--win32] [--interval N] [--save file]
 wkappbot capture <window-title> [-o output.png]
-wkappbot hts-stress <form.xmf> [-n 100]
+wkappbot hts-stress <form.xmf> [-n 20] [--pattern repeat|memory|ctx-only]
+```
+
+### HTS 스트레스 테스트 옵션
+```
+wkappbot hts-stress <form.xmf> [options]
+
+--pattern <name>  테스트 패턴: repeat|memory|ctx-only (default: repeat)
+-n N              반복 횟수 (default: 20)
+--delay N         액션 간 딜레이 ms (default: 800)
+--open-ms N       repeat 패턴 open 딜레이 (default: 1000)
+--close-ms N      repeat 패턴 close 딜레이 (default: 1000)
+--open N          memory 패턴 사이클당 open 수 (default: 3)
+--close N         memory 패턴 사이클당 close 수 (default: 1)
+--batch N         ctx-only 패턴 배치 크기 (default: 1)
+--process <name>  대상 프로세스 이름 (default: HTSRun)
+--no-watch        [WATCH] 백그라운드 추적 비활성화
+--watch-interval  와처 폴링 ms (default: 500)
 ```
 
 ## Key Design Decisions
@@ -151,18 +168,26 @@ Phase 3: Timeout → 스텝 Fail
 각 스텝은 사람이 테스트하듯 완전한 이야기로 출력:
 ```
 ─── [1/32] [Addition] Click Plus ──────────────────
-[WATCH] [ApplicationFrameWindow/Windows.UI.Core.CoreWindow] 계산기/계산기/NavView/Group/표시는 15
-[WATCH] 14:30:01.234  ( 1234,  567)  [Text] "표시는 15" aid="CalculatorResults"  ← click
+[WATCH] [ApplicationFrameWindow/Windows.UI.Core.CoreWindow] 계산기/NavView/Group/표시는 15
+[WATCH] [Text] "표시는 15" aid="CalculatorResults" (Value)
+[WATCH] OCR="표시는 15" conf=0.95★  UIA↔OCR=100%★  watch/001_CalculatorResults.png
+[WATCH] ← click  ( 1234,  567) 14:30:01.234
 [RUN] Click plusButton (Invoke, automation_id, focusless)
-[WATCH] [ApplicationFrameWindow/Windows.UI.Core.CoreWindow] 계산기/계산기/NavView/Group/표시는 15 +
-[WATCH] 14:30:01.456  ( 1234,  567)  [Text] "표시는 15 + " aid="CalculatorResults"  ← click
 [RUN] → PASS (42ms)
 ```
+
+**WATCH 4줄 레이아웃** (stable LEFT → volatile RIGHT):
+- Line 1: `[WATCH]` [ClassPath] UIA 이름 경로
+- Line 2: `[WATCH]` [Type] "Name" aid="id" (patterns)
+- Line 3: `[WATCH]` OCR="text" conf=★ UIA↔OCR=% screenshot (nudge 시에만)
+- Line 4: `[WATCH]` ← action (x,y) timestamp (volatile, `\r` 덮어쓰기)
 
 ### 4. 태그 규칙
 - **[WATCH]**: 백그라운드 와처의 모든 요소 추적 출력 (통일)
 - **[RUN]**: 테스트 실행 관련 출력 (액션 상세, 결과 판정)
 - **[FOCUS]**: 포커스 확보 관련 출력 (경고, 복구, 실패)
+- **[VERIFY]**: SendInput 전 대상 좌표 검증 출력 (렉트/오버레이/요소 변화)
+- **[STRESS]**: HTS 스트레스 테스트 메모리 테이블 행
 
 ### 5. BackgroundWatcher Nudge/Ack 핸드셰이크
 - `Nudge()`: ScenarioRunner가 각 스텝 전/후에 호출 → 백그라운드 스레드 깨우기
@@ -180,18 +205,39 @@ Phase 3: Timeout → 스텝 Fail
 - `WS_EX_TRANSPARENT`, `WS_EX_LAYERED` 스타일 체크
 - UIA AutomationId `BTN_BKGRND` 등 알려진 오버레이 패턴 감지
 
-### 8. ActionDetail (Focusless + Vision 태그 포함)
+### 8. ActionDetail (Focusless + Vision + Verify 태그 포함)
 - `StepResult.ActionDetail`: 각 액션이 실제로 한 일의 사람 읽기 좋은 설명
 - 형식:
   - `Click plusButton (Invoke, automation_id, focusless)` ← UIA Invoke (포커스 불필요!)
-  - `Click plusButton (320,550) (automation_id)` ← Invoke 실패 → SendInput
+  - `Click plusButton (320,550) (automation_id, verify=OK)` ← SendInput + 검증 OK
+  - `Click plusButton (320,550) (automation_id, verify=WARN(overlay))` ← 방해 창 감지!
   - `Click (234, 567) (vision_cache, conf=0.95)` ← Vision 캐시 히트!
   - `Click (234, 567) (simple_ocr, conf=0.90, "확인")` ← OCR 텍스트 매칭 (무료!)
   - `Click (234, 567) (vision_api, conf=0.92)` ← Claude API 호출 (고비용 폴백)
-  - `Click (234, 567) (coordinate)` ← 좌표 폴백
+  - `Click (234, 567) (coordinate, verify=OK)` ← 좌표 폴백 + 검증
   - `Type "15" (UIA Value, focusless)` ← Value 패턴 (포커스 불필요!)
   - `Type "15"` ← SendInput 폴백
   - `Assert text_contains "42" on CalculatorResults → "표시는 42"`
+
+### 8-1. Pre/Post Action Verification ([VERIFY] 태그)
+SendInput 클릭 전 대상 좌표의 요소를 검증하는 3가지 체크:
+1. **렉트 안에 있는가?** — 클릭 좌표가 UIA BoundingRectangle 안인지
+2. **방해꾼 없는가?** — `WindowFromPoint`로 오버레이 창 감지
+3. **대상 요소가 맞는가?** — 포커스 전/후 요소 비교 + AutomationId 일치 확인
+
+```
+verify=OK                           ← 렉트 안 + 방해꾼 없음 + 요소 일치
+verify=WARN(overlay(Chrome_Widget)) ← 다른 창이 위에 있음!
+verify=WARN(outside_bounds)         ← 좌표가 렉트 밖으로 벗어남!
+verify=WARN(element_changed)        ← 포커스 전후로 다른 요소가 됨!
+verify=WARN(aid_mismatch)           ← AutomationId가 기대값과 불일치!
+```
+
+**[VERIFY] 출력**: 경고 시에만 출력 (실행을 차단하지 않음)
+```
+[VERIFY] Overlay detected at (320,550): class="Chrome_WidgetWin_1" blocking target window
+[VERIFY] Click point (320,550) outside element rect: [Button]"Plus" at (300,540 60x40)
+```
 
 ### 9. Vision Cache DB ("경험치 축적")
 - **2레벨 캐시**: ConcurrentDictionary(메모리) + JSON 파일(디스크)
@@ -216,7 +262,37 @@ Phase 3: Timeout → 스텝 Fail
 - Vision 폴백 시 디버그 스크린샷 저장: `{vision_cache_dir}/screenshots/{timestamp}_{desc}.png`
 - **위치**: UIA 실패 후 첫 번째 시도 (Claude API 전)
 
-### 11. VisionAnalyzer (Claude API — 고비용 최종 폴백)
+### 11. HTS MDI 스트레스 테스트 (HtsInterop)
+VIGSOne `leak_test_*.ps1` 3가지 패턴을 C#으로 포팅:
+
+| 패턴 | 원본 스크립트 | 동작 |
+|------|-------------|------|
+| **repeat** | `leak_test_repeat.ps1` | 폼 open/close N회 반복 |
+| **memory** | `leak_test_memory.ps1` | 사이클당 open M / close K + 메모리 테이블 |
+| **ctx-only** | `leak_test_ctx_only.ps1` | 앵커 폼 유지 + 2nd 폼 반복 (V8 Context 격리) |
+
+- `WM_COPYDATA` (dwData=100) + CP949 경로로 HTS 폼 오픈
+- `WM_MDIGETACTIVE` + `WM_CLOSE`로 MDI 자식 닫기
+- `Process.WorkingSet64` / `PrivateMemorySize64`로 메모리 추적
+- per-cycle KB, per-context KB 자동 계산
+- `[STRESS]` 태그 + 색상 코드: green(<5MB), yellow(5~20MB), red(>20MB)
+- Background `[WATCH]` 통합: 사이클 경계에서 Nudge → MDI 변화 추적
+
+### 12. 패턴 매칭 (PatternMatcher)
+UIA Name/AutomationId에 와일드카드/정규식 매칭 지원:
+
+| 구문 | 예시 | 동작 |
+|------|------|------|
+| 리터럴 | `"plusButton"` | 정확 일치 (기본, 하위호환) |
+| 와일드카드 | `"*Button*"`, `"결과*"`, `"?u?"` | glob 스타일 (* = 0+문자, ? = 1문자) |
+| 정규식 | `"regex:btn_\\d+"` | 정규식 (대소문자 무시) |
+
+- `PatternMatcher.IsPattern()`: 패턴 구문 감지 → 리터럴이면 빠른 UIA PropertyCondition 사용
+- 패턴이면 `FindAllDescendants` BFS 트리 워크 → predicate 필터 (maxDepth=6)
+- `FindElement()`에서 자동 분기: exact match 먼저 → 패턴이면 BFS 폴백
+- 반환 메서드: `"automation_id_pattern"`, `"name_pattern"` (기존 `"automation_id"`, `"name"`과 구분)
+
+### 13. VisionAnalyzer (Claude API — 고비용 최종 폴백)
 - `ANTHROPIC_API_KEY` 환경변수 필요 (없으면 이 티어 스킵)
 - HttpClient로 Claude Messages API 직접 호출
 - 스크린샷 base64 PNG → `image/png` media type
@@ -294,6 +370,10 @@ teardown:
 - **Phase 1 완료**: Smart Focus (Focusless-First + EnsureFocus 4단계 + [FOCUS] 태그)
 - **Phase 2 완료**: Vision Cache DB (2레벨 캐시, Claude API, per-control 학습)
 - **Phase 3 완료**: Simple OCR (Windows.Media.Ocr, 한글+영어, 5티어 체인 완성)
+- **HTS Stress 완료**: 3패턴 스트레스 테스트 (repeat/memory/ctx-only) + [STRESS] 메모리 테이블
+- **WATCH 레이아웃 완료**: 4줄 구조 (hierarchy/element/OCR/volatile), OCR + 스크린샷 on nudge
+- **패턴 매칭 완료**: 와일드카드 (`*`, `?`) + 정규식 (`regex:`) UIA Name/AutomationId 매칭
+- **Pre/Post 검증 완료**: [VERIFY] — 렉트 내 좌표, 오버레이 감지, 요소 안정성 확인
 - **미구현**: HTML 리포트, DPI 스케일링
 
 ## Important Notes

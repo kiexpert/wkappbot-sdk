@@ -189,6 +189,89 @@ public static class WindowFinder
         return string.Join("/", parts);
     }
 
+    // ── Win32 Recursive Tree Dump (Z-order, front→back) ────────
+
+    /// <summary>
+    /// Dump Win32 child window tree recursively in Z-order (front to back).
+    /// Windows fully occluded by siblings in front are marked [occluded].
+    /// MFC/Win32 native apps have no UIA tree — this is the only way to inspect them.
+    /// </summary>
+    public static string DumpWin32Tree(IntPtr hWnd, int maxDepth = 6)
+    {
+        var sb = new StringBuilder(8192);
+        var info = WindowInfo.FromHwnd(hWnd);
+        var vis = info.IsVisible ? "" : " [hidden]";
+        var title = string.IsNullOrEmpty(info.Title) ? "" : $" \"{info.Title}\"";
+        var r = info.Rect;
+        sb.AppendLine($"[{info.ClassName}]{title} hwnd={hWnd:X8} cid={info.ControlId} ({r.Left},{r.Top} {r.Width}x{r.Height}){vis}");
+        DumpWin32Children(hWnd, sb, maxDepth, 1);
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Get direct child windows in Z-order (front to back) using GetWindow chain.
+    /// </summary>
+    private static List<WindowInfo> GetChildrenZOrder(IntPtr hParent)
+    {
+        var results = new List<WindowInfo>();
+        var child = NativeMethods.GetWindow(hParent, NativeMethods.GW_CHILD);
+        while (child != IntPtr.Zero)
+        {
+            results.Add(WindowInfo.FromHwnd(child));
+            child = NativeMethods.GetWindow(child, NativeMethods.GW_HWNDNEXT);
+        }
+        return results;
+    }
+
+    /// <summary>
+    /// Check if targetRect is fully covered by a set of rects in front of it.
+    /// Simple check: any single front rect fully contains the target.
+    /// </summary>
+    private static bool IsFullyOccluded(RECT target, List<RECT> frontRects)
+    {
+        if (target.Width <= 0 || target.Height <= 0) return false;
+        foreach (var fr in frontRects)
+        {
+            if (fr.Left <= target.Left && fr.Top <= target.Top &&
+                fr.Right >= target.Right && fr.Bottom >= target.Bottom)
+                return true;
+        }
+        return false;
+    }
+
+    private static void DumpWin32Children(IntPtr hParent, StringBuilder sb, int maxDepth, int level)
+    {
+        if (level > maxDepth) return;
+
+        var children = GetChildrenZOrder(hParent);
+        var indent = new string(' ', level * 2);
+
+        // Track visible rects of siblings in front (for occlusion check)
+        var frontRects = new List<RECT>();
+
+        foreach (var child in children)
+        {
+            var vis = "";
+            if (!child.IsVisible)
+            {
+                vis = " [hidden]";
+            }
+            else if (IsFullyOccluded(child.Rect, frontRects))
+            {
+                vis = " [occluded]";
+            }
+
+            // Add this visible window's rect to front list for next siblings
+            if (child.IsVisible && child.Rect.Width > 0 && child.Rect.Height > 0)
+                frontRects.Add(child.Rect);
+
+            var title = string.IsNullOrEmpty(child.Title) ? "" : $" \"{child.Title}\"";
+            var r = child.Rect;
+            sb.AppendLine($"{indent}[{child.ClassName}]{title} hwnd={child.Handle:X8} cid={child.ControlId} ({r.Left},{r.Top} {r.Width}x{r.Height}){vis}");
+            DumpWin32Children(child.Handle, sb, maxDepth, level + 1);
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────
 
     public static string GetWindowText(IntPtr hWnd)

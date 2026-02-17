@@ -123,7 +123,9 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
 
+    public const uint GW_HWNDFIRST = 0; // topmost child in Z-order
     public const uint GW_HWNDNEXT = 2;  // next in Z-order (behind)
+    public const uint GW_CHILD = 5;     // first child window
 
     [DllImport("user32.dll")]
     public static extern bool PtInRect(ref RECT lprc, POINT pt);

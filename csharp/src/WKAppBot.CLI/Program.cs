@@ -4,6 +4,7 @@ using WKAppBot.Core.Runner;
 using WKAppBot.Core.Scenario;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Native;
+using WKAppBot.Vision;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
@@ -22,17 +23,25 @@ internal class Program
         // Enable DPI awareness
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
 
-        if (args.Length == 0)
-        {
-            PrintUsage();
-            return 1;
-        }
-
-        var command = args[0].ToLowerInvariant();
-        var restArgs = args.Skip(1).ToArray();
+        // Auto-log: tee all console output to file
+        var exePath = Environment.ProcessPath ?? "wkappbot.exe";
+        var exeName = Path.GetFileName(exePath);
+        var logDir = Path.Combine(Path.GetDirectoryName(exePath) ?? ".", "logs");
+        var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+        using var tee = new TeeTextWriter(Console.Out, logFile);
+        Console.SetOut(tee);
 
         try
         {
+            if (args.Length == 0)
+            {
+                PrintUsage();
+                return 1;
+            }
+
+            var command = args[0].ToLowerInvariant();
+            var restArgs = args.Skip(1).ToArray();
+
             return command switch
             {
                 "run" => RunCommand(restArgs),
@@ -52,6 +61,11 @@ internal class Program
             Console.Error.WriteLine($"Error: {ex.Message}");
             Console.ResetColor();
             return 1;
+        }
+        finally
+        {
+            Console.SetOut(tee.OriginalConsole);
+            Console.WriteLine($"Log saved: {tee.LogPath}");
         }
     }
 
@@ -115,10 +129,11 @@ internal class Program
     static int InspectCommand(string[] args)
     {
         if (args.Length == 0)
-            return Error("Usage: appbot inspect <window-title> [--depth N]");
+            return Error("Usage: appbot inspect <window-title> [--depth N] [--win32]");
 
         string title = args[0];
         int depth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 5;
+        bool win32Mode = args.Contains("--win32");
 
         var windows = WindowFinder.FindByTitle(title);
         if (windows.Count == 0)
@@ -131,13 +146,32 @@ internal class Program
         Console.WriteLine($"Window: {win}");
         Console.WriteLine();
 
-        using var uia = new UiaLocator();
-        var tree = uia.DumpTree(win.Handle, depth);
-        Console.Write(tree);
+        if (win32Mode)
+        {
+            // Win32 recursive child window tree (for MFC/native apps where UIA is empty)
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"── Win32 Window Tree (depth={depth}) ──");
+            Console.ResetColor();
+            var win32Tree = WindowFinder.DumpWin32Tree(win.Handle, depth);
+            Console.Write(win32Tree);
+        }
+        else
+        {
+            // UIA tree (default — works for UWP/WPF/WinForms)
+            using var uia = new UiaLocator();
+            var tree = uia.DumpTree(win.Handle, depth);
+            Console.Write(tree);
 
-        // Also show Win32 child count
-        var children = WindowFinder.GetChildren(win.Handle);
-        Console.WriteLine($"\n--- Win32 children: {children.Count} ---");
+            // Also show Win32 child count hint
+            var children = WindowFinder.GetChildren(win.Handle);
+            Console.WriteLine($"\n--- Win32 children: {children.Count} ---");
+            if (children.Count > 0 && string.IsNullOrWhiteSpace(tree.Replace($"[Window] \"{win.Title}\"", "").Trim()))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Hint: UIA tree is empty. Try --win32 for Win32 native child windows.");
+                Console.ResetColor();
+            }
+        }
 
         return 0;
     }
@@ -830,6 +864,16 @@ Options:
         Console.WriteLine($"  Baseline : WS={baseMem.WorkingSetMB}MB  Priv={baseMem.PrivateMemMB}MB  MDI={baseMdi}");
         Console.WriteLine();
 
+        // ── Initialize Simple OCR (free, offline) ──
+        SimpleOcrAnalyzer? simpleOcr = null;
+        try
+        {
+            var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
+            var primaryLang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
+            simpleOcr = new SimpleOcrAnalyzer(primaryLanguage: primaryLang, confidenceThreshold: 0.7f);
+        }
+        catch { /* OCR not available — continue without it */ }
+
         // ── Start background watcher (optional) ──
         BackgroundWatcher? watcher = null;
         var ctx = new RuntimeContext { MainWindowHandle = hMain, AppTitle = processName };
@@ -837,17 +881,18 @@ Options:
 
         if (!noWatch)
         {
-            watcher = new BackgroundWatcher(watchMs, ctx: ctx);
+            watcher = new BackgroundWatcher(watchMs, ctx: ctx, ocr: simpleOcr);
             consoleLock = watcher.ConsoleLock;
             ctx.ConsoleLock = consoleLock;
             watcher.Start();
 
+            var ocrTag = simpleOcr != null ? " + OCR" : "";
             lock (consoleLock)
             {
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write("[WATCH] ");
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("Started — tracking MDI form changes");
+                Console.WriteLine($"Started — tracking MDI form changes{ocrTag}");
                 Console.ResetColor();
             }
         }
@@ -951,12 +996,14 @@ Options:
 
             watcher?.Stop(printSummary: true);
             watcher?.Dispose();
+            simpleOcr?.Dispose();
             return 0;
         }
 
         // ── Stop watcher ──
         watcher?.Stop(printSummary: true);
         watcher?.Dispose();
+        simpleOcr?.Dispose();
 
         // ── Results summary ──
         Console.WriteLine();
