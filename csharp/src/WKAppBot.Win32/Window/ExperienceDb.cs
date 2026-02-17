@@ -255,45 +255,190 @@ public sealed class ExperienceDb
 
     /// <summary>
     /// Build puppet pattern by diffing multiple text snapshots.
-    /// Tokens that change across snapshots → {*}, stable tokens → literal.
-    /// TODO: improve with Y-coordinate line alignment (Phase 5)
+    /// Phase 5: LCS line alignment + token-level diff + consecutive wildcard merging.
+    ///
+    /// Algorithm:
+    ///   1. Pairwise LCS align baseline (snap[0]) with each subsequent snapshot
+    ///   2. Matched lines → token-level diff (stable tokens literal, changed → {*})
+    ///   3. Unmatched lines in baseline → entire line becomes {*}
+    ///   4. Consecutive {*} tokens within a line → merged to single {*}
+    ///   5. Lines that are ONLY {*} across all comparisons → marked as fully dynamic
     /// </summary>
     private static string BuildPuppetPattern(List<List<string>> snapshots)
     {
         if (snapshots.Count < 2) return "";
 
         var baseline = snapshots[0];
-        var patternLines = new List<string>();
+        // Track per-line stability: patternTokens[lineIdx] = token array or null (dynamic)
+        var linePatterns = new string[]?[baseline.Count];
 
+        // Initialize from baseline
         for (int i = 0; i < baseline.Count; i++)
-        {
-            var baseTokens = baseline[i].Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var patternTokens = new string[baseTokens.Length];
+            linePatterns[i] = baseline[i].Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-            for (int t = 0; t < baseTokens.Length; t++)
+        // Compare baseline against each subsequent snapshot using LCS line alignment
+        for (int s = 1; s < snapshots.Count; s++)
+        {
+            var other = snapshots[s];
+            var alignment = LcsAlignLines(baseline, other);
+
+            for (int i = 0; i < baseline.Count; i++)
             {
-                bool stable = true;
-                for (int s = 1; s < snapshots.Count; s++)
+                if (linePatterns[i] == null) continue; // already fully dynamic
+
+                if (!alignment.TryGetValue(i, out int otherIdx))
                 {
-                    if (i >= snapshots[s].Count)
+                    // Baseline line not found in this snapshot → fully dynamic
+                    linePatterns[i] = null;
+                    continue;
+                }
+
+                // Token-level diff between current pattern and the matched other line
+                var currentTokens = linePatterns[i]!;
+                var otherTokens = other[otherIdx].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                if (currentTokens.Length != otherTokens.Length)
+                {
+                    // Token count changed → try partial alignment with LCS on tokens
+                    linePatterns[i] = DiffTokensLcs(currentTokens, otherTokens);
+                }
+                else
+                {
+                    // Same token count → compare each
+                    for (int t = 0; t < currentTokens.Length; t++)
                     {
-                        stable = false;
-                        break;
-                    }
-                    var otherTokens = snapshots[s][i].Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (t >= otherTokens.Length || otherTokens[t] != baseTokens[t])
-                    {
-                        stable = false;
-                        break;
+                        if (currentTokens[t] == "{*}") continue; // already wild
+                        if (currentTokens[t] != otherTokens[t])
+                            currentTokens[t] = "{*}";
                     }
                 }
-                patternTokens[t] = stable ? baseTokens[t] : "{*}";
+            }
+        }
+
+        // Build final pattern lines with consecutive {*} merging
+        var patternLines = new List<string>();
+        for (int i = 0; i < baseline.Count; i++)
+        {
+            if (linePatterns[i] == null)
+            {
+                patternLines.Add("{*}");
+                continue;
             }
 
-            patternLines.Add(string.Join(" ", patternTokens));
+            var merged = MergeConsecutiveWildcards(linePatterns[i]!);
+            patternLines.Add(string.Join(" ", merged));
         }
 
         return string.Join("\n", patternLines);
+    }
+
+    /// <summary>
+    /// LCS-based line alignment between two text snapshots.
+    /// Returns a mapping: baselineIndex → otherIndex for matched lines.
+    /// Uses exact string match (trimmed) for LCS.
+    /// </summary>
+    private static Dictionary<int, int> LcsAlignLines(List<string> baseline, List<string> other)
+    {
+        int m = baseline.Count, n = other.Count;
+        // Trim lines for comparison (WM_GETTEXT sometimes has leading spaces)
+        var bTrimmed = baseline.Select(l => l.Trim()).ToArray();
+        var oTrimmed = other.Select(l => l.Trim()).ToArray();
+
+        // Build LCS table
+        var dp = new int[m + 1, n + 1];
+        for (int i = 1; i <= m; i++)
+            for (int j = 1; j <= n; j++)
+                dp[i, j] = bTrimmed[i - 1] == oTrimmed[j - 1]
+                    ? dp[i - 1, j - 1] + 1
+                    : Math.Max(dp[i - 1, j], dp[i, j - 1]);
+
+        // Backtrack to find matched pairs
+        var result = new Dictionary<int, int>();
+        int bi = m, oi = n;
+        while (bi > 0 && oi > 0)
+        {
+            if (bTrimmed[bi - 1] == oTrimmed[oi - 1])
+            {
+                result[bi - 1] = oi - 1;
+                bi--; oi--;
+            }
+            else if (dp[bi - 1, oi] >= dp[bi, oi - 1])
+                bi--;
+            else
+                oi--;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Token-level LCS diff when token counts differ between snapshots.
+    /// Returns merged token array where changed tokens become {*}.
+    /// </summary>
+    private static string[] DiffTokensLcs(string[] current, string[] other)
+    {
+        int m = current.Length, n = other.Length;
+        var dp = new int[m + 1, n + 1];
+        for (int i = 1; i <= m; i++)
+            for (int j = 1; j <= n; j++)
+            {
+                var ct = current[i - 1] == "{*}" ? "{*}" : current[i - 1];
+                dp[i, j] = (ct != "{*}" && ct == other[j - 1])
+                    ? dp[i - 1, j - 1] + 1
+                    : Math.Max(dp[i - 1, j], dp[i, j - 1]);
+            }
+
+        // Backtrack: matched tokens stay, unmatched → {*}
+        var result = new List<string>();
+        int ci = m, oi2 = n;
+        var matchedCurrent = new HashSet<int>();
+        var matchedOther = new HashSet<int>();
+
+        while (ci > 0 && oi2 > 0)
+        {
+            var ct = current[ci - 1] == "{*}" ? "{*}" : current[ci - 1];
+            if (ct != "{*}" && ct == other[oi2 - 1])
+            {
+                matchedCurrent.Add(ci - 1);
+                matchedOther.Add(oi2 - 1);
+                ci--; oi2--;
+            }
+            else if (dp[ci - 1, oi2] >= dp[ci, oi2 - 1])
+                ci--;
+            else
+                oi2--;
+        }
+
+        // Build output: keep matched tokens, replace unmatched with {*}
+        for (int i = 0; i < current.Length; i++)
+            result.Add(matchedCurrent.Contains(i) ? current[i] : "{*}");
+
+        return result.ToArray();
+    }
+
+    /// <summary>
+    /// Merge consecutive {*} tokens into a single {*}.
+    /// Example: ["{*}", "{*}", "매도", "{*}"] → ["{*}", "매도", "{*}"]
+    /// </summary>
+    private static string[] MergeConsecutiveWildcards(string[] tokens)
+    {
+        var result = new List<string>();
+        bool lastWasWild = false;
+        foreach (var t in tokens)
+        {
+            if (t == "{*}")
+            {
+                if (!lastWasWild)
+                    result.Add("{*}");
+                lastWasWild = true;
+            }
+            else
+            {
+                result.Add(t);
+                lastWasWild = false;
+            }
+        }
+        return result.ToArray();
     }
 
     // ── Persistence ──────────────────────────────────────

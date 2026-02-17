@@ -1296,10 +1296,13 @@ Options:
                 }
                 if (formExp.PuppetPattern != null)
                 {
-                    var patternLines = formExp.PuppetPattern.Split('\n').Length;
-                    var wildcards = formExp.PuppetPattern.Split("{*}").Length - 1;
+                    var pLines = formExp.PuppetPattern.Split('\n');
+                    int totalLines = pLines.Length;
+                    int dynamicLines = pLines.Count(l => l.Trim() == "{*}");
+                    int fixedLines = totalLines - dynamicLines;
+                    int wildcards = pLines.Sum(l => l.Split("{*}").Length - 1);
                     Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.WriteLine($"         puppet: {patternLines} lines, {wildcards} dynamic fields (scan #{formExp.PuppetScanCount})");
+                    Console.WriteLine($"         puppet: {fixedLines} fixed + {dynamicLines} dynamic lines, {wildcards} fields (scan #{formExp.PuppetScanCount})");
                 }
                 Console.ResetColor();
             }
