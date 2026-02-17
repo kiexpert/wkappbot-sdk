@@ -127,6 +127,9 @@ public sealed class ExperienceDb
                 existing.OcrConfidence = control.OcrConfidence;
             }
 
+            // Update WM_GETTEXT (always take latest — it reflects current state)
+            if (control.WmGetText != null) existing.WmGetText = control.WmGetText;
+
             // Always update class and size info
             if (control.ClassName != null) existing.ClassName = control.ClassName;
             if (control.Width > 0) existing.Width = control.Width;
@@ -466,6 +469,13 @@ public sealed class ControlExperience
 
     [JsonPropertyName("ocr_confidence")]
     public double OcrConfidence { get; set; }
+
+    /// <summary>
+    /// Raw WM_GETTEXT value from Win32 API (may differ from OCR text).
+    /// Useful for Edit/ComboBox controls where OCR is unreliable.
+    /// </summary>
+    [JsonPropertyName("wm_gettext")]
+    public string? WmGetText { get; set; }
 
     [JsonPropertyName("width")]
     public int Width { get; set; }

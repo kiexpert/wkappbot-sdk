@@ -309,6 +309,20 @@ public static partial class NativeMethods
     public const uint PW_CLIENTONLY = 0x01;
     public const uint PW_RENDERFULLCONTENT = 0x02;
 
+    // ── Window Z-order positioning ─────────────────────────────
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowPos(
+        IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    public static readonly IntPtr HWND_TOP = IntPtr.Zero;           // 0
+    public static readonly IntPtr HWND_BOTTOM = new(1);
+    public static readonly IntPtr HWND_TOPMOST = new(-1);
+    public static readonly IntPtr HWND_NOTOPMOST = new(-2);
+    public const uint SWP_NOMOVE = 0x0002;
+    public const uint SWP_NOSIZE = 0x0001;
+    public const uint SWP_NOACTIVATE = 0x0010;
+    public const uint SWP_SHOWWINDOW = 0x0040;
+
     // ── Focus / Alert ──────────────────────────────────────────
     [DllImport("user32.dll")]
     public static extern bool MessageBeep(uint uType);

@@ -39,8 +39,49 @@ public static class ScreenCapture
         }
         bmp.Dispose();
 
-        // Fallback: capture from screen (works for HTS)
-        return CaptureScreenRegion(rect.Left, rect.Top, w, h);
+        // Fallback: bring window to front → capture from screen → restore Z-order
+        // (Prevents overlapping windows from appearing in the screenshot)
+        return CaptureWindowWithBringToFront(hWnd);
+    }
+
+    /// <summary>
+    /// Capture window by temporarily bringing it to Z-order top.
+    /// Uses SWP_NOACTIVATE to avoid stealing focus from the user.
+    /// Used when PrintWindow fails (common with HTS MFC apps).
+    /// </summary>
+    private static Bitmap CaptureWindowWithBringToFront(IntPtr hWnd)
+    {
+        var originalFg = NativeMethods.GetForegroundWindow();
+        bool needsRestore = originalFg != IntPtr.Zero && originalFg != hWnd;
+
+        try
+        {
+            // Bring target window to Z-order top without activating (no focus steal)
+            NativeMethods.SetWindowPos(
+                hWnd, NativeMethods.HWND_TOP,
+                0, 0, 0, 0,
+                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE |
+                NativeMethods.SWP_SHOWWINDOW | NativeMethods.SWP_NOACTIVATE);
+
+            // Wait for window to render on top
+            Thread.Sleep(100);
+
+            // Re-read rect (in case the window was moved)
+            NativeMethods.GetWindowRect(hWnd, out var rect);
+            return CaptureScreenRegion(rect.Left, rect.Top, rect.Width, rect.Height);
+        }
+        finally
+        {
+            // Restore original foreground window to Z-order top (best-effort)
+            if (needsRestore)
+            {
+                NativeMethods.SetWindowPos(
+                    originalFg, NativeMethods.HWND_TOP,
+                    0, 0, 0, 0,
+                    NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE |
+                    NativeMethods.SWP_SHOWWINDOW | NativeMethods.SWP_NOACTIVATE);
+            }
+        }
     }
 
     /// <summary>

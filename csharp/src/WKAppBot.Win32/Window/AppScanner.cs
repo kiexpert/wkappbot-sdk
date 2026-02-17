@@ -256,6 +256,22 @@ public static class AppScanner
     {
         var result = new OcrLearnResult();
 
+        // Bring the main window to front before capturing MDI children.
+        // MDI child windows live inside the parent — SetWindowPos on a child alone
+        // won't help if another app (editor, browser) covers the parent.
+        // SWP_NOACTIVATE avoids stealing focus from the user.
+        var originalFg = NativeMethods.GetForegroundWindow();
+        bool needsRestore = originalFg != IntPtr.Zero && originalFg != scanResult.Handle;
+        NativeMethods.SetWindowPos(
+            scanResult.Handle, NativeMethods.HWND_TOP,
+            0, 0, 0, 0,
+            NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE |
+            NativeMethods.SWP_SHOWWINDOW | NativeMethods.SWP_NOACTIVATE);
+        Thread.Sleep(150); // let it render on top
+
+        try
+        {
+
         // Group forms by type — only OCR one instance per type
         var formGroups = scanResult.Forms
             .Where(f => f.FormId != null && f.IsVisible && f.Rect.Width > 50 && f.Rect.Height > 50)
@@ -289,7 +305,13 @@ public static class AppScanner
 
                     // Find OCR words that overlap with this control's rect
                     var matchedText = FindOverlappingOcrText(ctrl, ocrWords, form.Rect);
-                    if (string.IsNullOrWhiteSpace(matchedText)) continue;
+
+                    // Also collect WM_GETTEXT (works for Edit/ComboBox where OCR is unreliable)
+                    var wmText = GetWindowText(ctrl.Handle);
+
+                    // Need at least one text source to learn this control
+                    if (string.IsNullOrWhiteSpace(matchedText) && string.IsNullOrWhiteSpace(wmText))
+                        continue;
 
                     // Calculate relative position (0.0~1.0 within form)
                     double relX = form.Rect.Width > 0
@@ -297,14 +319,18 @@ public static class AppScanner
                     double relY = form.Rect.Height > 0
                         ? (double)(ctrl.Rect.Top - form.Rect.Top) / form.Rect.Height : 0;
 
+                    // Use OCR text as primary (visual), WM_GETTEXT as supplementary
+                    var primaryText = !string.IsNullOrWhiteSpace(matchedText) ? matchedText : wmText!;
+
                     // Learn this control
                     var experience = new ControlExperience
                     {
                         ControlId = ctrl.ControlId,
                         ClassName = ctrl.ClassName,
-                        Role = InferRole(ctrl.ClassName, matchedText),
+                        Role = InferRole(ctrl.ClassName, primaryText),
                         OcrText = matchedText,
-                        OcrConfidence = 0.8, // default for spatial match
+                        OcrConfidence = !string.IsNullOrWhiteSpace(matchedText) ? 0.8 : 0.0,
+                        WmGetText = !string.IsNullOrWhiteSpace(wmText) ? wmText : null,
                         Width = ctrl.Rect.Width,
                         Height = ctrl.Rect.Height,
                         RelativeX = Math.Round(relX, 4),
@@ -337,6 +363,20 @@ public static class AppScanner
         }
 
         return result;
+
+        } // end try
+        finally
+        {
+            // Restore original foreground window Z-order (best-effort)
+            if (needsRestore)
+            {
+                NativeMethods.SetWindowPos(
+                    originalFg, NativeMethods.HWND_TOP,
+                    0, 0, 0, 0,
+                    NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE |
+                    NativeMethods.SWP_SHOWWINDOW | NativeMethods.SWP_NOACTIVATE);
+            }
+        }
     }
 
     /// <summary>
@@ -471,6 +511,57 @@ public static class AppScanner
         if (lower.Contains("정정") || lower.Contains("수정")) return "modify_button";
 
         return "control";
+    }
+
+    // ── Form-level Text Snapshot (WM_GETTEXT) ─────────────────
+
+    /// <summary>
+    /// Collect all visible text (WM_GETTEXT) from a form's child controls, sorted by Y-coordinate.
+    /// Returns text lines for puppet pattern building via ExperienceDb.AddTextSnapshot().
+    ///
+    /// Text collection is NEVER skipped even for DB-known controls — needed for puppet pattern diff.
+    /// </summary>
+    /// <param name="hForm">Form window handle</param>
+    /// <param name="formRect">Form bounding rectangle (for relative Y sorting)</param>
+    /// <param name="maxDepth">Max recursion depth for child traversal</param>
+    public static List<string> CollectFormTextSnapshot(IntPtr hForm, RECT formRect, int maxDepth = 4)
+    {
+        var textItems = new List<(int y, string text)>();
+        CollectTextRecursive(hForm, formRect, textItems, 0, maxDepth);
+
+        // Sort by Y-coordinate → deduplicate adjacent identical lines
+        return textItems
+            .OrderBy(item => item.y)
+            .Select(item => item.text)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToList();
+    }
+
+    private static void CollectTextRecursive(
+        IntPtr hParent, RECT formRect, List<(int y, string text)> textItems,
+        int depth, int maxDepth)
+    {
+        if (depth > maxDepth) return;
+
+        var children = WindowFinder.GetChildrenZOrder(hParent);
+        foreach (var child in children)
+        {
+            if (!child.IsVisible || child.Rect.Width <= 0 || child.Rect.Height <= 0) continue;
+
+            // Collect WM_GETTEXT from this control
+            var text = GetWindowText(child.Handle);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                int relativeY = child.Rect.Top - formRect.Top;
+                textItems.Add((relativeY, text));
+            }
+
+            // Recurse into children (unless leaf-like class)
+            if (!IsLeafLikeClass(child.ClassName))
+            {
+                CollectTextRecursive(child.Handle, formRect, textItems, depth + 1, maxDepth);
+            }
+        }
     }
 
     // ── Structural Fingerprint + OCR Keywords ──────────────────

@@ -1193,7 +1193,64 @@ Options:
                         Console.ResetColor();
                     }
 
-                    // Save experience DB
+                    // ── Text Snapshot Collection (Puppet Pattern) ──
+                    Console.WriteLine();
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine("── Text Snapshot (Puppet Pattern) ─────");
+                    Console.ResetColor();
+
+                    int snapshotCount = 0;
+                    var formGroupsForSnapshot = scanResult.Forms
+                        .Where(f => f.FormId != null && f.IsVisible && f.Rect.Width > 50 && f.Rect.Height > 50)
+                        .GroupBy(f => f.FormId!)
+                        .ToList();
+
+                    foreach (var snapGroup in formGroupsForSnapshot)
+                    {
+                        var snapFormId = snapGroup.Key;
+                        var snapForm = snapGroup.First();
+
+                        try
+                        {
+                            var textLines = AppScanner.CollectFormTextSnapshot(
+                                snapForm.Handle, snapForm.Rect, maxDepth: 4);
+
+                            if (textLines.Count > 0)
+                            {
+                                expDb.AddTextSnapshot(snapFormId, textLines);
+                                snapshotCount++;
+
+                                var formExp = expDb.GetForm(snapFormId);
+                                if (formExp?.PuppetPattern != null)
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Green;
+                                    Console.WriteLine($"  [{snapFormId}] Puppet pattern built ({textLines.Count} lines, scan #{formExp.PuppetScanCount})");
+                                    Console.ResetColor();
+                                }
+                                else
+                                {
+                                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                                    Console.WriteLine($"  [{snapFormId}] {textLines.Count} text lines collected (need 1 more scan for pattern)");
+                                    Console.ResetColor();
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine($"  [{snapFormId}] Snapshot failed: {ex.Message}");
+                            Console.ResetColor();
+                        }
+                    }
+
+                    if (snapshotCount > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"  {snapshotCount} text snapshots collected");
+                        Console.ResetColor();
+                    }
+
+                    // Save experience DB (includes text snapshots + puppet patterns)
                     expDb.SaveAll();
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine($"  Experience saved: {expDir}");
@@ -1236,6 +1293,13 @@ Options:
                     var kwList = string.Join(", ", formExp.OcrKeywords.Take(15));
                     var more = formExp.OcrKeywords.Count > 15 ? $" +{formExp.OcrKeywords.Count - 15} more" : "";
                     Console.WriteLine($"         keywords: [{kwList}]{more}");
+                }
+                if (formExp.PuppetPattern != null)
+                {
+                    var patternLines = formExp.PuppetPattern.Split('\n').Length;
+                    var wildcards = formExp.PuppetPattern.Split("{*}").Length - 1;
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.WriteLine($"         puppet: {patternLines} lines, {wildcards} dynamic fields (scan #{formExp.PuppetScanCount})");
                 }
                 Console.ResetColor();
             }
