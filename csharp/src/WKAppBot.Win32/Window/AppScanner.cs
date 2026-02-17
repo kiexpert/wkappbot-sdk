@@ -248,11 +248,13 @@ public static class AppScanner
     /// Injected to avoid WKAppBot.Vision dependency in Win32 project.
     /// </param>
     /// <param name="onProgress">Optional progress callback (formId, controlCount)</param>
+    /// <param name="captureDetails">If true, save per-control screenshots + text history</param>
     public static async Task<OcrLearnResult> LearnFormsWithOcr(
         AppScanResult scanResult,
         ExperienceDb expDb,
         Func<Bitmap, Task<IReadOnlyList<OcrWordInfo>>> ocrRecognizeAll,
-        Action<string, int>? onProgress = null)
+        Action<string, int>? onProgress = null,
+        bool captureDetails = false)
     {
         var result = new OcrLearnResult();
 
@@ -340,6 +342,25 @@ public static class AppScanner
 
                     expDb.LearnControl(formId, form.FormName ?? formId, experience);
                     result.ControlsLearned++;
+
+                    // ── Per-control detail capture (--detail) ──
+                    if (captureDetails && ctrl.Rect.Width > 0 && ctrl.Rect.Height > 0)
+                    {
+                        try
+                        {
+                            // Capture control screenshot (screen region — window is already on top)
+                            using var ctrlBmp = ScreenCapture.CaptureScreenRegion(
+                                ctrl.Rect.Left, ctrl.Rect.Top,
+                                ctrl.Rect.Width, ctrl.Rect.Height);
+                            expDb.SaveControlScreenshot(formId, ctrl.ControlId, ctrlBmp);
+                            result.DetailScreenshots++;
+
+                            // Append text history (dedup: only if text changed)
+                            if (expDb.AppendTextHistory(formId, ctrl.ControlId, matchedText, wmText))
+                                result.DetailTextChanges++;
+                        }
+                        catch { /* best-effort — don't fail scan over detail capture */ }
+                    }
                 }
 
                 onProgress?.Invoke(formId, result.ControlsLearned);
@@ -883,11 +904,16 @@ public sealed class OcrLearnResult
 {
     public int FormsScanned { get; set; }
     public int ControlsLearned { get; set; }
+    public int DetailScreenshots { get; set; }
+    public int DetailTextChanges { get; set; }
     public List<string> Errors { get; } = new();
 
     public override string ToString()
     {
         var errStr = Errors.Count > 0 ? $", {Errors.Count} errors" : "";
-        return $"OCR Learning: {ControlsLearned} controls learned from {FormsScanned} form types{errStr}";
+        var detailStr = DetailScreenshots > 0
+            ? $", {DetailScreenshots} screenshots + {DetailTextChanges} text changes"
+            : "";
+        return $"OCR Learning: {ControlsLearned} controls learned from {FormsScanned} form types{detailStr}{errStr}";
     }
 }

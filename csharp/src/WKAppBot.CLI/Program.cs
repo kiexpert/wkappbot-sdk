@@ -1059,11 +1059,12 @@ Options:
     static int ScanCommand(string[] args)
     {
         if (args.Length == 0)
-            return Error("Usage: appbot scan <window-title> [--save] [--ocr] [--depth N]");
+            return Error("Usage: appbot scan <window-title> [--save] [--ocr] [--detail] [--depth N]");
 
         string title = args[0];
         bool save = args.Contains("--save");
         bool useOcr = args.Contains("--ocr");
+        bool captureDetails = args.Contains("--detail");
         int depth = 1; // default: form level only
         var depthStr = GetArgValue(args, "--depth");
         if (depthStr != null) int.TryParse(depthStr, out depth);
@@ -1178,7 +1179,8 @@ Options:
                             Console.ForegroundColor = ConsoleColor.DarkGray;
                             Console.Write($"\r  Scanning [{formId}]... {count} controls learned");
                             Console.ResetColor();
-                        }
+                        },
+                        captureDetails: captureDetails
                     ).GetAwaiter().GetResult();
 
                     Console.WriteLine();
@@ -1190,6 +1192,37 @@ Options:
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine($"  Warning: {err}");
+                        Console.ResetColor();
+                    }
+
+                    // ── Control Detail Cache (--detail) ──
+                    if (captureDetails && ocrResult.DetailScreenshots > 0)
+                    {
+                        Console.WriteLine();
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine("── Control Detail Cache ────────────────");
+                        Console.ResetColor();
+
+                        // Per-form stats
+                        foreach (var formGroup2 in scanResult.Forms
+                            .Where(f => f.FormId != null && f.IsVisible)
+                            .GroupBy(f => f.FormId!))
+                        {
+                            var fid = formGroup2.Key;
+                            var fExp = expDb.GetForm(fid);
+                            if (fExp == null) continue;
+                            var ctrlDir = Path.Combine(expDb.ExpDir, $"form_{fid}", "controls");
+                            if (Directory.Exists(ctrlDir))
+                            {
+                                var cidDirs = Directory.GetDirectories(ctrlDir);
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine($"  [{fid}] {fExp.Controls.Count} controls → {cidDirs.Length} screenshots saved");
+                                Console.ResetColor();
+                            }
+                        }
+
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"  Total: {ocrResult.DetailScreenshots} screenshots, {ocrResult.DetailTextChanges} text history entries");
                         Console.ResetColor();
                     }
 
@@ -2752,7 +2785,7 @@ Usage:
   appbot watch [--duration N] [--live] [--win32] [--interval N] [--save file]
   appbot capture <window-title> [-o output.png]
   appbot hts-stress <form.xmf> [-n 20] [--pattern repeat|memory|ctx-only]
-  appbot scan <window-title> [--save] [--ocr] [--depth N]
+  appbot scan <window-title> [--save] [--ocr] [--detail] [--depth N]
 
 Commands:
   run        Run a test scenario (with passive [WATCH] background tracker)

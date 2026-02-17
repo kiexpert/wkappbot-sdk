@@ -467,6 +467,67 @@ public sealed class ExperienceDb
             SaveForm(formId);
     }
 
+    // ── Control Detail Cache (Phase 6) ──────────────────
+
+    /// <summary>
+    /// Get the directory path for a specific control's detail cache.
+    /// Creates the directory if it doesn't exist.
+    /// Layout: {_expDir}/form_{formId}/controls/cid_{cid}/
+    /// </summary>
+    public string GetControlDir(string formId, int cid, bool create = true)
+    {
+        var dir = Path.Combine(_expDir, $"form_{formId}", "controls", $"cid_{cid}");
+        if (create && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    /// <summary>
+    /// Save a control's screenshot as latest.png in its detail cache directory.
+    /// Overwrites on each scan — always keeps the most recent image.
+    /// </summary>
+    public void SaveControlScreenshot(string formId, int cid, System.Drawing.Bitmap screenshot)
+    {
+        var dir = GetControlDir(formId, cid);
+        Input.ScreenCapture.SaveToFile(screenshot, Path.Combine(dir, "latest.png"));
+    }
+
+    /// <summary>
+    /// Append a text history entry to a control's text_history.jsonl.
+    /// Only appends if text actually changed from the last entry (dedup).
+    /// Format: {"ts":"...","ocr":"...","wm":"..."}\n
+    /// </summary>
+    public bool AppendTextHistory(string formId, int cid, string? ocrText, string? wmText)
+    {
+        var dir = GetControlDir(formId, cid);
+        var path = Path.Combine(dir, "text_history.jsonl");
+
+        // Check last entry for dedup
+        if (File.Exists(path))
+        {
+            try
+            {
+                var lines = File.ReadAllLines(path);
+                if (lines.Length > 0)
+                {
+                    var last = JsonSerializer.Deserialize<TextHistoryEntry>(lines[^1]);
+                    if (last != null && last.Ocr == ocrText && last.Wm == wmText)
+                        return false; // no change
+                }
+            }
+            catch { /* corrupted file — append anyway */ }
+        }
+
+        var entry = new TextHistoryEntry
+        {
+            Ts = DateTime.UtcNow.ToString("o"),
+            Ocr = ocrText,
+            Wm = wmText
+        };
+        File.AppendAllText(path, JsonSerializer.Serialize(entry) + "\n");
+        return true;
+    }
+
     /// <summary>
     /// Load all form experiences from disk.
     /// </summary>
@@ -672,4 +733,20 @@ public sealed class ClickStrategyStats
 
     [JsonIgnore]
     public double SuccessRate => (Success + Fail) == 0 ? 0.5 : (double)Success / (Success + Fail);
+}
+
+/// <summary>
+/// A single entry in a control's text_history.jsonl file.
+/// Tracks OCR and WM_GETTEXT values over time for change detection.
+/// </summary>
+public sealed class TextHistoryEntry
+{
+    [JsonPropertyName("ts")]
+    public string Ts { get; set; } = "";
+
+    [JsonPropertyName("ocr")]
+    public string? Ocr { get; set; }
+
+    [JsonPropertyName("wm")]
+    public string? Wm { get; set; }
 }
