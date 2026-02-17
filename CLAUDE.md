@@ -401,6 +401,7 @@ teardown:
 - **Phase 4 완료**: `scan` CLI + AppScanner + ExperienceDB + AppProfile + WM_GETTEXT + 스크린샷 가림방지(SWP_NOACTIVATE)
 - **Phase 5 완료**: LCS 포펫 패턴 — 라인 정렬 + 토큰 단위 diff + 연속 와일드카드 병합
 - **Phase 6 완료**: 컨트롤 디테일 캐시 — per-control latest.png + text_history.jsonl (`--detail` 플래그)
+- **Phase 7 완료**: 클릭 전략 DB 연동 — SmartClickButton이 ExperienceDb 성공률 기반 전략 순서 최적화
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -432,11 +433,14 @@ teardown:
 - ExperienceDb: SaveControlScreenshot, AppendTextHistory, GetControlDir
 - 검증: 194개 스크린샷 저장, 2차 스캔 dedup 정상 (194→64 text changes)
 
-### Phase 7: 클릭 전략 DB 연동 — "SmartClick이 경험에서 배운다"
-**목표**: SmartClickButton이 ExperienceDb.ClickStrategies를 읽어 성공률 순으로 전략 시도
-**상태**: 모델 완료 (RecordClickStrategy, GetBestClickOrder), SmartClickButton 미연동
-- DB에서 cid별 전략 조회 → 성공률 기반 자동 최적화
-- 기본 순서: bm_click → wm_lbutton → send_input
+### Phase 7: 클릭 전략 DB 연동 — "SmartClick이 경험에서 배운다" ✅
+**상태**: 완료
+- SmartClickButton: 전략 루프화 (Dictionary + foreach), ExperienceDb optional 연동
+- `GetBestClickOrder()` → 성공률 기반 전략 순서 최적화 (default: bm_click → wm_lbutton → send_input)
+- 매 시도마다 `RecordClickStrategy()` → 결과 기록 + `SaveAll()` 즉시 디스크 저장
+- DoCommand: 인라인 BM_CLICK+WM_LBUTTON → SmartClickButton 호출로 통합 (SendInput 폴백 자동 포함)
+- DoCommand: ProfileStore 매칭 → ExperienceDb 자동 로드 (best-effort)
+- `[EXP]` 태그: 경험 데이터 있을 때 전략 순서+성공률 표시
 
 ### Phase 8: 포펫 패턴 매칭 — "이미지만으로 폼 식별"
 **목표**: FormTypeIdentifier Level 4로 puppet pattern 기반 폼 식별

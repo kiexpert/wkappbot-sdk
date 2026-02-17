@@ -1977,6 +1977,24 @@ Examples:
         Console.ResetColor();
         Console.WriteLine(" — physical mouse enabled");
 
+        // Load ExperienceDb from matching profile (best-effort)
+        ExperienceDb? expDb = null;
+        try
+        {
+            var profileStore = new ProfileStore();
+            NativeMethods.GetWindowThreadProcessId(win.Handle, out uint pid2);
+            string procName = "";
+            try { procName = System.Diagnostics.Process.GetProcessById((int)pid2).ProcessName; } catch { }
+            var match = profileStore.FindByMatch(win.ClassName, "")
+                ?? (!string.IsNullOrEmpty(procName) ? profileStore.FindByMatch("", procName) : null);
+            if (match != null)
+            {
+                var expDir = Path.Combine(profileStore.ProfileDir, $"{match.Value.name}_exp");
+                expDb = new ExperienceDb(expDir);
+            }
+        }
+        catch { /* best-effort — proceed without experience DB */ }
+
         // Find form
         var scanResult = AppScanner.Scan(win.Handle);
         var targetForm = scanResult.Forms.FirstOrDefault(f => f.FormId == targetFormId);
@@ -2193,32 +2211,14 @@ Examples:
             Thread.Sleep(stepDelay);
         }
 
-        // ── Final: Click the button ──
+        // ── Final: Click the button (SmartClickButton with experience DB) ──
         Console.WriteLine();
-        NativeMethods.GetWindowRect(targetButton.Handle, out var btnRect);
-        int bx = (btnRect.Left + btnRect.Right) / 2;
-        int by = (btnRect.Top + btnRect.Bottom) / 2;
-
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Write($"  ▶ Clicking: \"{targetButton.Title}\"");
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.Write($" @({bx},{by})");
+        Console.Write($"  ▶ Clicking: \"{targetButton.Title}\" ");
         Console.ResetColor();
-        Console.Write(" ... ");
 
-        // Use message-based click (like the click command)
-        NativeMethods.PostMessageW(targetButton.Handle, 0x00F5 /*BM_CLICK*/, IntPtr.Zero, IntPtr.Zero);
-        Thread.Sleep(200);
-        int localX = bx - btnRect.Left;
-        int localY = by - btnRect.Top;
-        IntPtr lParam = (IntPtr)((localY << 16) | (localX & 0xFFFF));
-        NativeMethods.PostMessageW(targetButton.Handle, 0x0201 /*WM_LBUTTONDOWN*/, (IntPtr)0x0001, lParam);
-        Thread.Sleep(50);
-        NativeMethods.PostMessageW(targetButton.Handle, 0x0202 /*WM_LBUTTONUP*/, IntPtr.Zero, lParam);
-
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("clicked! [message]");
-        Console.ResetColor();
+        SmartClickButton(targetButton.Handle, targetForm.Handle,
+            expDb, targetFormId, targetButton.ControlId);
 
         // Wait and check reaction
         Thread.Sleep(500);
@@ -2313,66 +2313,114 @@ Examples:
     }
 
     /// <summary>
-    /// Smart click: tries 3 strategies in order, checking for window change after each.
-    /// Priority: no cursor movement first → cursor movement last.
-    /// 1. BM_CLICK (message, no cursor)
-    /// 2. WM_LBUTTONDOWN/UP (message, no cursor)
-    /// 3. SendInput physical mouse (moves cursor)
+    /// Smart click: tries strategies in experience-optimized order, checking for window change after each.
+    /// Default priority: no cursor movement first → cursor movement last.
+    /// With ExperienceDb: reorders by historical success rate.
     /// Detection: checks if dialog closed OR a new modal appeared.
     /// </summary>
-    private static bool SmartClickButton(IntPtr hButton, IntPtr hDialogOrParent)
+    private static bool SmartClickButton(
+        IntPtr hButton, IntPtr hDialogOrParent,
+        ExperienceDb? expDb = null, string? formId = null, int? controlId = null)
     {
         NativeMethods.GetWindowRect(hButton, out var btnRect);
         int cx = (btnRect.Left + btnRect.Right) / 2;
         int cy = (btnRect.Top + btnRect.Bottom) / 2;
+        int localX = (btnRect.Right - btnRect.Left) / 2;
+        int localY = (btnRect.Bottom - btnRect.Top) / 2;
+
+        // Strategy implementations keyed by name
+        var strategyActions = new Dictionary<string, Action>
+        {
+            ["bm_click"] = () =>
+            {
+                NativeMethods.PostMessageW(hButton, 0x00F5 /*BM_CLICK*/, IntPtr.Zero, IntPtr.Zero);
+            },
+            ["wm_lbutton"] = () =>
+            {
+                IntPtr lParam = (IntPtr)((localY << 16) | (localX & 0xFFFF));
+                NativeMethods.SendMessageW(hButton, 0x0201 /*WM_LBUTTONDOWN*/, (IntPtr)0x0001, lParam);
+                Thread.Sleep(80);
+                NativeMethods.SendMessageW(hButton, 0x0202 /*WM_LBUTTONUP*/, IntPtr.Zero, lParam);
+            },
+            ["send_input"] = () =>
+            {
+                NativeMethods.SetForegroundWindow(hDialogOrParent);
+                Thread.Sleep(100);
+                MouseInput.MoveTo(cx, cy);
+                Thread.Sleep(150);
+                var downInput = new INPUT[1];
+                downInput[0].type = INPUT.INPUT_MOUSE;
+                downInput[0].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTDOWN;
+                downInput[0].u.mi.dwExtraInfo = NativeMethods.GetMessageExtraInfo();
+                NativeMethods.SendInput(1, downInput, Marshal.SizeOf<INPUT>());
+                Thread.Sleep(80);
+                var upInput = new INPUT[1];
+                upInput[0].type = INPUT.INPUT_MOUSE;
+                upInput[0].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTUP;
+                upInput[0].u.mi.dwExtraInfo = NativeMethods.GetMessageExtraInfo();
+                NativeMethods.SendInput(1, upInput, Marshal.SizeOf<INPUT>());
+            },
+        };
+
+        // Get optimal order from experience DB (or default)
+        bool hasExpData = expDb != null && formId != null && controlId != null;
+        var order = hasExpData
+            ? expDb!.GetBestClickOrder(formId!, controlId!.Value)
+            : (IReadOnlyList<string>)new[] { "bm_click", "wm_lbutton", "send_input" };
+
+        // Show experience-based order if it differs from default
+        if (hasExpData)
+        {
+            var ctrl = expDb!.GetControl(formId!, controlId!.Value);
+            if (ctrl?.ClickStrategies != null && ctrl.ClickStrategies.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.Write($"@({cx},{cy}) [EXP] ");
+                var parts = order.Select(s =>
+                {
+                    if (ctrl.ClickStrategies.TryGetValue(s, out var st))
+                        return $"{s}({st.SuccessRate:P0})";
+                    return $"{s}(new)";
+                });
+                Console.Write(string.Join(" → ", parts));
+                Console.ResetColor();
+                Console.Write("  ");
+            }
+        }
 
         // Snapshot: foreground window before clicking
         var fgBefore = NativeMethods.GetForegroundWindow();
+        bool isFirst = true;
 
-        // Strategy 1: BM_CLICK — no cursor movement
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.Write($"@({cx},{cy}) BM_CLICK");
-        Console.ResetColor();
-        NativeMethods.PostMessageW(hButton, 0x00F5 /*BM_CLICK*/, IntPtr.Zero, IntPtr.Zero);
-        if (CheckDialogGone(hDialogOrParent, fgBefore, "BM_CLICK")) return true;
+        foreach (var strategyName in order)
+        {
+            if (!strategyActions.TryGetValue(strategyName, out var action))
+                continue;
 
-        // Strategy 2: WM_LBUTTONDOWN/UP — no cursor movement
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.Write(" → WM_LBUTTON");
-        Console.ResetColor();
-        int localX = (btnRect.Right - btnRect.Left) / 2;
-        int localY = (btnRect.Bottom - btnRect.Top) / 2;
-        IntPtr lParam = (IntPtr)((localY << 16) | (localX & 0xFFFF));
-        NativeMethods.SendMessageW(hButton, 0x0201, (IntPtr)0x0001, lParam);
-        Thread.Sleep(80);
-        NativeMethods.SendMessageW(hButton, 0x0202, IntPtr.Zero, lParam);
-        if (CheckDialogGone(hDialogOrParent, fgBefore, "WM_LBUTTON")) return true;
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.Write(isFirst ? $"@({cx},{cy}) {strategyName}" : $" → {strategyName}");
+            Console.ResetColor();
+            isFirst = false;
 
-        // Strategy 3: Physical mouse — moves cursor
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.Write(" → SendInput");
-        Console.ResetColor();
-        // Bring dialog to front first
-        NativeMethods.SetForegroundWindow(hDialogOrParent);
-        Thread.Sleep(100);
-        MouseInput.MoveTo(cx, cy);
-        Thread.Sleep(150);
-        var downInput = new INPUT[1];
-        downInput[0].type = INPUT.INPUT_MOUSE;
-        downInput[0].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTDOWN;
-        downInput[0].u.mi.dwExtraInfo = NativeMethods.GetMessageExtraInfo();
-        NativeMethods.SendInput(1, downInput, Marshal.SizeOf<INPUT>());
-        Thread.Sleep(80);
-        var upInput = new INPUT[1];
-        upInput[0].type = INPUT.INPUT_MOUSE;
-        upInput[0].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTUP;
-        upInput[0].u.mi.dwExtraInfo = NativeMethods.GetMessageExtraInfo();
-        NativeMethods.SendInput(1, upInput, Marshal.SizeOf<INPUT>());
-        if (CheckDialogGone(hDialogOrParent, fgBefore, "SendInput")) return true;
+            action();
+            bool success = CheckDialogGone(hDialogOrParent, fgBefore, strategyName);
 
+            // Record result in experience DB
+            if (hasExpData)
+                expDb!.RecordClickStrategy(formId!, controlId!.Value, strategyName, success);
+
+            if (success)
+            {
+                if (hasExpData) expDb!.SaveAll();
+                return true;
+            }
+        }
+
+        // Record overall failure
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine(" ✗ (all strategies failed)");
         Console.ResetColor();
+        if (hasExpData) expDb!.SaveAll();
         return false;
     }
 

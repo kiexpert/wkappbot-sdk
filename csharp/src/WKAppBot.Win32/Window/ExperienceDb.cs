@@ -179,7 +179,6 @@ public sealed class ExperienceDb
     /// <summary>
     /// Record a click strategy attempt result for a specific control.
     /// SmartClickButton calls this after each strategy attempt.
-    /// TODO: implement in Phase 7
     /// </summary>
     /// <param name="formId">Form type ID</param>
     /// <param name="controlId">Control ID (cid)</param>
@@ -205,7 +204,7 @@ public sealed class ExperienceDb
     /// Get the best click strategy order for a control based on recorded stats.
     /// Returns strategies sorted by success rate (highest first).
     /// Falls back to default order if no data available.
-    /// TODO: wire up in SmartClickButton (Phase 7)
+    /// Wired into SmartClickButton via optional ExperienceDb parameter.
     /// </summary>
     public IReadOnlyList<string> GetBestClickOrder(string formId, int controlId)
     {
