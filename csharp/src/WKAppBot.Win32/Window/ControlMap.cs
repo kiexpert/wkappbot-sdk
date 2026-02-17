@@ -78,6 +78,126 @@ public sealed class ControlMap
         return map;
     }
 
+    /// <summary>
+    /// Create a ControlMap from an AppProfile + ExperienceDb.
+    /// Combines profile's form_type definitions with experience DB's OCR-learned controls.
+    ///
+    /// Priority: Experience DB (OCR-learned, cid-specific) > Profile (static definitions) > default
+    /// </summary>
+    /// <param name="profile">App profile with zone/form structure</param>
+    /// <param name="expDb">Optional experience DB with OCR-learned controls</param>
+    /// <returns>ControlMap populated from profile + experience knowledge</returns>
+    public static ControlMap FromProfile(AppProfile profile, ExperienceDb? expDb = null)
+    {
+        var map = new ControlMap();
+
+        // 1. Register MDI structure (universal)
+        map.Register("MDIClient", null, "mdi_container", "MDI child container");
+
+        // 2. Register zone-level controls from profile
+        foreach (var zone in profile.Zones)
+        {
+            if (!string.IsNullOrEmpty(zone.ClassName))
+            {
+                map.Register(zone.ClassName, zone.ControlId > 0 ? zone.ControlId : null,
+                    zone.Zone, zone.Description);
+            }
+
+            // Zone children (e.g., Edit cid=2000 inside a bar)
+            if (zone.Children != null)
+            {
+                foreach (var child in zone.Children)
+                {
+                    if (!string.IsNullOrEmpty(child.ClassName))
+                    {
+                        map.Register(child.ClassName, child.ControlId > 0 ? child.ControlId : null,
+                            child.Role, child.Description);
+                    }
+                }
+            }
+        }
+
+        // 3. Register form-type controls from profile (static definitions)
+        foreach (var (formId, formDef) in profile.FormTypes)
+        {
+            // Register the form frame class itself
+            if (!string.IsNullOrEmpty(formDef.FrameClass))
+            {
+                map.Register(formDef.FrameClass, null, "form_frame",
+                    $"[{formId}] {formDef.Name}");
+            }
+
+            // Register form-level control definitions
+            foreach (var ctrl in formDef.Controls)
+            {
+                if (!string.IsNullOrEmpty(ctrl.ClassName))
+                {
+                    var desc = ctrl.Description ?? ctrl.OcrText ?? $"[{formId}] cid={ctrl.ControlId}";
+                    map.Register(ctrl.ClassName, ctrl.ControlId > 0 ? ctrl.ControlId : null,
+                        ctrl.Role, desc);
+                }
+            }
+        }
+
+        // 4. Register experience DB controls (OCR-learned — highest priority)
+        if (expDb != null)
+        {
+            foreach (var (formId, formExp) in expDb.GetAllForms())
+            {
+                foreach (var ctrl in formExp.Controls)
+                {
+                    if (string.IsNullOrEmpty(ctrl.ClassName)) continue;
+
+                    var role = ctrl.Role ?? "control";
+                    var desc = ctrl.OcrText ?? $"[{formId}] cid={ctrl.ControlId}";
+
+                    // Experience DB entries are cid-specific → always register with cid
+                    map.Register(ctrl.ClassName, ctrl.ControlId, role, desc);
+                }
+            }
+        }
+
+        // 5. Register common standard controls (fallback)
+        // Only register if not already covered by profile/experience
+        var standardDefaults = new Dictionary<string, string>
+        {
+            ["Button"] = "button",
+            ["Static"] = "label",
+            ["Edit"] = "text_input",
+            ["ComboBox"] = "combo_box",
+            ["ListBox"] = "list_box",
+            ["SysTabControl32"] = "tab_control",
+            ["SysListView32"] = "list_view",
+            ["SysTreeView32"] = "tree_view",
+            ["RichEdit20A"] = "rich_edit",
+            ["RichEdit20W"] = "rich_edit",
+        };
+
+        foreach (var (cls, role) in standardDefaults)
+        {
+            if (map.Lookup(cls, 0) == null)
+                map.Register(cls, null, role, $"Standard Win32 {cls}");
+        }
+
+        // 6. Register stock code CID pattern from profile
+        foreach (var cid in profile.KnownStockCodeCids)
+        {
+            // Register for common Afx classes (different MFC versions)
+            foreach (var afxPrefix in new[] { "AfxWnd110", "AfxWnd140" })
+            {
+                if (map.Lookup(afxPrefix, cid) == null)
+                    map.Register(afxPrefix, cid, "stock_code_input", $"Stock code input (cid={cid})");
+            }
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// Get total number of registered entries.
+    /// </summary>
+    public int Count => _byKey.Count;
+
     private static string MakeKey(string className, int? controlId)
         => controlId.HasValue ? $"{className}:{controlId}" : className;
 }

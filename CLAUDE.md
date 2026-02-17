@@ -374,7 +374,258 @@ teardown:
 - **WATCH 레이아웃 완료**: 4줄 구조 (hierarchy/element/OCR/volatile), OCR + 스크린샷 on nudge
 - **패턴 매칭 완료**: 와일드카드 (`*`, `?`) + 정규식 (`regex:`) UIA Name/AutomationId 매칭
 - **Pre/Post 검증 완료**: [VERIFY] — 렉트 내 좌표, 오버레이 감지, 요소 안정성 확인
-- **미구현**: HTML 리포트, DPI 스케일링
+- **HTS 캐치 자동화 완료**: 콤보선택 → 매매시작 → 확인 다이얼로그 자동처리 (`do` 커맨드)
+- **SmartClickButton 완료**: 3티어 클릭 전략 (BM_CLICK → WM_LBUTTON → SendInput) + 창변화/모달 감지
+- **설계 완료 (모델+주석)**: Experience DB 포펫 패턴, 컨트롤별 디테일 캐시, 클릭 전략 DB
+- **미구현**: 아래 로드맵 참조
+
+## 구현 로드맵 (Implementation Roadmap)
+
+### Phase 4: Experience DB 실전 연동 — "풀스캔 → DB 저장"
+**목표**: `wkappbot scan` 명령으로 앱 풀스캔 → Experience DB에 저장
+**상태**: 모델 완료, 실행 로직 미연결
+**작업**:
+1. `scan` CLI 커맨드 추가
+   - `wkappbot scan --title '영웅문' [--ocr] [--save]`
+   - AppScanner.Scan() 실행 → FormatSummary() 출력
+   - `--ocr`: LearnFormsWithOcr() 실행 (OCR 학습)
+   - `--save`: ProfileStore.Save() + ExperienceDb.SaveAll()
+2. ExperienceDb 폴더 구조 실제 생성
+   - `data/experience/{profile}/form_{formId}/experience.json`
+   - 현재 ExperienceDb는 flat JSON 파일 — 폴더 구조로 마이그레이션
+3. scan 시 각 컨트롤 WM_GETTEXT 수집 → ControlExperience에 저장
+4. 테스트: 영웅문 풀스캔 → JSON 저장 확인
+
+### Phase 5: 포펫 패턴 생성 — "누적 diff → 패턴 안정화"
+**목표**: 여러 시점 스캔 텍스트를 diff하여 자동으로 포펫 패턴 생성
+**상태**: FormExperience에 PuppetPattern/TextSnapshots 필드 추가 완료
+**작업**:
+1. PuppetPatternBuilder 클래스 구현 (AppScanner.cs 또는 별도 파일)
+   - `BuildPattern(List<List<string>> snapshots) → string pattern`
+   - 라인 매칭: Y좌표 대역 기반 (OCR 라인 위치 활용)
+   - 토큰 diff: 같은 라인의 단어 단위 비교 → 변한 토큰 = `{*}`
+   - 숫자/시간/종목코드 휴리스틱: 첫 스캔에서도 동적 후보로 마킹
+2. scan 실행 시 TextSnapshots에 append (FIFO 최대 5개)
+3. scan_count >= 2 이면 자동 PuppetPattern 생성
+4. `puppet_pattern.txt` 파일로도 저장 (사람이 읽기 좋게)
+5. 테스트: 캐치 시작안내 다이얼로그 2회 스캔 → 패턴 자동 생성 확인
+
+### Phase 6: 컨트롤 디테일 캐시 — "스크린샷 + 텍스트 히스토리"
+**목표**: 컨트롤별 서브폴더에 스크린샷/텍스트 이력 누적
+**상태**: 폴더 구조 설계 완료, 구현 없음
+**작업**:
+1. ControlDetailCache 클래스 구현
+   - `SaveControlSnapshot(formId, cid, Bitmap screenshot, string text)`
+   - `controls/cid_{N}/info.json` 생성/업데이트
+   - `controls/cid_{N}/latest.png` 덮어쓰기
+   - `controls/cid_{N}/text_history.jsonl` append
+2. 텍스트 변화 감지 시에만 스크린샷 저장 (snapshots/ 폴더)
+3. scan --detail 플래그: 개별 컨트롤 BitBlt 캡처 + 저장
+4. 테스트: 캐치 폼 스캔 → controls/ 폴더 생성 확인
+
+### Phase 7: 클릭 전략 DB 연동 — "SmartClick이 경험에서 배운다"
+**목표**: SmartClickButton이 Experience DB의 ClickStrategies를 읽어 최적 순서로 시도
+**상태**: ClickStrategyStats 모델 완료, SmartClickButton 미연동
+**작업**:
+1. SmartClickButton에 ExperienceDb 파라미터 추가
+   - DB에서 해당 컨트롤(cid)의 ClickStrategies 조회
+   - 성공률 높은 전략부터 시도 (기본 순서: bm_click → wm_lbutton → send_input)
+2. 각 전략 시도 후 성공/실패를 DB에 기록
+   - RecordClickStrategy(formId, cid, strategyName, success: bool)
+3. DB 저장 타이밍: 프로세스 종료 시 or 일정 간격 flush
+4. 테스트: 캐치 확인 버튼 3회 클릭 → DB에 wm_lbutton success 누적 확인
+
+### Phase 8: 포펫 패턴 매칭 — "이미지만으로 폼 식별"
+**목표**: FormTypeIdentifier에 Level 4 (포펫 패턴 매칭) 추가
+**상태**: FormTypeIdentifier에 Level 1~3 구현됨, Level 4 미구현
+**작업**:
+1. FormTypeIdentifier.MatchByPuppetPattern() 구현
+   - OCR 텍스트 라인 vs 패턴 라인 매칭 (고정부 일치율 계산)
+   - `{*}` 위치는 아무 값이나 허용
+   - confidence = 0.85 × matchRatio
+2. Identify()에 Level 4 추가 (Level 3 이후)
+3. 매칭 시 동적부 값도 추출 → Dictionary<string, string> extractedValues
+4. 테스트: 캐치 시작안내 스크린샷 OCR → 포펫 패턴 매칭 → form_id 식별 확인
+
+### Phase 9: 원격(Image-Only) 자동화 — "로컬 경험으로 원격 클릭"
+**목표**: 스크린샷만으로 폼 식별 → 캐시된 좌표/전략으로 자동 클릭
+**상태**: 설계 완료 (CLAUDE.md 원격 모드 흐름도), 구현 없음
+**작업**:
+1. ImageOnlyExecutor 클래스 구현
+   - 입력: 스크린샷 이미지 (Bitmap or file path)
+   - OCR → FormTypeIdentifier → Experience DB 로드
+   - 상대좌표 × 이미지 해상도 → 절대 클릭 좌표
+   - 클릭 전략 DB 기반 SmartClick 실행
+2. CLI: `wkappbot image-click <screenshot.png> <control-role>`
+3. RDP/VNC 연동은 별도 Phase (스크린샷 자동 캡처 + 루프)
+
+### 미래 과제 (우선순위 낮음)
+- HTML 리포트 생성
+- DPI 스케일링 처리
+- 여러 앱 프로파일 동시 관리
+- CI/CD 연동 (headless 테스트)
+
+## HTS 영웅문 자동화 노하우 (캐치 실전매매 [4051])
+
+### MFC 커스텀 컨트롤 특성
+- **콤보박스**: 표준 ComboBox가 아닌 `AfxWnd110` + `Edit` 자식 구조
+  - CB_SETCURSEL/CB_GETCOUNT 사용 불가
+  - 클릭 방법: Edit 자식 중앙 클릭 → 드롭다운 펼침 → Edit.Bottom + 14px 에서 첫 항목 마우스 클릭
+  - 콤보 식별: AfxWnd 안의 enabled Edit 자식이 있고, 대상 버튼 위에 위치, 계좌번호(dash패턴)/종목코드(cid=32760) 제외
+- **Owner-drawn 버튼**: 텍스트 없음 (GetWindowText = ""), 버튼 순서는 Z-order가 아닌 X좌표 정렬
+  - BM_CLICK: 일부 동작하나 불안정 (영웅문 owner-drawn에서 안 먹히는 경우 많음)
+  - WM_LBUTTONDOWN/UP: 대부분 동작 (SendMessage 사용, 커서 이동 없음)
+  - SendInput 물리 마우스: 항상 동작하나 커서 이동됨
+- **다이얼로그**: `#32770` 클래스, 모달, owner-drawn 버튼 포함
+
+### SmartClickButton 3티어 전략 + 창변화 감지
+```
+Strategy 1: BM_CLICK (PostMessage, 커서 이동 없음)
+Strategy 2: WM_LBUTTONDOWN/UP (SendMessage, 커서 이동 없음) ← 영웅문에서 가장 효과적
+Strategy 3: SendInput 물리 마우스 (커서 이동됨, 최후 수단)
+```
+각 전략 후 `CheckDialogGone()`:
+- `IsWindow()` + `IsWindowVisible()` 이중 체크 (transient 상태 재확인)
+- 포그라운드 윈도우 변화 감지 (새 모달 팝업)
+- 참고: `IsWindowVisible`만으로는 불안정 — 리페인트 중 false 반환 가능
+
+### CLI 커맨드 추가
+```
+wkappbot do <form-title> <button-text> [--confirm] [--step-delay N]
+  전체 시퀀스: MFC 콤보 선택 → 버튼 클릭 → 다이얼로그 자동확인
+
+wkappbot form-dump <form-title>
+  Win32 전체 자식 트리 덤프 (WM_GETTEXT 포함)
+
+wkappbot dialog-click <dialog-title> [button-index]
+  다이얼로그 버튼 SmartClick (owner-drawn 지원)
+```
+
+### 실행 예시 (캐치 실전매매 시작)
+```bash
+DOTNET_ROOT='W:/SDK/dotnet' wkappbot.exe do '캐치' '매매시작' --confirm
+```
+
+### 컨트롤 DB + 포펫 패턴 전략
+
+#### 폴더 = DB 구조
+```
+data/experience/{profile_name}/
+├── profile.json                    # AppProfile (zones, form_types)
+├── form_{formId}/
+│   ├── experience.json             # FormExperience (controls, fingerprint, ocr_keywords)
+│   ├── puppet_pattern.txt          # 포펫 패턴 (고정텍스트 + {*} 와일드카드)
+│   ├── snapshot_latest.png         # 최신 스크린샷
+│   └── snapshots/                  # 시점별 스크린샷 히스토리
+│       ├── 20260218_013000.png
+│       └── 20260218_140000.png
+└── click_strategy.json             # 클래스별 클릭 전략 효과 DB
+```
+
+#### 포펫 패턴 (Puppet Pattern) — 폼 텍스트 지문
+**개념**: 폼 전체의 OCR 텍스트를 레이아웃 보존한 채 동적 부분만 `{*}`로 치환한 패턴
+- 시점에 따라 변하는 값 (가격, 수량, 시간, 종목코드) → `{*}`
+- 항상 동일한 레이블/제목 → 고정 텍스트로 유지
+- 여러 시점의 텍스트를 누적 비교하여 자동으로 고정/동적 판별
+
+**예시: 캐치 시작안내 다이얼로그**
+```
+조건식: {*}
+매매유형: 자동매수/자동매도
+트레일링 ({*})
+종목당 투자금액 {*} 로스컷 {*}
+당일청산 {*}
+계좌증거금률: {*}
+추정예수금: {*}원
+```
+
+**생성 알고리즘**:
+1. 첫 스캔: OCR 전체 텍스트를 라인별로 저장 (baseline)
+2. 이후 스캔마다: 같은 라인 위치의 텍스트 비교
+3. 변한 토큰 → `{*}`로 치환, 안 변한 토큰 → 고정 텍스트 확정
+4. scan_count >= 3 이면 패턴 안정화 (confidence 높음)
+5. 저장: `puppet_pattern.txt` (사람이 읽기 좋은 포맷)
+
+**활용**:
+- **폼 식별**: FormTypeIdentifier Level 4로 추가 (패턴 매칭)
+- **상태 감지**: 고정 텍스트 일치 + 동적 부분 값 추출 → 폼의 현재 상태 파악
+- **변화 감지**: 패턴의 동적 부분 값이 바뀌면 → 상태 전환 이벤트
+- **Assert 자동생성**: 포펫 패턴에서 기대값 자동 추출
+
+#### 클릭 전략 DB
+클래스명별로 어떤 전략이 효과적인지 누적 학습:
+```json
+{
+  "Button": { "bm_click": {"success": 15, "fail": 0}, "wm_lbutton": {"success": 3, "fail": 0} },
+  "owner_drawn_button": { "bm_click": {"success": 0, "fail": 5}, "wm_lbutton": {"success": 8, "fail": 0} },
+  "AfxWnd110_Edit": { "send_input_mouse": {"success": 12, "fail": 1} }
+}
+```
+SmartClickButton이 전략 순서를 DB 기반으로 자동 최적화
+
+#### 원격(Image-Only) 모드 — Win32 API 없이 자동화
+로컬에서 학습한 Experience DB를 원격 RDP/VNC 환경에서 재활용하는 흐름:
+```
+[원격 화면 이미지]
+    ↓ OCR (Windows.Media.Ocr or Claude Vision)
+    ↓
+[추출된 텍스트 라인들]
+    ↓ FormTypeIdentifier
+    ↓ Level 3: OCR 키워드 매칭
+    ↓ Level 4: 포펫 패턴 매칭 (고정 레이블 라인 순서 비교)
+    ↓
+[폼 식별] → "form_4051 캐치 실전매매 시작안내" (conf 0.9)
+    ↓
+[Experience DB 로드] → form_4051/experience.json
+    ↓ 캐시된 컨트롤 맵:
+    ↓   확인 버튼 = relativeX:0.52, relativeY:0.85, class:owner_drawn
+    ↓   취소 버튼 = relativeX:0.72, relativeY:0.85, class:owner_drawn
+    ↓
+[좌표 산출] → 이미지 해상도 × 상대좌표 = 절대 클릭 좌표
+    ↓
+[클릭 전략 선택] → click_strategy DB: owner_drawn → WM_LBUTTON 우선
+    ↓
+[실행] → 클릭 + CheckDialogGone 검증
+```
+핵심: 로컬에서 한 번 학습하면, 같은 앱의 원격 화면에서도 OCR만으로 자동화 가능
+
+#### 트리 탐색 최적화 — "DB 히트 시 이하 스킵"
+Win32 트리를 탐색할 때, DB에 이미 학습된 컨트롤을 만나면 그 아래는 탐색하지 않음:
+```
+첫 방문 (DB 없음): 전체 트리 재귀 탐색 + OCR + 스냅샷 → DB 저장
+재방문 (DB 있음): 클래스+cid가 DB 매칭 → 이하 서브트리 스킵 → 캐시된 정보 즉시 사용
+```
+- ExperienceDb.IsKnownControl(formId, cid) → true면 **구조 탐색**만 스킵
+- 캐시된 상대좌표/클릭전략/OCR텍스트를 바로 활용
+- 트리가 깊은 MFC 앱에서 탐색 시간 대폭 단축
+- 앱 업데이트로 구조 변경 시: DB 미스 → 다시 풀스캔 → 자동 재학습
+
+**주의: 텍스트 수집은 스킵하면 안 됨!**
+- 구조 스킵 ≠ 텍스트 스킵. DB 히트된 컨트롤이라도 WM_GETTEXT는 매번 수집
+- 포펫 패턴 diff를 위해 텍스트 변화 추적이 필수
+- 수집 비용은 낮음 (WM_GETTEXT는 마이크로초 단위)
+
+#### 컨트롤별 디테일 캐시 (서브폴더)
+각 컨트롤의 스크린샷 + 텍스트 히스토리를 폴더에 누적 저장:
+```
+data/experience/{profile}/form_{formId}/
+├── experience.json                 # 전체 컨트롤 맵
+├── puppet_pattern.txt              # 포펫 패턴
+├── controls/                       # 컨트롤별 디테일 캐시
+│   ├── cid_{N}/
+│   │   ├── info.json               # class, role, 상대좌표, 클릭전략 통계
+│   │   ├── latest.png              # 최신 컨트롤 스크린샷 (BitBlt)
+│   │   ├── text_history.jsonl      # 텍스트 변화 이력 (timestamp + value)
+│   │   └── snapshots/              # 시점별 스크린샷 (변화 감지 시에만 저장)
+│   │       ├── 20260218_093000.png
+│   │       └── 20260218_140000.png
+│   └── cid_{M}/
+│       └── ...
+└── snapshots/                      # 폼 전체 스크린샷 히스토리
+```
+- text_history.jsonl: `{"ts":"2026-02-18T09:30:00","v":"5,788,470원"}` (줄 단위 append)
+- 스크린샷: 전체 폼은 매 스캔, 개별 컨트롤은 텍스트 변화 감지 시에만 캡처 (디스크 절약)
+- Claude 연구용: 나중에 스크린샷 + text_history 분석으로 UI 패턴 학습 가능
 
 ## Important Notes
 - Windows 전용 (.NET 8.0 `net8.0-windows10.0.22621.0`)

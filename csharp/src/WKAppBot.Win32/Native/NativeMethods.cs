@@ -29,6 +29,9 @@ public static partial class NativeMethods
     public static extern bool IsWindowVisible(IntPtr hWnd);
 
     [DllImport("user32.dll")]
+    public static extern bool IsWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
     public static extern bool IsWindowEnabled(IntPtr hWnd);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -218,6 +221,59 @@ public static partial class NativeMethods
 
     [DllImport("kernel32.dll")]
     public static extern uint GetCurrentThreadId();
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool GetTokenInformation(
+        IntPtr TokenHandle, int TokenInformationClass,
+        out int TokenInformation, int TokenInformationLength, out int ReturnLength);
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
+
+    [DllImport("kernel32.dll")]
+    public static extern bool CloseHandle(IntPtr hObject);
+
+    private const uint TOKEN_QUERY = 0x0008;
+    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    private const int TokenElevation = 20;
+
+    /// <summary>
+    /// Check if a process (by PID) is running elevated (as administrator).
+    /// Returns null if access denied (itself suggests elevation difference).
+    /// </summary>
+    public static bool? IsProcessElevated(uint processId)
+    {
+        var hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+        if (hProcess == IntPtr.Zero) return null; // access denied → likely elevated
+
+        try
+        {
+            if (!OpenProcessToken(hProcess, TOKEN_QUERY, out var hToken))
+                return null;
+
+            try
+            {
+                if (GetTokenInformation(hToken, TokenElevation, out int elevation, 4, out _))
+                    return elevation != 0;
+                return null;
+            }
+            finally { CloseHandle(hToken); }
+        }
+        finally { CloseHandle(hProcess); }
+    }
+
+    /// <summary>
+    /// Check if the current process is running elevated.
+    /// </summary>
+    public static bool IsCurrentProcessElevated()
+    {
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        var principal = new System.Security.Principal.WindowsPrincipal(identity);
+        return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+    }
 
     // ── Screen capture ───────────────────────────────────────────
     [DllImport("user32.dll")]

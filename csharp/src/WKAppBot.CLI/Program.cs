@@ -1,8 +1,10 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using WKAppBot.Core.Runner;
 using WKAppBot.Core.Scenario;
 using WKAppBot.Win32.Accessibility;
+using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Native;
 using WKAppBot.Vision;
 using WKAppBot.Win32.Window;
@@ -51,6 +53,11 @@ internal class Program
                 "watch" => WatchCommand(restArgs),
                 "capture" => CaptureCommand(restArgs),
                 "hts-stress" => HtsStressCommand(restArgs),
+                "scan" => ScanCommand(restArgs),
+                "click" => ClickCommand(restArgs),
+                "form-dump" => FormDumpCommand(restArgs),
+                "do" => DoCommand(restArgs),
+                "dialog-click" => DialogClickCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
             };
@@ -1047,6 +1054,1622 @@ Options:
         return 0;
     }
 
+    // ── scan ──────────────────────────────────────────────────
+
+    static int ScanCommand(string[] args)
+    {
+        if (args.Length == 0)
+            return Error("Usage: appbot scan <window-title> [--save] [--ocr] [--depth N]");
+
+        string title = args[0];
+        bool save = args.Contains("--save");
+        bool useOcr = args.Contains("--ocr");
+        int depth = 1; // default: form level only
+        var depthStr = GetArgValue(args, "--depth");
+        if (depthStr != null) int.TryParse(depthStr, out depth);
+
+        // Find target window
+        var windows = WindowFinder.FindByTitle(title);
+        if (windows.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Window not found: \"{title}\"");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var win = windows[0];
+        Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\" ({win.ClassName}) {win.Rect.Width}x{win.Rect.Height}");
+        Console.WriteLine();
+
+        // Check for existing profile
+        var profileStore = new ProfileStore();
+        var match = profileStore.FindByMatch(win.ClassName, "");
+        string? profileName = null;
+        AppProfile? existingProfile = null;
+
+        // Get process name for profile matching
+        NativeMethods.GetWindowThreadProcessId(win.Handle, out uint pid);
+        string processName = "";
+        try { processName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+
+        if (match == null && !string.IsNullOrEmpty(processName))
+            match = profileStore.FindByMatch("", processName);
+
+        if (match != null)
+        {
+            profileName = match.Value.name;
+            existingProfile = match.Value.profile;
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"Profile: {profileName} (matched, scan #{existingProfile.ScanCount + 1})");
+            Console.ResetColor();
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("Profile: (new — use --save to create)");
+            Console.ResetColor();
+        }
+        Console.WriteLine();
+
+        // Run scan
+        var scanResult = AppScanner.Scan(win.Handle);
+
+        // Print summary
+        var summary = AppScanner.FormatSummary(scanResult, profileName);
+        Console.Write(summary);
+
+        // Determine profile name early (needed for OCR + exp DB)
+        if (profileName == null && (save || useOcr))
+            profileName = ProfileStore.GenerateProfileName(scanResult);
+
+        // Experience DB
+        var expDir = profileName != null
+            ? Path.Combine(profileStore.ProfileDir, $"{profileName}_exp")
+            : null;
+        ExperienceDb? expDb = expDir != null ? new ExperienceDb(expDir) : null;
+
+        // ── OCR learning pass (--ocr) ──
+        if (useOcr && expDb != null)
+        {
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("── OCR Learning ────────────────────────");
+            Console.ResetColor();
+
+            // Initialize Simple OCR
+            SimpleOcrAnalyzer? simpleOcr = null;
+            try
+            {
+                var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
+                var primaryLang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
+                simpleOcr = new SimpleOcrAnalyzer(primaryLanguage: primaryLang, confidenceThreshold: 0.5f);
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  OCR init failed: {ex.Message}");
+                Console.ResetColor();
+            }
+
+            if (simpleOcr != null)
+            {
+                try
+                {
+                    // Bridge: SimpleOcrAnalyzer.RecognizeAll → OcrWordInfo[]
+                    // (avoids WKAppBot.Vision dependency in Win32 project)
+                    async Task<IReadOnlyList<OcrWordInfo>> OcrBridge(System.Drawing.Bitmap bmp)
+                    {
+                        var ocrFull = await simpleOcr.RecognizeAll(bmp);
+                        return ocrFull.Words.Select(w => new OcrWordInfo
+                        {
+                            Text = w.Text,
+                            X = w.X,
+                            Y = w.Y,
+                            Width = w.Width,
+                            Height = w.Height,
+                        }).ToArray();
+                    }
+
+                    var ocrResult = AppScanner.LearnFormsWithOcr(
+                        scanResult, expDb, OcrBridge,
+                        onProgress: (formId, count) =>
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkGray;
+                            Console.Write($"\r  Scanning [{formId}]... {count} controls learned");
+                            Console.ResetColor();
+                        }
+                    ).GetAwaiter().GetResult();
+
+                    Console.WriteLine();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"  {ocrResult}");
+                    Console.ResetColor();
+
+                    foreach (var err in ocrResult.Errors)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"  Warning: {err}");
+                        Console.ResetColor();
+                    }
+
+                    // Save experience DB
+                    expDb.SaveAll();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"  Experience saved: {expDir}");
+                    Console.ResetColor();
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"  OCR error: {ex.Message}");
+                    Console.ResetColor();
+                }
+                finally
+                {
+                    simpleOcr.Dispose();
+                }
+            }
+        }
+
+        // Print experience DB stats (with fingerprint + keywords)
+        if (expDb != null)
+        {
+            Console.WriteLine();
+            Console.WriteLine(expDb.GetStatsString());
+
+            // Show fingerprint + keywords for each form type
+            foreach (var (formId, formExp) in expDb.GetAllForms())
+            {
+                var ctrlCount = formExp.Controls.Count;
+                var fpStr = formExp.FingerprintHash != null ? $"fp={formExp.FingerprintHash}" : "fp=(none)";
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"  [{formId}] {formExp.FormName}: ");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write($"{ctrlCount} controls, ");
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine(fpStr);
+
+                if (formExp.OcrKeywords != null && formExp.OcrKeywords.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    var kwList = string.Join(", ", formExp.OcrKeywords.Take(15));
+                    var more = formExp.OcrKeywords.Count > 15 ? $" +{formExp.OcrKeywords.Count - 15} more" : "";
+                    Console.WriteLine($"         keywords: [{kwList}]{more}");
+                }
+                Console.ResetColor();
+            }
+        }
+
+        // ── Save profile ──
+        if (save)
+        {
+            AppProfile profile;
+            if (existingProfile != null)
+            {
+                // Update existing profile
+                profile = existingProfile;
+                profile.ScanCount++;
+                profile.UpdatedAt = DateTime.UtcNow;
+
+                // Merge new form types
+                var newFormGroups = scanResult.Forms
+                    .Where(f => f.FormId != null)
+                    .GroupBy(f => f.FormId!);
+
+                foreach (var g in newFormGroups)
+                {
+                    if (!profile.FormTypes.ContainsKey(g.Key))
+                    {
+                        var first = g.First();
+                        profile.FormTypes[g.Key] = new FormTypeDefinition
+                        {
+                            Name = first.FormName ?? g.Key,
+                            FrameClass = first.ClassName,
+                            ScanCount = 1,
+                        };
+                    }
+                    else
+                    {
+                        profile.FormTypes[g.Key].ScanCount++;
+                    }
+
+                    // Copy fingerprint hash from experience DB
+                    var formExp = expDb?.GetForm(g.Key);
+                    if (formExp?.FingerprintHash != null)
+                        profile.FormTypes[g.Key].FingerprintHash = formExp.FingerprintHash;
+                }
+            }
+            else
+            {
+                // Create new profile from scan (with fingerprint hashes from experience DB)
+                profile = ProfileStore.FromScanResult(scanResult, expDb);
+            }
+
+            profileStore.Save(profileName!, profile);
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"Profile saved: {Path.Combine(profileStore.ProfileDir, profileName + ".json")}");
+            Console.ResetColor();
+        }
+
+        return 0;
+    }
+
+    // ── click ──────────────────────────────────────────────────
+
+    static int ClickCommand(string[] args)
+    {
+        if (args.Length < 2)
+            return Error(@"Usage: appbot click <window-title> <form-id> [button-text]
+  Finds a specific MDI form and clicks a button inside it.
+  If button-text is omitted, lists all buttons in the form.
+
+Examples:
+  appbot click ""영웅문"" 4051              # list all buttons in [4051] 캐치 실전매매
+  appbot click ""영웅문"" 4051 ""매매시작""    # click the 매매시작 button
+  appbot click ""투혼"" 1101 --cid 3785    # click button by control ID
+  appbot click ""영웅문"" 4051 --list-all   # list ALL controls (buttons, combos, edits)
+  appbot click ""영웅문"" 4051 --combo 1 0  # select item 0 in combo #1, then click
+  appbot click ""영웅문"" 4051 ""매매시작"" --combo 1 0 --combo 2 0  # combos then click");
+
+        string title = args[0];
+        string targetFormId = args[1];
+        string? buttonText = args.Length >= 3 && !args[2].StartsWith("--") ? args[2] : null;
+        int? targetCid = int.TryParse(GetArgValue(args, "--cid"), out var cid) ? cid : null;
+        bool dryRun = args.Contains("--dry");
+        bool listAll = args.Contains("--list-all");
+        int maxDepth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 4;
+
+        // Parse --combo N INDEX pairs (e.g., --combo 1 0 --combo 2 0)
+        var comboSelections = new List<(int comboIndex, int itemIndex)>();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--combo" && i + 2 < args.Length)
+            {
+                if (int.TryParse(args[i + 1], out var ci) && int.TryParse(args[i + 2], out var ii))
+                    comboSelections.Add((ci, ii));
+            }
+        }
+
+        // Find target window
+        var windows = WindowFinder.FindByTitle(title);
+        if (windows.Count == 0)
+            return Error($"Window not found: \"{title}\"");
+
+        var win = windows[0];
+        Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
+
+        // Check elevation: target app elevated but we're not?
+        NativeMethods.GetWindowThreadProcessId(win.Handle, out uint targetPid);
+        var targetElevated = NativeMethods.IsProcessElevated(targetPid);
+        bool weAreElevated = NativeMethods.IsCurrentProcessElevated();
+
+        if ((targetElevated == true || targetElevated == null) && !weAreElevated)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  ⚠ Target process (pid={targetPid}) is elevated (admin).");
+            Console.WriteLine($"  ⚠ This process is NOT elevated → SendInput/SetCursorPos will be blocked by UIPI.");
+            Console.ResetColor();
+
+            // Auto-relaunch as admin
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("  → Re-launching as administrator...");
+            Console.ResetColor();
+            Console.Out.Flush();
+
+            try
+            {
+                // Find the .exe (not .dll) — dotnet publish creates both
+                var exePath = Environment.ProcessPath ?? "wkappbot.exe";
+                if (exePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                    exePath = Path.ChangeExtension(exePath, ".exe");
+
+                var exeDir = Path.GetDirectoryName(exePath) ?? ".";
+                var escapedArgs = string.Join(" ", args.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
+
+                // Use cmd /c to set DOTNET_ROOT and run, so output goes to a temp file we can read
+                var resultFile = Path.Combine(exeDir, "logs", "_elevated_result.txt");
+                var cmdLine = $"/c set \"DOTNET_ROOT={Environment.GetEnvironmentVariable("DOTNET_ROOT")}\" && " +
+                              $"\"{exePath}\" click {escapedArgs} > \"{resultFile}\" 2>&1";
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = cmdLine,
+                    WorkingDirectory = exeDir,
+                    UseShellExecute = true,
+                    Verb = "runas",  // triggers UAC
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                };
+                var proc = Process.Start(psi);
+                proc?.WaitForExit();
+
+                // Show the elevated process's output
+                if (File.Exists(resultFile))
+                {
+                    Console.WriteLine();
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine("  ── Elevated process output ──");
+                    Console.ResetColor();
+                    Console.Write(File.ReadAllText(resultFile));
+                }
+
+                return proc?.ExitCode ?? 1;
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) // user cancelled UAC
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("  ✗ UAC cancelled. Cannot click elevated app without admin privileges.");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+
+        if (weAreElevated)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write("  ✓ Running elevated");
+            Console.ResetColor();
+            Console.WriteLine(" — physical mouse input enabled");
+        }
+
+        // Scan to find MDI forms
+        var scanResult = AppScanner.Scan(win.Handle);
+
+        // Find the specific form by form_id
+        var targetForm = scanResult.Forms.FirstOrDefault(f => f.FormId == targetFormId);
+        if (targetForm == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Form [{targetFormId}] not found. Available forms:");
+            Console.ResetColor();
+            foreach (var f in scanResult.Forms.Where(f => f.FormId != null).GroupBy(f => f.FormId!))
+            {
+                var first = f.First();
+                Console.WriteLine($"  [{first.FormId}] {first.FormName}");
+            }
+            return 1;
+        }
+
+        Console.WriteLine($"Form: [{targetForm.FormId}] {targetForm.FormName} ({targetForm.Rect.Width}x{targetForm.Rect.Height})");
+        Console.WriteLine();
+
+        // Recursively find all controls in this form
+        var allControls = new List<(WindowInfo Info, int Depth, string Path)>();
+        FindControlsRecursive(targetForm.Handle, "", 0, maxDepth, allControls);
+
+        // Separate by type
+        var allButtons = allControls.Where(c => c.Info.ClassName == "Button").ToList();
+        var allCombos = allControls.Where(c => c.Info.ClassName == "ComboBox").ToList();
+
+        // --list-all: show every control
+        if (listAll)
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"── All Controls in [{targetFormId}] ({allControls.Count}) ────────────────────");
+            Console.ResetColor();
+            foreach (var (ctrl, depth, path) in allControls)
+            {
+                var txt = !string.IsNullOrEmpty(ctrl.Title) ? $" \"{ctrl.Title}\"" : "";
+                var vis = ctrl.IsVisible ? "" : " [hidden]";
+                var color = ctrl.ClassName switch
+                {
+                    "Button" => ConsoleColor.Yellow,
+                    "ComboBox" => ConsoleColor.Blue,
+                    "Edit" => ConsoleColor.Green,
+                    "Static" => ConsoleColor.DarkGray,
+                    _ => ConsoleColor.Gray
+                };
+                Console.ForegroundColor = color;
+                Console.Write($"    [{ctrl.ClassName}]");
+                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.Write($" cid={ctrl.ControlId,-6}{txt} {ctrl.Rect.Width}x{ctrl.Rect.Height} @({ctrl.Rect.Left},{ctrl.Rect.Top}){vis}");
+                if (!string.IsNullOrEmpty(path)) Console.Write($" [{path}]");
+                Console.WriteLine();
+            }
+            Console.ResetColor();
+
+            // Show combo box details
+            if (allCombos.Count > 0)
+            {
+                Console.WriteLine();
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"── ComboBoxes ({allCombos.Count}) ────────────────────");
+                Console.ResetColor();
+                for (int ci = 0; ci < allCombos.Count; ci++)
+                {
+                    var combo = allCombos[ci].Info;
+                    int count = (int)NativeMethods.SendMessageW(combo.Handle, 0x0146 /*CB_GETCOUNT*/, IntPtr.Zero, IntPtr.Zero);
+                    int curSel = (int)NativeMethods.SendMessageW(combo.Handle, 0x0147 /*CB_GETCURSEL*/, IntPtr.Zero, IntPtr.Zero);
+                    Console.ForegroundColor = ConsoleColor.Blue;
+                    Console.Write($"  Combo #{ci + 1}");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($" cid={combo.ControlId} @({combo.Rect.Left},{combo.Rect.Top}) {combo.Rect.Width}x{combo.Rect.Height}");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine($" — {count} items (selected: {(curSel >= 0 ? curSel.ToString() : "none")})");
+                    Console.ResetColor();
+
+                    for (int j = 0; j < Math.Min(count, 30); j++)
+                    {
+                        int len = (int)NativeMethods.SendMessageW(combo.Handle, 0x0149 /*CB_GETLBTEXTLEN*/, (IntPtr)j, IntPtr.Zero);
+                        if (len > 0 && len < 1024)
+                        {
+                            var sb = new StringBuilder(len + 2);
+                            NativeMethods.SendMessageW(combo.Handle, 0x0148 /*CB_GETLBTEXT*/, (IntPtr)j, sb);
+                            var marker = j == curSel ? " ◀" : "";
+                            Console.ForegroundColor = j == curSel ? ConsoleColor.Yellow : ConsoleColor.Gray;
+                            Console.WriteLine($"    [{j}] {sb}{marker}");
+                            Console.ResetColor();
+                        }
+                    }
+                }
+            }
+
+            return 0;
+        }
+
+        if (allButtons.Count == 0 && comboSelections.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("  No buttons found in this form.");
+            Console.ResetColor();
+
+            // Also try OCR to show what's visible
+            Console.WriteLine("\n  Visible child controls:");
+            var children = WindowFinder.GetChildrenZOrder(targetForm.Handle);
+            foreach (var c in children.Take(30))
+            {
+                var vis = c.IsVisible ? "" : " [hidden]";
+                var txt = !string.IsNullOrEmpty(c.Title) ? $" \"{c.Title}\"" : "";
+                Console.WriteLine($"    [{c.ClassName}] cid={c.ControlId} {c.Rect.Width}x{c.Rect.Height}{txt}{vis}");
+            }
+            return 1;
+        }
+
+        // Display all found buttons
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"── Buttons in [{targetFormId}] ({allButtons.Count}) ────────────────────");
+        Console.ResetColor();
+
+        WindowInfo? matchedButton = null;
+
+        foreach (var (btn, depth, path) in allButtons)
+        {
+            var txt = !string.IsNullOrEmpty(btn.Title) ? btn.Title : "(no text)";
+            var size = $"{btn.Rect.Width}x{btn.Rect.Height}";
+            var vis = btn.IsVisible ? "" : " [hidden]";
+
+            // Check if this button matches the target
+            bool isMatch = false;
+            if (targetCid.HasValue && btn.ControlId == targetCid.Value)
+                isMatch = true;
+            else if (buttonText != null && !string.IsNullOrEmpty(btn.Title) && btn.Title.Contains(buttonText))
+                isMatch = true;
+
+            if (isMatch)
+            {
+                matchedButton = btn;
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write("  ▶ ");
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write("    ");
+            }
+
+            Console.ForegroundColor = isMatch ? ConsoleColor.White : ConsoleColor.Gray;
+            Console.Write($"cid={btn.ControlId,-6}");
+            Console.ForegroundColor = isMatch ? ConsoleColor.Yellow : ConsoleColor.DarkYellow;
+            Console.Write($" \"{txt}\"");
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.Write($" {size} @({btn.Rect.Left},{btn.Rect.Top}){vis}");
+            if (!string.IsNullOrEmpty(path))
+                Console.Write($" [{path}]");
+            Console.WriteLine();
+            Console.ResetColor();
+        }
+
+        // ── Process combo selections BEFORE button click ──
+        if (comboSelections.Count > 0 && allCombos.Count > 0)
+        {
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("── ComboBox Selections ────────────────────");
+            Console.ResetColor();
+
+            foreach (var (comboIdx, itemIdx) in comboSelections)
+            {
+                if (comboIdx < 1 || comboIdx > allCombos.Count)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"  ✗ Combo #{comboIdx} not found (have {allCombos.Count} combos)");
+                    Console.ResetColor();
+                    continue;
+                }
+                var combo = allCombos[comboIdx - 1].Info;
+                int count = (int)NativeMethods.SendMessageW(combo.Handle, 0x0146 /*CB_GETCOUNT*/, IntPtr.Zero, IntPtr.Zero);
+                if (itemIdx < 0 || itemIdx >= count)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"  ✗ Combo #{comboIdx}: item [{itemIdx}] out of range (have {count} items)");
+                    Console.ResetColor();
+                    continue;
+                }
+
+                // Get item text for display
+                int len = (int)NativeMethods.SendMessageW(combo.Handle, 0x0149 /*CB_GETLBTEXTLEN*/, (IntPtr)itemIdx, IntPtr.Zero);
+                var itemText = "(?)";
+                if (len > 0 && len < 1024)
+                {
+                    var sb = new StringBuilder(len + 2);
+                    NativeMethods.SendMessageW(combo.Handle, 0x0148 /*CB_GETLBTEXT*/, (IntPtr)itemIdx, sb);
+                    itemText = sb.ToString();
+                }
+
+                // Select the item
+                NativeMethods.SendMessageW(combo.Handle, 0x014E /*CB_SETCURSEL*/, (IntPtr)itemIdx, IntPtr.Zero);
+                Thread.Sleep(100);
+
+                // Notify parent (CBN_SELCHANGE = 1)
+                int notifyCode = 1; // CBN_SELCHANGE
+                int comboControlId = NativeMethods.GetDlgCtrlID(combo.Handle);
+                IntPtr wParam = (IntPtr)((notifyCode << 16) | (comboControlId & 0xFFFF));
+                var parent = NativeMethods.GetParent(combo.Handle);
+                NativeMethods.SendMessageW(parent, 0x0111 /*WM_COMMAND*/, wParam, combo.Handle);
+                Thread.Sleep(200);
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write($"  ✓ Combo #{comboIdx}");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write($" → [{itemIdx}] \"{itemText}\"");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($" (cid={comboControlId})");
+                Console.ResetColor();
+            }
+        }
+
+        // If no specific button requested, just list them
+        if (buttonText == null && !targetCid.HasValue)
+        {
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("  Tip: appbot click \"<title>\" <form-id> \"<button-text>\" to click a button");
+            Console.WriteLine("  Tip: appbot click \"<title>\" <form-id> --list-all   to see ALL controls");
+            Console.ResetColor();
+            return 0;
+        }
+
+        // Click the matched button
+        if (matchedButton == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            var searchDesc = targetCid.HasValue ? $"cid={targetCid}" : $"\"{buttonText}\"";
+            Console.WriteLine($"\n  Button {searchDesc} not found in [{targetFormId}]");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.WriteLine();
+        if (dryRun)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [DRY RUN] Would click: \"{matchedButton.Title}\" cid={matchedButton.ControlId}");
+            Console.WriteLine($"  Screen pos: ({matchedButton.Rect.Left + matchedButton.Rect.Width/2}, {matchedButton.Rect.Top + matchedButton.Rect.Height/2})");
+            Console.ResetColor();
+        }
+        else
+        {
+            int cx = matchedButton.Rect.Left + matchedButton.Rect.Width / 2;
+            int cy = matchedButton.Rect.Top + matchedButton.Rect.Height / 2;
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write($"  Clicking: \"{matchedButton.Title}\" cid={matchedButton.ControlId}");
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.Write($" @({cx},{cy})");
+            Console.ResetColor();
+            Console.Write(" ... ");
+
+            // Snapshot: child windows of main + form BEFORE click
+            var preMainChildren = new HashSet<IntPtr>(
+                WindowFinder.GetChildrenZOrder(win.Handle).Select(c => c.Handle));
+            var preFormChildren = new HashSet<IntPtr>(
+                WindowFinder.GetChildrenZOrder(targetForm.Handle).Select(c => c.Handle));
+            var preFgHwnd = NativeMethods.GetForegroundWindow();
+            var preButtonText = matchedButton.Title;
+
+            // Bring MAIN window to front (MDI child can't be foreground independently)
+            NativeMethods.SmartSetForegroundWindow(win.Handle);
+            Thread.Sleep(300);
+
+            // Re-read button rect (in case window moved during focus switch)
+            NativeMethods.GetWindowRect(matchedButton.Handle, out var btnRect);
+            cx = (btnRect.Left + btnRect.Right) / 2;
+            cy = (btnRect.Top + btnRect.Bottom) / 2;
+
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.Write($"(rect: {btnRect.Left},{btnRect.Top}-{btnRect.Right},{btnRect.Bottom}) ");
+            Console.ResetColor();
+
+            // ── Click Strategy ──
+            // Try message-based click first (no cursor movement).
+            // If no reaction detected, fall back to physical mouse click.
+            bool usePhysicalMouse = args.Contains("--mouse");
+            string clickMethod;
+
+            if (!usePhysicalMouse)
+            {
+                // Strategy 1: BM_CLICK (0x00F5) — standard button click message
+                // Works for standard Win32 Button class, even owner-drawn
+                NativeMethods.PostMessageW(matchedButton.Handle, 0x00F5, IntPtr.Zero, IntPtr.Zero);
+                Thread.Sleep(200);
+
+                // Strategy 2: WM_LBUTTONDOWN/UP with local coords
+                // Works for custom controls that don't respond to BM_CLICK
+                int localX = cx - btnRect.Left;
+                int localY = cy - btnRect.Top;
+                IntPtr lParam = (IntPtr)((localY << 16) | (localX & 0xFFFF));
+                NativeMethods.PostMessageW(matchedButton.Handle, 0x0201, (IntPtr)0x0001, lParam);
+                Thread.Sleep(50);
+                NativeMethods.PostMessageW(matchedButton.Handle, 0x0202, IntPtr.Zero, lParam);
+
+                clickMethod = "message";
+            }
+            else
+            {
+                // Strategy 3: Physical mouse (SendInput) — guaranteed but moves cursor
+                MouseInput.Click(cx, cy);
+                clickMethod = "mouse";
+            }
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write($"clicked!");
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($" [{clickMethod}]");
+            Console.ResetColor();
+
+            // Wait for reaction
+            Thread.Sleep(500);
+
+            // ── Detect reaction ──
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("\n── Reaction Check ────────────────────");
+            Console.ResetColor();
+
+            bool anyReaction = false;
+
+            // 1. Check for new popup/dialog windows (system-wide top-level)
+            var postFgHwnd = NativeMethods.GetForegroundWindow();
+            if (postFgHwnd != preFgHwnd && postFgHwnd != targetForm.Handle && postFgHwnd != win.Handle)
+            {
+                var popupInfo = WindowInfo.FromHwnd(postFgHwnd);
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write("  📢 New foreground window: ");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine($"[{popupInfo.ClassName}] \"{popupInfo.Title}\" ({popupInfo.Rect.Width}x{popupInfo.Rect.Height})");
+                Console.ResetColor();
+                ReadDialogContents(postFgHwnd);
+                anyReaction = true;
+            }
+
+            // 2. Check for new child windows under main window (HTS alerts are often children)
+            var postMainChildren = WindowFinder.GetChildrenZOrder(win.Handle);
+            foreach (var child in postMainChildren)
+            {
+                if (!preMainChildren.Contains(child.Handle) && child.IsVisible)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write("  📢 New child window: ");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.Write($"[{child.ClassName}] \"{child.Title}\"");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($" ({child.Rect.Width}x{child.Rect.Height})");
+                    Console.ResetColor();
+                    anyReaction = true;
+                }
+            }
+
+            // 3. Check for new children under the form (in-form popups)
+            var postFormChildren = WindowFinder.GetChildrenZOrder(targetForm.Handle);
+            foreach (var child in postFormChildren)
+            {
+                if (!preFormChildren.Contains(child.Handle) && child.IsVisible)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write("  📢 New form child: ");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.Write($"[{child.ClassName}] \"{child.Title}\"");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($" ({child.Rect.Width}x{child.Rect.Height})");
+                    Console.ResetColor();
+                    anyReaction = true;
+                }
+            }
+
+            // 4. Check if button text changed (toggle buttons like 매매시작→매매중지)
+            var postButtonText = WindowFinder.GetWindowText(matchedButton.Handle);
+            if (postButtonText != preButtonText)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write("  🔄 Button text changed: ");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine($"\"{preButtonText}\" → \"{postButtonText}\"");
+                Console.ResetColor();
+                anyReaction = true;
+            }
+
+            // 5. Check if any MessageBox-like popup appeared (same process, any window)
+            NativeMethods.GetWindowThreadProcessId(win.Handle, out uint clickTargetPid);
+            var topWindows = WindowFinder.FindByTitle(""); // all visible windows
+            foreach (var tw in topWindows)
+            {
+                NativeMethods.GetWindowThreadProcessId(tw.Handle, out uint twPid);
+                if (twPid == clickTargetPid && !preMainChildren.Contains(tw.Handle)
+                    && tw.Handle != win.Handle && tw.Handle != postFgHwnd
+                    && tw.IsVisible && tw.Rect.Width > 50 && tw.Rect.Height > 30)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write("  📢 Popup: ");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.Write($"[{tw.ClassName}] \"{tw.Title}\"");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($" ({tw.Rect.Width}x{tw.Rect.Height})");
+                    Console.ResetColor();
+                    ReadDialogContents(tw.Handle);
+                    anyReaction = true;
+                }
+            }
+
+            if (!anyReaction)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine("  (no visible reaction detected — button may require specific state)");
+                Console.ResetColor();
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Dump all Win32 children of a specific MDI form as a tree.
+    /// Shows EVERY control with class, CID, text, rect — for debugging custom MFC controls.
+    /// </summary>
+    /// <summary>
+    /// Multi-step action: click MFC custom combos (AfxWnd+Edit) to open dropdown,
+    /// select first item, then click a button. Designed for HTS trading forms.
+    /// Usage: appbot do &lt;window-title&gt; &lt;form-id&gt; &lt;button-text&gt; [--delay N]
+    /// </summary>
+    static int DoCommand(string[] args)
+    {
+        if (args.Length < 3)
+            return Error(@"Usage: appbot do <window-title> <form-id> <button-text> [--delay N]
+  Selects first item in all MFC custom combos, then clicks a button.
+
+Examples:
+  appbot do ""영웅문"" 4051 ""매매시작""          # select combos + click 매매시작
+  appbot do ""영웅문"" 4051 ""매매시작"" --delay 500  # custom delay between steps");
+
+        string title = args[0];
+        string targetFormId = args[1];
+        string buttonText = args[2];
+        int stepDelay = int.TryParse(GetArgValue(args, "--delay"), out var sd) ? sd : 300;
+
+        // Find window
+        var windows = WindowFinder.FindByTitle(title);
+        if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
+        var win = windows[0];
+        Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
+
+        // Elevation check
+        NativeMethods.GetWindowThreadProcessId(win.Handle, out uint targetPid);
+        bool weAreElevated = NativeMethods.IsCurrentProcessElevated();
+        if (!weAreElevated)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("  ✗ Not elevated — physical mouse click requires admin. Re-run as admin.");
+            Console.ResetColor();
+            return 1;
+        }
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write("  ✓ Elevated");
+        Console.ResetColor();
+        Console.WriteLine(" — physical mouse enabled");
+
+        // Find form
+        var scanResult = AppScanner.Scan(win.Handle);
+        var targetForm = scanResult.Forms.FirstOrDefault(f => f.FormId == targetFormId);
+        if (targetForm == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Form [{targetFormId}] not found.");
+            Console.ResetColor();
+            return 1;
+        }
+        Console.WriteLine($"Form: [{targetForm.FormId}] {targetForm.FormName}");
+        Console.WriteLine();
+
+        // Find the target button first (매매시작)
+        var allControls = new List<(WindowInfo Info, int Depth, string Path)>();
+        FindControlsRecursive(targetForm.Handle, "", 0, 6, allControls);
+        var allButtons = allControls.Where(c =>
+            c.Info.ClassName == "Button" && !string.IsNullOrEmpty(c.Info.Title) && c.Info.Title.Contains(buttonText)).ToList();
+
+        if (allButtons.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  ✗ Button \"{buttonText}\" not found in form [{targetFormId}]");
+            Console.ResetColor();
+            return 1;
+        }
+        var targetButton = allButtons[0].Info;
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"  Found button: \"{targetButton.Title}\" @({targetButton.Rect.Left},{targetButton.Rect.Top})");
+        Console.ResetColor();
+
+        // ── Step 1: Find MFC custom combos ──
+        // Pattern: AfxWnd parent containing an enabled Edit child, small size, above the button
+        // Direct Win32 tree walk (not UIA) to find these MFC custom controls
+        var mfcCombos = new List<WindowInfo>();
+        FindMfcCombos(targetForm.Handle, targetButton.Rect, mfcCombos, 0, 6);
+
+        // Sort by X position (left to right)
+        mfcCombos.Sort((a, b) => a.Rect.Left.CompareTo(b.Rect.Left));
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"── Action Sequence ({mfcCombos.Count} combos + 1 button) ────────────────────");
+        Console.ResetColor();
+
+        if (mfcCombos.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("  No MFC custom combos found above button. Skipping to button click.");
+            Console.ResetColor();
+        }
+
+        // Bring window to front for physical mouse
+        NativeMethods.SmartSetForegroundWindow(win.Handle);
+        Thread.Sleep(stepDelay);
+
+        // ── Process each combo ──
+        // Click the EDIT inside the AfxWnd (more precise than clicking container)
+        int comboNum = 0;
+        foreach (var combo in mfcCombos)
+        {
+            comboNum++;
+
+            // Find the Edit child inside this combo container
+            var comboChildren = WindowFinder.GetChildrenZOrder(combo.Handle);
+            var editChild = comboChildren.FirstOrDefault(c => c.ClassName == "Edit");
+            var clickTarget = editChild ?? combo; // fallback to container
+
+            // Re-read rect (window might have moved)
+            NativeMethods.GetWindowRect(clickTarget.Handle, out var editRect);
+            int cx = (editRect.Left + editRect.Right) / 2;
+            int cy = (editRect.Top + editRect.Bottom) / 2;
+
+            // Read current value
+            var valSb = new StringBuilder(256);
+            NativeMethods.SendMessageW(clickTarget.Handle, 0x000D /*WM_GETTEXT*/, (IntPtr)256, valSb);
+            var currentVal = valSb.ToString();
+
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write($"  [{comboNum}/{mfcCombos.Count}] Combo");
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.Write($" @({cx},{cy}) {clickTarget.Rect.Width}x{clickTarget.Rect.Height}");
+            if (!string.IsNullOrEmpty(currentVal))
+            {
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write($" (\"{currentVal}\")");
+            }
+            Console.ResetColor();
+            Console.Write(" → click ... ");
+
+            // Snapshot windows before click
+            var preWindows = new HashSet<IntPtr>();
+            NativeMethods.EnumWindows((hWnd, _) => { preWindows.Add(hWnd); return true; }, IntPtr.Zero);
+
+            // Click the Edit to open dropdown
+            MouseInput.Click(cx, cy);
+            Thread.Sleep(stepDelay + 300); // wait for dropdown
+
+            // Capture screenshot to see what happened
+            try
+            {
+                using var bmp = ScreenCapture.CaptureWindow(win.Handle);
+                var ssPath = Path.Combine(
+                    Path.GetDirectoryName(Environment.ProcessPath) ?? ".",
+                    "logs", $"combo{comboNum}_opened.png");
+                bmp.Save(ssPath);
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[screenshot: {Path.GetFileName(ssPath)}] ");
+                Console.ResetColor();
+            }
+            catch { /* screenshot not critical */ }
+
+            // Detect dropdown: look for NEW top-level windows from same process
+            var dropdownHwnd = IntPtr.Zero;
+            var newWindows = new List<(IntPtr Handle, string ClassName, RECT Rect)>();
+
+            NativeMethods.EnumWindows((hWnd, _) =>
+            {
+                if (preWindows.Contains(hWnd)) return true;
+                if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                if (pid != targetPid) return true;
+                var cls = WindowFinder.GetClassName(hWnd);
+                NativeMethods.GetWindowRect(hWnd, out var r);
+                if (r.Width > 10 && r.Height > 10)
+                    newWindows.Add((hWnd, cls, r));
+                return true;
+            }, IntPtr.Zero);
+
+            // Also check for new children under combo's grandparent
+            var grandParent = NativeMethods.GetParent(NativeMethods.GetParent(combo.Handle));
+            if (grandParent != IntPtr.Zero)
+            {
+                var allDescendants = new List<WindowInfo>();
+                FindAllChildrenFlat(grandParent, allDescendants, 0, 4);
+                foreach (var desc in allDescendants)
+                {
+                    if (desc.ClassName == "ListBox" && desc.IsVisible && desc.Rect.Height > 20)
+                    {
+                        dropdownHwnd = desc.Handle;
+                        break;
+                    }
+                }
+            }
+
+            // Pick the best dropdown candidate from new windows
+            if (dropdownHwnd == IntPtr.Zero && newWindows.Count > 0)
+            {
+                // Prefer ListBox, then anything near the combo
+                var listBox = newWindows.FirstOrDefault(w => w.ClassName.Contains("ListBox"));
+                if (listBox.Handle != IntPtr.Zero)
+                    dropdownHwnd = listBox.Handle;
+                else
+                {
+                    // Pick the one closest to the combo
+                    var nearest = newWindows.OrderBy(w => Math.Abs(w.Rect.Top - editRect.Bottom)).First();
+                    dropdownHwnd = nearest.Handle;
+                }
+            }
+
+            if (dropdownHwnd != IntPtr.Zero)
+            {
+                var ddCls = WindowFinder.GetClassName(dropdownHwnd);
+                NativeMethods.GetWindowRect(dropdownHwnd, out var ddRect);
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write($"dropdown [{ddCls}] {ddRect.Width}x{ddRect.Height} → ");
+                Console.ResetColor();
+
+                // Click first item (top of dropdown + offset)
+                int itemX = (ddRect.Left + ddRect.Right) / 2;
+                int itemY = ddRect.Top + 12;
+                MouseInput.Click(itemX, itemY);
+                Thread.Sleep(stepDelay);
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("selected first item ✓");
+                Console.ResetColor();
+            }
+            else
+            {
+                // No popup window → in-place dropdown (MFC custom)
+                // The list appears BELOW the edit. Click first item by mouse.
+                NativeMethods.GetWindowRect(clickTarget.Handle, out var editRect2);
+                int firstItemX = (editRect2.Left + editRect2.Right) / 2;
+                int firstItemY = editRect2.Bottom + 14; // first visible item
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($"in-place dropdown → click @({firstItemX},{firstItemY}) ... ");
+                Console.ResetColor();
+
+                MouseInput.Click(firstItemX, firstItemY);
+                Thread.Sleep(stepDelay + 200);
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("✓");
+                Console.ResetColor();
+            }
+
+            // Small delay to let UI settle before next step
+            Thread.Sleep(300);
+
+            // Read new value after selection
+            var newValSb = new StringBuilder(256);
+            NativeMethods.SendMessageW(clickTarget.Handle, 0x000D /*WM_GETTEXT*/, (IntPtr)256, newValSb);
+            var newVal = newValSb.ToString();
+            if (newVal != currentVal)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write("         value: ");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine($"\"{currentVal}\" → \"{newVal}\"");
+                Console.ResetColor();
+            }
+
+            Thread.Sleep(stepDelay);
+        }
+
+        // ── Final: Click the button ──
+        Console.WriteLine();
+        NativeMethods.GetWindowRect(targetButton.Handle, out var btnRect);
+        int bx = (btnRect.Left + btnRect.Right) / 2;
+        int by = (btnRect.Top + btnRect.Bottom) / 2;
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write($"  ▶ Clicking: \"{targetButton.Title}\"");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write($" @({bx},{by})");
+        Console.ResetColor();
+        Console.Write(" ... ");
+
+        // Use message-based click (like the click command)
+        NativeMethods.PostMessageW(targetButton.Handle, 0x00F5 /*BM_CLICK*/, IntPtr.Zero, IntPtr.Zero);
+        Thread.Sleep(200);
+        int localX = bx - btnRect.Left;
+        int localY = by - btnRect.Top;
+        IntPtr lParam = (IntPtr)((localY << 16) | (localX & 0xFFFF));
+        NativeMethods.PostMessageW(targetButton.Handle, 0x0201 /*WM_LBUTTONDOWN*/, (IntPtr)0x0001, lParam);
+        Thread.Sleep(50);
+        NativeMethods.PostMessageW(targetButton.Handle, 0x0202 /*WM_LBUTTONUP*/, IntPtr.Zero, lParam);
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("clicked! [message]");
+        Console.ResetColor();
+
+        // Wait and check reaction
+        Thread.Sleep(500);
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("\n── Reaction Check ────────────────────");
+        Console.ResetColor();
+
+        bool anyReaction = false;
+        bool autoConfirm = args.Contains("--confirm");
+
+        var postFgHwnd = NativeMethods.GetForegroundWindow();
+        if (postFgHwnd != win.Handle)
+        {
+            var popupInfo = WindowInfo.FromHwnd(postFgHwnd);
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("  📢 New foreground: ");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine($"[{popupInfo.ClassName}] \"{popupInfo.Title}\" ({popupInfo.Rect.Width}x{popupInfo.Rect.Height})");
+            Console.ResetColor();
+            ReadDialogContents(postFgHwnd);
+            anyReaction = true;
+
+            // Auto-confirm: click the first Button in the dialog
+            if (autoConfirm && popupInfo.ClassName == "#32770")
+            {
+                ClickFirstButtonInDialog(postFgHwnd, "confirm");
+            }
+        }
+
+        // Check button text change (매매시작 → 매매중지?)
+        var postButtonText = WindowFinder.GetWindowText(targetButton.Handle);
+        if (postButtonText != targetButton.Title)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("  🔄 Button changed: ");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine($"\"{targetButton.Title}\" → \"{postButtonText}\"");
+            Console.ResetColor();
+            anyReaction = true;
+        }
+
+        // Check for popups from same process
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+            if (pid != targetPid || hWnd == win.Handle || hWnd == postFgHwnd) return true;
+            NativeMethods.GetWindowRect(hWnd, out var r);
+            if (r.Width < 50 || r.Height < 30) return true;
+            var info = WindowInfo.FromHwnd(hWnd);
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("  📢 Popup: ");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write($"[{info.ClassName}] \"{info.Title}\"");
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($" ({info.Rect.Width}x{info.Rect.Height})");
+            Console.ResetColor();
+            ReadDialogContents(hWnd);
+            anyReaction = true;
+            return true;
+        }, IntPtr.Zero);
+
+        if (!anyReaction)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("  (no visible reaction)");
+            Console.ResetColor();
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Find and click the first Button in a dialog window.
+    /// Searches direct children and one level of nested panels.
+    /// </summary>
+    private static void ClickFirstButtonInDialog(IntPtr hDialog, string label)
+    {
+        // Find first button: direct children, then one level deeper
+        var allChildren = new List<WindowInfo>();
+        FindAllChildrenFlat(hDialog, allChildren, 0, 3);
+        var buttons = allChildren.Where(c => c.ClassName == "Button" && c.IsVisible && c.Rect.Width > 10)
+            .OrderBy(b => b.Rect.Left).ToList();
+
+        if (buttons.Count == 0) return;
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write($"  ✓ Auto-{label}: ");
+        Console.ResetColor();
+
+        SmartClickButton(buttons[0].Handle, hDialog);
+    }
+
+    /// <summary>
+    /// Smart click: tries 3 strategies in order, checking for window change after each.
+    /// Priority: no cursor movement first → cursor movement last.
+    /// 1. BM_CLICK (message, no cursor)
+    /// 2. WM_LBUTTONDOWN/UP (message, no cursor)
+    /// 3. SendInput physical mouse (moves cursor)
+    /// Detection: checks if dialog closed OR a new modal appeared.
+    /// </summary>
+    private static bool SmartClickButton(IntPtr hButton, IntPtr hDialogOrParent)
+    {
+        NativeMethods.GetWindowRect(hButton, out var btnRect);
+        int cx = (btnRect.Left + btnRect.Right) / 2;
+        int cy = (btnRect.Top + btnRect.Bottom) / 2;
+
+        // Snapshot: foreground window before clicking
+        var fgBefore = NativeMethods.GetForegroundWindow();
+
+        // Strategy 1: BM_CLICK — no cursor movement
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write($"@({cx},{cy}) BM_CLICK");
+        Console.ResetColor();
+        NativeMethods.PostMessageW(hButton, 0x00F5 /*BM_CLICK*/, IntPtr.Zero, IntPtr.Zero);
+        if (CheckDialogGone(hDialogOrParent, fgBefore, "BM_CLICK")) return true;
+
+        // Strategy 2: WM_LBUTTONDOWN/UP — no cursor movement
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write(" → WM_LBUTTON");
+        Console.ResetColor();
+        int localX = (btnRect.Right - btnRect.Left) / 2;
+        int localY = (btnRect.Bottom - btnRect.Top) / 2;
+        IntPtr lParam = (IntPtr)((localY << 16) | (localX & 0xFFFF));
+        NativeMethods.SendMessageW(hButton, 0x0201, (IntPtr)0x0001, lParam);
+        Thread.Sleep(80);
+        NativeMethods.SendMessageW(hButton, 0x0202, IntPtr.Zero, lParam);
+        if (CheckDialogGone(hDialogOrParent, fgBefore, "WM_LBUTTON")) return true;
+
+        // Strategy 3: Physical mouse — moves cursor
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write(" → SendInput");
+        Console.ResetColor();
+        // Bring dialog to front first
+        NativeMethods.SetForegroundWindow(hDialogOrParent);
+        Thread.Sleep(100);
+        MouseInput.MoveTo(cx, cy);
+        Thread.Sleep(150);
+        var downInput = new INPUT[1];
+        downInput[0].type = INPUT.INPUT_MOUSE;
+        downInput[0].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTDOWN;
+        downInput[0].u.mi.dwExtraInfo = NativeMethods.GetMessageExtraInfo();
+        NativeMethods.SendInput(1, downInput, Marshal.SizeOf<INPUT>());
+        Thread.Sleep(80);
+        var upInput = new INPUT[1];
+        upInput[0].type = INPUT.INPUT_MOUSE;
+        upInput[0].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTUP;
+        upInput[0].u.mi.dwExtraInfo = NativeMethods.GetMessageExtraInfo();
+        NativeMethods.SendInput(1, upInput, Marshal.SizeOf<INPUT>());
+        if (CheckDialogGone(hDialogOrParent, fgBefore, "SendInput")) return true;
+
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine(" ✗ (all strategies failed)");
+        Console.ResetColor();
+        return false;
+    }
+
+    /// <summary>
+    /// Robust check: did the dialog close or did a new modal appear?
+    /// Waits, then triple-checks: IsWindow + IsWindowVisible + foreground change + new modal.
+    /// </summary>
+    private static bool CheckDialogGone(IntPtr hDialog, IntPtr fgBefore, string strategyName)
+    {
+        Thread.Sleep(400);
+
+        // Check 1: Is the window handle still valid?
+        bool hwndValid = NativeMethods.IsWindow(hDialog);
+        bool hwndVisible = hwndValid && NativeMethods.IsWindowVisible(hDialog);
+
+        // Check 2: Did the foreground window change? (new modal may have appeared)
+        var fgNow = NativeMethods.GetForegroundWindow();
+        bool fgChanged = fgNow != fgBefore && fgNow != hDialog;
+
+        // Check 3: Re-verify after another short wait (avoid transient states)
+        if (!hwndValid || !hwndVisible)
+        {
+            Thread.Sleep(200);
+            hwndValid = NativeMethods.IsWindow(hDialog);
+            hwndVisible = hwndValid && NativeMethods.IsWindowVisible(hDialog);
+        }
+
+        bool dialogGone = !hwndValid || !hwndVisible;
+        bool newModalAppeared = fgChanged && fgNow != IntPtr.Zero;
+
+        if (dialogGone)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($" ✓ [{strategyName}: dialog closed]");
+            Console.ResetColor();
+            return true;
+        }
+
+        if (newModalAppeared)
+        {
+            // A new window appeared on top — the click probably worked and triggered something
+            var sb = new System.Text.StringBuilder(256);
+            NativeMethods.GetWindowTextW(fgNow, sb, 256);
+            string newTitle = sb.ToString();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write($" ✓ [{strategyName}: new modal] ");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"\"{newTitle}\"");
+            Console.ResetColor();
+            return true;
+        }
+
+        return false; // no change detected, try next strategy
+    }
+
+    /// <summary>
+    /// Click a button in a top-level dialog by title match.
+    /// Usage: appbot dialog-click "dialog title" [button-index]
+    /// Uses physical mouse click (works with owner-drawn buttons).
+    /// </summary>
+    static int DialogClickCommand(string[] args)
+    {
+        if (args.Length < 1)
+            return Error(@"Usage: appbot dialog-click <dialog-title> [button-index]
+  Finds a dialog by title and clicks a button using physical mouse.
+  button-index: 0=first (default), 1=second, etc.");
+
+        string title = args[0];
+        int btnIndex = args.Length >= 2 && int.TryParse(args[1], out var bi) ? bi : 0;
+
+        // Find dialog
+        var windows = WindowFinder.FindByTitle(title);
+        if (windows.Count == 0) return Error($"Dialog not found: \"{title}\"");
+        var dlg = windows[0];
+        Console.WriteLine($"Dialog: [{dlg.Handle:X8}] \"{dlg.Title}\" ({dlg.Rect.Width}x{dlg.Rect.Height})");
+
+        // Find all buttons recursively (up to 2 levels)
+        var buttons = new List<WindowInfo>();
+        var allChildren = new List<WindowInfo>();
+        FindAllChildrenFlat(dlg.Handle, allChildren, 0, 3);
+        buttons = allChildren.Where(c => c.ClassName == "Button" && c.IsVisible && c.Rect.Width > 10)
+            .OrderBy(b => b.Rect.Left).ToList(); // left-to-right order (확인 first)
+
+        if (buttons.Count == 0) return Error("No buttons found in dialog.");
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        for (int i = 0; i < buttons.Count; i++)
+        {
+            var b = buttons[i];
+            var txt = !string.IsNullOrEmpty(b.Title) ? $"\"{b.Title}\"" : "(owner-drawn)";
+            var marker = i == btnIndex ? " ◀" : "";
+            Console.WriteLine($"  [{i}] {txt} {b.Rect.Width}x{b.Rect.Height} @({b.Rect.Left},{b.Rect.Top}){marker}");
+        }
+        Console.ResetColor();
+
+        if (btnIndex >= buttons.Count)
+            return Error($"Button index {btnIndex} out of range (have {buttons.Count})");
+
+        var target = buttons[btnIndex];
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write($"  Clicking [{btnIndex}]: ");
+        Console.ResetColor();
+        SmartClickButton(target.Handle, dlg.Handle);
+
+        // Check if dialog closed
+        if (!NativeMethods.IsWindowVisible(dlg.Handle))
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("  Dialog closed ✓");
+            Console.ResetColor();
+        }
+
+        return 0;
+    }
+
+    static int FormDumpCommand(string[] args)
+    {
+        if (args.Length < 2)
+            return Error("Usage: appbot form-dump <window-title> <form-id> [--depth N]");
+
+        string title = args[0];
+        string targetFormId = args[1];
+        int maxDepth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 6;
+
+        var windows = WindowFinder.FindByTitle(title);
+        if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
+        var win = windows[0];
+
+        var scanResult = AppScanner.Scan(win.Handle);
+        var targetForm = scanResult.Forms.FirstOrDefault(f => f.FormId == targetFormId);
+        if (targetForm == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Form [{targetFormId}] not found.");
+            Console.ResetColor();
+            foreach (var f in scanResult.Forms.Where(f => f.FormId != null).GroupBy(f => f.FormId!))
+                Console.WriteLine($"  [{f.First().FormId}] {f.First().FormName}");
+            return 1;
+        }
+
+        Console.WriteLine($"Form: [{targetForm.FormId}] {targetForm.FormName} ({targetForm.Rect.Width}x{targetForm.Rect.Height})");
+        Console.WriteLine();
+
+        DumpFormTree(targetForm.Handle, 0, maxDepth);
+        return 0;
+    }
+
+    /// <summary>
+    /// Find MFC custom combo-like controls: AfxWnd parent with an enabled Edit child,
+    /// small size, positioned above the target button. Direct Win32 tree walk.
+    /// </summary>
+    /// <summary>Flat enumeration of all child windows (for finding dropdown ListBox etc).</summary>
+    private static void FindAllChildrenFlat(IntPtr hParent, List<WindowInfo> results, int depth, int maxDepth)
+    {
+        if (depth > maxDepth) return;
+        var children = WindowFinder.GetChildrenZOrder(hParent);
+        foreach (var child in children)
+        {
+            results.Add(child);
+            FindAllChildrenFlat(child.Handle, results, depth + 1, maxDepth);
+        }
+    }
+
+    private static void FindMfcCombos(IntPtr hParent, RECT buttonRect, List<WindowInfo> results, int depth, int maxDepth)
+    {
+        if (depth > maxDepth) return;
+        var children = WindowFinder.GetChildrenZOrder(hParent);
+        foreach (var child in children)
+        {
+            if (!child.IsVisible) continue;
+
+            // Check if this AfxWnd looks like a combo container
+            if (child.ClassName.StartsWith("Afx") &&
+                child.Rect.Height >= 20 && child.Rect.Height <= 35 &&
+                child.Rect.Width >= 50 && child.Rect.Width <= 200 &&
+                child.Rect.Top >= buttonRect.Top - 80 &&
+                child.Rect.Top <= buttonRect.Top)
+            {
+                // Check for Edit child that is enabled
+                var grandChildren = WindowFinder.GetChildrenZOrder(child.Handle);
+                var edit = grandChildren.FirstOrDefault(c => c.ClassName == "Edit" && NativeMethods.IsWindowEnabled(c.Handle));
+                if (edit != null)
+                {
+                    // Read current text
+                    var sb = new StringBuilder(256);
+                    NativeMethods.SendMessageW(edit.Handle, 0x000D /*WM_GETTEXT*/, (IntPtr)256, sb);
+                    var currentText = sb.ToString();
+
+                    // Skip account number (has dash like "5229-9737") and stock code (cid=32760)
+                    if (currentText.Contains("-") && currentText.Length >= 8) goto recurse;
+                    if (edit.ControlId == 32760) goto recurse;
+
+                    // Skip disabled containers
+                    if (!NativeMethods.IsWindowEnabled(child.Handle)) goto recurse;
+
+                    results.Add(child);
+                    continue; // don't recurse into combos
+                }
+            }
+
+            recurse:
+            FindMfcCombos(child.Handle, buttonRect, results, depth + 1, maxDepth);
+        }
+    }
+
+    private static void DumpFormTree(IntPtr hParent, int level, int maxDepth)
+    {
+        if (level > maxDepth) return;
+        var children = WindowFinder.GetChildrenZOrder(hParent);
+        var indent = new string(' ', level * 2);
+
+        foreach (var child in children)
+        {
+            // Read text via WM_GETTEXT
+            var sb = new StringBuilder(512);
+            NativeMethods.SendMessageW(child.Handle, 0x000D /*WM_GETTEXT*/, (IntPtr)512, sb);
+            var text = sb.ToString();
+            var textDisplay = string.IsNullOrEmpty(text) ? "" : $" \"{text}\"";
+
+            var vis = child.IsVisible ? "" : " [H]";
+            var en = NativeMethods.IsWindowEnabled(child.Handle) ? "" : " [disabled]";
+
+            // Color by class
+            var color = child.ClassName switch
+            {
+                "Button" => ConsoleColor.Yellow,
+                "ComboBox" => ConsoleColor.Blue,
+                "Edit" => ConsoleColor.Green,
+                "Static" => ConsoleColor.DarkGray,
+                "ListBox" => ConsoleColor.Cyan,
+                _ when child.ClassName.StartsWith("Afx") => ConsoleColor.Gray,
+                _ => ConsoleColor.White
+            };
+
+            Console.ForegroundColor = color;
+            Console.Write($"{indent}[{child.ClassName}]");
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.Write($" cid={child.ControlId}");
+            if (!string.IsNullOrEmpty(textDisplay))
+            {
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write(textDisplay);
+            }
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.Write($" {child.Rect.Width}x{child.Rect.Height} @({child.Rect.Left},{child.Rect.Top}){vis}{en}");
+            Console.WriteLine();
+            Console.ResetColor();
+
+            DumpFormTree(child.Handle, level + 1, maxDepth);
+        }
+    }
+
+    /// <summary>
+    /// Recursively find all controls inside a window (buttons, combos, edits, etc).
+    /// Buttons are found at leaf level; ComboBox is NOT recursed into (it has internal Edit+ListBox).
+    /// </summary>
+    private static void FindControlsRecursive(
+        IntPtr hParent, string path, int depth, int maxDepth,
+        List<(WindowInfo Info, int Depth, string Path)> results)
+    {
+        if (depth > maxDepth) return;
+
+        var children = WindowFinder.GetChildrenZOrder(hParent);
+        foreach (var child in children)
+        {
+            var childPath = string.IsNullOrEmpty(path) ? child.ClassName : $"{path}>{child.ClassName}";
+
+            // Record interesting control types
+            if (child.ClassName is "Button" or "ComboBox" or "Edit" or "Static" or "ListBox"
+                or "SysListView32" or "SysTreeView32")
+            {
+                results.Add((child, depth, childPath));
+            }
+
+            // Also record MFC owner-drawn buttons (AfxWnd with small size that look like buttons)
+            if (child.ClassName.StartsWith("Afx") && child.Rect.Width > 10 && child.Rect.Height > 10
+                && child.Rect.Width < 200 && child.Rect.Height < 60 && child.IsVisible)
+            {
+                // Check if it has button-like text (from GetWindowText)
+                if (!string.IsNullOrEmpty(child.Title))
+                    results.Add((child, depth, childPath));
+            }
+
+            // Don't recurse into ComboBox (has internal Edit+ListBox children)
+            if (child.ClassName != "ComboBox")
+            {
+                FindControlsRecursive(child.Handle, childPath, depth + 1, maxDepth, results);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Read and display contents of a dialog/popup window.
+    /// Uses Win32 GetWindowText first, falls back to OCR for owner-drawn content.
+    /// </summary>
+    private static void ReadDialogContents(IntPtr hDialog)
+    {
+        var children = WindowFinder.GetChildrenZOrder(hDialog);
+        bool foundText = false;
+
+        // Pass 1: Try Win32 GetWindowText on children
+        foreach (var child in children)
+        {
+            var text = WindowFinder.GetWindowText(child.Handle);
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            if (child.ClassName == "Static")
+            {
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write("         message: ");
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"\"{text}\"");
+                Console.ResetColor();
+                foundText = true;
+            }
+            else if (child.ClassName == "Button")
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"         button: [{text}]");
+                Console.ResetColor();
+            }
+        }
+
+        // Recurse one level for nested dialogs
+        foreach (var child in children)
+        {
+            if (child.ClassName == "#32770" || child.ClassName.StartsWith("Afx"))
+            {
+                var subChildren = WindowFinder.GetChildrenZOrder(child.Handle);
+                foreach (var sc in subChildren)
+                {
+                    var text = WindowFinder.GetWindowText(sc.Handle);
+                    if (string.IsNullOrWhiteSpace(text)) continue;
+
+                    if (sc.ClassName == "Static")
+                    {
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.Write("         message: ");
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"\"{text}\"");
+                        Console.ResetColor();
+                        foundText = true;
+                    }
+                    else if (sc.ClassName == "Button")
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"         button: [{text}]");
+                        Console.ResetColor();
+                    }
+                }
+            }
+        }
+
+        // Pass 2: If no Static text found, try OCR on the dialog window
+        if (!foundText)
+        {
+            try
+            {
+                using var bmp = ScreenCapture.CaptureWindow(hDialog);
+                if (bmp.Width > 20 && bmp.Height > 20)
+                {
+                    var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
+                    var lang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
+                    using var ocr = new SimpleOcrAnalyzer(primaryLanguage: lang, confidenceThreshold: 0.5f);
+
+                    var result = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
+                    if (result.Words.Count > 0)
+                    {
+                        // Filter out button text, keep dialog message text only
+                        var buttonTexts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var child in children)
+                        {
+                            var bt = WindowFinder.GetWindowText(child.Handle);
+                            if (!string.IsNullOrWhiteSpace(bt)) buttonTexts.Add(bt.Trim());
+                        }
+
+                        var messageWords = result.Words
+                            .Where(w => !buttonTexts.Contains(w.Text.Trim()))
+                            .Select(w => w.Text)
+                            .ToList();
+
+                        if (messageWords.Count > 0)
+                        {
+                            var ocrMsg = string.Join(" ", messageWords);
+                            Console.ForegroundColor = ConsoleColor.White;
+                            Console.Write("         OCR: ");
+                            Console.ForegroundColor = ConsoleColor.Cyan;
+                            Console.WriteLine($"\"{ocrMsg}\"");
+                            Console.ResetColor();
+                        }
+                    }
+                }
+            }
+            catch { /* OCR not critical */ }
+        }
+    }
+
     // ── helpers ─────────────────────────────────────────────────
 
     static int PrintUsage()
@@ -1062,6 +2685,7 @@ Usage:
   appbot watch [--duration N] [--live] [--win32] [--interval N] [--save file]
   appbot capture <window-title> [-o output.png]
   appbot hts-stress <form.xmf> [-n 20] [--pattern repeat|memory|ctx-only]
+  appbot scan <window-title> [--save] [--ocr] [--depth N]
 
 Commands:
   run        Run a test scenario (with passive [WATCH] background tracker)
@@ -1071,6 +2695,7 @@ Commands:
   watch      Real-time element tracking under mouse cursor
   capture    Capture a screenshot of a window
   hts-stress HTS MDI stress test (3 patterns: repeat/memory/ctx-only)
+  scan       Scan window structure (auto-classify zones + MDI forms + experience DB)
 
 Run options:
   --no-watch          Disable passive background element watcher

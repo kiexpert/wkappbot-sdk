@@ -211,7 +211,7 @@ public static class WindowFinder
     /// <summary>
     /// Get direct child windows in Z-order (front to back) using GetWindow chain.
     /// </summary>
-    private static List<WindowInfo> GetChildrenZOrder(IntPtr hParent)
+    public static List<WindowInfo> GetChildrenZOrder(IntPtr hParent)
     {
         var results = new List<WindowInfo>();
         var child = NativeMethods.GetWindow(hParent, NativeMethods.GW_CHILD);
