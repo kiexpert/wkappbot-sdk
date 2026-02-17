@@ -1,32 +1,39 @@
 using System.Diagnostics;
+using System.Drawing;
+using WKAppBot.Vision;
 using WKAppBot.Win32.Accessibility;
+using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.Core.Runner;
 
 /// <summary>
-/// Passive background element tracker.
-/// Runs as a background thread during scenario execution,
-/// outputting [WATCH] tagged lines when the element under the tracking point changes.
+/// Passive background element tracker with optional OCR measurement.
 ///
-/// Tracking priority:
-///   1. Test action point (from ActionExecutor via RuntimeContext.LastActionPoint)
-///   2. Mouse cursor position (fallback when no test action point)
+/// Output layout (stable LEFT → volatile RIGHT):
 ///
-/// If the test target window is occluded, brings it to front automatically.
+/// Line 1: [WATCH] [ClassPath] UIA name hierarchy path
+/// Line 2: [WATCH] [Type] "Name" aid="id" (patterns)
+/// Line 3: [WATCH] OCR="text" conf=0.95★  UIA↔OCR=90%  watch/001.png    (nudge only)
+/// Line 4: [WATCH] ← action  (x,y) HH:mm:ss.fff                        (volatile, \r)
+///
+/// OCR runs only on nudge (force=true) to avoid CPU waste.
+/// Screenshots saved to {VisionCacheDir}/watch/ on each nudge.
 /// </summary>
 public sealed class BackgroundWatcher : IDisposable
 {
     private readonly int _intervalMs;
     private readonly object _consoleLock;
     private readonly RuntimeContext? _ctx;
+    private readonly SimpleOcrAnalyzer? _ocr;
     private Thread? _thread;
     private volatile bool _running;
     private UiaLocator? _uia;
 
     // Stats
     private int _changeCount;
+    private int _ocrRunCount;
     private readonly HashSet<string> _seenElements = new();
     private readonly Stopwatch _uptime = new();
 
@@ -35,54 +42,40 @@ public sealed class BackgroundWatcher : IDisposable
     private int _lastPtX = -1, _lastPtY = -1;
     private bool _lineHasContent;
 
+    // Cache the stable prefix so \r can just redraw coords+timestamp
+    private string _stablePrefix = "";
+
     // Track last action point to detect changes
     private DateTime _lastActionTimestamp = DateTime.MinValue;
     private bool _lastWasTestPoint;
 
-    // Nudge signal: wakes up the background thread for immediate poll
+    // Nudge signal + ack
     private readonly ManualResetEventSlim _nudgeSignal = new(false);
-    // Ack signal: background thread sets this after processing a nudge
     private readonly ManualResetEventSlim _nudgeAck = new(false);
 
-    /// <summary>
-    /// Create a background watcher.
-    /// </summary>
-    /// <param name="intervalMs">Polling interval in ms (default: 200)</param>
-    /// <param name="consoleLock">Shared lock for console output (shared with ScenarioRunner)</param>
-    /// <param name="ctx">Runtime context for reading test action points. Null = mouse-only mode.</param>
-    public BackgroundWatcher(int intervalMs = 200, object? consoleLock = null, RuntimeContext? ctx = null)
+    /// <param name="ocr">Optional OCR analyzer. When provided + OcrPreview, runs OCR on nudge.</param>
+    public BackgroundWatcher(
+        int intervalMs = 200,
+        object? consoleLock = null,
+        RuntimeContext? ctx = null,
+        SimpleOcrAnalyzer? ocr = null)
     {
         _intervalMs = intervalMs;
         _consoleLock = consoleLock ?? new object();
         _ctx = ctx;
+        _ocr = ocr;
     }
 
-    /// <summary>
-    /// The shared console lock. ScenarioRunner should use this same lock for [RUN] output.
-    /// </summary>
     public object ConsoleLock => _consoleLock;
 
-    /// <summary>
-    /// Force an immediate watch output for the current action point.
-    /// Called by ScenarioRunner after each action completes.
-    /// Signals the background thread to wake up and poll immediately,
-    /// then waits for acknowledgment (max 100ms) to ensure output before [RUN] continues.
-    /// (UIA COM objects must be used on the thread that created them.)
-    /// </summary>
     public void Nudge()
     {
         if (!_running) return;
         _nudgeAck.Reset();
         _nudgeSignal.Set();
-        // Wait for background thread to process — ensures [⚡TEST] appears before [RUN] result
-        // User preference: "테스트입력은 사람보다 빠를필요는 없으므로 와치출력이 완료된 이후에 해도 될것 같아요"
-        // Use generous timeout (2s) to guarantee watch output completes before next step
         _nudgeAck.Wait(2000);
     }
 
-    /// <summary>
-    /// Start passive background watching.
-    /// </summary>
     public void Start()
     {
         if (_running) return;
@@ -98,9 +91,6 @@ public sealed class BackgroundWatcher : IDisposable
         _thread.Start();
     }
 
-    /// <summary>
-    /// Stop the watcher and print summary.
-    /// </summary>
     public void Stop(bool printSummary = true)
     {
         if (!_running) return;
@@ -112,14 +102,14 @@ public sealed class BackgroundWatcher : IDisposable
         {
             lock (_consoleLock)
             {
-                // Finalize any pending \r line
                 if (_lineHasContent)
                     Console.WriteLine();
 
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write("[WATCH] ");
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"Stopped. {_changeCount} changes, {_seenElements.Count} unique elements in {_uptime.Elapsed:mm\\:ss\\.f}");
+                var ocrInfo = _ocrRunCount > 0 ? $", {_ocrRunCount} OCR scans" : "";
+                Console.WriteLine($"Stopped. {_changeCount} changes, {_seenElements.Count} unique elements{ocrInfo} in {_uptime.Elapsed:mm\\:ss\\.f}");
                 Console.ResetColor();
             }
         }
@@ -133,30 +123,18 @@ public sealed class BackgroundWatcher : IDisposable
 
             while (_running)
             {
-                // Check if nudged (force immediate poll)
                 bool wasNudged = _nudgeSignal.IsSet;
                 if (wasNudged) _nudgeSignal.Reset();
 
-                try
-                {
-                    PollOnce(force: wasNudged);
-                }
-                catch
-                {
-                    // Silently skip errors — passive mode, don't disrupt run
-                }
+                try { PollOnce(force: wasNudged); }
+                catch { }
 
-                // Acknowledge nudge so caller can proceed
                 if (wasNudged) _nudgeAck.Set();
 
-                // Wait for interval OR nudge signal (whichever comes first)
                 _nudgeSignal.Wait(_intervalMs);
             }
         }
-        catch
-        {
-            // Thread died — that's ok for passive mode
-        }
+        catch { }
         finally
         {
             _uia?.Dispose();
@@ -169,16 +147,14 @@ public sealed class BackgroundWatcher : IDisposable
         if (_uia == null) return;
 
         // ── Determine tracking point ────────────────────────
-        // Priority: test action point > mouse cursor
         POINT pt;
         bool isTestPoint = false;
-        bool isNewAction = false;  // true = new test action since last poll
+        bool isNewAction = false;
         string? actionLabel = null;
 
         var actionPt = _ctx?.LastActionPoint;
         if (actionPt != null && actionPt.Timestamp > _lastActionTimestamp)
         {
-            // New test action point available — this is the primary change signal
             pt = new POINT { X = actionPt.X, Y = actionPt.Y };
             isTestPoint = true;
             isNewAction = true;
@@ -187,14 +163,12 @@ public sealed class BackgroundWatcher : IDisposable
         }
         else if (actionPt != null && _lastWasTestPoint)
         {
-            // Same test point, keep tracking it (don't fall back to mouse mid-step)
             pt = new POINT { X = actionPt.X, Y = actionPt.Y };
             isTestPoint = true;
             actionLabel = actionPt.Action;
         }
         else
         {
-            // No test action point — fall back to mouse cursor
             NativeMethods.GetCursorPos(out pt);
         }
 
@@ -206,16 +180,11 @@ public sealed class BackgroundWatcher : IDisposable
 
         if (isTestPoint && _ctx?.MainWindowHandle != IntPtr.Zero)
         {
-            // Test mode: use the test target window directly
             hWndTarget = _ctx!.MainWindowHandle;
             targetClass = WindowFinder.GetClassName(hWndTarget);
-
-            // NOTE: UIA works even when window is occluded, no forced focus needed.
-            // Vision fallback would need EnsureWindowVisible() here in the future.
         }
         else
         {
-            // Mouse mode: probe from point
             var hWndTop = NativeMethods.WindowFromPoint(pt);
             var topClass = WindowFinder.GetClassName(hWndTop);
             hWndTarget = NativeMethods.FindRealWindowFromPoint(pt, hWndTop, topClass);
@@ -228,14 +197,11 @@ public sealed class BackgroundWatcher : IDisposable
 
         if (isTestPoint)
         {
-            // For test points, always query within the target window tree
             elemInfo = _uia.GetElementAtPointInWindow(pt.X, pt.Y, hWndTarget);
         }
         else
         {
-            // Mouse mode: full probe with overlay detection
             var hWndTop2 = NativeMethods.WindowFromPoint(pt);
-            var topClass2 = WindowFinder.GetClassName(hWndTop2);
             overlayDetected = (hWndTarget != hWndTop2);
 
             if (overlayDetected)
@@ -246,7 +212,6 @@ public sealed class BackgroundWatcher : IDisposable
             {
                 elemInfo = _uia.GetElementAtPoint(pt.X, pt.Y);
 
-                // Check for known overlay elements
                 if (elemInfo != null && IsOverlayElement(elemInfo.AutomationId, targetClass))
                 {
                     overlayDetected = true;
@@ -280,22 +245,15 @@ public sealed class BackgroundWatcher : IDisposable
         bool elementChanged = (elemKey != _lastElemKey);
         bool posChanged = (pt.X != _lastPtX || pt.Y != _lastPtY);
 
-        // Test mode: new action timestamp = always significant change
-        // (even if same element at same position — e.g. pressing Escape twice on same window center)
-        // Mouse mode: only react to element/position changes
         if (!force && !isNewAction && !elementChanged && !posChanged) return;
 
-        // Full output (with hierarchy path) when:
-        //   - Nudge (force): shell-prompt style, always before/after each step
-        //   - New test action: action timestamp changed = new input happened
-        //   - Element changed: different UI element under point
         bool fullOutput = force || isNewAction || elementChanged;
 
         _lastPtX = pt.X;
         _lastPtY = pt.Y;
         var ts = DateTime.Now.ToString("HH:mm:ss.fff");
 
-        // Build hierarchy path for full output
+        // Build hierarchy path
         string? hierarchyPath = null;
         if (fullOutput)
         {
@@ -306,10 +264,40 @@ public sealed class BackgroundWatcher : IDisposable
             catch { }
         }
 
-        // ── Tag: always [WATCH] ──────────────────────────────
-        string tag = "WATCH";
-        var tagColor = ConsoleColor.DarkGray;
+        // ── OCR: only on nudge (force) + OcrPreview enabled ──
+        OcrMatchResult? ocrResult = null;
+        string? screenshotPath = null;
+        bool doOcr = force && _ocr != null && _ctx?.OcrPreview == true && hWndTarget != IntPtr.Zero;
 
+        if (doOcr)
+        {
+            try
+            {
+                using var screenshot = ScreenCapture.CaptureWindow(hWndTarget);
+
+                // Save screenshot
+                var watchDir = Path.Combine(_ctx!.VisionCacheDir.Replace("/entries", ""), "watch");
+                if (!Directory.Exists(watchDir)) Directory.CreateDirectory(watchDir);
+
+                var safeName = (elemInfo?.AutomationId ?? elemInfo?.Name ?? "unknown")
+                    .Replace(" ", "_").Replace("/", "_").Replace("\\", "_");
+                if (safeName.Length > 30) safeName = safeName[..30];
+                screenshotPath = Path.Combine(watchDir, $"{_ocrRunCount:D3}_{safeName}.png");
+                ScreenCapture.SaveToFile(screenshot, screenshotPath);
+
+                // Run OCR if element has text to compare
+                var searchText = elemInfo?.Name;
+                if (!string.IsNullOrEmpty(searchText))
+                {
+                    ocrResult = _ocr!.FindElement(screenshot, searchText).GetAwaiter().GetResult();
+                }
+
+                _ocrRunCount++;
+            }
+            catch { /* OCR errors are non-fatal in watch mode */ }
+        }
+
+        // ── Output ──────────────────────────────────────────
         lock (_consoleLock)
         {
             if (fullOutput)
@@ -321,17 +309,15 @@ public sealed class BackgroundWatcher : IDisposable
                     _seenElements.Add(elemKey);
                 }
 
-                // Finalize previous \r line
                 if (_lineHasContent)
                     Console.WriteLine();
 
-                // Line 1: combined hierarchy path
+                // Line 1: [WATCH] [ClassPath] hierarchy
                 if (!string.IsNullOrEmpty(hierarchyPath))
                 {
-                    Console.ForegroundColor = tagColor;
-                    Console.Write($"[{tag}] ");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("[WATCH] ");
 
-                    // Split at "] " to color brackets differently
                     var bracketEnd = hierarchyPath.IndexOf("] ");
                     if (bracketEnd >= 0)
                     {
@@ -351,57 +337,152 @@ public sealed class BackgroundWatcher : IDisposable
                         Console.ForegroundColor = ConsoleColor.Red;
                         Console.Write($"  !! overlay");
                     }
+                    Console.WriteLine();
+                }
+
+                // Line 2: [WATCH] [Type] "Name" aid="id" (patterns)
+                WriteStablePart(elemInfo);
+
+                // Line 3: [WATCH] OCR results (nudge only)
+                if (ocrResult != null || screenshotPath != null)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("[WATCH] ");
+
+                    if (ocrResult != null)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.Write($"OCR=\"{ocrResult.MatchedText}\"");
+
+                        var confColor = ocrResult.Confidence >= 0.9 ? ConsoleColor.Green
+                                      : ocrResult.Confidence >= 0.7 ? ConsoleColor.Yellow
+                                      : ConsoleColor.Red;
+                        Console.ForegroundColor = confColor;
+                        Console.Write($" conf={ocrResult.Confidence:F2}");
+                        if (ocrResult.Confidence >= 0.9) Console.Write("\u2605"); // ★
+
+                        // UIA↔OCR match rate
+                        if (elemInfo?.Name != null)
+                        {
+                            double matchRate = CalculateTextMatchRate(elemInfo.Name, ocrResult.MatchedText);
+                            var mrColor = matchRate >= 0.9 ? ConsoleColor.Green
+                                        : matchRate >= 0.7 ? ConsoleColor.Yellow
+                                        : ConsoleColor.Red;
+                            Console.ForegroundColor = mrColor;
+                            Console.Write($"  UIA\u2194OCR={matchRate:P0}");
+                            if (matchRate >= 0.9) Console.Write("\u2605");
+                        }
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write("OCR=(no match)");
+                    }
+
+                    if (screenshotPath != null)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write($"  {screenshotPath}");
+                    }
 
                     Console.WriteLine();
                 }
 
-                // Line 2: timestamp + coords + element detail (\r overwritable)
-                Console.ForegroundColor = tagColor;
-                Console.Write($"[{tag}] ");
-
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($"{ts}  ");
-
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.Write($"({pt.X,5},{pt.Y,5})  ");
-
-                WriteElement(elemInfo);
-
-                // Show action label for test points
-                if (isTestPoint && actionLabel != null)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.Write($"  ← {actionLabel}");
-                }
+                // Line 4 (volatile): ← action  (x,y) timestamp
+                WriteActionLine(isTestPoint, actionLabel);
+                WriteVolatilePart(pt, ts);
 
                 Console.ResetColor();
                 _lineHasContent = true;
             }
             else if (posChanged && _lineHasContent)
             {
-                // Same element, position moved → \r overwrite (passive polling only)
                 ClearCurrentLine();
-
-                Console.ForegroundColor = tagColor;
-                Console.Write($"[{tag}] ");
-
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($"{ts}  ");
-
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.Write($"({pt.X,5},{pt.Y,5})  ");
-
-                WriteElement(elemInfo);
-
-                if (isTestPoint && actionLabel != null)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.Write($"  ← {actionLabel}");
-                }
-
+                WriteStablePrefixRaw();
+                WriteVolatilePart(pt, ts);
                 Console.ResetColor();
             }
         }
+    }
+
+    /// <summary>
+    /// Write element stable part (Line 2) and cache for \r redraws.
+    /// </summary>
+    private void WriteStablePart(ElementAtPointInfo? info)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("[WATCH] ");
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write("[WATCH] ");
+
+        WriteElement(info);
+        sb.Append(GetElementPlain(info));
+
+        Console.WriteLine();
+        // _stablePrefix used for Line 4 \r redraws
+    }
+
+    /// <summary>
+    /// Write action + pad for volatile (Line 4 left side), cache for \r.
+    /// </summary>
+    private void WriteActionLine(bool isTestPoint, string? actionLabel)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("[WATCH] ");
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write("[WATCH] ");
+
+        if (isTestPoint && actionLabel != null)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.Write($"\u2190 {actionLabel}  ");
+            sb.Append($"<- {actionLabel}  ");
+        }
+
+        _stablePrefix = sb.ToString();
+    }
+
+    /// <summary>
+    /// Redraw cached stable prefix for \r overwrites.
+    /// </summary>
+    private void WriteStablePrefixRaw()
+    {
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write(_stablePrefix);
+    }
+
+    /// <summary>
+    /// Write volatile part: coordinates + timestamp (rightmost, \r updatable).
+    /// </summary>
+    private static void WriteVolatilePart(POINT pt, string ts)
+    {
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.Write($"({pt.X,5},{pt.Y,5})");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write($" {ts}");
+    }
+
+    /// <summary>
+    /// Calculate text match rate between UIA name and OCR text.
+    /// </summary>
+    private static double CalculateTextMatchRate(string uiaText, string ocrText)
+    {
+        if (string.IsNullOrEmpty(uiaText) || string.IsNullOrEmpty(ocrText)) return 0;
+
+        var a = uiaText.ToLowerInvariant().Trim();
+        var b = ocrText.ToLowerInvariant().Trim();
+
+        if (a == b) return 1.0;
+        if (a.Contains(b) || b.Contains(a)) return 0.9;
+
+        // Dice coefficient
+        var setA = new HashSet<char>(a.Where(c => !char.IsWhiteSpace(c)));
+        var setB = new HashSet<char>(b.Where(c => !char.IsWhiteSpace(c)));
+        if (setA.Count == 0 || setB.Count == 0) return 0;
+        int intersection = setA.Intersect(setB).Count();
+        return 2.0 * intersection / (setA.Count + setB.Count);
     }
 
     private static void WriteElement(ElementAtPointInfo? info)
@@ -413,7 +494,6 @@ public sealed class BackgroundWatcher : IDisposable
             return;
         }
 
-        // Control type with color
         Console.ForegroundColor = info.ControlType switch
         {
             "Button" => ConsoleColor.Yellow,
@@ -445,6 +525,28 @@ public sealed class BackgroundWatcher : IDisposable
             Console.ForegroundColor = ConsoleColor.DarkCyan;
             Console.Write($" ({string.Join(",", info.Patterns)})");
         }
+    }
+
+    private static string GetElementPlain(ElementAtPointInfo? info)
+    {
+        if (info == null) return "[?]";
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"[{info.ControlType}]");
+
+        if (!string.IsNullOrEmpty(info.Name))
+        {
+            var display = info.Name.Length > 25 ? info.Name[..25] + "..." : info.Name;
+            sb.Append($" \"{display}\"");
+        }
+
+        if (!string.IsNullOrEmpty(info.AutomationId))
+            sb.Append($" aid=\"{info.AutomationId}\"");
+
+        if (info.Patterns.Count > 0)
+            sb.Append($" ({string.Join(",", info.Patterns)})");
+
+        return sb.ToString();
     }
 
     private static bool IsOverlayElement(string? automationId, string className)

@@ -86,13 +86,13 @@ W:\SDK\dotnet\dotnet.exe
 
 ### 실행 (4칙연산 테스트 — bash)
 ```bash
-DOTNET_ROOT='W:/SDK/dotnet' 'W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/bin/Release/net8.0-windows/wkappbot.exe' run 'W:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml' -v
+DOTNET_ROOT='W:/SDK/dotnet' 'W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/bin/Release/net8.0-windows10.0.22621.0/wkappbot.exe' run 'W:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml' -v
 ```
 
 ### 실행 (PowerShell)
 ```powershell
 $env:DOTNET_ROOT = 'W:\SDK\dotnet'
-& 'W:\GitHub\WKAppBot\csharp\src\WKAppBot.CLI\bin\Release\net8.0-windows\wkappbot.exe' run 'W:\GitHub\WKAppBot\scenarios\calc_four_ops.yaml' -v
+& 'W:\GitHub\WKAppBot\csharp\src\WKAppBot.CLI\bin\Release\net8.0-windows10.0.22621.0\wkappbot.exe' run 'W:\GitHub\WKAppBot\scenarios\calc_four_ops.yaml' -v
 ```
 
 ### CLI 명령어
@@ -297,7 +297,7 @@ teardown:
 - **미구현**: HTML 리포트, DPI 스케일링
 
 ## Important Notes
-- Windows 전용 (.NET 8.0 `net8.0-windows`)
+- Windows 전용 (.NET 8.0 `net8.0-windows10.0.22621.0`)
 - 한국어 UI 지원 (UTF-8 출력, Unicode Win32 API)
 - UWP 앱 (ApplicationFrameHost) 지원: 타이틀 검색 전략 포함
 - 계산기 PoC 시나리오가 기본 검증 테스트

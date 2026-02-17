@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.UIA3;
@@ -73,7 +74,71 @@ public sealed class UiaLocator : IDisposable
     }
 
     /// <summary>
+    /// Find element by Name pattern (wildcard or regex) within a window.
+    /// Walks all descendants and matches against pattern.
+    ///
+    /// Pattern syntax:
+    ///   "exact text"      — exact match (handled by FindByName, not this)
+    ///   "*partial*"       — wildcard (* = 0+ chars, ? = 1 char)
+    ///   "regex:pattern"   — regular expression
+    /// </summary>
+    public AutomationElement? FindByNamePattern(IntPtr hWnd, string pattern)
+    {
+        var matcher = PatternMatcher.Create(pattern);
+        var root = _automation.FromHandle(hWnd);
+        return FindFirstDescendantMatching(root, el =>
+        {
+            try { return matcher.IsMatch(el.Name ?? ""); } catch { return false; }
+        });
+    }
+
+    /// <summary>
+    /// Find element by AutomationId pattern (wildcard or regex).
+    /// </summary>
+    public AutomationElement? FindByAutomationIdPattern(IntPtr hWnd, string pattern)
+    {
+        var matcher = PatternMatcher.Create(pattern);
+        var root = _automation.FromHandle(hWnd);
+        return FindFirstDescendantMatching(root, el =>
+        {
+            try { return matcher.IsMatch(el.AutomationId ?? ""); } catch { return false; }
+        });
+    }
+
+    /// <summary>
+    /// Walk UIA tree and return first element matching a predicate.
+    /// BFS order for predictable results (closest to root first).
+    /// </summary>
+    private static AutomationElement? FindFirstDescendantMatching(
+        AutomationElement root, Func<AutomationElement, bool> predicate, int maxDepth = 6)
+    {
+        var queue = new Queue<(AutomationElement el, int depth)>();
+        queue.Enqueue((root, 0));
+
+        while (queue.Count > 0)
+        {
+            var (el, depth) = queue.Dequeue();
+
+            if (depth > 0 && predicate(el))
+                return el;
+
+            if (depth >= maxDepth) continue;
+
+            try
+            {
+                var children = el.FindAllChildren();
+                if (children != null)
+                    foreach (var child in children)
+                        queue.Enqueue((child, depth + 1));
+            }
+            catch { /* skip inaccessible subtrees */ }
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Combined locator: try AutomationId first, then Name, then ControlType.
+    /// Supports pattern matching: wildcard (*,?) and regex (prefix "regex:").
     /// Returns (element, method_used) or (null, null).
     /// </summary>
     public (AutomationElement? element, string? method) FindElement(
@@ -82,18 +147,37 @@ public sealed class UiaLocator : IDisposable
         string? name,
         string? controlType)
     {
+        // ── AutomationId: exact first, pattern fallback ──
         if (automationId != null)
         {
-            var el = FindByAutomationId(hWnd, automationId);
-            if (el != null) return (el, "automation_id");
+            if (PatternMatcher.IsPattern(automationId))
+            {
+                var el = FindByAutomationIdPattern(hWnd, automationId);
+                if (el != null) return (el, "automation_id_pattern");
+            }
+            else
+            {
+                var el = FindByAutomationId(hWnd, automationId);
+                if (el != null) return (el, "automation_id");
+            }
         }
 
+        // ── Name: exact first, pattern fallback ──
         if (name != null)
         {
-            var el = FindByName(hWnd, name);
-            if (el != null) return (el, "name");
+            if (PatternMatcher.IsPattern(name))
+            {
+                var el = FindByNamePattern(hWnd, name);
+                if (el != null) return (el, "name_pattern");
+            }
+            else
+            {
+                var el = FindByName(hWnd, name);
+                if (el != null) return (el, "name");
+            }
         }
 
+        // ── ControlType ──
         if (controlType != null)
         {
             var el = FindByControlType(hWnd, controlType, name);
@@ -498,4 +582,75 @@ public sealed class ElementAtPointInfo
 
     private static string Truncate(string s, int max) =>
         s.Length <= max ? s : s[..max] + "...";
+}
+
+/// <summary>
+/// Unified pattern matcher for UI element name/id matching.
+///
+/// Syntax:
+///   "exact text"       — literal exact match (default, backward-compatible)
+///   "*partial*"        — wildcard: * = 0+ chars, ? = 1 char (glob-style)
+///   "regex:pattern"    — regular expression (case-insensitive)
+///
+/// Examples:
+///   "num5Button"       → exact match for automation id
+///   "*Button*"         → any name containing "Button"
+///   "결과*"            → names starting with "결과"
+///   "regex:btn_\\d+"   → regex matching btn_ followed by digits
+///   "?u?"              → 3-char names with 'u' in middle
+/// </summary>
+public sealed class PatternMatcher
+{
+    private readonly Regex? _regex;
+    private readonly string? _literal;
+
+    private PatternMatcher(Regex regex) { _regex = regex; }
+    private PatternMatcher(string literal) { _literal = literal; }
+
+    /// <summary>
+    /// Create a matcher from a pattern string.
+    /// Auto-detects pattern type: regex: prefix, wildcard (*/?), or literal.
+    /// </summary>
+    public static PatternMatcher Create(string pattern)
+    {
+        // regex: prefix → explicit regex
+        if (pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase))
+        {
+            var regexStr = pattern[6..];
+            return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
+        }
+
+        // Contains wildcard chars → convert glob to regex
+        if (pattern.Contains('*') || pattern.Contains('?'))
+        {
+            var regexStr = "^" + Regex.Escape(pattern)
+                .Replace("\\*", ".*")
+                .Replace("\\?", ".") + "$";
+            return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
+        }
+
+        // Plain literal → exact match
+        return new PatternMatcher(pattern);
+    }
+
+    /// <summary>
+    /// Does the given pattern string use pattern syntax (wildcard/regex)?
+    /// If false, it's a plain literal and can use fast UIA PropertyCondition.
+    /// </summary>
+    public static bool IsPattern(string text) =>
+        text.StartsWith("regex:", StringComparison.OrdinalIgnoreCase) ||
+        text.Contains('*') || text.Contains('?');
+
+    /// <summary>
+    /// Test if a value matches this pattern.
+    /// </summary>
+    public bool IsMatch(string value)
+    {
+        if (_regex != null)
+            return _regex.IsMatch(value);
+        return string.Equals(_literal, value, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public override string ToString() =>
+        _regex != null ? $"pattern({_regex})" : $"literal({_literal})";
 }

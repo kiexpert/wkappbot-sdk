@@ -71,25 +71,7 @@ public sealed class ScenarioRunner
             LaunchApp(doc.App, ctx);
             LogRun($"Window found: 0x{ctx.MainWindowHandle:X8} \"{ctx.AppTitle}\"");
 
-            // 2. Start background watcher (passive mode, tracking test action points)
-            if (_watch)
-            {
-                watcher = new BackgroundWatcher(_watchIntervalMs, ctx: ctx);
-                _consoleLock = watcher.ConsoleLock;
-                ctx.ConsoleLock = _consoleLock;  // Share lock with ActionExecutor for [FOCUS] output
-                watcher.Start();
-
-                lock (_consoleLock)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write("[WATCH] ");
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine("Started — tracking test action points (mouse fallback)");
-                    Console.ResetColor();
-                }
-            }
-
-            // 3. Initialize Vision components (if enabled or OCR preview mode)
+            // 2. Initialize Vision components BEFORE watcher (OCR needed by watcher)
             if (ctx.VisionEnabled || ctx.OcrPreview)
             {
                 try
@@ -139,6 +121,25 @@ public sealed class ScenarioRunner
                     visionAnalyzer = null;
                     simpleOcr = null;
                     ctx.VisionEnabled = false;
+                }
+            }
+
+            // 3. Start background watcher (passive mode, with OCR if available)
+            if (_watch)
+            {
+                watcher = new BackgroundWatcher(_watchIntervalMs, ctx: ctx, ocr: simpleOcr);
+                _consoleLock = watcher.ConsoleLock;
+                ctx.ConsoleLock = _consoleLock;  // Share lock with ActionExecutor for [FOCUS] output
+                watcher.Start();
+
+                lock (_consoleLock)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("[WATCH] ");
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    var ocrTag = simpleOcr != null ? " + OCR" : "";
+                    Console.WriteLine($"Started — tracking test action points (mouse fallback{ocrTag})");
+                    Console.ResetColor();
                 }
             }
 
