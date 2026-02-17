@@ -11,11 +11,12 @@ namespace WKAppBot.Core.Runner;
 
 /// <summary>
 /// Executes individual step actions.
-/// 4-tier Chain of Responsibility:
+/// 5-tier Chain of Responsibility:
 ///   1. UIA (Accessibility) — fast, reliable
-///   2. Vision Cache — cached API results (경험치!)
-///   3. Vision API — Claude screenshot analysis (expensive, cached)
-///   4. Coordinate — raw x,y fallback
+///   2. Vision Cache — cached results (경험치!)
+///   3. Simple OCR — Windows.Media.Ocr text matching (free, fast, offline)
+///   4. Vision API — Claude screenshot analysis (expensive, cached)
+///   5. Coordinate — raw x,y fallback
 ///
 /// Focusless-First principle:
 ///   - UIA Invoke (click), UIA Value (type) → no focus needed, user undisturbed
@@ -30,15 +31,18 @@ public sealed class ActionExecutor : IDisposable
     // Vision tier (optional — only when vision_enabled: true)
     private VisionCache? _visionCache;
     private VisionAnalyzer? _visionAnalyzer;
+    private SimpleOcrAnalyzer? _simpleOcr;
 
     public ActionExecutor(RuntimeContext ctx, bool verbose = false,
-                          VisionCache? visionCache = null, VisionAnalyzer? visionAnalyzer = null)
+                          VisionCache? visionCache = null, VisionAnalyzer? visionAnalyzer = null,
+                          SimpleOcrAnalyzer? simpleOcr = null)
     {
         _ctx = ctx;
         _verbose = verbose;
         _uia = new UiaLocator();
         _visionCache = visionCache;
         _visionAnalyzer = visionAnalyzer;
+        _simpleOcr = simpleOcr;
     }
 
     // ── Smart Focus ("위치확보") ─────────────────────────────
@@ -391,16 +395,17 @@ public sealed class ActionExecutor : IDisposable
         Log($"  Scrolled {direction} {amount}");
     }
 
-    // ── Element location (4-tier chain) ────────────────────────
+    // ── Element location (5-tier chain) ────────────────────────
 
     /// <summary>
-    /// 4-tier element locator chain:
+    /// 5-tier element locator chain:
     ///   1. UIA (AutomationId → Name → ControlType)
     ///   2. Vision Cache (class_path + description + window_size)
-    ///   3. Vision API (screenshot + Claude API → cache result)
-    ///   4. Coordinate (step.Target.X/Y)
+    ///   3. Simple OCR (Windows.Media.Ocr text matching — free, offline)
+    ///   4. Vision API (screenshot + Claude API → cache result, expensive)
+    ///   5. Coordinate (step.Target.X/Y)
     /// Returns (UIA element if found, locator method string).
-    /// For Vision/Coordinate hits, sets step.Target.X/Y for SendInput.
+    /// For Vision/OCR/Coordinate hits, sets step.Target.X/Y for SendInput.
     /// </summary>
     private (AutomationElement? element, string? method) LocateElement(StepDefinition step)
     {
@@ -413,10 +418,18 @@ public sealed class ActionExecutor : IDisposable
             step.Target.Name,
             step.Target.ControlType);
 
-        if (element != null) return (element, method);
+        if (element != null)
+        {
+            // OCR Preview: even if UIA succeeds, run OCR for benchmarking/data collection
+            if (_ctx.OcrPreview && _simpleOcr != null && !string.IsNullOrEmpty(step.Target.Description))
+            {
+                RunOcrPreview(step);
+            }
+            return (element, method);
+        }
 
-        // ── Tier 2+3: Vision (only if enabled + description available) ──
-        if (_ctx.VisionEnabled && !string.IsNullOrEmpty(step.Target.Description))
+        // ── Tier 2+3+4: Vision/OCR (only if enabled + description available) ──
+        if ((_ctx.VisionEnabled || _ctx.OcrPreview) && !string.IsNullOrEmpty(step.Target.Description))
         {
             var visionCoords = TryVisionLocate(step);
             if (visionCoords != null)
@@ -428,14 +441,15 @@ public sealed class ActionExecutor : IDisposable
             }
         }
 
-        // ── Tier 4: Coordinate (already set in YAML) ────────
+        // ── Tier 5: Coordinate (already set in YAML) ────────
         // Returned as (null, null) — caller checks step.Target.X/Y
         return (null, null);
     }
 
     /// <summary>
-    /// Try Vision Cache → Vision API fallback.
+    /// Try Vision Cache → Simple OCR → Vision API (Claude) fallback chain.
     /// Returns absolute screen coordinates if found.
+    /// Saves debug screenshots to vision_cache_dir for future Claude review.
     /// </summary>
     private (int x, int y, string method)? TryVisionLocate(StepDefinition step)
     {
@@ -466,21 +480,76 @@ public sealed class ActionExecutor : IDisposable
             }
         }
 
-        // ── Tier 3: Vision API (Claude) ─────────────────────
-        if (_visionAnalyzer != null)
+        // ── Capture screenshot once (shared by OCR + Vision API) ──
+        System.Drawing.Bitmap? bmp = null;
+        string? screenshotPath = null;
+        try
+        {
+            bmp = ScreenCapture.CaptureWindow(_ctx.MainWindowHandle);
+
+            // Save debug screenshot for future review by Claude/human
+            screenshotPath = SaveVisionScreenshot(bmp, step.Target.Description);
+            if (screenshotPath != null)
+                Log($"  Vision screenshot: {screenshotPath}");
+        }
+        catch (Exception ex)
+        {
+            Log($"  Vision capture error: {ex.Message}");
+        }
+
+        // ── Tier 3: Simple OCR (Windows.Media.Ocr — free, offline) ──
+        if (_simpleOcr != null && bmp != null)
         {
             try
             {
-                Log($"  Vision API: querying for \"{step.Target.Description}\"...");
+                Log($"  Simple OCR: searching for \"{step.Target.Description}\"...");
 
-                // Capture window screenshot (focusless!)
-                using var bmp = ScreenCapture.CaptureWindow(_ctx.MainWindowHandle);
+                var ocrMatch = _simpleOcr.FindElement(bmp, step.Target.Description)
+                    .GetAwaiter().GetResult();
+
+                if (ocrMatch != null)
+                {
+                    int absX = rect.Left + ocrMatch.X;
+                    int absY = rect.Top + ocrMatch.Y;
+
+                    // Cache the result (경험치 축적!)
+                    if (_visionCache != null)
+                    {
+                        var entry = VisionCacheEntry.FromAbsolute(
+                            classPath, step.Target.Description,
+                            winW, winH, absX, absY, rect.Left, rect.Top,
+                            ocrMatch.Width, ocrMatch.Height,
+                            ocrMatch.Confidence, ocrMatch.MatchedText, "OcrText");
+
+                        _visionCache.Put(classPath, step.Target.Description, winW, winH, entry);
+                    }
+
+                    Log($"  Simple OCR: found \"{ocrMatch.MatchedText}\" at ({absX},{absY}) conf={ocrMatch.Confidence:F2} [{ocrMatch.MatchType}]");
+                    return (absX, absY, $"simple_ocr, conf={ocrMatch.Confidence:F2}, \"{ocrMatch.MatchedText}\"");
+                }
+                else
+                {
+                    Log($"  Simple OCR: no matching text found");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"  Simple OCR error: {ex.Message}");
+            }
+        }
+
+        // ── Tier 4: Vision API (Claude — expensive, last resort) ──
+        if (_visionAnalyzer != null && bmp != null)
+        {
+            try
+            {
+                Log($"  Vision API: querying Claude for \"{step.Target.Description}\"...");
+
                 var location = _visionAnalyzer.FindElement(bmp, step.Target.Description)
                     .GetAwaiter().GetResult();
 
                 if (location != null)
                 {
-                    // Convert screenshot-relative coords to absolute screen coords
                     int absX = rect.Left + location.CenterX;
                     int absY = rect.Top + location.CenterY;
 
@@ -510,7 +579,131 @@ public sealed class ActionExecutor : IDisposable
             }
         }
 
+        bmp?.Dispose();
         return null;
+    }
+
+    /// <summary>
+    /// Save a debug screenshot for Vision fallback analysis.
+    /// Returns the saved file path, or null if saving failed.
+    /// Future Claude sessions can review these to understand OCR/Vision failures.
+    /// </summary>
+    private string? SaveVisionScreenshot(System.Drawing.Bitmap bmp, string description)
+    {
+        try
+        {
+            var dir = Path.Combine(_ctx.VisionCacheDir, "screenshots");
+            Directory.CreateDirectory(dir);
+
+            // Sanitize description for filename
+            var safeName = string.Join("_",
+                description.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries))
+                .Replace(' ', '_');
+            if (safeName.Length > 40) safeName = safeName[..40];
+
+            var timestamp = DateTime.Now.ToString("HHmmss_fff");
+            var filename = $"{timestamp}_{safeName}.png";
+            var path = Path.Combine(dir, filename);
+
+            bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            return path;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// OCR Preview: run OCR in background even when UIA succeeds.
+    /// Compares UIA text vs OCR text for accuracy benchmarking.
+    /// Does NOT affect actual element location — purely informational.
+    /// </summary>
+    private void RunOcrPreview(StepDefinition step)
+    {
+        try
+        {
+            using var bmp = ScreenCapture.CaptureWindow(_ctx.MainWindowHandle);
+            var screenshotPath = SaveVisionScreenshot(bmp, step.Target!.Description!);
+
+            // Get UIA text for comparison
+            string? uiaText = null;
+            try
+            {
+                var (uiaElem, _) = _uia.FindElement(
+                    _ctx.MainWindowHandle,
+                    step.Target.AutomationId,
+                    step.Target.Name,
+                    step.Target.ControlType);
+                if (uiaElem != null)
+                    uiaText = uiaElem.Properties.Name.ValueOrDefault;
+            }
+            catch { /* ignore */ }
+
+            // Run OCR full recognition
+            var fullResult = _simpleOcr!.RecognizeAll(bmp).GetAwaiter().GetResult();
+
+            // Run OCR element matching
+            var ocrMatch = _simpleOcr.FindElement(bmp, step.Target.Description!)
+                .GetAwaiter().GetResult();
+
+            if (ocrMatch != null)
+            {
+                // Calculate UIA vs OCR match rate
+                string matchInfo = "";
+                if (!string.IsNullOrEmpty(uiaText))
+                {
+                    var rate = CalculateTextMatchRate(uiaText, ocrMatch.MatchedText);
+                    matchInfo = rate >= 0.9
+                        ? $" | UIA\u2194OCR={rate:P0} \u2605"
+                        : $" | UIA\u2194OCR={rate:P0}";
+                }
+
+                Log($"  [OCR PREVIEW] found \"{ocrMatch.MatchedText}\" ({ocrMatch.X},{ocrMatch.Y}) conf={ocrMatch.Confidence:F2} [{ocrMatch.MatchType}]{matchInfo}");
+            }
+            else
+            {
+                var textSnippet = fullResult.FullText.Length > 80
+                    ? fullResult.FullText[..80] + "..."
+                    : fullResult.FullText;
+                Log($"  [OCR PREVIEW] no match for \"{step.Target.Description}\" | OCR saw: \"{textSnippet.Replace('\n', ' ')}\"");
+            }
+
+            // Summary line
+            Log($"  [OCR PREVIEW] {fullResult.Words.Count} words | UIA=\"{uiaText ?? "(none)"}\" | img={screenshotPath ?? "n/a"}");
+        }
+        catch (Exception ex)
+        {
+            Log($"  [OCR PREVIEW] error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Calculate similarity between UIA text and OCR text (0.0~1.0).
+    /// </summary>
+    private static double CalculateTextMatchRate(string uiaText, string ocrText)
+    {
+        var a = uiaText.Trim().ToLowerInvariant();
+        var b = ocrText.Trim().ToLowerInvariant();
+
+        if (a == b) return 1.0;
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return 0;
+
+        // Contains check
+        if (a.Contains(b) || b.Contains(a))
+        {
+            double shorter = Math.Min(a.Length, b.Length);
+            double longer = Math.Max(a.Length, b.Length);
+            return shorter / longer;
+        }
+
+        // Character overlap (Dice coefficient)
+        var setA = new HashSet<char>(a.Where(c => !char.IsWhiteSpace(c)));
+        var setB = new HashSet<char>(b.Where(c => !char.IsWhiteSpace(c)));
+        if (setA.Count == 0 || setB.Count == 0) return 0;
+
+        int intersection = setA.Intersect(setB).Count();
+        return 2.0 * intersection / (setA.Count + setB.Count);
     }
 
     /// <summary>

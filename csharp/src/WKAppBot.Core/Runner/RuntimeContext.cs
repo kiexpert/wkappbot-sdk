@@ -26,6 +26,7 @@ public sealed class RuntimeContext
     public int VisionCacheTtlDays { get; set; } = 7;
     public double VisionConfidenceThreshold { get; set; } = 0.7;
     public string VisionModel { get; set; } = "claude-sonnet-4-20250514";
+    public bool OcrPreview { get; set; } = false;
 
     /// <summary>
     /// Shared console lock for thread-safe output.

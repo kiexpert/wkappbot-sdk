@@ -84,11 +84,17 @@ public sealed class ScenarioConfig
     public double VisionConfidenceThreshold { get; set; } = 0.7;
 
     /// <summary>
-    /// Vision model to use.
-    /// Future: "simple" model first → Claude as fallback.
-    /// Current: Claude only.
+    /// Vision model to use for Claude API fallback.
     /// </summary>
     public string VisionModel { get; set; } = "claude-sonnet-4-20250514";
+
+    /// <summary>
+    /// OCR preview mode: run OCR on every step even when UIA succeeds.
+    /// Logs OCR results for performance testing / data collection.
+    /// Does NOT affect actual element location — just logs what OCR would find.
+    /// Default: false. Set true for OCR training/benchmarking.
+    /// </summary>
+    public bool OcrPreview { get; set; } = false;
 }
 
 public sealed class AppConfig

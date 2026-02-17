@@ -44,6 +44,7 @@ public sealed class ScenarioRunner
             VisionCacheTtlDays = doc.Config.VisionCacheTtlDays,
             VisionConfidenceThreshold = doc.Config.VisionConfidenceThreshold,
             VisionModel = doc.Config.VisionModel,
+            OcrPreview = doc.Config.OcrPreview,
         };
 
         // Copy variables
@@ -59,6 +60,7 @@ public sealed class ScenarioRunner
         BackgroundWatcher? watcher = null;
         VisionCache? visionCache = null;
         VisionAnalyzer? visionAnalyzer = null;
+        SimpleOcrAnalyzer? simpleOcr = null;
 
         try
         {
@@ -87,30 +89,61 @@ public sealed class ScenarioRunner
                 }
             }
 
-            // 3. Initialize Vision components (if enabled)
-            if (ctx.VisionEnabled)
+            // 3. Initialize Vision components (if enabled or OCR preview mode)
+            if (ctx.VisionEnabled || ctx.OcrPreview)
             {
                 try
                 {
                     visionCache = new VisionCache(ctx.VisionCacheDir, ctx.VisionCacheTtlDays);
-                    visionAnalyzer = new VisionAnalyzer(
-                        model: ctx.VisionModel,
-                        confidenceThreshold: ctx.VisionConfidenceThreshold);
+
+                    // Simple OCR first (free, fast, offline)
+                    try
+                    {
+                        var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
+                        var primaryOcrLang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
+                        simpleOcr = new SimpleOcrAnalyzer(
+                            primaryLanguage: primaryOcrLang,
+                            confidenceThreshold: ctx.VisionConfidenceThreshold);
+                        LogRun($"Simple OCR enabled: lang={primaryOcrLang} (available: {string.Join(", ", ocrLangs)})");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogRun($"Simple OCR init failed: {ex.Message} — OCR tier skipped");
+                        simpleOcr = null;
+                    }
+
+                    // Claude Vision API (expensive fallback — only if vision_enabled AND API key available)
+                    if (ctx.VisionEnabled)
+                    {
+                        try
+                        {
+                            visionAnalyzer = new VisionAnalyzer(
+                                model: ctx.VisionModel,
+                                confidenceThreshold: ctx.VisionConfidenceThreshold);
+                            LogRun($"Vision API enabled: model={ctx.VisionModel}");
+                        }
+                        catch (Exception ex)
+                        {
+                            LogRun($"Vision API not available: {ex.Message} — Claude fallback disabled");
+                            visionAnalyzer = null;
+                        }
+                    }
 
                     var (totalEntries, _, avgRate) = visionCache.GetStats();
-                    LogRun($"Vision enabled: model={ctx.VisionModel}, cache={totalEntries} entries (avg success={avgRate:P0})");
+                    LogRun($"Vision cache: {totalEntries} entries (avg success={avgRate:P0})");
                 }
                 catch (Exception ex)
                 {
                     LogRun($"Vision init failed: {ex.Message} — continuing without Vision");
                     visionCache = null;
                     visionAnalyzer = null;
+                    simpleOcr = null;
                     ctx.VisionEnabled = false;
                 }
             }
 
             // 4. Run steps
-            using var executor = new ActionExecutor(ctx, _verbose, visionCache, visionAnalyzer);
+            using var executor = new ActionExecutor(ctx, _verbose, visionCache, visionAnalyzer, simpleOcr);
 
             for (int i = 0; i < doc.Steps.Count; i++)
             {
@@ -187,6 +220,7 @@ public sealed class ScenarioRunner
             watcher?.Stop(printSummary: true);
 
             // Dispose vision components
+            simpleOcr?.Dispose();
             visionAnalyzer?.Dispose();
             visionCache?.Dispose();
 
