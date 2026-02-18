@@ -69,58 +69,101 @@ public sealed class SimpleOcrAnalyzer : IDisposable
         string description,
         CancellationToken ct = default)
     {
-        // Convert System.Drawing.Bitmap → WinRT SoftwareBitmap
-        using var softwareBitmap = await ConvertToSoftwareBitmap(screenshot);
-
-        // Run OCR (primary language first)
-        var result = await _ocrEngine.RecognizeAsync(softwareBitmap);
-
-        // Try matching
-        var match = FindBestMatch(result, description, screenshot.Width, screenshot.Height);
-
-        // If no match and fallback exists, try fallback language
-        if (match == null && _ocrEngineFallback != null)
+        // Auto-upscale small images for better OCR accuracy
+        var bmpToUse = screenshot;
+        int scale = 1;
+        bool needDispose = false;
+        if (screenshot.Height < 200 || screenshot.Width < 400)
         {
-            var fallbackResult = await _ocrEngineFallback.RecognizeAsync(softwareBitmap);
-            match = FindBestMatch(fallbackResult, description, screenshot.Width, screenshot.Height);
+            scale = screenshot.Height < 80 ? 4 : screenshot.Height < 200 ? 3 : 2;
+            bmpToUse = UpscaleBitmap(screenshot, scale);
+            needDispose = true;
         }
 
-        return match;
+        try
+        {
+            using var softwareBitmap = await ConvertToSoftwareBitmap(bmpToUse);
+            var result = await _ocrEngine.RecognizeAsync(softwareBitmap);
+            var match = FindBestMatch(result, description, bmpToUse.Width, bmpToUse.Height);
+
+            if (match == null && _ocrEngineFallback != null)
+            {
+                var fallbackResult = await _ocrEngineFallback.RecognizeAsync(softwareBitmap);
+                match = FindBestMatch(fallbackResult, description, bmpToUse.Width, bmpToUse.Height);
+            }
+
+            // Scale coordinates back to original image space
+            if (match != null && scale > 1)
+            {
+                match.X /= scale;
+                match.Y /= scale;
+                match.Width /= scale;
+                match.Height /= scale;
+            }
+
+            return match;
+        }
+        finally
+        {
+            if (needDispose) bmpToUse.Dispose();
+        }
     }
 
     /// <summary>
     /// Get ALL recognized text from a screenshot.
+    /// Auto-upscales small images for better OCR accuracy.
     /// Useful for debugging / assert verification.
     /// </summary>
     public async Task<OcrFullResult> RecognizeAll(
         Bitmap screenshot,
         CancellationToken ct = default)
     {
-        using var softwareBitmap = await ConvertToSoftwareBitmap(screenshot);
-        var result = await _ocrEngine.RecognizeAsync(softwareBitmap);
-
-        var words = new List<OcrWord>();
-        foreach (var line in result.Lines)
+        // Auto-upscale small images for better OCR accuracy
+        // Windows.Media.Ocr works best with text >= 40px height
+        var bmpToUse = screenshot;
+        int scale = 1;
+        bool needDispose = false;
+        if (screenshot.Height < 200 || screenshot.Width < 400)
         {
-            foreach (var word in line.Words)
-            {
-                words.Add(new OcrWord
-                {
-                    Text = word.Text,
-                    X = (int)word.BoundingRect.X,
-                    Y = (int)word.BoundingRect.Y,
-                    Width = (int)word.BoundingRect.Width,
-                    Height = (int)word.BoundingRect.Height
-                });
-            }
+            scale = screenshot.Height < 80 ? 4 : screenshot.Height < 200 ? 3 : 2;
+            bmpToUse = UpscaleBitmap(screenshot, scale);
+            needDispose = true;
         }
 
-        return new OcrFullResult
+        try
         {
-            FullText = result.Text,
-            Words = words,
-            Angle = result.TextAngle ?? 0
-        };
+            using var softwareBitmap = await ConvertToSoftwareBitmap(bmpToUse);
+            var result = await _ocrEngine.RecognizeAsync(softwareBitmap);
+
+            var words = new List<OcrWord>();
+            foreach (var line in result.Lines)
+            {
+                foreach (var word in line.Words)
+                {
+                    // Scale coordinates back to original image space
+                    words.Add(new OcrWord
+                    {
+                        Text = word.Text,
+                        X = (int)(word.BoundingRect.X / scale),
+                        Y = (int)(word.BoundingRect.Y / scale),
+                        Width = (int)(word.BoundingRect.Width / scale),
+                        Height = (int)(word.BoundingRect.Height / scale)
+                    });
+                }
+            }
+
+            return new OcrFullResult
+            {
+                FullText = result.Text,
+                Words = words,
+                Angle = result.TextAngle ?? 0,
+                UpscaleFactor = scale
+            };
+        }
+        finally
+        {
+            if (needDispose) bmpToUse.Dispose();
+        }
     }
 
     /// <summary>
@@ -233,6 +276,24 @@ public sealed class SimpleOcrAnalyzer : IDisposable
     }
 
     /// <summary>
+    /// Upscale a bitmap by a factor using high-quality bicubic interpolation.
+    /// Small text (under ~40px) is hard for OCR; upscaling 2-4x dramatically improves accuracy.
+    /// </summary>
+    private static Bitmap UpscaleBitmap(Bitmap original, int factor)
+    {
+        var newWidth = original.Width * factor;
+        var newHeight = original.Height * factor;
+        var scaled = new Bitmap(newWidth, newHeight, original.PixelFormat);
+        scaled.SetResolution(original.HorizontalResolution * factor, original.VerticalResolution * factor);
+        using var g = Graphics.FromImage(scaled);
+        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+        g.DrawImage(original, 0, 0, newWidth, newHeight);
+        return scaled;
+    }
+
+    /// <summary>
     /// Convert System.Drawing.Bitmap → WinRT SoftwareBitmap for OCR.
     /// </summary>
     private static async Task<SoftwareBitmap> ConvertToSoftwareBitmap(Bitmap bitmap)
@@ -324,6 +385,8 @@ public sealed class OcrFullResult
     public string FullText { get; set; } = "";
     public List<OcrWord> Words { get; set; } = new();
     public double Angle { get; set; }
+    /// <summary>Upscale factor applied before OCR (1 = no upscale). Coordinates are already scaled back.</summary>
+    public int UpscaleFactor { get; set; } = 1;
 }
 
 /// <summary>
