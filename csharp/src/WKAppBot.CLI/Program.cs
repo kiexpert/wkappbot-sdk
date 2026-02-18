@@ -58,6 +58,7 @@ internal class Program
                 "form-dump" => FormDumpCommand(restArgs),
                 "do" => DoCommand(restArgs),
                 "dismiss" => DismissCommand(restArgs),
+                "toolbar-ocr" => ToolbarOcrCommand(restArgs),
                 "dialog-click" => DialogClickCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
@@ -2869,6 +2870,274 @@ Examples:
     /// <summary>
     /// <summary>
     /// Dismiss MDI child windows matching keywords in their title.
+    /// <summary>
+    /// OCR-scan toolbar panes, show recognized text regions, and optionally click one.
+    /// MFC apps expose toolbars as Pane elements with custom-drawn buttons (no UIA Button children).
+    /// Strategy: screenshot entire toolbar pane → OCR → find text regions.
+    /// Usage: appbot toolbar-ocr "window-title" [--click "text"] [--save]
+    /// </summary>
+    static int ToolbarOcrCommand(string[] args)
+    {
+        if (args.Length < 1)
+            return Error(@"Usage: appbot toolbar-ocr <window-title> [--click ""text""] [--save]
+  OCR-scans toolbar panes and shows recognized text regions.
+  --click ""text""  Click the region whose OCR text matches.
+  --save           Save toolbar screenshots to output/toolbar/");
+
+        string title = args[0];
+        string? clickText = GetArgValue(args, "--click");
+        bool save = args.Contains("--save");
+
+        var windows = WindowFinder.FindByTitle(title);
+        if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
+        var win = windows[0];
+        Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
+
+        // Find toolbar panes via UIA — MFC toolbars are Pane elements with "툴바" in name
+        var uia = new FlaUI.UIA3.UIA3Automation();
+        var root = uia.FromHandle(win.Handle);
+
+        // Look for panes named "*툴바*" (메뉴툴바, 화면툴바, 쾌속주문툴바)
+        var allPanes = root.FindAllChildren(cf =>
+            cf.ByControlType(FlaUI.Core.Definitions.ControlType.Pane));
+
+        var toolbarPanes = new List<(FlaUI.Core.AutomationElements.AutomationElement elem, string name)>();
+        foreach (var pane in allPanes)
+        {
+            string paneName;
+            try { paneName = pane.Name ?? ""; } catch { paneName = ""; }
+            if (paneName.Contains("툴바"))
+                toolbarPanes.Add((pane, paneName));
+        }
+
+        if (toolbarPanes.Count == 0)
+            return Error("No toolbar panes found (looking for panes with '툴바' in name).");
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"Found {toolbarPanes.Count} toolbar pane(s).");
+        Console.ResetColor();
+
+        // Init OCR
+        var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
+        var lang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
+        using var ocr = new SimpleOcrAnalyzer(primaryLanguage: lang, confidenceThreshold: 0.3);
+
+        if (save)
+            Directory.CreateDirectory(Path.Combine(
+                Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "output", "toolbar"));
+
+        OcrWord? clickWord = null;
+        System.Drawing.RectangleF clickPaneRect = default;
+        int totalWords = 0;
+
+        foreach (var (tbElem, tbName) in toolbarPanes)
+        {
+            var tbRect = tbElem.BoundingRectangle;
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"\n── {tbName} ── ({(int)tbRect.X},{(int)tbRect.Y}) {(int)tbRect.Width}x{(int)tbRect.Height}");
+            Console.ResetColor();
+
+            // Screenshot the entire toolbar pane
+            try
+            {
+                using var bmp = ScreenCapture.CaptureScreenRegion(
+                    (int)tbRect.X, (int)tbRect.Y, (int)tbRect.Width, (int)tbRect.Height);
+
+                if (save)
+                {
+                    var safeName = string.Join("", tbName.Split(Path.GetInvalidFileNameChars()));
+                    var outPath = Path.Combine(
+                        Path.GetDirectoryName(Environment.ProcessPath) ?? ".",
+                        "output", "toolbar", $"toolbar_{safeName}.png");
+                    bmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"  Saved: {outPath}");
+                    Console.ResetColor();
+                }
+
+                // OCR entire toolbar
+                var ocrResult = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
+
+                if (ocrResult.Words.Count == 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine("  (no text recognized)");
+                    Console.ResetColor();
+                    continue;
+                }
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"  {ocrResult.Words.Count} words recognized (upscale: x{ocrResult.UpscaleFactor})");
+                Console.ResetColor();
+
+                // Group nearby words into logical button labels
+                // Words within ~5px Y-gap and ~15px X-gap belong together
+                var groups = GroupWordsIntoLabels(ocrResult.Words);
+
+                int idx = 0;
+                foreach (var group in groups)
+                {
+                    // Build label: sort words top-to-bottom then left-to-right
+                    var orderedWords = group.OrderBy(w => w.Y).ThenBy(w => w.X).ToList();
+                    string labelText = string.Join("", orderedWords.Select(w => w.Text));
+                    int gx = group.Min(w => w.X);
+                    int gy = group.Min(w => w.Y);
+                    int gx2 = group.Max(w => w.X + w.Width);
+                    int gy2 = group.Max(w => w.Y + w.Height);
+                    int gw = gx2 - gx;
+                    int gh = gy2 - gy;
+
+                    // Screen coordinates: pane origin + word offset
+                    int screenX = (int)tbRect.X + (gx + gw / 2);
+                    int screenY = (int)tbRect.Y + (gy + gh / 2);
+
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.Write($"  [{idx:D2}] \"{labelText}\"");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($"  rel=({gx},{gy} {gw}x{gh})");
+                    Console.Write($"  scr=({screenX},{screenY})");
+                    Console.WriteLine();
+                    Console.ResetColor();
+
+                    // Check if this is the click target
+                    if (clickText != null &&
+                        labelText.Contains(clickText, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Create a synthetic OcrWord for the group center
+                        clickWord = new OcrWord
+                        {
+                            Text = labelText,
+                            X = gx + gw / 2,
+                            Y = gy + gh / 2,
+                            Width = gw,
+                            Height = gh
+                        };
+                        clickPaneRect = tbRect;
+                    }
+
+                    idx++;
+                    totalWords++;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  Error: {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
+        // Summary
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"  Total: {totalWords} text regions across {toolbarPanes.Count} toolbar(s)");
+        Console.ResetColor();
+
+        // Click target if found
+        if (clickText != null)
+        {
+            if (clickWord != null)
+            {
+                int cx = (int)clickPaneRect.X + clickWord.X;
+                int cy = (int)clickPaneRect.Y + clickWord.Y;
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write($"\n  Clicking \"{clickWord.Text}\" at ({cx},{cy})...");
+                Console.ResetColor();
+
+                // Use physical mouse click (need foreground)
+                NativeMethods.SetForegroundWindow(win.Handle);
+                Thread.Sleep(200);
+                MouseInput.Click(cx, cy);
+                Thread.Sleep(500);
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine(" done.");
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"\n  Text \"{clickText}\" not found in toolbar OCR results.");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Group OCR words into logical toolbar button labels.
+    /// MFC toolbars use 2-line layout: top line + bottom line per button.
+    /// Words that overlap horizontally (within ~10px) are grouped as one button.
+    /// Then sorted by X position of group center.
+    /// </summary>
+    private static List<List<OcrWord>> GroupWordsIntoLabels(List<OcrWord> words)
+    {
+        if (words.Count == 0) return new();
+
+        // Strategy: group by X-overlap.
+        // Two words belong to the same button if their X ranges overlap significantly.
+        // This handles the 2-line toolbar layout where "캐치" (top) + "실전" (bottom) share X range.
+
+        var sorted = words.OrderBy(w => w.X).ToList();
+        var used = new bool[sorted.Count];
+        var groups = new List<List<OcrWord>>();
+
+        for (int i = 0; i < sorted.Count; i++)
+        {
+            if (used[i]) continue;
+
+            var group = new List<OcrWord> { sorted[i] };
+            used[i] = true;
+
+            // Find all other words that overlap with this group's X range
+            int groupLeft = sorted[i].X;
+            int groupRight = sorted[i].X + sorted[i].Width;
+
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                for (int j = i + 1; j < sorted.Count; j++)
+                {
+                    if (used[j]) continue;
+                    var w = sorted[j];
+                    int wLeft = w.X;
+                    int wRight = w.X + w.Width;
+
+                    // Check X-overlap: word starts before group ends + some margin
+                    // and word ends after group starts - some margin
+                    int margin = 10;
+                    bool overlaps = wLeft < groupRight + margin && wRight > groupLeft - margin;
+
+                    if (overlaps)
+                    {
+                        group.Add(w);
+                        used[j] = true;
+                        // Expand group range
+                        if (wLeft < groupLeft) groupLeft = wLeft;
+                        if (wRight > groupRight) groupRight = wRight;
+                        changed = true;
+                    }
+                }
+            }
+
+            groups.Add(group);
+        }
+
+        // Sort groups by their center X
+        groups.Sort((a, b) =>
+        {
+            double ax = a.Average(w => w.X + w.Width / 2.0);
+            double bx = b.Average(w => w.X + w.Width / 2.0);
+            return ax.CompareTo(bx);
+        });
+
+        return groups;
+    }
+
     /// Usage: appbot dismiss "영웅문" [keyword1] [keyword2] ...
     /// If no keywords given, closes common notice windows (공지, 인사, 안내, 알림).
     /// Sends WM_CLOSE to each matching MDI child.
