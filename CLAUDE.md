@@ -36,10 +36,12 @@ W:/GitHub/WKAppBot/
 │       │   │   ├── ScenarioRunner.cs    # 시나리오 오케스트레이터
 │       │   │   ├── ActionExecutor.cs    # 액션 실행기 (click, type, assert 등) + EnsureFocus
 │       │   │   ├── BackgroundWatcher.cs # [WATCH] 패시브 백그라운드 요소 추적
-│       │   │   └── RuntimeContext.cs    # 런타임 상태 (변수, ActionPoint, StepResult, FocusConfig)
+│       │   │   ├── RuntimeContext.cs    # 런타임 상태 (변수, ActionPoint, StepResult, FocusConfig)
+│       │   │   └── DialogHandlerManager.cs # [BLOCK] 방해꾼 핸들러 로더/매처/학습
 │       │   └── Scenario/
 │       │       ├── Models.cs            # YAML 데이터 모델 (ScenarioConfig에 focus 설정 포함)
-│       │       └── ScenarioParser.cs    # YAML 파싱/검증
+│       │       ├── ScenarioParser.cs    # YAML 파싱/검증
+│       │       └── DialogHandler.cs     # 방해꾼 핸들러 YAML 모델
 │       ├── WKAppBot.Win32/            # Win32 네이티브 계층
 │       │   ├── Native/
 │       │   │   └── NativeMethods.cs     # P/Invoke 선언 (user32, gdi32, shcore)
@@ -64,6 +66,9 @@ W:/GitHub/WKAppBot/
 │       │   ├── VisionCache.cs           # 2레벨 캐시 (메모리+디스크 JSON, SHA256 키)
 │       │   └── VisionCacheEntry.cs      # 캐시 엔트리 모델 (상대좌표, per-control 학습)
 │       └── WKAppBot.Report/           # 리포트 생성 (스켈레톤)
+├── handlers/                        # 방해꾼 다이얼로그 핸들러 YAML (빌드 시 자동 복사)
+│   ├── #32770.yaml                  # nkrunlite 범용 다이얼로그 핸들러
+│   └── 접속끊김.yaml                # 접속 끊김 전용 핸들러 (30s 대기)
 ├── scenarios/                       # YAML 테스트 시나리오
 │   ├── calc_basic.yaml              # 계산기 기본 (15+27=42)
 │   └── calc_four_ops.yaml           # 계산기 4칙연산 (32 steps, PoC)
@@ -210,6 +215,7 @@ Phase 3: Timeout → 스텝 Fail
 - **[FOCUS]**: 포커스 확보 관련 출력 (경고, 복구, 실패)
 - **[VERIFY]**: SendInput 전 대상 좌표 검증 출력 (렉트/오버레이/요소 변화)
 - **[STRESS]**: HTS 스트레스 테스트 메모리 테이블 행
+- **[BLOCK]**: 방해꾼 다이얼로그 감지/처리/학습 출력
 
 ### 5. BackgroundWatcher Nudge/Ack 핸드셰이크
 - `Nudge()`: ScenarioRunner가 각 스텝 전/후에 호출 → 백그라운드 스레드 깨우기
@@ -402,6 +408,7 @@ teardown:
 - **Phase 5 완료**: LCS 포펫 패턴 — 라인 정렬 + 토큰 단위 diff + 연속 와일드카드 병합
 - **Phase 6 완료**: 컨트롤 디테일 캐시 — per-control latest.png + text_history.jsonl (`--detail` 플래그)
 - **Phase 7 완료**: 클릭 전략 DB 연동 — SmartClickButton이 ExperienceDb 성공률 기반 전략 순서 최적화
+- **Dialog Handlers 완료**: YAML 기반 방해꾼 자동처리 + EnumWindows 감지 + 마우스 호버 인터랙티브 학습
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -441,6 +448,20 @@ teardown:
 - DoCommand: 인라인 BM_CLICK+WM_LBUTTON → SmartClickButton 호출로 통합 (SendInput 폴백 자동 포함)
 - DoCommand: ProfileStore 매칭 → ExperienceDb 자동 로드 (best-effort)
 - `[EXP]` 태그: 경험 데이터 있을 때 전략 순서+성공률 표시
+
+### Dialog Handlers — "방해꾼 자동처리 + 인터랙티브 학습" ✅
+**상태**: 완료
+- `handlers/*.yaml` 파일 기반 방해꾼 자동 감지+처리 프레임워크
+- **파일명 = 키워드 트리거**: 파일명(확장자 제외)이 classPath+title에 포함되면 매칭
+- **classPath 계층**: `_NKHeroMainClass/#32770` — GetParent 체인으로 구축
+- **2단계 감지**: (1) GetForegroundWindow, (2) EnumWindows 프로세스 전체 스캔 (owned popup 감지)
+- **YAML 조건**: title_contains, class, process, message_contains (OCR 폴백 포함)
+- **지원 액션**: click_button (button_text/button_index), dismiss (ESC/Alt+F4), report
+- **인터랙티브 학습**: 미지 방해꾼 → 마우스 호버 1초 → 버튼 선택 → 핸들러 YAML 자동 생성
+- **DoCommand 연동**: pre-action + post-action 체크, retry 루프, --confirm 하위호환
+- **csproj 자동 복사**: 소스 `handlers/` → 빌드 출력 자동 복사
+- DialogHandler.cs (YAML 모델), DialogHandlerManager.cs (로더/매처/샘플생성)
+- `[BLOCK]` 태그: 방해꾼 감지/처리/학습 출력
 
 ### Phase 8: 포펫 패턴 매칭 — "이미지만으로 폼 식별"
 **목표**: FormTypeIdentifier Level 4로 puppet pattern 기반 폼 식별

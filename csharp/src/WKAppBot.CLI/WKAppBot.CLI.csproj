@@ -17,4 +17,10 @@
     <ProjectReference Include="..\WKAppBot.Report\WKAppBot.Report.csproj" />
   </ItemGroup>
 
+  <!-- Copy handler YAML files from project root to output -->
+  <ItemGroup>
+    <None Include="..\..\..\handlers\**\*.yaml" CopyToOutputDirectory="PreserveNewest" LinkBase="handlers" />
+    <None Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" LinkBase="handlers" />
+  </ItemGroup>
+
 </Project>

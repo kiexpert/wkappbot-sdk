@@ -1956,6 +1956,16 @@ Examples:
         string buttonText = args[2];
         int stepDelay = int.TryParse(GetArgValue(args, "--delay"), out var sd) ? sd : 300;
 
+        // Load dialog handlers from handlers/ directory
+        var handlersDir = Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "handlers");
+        var handlerMgr = new DialogHandlerManager(handlersDir);
+        if (handlerMgr.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkCyan;
+            Console.WriteLine($"[BLOCK] {handlerMgr}");
+            Console.ResetColor();
+        }
+
         // Find window
         var windows = WindowFinder.FindByTitle(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
@@ -2008,22 +2018,46 @@ Examples:
         Console.WriteLine($"Form: [{targetForm.FormId}] {targetForm.FormName}");
         Console.WriteLine();
 
-        // Find the target button first (매매시작)
-        var allControls = new List<(WindowInfo Info, int Depth, string Path)>();
-        FindControlsRecursive(targetForm.Handle, "", 0, 6, allControls);
-        var allButtons = allControls.Where(c =>
-            c.Info.ClassName == "Button" && !string.IsNullOrEmpty(c.Info.Title) && c.Info.Title.Contains(buttonText)).ToList();
-
-        if (allButtons.Count == 0)
+        // Find the target button (with blocker retry loop)
+        WindowInfo? targetButton = null;
+        int maxRetries = 3;
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
         {
+            var allControls = new List<(WindowInfo Info, int Depth, string Path)>();
+            FindControlsRecursive(targetForm.Handle, "", 0, 6, allControls);
+            var allButtons = allControls.Where(c =>
+                c.Info.ClassName == "Button" && !string.IsNullOrEmpty(c.Info.Title) && c.Info.Title.Contains(buttonText)).ToList();
+
+            if (allButtons.Count > 0)
+            {
+                targetButton = allButtons[0].Info;
+                break;
+            }
+
+            // Button not found — could be a blocker dialog hiding/disabling UI
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  Button \"{buttonText}\" not found (attempt {attempt + 1}/{maxRetries + 1})");
+            Console.ResetColor();
+
+            if (attempt < maxRetries)
+            {
+                var (handled, shouldRetry) = TryHandleBlocker(win.Handle, handlerMgr);
+                if (handled && shouldRetry)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine("[BLOCK] Blocker handled. Re-scanning for button...");
+                    Console.ResetColor();
+                    continue;
+                }
+            }
+
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"  ✗ Button \"{buttonText}\" not found in form [{targetFormId}]");
             Console.ResetColor();
             return 1;
         }
-        var targetButton = allButtons[0].Info;
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"  Found button: \"{targetButton.Title}\" @({targetButton.Rect.Left},{targetButton.Rect.Top})");
+        Console.WriteLine($"  Found button: \"{targetButton!.Title}\" @({targetButton.Rect.Left},{targetButton.Rect.Top})");
         Console.ResetColor();
 
         // ── Step 1: Find MFC custom combos ──
@@ -2043,6 +2077,15 @@ Examples:
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("  No MFC custom combos found above button. Skipping to button click.");
+            Console.ResetColor();
+        }
+
+        // Check for blockers before starting (e.g. disconnection dialog already showing)
+        var (preBlocked, _) = TryHandleBlocker(win.Handle, handlerMgr);
+        if (preBlocked)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("[BLOCK] Pre-action blocker handled. Continuing...");
             Console.ResetColor();
         }
 
@@ -2230,20 +2273,22 @@ Examples:
         bool autoConfirm = args.Contains("--confirm");
 
         var postFgHwnd = NativeMethods.GetForegroundWindow();
-        if (postFgHwnd != win.Handle)
+        if (postFgHwnd != win.Handle && postFgHwnd != IntPtr.Zero)
         {
             var popupInfo = WindowInfo.FromHwnd(postFgHwnd);
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("  📢 New foreground: ");
+            Console.Write("  New foreground: ");
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine($"[{popupInfo.ClassName}] \"{popupInfo.Title}\" ({popupInfo.Rect.Width}x{popupInfo.Rect.Height})");
             Console.ResetColor();
             ReadDialogContents(postFgHwnd);
             anyReaction = true;
 
-            // Auto-confirm: click the first Button in the dialog
-            if (autoConfirm && popupInfo.ClassName == "#32770")
+            // Try handler-based auto-handling first, then --confirm fallback
+            var (handled, shouldRetry) = TryHandleBlocker(win.Handle, handlerMgr);
+            if (!handled && autoConfirm && popupInfo.ClassName == "#32770")
             {
+                // Legacy --confirm fallback: click first button in #32770 dialogs
                 ClickFirstButtonInDialog(postFgHwnd, "confirm");
             }
         }
@@ -2253,7 +2298,7 @@ Examples:
         if (postButtonText != targetButton.Title)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("  🔄 Button changed: ");
+            Console.Write("  Button changed: ");
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine($"\"{targetButton.Title}\" → \"{postButtonText}\"");
             Console.ResetColor();
@@ -2270,7 +2315,7 @@ Examples:
             if (r.Width < 50 || r.Height < 30) return true;
             var info = WindowInfo.FromHwnd(hWnd);
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("  📢 Popup: ");
+            Console.Write("  Popup: ");
             Console.ForegroundColor = ConsoleColor.White;
             Console.Write($"[{info.ClassName}] \"{info.Title}\"");
             Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -2474,6 +2519,241 @@ Examples:
         }
 
         return false; // no change detected, try next strategy
+    }
+
+    /// <summary>
+    /// Check if a blocker dialog appeared and try to handle it automatically.
+    /// Uses DialogHandlerManager to match and execute handlers from handlers/*.yaml.
+    /// If no handler matches, generates a sample YAML template for the user to edit.
+    /// Returns: (handled, shouldRetry) — handled=true if blocker was processed, shouldRetry from handler params.
+    /// </summary>
+    private static (bool handled, bool shouldRetry) TryHandleBlocker(
+        IntPtr expectedFgWindow, DialogHandlerManager? handlerMgr)
+    {
+        // Strategy 1: Check foreground window
+        var fg = NativeMethods.GetForegroundWindow();
+        IntPtr blockerHwnd = IntPtr.Zero;
+
+        if (fg != expectedFgWindow && fg != IntPtr.Zero)
+        {
+            NativeMethods.GetWindowThreadProcessId(fg, out uint fgPid);
+            NativeMethods.GetWindowThreadProcessId(expectedFgWindow, out uint targetPid1);
+            uint myPid = (uint)Environment.ProcessId;
+
+            // Only consider foreground if it's from the target process (not us, not other apps)
+            if (fgPid != myPid && fgPid == targetPid1)
+                blockerHwnd = fg;
+        }
+
+        // Strategy 2: EnumWindows scan — find popup/dialog owned by same process
+        // This catches modal dialogs that overlay the main window but aren't foreground
+        if (blockerHwnd == IntPtr.Zero)
+        {
+            NativeMethods.GetWindowThreadProcessId(expectedFgWindow, out uint targetPid2);
+            var candidates = new List<IntPtr>();
+
+            NativeMethods.EnumWindows((hWnd, _) =>
+            {
+                if (hWnd == expectedFgWindow) return true;
+                if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                if (pid != targetPid2) return true;
+
+                // Check if it's a dialog-like window (#32770 or small popup)
+                var clsSb = new StringBuilder(256);
+                NativeMethods.GetClassNameW(hWnd, clsSb, 256);
+                var cls = clsSb.ToString();
+
+                NativeMethods.GetWindowRect(hWnd, out var r);
+                bool isDialog = cls == "#32770";
+                bool isPopup = r.Width > 50 && r.Height > 30 && r.Width < 800 && r.Height < 600;
+
+                if (isDialog || isPopup)
+                    candidates.Add(hWnd);
+
+                return true;
+            }, IntPtr.Zero);
+
+            // Pick the topmost (first in Z-order from EnumWindows) dialog
+            if (candidates.Count > 0)
+                blockerHwnd = candidates[0];
+        }
+
+        if (blockerHwnd == IntPtr.Zero)
+            return (false, false);
+
+        // Get blocker window info
+        var titleSb = new StringBuilder(256);
+        NativeMethods.GetWindowTextW(blockerHwnd, titleSb, 256);
+        var windowTitle = titleSb.ToString();
+
+        var classSb = new StringBuilder(256);
+        NativeMethods.GetClassNameW(blockerHwnd, classSb, 256);
+        var className = classSb.ToString();
+
+        // Build class hierarchy path: walk GetParent chain up to desktop
+        var classPath = BuildClassPath(blockerHwnd);
+
+        NativeMethods.GetWindowThreadProcessId(blockerHwnd, out uint blockerPid);
+        string processName = "";
+        try { processName = Process.GetProcessById((int)blockerPid).ProcessName; } catch { }
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"\n[BLOCK] Blocker detected: [{classPath}] \"{windowTitle}\" (process: {processName})");
+        Console.ResetColor();
+
+        // Read dialog contents for context and handler matching
+        var messageText = GetDialogMessageText(blockerHwnd);
+        ReadDialogContents(blockerHwnd);
+
+        // Try to find a matching handler
+        // Resolve handlers directory
+        var resolvedHandlersDir = handlerMgr?.HandlersDir
+            ?? Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "handlers");
+
+        if (handlerMgr == null || handlerMgr.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[BLOCK] No handlers loaded.");
+            Console.ResetColor();
+
+            // Interactive learning: ask user to hover over desired button
+            return InteractiveButtonLearn(
+                blockerHwnd, windowTitle, classPath, className, processName, resolvedHandlersDir);
+        }
+
+        var handler = handlerMgr.FindHandler(windowTitle, classPath, className, processName, messageText);
+        if (handler == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[BLOCK] No matching handler for [{classPath}] \"{windowTitle}\".");
+            Console.ResetColor();
+
+            // Interactive learning: ask user to hover over desired button
+            return InteractiveButtonLearn(
+                blockerHwnd, windowTitle, classPath, className, processName, resolvedHandlersDir);
+        }
+
+        // Execute handler action
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write($"[BLOCK] Handler matched → action: {handler.Action}");
+        Console.ResetColor();
+
+        bool success = false;
+        switch (handler.Action.ToLowerInvariant())
+        {
+            case "click_button":
+                success = ExecuteClickButton(blockerHwnd, handler.Params);
+                break;
+
+            case "dismiss":
+                // Send ESC to close the dialog
+                NativeMethods.SetForegroundWindow(blockerHwnd);
+                Thread.Sleep(100);
+                KeyboardInput.PressKey("escape");
+                Thread.Sleep(300);
+                success = !NativeMethods.IsWindow(blockerHwnd) || !NativeMethods.IsWindowVisible(blockerHwnd);
+                if (!success)
+                {
+                    // Fallback: Alt+F4
+                    KeyboardInput.Hotkey(new[] { "alt", "f4" });
+                    Thread.Sleep(300);
+                    success = !NativeMethods.IsWindow(blockerHwnd) || !NativeMethods.IsWindowVisible(blockerHwnd);
+                }
+                Console.ForegroundColor = success ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.WriteLine(success ? " ✓ dismissed" : " ✗ dismiss failed");
+                Console.ResetColor();
+                break;
+
+            case "report":
+            default:
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine(" (report only — no auto-action)");
+                Console.ResetColor();
+                return (false, false);
+        }
+
+        if (success && handler.Params != null)
+        {
+            // Wait after handling
+            if (handler.Params.WaitAfter > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"[BLOCK] Waiting {handler.Params.WaitAfter}ms after handling...");
+                Console.ResetColor();
+                Thread.Sleep(handler.Params.WaitAfter);
+            }
+
+            return (true, handler.Params.Retry);
+        }
+
+        return (success, false);
+    }
+
+    /// <summary>
+    /// Execute click_button action: find and click a button in the dialog.
+    /// Supports button_index (positional) and button_text (text match).
+    /// </summary>
+    private static bool ExecuteClickButton(IntPtr hDialog, DialogActionParams? prms)
+    {
+        var allChildren = new List<WindowInfo>();
+        FindAllChildrenFlat(hDialog, allChildren, 0, 3);
+        var buttons = allChildren.Where(c => c.ClassName == "Button" && c.IsVisible && c.Rect.Width > 10)
+            .OrderBy(b => b.Rect.Left).ToList();
+
+        if (buttons.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(" ✗ no buttons found in dialog");
+            Console.ResetColor();
+            return false;
+        }
+
+        WindowInfo targetBtn;
+
+        if (prms?.ButtonText != null)
+        {
+            // Match by text
+            var textMatch = buttons.FirstOrDefault(b =>
+                b.Title.Contains(prms.ButtonText, StringComparison.OrdinalIgnoreCase));
+            if (textMatch == null)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($" ✗ button \"{prms.ButtonText}\" not found");
+                Console.ResetColor();
+                return false;
+            }
+            targetBtn = textMatch;
+        }
+        else
+        {
+            // Match by index (default: 0 = first)
+            int idx = prms?.ButtonIndex ?? 0;
+            if (idx >= buttons.Count)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($" ✗ button index {idx} out of range ({buttons.Count} buttons)");
+                Console.ResetColor();
+                return false;
+            }
+            targetBtn = buttons[idx];
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write($" → clicking \"{targetBtn.Title}\"");
+        Console.ResetColor();
+
+        bool clicked = SmartClickButton(targetBtn.Handle, hDialog);
+        if (!clicked)
+        {
+            // SmartClickButton logs its own failure
+            return false;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine();
+        Console.ResetColor();
+        return true;
     }
 
     /// <summary>
@@ -2716,6 +2996,303 @@ Examples:
     /// Read and display contents of a dialog/popup window.
     /// Uses Win32 GetWindowText first, falls back to OCR for owner-drawn content.
     /// </summary>
+    /// <summary>
+    /// Build class hierarchy path by walking GetParent chain.
+    /// Returns "GrandparentClass/ParentClass/MyClass" (up to 5 levels, stops at desktop/null).
+    /// </summary>
+    private static string BuildClassPath(IntPtr hWnd)
+    {
+        var parts = new List<string>();
+        var current = hWnd;
+        for (int i = 0; i < 5 && current != IntPtr.Zero; i++)
+        {
+            var sb = new StringBuilder(256);
+            NativeMethods.GetClassNameW(current, sb, 256);
+            var cls = sb.ToString();
+            if (string.IsNullOrEmpty(cls)) break;
+            parts.Add(cls);
+            current = NativeMethods.GetParent(current);
+        }
+        parts.Reverse(); // root → leaf order
+        return string.Join("/", parts);
+    }
+
+    /// <summary>
+    /// Extract Static/Label text from a dialog (for handler message_contains matching).
+    /// Does NOT print to console — use ReadDialogContents for that.
+    /// </summary>
+    private static string GetDialogMessageText(IntPtr hDialog)
+    {
+        var texts = new List<string>();
+        var children = WindowFinder.GetChildrenZOrder(hDialog);
+
+        foreach (var child in children)
+        {
+            if (child.ClassName != "Static") continue;
+            var text = WindowFinder.GetWindowText(child.Handle);
+            if (!string.IsNullOrWhiteSpace(text))
+                texts.Add(text);
+        }
+
+        // Also check nested dialogs
+        foreach (var child in children)
+        {
+            if (child.ClassName == "#32770" || child.ClassName.StartsWith("Afx"))
+            {
+                foreach (var sc in WindowFinder.GetChildrenZOrder(child.Handle))
+                {
+                    if (sc.ClassName != "Static") continue;
+                    var text = WindowFinder.GetWindowText(sc.Handle);
+                    if (!string.IsNullOrWhiteSpace(text))
+                        texts.Add(text);
+                }
+            }
+        }
+
+        // Fallback: OCR if no Static text found (owner-drawn dialogs)
+        if (texts.Count == 0)
+        {
+            try
+            {
+                using var bmp = ScreenCapture.CaptureWindow(hDialog);
+                if (bmp.Width > 20 && bmp.Height > 20)
+                {
+                    var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
+                    var lang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
+                    using var ocr = new SimpleOcrAnalyzer(primaryLanguage: lang, confidenceThreshold: 0.5f);
+                    var result = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
+                    if (result.Words.Count > 0)
+                        texts.Add(string.Join(" ", result.Words.Select(w => w.Text)));
+                }
+            }
+            catch { /* OCR not critical */ }
+        }
+
+        return string.Join(" ", texts);
+    }
+
+    /// <summary>
+    /// Interactive button learning for unknown dialogs.
+    /// Shows buttons, asks user to hover mouse over desired button for 1+ second,
+    /// then clicks it and auto-generates a handler YAML.
+    /// Returns: (clicked, shouldRetry, buttonText) — same semantics as TryHandleBlocker.
+    /// </summary>
+    private static (bool clicked, bool shouldRetry) InteractiveButtonLearn(
+        IntPtr hDialog, string windowTitle, string classPath, string className,
+        string processName, string handlersDir)
+    {
+        // Find all buttons in the dialog
+        var allChildren = new List<WindowInfo>();
+        FindAllChildrenFlat(hDialog, allChildren, 0, 3);
+        var buttons = allChildren.Where(c => c.ClassName == "Button" && c.IsVisible && c.Rect.Width > 10)
+            .OrderBy(b => b.Rect.Left).ToList();
+
+        if (buttons.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("[BLOCK] No buttons found in dialog — cannot learn.");
+            Console.ResetColor();
+            return (false, false);
+        }
+
+        // Show available buttons
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("[BLOCK] Unknown dialog — interactive learning mode!");
+        Console.WriteLine("[BLOCK] Hover your mouse over the button you want, and hold for 1 second.");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        for (int i = 0; i < buttons.Count; i++)
+        {
+            var b = buttons[i];
+            var txt = !string.IsNullOrEmpty(b.Title) ? $"\"{b.Title}\"" : "(owner-drawn)";
+            Console.WriteLine($"  [{i}] {txt} {b.Rect.Width}x{b.Rect.Height} @({b.Rect.Left},{b.Rect.Top})");
+        }
+        Console.ResetColor();
+
+        // Alert user with beep + flash
+        NativeMethods.MessageBeep(0x00000030); // MB_ICONEXCLAMATION
+        NativeMethods.FlashWindow(hDialog, true);
+
+        // Poll mouse position: detect hover over a button for 1+ second
+        const int pollIntervalMs = 100;
+        const int hoverThresholdMs = 1000;
+        const int totalTimeoutMs = 15000;
+
+        IntPtr hoveredBtn = IntPtr.Zero;
+        int hoverDurationMs = 0;
+        int elapsedMs = 0;
+
+        while (elapsedMs < totalTimeoutMs)
+        {
+            Thread.Sleep(pollIntervalMs);
+            elapsedMs += pollIntervalMs;
+
+            // Check if dialog is still alive
+            if (!NativeMethods.IsWindow(hDialog) || !NativeMethods.IsWindowVisible(hDialog))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("[BLOCK] Dialog disappeared during learning.");
+                Console.ResetColor();
+                return (false, false);
+            }
+
+            NativeMethods.GetCursorPos(out var cursorPos);
+
+            // Check which button the cursor is over
+            IntPtr currentBtn = IntPtr.Zero;
+            foreach (var btn in buttons)
+            {
+                NativeMethods.GetWindowRect(btn.Handle, out var rect);
+                if (cursorPos.X >= rect.Left && cursorPos.X <= rect.Right &&
+                    cursorPos.Y >= rect.Top && cursorPos.Y <= rect.Bottom)
+                {
+                    currentBtn = btn.Handle;
+                    break;
+                }
+            }
+
+            if (currentBtn != IntPtr.Zero && currentBtn == hoveredBtn)
+            {
+                hoverDurationMs += pollIntervalMs;
+
+                // Show progress
+                if (hoverDurationMs % 500 == 0 && hoverDurationMs < hoverThresholdMs)
+                {
+                    var btnInfo = buttons.First(b => b.Handle == currentBtn);
+                    var btnText = !string.IsNullOrEmpty(btnInfo.Title) ? $"\"{btnInfo.Title}\"" : "(owner-drawn)";
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.Write($"\r[BLOCK] Hovering over {btnText}... {hoverDurationMs}ms / {hoverThresholdMs}ms");
+                    Console.ResetColor();
+                }
+
+                if (hoverDurationMs >= hoverThresholdMs)
+                {
+                    // Button selected!
+                    var selected = buttons.First(b => b.Handle == currentBtn);
+                    var selectedText = !string.IsNullOrEmpty(selected.Title) ? selected.Title : null;
+                    var displayText = selectedText ?? "(owner-drawn)";
+
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"\r[BLOCK] Button selected: \"{displayText}\" — clicking now!          ");
+                    Console.ResetColor();
+
+                    // Click the button
+                    bool clicked = SmartClickButton(selected.Handle, hDialog);
+                    if (clicked)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine("[BLOCK] Button clicked successfully.");
+                        Console.ResetColor();
+
+                        // Auto-generate handler YAML with the selected button
+                        var handlerPath = GenerateLearnedHandler(
+                            handlersDir, windowTitle, classPath, className, processName,
+                            selectedText, buttons.IndexOf(selected));
+
+                        if (handlerPath != null)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Cyan;
+                            Console.WriteLine($"[BLOCK] Handler learned and saved: {Path.GetFileName(handlerPath)}");
+                            Console.WriteLine("[BLOCK] Next time this dialog appears, it will be handled automatically!");
+                            Console.ResetColor();
+                        }
+
+                        return (true, true); // clicked + retry
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("[BLOCK] Click failed.");
+                        Console.ResetColor();
+                        return (false, false);
+                    }
+                }
+            }
+            else
+            {
+                // Cursor moved to different button or outside
+                hoveredBtn = currentBtn;
+                hoverDurationMs = currentBtn != IntPtr.Zero ? pollIntervalMs : 0;
+            }
+        }
+
+        // Timeout — no button selected
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"\r[BLOCK] No button selected within {totalTimeoutMs / 1000}s — giving up.          ");
+        Console.ResetColor();
+
+        // Still generate sample handler for manual editing
+        var samplePath = DialogHandlerManager.GenerateSampleHandler(
+            handlersDir, windowTitle, classPath, className, processName);
+        if (samplePath != null)
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"[BLOCK] Sample handler created: {Path.GetFileName(samplePath)}");
+            Console.WriteLine("[BLOCK] Edit this file to configure auto-handling, then re-run.");
+            Console.ResetColor();
+        }
+
+        return (false, false);
+    }
+
+    /// <summary>
+    /// Generate a complete handler YAML from interactive learning.
+    /// The button selected by the user becomes the action target.
+    /// </summary>
+    private static string? GenerateLearnedHandler(
+        string handlersDir, string windowTitle, string classPath, string className,
+        string processName, string? buttonText, int buttonIndex)
+    {
+        // Build keyword from classPath leaf or title
+        var keyword = !string.IsNullOrWhiteSpace(windowTitle)
+            ? windowTitle.Trim()
+            : className; // fallback to class name
+
+        // Sanitize for filename
+        keyword = string.Join("", keyword.Split(Path.GetInvalidFileNameChars())).Trim();
+        if (keyword.Length > 30) keyword = keyword[..30];
+        if (string.IsNullOrEmpty(keyword)) keyword = className;
+
+        try
+        {
+            Directory.CreateDirectory(handlersDir);
+            var filePath = Path.Combine(handlersDir, $"{keyword}.yaml");
+
+            // Don't overwrite existing handler
+            if (File.Exists(filePath))
+            {
+                // Append _learned suffix
+                filePath = Path.Combine(handlersDir, $"{keyword}_learned.yaml");
+                if (File.Exists(filePath)) return null;
+            }
+
+            var buttonSection = buttonText != null
+                ? $"  button_text: \"{buttonText}\"   # learned from user hover"
+                : $"  button_index: {buttonIndex}     # learned from user hover (owner-drawn, no text)";
+
+            var yaml = $@"# Auto-learned handler for: ""{windowTitle}""
+# Class hierarchy: {classPath}
+# Generated by interactive mouse-hover learning.
+
+match:
+  class: ""{className}""
+  process: ""{processName}""
+
+action: click_button
+
+params:
+{buttonSection}
+  wait_after: 5000
+  retry: true
+";
+            File.WriteAllText(filePath, yaml);
+            return filePath;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static void ReadDialogContents(IntPtr hDialog)
     {
         var children = WindowFinder.GetChildrenZOrder(hDialog);
