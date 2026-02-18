@@ -2698,8 +2698,66 @@ Examples:
     {
         var allChildren = new List<WindowInfo>();
         FindAllChildrenFlat(hDialog, allChildren, 0, 3);
-        var buttons = allChildren.Where(c => c.ClassName == "Button" && c.IsVisible && c.Rect.Width > 10)
+
+        // Button detection: standard Button class + small clickable MFC controls
+        var buttons = allChildren.Where(c => c.IsVisible && c.Rect.Width > 10 && IsButtonLike(c))
             .OrderBy(b => b.Rect.Left).ToList();
+
+        // Build text map: GetWindowText → WM_GETTEXT → OCR fallback for owner-drawn buttons
+        var buttonTexts = new Dictionary<IntPtr, string>();
+        bool needOcr = false;
+        foreach (var btn in buttons)
+        {
+            var text = btn.Title;
+            if (string.IsNullOrEmpty(text))
+                text = GetWmGetText(btn.Handle);
+            if (string.IsNullOrEmpty(text))
+                needOcr = true;
+            buttonTexts[btn.Handle] = text ?? "";
+        }
+
+        // OCR fallback: capture button regions and read text via SimpleOcr
+        if (needOcr)
+        {
+            try
+            {
+                var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
+                var lang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
+                using var ocr = new SimpleOcrAnalyzer(primaryLanguage: lang, confidenceThreshold: 0.3f);
+
+                foreach (var btn in buttons)
+                {
+                    if (!string.IsNullOrEmpty(buttonTexts[btn.Handle])) continue;
+                    try
+                    {
+                        // Capture button screen region
+                        using var bmp = ScreenCapture.CaptureScreenRegion(
+                            btn.Rect.Left, btn.Rect.Top, btn.Rect.Width, btn.Rect.Height);
+                        var result = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
+                        var ocrText = string.Join("", result.Words.Select(w => w.Text)).Trim();
+                        if (!string.IsNullOrEmpty(ocrText))
+                            buttonTexts[btn.Handle] = ocrText;
+                    }
+                    catch { /* OCR per-button is best-effort */ }
+                }
+            }
+            catch { /* OCR init failure is non-critical */ }
+        }
+
+        // Debug: show buttons found
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write(" →");
+        if (buttons.Count == 0)
+            Console.Write(" (no buttons)");
+        else
+            foreach (var b in buttons)
+            {
+                var t = buttonTexts[b.Handle];
+                var display = !string.IsNullOrEmpty(t) ? $"\"{t}\"" : "(owner-drawn)";
+                Console.Write($" [{b.ClassName}]{display}");
+            }
+        Console.WriteLine();
+        Console.ResetColor();
 
         if (buttons.Count == 0)
         {
@@ -2713,13 +2771,23 @@ Examples:
 
         if (prms?.ButtonText != null)
         {
-            // Match by text
+            // Match by text (GetWindowText + WM_GETTEXT)
             var textMatch = buttons.FirstOrDefault(b =>
-                b.Title.Contains(prms.ButtonText, StringComparison.OrdinalIgnoreCase));
+                buttonTexts[b.Handle].Contains(prms.ButtonText, StringComparison.OrdinalIgnoreCase));
+
+            if (textMatch == null && buttons.Count == 1)
+            {
+                // Single button fallback: if only 1 button exists, assume it's the one
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Write($" (single button fallback)");
+                Console.ResetColor();
+                textMatch = buttons[0];
+            }
+
             if (textMatch == null)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($" ✗ button \"{prms.ButtonText}\" not found");
+                Console.WriteLine($" ✗ button \"{prms.ButtonText}\" not found ({buttons.Count} buttons available)");
                 Console.ResetColor();
                 return false;
             }
@@ -2740,7 +2808,8 @@ Examples:
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Write($" → clicking \"{targetBtn.Title}\"");
+        var targetBtnText = buttonTexts.GetValueOrDefault(targetBtn.Handle, targetBtn.Title ?? "");
+        Console.Write($" → clicking \"{targetBtnText}\"");
         Console.ResetColor();
 
         bool clicked = SmartClickButton(targetBtn.Handle, hDialog);
@@ -3018,6 +3087,39 @@ Examples:
     }
 
     /// <summary>
+    /// Get text from a window using WM_GETTEXT (works for some owner-drawn controls).
+    /// </summary>
+    private static string GetWmGetText(IntPtr hWnd)
+    {
+        var len = (int)NativeMethods.SendMessageW(hWnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
+        if (len <= 0) return "";
+        var sb = new StringBuilder(len + 2);
+        NativeMethods.SendMessageW(hWnd, NativeMethods.WM_GETTEXT, (IntPtr)(len + 1), sb);
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Determine if a child window looks like a button.
+    /// Standard "Button" class + small owner-drawn AfxWnd110 controls in MFC dialogs.
+    /// </summary>
+    private static bool IsButtonLike(WindowInfo c)
+    {
+        // Standard Win32 Button class (includes BS_OWNERDRAW variants)
+        if (c.ClassName == "Button") return true;
+
+        // MFC owner-drawn: small clickable AfxWnd110 controls
+        // Typical button: 50~120px wide, 18~30px tall
+        if (c.ClassName.StartsWith("AfxWnd") || c.ClassName.StartsWith("Afx:"))
+        {
+            if (c.Rect.Width >= 30 && c.Rect.Width <= 200 &&
+                c.Rect.Height >= 15 && c.Rect.Height <= 40)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Extract Static/Label text from a dialog (for handler message_contains matching).
     /// Does NOT print to console — use ReadDialogContents for that.
     /// </summary>
@@ -3081,10 +3183,10 @@ Examples:
         IntPtr hDialog, string windowTitle, string classPath, string className,
         string processName, string handlersDir)
     {
-        // Find all buttons in the dialog
+        // Find all buttons in the dialog (including MFC owner-drawn)
         var allChildren = new List<WindowInfo>();
         FindAllChildrenFlat(hDialog, allChildren, 0, 3);
-        var buttons = allChildren.Where(c => c.ClassName == "Button" && c.IsVisible && c.Rect.Width > 10)
+        var buttons = allChildren.Where(c => c.IsVisible && c.Rect.Width > 10 && IsButtonLike(c))
             .OrderBy(b => b.Rect.Left).ToList();
 
         if (buttons.Count == 0)

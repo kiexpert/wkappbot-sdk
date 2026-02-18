@@ -53,6 +53,24 @@ public sealed class DialogHandlerManager
                 Console.ResetColor();
             }
         }
+
+        // Sort by specificity: more match conditions = higher priority (checked first)
+        // This ensures specific handlers (title_contains + class + process) match before generic ones
+        _handlers.Sort((a, b) => Specificity(b.config).CompareTo(Specificity(a.config)));
+    }
+
+    /// <summary>
+    /// Calculate handler specificity score: more match conditions = higher priority.
+    /// </summary>
+    private static int Specificity(DialogHandlerConfig cfg)
+    {
+        if (cfg.Match == null) return 0;
+        int score = 0;
+        if (cfg.Match.TitleContains != null) score += 10; // title is most specific
+        if (cfg.Match.MessageContains != null) score += 5;
+        if (cfg.Match.Class != null) score += 2;
+        if (cfg.Match.Process != null) score += 1;
+        return score;
     }
 
     /// <summary>
