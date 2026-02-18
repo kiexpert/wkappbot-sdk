@@ -57,6 +57,7 @@ internal class Program
                 "click" => ClickCommand(restArgs),
                 "form-dump" => FormDumpCommand(restArgs),
                 "do" => DoCommand(restArgs),
+                "dismiss" => DismissCommand(restArgs),
                 "dialog-click" => DialogClickCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
@@ -2007,6 +2008,25 @@ Examples:
 
         // Find form
         var scanResult = AppScanner.Scan(win.Handle);
+
+        // Auto-dismiss notice/popup MDI children before proceeding
+        var noticeKeywords = new[] { "공지", "인사", "안내", "알림", "POP-UP", "POPUP" };
+        foreach (var form in scanResult.Forms)
+        {
+            var fn = form.FormName ?? "";
+            if (noticeKeywords.Any(kw => fn.Contains(kw, StringComparison.OrdinalIgnoreCase)))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($"  [DISMISS] [{form.FormId}] \"{fn}\"");
+                NativeMethods.SendMessageW(form.Handle, NativeMethods.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                Thread.Sleep(200);
+                bool gone = !NativeMethods.IsWindow(form.Handle) || !NativeMethods.IsWindowVisible(form.Handle);
+                Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.WriteLine(gone ? " ← closed" : " ← still visible");
+                Console.ResetColor();
+            }
+        }
+
         var targetForm = scanResult.Forms.FirstOrDefault(f => f.FormId == targetFormId);
         if (targetForm == null)
         {
@@ -2823,6 +2843,126 @@ Examples:
         Console.WriteLine();
         Console.ResetColor();
         return true;
+    }
+
+    /// <summary>
+    /// <summary>
+    /// Dismiss MDI child windows matching keywords in their title.
+    /// Usage: appbot dismiss "영웅문" [keyword1] [keyword2] ...
+    /// If no keywords given, closes common notice windows (공지, 인사, 안내, 알림).
+    /// Sends WM_CLOSE to each matching MDI child.
+    /// </summary>
+    static int DismissCommand(string[] args)
+    {
+        if (args.Length < 1)
+            return Error(@"Usage: appbot dismiss <window-title> [keyword1] [keyword2] ...
+  Closes MDI child windows matching keywords in their title.
+  If no keywords given, closes common notices (공지, 인사, 안내, 알림, POP-UP).");
+
+        string title = args[0];
+        var keywords = args.Length > 1
+            ? args.Skip(1).ToArray()
+            : new[] { "공지", "인사", "안내", "알림", "POP-UP", "POPUP", "notice", "popup" };
+
+        var windows = WindowFinder.FindByTitle(title);
+        if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
+        var win = windows[0];
+        Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
+
+        // Load dialog handlers
+        var handlersDir = Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "handlers");
+        var handlerMgr = Directory.Exists(handlersDir) ? new DialogHandlerManager(handlersDir) : null;
+
+        // Step 1: Scan MDI children for matching titles
+        var scanResult = AppScanner.Scan(win.Handle);
+        int closedCount = 0;
+
+        foreach (var form in scanResult.Forms)
+        {
+            var formTitle = form.FormName ?? "";
+            bool matches = keywords.Any(kw =>
+                formTitle.Contains(kw, StringComparison.OrdinalIgnoreCase));
+
+            if (matches)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($"  [DISMISS] [{form.FormId}] \"{formTitle}\"");
+                Console.ResetColor();
+
+                NativeMethods.SendMessageW(form.Handle, NativeMethods.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                Thread.Sleep(300);
+
+                bool gone = !NativeMethods.IsWindow(form.Handle) || !NativeMethods.IsWindowVisible(form.Handle);
+                Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.WriteLine(gone ? " ← closed" : " ← still visible");
+                Console.ResetColor();
+                if (gone) closedCount++;
+            }
+        }
+
+        // Step 2: Also scan for #32770 popup dialogs from same process (like before)
+        NativeMethods.GetWindowThreadProcessId(win.Handle, out uint targetPid);
+        var popupCandidates = new List<IntPtr>();
+
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (hWnd == win.Handle) return true;
+            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+            if (pid != targetPid) return true;
+
+            var clsSb = new StringBuilder(256);
+            NativeMethods.GetClassNameW(hWnd, clsSb, 256);
+            if (clsSb.ToString() == "#32770")
+                popupCandidates.Add(hWnd);
+
+            return true;
+        }, IntPtr.Zero);
+
+        foreach (var hPopup in popupCandidates)
+        {
+            var popTitle = new StringBuilder(256);
+            NativeMethods.GetWindowTextW(hPopup, popTitle, 256);
+            var classPath = BuildClassPath(hPopup);
+
+            var clsSb2 = new StringBuilder(256);
+            NativeMethods.GetClassNameW(hPopup, clsSb2, 256);
+            var cls = clsSb2.ToString();
+
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write($"  [DISMISS] [{classPath}] \"{popTitle}\"");
+            Console.ResetColor();
+
+            // Try handler first
+            NativeMethods.GetWindowThreadProcessId(hPopup, out uint popPid);
+            string procName = "";
+            try { procName = Process.GetProcessById((int)popPid).ProcessName; } catch { }
+            var msgText = GetDialogMessageText(hPopup);
+
+            var handler = handlerMgr?.FindHandler(popTitle.ToString(), classPath, cls, procName, msgText);
+            if (handler != null && handler.Action == "click_button")
+            {
+                bool ok = ExecuteClickButton(hPopup, handler.Params);
+                if (ok) closedCount++;
+            }
+            else
+            {
+                // Default: WM_CLOSE
+                NativeMethods.SendMessageW(hPopup, NativeMethods.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                Thread.Sleep(300);
+                bool gone = !NativeMethods.IsWindow(hPopup) || !NativeMethods.IsWindowVisible(hPopup);
+                Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.WriteLine(gone ? " ← closed" : " ← still visible");
+                Console.ResetColor();
+                if (gone) closedCount++;
+            }
+        }
+
+        Console.ForegroundColor = closedCount > 0 ? ConsoleColor.Green : ConsoleColor.DarkGray;
+        Console.WriteLine($"\n  {closedCount} window(s) dismissed.");
+        Console.ResetColor();
+
+        return 0;
     }
 
     /// <summary>
