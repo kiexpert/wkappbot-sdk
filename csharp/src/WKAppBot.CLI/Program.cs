@@ -2017,12 +2017,33 @@ Examples:
             if (noticeKeywords.Any(kw => fn.Contains(kw, StringComparison.OrdinalIgnoreCase)))
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"  [DISMISS] [{form.FormId}] \"{fn}\"");
+                Console.WriteLine($"  [DISMISS] [{form.FormId}] \"{fn}\"");
+                Console.ResetColor();
+
+                // Read notice content before closing
+                var noticeText = ReadNoticeContent(form.Handle, fn);
+                if (!string.IsNullOrWhiteSpace(noticeText))
+                {
+                    var importance = ClassifyNoticeImportance(noticeText);
+                    if (importance == NoticeImportance.Critical)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"  *** IMPORTANT NOTICE — NOT closing ***");
+                        Console.ForegroundColor = ConsoleColor.White;
+                        PrintNoticeText(noticeText);
+                        Console.ResetColor();
+                        continue;
+                    }
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    PrintNoticeText(noticeText);
+                    Console.ResetColor();
+                }
+
                 NativeMethods.SendMessageW(form.Handle, NativeMethods.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
                 Thread.Sleep(200);
                 bool gone = !NativeMethods.IsWindow(form.Handle) || !NativeMethods.IsWindowVisible(form.Handle);
                 Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine(gone ? " ← closed" : " ← still visible");
+                Console.WriteLine(gone ? "  ← closed" : "  ← still visible");
                 Console.ResetColor();
             }
         }
@@ -2886,15 +2907,37 @@ Examples:
             if (matches)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"  [DISMISS] [{form.FormId}] \"{formTitle}\"");
+                Console.WriteLine($"  [DISMISS] [{form.FormId}] \"{formTitle}\"");
                 Console.ResetColor();
+
+                // Read notice content via OCR before closing
+                var noticeText = ReadNoticeContent(form.Handle, formTitle);
+                if (!string.IsNullOrWhiteSpace(noticeText))
+                {
+                    // Check importance
+                    var importance = ClassifyNoticeImportance(noticeText);
+                    if (importance == NoticeImportance.Critical)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"  *** IMPORTANT NOTICE — NOT closing ***");
+                        Console.ForegroundColor = ConsoleColor.White;
+                        PrintNoticeText(noticeText);
+                        Console.ResetColor();
+                        continue; // skip closing
+                    }
+
+                    // Normal notice — print summary and close
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    PrintNoticeText(noticeText);
+                    Console.ResetColor();
+                }
 
                 NativeMethods.SendMessageW(form.Handle, NativeMethods.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
                 Thread.Sleep(300);
 
                 bool gone = !NativeMethods.IsWindow(form.Handle) || !NativeMethods.IsWindowVisible(form.Handle);
                 Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine(gone ? " ← closed" : " ← still visible");
+                Console.WriteLine(gone ? "  ← closed" : "  ← still visible");
                 Console.ResetColor();
                 if (gone) closedCount++;
             }
@@ -3224,6 +3267,101 @@ Examples:
         }
         parts.Reverse(); // root → leaf order
         return string.Join("/", parts);
+    }
+
+    // ── Notice content reading + importance classification ─────────
+
+    private enum NoticeImportance { Normal, Critical }
+
+    /// <summary>
+    /// Critical keywords: notices containing these should NOT be auto-dismissed.
+    /// Trading-critical events that require user attention.
+    /// </summary>
+    private static readonly string[] CriticalKeywords = {
+        "긴급", "장애", "거래중지", "거래정지", "시스템장애", "서버장애",
+        "점검시간변경", "임시점검", "긴급점검",
+        "증거금률변경", "위탁증거금", "반대매매",
+        "상장폐지", "매매거래정지", "투자경고",
+        "해킹", "보안", "개인정보유출"
+    };
+
+    /// <summary>
+    /// Read notice content from an MDI child window via OCR.
+    /// Returns the full text content, or null if unreadable.
+    /// </summary>
+    private static string? ReadNoticeContent(IntPtr hWnd, string formTitle)
+    {
+        try
+        {
+            // Try WM_GETTEXT on child controls first
+            var children = new List<WindowInfo>();
+            FindAllChildrenFlat(hWnd, children, 0, 4);
+
+            var texts = new List<string>();
+            foreach (var child in children.Where(c => c.IsVisible))
+            {
+                var text = child.Title;
+                if (string.IsNullOrEmpty(text))
+                    text = GetWmGetText(child.Handle);
+                if (!string.IsNullOrWhiteSpace(text) && text.Length > 2)
+                    texts.Add(text);
+            }
+
+            // If we got reasonable text from WM_GETTEXT, use it
+            if (texts.Count > 0)
+            {
+                var combined = string.Join(" ", texts);
+                if (combined.Length > 10) return combined;
+            }
+
+            // Fallback: OCR the window
+            using var bmp = ScreenCapture.CaptureWindow(hWnd);
+            if (bmp.Width < 30 || bmp.Height < 30) return null;
+
+            var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
+            var lang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
+            using var ocr = new SimpleOcrAnalyzer(primaryLanguage: lang, confidenceThreshold: 0.3f);
+            var result = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
+
+            if (!string.IsNullOrWhiteSpace(result.FullText))
+                return result.FullText;
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Classify notice importance based on critical keywords.
+    /// </summary>
+    private static NoticeImportance ClassifyNoticeImportance(string text)
+    {
+        foreach (var kw in CriticalKeywords)
+        {
+            if (text.Contains(kw, StringComparison.OrdinalIgnoreCase))
+                return NoticeImportance.Critical;
+        }
+        return NoticeImportance.Normal;
+    }
+
+    /// <summary>
+    /// Print notice text in a readable format (indented, max 5 lines).
+    /// </summary>
+    private static void PrintNoticeText(string text)
+    {
+        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        int maxLines = 8;
+        for (int i = 0; i < Math.Min(lines.Length, maxLines); i++)
+        {
+            var line = lines[i].Trim();
+            if (line.Length > 120) line = line[..117] + "...";
+            Console.WriteLine($"    | {line}");
+        }
+        if (lines.Length > maxLines)
+            Console.WriteLine($"    | ... ({lines.Length - maxLines} more lines)");
     }
 
     /// <summary>
