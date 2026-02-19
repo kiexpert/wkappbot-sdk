@@ -109,7 +109,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
 
     /// <summary>
     /// When true, injects a WebBot URL bar at the top of each page after navigation,
-    /// and updates document.title to "{PageTitle} - WebBot v0.1".
+    /// and updates document.title to "{PageTitle} - WKWebBot v0.1".
     /// </summary>
     public bool InjectWebBotBar { get; set; }
 
@@ -128,9 +128,10 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
-    /// Inject a fixed URL bar at the top of the page showing current URL,
-    /// and update document.title to "{PageTitle} - WebBot v0.1".
-    /// The bar auto-updates on pushState/replaceState/popstate via MutationObserver.
+    /// Inject top URL bar + bottom status bar, and update document.title.
+    /// Top bar: WebBot brand + URL + connection dot
+    /// Bottom bar: last action + elapsed time + step counter
+    /// Auto-updates URL on SPA navigation (pushState/popstate).
     /// </summary>
     private async Task InjectBarAsync()
     {
@@ -138,86 +139,164 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         {
             await EvalAsync("""
                 (() => {
-                    // Remove existing bar if re-injected
-                    const existing = document.getElementById('__wkappbot_bar');
-                    if (existing) existing.remove();
+                    // Remove existing bars if re-injected
+                    document.getElementById('__wkappbot_bar')?.remove();
+                    document.getElementById('__wkappbot_status')?.remove();
 
-                    // Create the bar
+                    // ── Shared style constants ──
+                    const DARK = '#1a1a2e';
+                    const FONT = "12px/24px 'Consolas', 'Courier New', monospace";
+                    const CYAN = '#4fc3f7';
+                    const GREEN = '#4caf50';
+
+                    // ── Top bar: brand + URL + dot ──
                     const bar = document.createElement('div');
                     bar.id = '__wkappbot_bar';
                     bar.style.cssText = `
                         position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647;
-                        height: 28px; background: #1a1a2e; color: #e0e0e0;
-                        font: 12px/28px 'Consolas', 'Courier New', monospace;
-                        display: flex; align-items: center; padding: 0 10px;
-                        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+                        height: 26px; background: ${DARK}; color: #e0e0e0;
+                        font: ${FONT}; display: flex; align-items: center;
+                        padding: 0 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
                         user-select: text; -webkit-user-select: text;
                     `;
 
-                    // Logo/brand
                     const brand = document.createElement('span');
-                    brand.textContent = 'WebBot';
-                    brand.style.cssText = `
-                        color: #4fc3f7; font-weight: bold; margin-right: 8px;
-                        font-size: 13px; letter-spacing: 0.5px;
-                    `;
+                    brand.textContent = 'WKWebBot';
+                    brand.style.cssText = `color:${CYAN};font-weight:bold;margin-right:8px;font-size:13px;letter-spacing:.5px;`;
 
-                    // Separator
                     const sep = document.createElement('span');
                     sep.textContent = '|';
-                    sep.style.cssText = 'color: #555; margin: 0 8px;';
+                    sep.style.cssText = 'color:#555;margin:0 8px;';
 
-                    // URL display
                     const urlEl = document.createElement('span');
                     urlEl.id = '__wkappbot_url';
-                    urlEl.style.cssText = `
-                        color: #aaa; flex: 1; overflow: hidden;
-                        text-overflow: ellipsis; white-space: nowrap;
-                    `;
+                    urlEl.style.cssText = 'color:#aaa;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
                     urlEl.textContent = location.href;
 
-                    // Status dot (green = connected)
                     const dot = document.createElement('span');
                     dot.id = '__wkappbot_dot';
-                    dot.style.cssText = `
-                        width: 8px; height: 8px; border-radius: 50%;
-                        background: #4caf50; margin-left: 8px; flex-shrink: 0;
-                    `;
+                    dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${GREEN};margin-left:8px;flex-shrink:0;`;
                     dot.title = 'CDP Connected';
 
-                    bar.appendChild(brand);
-                    bar.appendChild(sep);
-                    bar.appendChild(urlEl);
-                    bar.appendChild(dot);
+                    bar.append(brand, sep, urlEl, dot);
 
-                    // Push page content down so bar doesn't overlap
-                    document.body.style.marginTop = '32px';
+                    // ── Bottom status bar: action + time + counter ──
+                    const status = document.createElement('div');
+                    status.id = '__wkappbot_status';
+                    status.style.cssText = `
+                        position: fixed; bottom: 0; left: 0; right: 0; z-index: 2147483647;
+                        height: 22px; background: ${DARK}; color: #888;
+                        font: 11px/22px 'Consolas', 'Courier New', monospace;
+                        display: flex; align-items: center; padding: 0 10px;
+                        box-shadow: 0 -1px 4px rgba(0,0,0,0.3);
+                    `;
+
+                    // Status icon (idle/running indicator)
+                    const icon = document.createElement('span');
+                    icon.id = '__wkappbot_icon';
+                    icon.textContent = '\u25CF';
+                    icon.style.cssText = `color:${GREEN};margin-right:6px;font-size:10px;`;
+                    icon.title = 'Idle';
+
+                    // Last action display
+                    const action = document.createElement('span');
+                    action.id = '__wkappbot_action';
+                    action.style.cssText = 'color:#aaa;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                    action.textContent = 'Ready';
+
+                    // Step counter
+                    const counter = document.createElement('span');
+                    counter.id = '__wkappbot_counter';
+                    counter.style.cssText = 'color:#666;margin-left:10px;';
+                    counter.textContent = '';
+
+                    // Elapsed time
+                    const elapsed = document.createElement('span');
+                    elapsed.id = '__wkappbot_elapsed';
+                    elapsed.style.cssText = 'color:#666;margin-left:10px;min-width:60px;text-align:right;';
+                    elapsed.textContent = '';
+
+                    status.append(icon, action, counter, elapsed);
+
+                    // Push page content to avoid overlap (top + bottom)
+                    document.body.style.marginTop = '30px';
+                    document.body.style.marginBottom = '26px';
                     document.body.insertBefore(bar, document.body.firstChild);
+                    document.body.appendChild(status);
 
-                    // Update title
+                    // Update title (short — no URL)
                     const origTitle = document.title || location.hostname || 'Untitled';
-                    document.title = origTitle + ' - WebBot v0.1';
+                    document.title = origTitle + ' - WKWebBot v0.1';
 
-                    // Auto-update URL on SPA navigation (pushState/popstate)
+                    // Auto-update URL on SPA navigation
                     const updateUrl = () => {
                         const u = document.getElementById('__wkappbot_url');
                         if (u) u.textContent = location.href;
                     };
                     window.addEventListener('popstate', updateUrl);
                     const origPush = history.pushState;
-                    history.pushState = function() {
-                        origPush.apply(this, arguments);
-                        updateUrl();
-                    };
+                    history.pushState = function() { origPush.apply(this, arguments); updateUrl(); };
                     const origReplace = history.replaceState;
-                    history.replaceState = function() {
-                        origReplace.apply(this, arguments);
-                        updateUrl();
+                    history.replaceState = function() { origReplace.apply(this, arguments); updateUrl(); };
+
+                    // Global helper for status updates from CDP
+                    window.__wkappbot = {
+                        stepCount: 0,
+                        setAction(text, isError) {
+                            const a = document.getElementById('__wkappbot_action');
+                            const i = document.getElementById('__wkappbot_icon');
+                            if (a) { a.textContent = text; a.style.color = isError ? '#f44336' : '#aaa'; }
+                            if (i) { i.style.color = isError ? '#f44336' : '#4caf50'; i.title = isError ? 'Error' : 'OK'; }
+                        },
+                        setRunning(text) {
+                            const a = document.getElementById('__wkappbot_action');
+                            const i = document.getElementById('__wkappbot_icon');
+                            if (a) { a.textContent = text; a.style.color = '#ffb74d'; }
+                            if (i) { i.style.color = '#ffb74d'; i.title = 'Running'; }
+                        },
+                        setElapsed(ms) {
+                            const e = document.getElementById('__wkappbot_elapsed');
+                            if (e) e.textContent = ms >= 1000 ? (ms/1000).toFixed(1)+'s' : ms+'ms';
+                        },
+                        setCounter(n, total) {
+                            this.stepCount = n;
+                            const c = document.getElementById('__wkappbot_counter');
+                            if (c) c.textContent = total ? `[${n}/${total}]` : `#${n}`;
+                        },
                     };
 
-                    return 'BAR_INJECTED';
+                    return 'BARS_INJECTED';
                 })()
             """);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Update the bottom status bar with current action info.</summary>
+    public async Task UpdateStatusAsync(string action, int? stepNum = null, int? totalSteps = null, int? elapsedMs = null, bool isError = false)
+    {
+        if (!InjectWebBotBar) return;
+        try
+        {
+            var escapedAction = action.Replace("\\", "\\\\").Replace("'", "\\'");
+            var js = $"window.__wkappbot?.setAction('{escapedAction}', {(isError ? "true" : "false")});";
+            if (stepNum.HasValue)
+                js += $"window.__wkappbot?.setCounter({stepNum.Value},{totalSteps ?? 0});";
+            if (elapsedMs.HasValue)
+                js += $"window.__wkappbot?.setElapsed({elapsedMs.Value});";
+            await EvalAsync(js);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Set status bar to "running" state (orange).</summary>
+    public async Task SetStatusRunningAsync(string action)
+    {
+        if (!InjectWebBotBar) return;
+        try
+        {
+            var escaped = action.Replace("\\", "\\\\").Replace("'", "\\'");
+            await EvalAsync($"window.__wkappbot?.setRunning('{escaped}');");
         }
         catch { /* best effort */ }
     }
