@@ -53,15 +53,26 @@ internal partial class Program
         ClaudeChat? ai = null;
         if (aiMode)
         {
-            try
+            // Try config file first, then env var
+            var aiKey = config["anthropic_api_key"]?.GetValue<string>()
+                ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+            if (string.IsNullOrEmpty(aiKey))
             {
-                ai = new ClaudeChat();
-                Console.WriteLine("[SLACK] AI mode enabled (Claude API)");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SLACK] AI mode unavailable: {ex.Message}");
+                Console.WriteLine("[SLACK] AI mode requires 'anthropic_api_key' in webhook.json or ANTHROPIC_API_KEY env var");
                 Console.WriteLine("[SLACK] Falling back to echo mode");
+            }
+            else
+            {
+                try
+                {
+                    ai = new ClaudeChat(apiKey: aiKey);
+                    Console.WriteLine("[SLACK] AI mode enabled (Claude API)");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SLACK] AI mode unavailable: {ex.Message}");
+                    Console.WriteLine("[SLACK] Falling back to echo mode");
+                }
             }
         }
 
@@ -165,10 +176,16 @@ internal partial class Program
             RedirectStandardError = true,
         };
 
-        // Pass DOTNET_ROOT if set
+        // Pass essential env vars to child process
+        // Use psi.Environment (inherits all parent env vars, then we add/override)
         var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
         if (!string.IsNullOrEmpty(dotnetRoot))
-            psi.EnvironmentVariables["DOTNET_ROOT"] = dotnetRoot;
+            psi.Environment["DOTNET_ROOT"] = dotnetRoot;
+
+        // Pass ANTHROPIC_API_KEY for --ai mode
+        var apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+        if (!string.IsNullOrEmpty(apiKey))
+            psi.Environment["ANTHROPIC_API_KEY"] = apiKey;
 
         var process = Process.Start(psi);
         if (process == null)
@@ -177,10 +194,10 @@ internal partial class Program
             return 1;
         }
 
-        // Redirect output to log file in background
+        // Redirect output to log file in background (auto-flush for real-time monitoring)
         _ = Task.Run(async () =>
         {
-            using var writer = new StreamWriter(logFile, append: true);
+            using var writer = new StreamWriter(logFile, append: true) { AutoFlush = true };
             while (!process.HasExited)
             {
                 var line = await process.StandardOutput.ReadLineAsync();
