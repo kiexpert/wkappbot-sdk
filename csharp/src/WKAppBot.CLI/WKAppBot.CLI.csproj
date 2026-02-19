@@ -15,6 +15,7 @@
     <ProjectReference Include="..\WKAppBot.Win32\WKAppBot.Win32.csproj" />
     <ProjectReference Include="..\WKAppBot.Vision\WKAppBot.Vision.csproj" />
     <ProjectReference Include="..\WKAppBot.Report\WKAppBot.Report.csproj" />
+    <ProjectReference Include="..\WKAppBot.WebBot\WKAppBot.WebBot.csproj" />
   </ItemGroup>
 
   <!-- Copy handler YAML files from project root to output -->
