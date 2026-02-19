@@ -1095,6 +1095,30 @@ Examples:
                 wmText: WindowFinder.GetWindowText(hButton));
         }
 
+        // Show existing knowhow before clicking (오답노트 펴보기)
+        if (hasExpData)
+        {
+            var knowhow = expDb!.ReadKnowhow(formId!, controlId!.Value);
+            if (knowhow != null)
+            {
+                // Count entries (## headers)
+                var entryCount = knowhow.Split('\n')
+                    .Count(l => l.StartsWith("## ["));
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($"[KNOWHOW] ");
+                Console.ResetColor();
+                Console.WriteLine($"cid={controlId}: {entryCount} knowhow entries found");
+                // Show compact summary (first line of each entry)
+                foreach (var line in knowhow.Split('\n')
+                    .Where(l => l.StartsWith("- **")))
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.WriteLine($"  {line}");
+                    Console.ResetColor();
+                }
+            }
+        }
+
         // Snapshot: foreground window before clicking
         var fgBefore = NativeMethods.GetForegroundWindow();
         bool isFirst = true;
