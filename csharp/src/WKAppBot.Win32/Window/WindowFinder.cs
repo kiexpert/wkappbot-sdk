@@ -469,6 +469,10 @@ public sealed class WindowInfo
     public int ControlId { get; init; }
     public RECT Rect { get; init; }
     public bool IsVisible { get; init; }
+    /// <summary>WS_* style bits from GetWindowLongW(GWL_STYLE)</summary>
+    public int Style { get; init; }
+    /// <summary>WS_EX_* extended style bits from GetWindowLongW(GWL_EXSTYLE)</summary>
+    public int ExStyle { get; init; }
 
     public static WindowInfo FromHwnd(IntPtr hWnd)
     {
@@ -481,6 +485,8 @@ public sealed class WindowInfo
             ControlId = NativeMethods.GetDlgCtrlID(hWnd),
             Rect = rect,
             IsVisible = NativeMethods.IsWindowVisible(hWnd),
+            Style = NativeMethods.GetWindowLongW(hWnd, NativeMethods.GWL_STYLE),
+            ExStyle = NativeMethods.GetWindowLongW(hWnd, NativeMethods.GWL_EXSTYLE),
         };
     }
 

@@ -141,12 +141,25 @@ public sealed class ExperienceDb
             // Update tree path if provided (overwrite — latest scan is authoritative)
             if (treePath != null) existing.TreePath = treePath;
 
+            // Update window styles (always take latest — may be 0 for legacy data)
+            if (control.Style != 0) existing.Style = control.Style;
+            if (control.ExStyle != 0) existing.ExStyle = control.ExStyle;
+
             existing.HitCount++;
+
+            // Update info.json if tree path is known (best-effort)
+            var tp = treePath ?? existing.TreePath;
+            if (tp != null)
+                try { SaveControlInfo(formId, existing.ControlId, tp); } catch { }
         }
         else
         {
             if (treePath != null) control.TreePath = treePath;
             form.Controls.Add(control);
+
+            // Save info.json for new control (best-effort)
+            if (treePath != null)
+                try { SaveControlInfo(formId, control.ControlId, treePath); } catch { }
         }
 
         form.UpdatedAt = DateTime.UtcNow;
@@ -672,6 +685,28 @@ public sealed class ExperienceDb
         treePath ??= GetTreePath(formId, cid);
         var dir = GetControlDir(formId, cid, treePath: treePath);
         Input.ScreenCapture.SaveToFile(screenshot, Path.Combine(dir, "latest.png"));
+
+        // Also dump info.json alongside latest.png (best-effort)
+        try { SaveControlInfo(formId, cid, treePath); } catch { }
+    }
+
+    /// <summary>
+    /// Save a control's experience data as info.json in its tree folder.
+    /// Makes control metadata browsable in file explorer alongside latest.png.
+    /// </summary>
+    public void SaveControlInfo(string formId, int cid, string? treePath = null)
+    {
+        treePath ??= GetTreePath(formId, cid);
+        var dir = GetControlDir(formId, cid, create: true, treePath: treePath);
+        var ctrl = GetControl(formId, cid);
+        if (ctrl == null) return;
+
+        var json = JsonSerializer.Serialize(ctrl, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        });
+        File.WriteAllText(Path.Combine(dir, "info.json"), json);
     }
 
     /// <summary>
@@ -925,6 +960,37 @@ public sealed class ControlExperience
     [JsonPropertyName("tree_path")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TreePath { get; set; }
+
+    // ── Window Style Traits (scan 시 한 번 수집, 불변 특성) ──
+
+    /// <summary>
+    /// Raw WS_* style bits from GetWindowLongW(GWL_STYLE).
+    /// 0 = not yet collected (legacy data).
+    /// </summary>
+    [JsonPropertyName("style")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int Style { get; set; }
+
+    /// <summary>
+    /// Raw WS_EX_* extended style bits from GetWindowLongW(GWL_EXSTYLE).
+    /// 0 = not yet collected.
+    /// </summary>
+    [JsonPropertyName("ex_style")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int ExStyle { get; set; }
+
+    // ── Derived style traits (computed from raw bits, not serialized) ──
+
+    [JsonIgnore] public bool HasCaption    => (Style & 0x00C00000) == 0x00C00000; // WS_CAPTION
+    [JsonIgnore] public bool IsResizable   => (Style & 0x00040000) != 0;          // WS_THICKFRAME
+    [JsonIgnore] public bool IsPopup       => (Style & unchecked((int)0x80000000)) != 0; // WS_POPUP
+    [JsonIgnore] public bool IsChild       => (Style & 0x40000000) != 0;          // WS_CHILD
+    [JsonIgnore] public bool IsDisabled    => (Style & 0x08000000) != 0;          // WS_DISABLED
+    [JsonIgnore] public bool HasScrollbar  => (Style & 0x00300000) != 0;          // WS_VSCROLL|WS_HSCROLL
+    [JsonIgnore] public bool IsTopmost     => (ExStyle & 0x00000008) != 0;        // WS_EX_TOPMOST
+    [JsonIgnore] public bool IsToolWindow  => (ExStyle & 0x00000080) != 0;        // WS_EX_TOOLWINDOW
+    [JsonIgnore] public bool IsTransparent => (ExStyle & 0x00000020) != 0;        // WS_EX_TRANSPARENT
+    [JsonIgnore] public bool IsLayered     => (ExStyle & 0x00080000) != 0;        // WS_EX_LAYERED
 }
 
 /// <summary>

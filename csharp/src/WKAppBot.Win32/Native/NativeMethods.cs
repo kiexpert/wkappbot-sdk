@@ -139,9 +139,24 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern int GetWindowLongW(IntPtr hWnd, int nIndex);
 
+    public const int GWL_STYLE = -16;
     public const int GWL_EXSTYLE = -20;
+
+    // WS_* — Window Styles (GWL_STYLE)
+    public const int WS_POPUP       = unchecked((int)0x80000000);
+    public const int WS_CHILD       = 0x40000000;
+    public const int WS_VISIBLE     = 0x10000000;
+    public const int WS_DISABLED    = 0x08000000;
+    public const int WS_CAPTION     = 0x00C00000;  // WS_BORDER | WS_DLGFRAME
+    public const int WS_THICKFRAME  = 0x00040000;  // resizable
+    public const int WS_VSCROLL     = 0x00200000;
+    public const int WS_HSCROLL     = 0x00100000;
+
+    // WS_EX_* — Extended Window Styles (GWL_EXSTYLE)
     public const int WS_EX_TRANSPARENT = 0x00000020;
-    public const int WS_EX_LAYERED = 0x00080000;
+    public const int WS_EX_TOOLWINDOW = 0x00000080;
+    public const int WS_EX_TOPMOST    = 0x00000008;
+    public const int WS_EX_LAYERED    = 0x00080000;
     public const int WS_EX_NOACTIVATE = 0x08000000;
 
     [DllImport("user32.dll")]
