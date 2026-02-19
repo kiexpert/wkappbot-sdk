@@ -761,6 +761,80 @@ public sealed class ExperienceDb
         return true;
     }
 
+    // ── Knowhow (per-control / per-form automation notes) ──────────────
+
+    /// <summary>
+    /// Append a knowhow entry to a control's knowhow.md file.
+    /// Creates the file if it doesn't exist. Always appends (never overwrites).
+    /// Best-effort: exceptions are caught internally and never propagate.
+    /// </summary>
+    public bool AppendKnowhow(string formId, int cid, string category, string lesson,
+        string? treePath = null)
+    {
+        try
+        {
+            treePath ??= GetTreePath(formId, cid);
+            var dir = GetControlDir(formId, cid, create: true, treePath: treePath);
+            var path = Path.Combine(dir, "knowhow.md");
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var entry = $"\n## [{timestamp}] {category}\n{lesson}\n";
+            File.AppendAllText(path, entry);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Append a knowhow entry at form level (not tied to a specific control).
+    /// File: form_{id}/knowhow.md
+    /// </summary>
+    public bool AppendFormKnowhow(string formId, string category, string lesson)
+    {
+        try
+        {
+            var dir = Path.Combine(_expDir, $"form_{formId}");
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, "knowhow.md");
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var entry = $"\n## [{timestamp}] {category}\n{lesson}\n";
+            File.AppendAllText(path, entry);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Read all knowhow for a control. Merges form-level + control-level.
+    /// Returns null if no knowhow exists.
+    /// </summary>
+    public string? ReadKnowhow(string formId, int cid, string? treePath = null)
+    {
+        var parts = new List<string>();
+
+        // Form-level knowhow
+        var formPath = Path.Combine(_expDir, $"form_{formId}", "knowhow.md");
+        if (File.Exists(formPath))
+            parts.Add($"# Form [{formId}] Knowhow\n{File.ReadAllText(formPath)}");
+
+        // Control-level knowhow
+        treePath ??= GetTreePath(formId, cid);
+        var ctrlDir = GetControlDir(formId, cid, create: false, treePath: treePath);
+        var ctrlPath = Path.Combine(ctrlDir, "knowhow.md");
+        if (File.Exists(ctrlPath))
+            parts.Add($"# Control cid={cid} Knowhow\n{File.ReadAllText(ctrlPath)}");
+
+        return parts.Count > 0 ? string.Join("\n\n---\n\n", parts) : null;
+    }
+
+    /// <summary>
+    /// Read form-level knowhow only.
+    /// </summary>
+    public string? ReadFormKnowhow(string formId)
+    {
+        var path = Path.Combine(_expDir, $"form_{formId}", "knowhow.md");
+        return File.Exists(path) ? File.ReadAllText(path) : null;
+    }
+
     /// <summary>
     /// Load all form experiences from disk.
     /// </summary>
