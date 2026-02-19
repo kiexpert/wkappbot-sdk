@@ -700,4 +700,125 @@ internal partial class Program
 
         return 0;
     }
+
+    // ── ocr ────────────────────────────────────────────────────
+
+    static int OcrCommand(string[] args)
+    {
+        if (args.Length == 0)
+            return Error(@"Usage: wkappbot ocr <window-title|image.png> [--save] [-o output.txt]
+  Runs OCR on a window screenshot or image file and prints all recognized text with coordinates.
+  --save: Save annotated screenshot with OCR bounding boxes");
+
+        string target = args[0];
+        bool save = args.Contains("--save");
+        string? outputFile = GetArgValue(args, "-o");
+
+        System.Drawing.Bitmap screenshot;
+        string sourceDesc;
+
+        // Check if target is an image file
+        if (File.Exists(target) && (target.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+            || target.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+            || target.EndsWith(".bmp", StringComparison.OrdinalIgnoreCase)))
+        {
+            screenshot = new System.Drawing.Bitmap(target);
+            sourceDesc = Path.GetFileName(target);
+        }
+        else
+        {
+            // Treat as window title
+            var windows = WindowFinder.FindByTitle(target);
+            if (windows.Count == 0)
+                return Error($"Window not found: \"{target}\"");
+
+            var win = windows[0];
+            Console.WriteLine($"Capturing: {win}");
+            screenshot = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(win.Handle);
+            sourceDesc = win.Title;
+        }
+
+        using (screenshot)
+        {
+            Console.WriteLine($"Image: {screenshot.Width}x{screenshot.Height} — {sourceDesc}");
+            Console.WriteLine();
+
+            // Run OCR
+            var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
+            var result = ocr.RecognizeAll(screenshot).GetAwaiter().GetResult();
+
+            Console.WriteLine($"── OCR Results ({result.Words.Count} words) ──────────────────────");
+            Console.WriteLine();
+
+            // Print full text first
+            if (!string.IsNullOrWhiteSpace(result.FullText))
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("[Full Text]");
+                Console.ResetColor();
+                // Limit to first 2000 chars
+                var text = result.FullText.Length > 2000
+                    ? result.FullText[..2000] + "..."
+                    : result.FullText;
+                Console.WriteLine(text);
+                Console.WriteLine();
+            }
+
+            // Print words with coordinates (grouped by Y position → lines)
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("[Words with Coordinates]");
+            Console.ResetColor();
+
+            // Group words into lines by Y proximity (within 8px)
+            var sortedWords = result.Words.OrderBy(w => w.Y).ThenBy(w => w.X).ToList();
+            int lastLineY = -100;
+            var lineWords = new List<WKAppBot.Vision.OcrWord>();
+
+            foreach (var word in sortedWords)
+            {
+                if (Math.Abs(word.Y - lastLineY) > 8 && lineWords.Count > 0)
+                {
+                    // Print previous line
+                    PrintOcrLine(lineWords);
+                    lineWords.Clear();
+                }
+                lineWords.Add(word);
+                lastLineY = word.Y;
+            }
+            if (lineWords.Count > 0) PrintOcrLine(lineWords);
+
+            Console.WriteLine();
+            Console.WriteLine($"Total: {result.Words.Count} words");
+
+            // Save output
+            if (outputFile != null)
+            {
+                var dir = Path.GetDirectoryName(outputFile);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                File.WriteAllText(outputFile, result.FullText ?? "");
+                Console.WriteLine($"Text saved: {outputFile}");
+            }
+
+            if (save)
+            {
+                var savePath = $"ocr_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+                WKAppBot.Win32.Input.ScreenCapture.SaveToFile(screenshot, savePath);
+                Console.WriteLine($"Screenshot saved: {savePath}");
+            }
+        }
+
+        return 0;
+    }
+
+    static void PrintOcrLine(List<WKAppBot.Vision.OcrWord> words)
+    {
+        var lineText = string.Join(" ", words.Select(w => w.Text));
+        var firstWord = words[0];
+        Console.Write($"  Y={firstWord.Y,4} | ");
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write(lineText);
+        Console.ResetColor();
+        Console.WriteLine($"  ({words.Count} words, x={firstWord.X}..{words.Last().X + words.Last().Width})");
+    }
 }

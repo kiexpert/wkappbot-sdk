@@ -124,6 +124,7 @@ wkappbot dismiss <window-title> [keywords...]
 wkappbot toolbar-ocr <window-title> [--click "text"] [--save]
 wkappbot chart-analyze <window-title|image.png> [--form <id>] [--candles N] [-o output.json] [--debug] [--tooltip]
 wkappbot tooltip-probe <process-name> [--capture]
+wkappbot ocr <window-title|image.png> [--save] [-o output.txt]
 ```
 
 ### chart-analyze 명령 (차트 스크린샷 → OHLC 추출)
@@ -154,6 +155,24 @@ wkappbot tooltip-probe nkrunlite
 # tooltip 캡처 + OCR (마우스를 캔들 위에 올린 상태에서 실행)
 wkappbot tooltip-probe nkrunlite --capture
 ```
+
+### ocr 명령 (이미지/윈도우 OCR 텍스트 추출)
+```bash
+# 이미지 파일 OCR
+wkappbot ocr screenshot.png
+
+# 윈도우 캡처 + OCR
+wkappbot ocr "영웅문"
+
+# 텍스트 파일로 저장
+wkappbot ocr screenshot.png -o result.txt
+
+# 스크린샷 저장
+wkappbot ocr "영웅문" --save
+```
+- Windows.Media.Ocr (무료, 오프라인, 한글+영어)
+- 전체 텍스트 + Y좌표별 라인 그룹핑 + 단어 좌표 출력
+- 작은 이미지 자동 업스케일 (MFC 비트맵 폰트 인식률 향상)
 
 ### scan 명령 (앱 풀스캔 + OCR 학습 + Experience DB)
 ```bash
@@ -463,6 +482,7 @@ teardown:
 - **Phase B 완료**: 툴팁 기반 Y축 재캘리브레이션 — 마우스 호버 → tooltips_class32 캡처 → OCR → OHLC 파싱 → Y축 교정
 - **Volume 추출 완료**: volume 패널 바 높이 추출 + tooltip 거래량 기반 절대값 캘리브레이션
 - **Columnar JSON 출력**: OHLCV별 1D 배열 (`result.arrays.json`) + 콘솔 미리보기
+- **ocr 커맨드 완료**: `wkappbot ocr` — 이미지/윈도우 OCR 텍스트+좌표 추출 (adb-style 범용 도구)
 - **캡처 검증 완료**: IsBlankBitmap(9-point 샘플링) + .fail.png(실제 화면 크롭) + .fail-iconic.png(최소화 태스크바 아이콘) + IsIconic 사전 체크
 - **윈도우 스타일 특성 완료**: GWL_STYLE/GWL_EXSTYLE 수집 → ControlExperience 저장 + info.json per tree folder
 - **미구현**: 아래 로드맵 참조
