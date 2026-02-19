@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace WKAppBot.Win32.Window;
 
@@ -103,7 +104,7 @@ public sealed class ExperienceDb
     /// Learn or update a control within a form type.
     /// Merges with existing knowledge (doesn't overwrite OCR text if already known).
     /// </summary>
-    public void LearnControl(string formId, string formName, ControlExperience control)
+    public void LearnControl(string formId, string formName, ControlExperience control, string? treePath = null)
     {
         if (!_forms.TryGetValue(formId, out var form))
         {
@@ -137,10 +138,14 @@ public sealed class ExperienceDb
             if (control.RelativeX > 0) existing.RelativeX = control.RelativeX;
             if (control.RelativeY > 0) existing.RelativeY = control.RelativeY;
 
+            // Update tree path if provided (overwrite — latest scan is authoritative)
+            if (treePath != null) existing.TreePath = treePath;
+
             existing.HitCount++;
         }
         else
         {
+            if (treePath != null) control.TreePath = treePath;
             form.Controls.Add(control);
         }
 
@@ -188,18 +193,20 @@ public sealed class ExperienceDb
     /// <param name="wmText">WM_GETTEXT text (nullable)</param>
     /// <returns>true if screenshot was captured (first encounter)</returns>
     public bool TouchControl(string formId, int cid,
-        System.Drawing.Rectangle rect, string? ocrText = null, string? wmText = null)
+        System.Drawing.Rectangle rect, string? ocrText = null, string? wmText = null,
+        string? treePath = null)
     {
         bool captured = false;
+        treePath ??= GetTreePath(formId, cid);
 
         // Auto-screenshot on first encounter
-        if (rect.Width > 0 && rect.Height > 0 && !HasScreenshot(formId, cid))
+        if (rect.Width > 0 && rect.Height > 0 && !HasScreenshot(formId, cid, treePath))
         {
             try
             {
                 using var bmp = Input.ScreenCapture.CaptureScreenRegion(
                     rect.X, rect.Y, rect.Width, rect.Height);
-                SaveControlScreenshot(formId, cid, bmp);
+                SaveControlScreenshot(formId, cid, bmp, treePath);
                 captured = true;
             }
             catch { /* best-effort */ }
@@ -208,7 +215,7 @@ public sealed class ExperienceDb
         // Always update text history (dedup inside)
         if (ocrText != null || wmText != null)
         {
-            try { AppendTextHistory(formId, cid, ocrText, wmText); }
+            try { AppendTextHistory(formId, cid, ocrText, wmText, treePath); }
             catch { /* best-effort */ }
         }
 
@@ -231,12 +238,14 @@ public sealed class ExperienceDb
     public bool TouchControl(string formId, int cid,
         System.Drawing.Bitmap formBitmap, System.Drawing.Rectangle formRect,
         System.Drawing.Rectangle controlRect,
-        string? ocrText = null, string? wmText = null)
+        string? ocrText = null, string? wmText = null,
+        string? treePath = null)
     {
         bool captured = false;
+        treePath ??= GetTreePath(formId, cid);
 
         // Auto-screenshot on first encounter — crop from form bitmap
-        if (controlRect.Width > 0 && controlRect.Height > 0 && !HasScreenshot(formId, cid))
+        if (controlRect.Width > 0 && controlRect.Height > 0 && !HasScreenshot(formId, cid, treePath))
         {
             try
             {
@@ -245,7 +254,7 @@ public sealed class ExperienceDb
                 using var bmp = Input.ScreenCapture.CropRegion(
                     formBitmap, cropX, cropY,
                     controlRect.Width, controlRect.Height);
-                SaveControlScreenshot(formId, cid, bmp);
+                SaveControlScreenshot(formId, cid, bmp, treePath);
                 captured = true;
             }
             catch { /* best-effort */ }
@@ -254,7 +263,7 @@ public sealed class ExperienceDb
         // Always update text history (dedup inside)
         if (ocrText != null || wmText != null)
         {
-            try { AppendTextHistory(formId, cid, ocrText, wmText); }
+            try { AppendTextHistory(formId, cid, ocrText, wmText, treePath); }
             catch { /* best-effort */ }
         }
 
@@ -553,37 +562,92 @@ public sealed class ExperienceDb
             SaveForm(formId);
     }
 
-    // ── Control Detail Cache (Phase 6) ──────────────────
+    // ── Control Detail Cache (Phase 6 + 6.2 tree) ──────
+
+    /// <summary>
+    /// Sanitize a Win32 class name for use as a filesystem folder name.
+    /// MFC Afx pattern: "Afx:00BD0000:b:00010005:..." → "Afx_00BD0000"
+    /// General: replace filesystem-unsafe chars with '_'.
+    /// </summary>
+    internal static string SanitizeClassName(string className)
+    {
+        // MFC Afx pattern: "Afx:ADDR:b:STYLE:..." — keep prefix + module addr only
+        if (className.StartsWith("Afx:"))
+        {
+            var parts = className.Split(':');
+            if (parts.Length >= 2)
+                return $"Afx_{parts[1]}";
+        }
+        // General: replace filesystem-unsafe chars (but keep # for #32770)
+        return Regex.Replace(className, @"[:<>""/\\|?*]", "_");
+    }
+
+    /// <summary>
+    /// Build a tree path segment: "{SanitizedClassName}_{cid}"
+    /// </summary>
+    internal static string BuildTreeSegment(string className, int cid)
+        => $"{SanitizeClassName(className)}_{cid}";
 
     /// <summary>
     /// Get the directory path for a specific control's detail cache.
-    /// Creates the directory if it doesn't exist.
-    /// Layout: {_expDir}/form_{formId}/controls/cid_{cid}/
+    /// If treePath is provided, uses tree structure: form_{id}/tree/{treePath}/
+    /// Otherwise falls back to legacy flat: form_{id}/controls/cid_{cid}/
     /// </summary>
-    public string GetControlDir(string formId, int cid, bool create = true)
+    public string GetControlDir(string formId, int cid, bool create = true, string? treePath = null)
     {
-        var dir = Path.Combine(_expDir, $"form_{formId}", "controls", $"cid_{cid}");
+        string dir;
+        if (treePath != null)
+        {
+            // Tree mode: form_{id}/tree/{treePath}/
+            dir = Path.Combine(_expDir, $"form_{formId}", "tree", treePath);
+        }
+        else
+        {
+            // Legacy flat mode: form_{id}/controls/cid_{cid}/
+            dir = Path.Combine(_expDir, $"form_{formId}", "controls", $"cid_{cid}");
+        }
         if (create && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
         return dir;
     }
 
     /// <summary>
-    /// Check if a control already has a cached screenshot (latest.png).
+    /// Look up a control's tree path from the experience DB.
+    /// Returns null if not found or no tree_path stored.
     /// </summary>
-    public bool HasScreenshot(string formId, int cid)
+    public string? GetTreePath(string formId, int cid)
     {
-        var dir = GetControlDir(formId, cid, create: false);
-        return File.Exists(Path.Combine(dir, "latest.png"));
+        var ctrl = GetControl(formId, cid);
+        return ctrl?.TreePath;
+    }
+
+    /// <summary>
+    /// Check if a control already has a cached screenshot (latest.png).
+    /// If treePath is provided, checks ONLY the tree path (new data goes to tree).
+    /// If no treePath, falls back to legacy flat path check.
+    /// </summary>
+    public bool HasScreenshot(string formId, int cid, string? treePath = null)
+    {
+        // If tree path provided, check only tree location (forces new captures into tree)
+        treePath ??= GetTreePath(formId, cid);
+        if (treePath != null)
+        {
+            var treeDir = GetControlDir(formId, cid, create: false, treePath: treePath);
+            return File.Exists(Path.Combine(treeDir, "latest.png"));
+        }
+        // No tree path — check legacy flat path
+        var flatDir = GetControlDir(formId, cid, create: false, treePath: null);
+        return File.Exists(Path.Combine(flatDir, "latest.png"));
     }
 
     /// <summary>
     /// Save a control's screenshot as latest.png in its detail cache directory.
-    /// Overwrites on each scan — always keeps the most recent image.
+    /// Uses tree path if available, otherwise legacy flat.
     /// </summary>
-    public void SaveControlScreenshot(string formId, int cid, System.Drawing.Bitmap screenshot)
+    public void SaveControlScreenshot(string formId, int cid, System.Drawing.Bitmap screenshot, string? treePath = null)
     {
-        var dir = GetControlDir(formId, cid);
+        treePath ??= GetTreePath(formId, cid);
+        var dir = GetControlDir(formId, cid, treePath: treePath);
         Input.ScreenCapture.SaveToFile(screenshot, Path.Combine(dir, "latest.png"));
     }
 
@@ -592,9 +656,10 @@ public sealed class ExperienceDb
     /// Only appends if text actually changed from the last entry (dedup).
     /// Format: {"ts":"...","ocr":"...","wm":"..."}\n
     /// </summary>
-    public bool AppendTextHistory(string formId, int cid, string? ocrText, string? wmText)
+    public bool AppendTextHistory(string formId, int cid, string? ocrText, string? wmText, string? treePath = null)
     {
-        var dir = GetControlDir(formId, cid);
+        treePath ??= GetTreePath(formId, cid);
+        var dir = GetControlDir(formId, cid, treePath: treePath);
         var path = Path.Combine(dir, "text_history.jsonl");
 
         // Check last entry for dedup
@@ -813,6 +878,15 @@ public sealed class ControlExperience
     /// </summary>
     [JsonPropertyName("click_strategies")]
     public Dictionary<string, ClickStrategyStats>? ClickStrategies { get; set; }
+
+    /// <summary>
+    /// Tree path mirroring Win32 hWnd class hierarchy.
+    /// Example: "#32770_59648/AfxWnd140_999/AfxWnd140_999/Button_3785"
+    /// null for legacy data (falls back to flat controls/cid_N/ path).
+    /// </summary>
+    [JsonPropertyName("tree_path")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TreePath { get; set; }
 }
 
 /// <summary>

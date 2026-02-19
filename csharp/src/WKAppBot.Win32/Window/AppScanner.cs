@@ -300,8 +300,11 @@ public static class AppScanner
                 var (leafControls, parentControls) = CollectAllControls(form.Handle, form.Rect, maxDepth: 4);
 
                 // Match OCR words to controls by spatial overlap
-                foreach (var ctrl in leafControls)
+                foreach (var cwp in leafControls)
                 {
+                    var ctrl = cwp.Info;
+                    var treePath = cwp.TreePath;
+
                     // Only interested in buttons, labels, and small controls
                     if (!IsOcrCandidate(ctrl)) continue;
 
@@ -324,7 +327,7 @@ public static class AppScanner
                     // Use OCR text as primary (visual), WM_GETTEXT as supplementary
                     var primaryText = !string.IsNullOrWhiteSpace(matchedText) ? matchedText : wmText!;
 
-                    // Learn this control
+                    // Learn this control (with tree path)
                     var experience = new ControlExperience
                     {
                         ControlId = ctrl.ControlId,
@@ -340,14 +343,14 @@ public static class AppScanner
                         HitCount = 1,
                     };
 
-                    expDb.LearnControl(formId, form.FormName ?? formId, experience);
+                    expDb.LearnControl(formId, form.FormName ?? formId, experience, treePath);
                     result.ControlsLearned++;
 
                     // ── Per-control detail capture ──
                     // --detail: always refresh screenshots + text history
                     // default: auto-capture on first encounter (no existing screenshot)
                     bool shouldCapture = ctrl.Rect.Width > 0 && ctrl.Rect.Height > 0
-                        && (captureDetails || !expDb.HasScreenshot(formId, ctrl.ControlId));
+                        && (captureDetails || !expDb.HasScreenshot(formId, ctrl.ControlId, treePath));
                     if (shouldCapture)
                     {
                         try
@@ -358,11 +361,11 @@ public static class AppScanner
                             using var ctrlBmp = ScreenCapture.CropRegion(
                                 screenshot, cropX, cropY,
                                 ctrl.Rect.Width, ctrl.Rect.Height);
-                            expDb.SaveControlScreenshot(formId, ctrl.ControlId, ctrlBmp);
+                            expDb.SaveControlScreenshot(formId, ctrl.ControlId, ctrlBmp, treePath);
                             result.DetailScreenshots++;
 
                             // Append text history (dedup: only if text changed)
-                            if (expDb.AppendTextHistory(formId, ctrl.ControlId, matchedText, wmText))
+                            if (expDb.AppendTextHistory(formId, ctrl.ControlId, matchedText, wmText, treePath))
                                 result.DetailTextChanges++;
                         }
                         catch { /* best-effort — don't fail scan over detail capture */ }
@@ -374,10 +377,13 @@ public static class AppScanner
                 // ── Parent control screenshots (grids, tables, panels — children included) ──
                 // Parent controls are treated as regular controls for screenshot purposes.
                 // They get exactly one screenshot showing their full content with all children.
-                foreach (var parent in parentControls)
+                foreach (var pwp in parentControls)
                 {
+                    var parent = pwp.Info;
+                    var parentTreePath = pwp.TreePath;
+
                     bool shouldCaptureParent = parent.Rect.Width > 0 && parent.Rect.Height > 0
-                        && (captureDetails || !expDb.HasScreenshot(formId, parent.ControlId));
+                        && (captureDetails || !expDb.HasScreenshot(formId, parent.ControlId, parentTreePath));
                     if (!shouldCaptureParent) continue;
 
                     try
@@ -387,13 +393,13 @@ public static class AppScanner
                         using var parentBmp = ScreenCapture.CropRegion(
                             screenshot, pCropX, pCropY,
                             parent.Rect.Width, parent.Rect.Height);
-                        expDb.SaveControlScreenshot(formId, parent.ControlId, parentBmp);
+                        expDb.SaveControlScreenshot(formId, parent.ControlId, parentBmp, parentTreePath);
                         result.DetailScreenshots++;
 
                         // Also record WM_GETTEXT for parent (often has meaningful text like "통", "Chart Window")
                         var parentWmText = GetWindowText(parent.Handle);
                         if (!string.IsNullOrWhiteSpace(parentWmText))
-                            expDb.AppendTextHistory(formId, parent.ControlId, null, parentWmText);
+                            expDb.AppendTextHistory(formId, parent.ControlId, null, parentWmText, parentTreePath);
 
                         // Ensure parent is registered in experience DB as a control
                         if (expDb.GetControl(formId, parent.ControlId) == null)
@@ -414,7 +420,7 @@ public static class AppScanner
                                 RelativeX = Math.Round(pRelX, 4),
                                 RelativeY = Math.Round(pRelY, 4),
                                 HitCount = 1,
-                            });
+                            }, parentTreePath);
                         }
                     }
                     catch { /* best-effort */ }
@@ -456,33 +462,42 @@ public static class AppScanner
     }
 
     /// <summary>
+    /// A control with its Win32 class hierarchy tree path.
+    /// TreePath mirrors the actual hWnd parent-child tree as filesystem folders.
+    /// Example: "#32770_59648/AfxWnd140_999/Button_3785"
+    /// </summary>
+    private record struct ControlWithPath(WindowInfo Info, string TreePath);
+
+    /// <summary>
     /// Collect leaf-level controls (buttons, labels, edits, etc.) from a form.
     /// Traverses the Win32 child tree and returns controls with no children or known leaf types.
     /// </summary>
     private static List<WindowInfo> CollectLeafControls(IntPtr hForm, RECT formRect, int maxDepth)
     {
-        var result = new List<WindowInfo>();
-        CollectLeafControlsRecursive(hForm, formRect, result, null, 0, maxDepth);
-        return result;
+        var leafResult = new List<ControlWithPath>();
+        var parentResult = new List<ControlWithPath>();
+        CollectControlsRecursive(hForm, formRect, "", leafResult, parentResult, 0, maxDepth);
+        return leafResult.Select(c => c.Info).ToList();
     }
 
     /// <summary>
-    /// Collect both leaf and parent controls.
+    /// Collect both leaf and parent controls with tree paths.
     /// Parent controls = controls that have children and are not leaf-like (grids, tables, panels).
     /// These get a screenshot with their children included.
     /// </summary>
-    private static (List<WindowInfo> leafControls, List<WindowInfo> parentControls) CollectAllControls(
+    private static (List<ControlWithPath> leafControls, List<ControlWithPath> parentControls) CollectAllControls(
         IntPtr hForm, RECT formRect, int maxDepth)
     {
-        var leafResult = new List<WindowInfo>();
-        var parentResult = new List<WindowInfo>();
-        CollectLeafControlsRecursive(hForm, formRect, leafResult, parentResult, 0, maxDepth);
+        var leafResult = new List<ControlWithPath>();
+        var parentResult = new List<ControlWithPath>();
+        CollectControlsRecursive(hForm, formRect, "", leafResult, parentResult, 0, maxDepth);
         return (leafResult, parentResult);
     }
 
-    private static void CollectLeafControlsRecursive(
-        IntPtr hParent, RECT formRect, List<WindowInfo> leafResult,
-        List<WindowInfo>? parentResult, int depth, int maxDepth)
+    private static void CollectControlsRecursive(
+        IntPtr hParent, RECT formRect, string parentPath,
+        List<ControlWithPath> leafResult, List<ControlWithPath> parentResult,
+        int depth, int maxDepth)
     {
         if (depth > maxDepth) return;
 
@@ -495,29 +510,33 @@ public static class AppScanner
             // Skip if outside form bounds (sometimes children have weird coords)
             if (child.Rect.Left > formRect.Right || child.Rect.Top > formRect.Bottom) continue;
 
+            // Build tree path segment for this control
+            var segment = ExperienceDb.BuildTreeSegment(child.ClassName, child.ControlId);
+            var currentPath = string.IsNullOrEmpty(parentPath) ? segment : $"{parentPath}/{segment}";
+
             var grandChildren = WindowFinder.GetChildrenZOrder(child.Handle);
 
             if (grandChildren.Count == 0)
             {
                 // Leaf node — this is a single control (button, label, edit, etc.)
-                leafResult.Add(child);
+                leafResult.Add(new ControlWithPath(child, currentPath));
             }
             else
             {
                 // Has children — check if it's a known leaf-like class, otherwise recurse
                 if (IsLeafLikeClass(child.ClassName))
                 {
-                    leafResult.Add(child);
+                    leafResult.Add(new ControlWithPath(child, currentPath));
                 }
                 else
                 {
                     // Parent control: collect for screenshot (children included)
                     // Only significant-size parents (not tiny wrapper panels)
-                    if (parentResult != null && child.Rect.Width >= 30 && child.Rect.Height >= 30)
+                    if (child.Rect.Width >= 30 && child.Rect.Height >= 30)
                     {
-                        parentResult.Add(child);
+                        parentResult.Add(new ControlWithPath(child, currentPath));
                     }
-                    CollectLeafControlsRecursive(child.Handle, formRect, leafResult, parentResult, depth + 1, maxDepth);
+                    CollectControlsRecursive(child.Handle, formRect, currentPath, leafResult, parentResult, depth + 1, maxDepth);
                 }
             }
         }
