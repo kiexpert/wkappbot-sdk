@@ -220,6 +220,19 @@ public static partial class NativeMethods
     // SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77
     // SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79
 
+    // ── Clipboard ────────────────────────────────────────────────
+    [DllImport("user32.dll")]
+    public static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+    [DllImport("user32.dll")]
+    public static extern bool CloseClipboard();
+
+    [DllImport("user32.dll")]
+    public static extern bool EmptyClipboard();
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
     // ── MDI ──────────────────────────────────────────────────────
     public const uint WM_CLOSE = 0x0010;
     public const uint WM_COPYDATA = 0x004A;

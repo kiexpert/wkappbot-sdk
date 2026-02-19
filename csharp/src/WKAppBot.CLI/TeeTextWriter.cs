@@ -23,7 +23,9 @@ public sealed class TeeTextWriter : TextWriter
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
-        _file = new StreamWriter(logPath, append: false, encoding: Encoding.UTF8)
+        // Use FileShare.ReadWrite to allow other processes to read the log concurrently
+        var stream = new FileStream(logPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+        _file = new StreamWriter(stream, encoding: Encoding.UTF8)
         {
             AutoFlush = true
         };
