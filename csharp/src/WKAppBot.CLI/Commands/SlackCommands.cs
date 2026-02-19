@@ -36,6 +36,15 @@ internal partial class Program
     static string SlackPidFile => Path.Combine(DataDir, "slack.pid");
     static string SlackInboxFile => Path.Combine(DataDir, "slack_inbox.jsonl");
     static string SlackLastTsFile => Path.Combine(DataDir, "slack_last_ts.txt");
+    /// <summary>Last reply context file: "channel=C0xxx\nthread=1234.5678" — so 'slack reply' needs no flags.</summary>
+    static string SlackReplyContextFile => Path.Combine(DataDir, "slack_reply_ctx.txt");
+
+    /// <summary>Default keywords for keyword monitoring (Korean typos + English variants).</summary>
+    static readonly string[] DefaultKeywords = new[]
+    {
+        "클롯", "클롣", "클로드", "앱봇",          // Korean + typos
+        "claude", "appbot", "wkappbot", "클봇",    // English + mixed
+    };
 
     /// <summary>Socket Mode: listen for events and respond to @mentions.</summary>
     static int SlackListenCommand(string[] args)
@@ -43,10 +52,11 @@ internal partial class Program
         bool background = args.Contains("--bg") || args.Contains("--background") || args.Contains("-d");
         bool aiMode = args.Contains("--ai");
         bool promptMode = args.Contains("--prompt");
+        bool keywordMode = args.Contains("--keywords") || args.Contains("-k");
 
         // --bg: launch self as background process (pass flags through)
         if (background)
-            return SlackLaunchBackground(aiMode, promptMode);
+            return SlackLaunchBackground(aiMode, promptMode, keywordMode);
 
         var config = LoadSlackConfig();
         if (config == null) return 1;
@@ -113,6 +123,7 @@ internal partial class Program
         var modeStr = new List<string>();
         if (ai != null) modeStr.Add("AI");
         if (promptInfo != null) modeStr.Add("Prompt");
+        if (keywordMode) modeStr.Add($"Keywords({DefaultKeywords.Length})");
         var modeSuffix = modeStr.Count > 0 ? $" + {string.Join(" + ", modeStr)}" : "";
         Console.WriteLine($"[SLACK] Starting Socket Mode listener{modeSuffix}...");
         Console.WriteLine("[SLACK] Press Ctrl+C to stop");
@@ -131,10 +142,29 @@ internal partial class Program
         slack.ConnectAsync(appToken, botToken).GetAwaiter().GetResult();
 
         // Track threads where bot is engaged (for thread reply forwarding)
-        // Key = thread_ts, Value = channel
         var activeThreads = new HashSet<string>();
 
-        // Handle @mentions — AI / inbox / echo
+        // Track message timestamps that THIS bot sent (for ping response thread tracking)
+        var ownMessageTimestamps = new HashSet<string>();
+
+        // Announce presence on startup (channel message, not thread)
+        var defaultChannel = config["channel"]?.GetValue<string>();
+        if (!string.IsNullOrEmpty(defaultChannel))
+        {
+            var cwd = Environment.CurrentDirectory;
+            var host = Environment.MachineName;
+            var pid = Environment.ProcessId;
+            var startupMsg = $"클봇 온라인! `{host}` pid={pid} `{cwd}`";
+            var (ok, sentTs) = SlackSendViaApi(botToken!, defaultChannel, startupMsg).GetAwaiter().GetResult();
+            if (ok && sentTs != null)
+            {
+                ownMessageTimestamps.Add(sentTs);
+                activeThreads.Add(sentTs);
+                Console.WriteLine($"[SLACK] Startup announcement sent (ts={sentTs})");
+            }
+        }
+
+        // Handle @mentions — always reply in-thread
         slack.OnMention += (msg) =>
         {
             Console.WriteLine($"[SLACK] << @mention from {msg.User}: {msg.Text}");
@@ -149,20 +179,20 @@ internal partial class Program
             if (string.IsNullOrEmpty(cleanText))
                 cleanText = "ping";
 
-            // Track this thread so we receive follow-up replies without @mention
-            // thread_ts = the original message's ts (thread parent)
-            var threadKey = msg.ThreadTs ?? msg.Timestamp;  // if already in thread, use thread_ts; else this msg starts the thread
+            // Track this thread so ALL follow-up messages come through (until "그만")
+            var threadKey = msg.ThreadTs ?? msg.Timestamp;
             activeThreads.Add(threadKey);
+
+            // Save reply context so 'slack reply' works with no flags
+            SaveReplyContext(msg.Channel, threadKey);
 
             // Prompt mode: type directly into Claude Code prompt
             if (promptHelper != null && promptInfo != null)
             {
-                // Include thread_ts so Claude Code can reply in-thread
-                var replyHint = $"wkappbot slack reply \"your response\" --channel {msg.Channel} --thread {threadKey}";
-                var promptText = $"{cleanText}\n\n(Slack @{msg.User} #{msg.Channel} — reply: {replyHint})";
+                var promptText = $"{cleanText}\n\n(Slack @{msg.User} #{msg.Channel} — reply: wkappbot slack reply \"...\")";
+                // reply context auto-saved, no need for --channel/--thread in hint
                 Console.WriteLine($"[SLACK] >> Typing into Claude prompt...");
 
-                // Re-find prompt (window may have moved/resized)
                 var fresh = promptHelper.FindPrompt();
                 if (fresh != null)
                 {
@@ -183,7 +213,6 @@ internal partial class Program
             string reply;
             if (ai != null)
             {
-                // Claude AI response
                 Console.Write("[SLACK] [AI] thinking... ");
                 try
                 {
@@ -198,14 +227,14 @@ internal partial class Program
             }
             else
             {
-                // No AI — just ack, Claude Code will reply via 'slack reply'
                 reply = null!;
             }
 
             if (!string.IsNullOrEmpty(reply))
             {
+                // Always reply in-thread (not channel)
                 Console.WriteLine($"[SLACK] >> {reply}");
-                slack.SendAsync(msg.Channel, reply).GetAwaiter().GetResult();
+                SlackSendViaApi(botToken!, msg.Channel, reply, threadKey).GetAwaiter().GetResult();
             }
             else
             {
@@ -213,25 +242,72 @@ internal partial class Program
             }
         };
 
-        // Handle channel messages — forward thread replies to prompt
+        // Handle channel messages — ping response + thread replies + keyword monitoring
         slack.OnMessage += (msg) =>
         {
+            // "핑" / "ping" command: bot responds in channel with identity + CWD
+            if (msg.ThreadTs == null && !string.IsNullOrEmpty(msg.Text))
+            {
+                var trimmed = msg.Text.Trim().ToLowerInvariant();
+                if (trimmed == "핑" || trimmed == "ping")
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[SLACK] << ping from {msg.User}");
+                    Console.ResetColor();
+                    SaveLastTs(msg.Channel, msg.Timestamp);
+
+                    var cwd = Environment.CurrentDirectory;
+                    var host = Environment.MachineName;
+                    var pid = Environment.ProcessId;
+                    var pingReply = $"퐁! `{host}` pid={pid} `{cwd}`";
+
+                    var (ok, sentTs) = SlackSendViaApi(botToken!, msg.Channel, pingReply).GetAwaiter().GetResult();
+                    if (ok && sentTs != null)
+                    {
+                        // Track our own response so thread replies come to US
+                        ownMessageTimestamps.Add(sentTs);
+                        activeThreads.Add(sentTs);
+                        Console.WriteLine($"[SLACK] >> pong sent (ts={sentTs})");
+                    }
+                    return;
+                }
+            }
+
             // Check if this is a thread reply to a conversation we're tracking
             if (msg.ThreadTs != null && activeThreads.Contains(msg.ThreadTs))
             {
-                Console.WriteLine($"[SLACK] << thread reply from {msg.User}: {msg.Text}");
-                SaveLastTs(msg.Channel, msg.Timestamp);
-
                 var cleanText = System.Text.RegularExpressions.Regex.Replace(
                     msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
+
+                // "그만" / "stop" → stop tracking this thread
+                if (!string.IsNullOrEmpty(cleanText))
+                {
+                    var trimmedLower = cleanText.Trim().ToLowerInvariant();
+                    if (trimmedLower == "그만" || trimmedLower == "stop" || trimmedLower == "ㄱㅁ")
+                    {
+                        activeThreads.Remove(msg.ThreadTs);
+                        ownMessageTimestamps.Remove(msg.ThreadTs);
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.WriteLine($"[SLACK] << thread stopped by {msg.User} (ts={msg.ThreadTs})");
+                        Console.ResetColor();
+                        // Send farewell in-thread
+                        SlackSendViaApi(botToken!, msg.Channel, "알겠습니다~ 이 쓰레드에서 물러납니다!", msg.ThreadTs)
+                            .GetAwaiter().GetResult();
+                        return;
+                    }
+                }
+
+                Console.WriteLine($"[SLACK] << thread reply from {msg.User}: {msg.Text}");
+                SaveLastTs(msg.Channel, msg.Timestamp);
+                SaveReplyContext(msg.Channel, msg.ThreadTs!);
 
                 if (string.IsNullOrEmpty(cleanText)) return;
 
                 // Prompt mode: forward to Claude Code
                 if (promptHelper != null && promptInfo != null)
                 {
-                    var replyHint = $"wkappbot slack reply \"your response\" --channel {msg.Channel} --thread {msg.ThreadTs}";
-                    var promptText = $"{cleanText}\n\n(Slack @{msg.User} #{msg.Channel} thread — reply: {replyHint})";
+                    var promptText = $"{cleanText}\n\n(Slack @{msg.User} #{msg.Channel} thread — reply: wkappbot slack reply \"...\")";
+                    // reply context auto-saved
                     Console.WriteLine($"[SLACK] >> Typing thread reply into Claude prompt...");
 
                     var fresh = promptHelper.FindPrompt();
@@ -253,6 +329,54 @@ internal partial class Program
                 return;
             }
 
+            // Keyword monitoring: check if message contains any watched keywords
+            if (keywordMode && !string.IsNullOrEmpty(msg.Text))
+            {
+                var textLower = msg.Text.ToLowerInvariant();
+                var matchedKeyword = DefaultKeywords.FirstOrDefault(kw => textLower.Contains(kw.ToLowerInvariant()));
+                if (matchedKeyword != null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.WriteLine($"[SLACK] << keyword hit \"{matchedKeyword}\" from {msg.User}: {msg.Text}");
+                    Console.ResetColor();
+                    SaveLastTs(msg.Channel, msg.Timestamp);
+
+                    // Start tracking this thread so follow-up messages also come through
+                    var threadKey = msg.ThreadTs ?? msg.Timestamp;
+                    activeThreads.Add(threadKey);
+                    SaveReplyContext(msg.Channel, threadKey);
+
+                    var cleanText = System.Text.RegularExpressions.Regex.Replace(
+                        msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
+                    if (string.IsNullOrEmpty(cleanText)) return;
+
+                    // Prompt mode: forward to Claude Code with keyword context
+                    if (promptHelper != null && promptInfo != null)
+                    {
+                        var promptText = $"{cleanText}\n\n(Slack keyword:\"{matchedKeyword}\" @{msg.User} #{msg.Channel} — reply: wkappbot slack reply \"...\")";
+                        // reply context auto-saved
+                        Console.WriteLine($"[SLACK] >> Typing keyword match into Claude prompt...");
+
+                        var fresh = promptHelper.FindPrompt();
+                        if (fresh != null)
+                        {
+                            promptHelper.TypeAndSubmit(fresh, promptText);
+                            Console.WriteLine("[SLACK] >> Sent to Claude prompt");
+                        }
+                        else
+                        {
+                            Console.WriteLine("[SLACK] >> Prompt lost! Writing to inbox instead");
+                            WriteInbox(msg.Channel, msg.User, cleanText, msg.Timestamp);
+                        }
+                        return;
+                    }
+
+                    // Fallback: write to inbox
+                    WriteInbox(msg.Channel, msg.User, cleanText, msg.Timestamp);
+                    return;
+                }
+            }
+
             Console.WriteLine($"[SLACK] msg [{msg.Channel}] {msg.User}: {msg.Text}");
         };
 
@@ -268,7 +392,7 @@ internal partial class Program
     }
 
     /// <summary>Launch wkappbot slack listen as a background process.</summary>
-    static int SlackLaunchBackground(bool aiMode = false, bool promptMode = false)
+    static int SlackLaunchBackground(bool aiMode = false, bool promptMode = false, bool keywordMode = false)
     {
         // Check if already running
         if (IsSlackListenerRunning(out int existingPid))
@@ -286,6 +410,7 @@ internal partial class Program
         var listenArgs = "slack listen";
         if (aiMode) listenArgs += " --ai";
         if (promptMode) listenArgs += " --prompt";
+        if (keywordMode) listenArgs += " --keywords";
         var psi = new ProcessStartInfo
         {
             FileName = exePath,
@@ -459,7 +584,7 @@ internal partial class Program
             return 1;
         }
 
-        var ok = SlackSendViaApi(botToken, channel, message).GetAwaiter().GetResult();
+        var (ok, _) = SlackSendViaApi(botToken, channel, message).GetAwaiter().GetResult();
 
         if (ok)
             Console.WriteLine($"[SLACK] Sent: {message}");
@@ -509,7 +634,7 @@ internal partial class Program
         // Test send
         if (!string.IsNullOrEmpty(channel))
         {
-            var sendOk = SlackSendViaApi(botToken!, channel, "WKAppBot test — connection verified!").GetAwaiter().GetResult();
+            var (sendOk, _) = SlackSendViaApi(botToken!, channel, "WKAppBot test — connection verified!").GetAwaiter().GetResult();
             Console.WriteLine(sendOk ? "[SLACK] send OK" : "[SLACK] send FAILED");
         }
 
@@ -533,8 +658,11 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>Send message via chat.postMessage API. If threadTs is provided, replies in-thread.</summary>
-    static async Task<bool> SlackSendViaApi(string botToken, string channel, string text, string? threadTs = null)
+    /// <summary>
+    /// Send message via chat.postMessage API. If threadTs is provided, replies in-thread.
+    /// Returns (ok, message_ts) — message_ts is the timestamp of the sent message (for thread tracking).
+    /// </summary>
+    static async Task<(bool ok, string? ts)> SlackSendViaApi(string botToken, string channel, string text, string? threadTs = null)
     {
         using var http = new HttpClient();
         object payloadObj = string.IsNullOrEmpty(threadTs)
@@ -555,7 +683,8 @@ internal partial class Program
         if (!ok)
             Console.WriteLine($"[SLACK] API error: {json?["error"]}");
 
-        return ok;
+        var messageTs = json?["ts"]?.GetValue<string>();
+        return (ok, messageTs);
     }
 
     /// <summary>
@@ -882,9 +1011,18 @@ internal partial class Program
 
         var botToken = config["bot_token"]?.GetValue<string>();
 
-        // Channel priority: --channel flag > inbox last message > config default
+        // Channel/thread priority: --flags > reply context file > inbox > config default
         string? channel = explicitChannel;
 
+        // Try saved reply context (written by listener on every forwarded message)
+        if (string.IsNullOrEmpty(channel) || threadTs == null)
+        {
+            var (ctxChannel, ctxThread) = LoadReplyContext();
+            channel ??= ctxChannel;
+            threadTs ??= ctxThread;
+        }
+
+        // Fallback: inbox last message
         if (string.IsNullOrEmpty(channel) && File.Exists(SlackInboxFile))
         {
             try
@@ -893,14 +1031,14 @@ internal partial class Program
                 if (lines.Length > 0)
                 {
                     var lastMsg = JsonSerializer.Deserialize<JsonNode>(lines[^1]);
-                    channel = lastMsg?["channel"]?.GetValue<string>();
-                    // Also get thread_ts from inbox if not explicitly provided
+                    channel ??= lastMsg?["channel"]?.GetValue<string>();
                     threadTs ??= lastMsg?["ts"]?.GetValue<string>();
                 }
             }
             catch { }
         }
 
+        // Final fallback: config default channel
         channel ??= config["channel"]?.GetValue<string>();
 
         if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
@@ -909,7 +1047,7 @@ internal partial class Program
             return 1;
         }
 
-        var ok = SlackSendViaApi(botToken, channel, replyText, threadTs).GetAwaiter().GetResult();
+        var (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs).GetAwaiter().GetResult();
 
         var threadNote = !string.IsNullOrEmpty(threadTs) ? " (in-thread)" : "";
         if (ok)
@@ -1119,6 +1257,32 @@ internal partial class Program
         return null;
     }
 
+    /// <summary>Save reply context so 'slack reply "text"' works without --channel/--thread.</summary>
+    static void SaveReplyContext(string channel, string threadTs)
+    {
+        try { File.WriteAllText(SlackReplyContextFile, $"channel={channel}\nthread={threadTs}"); }
+        catch { }
+    }
+
+    /// <summary>Load saved reply context (channel, threadTs).</summary>
+    static (string? channel, string? threadTs) LoadReplyContext()
+    {
+        string? channel = null, threadTs = null;
+        try
+        {
+            if (!File.Exists(SlackReplyContextFile)) return (null, null);
+            foreach (var line in File.ReadAllLines(SlackReplyContextFile))
+            {
+                var parts = line.Split('=', 2);
+                if (parts.Length != 2) continue;
+                if (parts[0] == "channel") channel = parts[1];
+                else if (parts[0] == "thread") threadTs = parts[1];
+            }
+        }
+        catch { }
+        return (channel, threadTs);
+    }
+
     /// <summary>
     /// Fetch missed messages from channel history since last processed timestamp.
     /// Usage: wkappbot slack catch-up [--channel ID] [--limit N] [--prompt]
@@ -1300,11 +1464,12 @@ internal partial class Program
         Console.WriteLine("Usage: wkappbot slack <command>");
         Console.WriteLine();
         Console.WriteLine("Commands:");
-        Console.WriteLine("  listen [--bg] [--ai] [--prompt]");
+        Console.WriteLine("  listen [--bg] [--ai] [--prompt] [--keywords]");
         Console.WriteLine("                        Socket Mode: listen for @mentions and reply");
         Console.WriteLine("                        --bg: run as background daemon process");
         Console.WriteLine("                        --ai: use Claude API for intelligent responses");
         Console.WriteLine("                        --prompt: type @mentions into Claude Code prompt");
+        Console.WriteLine("                        --keywords/-k: engage when keywords detected");
         Console.WriteLine("  send \"message\"      Send a message to the configured channel");
         Console.WriteLine("  test                Test Slack connection (auth + send + socket)");
         Console.WriteLine("  status              Check if background listener is running");
