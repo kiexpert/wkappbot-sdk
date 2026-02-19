@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>WKAppBot Page 2</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 700px; margin: 20px auto; padding: 20px; }
+        h1 { color: #4CAF50; }
+        .section { margin: 10px 0; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+        button { padding: 8px 16px; margin: 3px; cursor: pointer; font-size: 13px; }
+        #result2 { margin-top: 8px; padding: 10px; background: #f0f0f0; border-radius: 4px; }
+        input[type="text"] { width: 100%; padding: 6px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <h1>Page 2 — Navigation Success!</h1>
+    <p id="arrival-msg" role="status">You arrived at Page 2 via WKAppBot</p>
+
+    <div class="section">
+        <h2>Search Test</h2>
+        <label for="search-input">Search:</label>
+        <input type="text" id="search-input" aria-label="Search input" placeholder="Type to search...">
+        <button id="btn-search" onclick="doSearch()">Search</button>
+        <div id="result2" role="status" aria-label="Search result">No results yet</div>
+    </div>
+
+    <div class="section">
+        <h2>Navigation</h2>
+        <a id="link-back" href="web_test.html">Back to Page 1</a><br>
+        <button id="btn-go-back" onclick="history.back()">Browser Back</button>
+    </div>
+
+    <script>
+        function doSearch() {
+            const q = document.getElementById('search-input').value;
+            document.getElementById('result2').textContent = q
+                ? `Search results for: "${q}" (3 items found)`
+                : 'Please enter a search term';
+        }
+    </script>
+</body>
+</html>
