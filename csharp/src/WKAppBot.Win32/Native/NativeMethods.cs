@@ -212,8 +212,12 @@ public static partial class NativeMethods
     public const uint WM_CHAR = 0x0102;
     public const uint WM_KEYDOWN = 0x0100;
     public const uint WM_KEYUP = 0x0101;
+    public const uint WM_MOUSEMOVE = 0x0200;
     public const uint WM_LBUTTONDOWN = 0x0201;
     public const uint WM_LBUTTONUP = 0x0202;
+
+    /// <summary>Pack (x, y) client coords into lParam for mouse messages.</summary>
+    public static IntPtr MakeLParam(int x, int y) => (IntPtr)((y << 16) | (x & 0xFFFF));
 
     // ── Process ──────────────────────────────────────────────────
     [DllImport("user32.dll")]
@@ -322,6 +326,9 @@ public static partial class NativeMethods
     public const uint SWP_NOSIZE = 0x0001;
     public const uint SWP_NOACTIVATE = 0x0010;
     public const uint SWP_SHOWWINDOW = 0x0040;
+
+    [DllImport("user32.dll")]
+    public static extern bool BringWindowToTop(IntPtr hWnd);
 
     // ── Focus / Alert ──────────────────────────────────────────
     [DllImport("user32.dll")]

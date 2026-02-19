@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*.png)",
+      "Read(*.jpg)",
+      "Read(*.jpeg)",
+      "Read(*.gif)",
+      "Read(*.bmp)",
+      "Read(**/*.png)",
+      "Read(**/*.jpg)",
+      "Read(**/*.jpeg)",
+      "Read(**/*.gif)",
+      "Read(**/*.bmp)"
+    ]
+  }
+}

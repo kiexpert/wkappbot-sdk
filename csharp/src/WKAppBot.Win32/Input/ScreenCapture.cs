@@ -85,6 +85,24 @@ public static class ScreenCapture
     }
 
     /// <summary>
+    /// Crop a sub-region from an existing bitmap (e.g., extract control from form capture).
+    /// Clamps the crop region to the bitmap bounds to avoid OutOfMemory on edge controls.
+    /// </summary>
+    public static Bitmap CropRegion(Bitmap source, int x, int y, int width, int height)
+    {
+        // Clamp to source bounds
+        if (x < 0) { width += x; x = 0; }
+        if (y < 0) { height += y; y = 0; }
+        if (x + width > source.Width) width = source.Width - x;
+        if (y + height > source.Height) height = source.Height - y;
+        if (width <= 0 || height <= 0)
+            throw new ArgumentException($"Crop region is empty after clamping: ({x},{y} {width}x{height}) from {source.Width}x{source.Height}");
+
+        var cropRect = new Rectangle(x, y, width, height);
+        return source.Clone(cropRect, source.PixelFormat);
+    }
+
+    /// <summary>
     /// Capture a region of the virtual screen.
     /// Handles negative coordinates for dual-monitor setups.
     /// </summary>

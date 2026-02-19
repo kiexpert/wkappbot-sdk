@@ -23,4 +23,13 @@
     <None Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" LinkBase="handlers" />
   </ItemGroup>
 
+  <!-- Single-file publish: copy EXE to W:\SDK\bin, handlers to wkappbot.hq -->
+  <Target Name="CopyToSdkBin" AfterTargets="Publish">
+    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFolder="W:\SDK\bin\" OverwriteReadOnlyFiles="true" />
+    <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <ItemGroup>
+    <_HandlersPublish Include="$(PublishDir)handlers\**\*.*" />
+  </ItemGroup>
+
 </Project>
