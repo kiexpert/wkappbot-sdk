@@ -134,7 +134,7 @@ public sealed class ProfileStore
     public ProfileStore(string? profileDir = null)
     {
         _profileDir = profileDir
-            ?? Path.Combine(Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".", "profiles");
+            ?? Path.Combine(Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".", "wkappbot.hq", "profiles");
 
         if (!Directory.Exists(_profileDir))
             Directory.CreateDirectory(_profileDir);

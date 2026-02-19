@@ -174,6 +174,93 @@ public sealed class ExperienceDb
         }
     }
 
+    // ── TouchControl — auto-learn on any encounter ─────
+
+    /// <summary>
+    /// Record that a control was encountered during any operation.
+    /// Auto-captures screenshot on first encounter, always updates text history.
+    /// Call this from any CLI command that touches a control.
+    /// </summary>
+    /// <param name="formId">Form type ID</param>
+    /// <param name="cid">Control ID</param>
+    /// <param name="rect">Screen rectangle of the control (for screenshot capture)</param>
+    /// <param name="ocrText">OCR text (nullable)</param>
+    /// <param name="wmText">WM_GETTEXT text (nullable)</param>
+    /// <returns>true if screenshot was captured (first encounter)</returns>
+    public bool TouchControl(string formId, int cid,
+        System.Drawing.Rectangle rect, string? ocrText = null, string? wmText = null)
+    {
+        bool captured = false;
+
+        // Auto-screenshot on first encounter
+        if (rect.Width > 0 && rect.Height > 0 && !HasScreenshot(formId, cid))
+        {
+            try
+            {
+                using var bmp = Input.ScreenCapture.CaptureScreenRegion(
+                    rect.X, rect.Y, rect.Width, rect.Height);
+                SaveControlScreenshot(formId, cid, bmp);
+                captured = true;
+            }
+            catch { /* best-effort */ }
+        }
+
+        // Always update text history (dedup inside)
+        if (ocrText != null || wmText != null)
+        {
+            try { AppendTextHistory(formId, cid, ocrText, wmText); }
+            catch { /* best-effort */ }
+        }
+
+        return captured;
+    }
+
+    /// <summary>
+    /// Record control encounter using a pre-captured form bitmap (PrintWindow-safe).
+    /// Crops the control region from the form screenshot — immune to other windows covering the area.
+    /// Preferred over the screen-coordinate overload during scan operations.
+    /// </summary>
+    /// <param name="formId">Form type ID</param>
+    /// <param name="cid">Control ID</param>
+    /// <param name="formBitmap">Pre-captured form bitmap (via PrintWindow/CaptureWindow)</param>
+    /// <param name="formRect">Form's screen rect (for coordinate offset calculation)</param>
+    /// <param name="controlRect">Control's screen rect</param>
+    /// <param name="ocrText">OCR text (nullable)</param>
+    /// <param name="wmText">WM_GETTEXT text (nullable)</param>
+    /// <returns>true if screenshot was captured</returns>
+    public bool TouchControl(string formId, int cid,
+        System.Drawing.Bitmap formBitmap, System.Drawing.Rectangle formRect,
+        System.Drawing.Rectangle controlRect,
+        string? ocrText = null, string? wmText = null)
+    {
+        bool captured = false;
+
+        // Auto-screenshot on first encounter — crop from form bitmap
+        if (controlRect.Width > 0 && controlRect.Height > 0 && !HasScreenshot(formId, cid))
+        {
+            try
+            {
+                int cropX = controlRect.X - formRect.X;
+                int cropY = controlRect.Y - formRect.Y;
+                using var bmp = Input.ScreenCapture.CropRegion(
+                    formBitmap, cropX, cropY,
+                    controlRect.Width, controlRect.Height);
+                SaveControlScreenshot(formId, cid, bmp);
+                captured = true;
+            }
+            catch { /* best-effort */ }
+        }
+
+        // Always update text history (dedup inside)
+        if (ocrText != null || wmText != null)
+        {
+            try { AppendTextHistory(formId, cid, ocrText, wmText); }
+            catch { /* best-effort */ }
+        }
+
+        return captured;
+    }
+
     // ── Click Strategy Recording (Phase 7) ─────────────
 
     /// <summary>
@@ -479,6 +566,15 @@ public sealed class ExperienceDb
         if (create && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
         return dir;
+    }
+
+    /// <summary>
+    /// Check if a control already has a cached screenshot (latest.png).
+    /// </summary>
+    public bool HasScreenshot(string formId, int cid)
+    {
+        var dir = GetControlDir(formId, cid, create: false);
+        return File.Exists(Path.Combine(dir, "latest.png"));
     }
 
     /// <summary>
