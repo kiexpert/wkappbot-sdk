@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.WebSockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -32,6 +34,9 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
 
     public bool IsConnected => _ws?.State == WebSocketState.Open;
     public string? WebSocketUrl { get; private set; }
+
+    /// <summary>Chrome browser process ID (resolved from CDP port).</summary>
+    public int ChromePid { get; private set; }
 
     /// <summary>
     /// Connect to Chrome's DevTools WebSocket.
@@ -65,9 +70,56 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         _ws = new ClientWebSocket();
         await _ws.ConnectAsync(new Uri(wsUrl), CancellationToken.None);
 
+        // Resolve Chrome browser PID from the CDP port
+        ChromePid = ResolvePidFromPort(port);
+
         // Start background receive loop
         _receiveCts = new CancellationTokenSource();
         _receiveTask = ReceiveLoopAsync(_receiveCts.Token);
+    }
+
+    /// <summary>
+    /// Find the PID of the process listening on a TCP port using netstat.
+    /// Fallback: returns 0 if unable to determine.
+    /// </summary>
+    private static int ResolvePidFromPort(int port)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "netstat",
+                Arguments = "-ano",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var proc = Process.Start(psi);
+            if (proc == null) return 0;
+
+            var output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(3000);
+
+            // Parse netstat output: look for LISTENING on our port
+            // Format: "  TCP    127.0.0.1:9222    0.0.0.0:0    LISTENING    12345"
+            var needle = $":{port}";
+            foreach (var rawLine in output.Split('\n'))
+            {
+                var line = rawLine.Trim();
+                if (!line.Contains(needle) || !line.Contains("LISTENING")) continue;
+
+                // Verify the port matches exactly (not :92220)
+                var parts = line.Split([' '], StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 5) continue;
+                var local = parts[1]; // e.g. "127.0.0.1:9222"
+                if (!local.EndsWith(needle)) continue;
+
+                if (int.TryParse(parts[^1], out var pid))
+                    return pid;
+            }
+        }
+        catch { }
+        return 0;
     }
 
     /// <summary>
@@ -125,6 +177,13 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         // Inject WebBot bar and update title
         if (InjectWebBotBar)
             await InjectBarAsync();
+
+        // Activate this tab so Chrome window title bar reflects the page title
+        await BringToFrontAsync();
+
+        // Force Chrome window title via Win32 (Chrome ignores document.title in some profiles)
+        if (InjectWebBotBar)
+            await SetWindowTitleAsync();
     }
 
     /// <summary>
@@ -225,8 +284,9 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                     document.body.appendChild(status);
 
                     // Update title (short — no URL)
-                    const origTitle = document.title || location.hostname || 'Untitled';
-                    document.title = origTitle + ' - WKWebBot v0.1';
+                    // Even pages with no title get at least "WKWebBot v0.1" in the window title bar
+                    const origTitle = document.title || location.hostname || '';
+                    document.title = origTitle ? origTitle + ' - WKWebBot v0.1' : 'WKWebBot v0.1';
 
                     // Auto-update URL on SPA navigation
                     const updateUrl = () => {
@@ -239,8 +299,28 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                     const origReplace = history.replaceState;
                     history.replaceState = function() { origReplace.apply(this, arguments); updateUrl(); };
 
+                    // Watch for title changes (MutationObserver on <title> element)
+                    // Stores pending title so C# can sync Win32 window title
+                    const titleEl = document.querySelector('head > title') || (() => {
+                        const t = document.createElement('title');
+                        document.head.appendChild(t);
+                        return t;
+                    })();
+                    const titleObs = new MutationObserver(() => {
+                        const curr = document.title;
+                        if (window.__wkappbot) {
+                            // Only flag if title doesn't already end with our suffix
+                            if (!curr.endsWith('- WKWebBot v0.1')) {
+                                document.title = curr ? curr + ' - WKWebBot v0.1' : 'WKWebBot v0.1';
+                            }
+                            window.__wkappbot._pendingTitle = document.title;
+                        }
+                    });
+                    titleObs.observe(titleEl, { childList: true, characterData: true, subtree: true });
+
                     // Global helper for status updates from CDP
                     window.__wkappbot = {
+                        _pendingTitle: null,
                         stepCount: 0,
                         setAction(text, isError) {
                             const a = document.getElementById('__wkappbot_action');
@@ -285,6 +365,27 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             if (elapsedMs.HasValue)
                 js += $"window.__wkappbot?.setElapsed({elapsedMs.Value});";
             await EvalAsync(js);
+        }
+        catch { /* best effort */ }
+
+        // Auto-sync Win32 window title if page changed document.title
+        await SyncTitleIfChangedAsync();
+    }
+
+    /// <summary>
+    /// Check if document.title changed (via MutationObserver flag) and sync Win32 window title.
+    /// Called automatically from UpdateStatusAsync/SetStatusRunningAsync.
+    /// </summary>
+    private async Task SyncTitleIfChangedAsync()
+    {
+        if (!InjectWebBotBar) return;
+        try
+        {
+            var pending = await EvalAsync("(() => { const t = window.__wkappbot?._pendingTitle; if (t) { window.__wkappbot._pendingTitle = null; return t; } return ''; })()");
+            if (!string.IsNullOrEmpty(pending))
+            {
+                await SetWindowTitleAsync(pending);
+            }
         }
         catch { /* best effort */ }
     }
@@ -424,6 +525,9 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         return base64 != null ? Convert.FromBase64String(base64) : [];
     }
 
+    /// <summary>Get the Chrome window handle for external Win32 operations (capture, etc).</summary>
+    public IntPtr GetChromeWindowHandle() => FindChromeMainWindow();
+
     /// <summary>Get the current page URL.</summary>
     public async Task<string?> GetUrlAsync()
     {
@@ -435,6 +539,96 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     {
         return await EvalAsync("document.title");
     }
+
+    /// <summary>
+    /// Activate this tab in Chrome (bring to front).
+    /// Makes Chrome's window title bar show this tab's title.
+    /// </summary>
+    public async Task BringToFrontAsync()
+    {
+        await SendAsync("Page.bringToFront");
+    }
+
+    /// <summary>
+    /// Set the Chrome window title bar directly via Win32 SetWindowText.
+    /// Chrome ignores document.title for the window title in some profiles,
+    /// so we force it via Win32 P/Invoke on the Chrome main window.
+    /// </summary>
+    public async Task SetWindowTitleAsync(string? customTitle = null)
+    {
+        try
+        {
+            // Get page title from CDP
+            var pageTitle = customTitle ?? await EvalAsync("document.title") ?? "";
+            if (string.IsNullOrEmpty(pageTitle))
+                pageTitle = "WKWebBot v0.1";
+
+            // Find Chrome process from CDP port (localhost:{port})
+            var chromeHwnd = FindChromeMainWindow();
+            if (chromeHwnd != IntPtr.Zero)
+            {
+                SetWindowTextW(chromeHwnd, pageTitle);
+            }
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>
+    /// Find the main Chrome window handle by enumerating top-level windows.
+    /// Uses ChromePid to find the exact Chrome instance connected via CDP.
+    /// Falls back to first visible Chrome_WidgetWin_1 if PID not available.
+    /// </summary>
+    private IntPtr FindChromeMainWindow()
+    {
+        IntPtr found = IntPtr.Zero;
+        var sb = new StringBuilder(512);
+        var targetPid = ChromePid;
+
+        EnumWindows((hwnd, _) =>
+        {
+            GetClassNameW(hwnd, sb, sb.Capacity);
+            var cls = sb.ToString();
+            if (cls != "Chrome_WidgetWin_1") return true; // continue
+
+            // Check if visible main window (not popup/child)
+            if (!IsWindowVisible(hwnd)) return true;
+            var style = GetWindowLong(hwnd, -16); // GWL_STYLE
+            if ((style & 0x00C00000) == 0) return true; // WS_CAPTION required
+
+            // Match by PID if known
+            if (targetPid > 0)
+            {
+                GetWindowThreadProcessId(hwnd, out var pid);
+                if (pid != targetPid) return true; // wrong Chrome instance
+            }
+
+            found = hwnd;
+            return false; // stop
+        }, IntPtr.Zero);
+
+        return found;
+    }
+
+    // Win32 P/Invoke for window title management
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool SetWindowTextW(IntPtr hWnd, string lpString);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassNameW(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
 
     /// <summary>Wait for an element to appear (polling).</summary>
     public async Task<bool> WaitForElementAsync(string selector, int timeoutMs = 5000)

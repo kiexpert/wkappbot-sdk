@@ -23,6 +23,7 @@ internal partial class Program
             "type" => WebTypeCommand(restArgs),
             "text" => WebGetTextCommand(restArgs),
             "screenshot" => WebScreenshotCommand(restArgs),
+            "capture" => WebCaptureCommand(restArgs),
             "navigate" or "nav" => WebNavigateCommand(restArgs),
             "wait" => WebWaitCommand(restArgs),
             "check" => WebCheckCommand(restArgs),
@@ -82,7 +83,9 @@ JavaScript:
 
 Output:
   screenshot [-o output.png] [--port N]
-      Capture page screenshot as PNG.
+      Capture page screenshot as PNG (CDP — page content only).
+  capture [-o output.png] [--port N]
+      Capture Chrome window including title bar (Win32 PrintWindow).
   html [--port N]
       Get full page HTML source.
 
@@ -306,6 +309,52 @@ Options:
         Console.WriteLine($"Saved ({png.Length:N0} bytes)");
         Console.ResetColor();
         Console.WriteLine($"[WEB] File: {output}");
+
+        return 0;
+    }
+
+    // ── capture (Win32 window — includes title bar) ─────────────
+
+    static int WebCaptureCommand(string[] args)
+    {
+        int port = GetPort(args);
+        string output = GetArgValue(args, "-o")
+            ?? Path.Combine(DataDir, "output", $"web_capture_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+
+        using var cdp = ConnectCdp(port);
+
+        Console.Write($"[WEB] Window capture (PID={cdp.ChromePid})... ");
+        var hwnd = cdp.GetChromeWindowHandle();
+
+        if (hwnd == IntPtr.Zero)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("FAILED (Chrome window not found)");
+            Console.ResetColor();
+            return 1;
+        }
+
+        // Use Win32 ScreenCapture (PrintWindow) — captures title bar + chrome
+        var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hwnd);
+        if (bmp == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("FAILED (PrintWindow returned null)");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var dir = Path.GetDirectoryName(output);
+        if (dir != null && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+
+        bmp.Save(output, System.Drawing.Imaging.ImageFormat.Png);
+        var fileInfo = new FileInfo(output);
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"Saved ({fileInfo.Length:N0} bytes, {bmp.Width}x{bmp.Height})");
+        Console.ResetColor();
+        Console.WriteLine($"[WEB] File: {output}");
+        bmp.Dispose();
 
         return 0;
     }
@@ -564,6 +613,7 @@ Options:
                     "type" => WebTypeCommand(subRest),
                     "text" => WebGetTextCommand(subRest),
                     "screenshot" => WebScreenshotCommand(subRest),
+                    "capture" => WebCaptureCommand(subRest),
                     "navigate" or "nav" => WebNavigateCommand(subRest),
                     "wait" => WebWaitCommand(subRest),
                     "check" => WebCheckCommand(subRest),
