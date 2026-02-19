@@ -21,12 +21,15 @@ internal partial class Program
             "test" => SlackTestCommand(args),
             "status" => SlackStatusCommand(),
             "stop" => SlackStopCommand(),
+            "inbox" => SlackInboxCommand(),
+            "reply" => SlackReplyCommand(args),
             _ => SlackUsage()
         };
     }
 
     static string SlackConfigPath => Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
     static string SlackPidFile => Path.Combine(DataDir, "slack.pid");
+    static string SlackInboxFile => Path.Combine(DataDir, "slack_inbox.jsonl");
 
     /// <summary>Socket Mode: listen for events and respond to @mentions.</summary>
     static int SlackListenCommand(string[] args)
@@ -53,12 +56,15 @@ internal partial class Program
         ClaudeChat? ai = null;
         if (aiMode)
         {
-            // Try config file first, then env var
-            var aiKey = config["anthropic_api_key"]?.GetValue<string>()
-                ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+            // Try config file → ANTHROPIC_API_KEY → CLAUDE_CODE_OAUTH_TOKEN (Claude Code session)
+            var aiKey = config["anthropic_api_key"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(aiKey))
+                aiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+            if (string.IsNullOrEmpty(aiKey))
+                aiKey = Environment.GetEnvironmentVariable("CLAUDE_CODE_OAUTH_TOKEN");
             if (string.IsNullOrEmpty(aiKey))
             {
-                Console.WriteLine("[SLACK] AI mode requires 'anthropic_api_key' in webhook.json or ANTHROPIC_API_KEY env var");
+                Console.WriteLine("[SLACK] AI mode: no API key found (webhook.json / ANTHROPIC_API_KEY / CLAUDE_CODE_OAUTH_TOKEN)");
                 Console.WriteLine("[SLACK] Falling back to echo mode");
             }
             else
@@ -95,7 +101,7 @@ internal partial class Program
         // Connect
         slack.ConnectAsync(appToken, botToken).GetAwaiter().GetResult();
 
-        // Handle @mentions — AI response or echo
+        // Handle @mentions — AI / inbox / echo
         slack.OnMention += (msg) =>
         {
             Console.WriteLine($"[SLACK] << @mention from {msg.User}: {msg.Text}");
@@ -106,6 +112,9 @@ internal partial class Program
 
             if (string.IsNullOrEmpty(cleanText))
                 cleanText = "ping";
+
+            // Always write to inbox (for Claude Code to pick up)
+            WriteInbox(msg.Channel, msg.User, cleanText, msg.Timestamp);
 
             string reply;
             if (ai != null)
@@ -125,12 +134,19 @@ internal partial class Program
             }
             else
             {
-                // Echo mode
-                reply = string.IsNullOrEmpty(cleanText) ? "WKAppBot online!" : cleanText;
+                // No AI — just ack, Claude Code will reply via 'slack reply'
+                reply = null!;
             }
 
-            Console.WriteLine($"[SLACK] >> {reply}");
-            slack.SendAsync(msg.Channel, reply).GetAwaiter().GetResult();
+            if (!string.IsNullOrEmpty(reply))
+            {
+                Console.WriteLine($"[SLACK] >> {reply}");
+                slack.SendAsync(msg.Channel, reply).GetAwaiter().GetResult();
+            }
+            else
+            {
+                Console.WriteLine("[SLACK] >> (queued for Claude Code)");
+            }
         };
 
         // Handle channel messages (log only, don't reply to every message)
@@ -182,10 +198,13 @@ internal partial class Program
         if (!string.IsNullOrEmpty(dotnetRoot))
             psi.Environment["DOTNET_ROOT"] = dotnetRoot;
 
-        // Pass ANTHROPIC_API_KEY for --ai mode
+        // Pass API keys for --ai mode (Claude Code session token as fallback)
         var apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
         if (!string.IsNullOrEmpty(apiKey))
             psi.Environment["ANTHROPIC_API_KEY"] = apiKey;
+        var oauthToken = Environment.GetEnvironmentVariable("CLAUDE_CODE_OAUTH_TOKEN");
+        if (!string.IsNullOrEmpty(oauthToken))
+            psi.Environment["CLAUDE_CODE_OAUTH_TOKEN"] = oauthToken;
 
         var process = Process.Start(psi);
         if (process == null)
@@ -430,6 +449,109 @@ internal partial class Program
         return JsonSerializer.Deserialize<JsonNode>(json);
     }
 
+    /// <summary>Show unread inbox messages (from @mentions).</summary>
+    static int SlackInboxCommand()
+    {
+        if (!File.Exists(SlackInboxFile))
+        {
+            Console.WriteLine("[SLACK] Inbox is empty");
+            return 0;
+        }
+
+        var lines = File.ReadAllLines(SlackInboxFile);
+        if (lines.Length == 0)
+        {
+            Console.WriteLine("[SLACK] Inbox is empty");
+            return 0;
+        }
+
+        Console.WriteLine($"[SLACK] {lines.Length} message(s) in inbox:");
+        foreach (var line in lines)
+        {
+            try
+            {
+                var msg = JsonSerializer.Deserialize<JsonNode>(line);
+                var time = msg?["time"]?.GetValue<string>() ?? "";
+                var user = msg?["user"]?.GetValue<string>() ?? "";
+                var text = msg?["text"]?.GetValue<string>() ?? "";
+                var channel = msg?["channel"]?.GetValue<string>() ?? "";
+                Console.WriteLine($"  [{time}] {user}: {text}");
+            }
+            catch { Console.WriteLine($"  {line}"); }
+        }
+        return 0;
+    }
+
+    /// <summary>Reply to a Slack message (and clear inbox).</summary>
+    static int SlackReplyCommand(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.WriteLine("Usage: wkappbot slack reply \"response text\"");
+            return 1;
+        }
+
+        var replyText = string.Join(" ", args.Skip(1));
+        var config = LoadSlackConfig();
+        if (config == null) return 1;
+
+        var botToken = config["bot_token"]?.GetValue<string>();
+
+        // Get channel from inbox (most recent message)
+        string? channel = null;
+        if (File.Exists(SlackInboxFile))
+        {
+            var lines = File.ReadAllLines(SlackInboxFile);
+            if (lines.Length > 0)
+            {
+                var lastMsg = JsonSerializer.Deserialize<JsonNode>(lines[^1]);
+                channel = lastMsg?["channel"]?.GetValue<string>();
+            }
+        }
+
+        channel ??= config["channel"]?.GetValue<string>();
+
+        if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
+        {
+            Console.WriteLine("[SLACK] ERROR: bot_token or channel not found");
+            return 1;
+        }
+
+        var ok = SlackSendViaApi(botToken, channel, replyText).GetAwaiter().GetResult();
+
+        if (ok)
+        {
+            Console.WriteLine($"[SLACK] Replied: {replyText}");
+            // Clear inbox after reply
+            try { File.Delete(SlackInboxFile); } catch { }
+        }
+        else
+            Console.WriteLine("[SLACK] Failed to send reply");
+
+        return ok ? 0 : 1;
+    }
+
+    /// <summary>Write a mention to inbox file for Claude Code to pick up.</summary>
+    static void WriteInbox(string channel, string user, string text, string ts)
+    {
+        try
+        {
+            var entry = JsonSerializer.Serialize(new
+            {
+                channel,
+                user,
+                text,
+                ts,
+                time = DateTime.Now.ToString("HH:mm:ss")
+            });
+            File.AppendAllText(SlackInboxFile, entry + "\n");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SLACK] Failed to write inbox: {ex.Message}");
+        }
+    }
+
     static int SlackUsage()
     {
         Console.WriteLine("Usage: wkappbot slack <command>");
@@ -442,6 +564,8 @@ internal partial class Program
         Console.WriteLine("  test                Test Slack connection (auth + send + socket)");
         Console.WriteLine("  status              Check if background listener is running");
         Console.WriteLine("  stop                Stop background listener");
+        Console.WriteLine("  inbox               Show unread @mention messages");
+        Console.WriteLine("  reply \"text\"        Reply to latest inbox message and clear inbox");
         Console.WriteLine();
         Console.WriteLine($"Config: {SlackConfigPath}");
         return 1;
