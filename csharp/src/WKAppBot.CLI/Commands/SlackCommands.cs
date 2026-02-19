@@ -201,8 +201,8 @@ internal partial class Program
                 }
                 else
                 {
-                    Console.WriteLine("[SLACK] >> Prompt lost! Writing to inbox instead");
-                    WriteInbox(msg.Channel, msg.User, cleanText, msg.Timestamp);
+                    HandlePromptLost(botToken!, msg.Channel, threadKey,
+                        msg.User, cleanText, msg.Timestamp);
                 }
                 return;
             }
@@ -318,8 +318,8 @@ internal partial class Program
                     }
                     else
                     {
-                        Console.WriteLine("[SLACK] >> Prompt lost! Writing to inbox instead");
-                        WriteInbox(msg.Channel, msg.User, cleanText, msg.Timestamp);
+                        HandlePromptLost(botToken!, msg.Channel, msg.ThreadTs!,
+                            msg.User, cleanText, msg.Timestamp);
                     }
                     return;
                 }
@@ -365,8 +365,9 @@ internal partial class Program
                         }
                         else
                         {
-                            Console.WriteLine("[SLACK] >> Prompt lost! Writing to inbox instead");
-                            WriteInbox(msg.Channel, msg.User, cleanText, msg.Timestamp);
+                            var kwThreadKey = msg.ThreadTs ?? msg.Timestamp;
+                            HandlePromptLost(botToken!, msg.Channel, kwThreadKey,
+                                msg.User, cleanText, msg.Timestamp);
                         }
                         return;
                     }
@@ -1457,6 +1458,84 @@ internal partial class Program
         using var reader = new StreamReader(resp.Content.ReadAsStream());
         var json = JsonSerializer.Deserialize<JsonNode>(reader.ReadToEnd());
         return json?["user_id"]?.GetValue<string>();
+    }
+
+    /// <summary>
+    /// When Claude prompt is lost (FindPrompt returns null), capture foreground window screenshot
+    /// and send it to Slack so the user can see what's blocking the prompt (e.g. permission dialog).
+    /// Also writes the original message to inbox as fallback.
+    /// </summary>
+    static void HandlePromptLost(string botToken, string channel, string threadTs,
+        string user, string cleanText, string ts)
+    {
+        Console.WriteLine("[SLACK] >> Prompt lost! Diagnosing foreground window...");
+
+        try
+        {
+            var fgWindow = WKAppBot.Win32.Native.NativeMethods.GetForegroundWindow();
+            if (fgWindow != IntPtr.Zero)
+            {
+                // Get foreground window info
+                var fgTitle = WKAppBot.Win32.Window.WindowFinder.GetWindowText(fgWindow);
+                var fgClass = WKAppBot.Win32.Window.WindowFinder.GetClassName(fgWindow);
+                Console.WriteLine($"[SLACK]    Foreground: \"{fgTitle}\" (class={fgClass})");
+
+                // Capture foreground window screenshot
+                var outputDir = Path.Combine(DataDir, "output", "screenshots");
+                Directory.CreateDirectory(outputDir);
+                var screenshotPath = Path.Combine(outputDir,
+                    $"prompt_blocked_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+
+                var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(fgWindow);
+                if (bmp != null && !WKAppBot.Win32.Input.ScreenCapture.IsBlankBitmap(bmp))
+                {
+                    bmp.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);
+                    bmp.Dispose();
+                    Console.WriteLine($"[SLACK]    Screenshot: {screenshotPath}");
+
+                    // Upload to Slack thread with diagnostic info
+                    var comment = $"Claude 프롬프트를 찾을 수 없어요!\n" +
+                        $"전경 윈도우: \"{fgTitle}\" (class={fgClass})\n" +
+                        $"원래 메시지: {cleanText}\n\n" +
+                        $"승인 다이얼로그가 떠있으면 수락해주세요!";
+
+                    SlackUploadFileAsync(botToken, channel, screenshotPath,
+                        $"Blocked: {fgTitle}", threadTs, comment).GetAwaiter().GetResult();
+                }
+                else
+                {
+                    bmp?.Dispose();
+                    // Screenshot failed, send text message instead
+                    var msg = $"Claude 프롬프트를 찾을 수 없어요!\n" +
+                        $"전경 윈도우: \"{fgTitle}\" (class={fgClass})\n" +
+                        $"원래 메시지: {cleanText}\n\n" +
+                        $"승인 다이얼로그가 떠있으면 수락해주세요!";
+                    SlackSendViaApi(botToken, channel, msg, threadTs).GetAwaiter().GetResult();
+                }
+            }
+            else
+            {
+                // No foreground window — just notify
+                SlackSendViaApi(botToken, channel,
+                    $"Claude 프롬프트를 찾을 수 없어요! 원래 메시지: {cleanText}",
+                    threadTs).GetAwaiter().GetResult();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SLACK]    Diagnosis failed: {ex.Message}");
+            // Fallback: text notification
+            try
+            {
+                SlackSendViaApi(botToken, channel,
+                    $"Claude 프롬프트를 찾을 수 없어요! (진단 실패: {ex.Message})\n원래 메시지: {cleanText}",
+                    threadTs).GetAwaiter().GetResult();
+            }
+            catch { }
+        }
+
+        // Always write to inbox as fallback
+        WriteInbox(channel, user, cleanText, ts);
     }
 
     static int SlackUsage()

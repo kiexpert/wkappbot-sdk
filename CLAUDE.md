@@ -140,13 +140,27 @@ wkappbot slack test
 
 # Socket Mode 리스너 시작 (@mention에 자동 응답)
 wkappbot slack listen
+wkappbot slack listen --bg --prompt --keywords  # 백그라운드 데몬 (프롬프트 전달 + 키워드 감시)
 
-# 메시지 전송
+# 메시지 전송/답장
 wkappbot slack send "Hello from WKAppBot!"
+wkappbot slack reply "response text"            # 최근 스레드에 답장 (컨텍스트 자동)
+
+# 파일 업로드/스크린샷 전송
+wkappbot slack upload <file> [--thread TS] [--title "name"] [--comment "msg"]
+wkappbot slack screenshot [window-title] [--thread TS]
+
+# 기타
+wkappbot slack status                           # 리스너 상태 확인
+wkappbot slack stop                             # 백그라운드 리스너 중지
+wkappbot slack catch-up [--prompt]              # 놓친 메시지 따라잡기
 ```
 - Socket Mode: 서버 없이 WebSocket으로 Slack과 양방향 통신
 - @mention 이벤트 수신 → 자동 응답 (listen 모드)
 - chat.postMessage API로 메시지 전송
+- files:write 스코프로 파일/스크린샷 업로드 (v2 3단계 API)
+- --prompt: 슬랙 메시지를 Claude Code 프롬프트에 직접 입력
+- --keywords: 키워드(클롯, claude, appbot 등) 감지 시 자동 전달
 - 설정: `wkappbot.hq/profiles/slack_exp/webhook.json`
 
 ### web 명령 (Chrome DevTools Protocol 웹 자동화)
@@ -545,6 +559,10 @@ teardown:
 - **WebBot (Phase 11A) 완료**: CDP 기반 웹 자동화 — `wkappbot web` CLI (27/27 배치 테스트 PASS)
 - **윈도우 스타일 특성 완료**: GWL_STYLE/GWL_EXSTYLE 수집 → ControlExperience 저장 + info.json per tree folder
 - **Slack Socket Mode 완료**: 양방향 메시징 — WebSocket으로 @mention 수신 + chat.postMessage 전송 (zero deps)
+- **Slack 파일 업로드 완료**: files:write 스코프 + v2 3단계 API (getUploadURL → PUT → complete)
+- **Slack→Claude 프롬프트 브릿지 완료**: --prompt 모드로 슬랙 메시지를 Claude Code 프롬프트에 직접 입력
+- **키워드 감시 완료**: --keywords 모드로 "클롯/claude/appbot" 등 키워드 감지 → 자동 전달
+- **웹봇 Slack API 자동화 완료**: CDP로 api.slack.com OAuth 페이지에서 스코프 추가 + 앱 재설치 자동 수행
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
