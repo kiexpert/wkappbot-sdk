@@ -78,6 +78,7 @@ internal partial class Program
                 "tooltip-probe" => TooltipProbeCommand(restArgs),
                 "ocr" => OcrCommand(restArgs),
                 "web" => WebCommand(restArgs),
+                "slack" => SlackCommand(restArgs),
                 "dialog-click" => DialogClickCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")

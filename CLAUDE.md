@@ -71,7 +71,8 @@ W:/GitHub/WKAppBot/
 │       │   └── VisionCacheEntry.cs      # 캐시 엔트리 모델 (상대좌표, per-control 학습)
 │       ├── WKAppBot.WebBot/           # WebBot — CDP (Chrome DevTools Protocol) 웹 자동화
 │       │   ├── CdpClient.cs           # CDP WebSocket JSON-RPC 클라이언트 (zero deps)
-│       │   └── ChromeLauncher.cs      # Chrome 자동 탐색 + --remote-debugging-port 실행
+│       │   ├── ChromeLauncher.cs      # Chrome 자동 탐색 + --remote-debugging-port 실행
+│       │   └── SlackSocketClient.cs   # Slack Socket Mode WebSocket 클라이언트 (zero deps)
 │       └── WKAppBot.Report/           # 리포트 생성 (스켈레톤)
 ├── handlers/                        # 방해꾼 다이얼로그 핸들러 YAML (빌드 시 자동 복사)
 │   ├── #32770.yaml                  # nkrunlite 범용 다이얼로그 핸들러
@@ -129,7 +130,24 @@ wkappbot chart-analyze <window-title|image.png> [--form <id>] [--candles N] [-o 
 wkappbot tooltip-probe <process-name> [--capture]
 wkappbot ocr <window-title|image.png> [--save] [-o output.txt]
 wkappbot web <subcommand> [options]   # WebBot CDP 웹 자동화
+wkappbot slack <subcommand>           # Slack Socket Mode 양방향 메시징
 ```
+
+### slack 명령 (Socket Mode 양방향 메시징)
+```bash
+# Slack 연결 테스트 (auth + send + socket)
+wkappbot slack test
+
+# Socket Mode 리스너 시작 (@mention에 자동 응답)
+wkappbot slack listen
+
+# 메시지 전송
+wkappbot slack send "Hello from WKAppBot!"
+```
+- Socket Mode: 서버 없이 WebSocket으로 Slack과 양방향 통신
+- @mention 이벤트 수신 → 자동 응답 (listen 모드)
+- chat.postMessage API로 메시지 전송
+- 설정: `wkappbot.hq/profiles/slack_exp/webhook.json`
 
 ### web 명령 (Chrome DevTools Protocol 웹 자동화)
 ```bash
@@ -526,6 +544,7 @@ teardown:
 - **Web UI 자동화 완료**: Chrome UIA Accessibility로 웹페이지 자동화 (Phase 1: 21/21 PASS, Phase 2: 19/19 PASS)
 - **WebBot (Phase 11A) 완료**: CDP 기반 웹 자동화 — `wkappbot web` CLI (27/27 배치 테스트 PASS)
 - **윈도우 스타일 특성 완료**: GWL_STYLE/GWL_EXSTYLE 수집 → ControlExperience 저장 + info.json per tree folder
+- **Slack Socket Mode 완료**: 양방향 메시징 — WebSocket으로 @mention 수신 + chat.postMessage 전송 (zero deps)
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -702,6 +721,24 @@ teardown:
 - **배치 모드**: `wkappbot web run steps.txt` — 텍스트 파일에서 커맨드 순차 실행
 - **싱글톤 특성**: Chrome 프로세스는 앱봇 종료 후에도 살아있음 → 다음 실행 시 재연결
 - **검증**: 27/27 배치 테스트 PASS (버튼, 입력, 체크박스, 셀렉트, 카운터, 네비게이션, JS eval, 스크린샷)
+
+### Phase 12: Slack Socket Mode — "서버 없는 양방향 메시징" ✅
+**상태**: 완료
+- **SlackSocketClient.cs**: System.Net.WebSockets 기반 Slack Socket Mode 클라이언트 (zero deps)
+  - `apps.connections.open` → WebSocket URL → connect → event receive → acknowledge
+  - Events: `OnMessage` (채널 메시지), `OnMention` (봇 @mention)
+  - `SendAsync()`: `chat.postMessage` API로 메시지 전송
+  - 자기 메시지 필터링 (`auth.test` → botUserId)
+- **SlackCommands.cs**: `wkappbot slack` CLI (partial class Program 패턴)
+  - `listen`: Socket Mode 리스너 — @mention에 자동 응답, 채널 메시지 로깅
+  - `send "msg"`: 설정된 채널에 메시지 전송
+  - `test`: auth.test + send + Socket Mode 연결 검증
+- **설정**: `wkappbot.hq/profiles/slack_exp/webhook.json` (tokens, channel, scopes)
+- **프로토콜**: Socket Mode (WebSocket from client TO Slack, no public server needed)
+- **토큰**: App-Level Token (`xapp-`) + Bot User OAuth Token (`xoxb-`)
+- **이벤트**: `app_mention`, `message.channels`
+- **스코프**: incoming-webhook, chat:write, channels:read, channels:history, app_mentions:read + connections:write (app-level)
+- **`[SLACK]` 태그**: 모든 Slack 관련 출력에 prefix
 
 ### Phase 11B: 웹봇 고급 기능 — "크롬이 할 수 있는 건 다 한다"
 **상태**: 로드맵

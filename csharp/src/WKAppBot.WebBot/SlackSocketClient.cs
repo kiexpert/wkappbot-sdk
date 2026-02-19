@@ -1,0 +1,344 @@
+using System.Collections.Concurrent;
+using System.Net.Http;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace WKAppBot.WebBot;
+
+/// <summary>
+/// Slack Socket Mode client — receives events via WebSocket, sends messages via HTTP API.
+/// Zero external dependencies — same pattern as CdpClient.
+///
+/// Usage:
+///   var slack = new SlackSocketClient();
+///   await slack.ConnectAsync(appToken, botToken);
+///   slack.OnMessage += (channel, user, text) => { /* handle */ };
+///   slack.OnMention += (channel, user, text) => { /* handle */ };
+///   await slack.SendAsync(channel, "Hello from WKAppBot!");
+///   await slack.DisconnectAsync();
+///
+/// Protocol:
+///   1. POST apps.connections.open (app token) → WebSocket URL
+///   2. Connect WebSocket → receive hello
+///   3. Events arrive as JSON: { envelope_id, type, payload }
+///   4. Acknowledge each event: { envelope_id }
+///   5. Send messages via POST chat.postMessage (bot token)
+/// </summary>
+public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
+{
+    private ClientWebSocket? _ws;
+    private CancellationTokenSource? _receiveCts;
+    private Task? _receiveTask;
+    private readonly HttpClient _http = new();
+
+    private string? _botToken;
+    private string? _appToken;
+    private string? _botUserId;  // our bot's user ID (to ignore own messages)
+
+    public bool IsConnected => _ws?.State == WebSocketState.Open;
+
+    /// <summary>Fired when a message is posted in a subscribed channel.</summary>
+    public event Action<SlackMessage>? OnMessage;
+
+    /// <summary>Fired when the bot is @mentioned.</summary>
+    public event Action<SlackMessage>? OnMention;
+
+    /// <summary>Fired on any event (raw JSON for extensibility).</summary>
+    public event Action<string, JsonNode?>? OnEvent;
+
+    /// <summary>
+    /// Connect to Slack via Socket Mode.
+    /// </summary>
+    /// <param name="appToken">App-Level Token (xapp-...)</param>
+    /// <param name="botToken">Bot User OAuth Token (xoxb-...)</param>
+    public async Task ConnectAsync(string appToken, string botToken)
+    {
+        _appToken = appToken;
+        _botToken = botToken;
+
+        // Resolve our bot's user ID (to filter out own messages)
+        _botUserId = await GetBotUserIdAsync();
+
+        // Step 1: Get WebSocket URL from apps.connections.open
+        var wsUrl = await OpenConnectionAsync();
+
+        // Step 2: Connect WebSocket
+        _ws = new ClientWebSocket();
+        await _ws.ConnectAsync(new Uri(wsUrl), CancellationToken.None);
+
+        // Step 3: Start receive loop
+        _receiveCts = new CancellationTokenSource();
+        _receiveTask = Task.Run(() => ReceiveLoopAsync(_receiveCts.Token));
+
+        Console.WriteLine($"[SLACK] Connected (Socket Mode)");
+    }
+
+    /// <summary>Send a text message to a channel.</summary>
+    public async Task<bool> SendAsync(string channel, string text)
+    {
+        var payload = new
+        {
+            channel,
+            text,
+            unfurl_links = false,
+            unfurl_media = false
+        };
+        var json = JsonSerializer.Serialize(payload);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, "https://slack.com/api/chat.postMessage");
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _botToken);
+        req.Content = content;
+
+        var resp = await _http.SendAsync(req);
+        var body = await resp.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonNode>(body);
+        var ok = result?["ok"]?.GetValue<bool>() ?? false;
+
+        if (!ok)
+            Console.WriteLine($"[SLACK] SendAsync failed: {result?["error"]}");
+
+        return ok;
+    }
+
+    /// <summary>Send a rich block message to a channel.</summary>
+    public async Task<bool> SendBlocksAsync(string channel, string text, JsonArray blocks)
+    {
+        var payload = new JsonObject
+        {
+            ["channel"] = channel,
+            ["text"] = text,
+            ["blocks"] = blocks
+        };
+        var json = payload.ToJsonString();
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, "https://slack.com/api/chat.postMessage");
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _botToken);
+        req.Content = content;
+
+        var resp = await _http.SendAsync(req);
+        var body = await resp.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonNode>(body);
+        return result?["ok"]?.GetValue<bool>() ?? false;
+    }
+
+    /// <summary>POST apps.connections.open to get WebSocket URL.</summary>
+    private async Task<string> OpenConnectionAsync()
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Post, "https://slack.com/api/apps.connections.open");
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _appToken);
+        req.Content = new StringContent("", Encoding.UTF8, "application/x-www-form-urlencoded");
+
+        var resp = await _http.SendAsync(req);
+        var body = await resp.Content.ReadAsStringAsync();
+        var json = JsonSerializer.Deserialize<JsonNode>(body);
+
+        var ok = json?["ok"]?.GetValue<bool>() ?? false;
+        if (!ok)
+            throw new InvalidOperationException($"apps.connections.open failed: {json?["error"]}");
+
+        var url = json?["url"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("No WebSocket URL in response");
+
+        return url;
+    }
+
+    /// <summary>Get our bot's user ID via auth.test.</summary>
+    private async Task<string?> GetBotUserIdAsync()
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Post, "https://slack.com/api/auth.test");
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _botToken);
+        req.Content = new StringContent("", Encoding.UTF8, "application/x-www-form-urlencoded");
+
+        var resp = await _http.SendAsync(req);
+        var body = await resp.Content.ReadAsStringAsync();
+        var json = JsonSerializer.Deserialize<JsonNode>(body);
+        return json?["user_id"]?.GetValue<string>();
+    }
+
+    /// <summary>Background WebSocket receive loop.</summary>
+    private async Task ReceiveLoopAsync(CancellationToken ct)
+    {
+        var buffer = new byte[64 * 1024];  // 64KB buffer
+        var messageBuffer = new StringBuilder();
+
+        while (!ct.IsCancellationRequested && _ws?.State == WebSocketState.Open)
+        {
+            try
+            {
+                var result = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    Console.WriteLine("[SLACK] WebSocket closed by server");
+                    break;
+                }
+
+                messageBuffer.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+
+                if (result.EndOfMessage)
+                {
+                    var message = messageBuffer.ToString();
+                    messageBuffer.Clear();
+                    ProcessMessage(message);
+                }
+            }
+            catch (OperationCanceledException) { break; }
+            catch (WebSocketException ex)
+            {
+                Console.WriteLine($"[SLACK] WebSocket error: {ex.Message}");
+                break;
+            }
+        }
+
+        Console.WriteLine("[SLACK] Receive loop ended");
+    }
+
+    /// <summary>Process a received WebSocket message.</summary>
+    private void ProcessMessage(string rawJson)
+    {
+        try
+        {
+            var json = JsonSerializer.Deserialize<JsonNode>(rawJson);
+            if (json == null) return;
+
+            var type = json["type"]?.GetValue<string>();
+
+            switch (type)
+            {
+                case "hello":
+                    Console.WriteLine("[SLACK] Received hello — connection established");
+                    break;
+
+                case "disconnect":
+                    Console.WriteLine($"[SLACK] Disconnect requested: {json["reason"]}");
+                    break;
+
+                case "events_api":
+                    HandleEventsApi(json);
+                    break;
+
+                default:
+                    // Unknown type — acknowledge anyway
+                    AcknowledgeEnvelope(json);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SLACK] Error processing message: {ex.Message}");
+        }
+    }
+
+    /// <summary>Handle events_api envelope.</summary>
+    private void HandleEventsApi(JsonNode envelope)
+    {
+        // Must acknowledge within 3 seconds
+        AcknowledgeEnvelope(envelope);
+
+        var payload = envelope["payload"];
+        var eventNode = payload?["event"];
+        if (eventNode == null) return;
+
+        var eventType = eventNode["type"]?.GetValue<string>();
+        var channel = eventNode["channel"]?.GetValue<string>();
+        var user = eventNode["user"]?.GetValue<string>();
+        var text = eventNode["text"]?.GetValue<string>();
+        var ts = eventNode["ts"]?.GetValue<string>();
+        var subtype = eventNode["subtype"]?.GetValue<string>();
+
+        // Skip bot's own messages
+        if (user == _botUserId) return;
+
+        // Skip message subtypes (bot_message, channel_join, etc.)
+        if (subtype != null) return;
+
+        // Fire raw event
+        OnEvent?.Invoke(eventType ?? "", eventNode);
+
+        var msg = new SlackMessage
+        {
+            Channel = channel ?? "",
+            User = user ?? "",
+            Text = text ?? "",
+            Timestamp = ts ?? "",
+            EventType = eventType ?? ""
+        };
+
+        switch (eventType)
+        {
+            case "app_mention":
+                Console.WriteLine($"[SLACK] @mention from {user} in {channel}: {text}");
+                OnMention?.Invoke(msg);
+                break;
+
+            case "message":
+                Console.WriteLine($"[SLACK] Message from {user} in {channel}: {text}");
+                OnMessage?.Invoke(msg);
+                break;
+        }
+    }
+
+    /// <summary>Acknowledge an envelope (required within 3s).</summary>
+    private void AcknowledgeEnvelope(JsonNode envelope)
+    {
+        var envelopeId = envelope["envelope_id"]?.GetValue<string>();
+        if (envelopeId == null) return;
+
+        var ack = JsonSerializer.Serialize(new { envelope_id = envelopeId });
+        var bytes = Encoding.UTF8.GetBytes(ack);
+
+        // Fire and forget — must be fast
+        _ = _ws?.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+    }
+
+    /// <summary>Disconnect and clean up.</summary>
+    public async Task DisconnectAsync()
+    {
+        _receiveCts?.Cancel();
+
+        if (_ws?.State == WebSocketState.Open)
+        {
+            try
+            {
+                await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None);
+            }
+            catch { }
+        }
+
+        if (_receiveTask != null)
+        {
+            try { await _receiveTask; } catch { }
+        }
+
+        _ws?.Dispose();
+        _ws = null;
+        Console.WriteLine("[SLACK] Disconnected");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await DisconnectAsync();
+        _http.Dispose();
+    }
+
+    public void Dispose()
+    {
+        _receiveCts?.Cancel();
+        _ws?.Dispose();
+        _http.Dispose();
+    }
+}
+
+/// <summary>Slack message event data.</summary>
+public record SlackMessage
+{
+    public string Channel { get; init; } = "";
+    public string User { get; init; } = "";
+    public string Text { get; init; } = "";
+    public string Timestamp { get; init; } = "";
+    public string EventType { get; init; } = "";
+}
