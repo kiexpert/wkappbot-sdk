@@ -374,6 +374,8 @@ public static class AppScanner
                         RelativeX = Math.Round(relX, 4),
                         RelativeY = Math.Round(relY, 4),
                         HitCount = 1,
+                        Style = ctrl.Style,
+                        ExStyle = ctrl.ExStyle,
                     };
 
                     expDb.LearnControl(formId, form.FormName ?? formId, experience, treePath);
@@ -453,6 +455,8 @@ public static class AppScanner
                                 RelativeX = Math.Round(pRelX, 4),
                                 RelativeY = Math.Round(pRelY, 4),
                                 HitCount = 1,
+                                Style = parent.Style,
+                                ExStyle = parent.ExStyle,
                             }, parentTreePath);
                         }
                     }

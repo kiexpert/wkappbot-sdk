@@ -464,6 +464,7 @@ teardown:
 - **Volume 추출 완료**: volume 패널 바 높이 추출 + tooltip 거래량 기반 절대값 캘리브레이션
 - **Columnar JSON 출력**: OHLCV별 1D 배열 (`result.arrays.json`) + 콘솔 미리보기
 - **캡처 검증 완료**: IsBlankBitmap(9-point 샘플링) + .fail.png(실제 화면 크롭) + .fail-iconic.png(최소화 태스크바 아이콘) + IsIconic 사전 체크
+- **윈도우 스타일 특성 완료**: GWL_STYLE/GWL_EXSTYLE 수집 → ControlExperience 저장 + info.json per tree folder
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -530,6 +531,18 @@ teardown:
 - **ExperienceDb.SaveFailScreenshot()**: 실패 진단 이미지 저장 (.fail.png)
 - **AppScanner**: IsIconic → .fail-iconic.png / IsBlank → .fail.png / OK → 정상 OCR 학습
 - **진단 파일 3종**: `latest.png`(정상), `.fail.png`(blank), `.fail-iconic.png`(최소화)
+
+### Phase 6.4: 윈도우 스타일 특성 + info.json — "컨트롤의 DNA를 기록한다" ✅
+**상태**: 완료
+- **윈도우 스타일 수집**: GetWindowLongW(GWL_STYLE, GWL_EXSTYLE) → ControlExperience에 저장
+  - WS_CAPTION(타이틀바), WS_THICKFRAME(리사이즈), WS_POPUP(팝업), WS_CHILD(자식)
+  - WS_DISABLED(비활성), WS_VSCROLL/HSCROLL(스크롤바)
+  - WS_EX_TOPMOST(항상위), WS_EX_TOOLWINDOW(툴), WS_EX_TRANSPARENT/LAYERED(투명/오버레이)
+- **Derived boolean traits**: Style raw bits에서 자동 계산 (HasCaption, IsResizable 등, JSON 미직렬화)
+- **info.json per tree folder**: 스크린샷 저장 시 옆에 info.json 자동 생성
+  - 탐색기에서 `latest.png` + `info.json` 나란히 → 스크린샷+메타데이터 한눈에 확인
+- **WindowInfo에 Style/ExStyle 추가**: FromHwnd()에서 한 번에 수집
+- **자동화 활용**: resizable 폼 → 상대좌표 필수 / popup+modal → 방해꾼 후보 / disabled → 클릭 스킵
 
 ### Phase 7: 클릭 전략 DB 연동 — "SmartClick이 경험에서 배운다" ✅
 **상태**: 완료
