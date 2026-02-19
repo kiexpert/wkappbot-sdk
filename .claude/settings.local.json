@@ -11,7 +11,9 @@
       "Read(**/*.jpg)",
       "Read(**/*.jpeg)",
       "Read(**/*.gif)",
-      "Read(**/*.bmp)"
+      "Read(**/*.bmp)",
+      "Read(*.json)",
+      "Read(**/*.json)"
     ]
   }
 }

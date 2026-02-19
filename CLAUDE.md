@@ -451,6 +451,7 @@ teardown:
 - **Phase 5 완료**: LCS puppet 패턴 — 라인 정렬 + 토큰 단위 diff + 연속 와일드카드 병합
 - **Phase 6 완료**: 컨트롤 디테일 캐시 — per-control latest.png + text_history.jsonl (첫 만남 자동 캡처 + --detail로 갱신)
 - **Phase 6.1 완료**: 스크린샷 캡처 수정 — CopyFromScreen→PrintWindow+CropRegion (Z-order 안전), parent container 캡처 추가
+- **Phase 6.2 완료**: 트리 기반 폴더 구조 — Win32 hWnd 클래스명 트리를 실제 폴더 계층으로 미러링
 - **Phase 7 완료**: 클릭 전략 DB 연동 — SmartClickButton이 ExperienceDb 성공률 기반 전략 순서 최적화
 - **TouchControl 완료**: 모든 경로에서 컨트롤 만나면 자동 경험 축적 (스크린샷+텍스트, best-effort)
 - **배포 구조 완료**: single-file EXE + wkappbot.hq/ (handlers, profiles, logs, output 통합 본부)
@@ -504,8 +505,8 @@ teardown:
 - **ExperienceDb.TouchControl(formBitmap, formRect, controlRect)**: PrintWindow 비트맵에서 크롭
 - **MFC 한계**: 일부 owner-drawn 컨트롤은 PrintWindow에 제대로 렌더링 안 됨 (알려진 한계)
 
-### Phase 6.2: 트리 기반 폴더 구조 — "클래스명 경로가 실제 폴더가 된다" 🔜
-**상태**: 구현 중
+### Phase 6.2: 트리 기반 폴더 구조 — "클래스명 경로가 실제 폴더가 된다" ✅
+**상태**: 완료
 - **목표**: Win32 hWnd 클래스명 트리를 실제 폴더 계층으로 미러링
 - **동기**: 탐색기에서 바로 계층 파악 + 하위구조 예측 → 스마트 스킵
 - **CID는 정적**: GetDlgCtrlID() = RC 리소스 파일 컴파일 타임 상수, 여러 인스턴스에서도 동일
