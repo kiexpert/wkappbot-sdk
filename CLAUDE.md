@@ -630,6 +630,23 @@ teardown:
 - OCR → FormTypeIdentifier → Experience DB → 상대좌표 × 해상도 → 클릭
 - CLI: `wkappbot image-click <screenshot.png> <control-role>`
 
+### Phase 10: logcat — "윈도우 변화 실시간 스트리밍"
+**목표**: adb logcat처럼 프로세스/시스템 윈도우 이벤트 실시간 모니터링
+**상태**: 로드맵 등록, 구현 없음
+- CLI: `wkappbot logcat [process-name] [--filter <keyword>] [--interval N]`
+- **감지 대상**: 윈도우 생성/소멸, 텍스트 변경, 포커스 변경, MDI 자식 추가/제거, 크기/위치 변경
+- **구현 전략 (2단계)**:
+  - Phase A: EnumWindows 폴링 diff (500ms~1s) — 간단, watch 코드 재활용, CPU 거의 0
+  - Phase B: SetWinEventHook 콜백 — OS가 알려줌, 오버헤드 0, P/Invoke 콜백 관리 필요
+- **출력 형식**: `[LOGCAT] timestamp +/-/~ type target detail`
+  ```
+  [LOGCAT] 14:30:01.234 +WINDOW #32770 "확인" pid=1234 (nkrunlite) 320x200
+  [LOGCAT] 14:30:01.500 ~TEXT   AfxWnd140_3930 "5,230" → "5,245" (form_1301)
+  [LOGCAT] 14:30:02.100 FOCUS  → nkrunlite/#32770 "매매확인"
+  [LOGCAT] 14:30:03.200 -WINDOW #32770 "확인" (dismissed)
+  ```
+- **ExperienceDb 연동**: 텍스트 변경 → text_history.jsonl 자동 기록
+
 ### 앱봇의 눈 — 장기 비전 (Vision Roadmap)
 
 **핵심 철학**: "앱봇은 쓸수록 똑똑해진다"

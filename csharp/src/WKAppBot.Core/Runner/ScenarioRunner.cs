@@ -294,10 +294,12 @@ public sealed class ScenarioRunner
 
     private void LaunchApp(AppConfig app, RuntimeContext ctx)
     {
-        // Start the process
+        // Start the process — split "cmd.exe /c echo ok" into FileName + Arguments
+        var launchParts = app.Launch.Split(' ', 2, StringSplitOptions.TrimEntries);
         var psi = new ProcessStartInfo
         {
-            FileName = app.Launch,
+            FileName = launchParts[0],
+            Arguments = launchParts.Length > 1 ? launchParts[1] : "",
             UseShellExecute = true
         };
         var proc = Process.Start(psi)
