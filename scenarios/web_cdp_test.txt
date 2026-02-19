@@ -1,0 +1,51 @@
+# WebBot CDP Batch Test — exercises all major features
+# Lines starting with # are comments
+
+# 1. Navigate to test page
+navigate file:///W:/GitHub/WKAppBot/output/web_test.html
+
+# 2. Button clicks
+click #btn-hello
+text #result
+
+# 3. Counter (3x)
+click #btn-count
+click #btn-count
+click #btn-count
+text #counter
+
+# 4. Text input + greet
+type #name-input WebBot
+type #message-input "CDP batch mode"
+click #btn-greet
+text #result
+
+# 5. Form controls
+check #chk-bold true
+select #font-select 24
+click #btn-double
+text #result
+
+# 6. Progress
+click #btn-progress-50
+click #btn-progress-100
+
+# 7. Table rows
+click #btn-add-row
+click #btn-add-row
+
+# 8. Eval JS
+eval document.title
+
+# 9. Page 2 navigation
+navigate file:///W:/GitHub/WKAppBot/output/web_test_page2.html
+type #search-input "batch test"
+click #btn-search
+text #result2
+
+# 10. Back to page 1
+navigate file:///W:/GitHub/WKAppBot/output/web_test.html
+text #result
+
+# 11. Screenshot
+screenshot -o W:/GitHub/WKAppBot/output/webbot_batch_result.png

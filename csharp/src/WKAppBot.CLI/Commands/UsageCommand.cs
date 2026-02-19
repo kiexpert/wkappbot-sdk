@@ -63,6 +63,19 @@ Chart Analysis Commands:
   tooltip-probe <process-name> [--capture]
       Enumerate tooltip windows for a process (diagnostic tool).
 
+WebBot Commands (Chrome DevTools Protocol):
+  web open [url] [--port N] [--headless] [--no-launch]
+      Launch Chrome and connect via CDP. Auto-finds chrome.exe.
+  web navigate <url>           Navigate to URL.
+  web click <css-selector>     Click an element.
+  web type <selector> <text>   Type text into an input.
+  web eval <expression>        Evaluate JavaScript.
+  web text <css-selector>      Get element text content.
+  web screenshot [-o file]     Capture page screenshot.
+  web status [--port N]        Check Chrome CDP status and list tabs.
+  web run <steps-file.txt>     Run batch of web commands from file.
+  web help                     Show all web subcommands.
+
 HTS Stress Test Commands:
   hts-stress <form.xmf> [-n 20] [--pattern repeat|memory|ctx-only] [options]
       HTS MDI stress test with memory tracking (3 patterns).

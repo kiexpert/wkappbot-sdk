@@ -69,6 +69,9 @@ W:/GitHub/WKAppBot/
 │       │   ├── VisionAnalyzer.cs        # Claude Vision API 호출 (고비용 폴백)
 │       │   ├── VisionCache.cs           # 2레벨 캐시 (메모리+디스크 JSON, SHA256 키)
 │       │   └── VisionCacheEntry.cs      # 캐시 엔트리 모델 (상대좌표, per-control 학습)
+│       ├── WKAppBot.WebBot/           # WebBot — CDP (Chrome DevTools Protocol) 웹 자동화
+│       │   ├── CdpClient.cs           # CDP WebSocket JSON-RPC 클라이언트 (zero deps)
+│       │   └── ChromeLauncher.cs      # Chrome 자동 탐색 + --remote-debugging-port 실행
 │       └── WKAppBot.Report/           # 리포트 생성 (스켈레톤)
 ├── handlers/                        # 방해꾼 다이얼로그 핸들러 YAML (빌드 시 자동 복사)
 │   ├── #32770.yaml                  # nkrunlite 범용 다이얼로그 핸들러
@@ -125,6 +128,42 @@ wkappbot toolbar-ocr <window-title> [--click "text"] [--save]
 wkappbot chart-analyze <window-title|image.png> [--form <id>] [--candles N] [-o output.json] [--debug] [--tooltip]
 wkappbot tooltip-probe <process-name> [--capture]
 wkappbot ocr <window-title|image.png> [--save] [-o output.txt]
+wkappbot web <subcommand> [options]   # WebBot CDP 웹 자동화
+```
+
+### web 명령 (Chrome DevTools Protocol 웹 자동화)
+```bash
+# Chrome 실행 + CDP 연결 + 페이지 열기
+wkappbot web open https://example.com
+wkappbot web open https://example.com --port 9222 --headless
+
+# 이미 실행 중인 Chrome에 연결만 (실행하지 않음)
+wkappbot web open https://example.com --no-launch
+
+# 페이지 조작
+wkappbot web navigate https://example.com
+wkappbot web click "#btn-login"
+wkappbot web type "#search" "hello world"
+wkappbot web text "#result"
+wkappbot web check "#chk-agree" true
+wkappbot web select "#country" "Korea"
+wkappbot web wait "#loading" --timeout 10000
+
+# JavaScript 실행
+wkappbot web eval "document.title"
+wkappbot web eval "document.querySelectorAll('a').length"
+
+# 출력
+wkappbot web screenshot -o page.png
+wkappbot web html -o page.html
+wkappbot web url
+wkappbot web title
+
+# 상태 확인 (탭 목록)
+wkappbot web status
+
+# 배치 실행 (텍스트 파일에서 커맨드 순차 실행)
+wkappbot web run steps.txt --delay 300
 ```
 
 ### chart-analyze 명령 (차트 스크린샷 → OHLC 추출)
@@ -484,6 +523,8 @@ teardown:
 - **Columnar JSON 출력**: OHLCV별 1D 배열 (`result.arrays.json`) + 콘솔 미리보기
 - **ocr 커맨드 완료**: `wkappbot ocr` — 이미지/윈도우 OCR 텍스트+좌표 추출 (adb-style 범용 도구)
 - **캡처 검증 완료**: IsBlankBitmap(9-point 샘플링) + .fail.png(실제 화면 크롭) + .fail-iconic.png(최소화 태스크바 아이콘) + IsIconic 사전 체크
+- **Web UI 자동화 완료**: Chrome UIA Accessibility로 웹페이지 자동화 (Phase 1: 21/21 PASS, Phase 2: 19/19 PASS)
+- **WebBot (Phase 11A) 완료**: CDP 기반 웹 자동화 — `wkappbot web` CLI (27/27 배치 테스트 PASS)
 - **윈도우 스타일 특성 완료**: GWL_STYLE/GWL_EXSTYLE 수집 → ControlExperience 저장 + info.json per tree folder
 - **미구현**: 아래 로드맵 참조
 
@@ -646,6 +687,32 @@ teardown:
   [LOGCAT] 14:30:03.200 -WINDOW #32770 "확인" (dismissed)
   ```
 - **ExperienceDb 연동**: 텍스트 변경 → text_history.jsonl 자동 기록
+
+### Phase 11A: WebBot CDP — "싱글톤 웹봇 시스템" ✅
+**상태**: 완료
+- **접근법**: CefSharp 대신 CDP (Chrome DevTools Protocol) 채택 — zero dependency, 기존 Chrome 재활용
+- **CdpClient.cs**: System.Net.WebSockets 기반 WebSocket JSON-RPC 클라이언트
+  - ConnectAsync, NavigateAsync, EvalAsync, ClickAsync, TypeAsync, GetTextAsync
+  - GetValueAsync, SetCheckedAsync, SelectAsync, ScreenshotAsync, WaitForElementAsync
+  - 백그라운드 receive loop + ConcurrentDictionary pending 응답 추적
+- **ChromeLauncher.cs**: Chrome 자동 탐색 (ProgramFiles/LocalAppData/PATH) + `--remote-debugging-port` 실행
+  - temp user-data-dir로 격리 (기존 Chrome 세션 간섭 없음)
+  - 이미 실행 중이면 재사용 (싱글톤!)
+- **CLI**: `wkappbot web <subcommand>` — open/navigate/click/type/text/eval/screenshot/check/select/wait/status/run
+- **배치 모드**: `wkappbot web run steps.txt` — 텍스트 파일에서 커맨드 순차 실행
+- **싱글톤 특성**: Chrome 프로세스는 앱봇 종료 후에도 살아있음 → 다음 실행 시 재연결
+- **검증**: 27/27 배치 테스트 PASS (버튼, 입력, 체크박스, 셀렉트, 카운터, 네비게이션, JS eval, 스크린샷)
+
+### Phase 11B: 웹봇 고급 기능 — "크롬이 할 수 있는 건 다 한다"
+**상태**: 로드맵
+- **탭 관리**: 새 탭 열기, 탭 전환, 탭 닫기
+- **네트워크 모니터링**: CDP Network domain으로 XHR/Fetch 응답 가로채기
+- **쿠키/스토리지**: CDP Storage domain으로 쿠키/localStorage 읽기/쓰기
+- **PDF 다운로드**: CDP Page.printToPDF
+- **DOM 쿼리**: CDP DOM domain으로 복잡한 DOM 탐색
+- **이벤트 리스닝**: CDP 이벤트 구독 (페이지 로드, 다이얼로그 등)
+- **프록시/인증**: Chrome 실행 인자로 프록시 설정
+- **활용 시나리오**: GPT 웹 활용, 포털 자동화, 웹 크롤링, API 테스트
 
 ### 앱봇의 눈 — 장기 비전 (Vision Roadmap)
 
