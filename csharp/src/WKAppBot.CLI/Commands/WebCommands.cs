@@ -183,9 +183,11 @@ Options:
         using var cdp = ConnectCdp(port);
 
         Console.Write($"[WEB] Navigating to {url}... ");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         cdp.NavigateAsync(url).GetAwaiter().GetResult();
 
         var title = cdp.GetTitleAsync().GetAwaiter().GetResult();
+        cdp.UpdateStatusAsync($"Navigate: {url}", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("OK");
         Console.ResetColor();
@@ -226,7 +228,10 @@ Options:
         using var cdp = ConnectCdp(port);
 
         Console.Write($"[WEB] Click '{selector}'... ");
+        cdp.SetStatusRunningAsync($"Click: {selector}").GetAwaiter().GetResult();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         cdp.ClickAsync(selector).GetAwaiter().GetResult();
+        cdp.UpdateStatusAsync($"Click: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("OK");
         Console.ResetColor();
@@ -250,7 +255,10 @@ Options:
         using var cdp = ConnectCdp(port);
 
         Console.Write($"[WEB] Type '{text}' into '{selector}'... ");
+        cdp.SetStatusRunningAsync($"Type: '{text}' -> {selector}").GetAwaiter().GetResult();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
+        cdp.UpdateStatusAsync($"Type: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("OK");
         Console.ResetColor();
@@ -534,6 +542,14 @@ Options:
                 stepArgs = [.. stepArgs, "--port", port.ToString()];
 
             Console.Write($"  [{i + 1}/{lines.Length}] {line} ... ");
+
+            // Update status bar step counter
+            try
+            {
+                using var stepCdp = ConnectCdp(port);
+                stepCdp.UpdateStatusAsync($"Running: {line}", stepNum: i + 1, totalSteps: lines.Length).GetAwaiter().GetResult();
+            }
+            catch { }
 
             try
             {
