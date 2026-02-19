@@ -249,6 +249,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         var text = eventNode["text"]?.GetValue<string>();
         var ts = eventNode["ts"]?.GetValue<string>();
         var subtype = eventNode["subtype"]?.GetValue<string>();
+        var threadTs = eventNode["thread_ts"]?.GetValue<string>();
 
         // Skip bot's own messages
         if (user == _botUserId) return;
@@ -265,7 +266,8 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             User = user ?? "",
             Text = text ?? "",
             Timestamp = ts ?? "",
-            EventType = eventType ?? ""
+            EventType = eventType ?? "",
+            ThreadTs = threadTs
         };
 
         switch (eventType)
@@ -341,4 +343,6 @@ public record SlackMessage
     public string Text { get; init; } = "";
     public string Timestamp { get; init; } = "";
     public string EventType { get; init; } = "";
+    /// <summary>Thread parent timestamp. Present when this message is a thread reply.</summary>
+    public string? ThreadTs { get; init; }
 }

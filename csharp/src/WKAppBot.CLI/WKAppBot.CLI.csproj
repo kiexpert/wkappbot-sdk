@@ -24,6 +24,11 @@
     <None Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" LinkBase="handlers" />
   </ItemGroup>
 
+  <!-- Pre-publish: kill running wkappbot.exe to avoid file lock -->
+  <Target Name="KillWkappbot" BeforeTargets="Publish">
+    <Exec Command="taskkill /IM wkappbot.exe /F" IgnoreExitCode="true" />
+  </Target>
+
   <!-- Single-file publish: copy EXE to W:\SDK\bin, handlers to wkappbot.hq -->
   <Target Name="CopyToSdkBin" AfterTargets="Publish">
     <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFolder="W:\SDK\bin\" OverwriteReadOnlyFiles="true" />
