@@ -229,6 +229,8 @@ public sealed class UiaLocator : IDisposable
 
     /// <summary>
     /// Get the text value of an element (Name or Value pattern).
+    /// For web elements: if Name and Value are empty, collects text from child Text elements.
+    /// This handles Chrome's StatusBar/Group containers where text lives in child nodes.
     /// </summary>
     public static string? GetText(AutomationElement element)
     {
@@ -237,12 +239,49 @@ public sealed class UiaLocator : IDisposable
         {
             var vp = element.Patterns.Value;
             if (vp.IsSupported)
-                return vp.Pattern.Value.Value;
+            {
+                var val = vp.Pattern.Value.Value;
+                if (!string.IsNullOrEmpty(val))
+                    return val;
+            }
         }
         catch { }
 
-        // Fall back to Name
-        return element.Name;
+        // Try Name
+        var name = element.Name;
+
+        // For web containers (StatusBar, Group, etc.), the actual text content
+        // lives in child Text nodes, while Name may be just an aria-label.
+        // Collect child text and prefer it if different from the element Name.
+        try
+        {
+            var children = element.FindAllChildren();
+            if (children.Length > 0)
+            {
+                var texts = new List<string>();
+                foreach (var child in children)
+                {
+                    try
+                    {
+                        var childName = child.Name;
+                        if (!string.IsNullOrEmpty(childName))
+                            texts.Add(childName);
+                    }
+                    catch { }
+                }
+                if (texts.Count > 0)
+                {
+                    var childText = string.Join(" ", texts);
+                    // Prefer child text if it differs from element Name
+                    // (Name is likely an aria-label, child text is actual content)
+                    if (childText != name)
+                        return childText;
+                }
+            }
+        }
+        catch { }
+
+        return name; // may be null/empty
     }
 
     /// <summary>

@@ -1,0 +1,138 @@
+scenario:
+  name: "Web UI Phase 1 — In-page Interactions"
+
+app:
+  launch: "chrome.exe file:///W:/GitHub/WKAppBot/output/web_test.html"
+  wait_for_window:
+    title_contains: "WKAppBot Web"
+
+config:
+  continue_on_error: true
+  retry_count: 2
+  focus_check: true
+  prefer_focusless: true
+
+steps:
+  # ── 1. Button Click ──
+  - name: "[Button] Say Hello"
+    target:
+      automation_id: "btn-hello"
+    action: click
+
+  - name: "[Assert] Result = Hello"
+    target:
+      automation_id: "result"
+    action: assert
+    params:
+      type: text_contains
+      expected: "Hello from WKAppBot"
+
+  # ── 2. Counter (3x click) ──
+  - name: "[Button] Count Up x1"
+    target:
+      automation_id: "btn-count"
+    action: click
+
+  - name: "[Button] Count Up x2"
+    target:
+      automation_id: "btn-count"
+    action: click
+
+  - name: "[Button] Count Up x3"
+    target:
+      automation_id: "btn-count"
+    action: click
+
+  # ── 3. Text Input + Greet ──
+  - name: "[Input] Click name field"
+    target:
+      automation_id: "name-input"
+    action: click
+
+  - name: "[Input] Type name"
+    action: type_text
+    params:
+      text: "AppBot"
+
+  - name: "[Input] Click message field"
+    target:
+      automation_id: "message-input"
+    action: click
+
+  - name: "[Input] Type message"
+    action: type_text
+    params:
+      text: "Web UI control works!"
+
+  - name: "[Button] Greet"
+    target:
+      automation_id: "btn-greet"
+    action: click
+
+  - name: "[Assert] Greeting result"
+    target:
+      automation_id: "result"
+    action: assert
+    params:
+      type: text_contains
+      expected: "Hello AppBot"
+
+  # ── 4. Progress bar ──
+  - name: "[Button] Progress +10%"
+    target:
+      automation_id: "btn-progress-10"
+    action: click
+
+  - name: "[Button] Progress set 50%"
+    target:
+      automation_id: "btn-progress-50"
+    action: click
+
+  - name: "[Button] Progress set 100%"
+    target:
+      automation_id: "btn-progress-100"
+    action: click
+
+  # ── 5. Table rows ──
+  - name: "[Button] Add row 1"
+    target:
+      automation_id: "btn-add-row"
+    action: click
+
+  - name: "[Button] Add row 2"
+    target:
+      automation_id: "btn-add-row"
+    action: click
+
+  - name: "[Button] Add row 3"
+    target:
+      automation_id: "btn-add-row"
+    action: click
+
+  # ── 6. Number doubling ──
+  - name: "[Button] Double number"
+    target:
+      automation_id: "btn-double"
+    action: click
+
+  - name: "[Assert] Double result"
+    target:
+      automation_id: "result"
+    action: assert
+    params:
+      type: text_contains
+      expected: "x 2 ="
+
+  # ── 7. Reset ──
+  - name: "[Button] Reset All"
+    target:
+      automation_id: "btn-reset"
+    action: click
+
+  - name: "[Assert] Result = Ready"
+    target:
+      automation_id: "result"
+    action: assert
+    params:
+      type: text_contains
+      expected: "Ready"
