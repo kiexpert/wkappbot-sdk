@@ -463,6 +463,7 @@ teardown:
 - **Phase B 완료**: 툴팁 기반 Y축 재캘리브레이션 — 마우스 호버 → tooltips_class32 캡처 → OCR → OHLC 파싱 → Y축 교정
 - **Volume 추출 완료**: volume 패널 바 높이 추출 + tooltip 거래량 기반 절대값 캘리브레이션
 - **Columnar JSON 출력**: OHLCV별 1D 배열 (`result.arrays.json`) + 콘솔 미리보기
+- **캡처 검증 완료**: IsBlankBitmap(9-point 샘플링) + .fail.png(실제 화면 크롭) + .fail-iconic.png(최소화 태스크바 아이콘) + IsIconic 사전 체크
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -516,6 +517,19 @@ teardown:
 - **하위호환**: TreePath null이면 레거시 `controls/cid_N/` 폴백
 - **Before**: `form_{id}/controls/cid_N/latest.png` (플랫, 동일 CID 충돌 가능)
 - **After**: `form_{id}/tree/#32770_59648/AfxWnd140_999/Button_3785/latest.png` (트리 미러)
+
+### Phase 6.3: 캡처 검증 — "부실한 스크린샷은 미래의 클롣을 오염시킨다" ✅
+**상태**: 완료
+- **핵심 철학**: 잘못된 스크린샷이 ExperienceDB에 저장되면 미래 Claude 세션에 부실한 정보 제공
+- **IsBlankBitmap()**: 3x3 그리드 9-point 샘플링 (기존 center pixel 단일 체크에서 강화)
+- **blank 캡처 시 .fail.png**: PrintWindow 실패 → `CaptureScreenRegion`으로 데스크탑에서 해당 좌표 크롭 저장
+  - 열어보면 "어떤 창이 가리고 있었는지" 또는 "화면 상태" 즉시 진단 가능
+- **최소화 윈도우 감지**: `IsIconic(hWnd)` P/Invoke 추가
+  - GetWindowRect가 태스크바 아이콘 좌표(~160x40) 반환 → 정상 캡처 불가
+  - `.fail-iconic.png`로 태스크바 아이콘 영역 캡처 (귀여운 증거 + 원인 진단)
+- **ExperienceDb.SaveFailScreenshot()**: 실패 진단 이미지 저장 (.fail.png)
+- **AppScanner**: IsIconic → .fail-iconic.png / IsBlank → .fail.png / OK → 정상 OCR 학습
+- **진단 파일 3종**: `latest.png`(정상), `.fail.png`(blank), `.fail-iconic.png`(최소화)
 
 ### Phase 7: 클릭 전략 DB 연동 — "SmartClick이 경험에서 배운다" ✅
 **상태**: 완료
