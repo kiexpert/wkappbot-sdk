@@ -17,11 +17,13 @@ obj/
 *.cache
 *.DotSettings.user
 
-# Output
-output/screenshots/*
-output/reports/*
-!output/screenshots/.gitkeep
-!output/reports/.gitkeep
+# Output & Temp files
+output/
+logs/
+profiles/
+chart_debug_*.png
+ocr_*.png
+nul
 
 # Logs
 *.log

@@ -746,17 +746,45 @@ teardown:
   - `apps.connections.open` → WebSocket URL → connect → event receive → acknowledge
   - Events: `OnMessage` (채널 메시지), `OnMention` (봇 @mention)
   - `SendAsync()`: `chat.postMessage` API로 메시지 전송
+  - `SlackUploadFileAsync()`: files:write v2 3단계 API (getUploadURL → PUT → complete)
   - 자기 메시지 필터링 (`auth.test` → botUserId)
 - **SlackCommands.cs**: `wkappbot slack` CLI (partial class Program 패턴)
-  - `listen`: Socket Mode 리스너 — @mention에 자동 응답, 채널 메시지 로깅
+  - `listen --bg --prompt --keywords`: 백그라운드 데몬 (프롬프트 전달 + 키워드 감시)
   - `send "msg"`: 설정된 채널에 메시지 전송
+  - `reply "msg"`: 최근 스레드에 답장 (컨텍스트 자동)
+  - `upload <file>`: 파일 업로드 (files:write v2 API)
+  - `screenshot [title]`: 윈도우 캡처 → Slack 업로드
+  - `catch-up [--prompt]`: 놓친 메시지 따라잡기
   - `test`: auth.test + send + Socket Mode 연결 검증
+- **HandlePromptLost()**: FindPrompt() 실패 시 전경 윈도우 캡처 → Slack 스크린샷 업로드
+  - GetForegroundWindow() → PrintWindow → IsBlankBitmap 검증 → SlackUploadFileAsync
+  - 승인 다이얼로그 등이 Claude 프롬프트를 가릴 때 원격 진단 가능
+  - 3곳에서 호출: OnMention, thread reply, keyword handler
 - **설정**: `wkappbot.hq/profiles/slack_exp/webhook.json` (tokens, channel, scopes)
 - **프로토콜**: Socket Mode (WebSocket from client TO Slack, no public server needed)
 - **토큰**: App-Level Token (`xapp-`) + Bot User OAuth Token (`xoxb-`)
 - **이벤트**: `app_mention`, `message.channels`
-- **스코프**: incoming-webhook, chat:write, channels:read, channels:history, app_mentions:read + connections:write (app-level)
+- **스코프**: incoming-webhook, chat:write, channels:read, channels:history, app_mentions:read, files:write + connections:write (app-level)
 - **`[SLACK]` 태그**: 모든 Slack 관련 출력에 prefix
+
+### WebBot Slack API 자동화 노하우 — "클봇이 직접 설정한다"
+**상태**: 완료 (files:write 스코프 추가 + 앱 재설치를 CDP로 자동 수행)
+- **대상**: `https://api.slack.com/apps/{APP_ID}/oauth` (OAuth & Permissions 페이지)
+- **ReactVirtualized 드롭다운 대응**:
+  - Slack의 스코프 선택기는 ReactVirtualized Grid 사용 → DOM에 ~15개만 존재 (총 50+)
+  - `document.querySelector('.p-app-scopes-picker__option')` 등으로 바로 탐색 불가
+  - **해결**: `.ReactVirtualized__Grid` 찾기 → `grid.scrollTop = N` 으로 알파벳순 위치로 스크롤 → 보이는 DOM에서 탐색
+  - `files:write`는 'f' 섹션 → `scrollTop ≈ 800` 정도
+- **React 입력 필드**:
+  - `input.value = "text"` 안 먹힘 (React controlled component)
+  - **해결**: CDP `wkappbot web type` 사용 (Runtime.evaluate로 focus → Input.dispatchKeyEvent)
+  - 또는 nativeInputValueSetter 패턴: `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val)`
+- **JS 클릭 패턴**: `.click()` 안 될 때 → `dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}))` 사용
+- **OAuth 재설치 플로우**:
+  1. 스코프 추가 후 노란 배너 "reinstall your app" 링크 클릭
+  2. 채널 선택: `.c-channel_entity__name` span에 mousedown+mouseup+click
+  3. "허용" 버튼 클릭
+  4. **bot_token은 재설치 후에도 동일** (webhook_url만 변경될 수 있음)
 
 ### Phase 11B: 웹봇 고급 기능 — "크롬이 할 수 있는 건 다 한다"
 **상태**: 로드맵
