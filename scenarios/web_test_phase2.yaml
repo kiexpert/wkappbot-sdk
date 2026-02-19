@@ -1,0 +1,136 @@
+scenario:
+  name: "Web UI Phase 2 — Navigation & Cross-page"
+
+app:
+  launch: "chrome.exe file:///W:/GitHub/WKAppBot/output/web_test.html"
+  wait_for_window:
+    title_contains: "WKAppBot Web"
+
+config:
+  continue_on_error: true
+  retry_count: 2
+  focus_check: true
+  prefer_focusless: true
+
+steps:
+  # ── 1. Verify we're on Page 1 ──
+  - name: "[Assert] Page 1 loaded"
+    target:
+      automation_id: "subtitle"
+    action: assert
+    params:
+      type: text_contains
+      expected: "Phase 1"
+
+  # ── 2. Click link to navigate to Page 2 ──
+  - name: "[Link] Click Page 2 link"
+    target:
+      automation_id: "link-page2"
+    action: click
+
+  - name: "[Wait] Page load"
+    action: wait
+    params:
+      seconds: 1
+
+  # ── 3. Verify we're on Page 2 ──
+  - name: "[Assert] Page 2 arrived"
+    target:
+      automation_id: "arrival-msg"
+    action: assert
+    params:
+      type: text_contains
+      expected: "Page 2"
+
+  # ── 4. Interact on Page 2 ──
+  - name: "[Input] Click search field"
+    target:
+      automation_id: "search-input"
+    action: click
+
+  - name: "[Input] Type search query"
+    action: type_text
+    params:
+      text: "WKAppBot web automation"
+
+  - name: "[Button] Click search"
+    target:
+      automation_id: "btn-search"
+    action: click
+
+  - name: "[Assert] Search result"
+    target:
+      automation_id: "result2"
+    action: assert
+    params:
+      type: text_contains
+      expected: "WKAppBot web automation"
+
+  # ── 5. Browser Back (via Chrome button) ──
+  - name: "[Nav] Click browser Back button"
+    target:
+      automation_id: "view_1001"
+    action: click
+
+  - name: "[Wait] Back navigation"
+    action: wait
+    params:
+      seconds: 1
+
+  # ── 6. Verify back on Page 1 ──
+  - name: "[Assert] Back on Page 1"
+    target:
+      automation_id: "subtitle"
+    action: assert
+    params:
+      type: text_contains
+      expected: "Phase 1"
+
+  # ── 7. Navigate via address bar ──
+  - name: "[Nav] Click address bar"
+    target:
+      automation_id: "view_1012"
+    action: click
+
+  - name: "[Nav] Type URL in address bar"
+    action: type_text
+    params:
+      text: "file:///W:/GitHub/WKAppBot/output/web_test_page2.html"
+
+  - name: "[Nav] Press Enter to navigate"
+    action: press_key
+    params:
+      key: "enter"
+
+  - name: "[Wait] Navigation"
+    action: wait
+    params:
+      seconds: 1
+
+  # ── 8. Verify on Page 2 again ──
+  - name: "[Assert] Page 2 via address bar"
+    target:
+      automation_id: "arrival-msg"
+    action: assert
+    params:
+      type: text_contains
+      expected: "Page 2"
+
+  # ── 9. Navigate back to Page 1 via link ──
+  - name: "[Link] Back to Page 1 link"
+    target:
+      automation_id: "link-back"
+    action: click
+
+  - name: "[Wait] Back navigation"
+    action: wait
+    params:
+      seconds: 1
+
+  - name: "[Assert] Final: back on Page 1"
+    target:
+      automation_id: "subtitle"
+    action: assert
+    params:
+      type: text_contains
+      expected: "Phase 1"
