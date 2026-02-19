@@ -76,6 +76,7 @@ internal partial class Program
                 "toolbar-ocr" => ToolbarOcrCommand(restArgs),
                 "chart-analyze" => ChartAnalyzeCommand(restArgs),
                 "tooltip-probe" => TooltipProbeCommand(restArgs),
+                "ocr" => OcrCommand(restArgs),
                 "dialog-click" => DialogClickCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
