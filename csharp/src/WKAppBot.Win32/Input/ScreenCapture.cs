@@ -13,6 +13,7 @@ public static class ScreenCapture
     /// <summary>
     /// Capture a specific window's client area.
     /// Falls back to screen-region capture if PrintWindow fails (common with HTS).
+    /// If minimized, captures the tiny taskbar icon area (caller can detect via IsIconic beforehand).
     /// </summary>
     public static Bitmap CaptureWindow(IntPtr hWnd)
     {
@@ -29,13 +30,8 @@ public static class ScreenCapture
             bool ok = NativeMethods.PrintWindow(hWnd, hdc, NativeMethods.PW_RENDERFULLCONTENT);
             g.ReleaseHdc(hdc);
 
-            if (ok)
-            {
-                // Verify it's not all black (PrintWindow sometimes returns "success" but blank)
-                var pixel = bmp.GetPixel(w / 2, h / 2);
-                if (pixel.R != 0 || pixel.G != 0 || pixel.B != 0)
-                    return bmp;
-            }
+            if (ok && !IsBlankBitmap(bmp))
+                return bmp;
         }
         bmp.Dispose();
 
@@ -82,6 +78,32 @@ public static class ScreenCapture
                     NativeMethods.SWP_SHOWWINDOW | NativeMethods.SWP_NOACTIVATE);
             }
         }
+    }
+
+    /// <summary>
+    /// Check if a bitmap is blank (all-black or nearly uniform).
+    /// Samples 9 points (3x3 grid) — if ALL are (0,0,0), the capture failed.
+    /// Important: bad screenshots pollute ExperienceDB and mislead future Claude sessions.
+    /// </summary>
+    public static bool IsBlankBitmap(Bitmap bmp)
+    {
+        if (bmp.Width <= 0 || bmp.Height <= 0) return true;
+
+        // Sample 9 points in a 3x3 grid (avoids center-only false positives)
+        int[] xs = { bmp.Width / 4, bmp.Width / 2, bmp.Width * 3 / 4 };
+        int[] ys = { bmp.Height / 4, bmp.Height / 2, bmp.Height * 3 / 4 };
+
+        foreach (int x in xs)
+        {
+            foreach (int y in ys)
+            {
+                if (x >= bmp.Width || y >= bmp.Height) continue;
+                var p = bmp.GetPixel(x, y);
+                if (p.R != 0 || p.G != 0 || p.B != 0)
+                    return false; // At least one non-black pixel → not blank
+            }
+        }
+        return true; // All 9 sample points are black → blank capture
     }
 
     /// <summary>

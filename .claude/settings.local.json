@@ -13,7 +13,9 @@
       "Read(**/*.gif)",
       "Read(**/*.bmp)",
       "Read(*.json)",
-      "Read(**/*.json)"
+      "Read(**/*.json)",
+      "WebSearch(*)",
+      "WebFetch(*)"
     ]
   }
 }

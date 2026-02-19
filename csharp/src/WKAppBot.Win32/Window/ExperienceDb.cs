@@ -199,15 +199,24 @@ public sealed class ExperienceDb
         bool captured = false;
         treePath ??= GetTreePath(formId, cid);
 
-        // Auto-screenshot on first encounter
+        // Auto-screenshot on first encounter (skip blank captures to protect DB quality)
         if (rect.Width > 0 && rect.Height > 0 && !HasScreenshot(formId, cid, treePath))
         {
             try
             {
                 using var bmp = Input.ScreenCapture.CaptureScreenRegion(
                     rect.X, rect.Y, rect.Width, rect.Height);
-                SaveControlScreenshot(formId, cid, bmp, treePath);
-                captured = true;
+                if (!Input.ScreenCapture.IsBlankBitmap(bmp))
+                {
+                    SaveControlScreenshot(formId, cid, bmp, treePath);
+                    captured = true;
+                }
+                else
+                {
+                    // Blank capture — save what's actually visible on screen for diagnostics
+                    // (shows what window was covering the target area)
+                    SaveFailScreenshot(formId, cid, bmp, treePath);
+                }
             }
             catch { /* best-effort */ }
         }
@@ -244,7 +253,7 @@ public sealed class ExperienceDb
         bool captured = false;
         treePath ??= GetTreePath(formId, cid);
 
-        // Auto-screenshot on first encounter — crop from form bitmap
+        // Auto-screenshot on first encounter — crop from form bitmap (skip blank captures)
         if (controlRect.Width > 0 && controlRect.Height > 0 && !HasScreenshot(formId, cid, treePath))
         {
             try
@@ -254,8 +263,22 @@ public sealed class ExperienceDb
                 using var bmp = Input.ScreenCapture.CropRegion(
                     formBitmap, cropX, cropY,
                     controlRect.Width, controlRect.Height);
-                SaveControlScreenshot(formId, cid, bmp, treePath);
-                captured = true;
+                if (!Input.ScreenCapture.IsBlankBitmap(bmp))
+                {
+                    SaveControlScreenshot(formId, cid, bmp, treePath);
+                    captured = true;
+                }
+                else
+                {
+                    // Crop was blank — capture actual screen to show what's covering the area
+                    try
+                    {
+                        using var screenBmp = Input.ScreenCapture.CaptureScreenRegion(
+                            controlRect.X, controlRect.Y, controlRect.Width, controlRect.Height);
+                        SaveFailScreenshot(formId, cid, screenBmp, treePath);
+                    }
+                    catch { /* best-effort */ }
+                }
             }
             catch { /* best-effort */ }
         }
@@ -649,6 +672,21 @@ public sealed class ExperienceDb
         treePath ??= GetTreePath(formId, cid);
         var dir = GetControlDir(formId, cid, treePath: treePath);
         Input.ScreenCapture.SaveToFile(screenshot, Path.Combine(dir, "latest.png"));
+    }
+
+    /// <summary>
+    /// Save a failed (blank) capture as .fail.png for diagnostics.
+    /// Overwrites previous .fail.png. Helps diagnose why capture failed.
+    /// </summary>
+    public void SaveFailScreenshot(string formId, int cid, System.Drawing.Bitmap screenshot, string? treePath = null)
+    {
+        try
+        {
+            treePath ??= GetTreePath(formId, cid);
+            var dir = GetControlDir(formId, cid, treePath: treePath);
+            Input.ScreenCapture.SaveToFile(screenshot, Path.Combine(dir, ".fail.png"));
+        }
+        catch { /* best-effort — don't let diagnostic save break the flow */ }
     }
 
     /// <summary>

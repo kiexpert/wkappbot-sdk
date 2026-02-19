@@ -288,9 +288,42 @@ public static class AppScanner
 
             try
             {
-                // Capture the form window
+                // Minimized window? Capture the cute taskbar icon as evidence
+                if (NativeMethods.IsIconic(form.Handle))
+                {
+                    try
+                    {
+                        NativeMethods.GetWindowRect(form.Handle, out var iconRect);
+                        if (iconRect.Width > 0 && iconRect.Height > 0)
+                        {
+                            using var iconBmp = ScreenCapture.CaptureScreenRegion(
+                                iconRect.Left, iconRect.Top, iconRect.Width, iconRect.Height);
+                            var failDir = Path.Combine(expDb.ExpDir, $"form_{formId}");
+                            if (!Directory.Exists(failDir)) Directory.CreateDirectory(failDir);
+                            ScreenCapture.SaveToFile(iconBmp, Path.Combine(failDir, ".fail-iconic.png"));
+                        }
+                    }
+                    catch { /* best-effort */ }
+                    continue;
+                }
+
+                // Capture the form window (skip blank captures — protect DB from bad data)
                 using var screenshot = ScreenCapture.CaptureWindow(form.Handle);
                 if (screenshot.Width < 10 || screenshot.Height < 10) continue;
+                if (ScreenCapture.IsBlankBitmap(screenshot))
+                {
+                    // Capture actual screen region to show what's covering the form area
+                    try
+                    {
+                        using var screenBmp = ScreenCapture.CaptureScreenRegion(
+                            form.Rect.Left, form.Rect.Top, form.Rect.Width, form.Rect.Height);
+                        var failDir = Path.Combine(expDb.ExpDir, $"form_{formId}");
+                        if (!Directory.Exists(failDir)) Directory.CreateDirectory(failDir);
+                        ScreenCapture.SaveToFile(screenBmp, Path.Combine(failDir, ".fail.png"));
+                    }
+                    catch { /* best-effort */ }
+                    continue;
+                }
 
                 // Run OCR on the form
                 var ocrWords = await ocrRecognizeAll(screenshot);
