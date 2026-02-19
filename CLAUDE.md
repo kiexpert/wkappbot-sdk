@@ -131,7 +131,24 @@ wkappbot tooltip-probe <process-name> [--capture]
 wkappbot ocr <window-title|image.png> [--save] [-o output.txt]
 wkappbot web <subcommand> [options]   # WebBot CDP 웹 자동화
 wkappbot slack <subcommand>           # Slack Socket Mode 양방향 메시징
+wkappbot knowhow <subcommand>        # 컨트롤별 자동화 노하우 기록/읽기
 ```
+
+### knowhow 명령 (컨트롤별 자동화 노하우)
+```bash
+# Win32 컨트롤 노하우 기록
+wkappbot knowhow write <form-id> "lesson" [--cid N] [--category "..."]
+wkappbot knowhow read <form-id> [--cid N]
+
+# 웹 컨트롤 노하우 기록
+wkappbot knowhow web <domain> "lesson" [--selector "..."] [--category "..."]
+wkappbot knowhow web-read <domain> [--selector "..."]
+wkappbot knowhow web-list
+```
+- knowhow.md = "클롯→미래 클롯" 노트 (한번 실수한 건 다시 안 한다!)
+- Win32: 각 컨트롤 폴더에 knowhow.md append (form-level + control-level)
+- Web: `wkappbot.hq/web_profiles/{domain}/knowhow.md` + 요소별 하위 폴더
+- SmartClickButton 전략 폴백 시 자동 기록 (왜 실패했는지)
 
 ### slack 명령 (Socket Mode 양방향 메시징)
 ```bash
@@ -563,6 +580,8 @@ teardown:
 - **Slack→Claude 프롬프트 브릿지 완료**: --prompt 모드로 슬랙 메시지를 Claude Code 프롬프트에 직접 입력
 - **키워드 감시 완료**: --keywords 모드로 "클롯/claude/appbot" 등 키워드 감지 → 자동 전달
 - **웹봇 Slack API 자동화 완료**: CDP로 api.slack.com OAuth 페이지에서 스코프 추가 + 앱 재설치 자동 수행
+- **HandlePromptLost 완료**: 프롬프트 유실 시 전경 윈도우 스크린샷 → Slack 업로드 (원격 진단)
+- **knowhow.md 완료**: 컨트롤별 자동화 노하우 기록 (Win32 + Web) — CLI + SmartClickButton 자동 기록
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)

@@ -1098,6 +1098,8 @@ Examples:
         // Snapshot: foreground window before clicking
         var fgBefore = NativeMethods.GetForegroundWindow();
         bool isFirst = true;
+        var failedStrategies = new List<string>();
+        var buttonText = WindowFinder.GetWindowText(hButton);
 
         foreach (var strategyName in order)
         {
@@ -1118,16 +1120,36 @@ Examples:
 
             if (success)
             {
+                // Auto-record knowhow when earlier strategies failed (fallback occurred)
+                if (hasExpData && failedStrategies.Count > 0)
+                {
+                    expDb!.AppendKnowhow(formId!, controlId!.Value,
+                        "Click Strategy Fallback",
+                        $"- **Control**: cid={controlId} ({buttonText})\n" +
+                        $"- **Failed**: {string.Join(", ", failedStrategies)}\n" +
+                        $"- **Succeeded**: {strategyName}\n" +
+                        $"- **Lesson**: Use {strategyName} first for this control type\n");
+                }
                 if (hasExpData) expDb!.SaveAll();
                 return true;
             }
+
+            failedStrategies.Add(strategyName);
         }
 
-        // Record overall failure
+        // Record overall failure + knowhow
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine(" ✗ (all strategies failed)");
         Console.ResetColor();
-        if (hasExpData) expDb!.SaveAll();
+        if (hasExpData)
+        {
+            expDb!.AppendKnowhow(formId!, controlId!.Value,
+                "Click Strategy Total Failure",
+                $"- **Control**: cid={controlId} ({buttonText})\n" +
+                $"- **All strategies failed**: {string.Join(", ", failedStrategies)}\n" +
+                $"- **Possible cause**: window state, elevation, or control type mismatch\n");
+            expDb!.SaveAll();
+        }
         return false;
     }
 

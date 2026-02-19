@@ -79,6 +79,7 @@ internal partial class Program
                 "ocr" => OcrCommand(restArgs),
                 "web" => WebCommand(restArgs),
                 "slack" => SlackCommand(restArgs),
+                "knowhow" => KnowhowCommand(restArgs),
                 "dialog-click" => DialogClickCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
