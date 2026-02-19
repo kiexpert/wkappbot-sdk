@@ -32,10 +32,11 @@ internal partial class Program
     static int SlackListenCommand(string[] args)
     {
         bool background = args.Contains("--bg") || args.Contains("--background") || args.Contains("-d");
+        bool aiMode = args.Contains("--ai");
 
-        // --bg: launch self as background process
+        // --bg: launch self as background process (pass --ai through)
         if (background)
-            return SlackLaunchBackground();
+            return SlackLaunchBackground(aiMode);
 
         var config = LoadSlackConfig();
         if (config == null) return 1;
@@ -48,10 +49,26 @@ internal partial class Program
             return 1;
         }
 
+        // Initialize Claude AI if --ai flag
+        ClaudeChat? ai = null;
+        if (aiMode)
+        {
+            try
+            {
+                ai = new ClaudeChat();
+                Console.WriteLine("[SLACK] AI mode enabled (Claude API)");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SLACK] AI mode unavailable: {ex.Message}");
+                Console.WriteLine("[SLACK] Falling back to echo mode");
+            }
+        }
+
         // Write PID file (for status/stop)
         WritePidFile();
 
-        Console.WriteLine("[SLACK] Starting Socket Mode listener...");
+        Console.WriteLine($"[SLACK] Starting Socket Mode listener{(ai != null ? " + AI" : "")}...");
         Console.WriteLine("[SLACK] Press Ctrl+C to stop");
 
         using var slack = new SlackSocketClient();
@@ -67,7 +84,7 @@ internal partial class Program
         // Connect
         slack.ConnectAsync(appToken, botToken).GetAwaiter().GetResult();
 
-        // Handle @mentions — echo back with prefix
+        // Handle @mentions — AI response or echo
         slack.OnMention += (msg) =>
         {
             Console.WriteLine($"[SLACK] << @mention from {msg.User}: {msg.Text}");
@@ -77,9 +94,30 @@ internal partial class Program
                 msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
 
             if (string.IsNullOrEmpty(cleanText))
-                cleanText = "WKAppBot online!";
+                cleanText = "ping";
 
-            var reply = $"{cleanText}";
+            string reply;
+            if (ai != null)
+            {
+                // Claude AI response
+                Console.Write("[SLACK] [AI] thinking... ");
+                try
+                {
+                    reply = ai.AskAsync(cleanText).GetAwaiter().GetResult();
+                    Console.WriteLine($"({reply.Length} chars)");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"error: {ex.Message}");
+                    reply = $"(AI error: {ex.Message})";
+                }
+            }
+            else
+            {
+                // Echo mode
+                reply = string.IsNullOrEmpty(cleanText) ? "WKAppBot online!" : cleanText;
+            }
+
             Console.WriteLine($"[SLACK] >> {reply}");
             slack.SendAsync(msg.Channel, reply).GetAwaiter().GetResult();
         };
@@ -95,12 +133,13 @@ internal partial class Program
         catch (OperationCanceledException) { }
 
         slack.DisconnectAsync().GetAwaiter().GetResult();
+        ai?.Dispose();
         DeletePidFile();
         return 0;
     }
 
     /// <summary>Launch wkappbot slack listen as a background process.</summary>
-    static int SlackLaunchBackground()
+    static int SlackLaunchBackground(bool aiMode = false)
     {
         // Check if already running
         if (IsSlackListenerRunning(out int existingPid))
@@ -115,10 +154,11 @@ internal partial class Program
         // Ensure log dir exists
         Directory.CreateDirectory(Path.GetDirectoryName(logFile)!);
 
+        var listenArgs = aiMode ? "slack listen --ai" : "slack listen";
         var psi = new ProcessStartInfo
         {
             FileName = exePath,
-            Arguments = "slack listen",
+            Arguments = listenArgs,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
@@ -378,8 +418,9 @@ internal partial class Program
         Console.WriteLine("Usage: wkappbot slack <command>");
         Console.WriteLine();
         Console.WriteLine("Commands:");
-        Console.WriteLine("  listen [--bg]       Socket Mode: listen for @mentions and reply");
-        Console.WriteLine("                      --bg: run as background daemon process");
+        Console.WriteLine("  listen [--bg] [--ai]  Socket Mode: listen for @mentions and reply");
+        Console.WriteLine("                        --bg: run as background daemon process");
+        Console.WriteLine("                        --ai: use Claude API for intelligent responses");
         Console.WriteLine("  send \"message\"      Send a message to the configured channel");
         Console.WriteLine("  test                Test Slack connection (auth + send + socket)");
         Console.WriteLine("  status              Check if background listener is running");
