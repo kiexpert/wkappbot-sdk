@@ -132,6 +132,7 @@ wkappbot ocr <window-title|image.png> [--save] [-o output.txt]
 wkappbot web <subcommand> [options]   # WebBot CDP 웹 자동화
 wkappbot slack <subcommand>           # Slack Socket Mode 양방향 메시징
 wkappbot knowhow <subcommand>        # 컨트롤별 자동화 노하우 기록/읽기
+wkappbot miniview [--port N] [--interval N] [--size WxH] [--pos X,Y]  # 클롣의 눈 라이브 오버레이
 ```
 
 ### knowhow 명령 (컨트롤별 자동화 노하우)
@@ -158,6 +159,7 @@ wkappbot slack test
 # Socket Mode 리스너 시작 (@mention에 자동 응답)
 wkappbot slack listen
 wkappbot slack listen --bg --prompt --keywords  # 백그라운드 데몬 (프롬프트 전달 + 키워드 감시)
+wkappbot slack listen --prompt --keywords --webbot  # + WebBot 현황 스트리밍 (Claude busy 시)
 
 # 메시지 전송/답장
 wkappbot slack send "Hello from WKAppBot!"
@@ -582,6 +584,10 @@ teardown:
 - **웹봇 Slack API 자동화 완료**: CDP로 api.slack.com OAuth 페이지에서 스코프 추가 + 앱 재설치 자동 수행
 - **HandlePromptLost 완료**: 프롬프트 유실 시 전경 윈도우 스크린샷 → Slack 업로드 (원격 진단)
 - **knowhow.md 완료**: 컨트롤별 자동화 노하우 기록 (Win32 + Web) — CLI + SmartClickButton 자동 기록
+- **MiniView 완료**: Claude Desktop 우상단 오버레이 — WebBot 라이브 스크린샷 + 콘텐츠 표시 (cloaking/hot-reload)
+- **Slack WebBot 스트리밍 완료**: --webbot 모드로 Claude busy 시 WebBot 현황을 Slack chat.update로 실시간 갱신
+- **Claude busy 감지 완료**: UIA "중단" 버튼 탐지 + StatusBar 텍스트로 현재 작업 상태 추출
+- **UIA 웹 콘텐츠 추출 완료**: --force-renderer-accessibility로 Chrome UIA 트리에서 웹 페이지 텍스트 직접 읽기 (CDP JS 대체)
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -804,6 +810,44 @@ teardown:
   2. 채널 선택: `.c-channel_entity__name` span에 mousedown+mouseup+click
   3. "허용" 버튼 클릭
   4. **bot_token은 재설치 후에도 동일** (webhook_url만 변경될 수 있음)
+
+### MiniView — "클롣의 눈" 라이브 오버레이 ✅
+**상태**: 완료
+- Claude Desktop 우상단에 자동 배치되는 반투명 오버레이 윈도우
+- WebBot Chrome 스크린샷 라이브 스트리밍 (~10fps) + 콘텐츠 텍스트 표시
+- **UIA 콘텐츠 추출**: CDP JavaScript 대신 Chrome Accessibility 트리에서 페이지 텍스트 읽기
+  - `--force-renderer-accessibility` Chrome 플래그로 웹 콘텐츠 UIA 노출
+  - `ExtractWebContentViaUia()`: Document[aid="RootWebArea"] → title_area → dic_area → Text 수집
+- **Cloaking**: 10초 동안 페이지 변화 없으면 자동 페이드아웃 (타이머 기반)
+- **Hot-reload**: EXE 파일 변경 감지 시 자동 종료 (빌드 후 자동 재시작)
+- **Click-to-restore**: 오버레이 클릭 시 Chrome 원본 윈도우 ShowWindow
+- 파일: `MiniViewCommands.cs`, `MiniViewWindow.cs`, `MiniViewHost.cs`
+
+### Slack WebBot 라이브 스트리밍 — "클롯이 바쁠 때 슬랙에서 현황 확인" ✅
+**상태**: 완료
+- `--webbot` 플래그로 Slack 데몬에 WebBot 모니터링 모드 활성화
+- **Claude busy 감지**: UIA "중단" 버튼 존재 여부로 Claude 작업 상태 탐지
+- **Claude 상태 텍스트**: UIA StatusBar → Text 최하단 요소에서 현재 작업 설명 추출
+- **콘텐츠 추출**: UIA (Accessibility)로 Chrome 웹 페이지 텍스트 읽기 (CDP JS 불필요)
+- **Slack chat.update**: 하나의 메시지를 계속 편집 (채널 스팸 방지)
+- **라이프사이클**: idle→busy 전환 시 메시지 생성 → 주기적 갱신 → busy→idle 시 "완료" 업데이트
+- **콘솔 로깅**: `[SLACK] WebBot [UIA]: {content}` 형태로 UIA 추출 내용 출력
+- CDP는 URL 조회용으로만 사용 (콘텐츠는 UIA, backoff 재연결)
+
+### UIA 웹 콘텐츠 추출 — "장애인의 눈으로 본 웹" ✅
+**상태**: 완료
+- **Chrome 플래그**: `--force-renderer-accessibility` → 웹 콘텐츠의 전체 Accessibility 트리 노출
+- **추출 전략** (ExtractWebContentViaUia):
+  1. `aid="title_area"` → 기사 제목 (네이버 뉴스 패턴)
+  2. `aid="dic_area"` 하위 Text → 기사 본문
+  3. 폴백: Document 하위 모든 Text 요소 수집 (Y > 0, 2자 이상)
+- **장점**: DOM 셀렉터 의존 없음, 사이트 구조 변경에 강건, 포커스 불필요
+- **용도**: MiniView 오버레이 + Slack 스트리밍 양쪽에서 공용 사용
+- **Claude Desktop UIA 발견사항**:
+  - `[Button] "중단"` = Claude 작업 중 (Stop 버튼)
+  - `[StatusBar] → [Text]` = 도구 사용 설명 (e.g., "파일 읽음", "명령 실행함")
+  - `[Group] "입력하세요" aid="turn-form"` = 프롬프트 입력 영역
+  - `[RadioButton] "Chat"/"Cowork"/"Code"` = 모드 선택기
 
 ### Phase 11B: 웹봇 고급 기능 — "크롬이 할 수 있는 건 다 한다"
 **상태**: 로드맵
