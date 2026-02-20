@@ -81,6 +81,7 @@ internal partial class Program
                 "slack" => SlackCommand(restArgs),
                 "knowhow" => KnowhowCommand(restArgs),
                 "stock-scan" => StockScanCommand(restArgs),
+                "miniview" => MiniViewCommand(restArgs),
                 "dialog-click" => DialogClickCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
