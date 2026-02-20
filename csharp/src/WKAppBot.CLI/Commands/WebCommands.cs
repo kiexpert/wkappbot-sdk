@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using WKAppBot.WebBot;
+using NativeMethods = WKAppBot.Win32.Native.NativeMethods;
 
 namespace WKAppBot.CLI;
 
@@ -219,7 +220,67 @@ Options:
         cdp.MinimizeChromeWindow();
         Console.WriteLine("[WEB] Chrome minimized (CDP works in background)");
 
+        // Auto-launch MiniView overlay if not already running
+        LaunchMiniViewIfNeeded(port);
+
         return 0;
+    }
+
+    /// <summary>
+    /// Auto-launch MiniView overlay process if not already running.
+    /// MiniView shows live WebBot screenshot on Claude Desktop — "클롯의 눈".
+    /// </summary>
+    static void LaunchMiniViewIfNeeded(int port)
+    {
+        try
+        {
+            // Check for existing MiniView window by title "Claude's Eye"
+            bool miniviewExists = false;
+            var sb = new System.Text.StringBuilder(256);
+            WKAppBot.Win32.Native.NativeMethods.EnumWindows((hwnd, _) =>
+            {
+                NativeMethods.GetWindowTextW(hwnd, sb, sb.Capacity);
+                if (sb.ToString() == "Claude's Eye")
+                {
+                    miniviewExists = true;
+                    return false; // stop enumeration
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            if (miniviewExists)
+            {
+                Console.WriteLine("[WEB] MiniView already running");
+                return;
+            }
+
+            // Launch miniview as detached background process
+            var exePath = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exePath)) return;
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = exePath,
+                Arguments = $"miniview --port {port}",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = false,
+                RedirectStandardError = false,
+            };
+
+            // Set DOTNET_ROOT if we have it
+            var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+            if (!string.IsNullOrEmpty(dotnetRoot))
+                psi.EnvironmentVariables["DOTNET_ROOT"] = dotnetRoot;
+
+            var proc2 = Process.Start(psi);
+            if (proc2 != null)
+                Console.WriteLine($"[WEB] MiniView launched (PID={proc2.Id})");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WEB] MiniView auto-launch failed: {ex.Message}");
+        }
     }
 
     // ── navigate ─────────────────────────────────────────────────
