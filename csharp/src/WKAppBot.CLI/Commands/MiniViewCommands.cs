@@ -167,19 +167,63 @@ internal partial class Program
                     }
                     catch { /* skip URL update if CDP busy */ }
 
-                    // Get focused element accessibility text
+                    // Get page content snippet for display
                     try
                     {
                         var axJs = @"(() => {
+                            // 1. If user is interacting with a form element, show that
                             const el = document.activeElement;
-                            if (!el || el === document.body) return document.title;
-                            const tag = el.tagName?.toLowerCase() || '';
-                            const role = el.getAttribute('role') || '';
-                            const label = el.getAttribute('aria-label') || '';
-                            const text = (el.textContent || '').trim().substring(0, 100);
-                            const val = el.value ? `""${el.value.substring(0, 50)}""` : '';
-                            const id = el.id ? `#${el.id}` : '';
-                            return `[${tag}${id}] ${role?'role='+role+' ':''}${label?label+' ':''}${val||text}`;
+                            if (el && el !== document.body && el !== document.documentElement) {
+                                const tag = el.tagName?.toLowerCase() || '';
+                                if (['input','textarea','select'].includes(tag)) {
+                                    const label = el.getAttribute('aria-label') || el.getAttribute('placeholder') || '';
+                                    const val = el.value ? el.value.substring(0, 80) : '';
+                                    return `[${tag}] ${label} = ""${val}""`;
+                                }
+                            }
+
+                            // 2. Extract page content: title + main text
+                            const parts = [];
+
+                            // Title: prefer article headline, fallback to document.title
+                            const h1 = document.querySelector('h1, h2.media_end_head_headline, .article_header h2, #articleTitle, .news_headline h4');
+                            const title = h1 ? h1.textContent.trim() : document.title.replace(/ - WKWebBot.*/, '');
+                            if (title) parts.push(title);
+
+                            // Main content: try common article selectors
+                            const contentSel = [
+                                '#dic_area', '#articleBodyContents', '#articeBody',
+                                'article', '[itemprop=""articleBody""]',
+                                '.article_body', '.news_body', '.article-body',
+                                '.newsct_article', '#newsct_article',
+                                'main', '.content', '#content'
+                            ];
+                            let body = '';
+                            for (const sel of contentSel) {
+                                const node = document.querySelector(sel);
+                                if (node) {
+                                    body = node.innerText?.trim() || '';
+                                    if (body.length > 30) break;
+                                }
+                            }
+
+                            // Fallback: grab visible text from body paragraphs
+                            if (body.length < 30) {
+                                const ps = document.querySelectorAll('p');
+                                const texts = [];
+                                for (const p of ps) {
+                                    const t = p.innerText?.trim();
+                                    if (t && t.length > 20) texts.push(t);
+                                    if (texts.join(' ').length > 500) break;
+                                }
+                                body = texts.join(' ');
+                            }
+
+                            // Truncate to reasonable length for overlay
+                            if (body.length > 500) body = body.substring(0, 497) + '...';
+                            if (body) parts.push(body);
+
+                            return parts.join('\n\n') || document.title;
                         })()";
                         var axTask = cdp.EvalAsync(axJs);
                         if (axTask.Wait(2000))
@@ -189,7 +233,7 @@ internal partial class Program
                                 host.UpdateAccessibilityText(axText);
                         }
                     }
-                    catch { /* skip AX update if busy */ }
+                    catch { /* skip content update if busy */ }
                 }
 
                 // Log stats periodically
