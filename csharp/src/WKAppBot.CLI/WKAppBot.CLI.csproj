@@ -18,10 +18,10 @@
     <ProjectReference Include="..\WKAppBot.WebBot\WKAppBot.WebBot.csproj" />
   </ItemGroup>
 
-  <!-- Copy handler YAML files from project root to output -->
+  <!-- Copy handler YAML files from project root to output + publish -->
   <ItemGroup>
-    <None Include="..\..\..\handlers\**\*.yaml" CopyToOutputDirectory="PreserveNewest" LinkBase="handlers" />
-    <None Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" LinkBase="handlers" />
+    <Content Include="..\..\..\handlers\**\*.yaml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="handlers" ExcludeFromSingleFile="true" />
+    <Content Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="handlers" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <!-- Post-publish: deploy as wkappbot.new.exe → daemon hot-reloads, or rename if not running -->

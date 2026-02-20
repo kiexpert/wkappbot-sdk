@@ -80,6 +80,7 @@ internal partial class Program
                 "web" => WebCommand(restArgs),
                 "slack" => SlackCommand(restArgs),
                 "knowhow" => KnowhowCommand(restArgs),
+                "stock-scan" => StockScanCommand(restArgs),
                 "dialog-click" => DialogClickCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
