@@ -24,15 +24,12 @@
     <None Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" LinkBase="handlers" />
   </ItemGroup>
 
-  <!-- Pre-publish: kill running wkappbot.exe to avoid file lock -->
-  <Target Name="KillWkappbot" BeforeTargets="Publish">
-    <Exec Command="taskkill /IM wkappbot.exe /F" IgnoreExitCode="true" />
-  </Target>
-
-  <!-- Single-file publish: copy EXE to W:\SDK\bin, handlers to wkappbot.hq -->
-  <Target Name="CopyToSdkBin" AfterTargets="Publish">
-    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFolder="W:\SDK\bin\" OverwriteReadOnlyFiles="true" />
+  <!-- Post-publish: deploy as wkappbot.new.exe → daemon hot-reloads, or rename if not running -->
+  <Target Name="DeployToSdkBin" AfterTargets="Publish">
+    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="W:\SDK\bin\wkappbot.new.exe" OverwriteReadOnlyFiles="true" />
     <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <!-- If daemon is not running, swap immediately -->
+    <Exec Command="if not exist &quot;W:\SDK\bin\wkappbot.hq\slack.pid&quot; ( if exist &quot;W:\SDK\bin\wkappbot.old.exe&quot; del &quot;W:\SDK\bin\wkappbot.old.exe&quot; &amp; if exist &quot;W:\SDK\bin\wkappbot.exe&quot; ren &quot;W:\SDK\bin\wkappbot.exe&quot; wkappbot.old.exe &amp; ren &quot;W:\SDK\bin\wkappbot.new.exe&quot; wkappbot.exe )" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
     <_HandlersPublish Include="$(PublishDir)handlers\**\*.*" />

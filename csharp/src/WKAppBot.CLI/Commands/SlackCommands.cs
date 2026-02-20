@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using WKAppBot.WebBot;
+using WKAppBot.Win32.Input;
+using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
@@ -34,6 +36,7 @@ internal partial class Program
 
     static string SlackConfigPath => Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
     static string SlackPidFile => Path.Combine(DataDir, "slack.pid");
+    static string SlackStopSignalFile => Path.Combine(DataDir, "slack.stop");
     static string SlackInboxFile => Path.Combine(DataDir, "slack_inbox.jsonl");
     static string SlackLastTsFile => Path.Combine(DataDir, "slack_last_ts.txt");
     /// <summary>Last reply context file: "channel=C0xxx\nthread=1234.5678" — so 'slack reply' needs no flags.</summary>
@@ -44,6 +47,12 @@ internal partial class Program
     {
         "클롯", "클롣", "클로드", "앱봇",          // Korean + typos
         "claude", "appbot", "wkappbot", "클봇",    // English + mixed
+    };
+
+    /// <summary>Keywords that trigger Ctrl+Enter (accept/approve) on Claude Code prompt.</summary>
+    static readonly string[] AcceptKeywords = new[]
+    {
+        "수락", "승인", "ㅅㄹ", "accept", "approve", "yes", "ㅇㅇ",
     };
 
     /// <summary>Socket Mode: listen for events and respond to @mentions.</summary>
@@ -186,6 +195,13 @@ internal partial class Program
             // Save reply context so 'slack reply' works with no flags
             SaveReplyContext(msg.Channel, threadKey);
 
+            // "수락" / "accept" → send Ctrl+Enter to Claude Code prompt (remote approval)
+            if (IsAcceptCommand(cleanText))
+            {
+                SendAcceptKeystroke(botToken!, msg.Channel, threadKey);
+                return;
+            }
+
             // Prompt mode: type directly into Claude Code prompt
             if (promptHelper != null && promptInfo != null)
             {
@@ -303,6 +319,13 @@ internal partial class Program
 
                 if (string.IsNullOrEmpty(cleanText)) return;
 
+                // "수락" / "accept" → send Ctrl+Enter to Claude Code prompt (remote approval)
+                if (IsAcceptCommand(cleanText))
+                {
+                    SendAcceptKeystroke(botToken!, msg.Channel, msg.ThreadTs!);
+                    return;
+                }
+
                 // Prompt mode: forward to Claude Code
                 if (promptHelper != null && promptInfo != null)
                 {
@@ -381,14 +404,141 @@ internal partial class Program
             Console.WriteLine($"[SLACK] msg [{msg.Channel}] {msg.User}: {msg.Text}");
         };
 
-        // Wait until cancelled
-        try { Task.Delay(-1, cts.Token).GetAwaiter().GetResult(); }
+        // Keep display awake while daemon is running (prevent lock screen)
+        // ES_CONTINUOUS keeps the state until explicitly cleared
+        NativeMethods.SetThreadExecutionState(
+            NativeMethods.ES_CONTINUOUS | NativeMethods.ES_SYSTEM_REQUIRED | NativeMethods.ES_DISPLAY_REQUIRED);
+        Console.WriteLine("[SLACK] Display sleep prevention: ON");
+
+        // Hot-reload: track current EXE timestamp for detecting new builds
+        var currentExePath = Environment.ProcessPath!;
+        var currentExeTime = File.GetLastWriteTimeUtc(currentExePath);
+        bool hotReload = false;
+
+        // Wait until cancelled — tick every 2s to check stop signal + hot-reload + keep-awake
+        try
+        {
+            int tickCount = 0;
+            while (!cts.Token.IsCancellationRequested)
+            {
+                Task.Delay(2_000, cts.Token).GetAwaiter().GetResult();
+
+                // Check stop signal file (written by 'slack stop')
+                if (File.Exists(SlackStopSignalFile))
+                {
+                    try { File.Delete(SlackStopSignalFile); } catch { }
+                    Console.WriteLine("[SLACK] Stop signal received — shutting down gracefully...");
+                    break;
+                }
+
+                // Hot-reload: check if a newer EXE exists in publish output
+                if (++tickCount % 5 == 0) // every 10s
+                {
+                    try
+                    {
+                        // Look for newer EXE in publish directory (sibling to source)
+                        var exeDir = Path.GetDirectoryName(currentExePath)!;
+                        var hotReloadSource = Path.Combine(exeDir, "wkappbot.new.exe");
+
+                        // Also check the publish output directly
+                        if (!File.Exists(hotReloadSource))
+                        {
+                            // Convention: csproj PostPublish copies to W:\SDK\bin\
+                            // After publish, the new EXE replaces the old one via rename trick
+                            // Check if current EXE timestamp changed (another process renamed+copied)
+                            var newTime = File.GetLastWriteTimeUtc(currentExePath);
+                            if (newTime != currentExeTime)
+                            {
+                                // Someone replaced our EXE while we were renamed — restart
+                                Console.WriteLine($"[SLACK] Hot-reload: EXE updated ({currentExeTime:HH:mm:ss} → {newTime:HH:mm:ss})");
+                                hotReload = true;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            // wkappbot.new.exe detected — perform rename swap
+                            Console.WriteLine("[SLACK] Hot-reload: new build detected (wkappbot.new.exe)");
+                            var oldPath = currentExePath + ".old";
+                            try { File.Delete(oldPath); } catch { }
+                            File.Move(currentExePath, oldPath);     // running EXE → .old (allowed on Windows!)
+                            File.Move(hotReloadSource, currentExePath); // .new → current name
+                            Console.WriteLine("[SLACK] Hot-reload: EXE swapped");
+                            hotReload = true;
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[SLACK] Hot-reload check error: {ex.Message}");
+                    }
+                }
+
+                // Refresh keep-awake every 60s (every 30 ticks)
+                if (tickCount % 30 == 0)
+                {
+                    NativeMethods.SetThreadExecutionState(
+                        NativeMethods.ES_CONTINUOUS | NativeMethods.ES_SYSTEM_REQUIRED | NativeMethods.ES_DISPLAY_REQUIRED);
+                }
+            }
+        }
         catch (OperationCanceledException) { }
+
+        // Clear keep-awake state on exit
+        NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
+        Console.WriteLine("[SLACK] Display sleep prevention: OFF");
+
+        // Send shutdown/reload message to Slack (in latest thread)
+        try
+        {
+            var host = Environment.MachineName;
+            var pid = Environment.ProcessId;
+            var uptime = DateTime.Now - Process.GetCurrentProcess().StartTime;
+            var uptimeStr = uptime.TotalHours >= 1
+                ? $"{uptime.Hours}h{uptime.Minutes}m"
+                : $"{uptime.Minutes}m{uptime.Seconds}s";
+            var shutdownMsg = hotReload
+                ? $"클봇 핫리로드! 새 빌드 감지 → 재시작합니다. `{host}` pid={pid} (uptime {uptimeStr})"
+                : $"클봇 오프라인. `{host}` pid={pid} (uptime {uptimeStr})";
+            var (replyChannel, replyThread) = LoadReplyContext();
+            var ch = replyChannel ?? defaultChannel!;
+            SlackSendViaApi(botToken!, ch, shutdownMsg, replyThread).GetAwaiter().GetResult();
+            Console.WriteLine("[SLACK] Shutdown message sent");
+        }
+        catch { /* best-effort */ }
 
         slack.DisconnectAsync().GetAwaiter().GetResult();
         ai?.Dispose();
         promptHelper?.Dispose();
         DeletePidFile();
+
+        // Hot-reload: restart self with same arguments
+        if (hotReload)
+        {
+            Console.WriteLine($"[SLACK] Hot-reload: restarting {currentExePath}...");
+            try
+            {
+                var cmdArgs = Environment.GetCommandLineArgs();
+                // cmdArgs[0] = exe path, cmdArgs[1..] = actual arguments
+                var restartArgs = string.Join(" ", cmdArgs.Skip(1).Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
+                var psi = new ProcessStartInfo
+                {
+                    FileName = currentExePath,
+                    Arguments = restartArgs,
+                    UseShellExecute = false,
+                    WorkingDirectory = Environment.CurrentDirectory,
+                };
+                // Pass through environment variables
+                psi.Environment["DOTNET_ROOT"] = Environment.GetEnvironmentVariable("DOTNET_ROOT") ?? "";
+                Process.Start(psi);
+                Console.WriteLine("[SLACK] Hot-reload: new process launched");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SLACK] Hot-reload restart failed: {ex.Message}");
+            }
+        }
+
         return 0;
     }
 
@@ -496,7 +646,7 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>Stop background Slack listener.</summary>
+    /// <summary>Stop background Slack listener (graceful → force kill).</summary>
     static int SlackStopCommand()
     {
         if (!IsSlackListenerRunning(out int pid))
@@ -508,15 +658,35 @@ internal partial class Program
         try
         {
             var proc = Process.GetProcessById(pid);
+
+            // Phase 1: graceful — write stop signal file, wait up to 10s
+            Console.WriteLine($"[SLACK] Sending stop signal to PID={pid}...");
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(SlackStopSignalFile)!);
+                File.WriteAllText(SlackStopSignalFile, "stop");
+            }
+            catch { }
+
+            if (proc.WaitForExit(10_000))
+            {
+                Console.WriteLine($"[SLACK] Listener stopped gracefully (PID={pid})");
+                DeletePidFile();
+                return 0;
+            }
+
+            // Phase 2: force kill
+            Console.WriteLine($"[SLACK] Graceful timeout — force killing PID={pid}...");
             proc.Kill(entireProcessTree: true);
-            proc.WaitForExit(5000);
-            Console.WriteLine($"[SLACK] Listener stopped (PID={pid})");
+            proc.WaitForExit(3000);
+            Console.WriteLine($"[SLACK] Listener killed (PID={pid})");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[SLACK] Failed to stop PID={pid}: {ex.Message}");
         }
 
+        try { File.Delete(SlackStopSignalFile); } catch { }
         DeletePidFile();
         return 0;
     }
@@ -574,6 +744,8 @@ internal partial class Program
         }
 
         var message = string.Join(" ", args.Skip(1));
+        // Bash history expansion escapes ! to \! even in single quotes — undo it
+        message = message.Replace("\\!", "!");
         var config = LoadSlackConfig();
         if (config == null) return 1;
 
@@ -1001,6 +1173,8 @@ internal partial class Program
         }
 
         var replyText = string.Join(" ", textParts);
+        // Bash history expansion escapes ! to \! even in single quotes — undo it
+        replyText = replyText.Replace("\\!", "!");
         if (string.IsNullOrWhiteSpace(replyText))
         {
             Console.WriteLine("[SLACK] ERROR: reply text is empty");
@@ -1263,6 +1437,35 @@ internal partial class Program
     {
         try { File.WriteAllText(SlackReplyContextFile, $"channel={channel}\nthread={threadTs}"); }
         catch { }
+    }
+
+    /// <summary>Check if the message is an accept/approve command.</summary>
+    static bool IsAcceptCommand(string text)
+    {
+        var trimmed = text.Trim().ToLowerInvariant();
+        return AcceptKeywords.Any(kw => trimmed == kw.ToLowerInvariant());
+    }
+
+    /// <summary>Send Ctrl+Enter to Claude Code prompt (remote approval via Slack).</summary>
+    static void SendAcceptKeystroke(string botToken, string channel, string threadTs)
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("[SLACK] >> Accept command received — sending Ctrl+Enter to Claude prompt");
+        Console.ResetColor();
+
+        try
+        {
+            KeyboardInput.Hotkey(new[] { "ctrl", "enter" });
+            Console.WriteLine("[SLACK] >> Ctrl+Enter sent!");
+            SlackSendViaApi(botToken, channel, "Ctrl+Enter 전송 완료! 수락 처리했습니다.", threadTs)
+                .GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SLACK] >> Accept keystroke failed: {ex.Message}");
+            SlackSendViaApi(botToken, channel, $"수락 전송 실패: {ex.Message}", threadTs)
+                .GetAwaiter().GetResult();
+        }
     }
 
     /// <summary>Load saved reply context (channel, threadTs).</summary>
