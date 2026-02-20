@@ -294,6 +294,19 @@ internal partial class Program
                 }
             }
 
+            // Auto-track threads on bot's own messages (query Slack API)
+            if (msg.ThreadTs != null && !activeThreads.Contains(msg.ThreadTs))
+            {
+                // Check if the thread parent is our bot's message
+                if (IsOwnThread(botToken!, msg.Channel, msg.ThreadTs))
+                {
+                    activeThreads.Add(msg.ThreadTs);
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"[SLACK] Auto-tracking thread on bot's message (ts={msg.ThreadTs})");
+                    Console.ResetColor();
+                }
+            }
+
             // Check if this is a thread reply to a conversation we're tracking
             if (msg.ThreadTs != null && activeThreads.Contains(msg.ThreadTs))
             {
@@ -334,7 +347,21 @@ internal partial class Program
                 // Prompt mode: forward to Claude Code
                 if (promptHelper != null && promptInfo != null)
                 {
-                    var promptText = $"{cleanText}\n\n(Slack @{msg.User} #{msg.Channel} thread — reply: wkappbot slack reply \"...\")";
+                    // If this is a reply to bot's own message, include parent context
+                    var parentContext = "";
+                    if (msg.ThreadTs != null && !ownMessageTimestamps.Contains(msg.ThreadTs))
+                    {
+                        // Auto-tracked thread — fetch bot's original message for context
+                        var parentText = GetThreadParentText(botToken!, msg.Channel, msg.ThreadTs);
+                        if (!string.IsNullOrEmpty(parentText))
+                        {
+                            // Truncate long bot messages
+                            if (parentText.Length > 300)
+                                parentText = parentText[..297] + "...";
+                            parentContext = $"\n\n[이전 클봇 메시지]\n{parentText}\n";
+                        }
+                    }
+                    var promptText = $"{cleanText}{parentContext}\n\n(Slack @{msg.User} #{msg.Channel} thread — reply: wkappbot slack reply \"...\")";
                     // reply context auto-saved
                     Console.WriteLine($"[SLACK] >> Typing thread reply into Claude prompt...");
 
@@ -1967,6 +1994,65 @@ internal partial class Program
         }, IntPtr.Zero);
 
         return found;
+    }
+
+    /// <summary>
+    /// Check if a thread's parent message was sent by our bot.
+    /// Uses conversations.replies API to get the parent message and check for bot_id.
+    /// Results are cached in ownMessageTimestamps to avoid repeated API calls.
+    /// </summary>
+    static bool IsOwnThread(string botToken, string channel, string threadTs)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {botToken}");
+            // Get only the parent message (limit=1, inclusive=true)
+            var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=1&inclusive=true";
+            var resp = http.GetAsync(url).GetAwaiter().GetResult();
+            var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var json = JsonNode.Parse(body);
+            if (json?["ok"]?.GetValue<bool>() != true) return false;
+
+            var messages = json["messages"]?.AsArray();
+            if (messages == null || messages.Count == 0) return false;
+
+            var parent = messages[0];
+            // Bot messages have "bot_id" field
+            var botId = parent?["bot_id"]?.GetValue<string>();
+            return !string.IsNullOrEmpty(botId);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Get the bot's parent message text from a thread (for context when replying).
+    /// Returns the first message in the thread (the bot's original message).
+    /// </summary>
+    static string? GetThreadParentText(string botToken, string channel, string threadTs)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {botToken}");
+            var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=1&inclusive=true";
+            var resp = http.GetAsync(url).GetAwaiter().GetResult();
+            var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var json = JsonNode.Parse(body);
+            if (json?["ok"]?.GetValue<bool>() != true) return null;
+
+            var messages = json["messages"]?.AsArray();
+            if (messages == null || messages.Count == 0) return null;
+
+            return messages[0]?["text"]?.GetValue<string>();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Format WebBot status message for Slack (text only, no images).</summary>
