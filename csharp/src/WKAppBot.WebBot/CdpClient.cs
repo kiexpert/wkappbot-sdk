@@ -42,10 +42,13 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     /// Connect to Chrome's DevTools WebSocket.
     /// Chrome must be running with --remote-debugging-port=PORT.
     /// </summary>
-    public async Task ConnectAsync(int port = 9222, int tabIndex = 0)
+    public async Task ConnectAsync(int port = 9222, int tabIndex = 0, int timeoutMs = 10_000)
     {
+        using var cts = new CancellationTokenSource(timeoutMs);
+        var ct = cts.Token;
+
         // Get available targets from Chrome's JSON API
-        var json = await _http.GetStringAsync($"http://localhost:{port}/json");
+        var json = await _http.GetStringAsync($"http://localhost:{port}/json", ct);
         var targets = JsonSerializer.Deserialize<JsonArray>(json);
         if (targets == null || targets.Count == 0)
             throw new InvalidOperationException("No Chrome targets found");
@@ -68,7 +71,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
 
         WebSocketUrl = wsUrl;
         _ws = new ClientWebSocket();
-        await _ws.ConnectAsync(new Uri(wsUrl), CancellationToken.None);
+        await _ws.ConnectAsync(new Uri(wsUrl), ct);
 
         // Resolve Chrome browser PID from the CDP port
         ChromePid = ResolvePidFromPort(port);
