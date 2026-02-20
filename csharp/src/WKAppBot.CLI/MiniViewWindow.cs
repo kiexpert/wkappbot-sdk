@@ -29,6 +29,7 @@ internal sealed class MiniViewOverlay : Window
     private readonly Image _image;
     private readonly TextBlock _urlText;
     private readonly TextBlock _timeText;
+    private readonly TextBlock _axText; // accessibility text display
     private readonly Ellipse _dot;
     private DateTime _lastUpdate = DateTime.MinValue;
     private DispatcherTimer? _cloakTimer;
@@ -69,6 +70,7 @@ internal sealed class MiniViewOverlay : Window
         var mainGrid = new Grid();
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(22) });  // header
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // image
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(36) });  // accessibility text
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });  // footer
 
         // ── Header: [●] Claude's Eye  [✕] ──
@@ -132,6 +134,21 @@ internal sealed class MiniViewOverlay : Window
         };
         Grid.SetRow(imageBorder, 1);
 
+        // ── Accessibility text overlay ──
+        _axText = new TextBlock
+        {
+            Text = "",
+            Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0xFF, 0x80)), // light green
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 9,
+            TextWrapping = TextWrapping.Wrap,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxHeight = 36,
+            Margin = new Thickness(6, 0, 6, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        Grid.SetRow(_axText, 2);
+
         // ── Footer: URL + timestamp ──
         var footer = new DockPanel { Margin = new Thickness(6, 0, 6, 2) };
 
@@ -157,10 +174,11 @@ internal sealed class MiniViewOverlay : Window
 
         footer.Children.Add(_timeText);
         footer.Children.Add(_urlText);
-        Grid.SetRow(footer, 2);
+        Grid.SetRow(footer, 3);
 
         mainGrid.Children.Add(header);
         mainGrid.Children.Add(imageBorder);
+        mainGrid.Children.Add(_axText);
         mainGrid.Children.Add(footer);
         root.Child = mainGrid;
         Content = root;
@@ -213,6 +231,18 @@ internal sealed class MiniViewOverlay : Window
                     _urlText.Text = url.Length > 40 ? url[..37] + "..." : url;
             }
             _lastUpdate = DateTime.Now;
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Update the accessibility text display.</summary>
+    public void UpdateAccessibilityText(string text)
+    {
+        try
+        {
+            _axText.Text = text;
+            _lastUpdate = DateTime.Now;
+            if (_isCloaked) Uncloak();
         }
         catch { /* best effort */ }
     }
@@ -302,6 +332,7 @@ internal sealed class MiniViewOverlay : Window
 /// <summary>
 /// Manages the STA thread for the MiniView WPF overlay window.
 /// Bridge between CLI main thread and WPF Dispatcher thread.
+/// When ownerHwnd is set, the overlay follows its parent window (e.g. Claude Desktop).
 /// </summary>
 internal sealed class MiniViewHost : IDisposable
 {
@@ -313,7 +344,8 @@ internal sealed class MiniViewHost : IDisposable
     public bool IsAlive => _uiThread?.IsAlive == true;
 
     /// <summary>Start the overlay window on a dedicated STA thread.</summary>
-    public void Start(int width = 320, int height = 220, int x = -1, int y = -1)
+    /// <param name="ownerHwnd">Optional parent window handle (e.g. Claude Desktop) — overlay follows it.</param>
+    public void Start(int width = 320, int height = 220, int x = -1, int y = -1, IntPtr ownerHwnd = default)
     {
         _uiThread = new Thread(() =>
         {
@@ -331,6 +363,19 @@ internal sealed class MiniViewHost : IDisposable
                 var screen = SystemParameters.WorkArea;
                 _window.Left = screen.Right - width - 10;
                 _window.Top = screen.Bottom - height - 80; // above taskbar + prompt
+            }
+
+            // Set owner window — overlay follows Claude Desktop (minimize/restore together)
+            if (ownerHwnd != IntPtr.Zero)
+            {
+                try
+                {
+                    var helper = new WindowInteropHelper(_window);
+                    helper.Owner = ownerHwnd;
+                    // Owner window means: overlay shows on top of Claude Desktop,
+                    // minimizes/restores with it, but retains its own Topmost + transparency
+                }
+                catch { /* best effort — continue without owner */ }
             }
 
             _dispatcher = Dispatcher.CurrentDispatcher;
@@ -355,6 +400,12 @@ internal sealed class MiniViewHost : IDisposable
     public void UpdateInfo(string? url, string? title)
     {
         _dispatcher?.BeginInvoke(() => _window?.UpdateInfo(url, title));
+    }
+
+    /// <summary>Update accessibility text in the overlay.</summary>
+    public void UpdateAccessibilityText(string text)
+    {
+        _dispatcher?.BeginInvoke(() => _window?.UpdateAccessibilityText(text));
     }
 
     /// <summary>Set the Chrome window handle for click-to-restore.</summary>
