@@ -161,9 +161,31 @@ internal partial class Program
         // Track message timestamps that THIS bot sent (for ping response thread tracking)
         var ownMessageTimestamps = new HashSet<string>();
 
-        // Channel ID for API calls (no startup announcement — just log locally)
+        // Announce presence on startup
         var defaultChannel = config["channel"]?.GetValue<string>();
-        Console.WriteLine($"[SLACK] Ready — pid={Environment.ProcessId} channel={defaultChannel}");
+        if (!string.IsNullOrEmpty(defaultChannel))
+        {
+            var host = Environment.MachineName;
+            var pid = Environment.ProcessId;
+            var startupMsg = $"클봇 온라인! `{host}` pid={pid}";
+            try
+            {
+                var sendTask = Task.Run(async () => await SlackSendViaApi(botToken!, defaultChannel, startupMsg));
+                if (sendTask.Wait(10_000))
+                {
+                    var (ok, sentTs) = sendTask.Result;
+                    if (ok && sentTs != null)
+                    {
+                        ownMessageTimestamps.Add(sentTs);
+                        activeThreads.Add(sentTs);
+                        Console.WriteLine($"[SLACK] Startup announcement sent (ts={sentTs})");
+                    }
+                }
+                else
+                    Console.WriteLine("[SLACK] Startup announcement timeout — skipping");
+            }
+            catch { Console.WriteLine("[SLACK] Startup announcement failed — skipping"); }
+        }
 
         // Handle @mentions — always reply in-thread
         slack.OnMention += (msg) =>
@@ -429,14 +451,15 @@ internal partial class Program
         bool hotReload = false;
 
         // WebBot monitoring state (--webbot)
-        CdpClient? webBotCdp = null;
+        // Simplified: no CDP/Chrome content — only Claude status via UIA + Slack profile
+        CdpClient? webBotCdp = null;       // Kept for Dispose cleanup
         string? webBotStatusTs = null;     // Slack message ts for chat.update
-        string? webBotLastUrl = null;      // Last URL (change detection)
-        string? webBotLastContent = null;  // Last page content
+        string? webBotLastUrl = null;      // Unused (kept for ref param compat)
+        string? webBotLastContent = null;  // Reused: tracks last Claude status text
         bool webBotClaudeBusy = false;     // Claude is currently busy
-        int webBotReconnectBackoff = 0;    // Reconnect backoff counter
+        int webBotReconnectBackoff = 0;    // Unused (kept for ref param compat)
         string? webBotStatusChannel = defaultChannel; // Channel for status messages
-        IntPtr webBotChromeHwnd = IntPtr.Zero; // Chrome window handle for UIA content extraction
+        IntPtr webBotChromeHwnd = IntPtr.Zero; // Unused (kept for ref param compat)
         var webBotIdlePollSw = Stopwatch.StartNew(); // Throttle idle busy-check to ~2s
 
         // WebBot: lazy CDP connection — connect on first busy detection
@@ -553,16 +576,24 @@ internal partial class Program
         NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
         Console.WriteLine("[SLACK] Display sleep prevention: OFF");
 
-        // Log shutdown locally (no Slack spam)
+        // Send shutdown message to latest thread
+        try
         {
+            var host = Environment.MachineName;
+            var pid = Environment.ProcessId;
             var uptime = DateTime.Now - Process.GetCurrentProcess().StartTime;
             var uptimeStr = uptime.TotalHours >= 1
                 ? $"{uptime.Hours}h{uptime.Minutes}m"
                 : $"{uptime.Minutes}m{uptime.Seconds}s";
-            Console.WriteLine(hotReload
-                ? $"[SLACK] Hot-reload shutdown (uptime {uptimeStr})"
-                : $"[SLACK] Shutdown (uptime {uptimeStr})");
+            var shutdownMsg = hotReload
+                ? $"클봇 핫리로드! 새 빌드 감지 → 재시작. `{host}` (uptime {uptimeStr})"
+                : $"클봇 오프라인. `{host}` (uptime {uptimeStr})";
+            var (replyChannel, replyThread) = LoadReplyContext();
+            var ch = replyChannel ?? defaultChannel!;
+            Task.Run(async () => await SlackSendViaApi(botToken!, ch, shutdownMsg, replyThread)).Wait(5000);
+            Console.WriteLine("[SLACK] Shutdown message sent");
         }
+        catch { /* best-effort */ }
 
         slack.DisconnectAsync().GetAwaiter().GetResult();
         ai?.Dispose();
@@ -1818,9 +1849,10 @@ internal partial class Program
     }
 
     /// <summary>
-    /// WebBot monitor tick — called every ~6 seconds from the listen loop.
-    /// Checks if Claude is busy, then streams WebBot page content to Slack.
-    /// Content extracted via UIA (Accessibility) instead of CDP JavaScript.
+    /// WebBot monitor tick — called every ~100ms from the listen loop.
+    /// Checks if Claude is busy, then updates Slack status message with Claude actions.
+    /// NO page content streaming — only Claude status text (e.g., "파일 읽음", "명령 실행함").
+    /// Status message is chat.update'd only when Claude's action text changes (not every tick).
     /// </summary>
     static void WebBotMonitorTick(
         string botToken, string channel,
@@ -1837,147 +1869,78 @@ internal partial class Program
         {
             // Transition: idle → busy
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("[SLACK] WebBot: Claude is busy — starting status stream");
+            Console.WriteLine("[SLACK] WebBot: Claude is busy");
             Console.ResetColor();
 
-            // Get Claude's latest status text (what tool is being used)
-            var statusText = GetClaudeStatusText(promptHelper);
-            if (!string.IsNullOrEmpty(statusText))
-                Console.WriteLine($"[SLACK] WebBot: Claude status: {statusText}");
+            var statusText = GetClaudeStatusText(promptHelper) ?? "작업 중...";
+            lastContent = statusText; // track for change detection
+
+            // Create status message
+            var message = $":robot_face: *Claude 작업 중* — {statusText} ({DateTime.Now:HH:mm:ss})";
+            if (statusTs == null)
+            {
+                var sendTask = Task.Run(async () => await SlackSendViaApi(botToken, channel, message));
+                if (sendTask.Wait(5000))
+                {
+                    var (ok, ts) = sendTask.Result;
+                    if (ok && ts != null)
+                    {
+                        statusTs = ts;
+                        Console.WriteLine($"[SLACK] Status: {statusText} (ts={ts})");
+                    }
+                }
+            }
+            else
+            {
+                // Reuse existing message — update it
+                var localTs = statusTs;
+                var updateTask = Task.Run(async () =>
+                    await SlackUpdateMessageAsync(botToken, channel, localTs, message));
+                updateTask.Wait(3000);
+                Console.WriteLine($"[SLACK] Status: {statusText}");
+            }
         }
         else if (!nowBusy && claudeBusy)
         {
             // Transition: busy → idle
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("[SLACK] WebBot: Claude is done — stopping status stream");
+            Console.WriteLine("[SLACK] WebBot: Claude is done");
             Console.ResetColor();
 
-            // Update final status message
+            // Update status message to "done"
             if (statusTs != null)
             {
-                var doneMsg = FormatWebBotStatus(lastUrl, lastContent, "Claude 응답 완료");
-                SlackUpdateMessageAsync(botToken, channel, statusTs, doneMsg).GetAwaiter().GetResult();
+                var doneMsg = $":white_check_mark: *Claude 응답 완료* ({DateTime.Now:HH:mm:ss})";
+                var localTs = statusTs;
+                var updateTask = Task.Run(async () =>
+                    await SlackUpdateMessageAsync(botToken, channel, localTs, doneMsg));
+                updateTask.Wait(5000);
+            }
+
+            lastContent = null;
+        }
+        else if (nowBusy && claudeBusy)
+        {
+            // Still busy — update status message only when Claude's action text changes
+            var statusText = GetClaudeStatusText(promptHelper);
+            if (!string.IsNullOrEmpty(statusText) && statusText != lastContent)
+            {
+                lastContent = statusText;
+
+                // Update the existing status message with new action
+                if (statusTs != null)
+                {
+                    var message = $":robot_face: *Claude 작업 중* — {statusText} ({DateTime.Now:HH:mm:ss})";
+                    var localTs = statusTs;
+                    var updateTask = Task.Run(async () =>
+                        await SlackUpdateMessageAsync(botToken, channel, localTs, message));
+                    updateTask.Wait(3000);
+                }
+                Console.WriteLine($"[SLACK] Status: {statusText}");
             }
         }
 
         claudeBusy = nowBusy;
-
-        // Only stream when Claude is busy
-        if (!claudeBusy)
-            return;
-
-        // 2. Connect to CDP if not connected (for URL retrieval)
-        if (cdp == null || !cdp.IsConnected)
-        {
-            if (reconnectBackoff > 0)
-            {
-                reconnectBackoff--;
-                return;
-            }
-
-            try
-            {
-                cdp?.Dispose();
-                // Task.Run to avoid sync-over-async deadlock in background process
-                var reconnectTask = Task.Run(async () =>
-                {
-                    var c = new CdpClient();
-                    await c.ConnectAsync(9222);
-                    return c;
-                });
-                if (reconnectTask.Wait(5000))
-                {
-                    cdp = reconnectTask.Result;
-                    Console.WriteLine("[SLACK] WebBot: Reconnected to Chrome");
-                    reconnectBackoff = 0;
-
-                    // Find Chrome window handle for UIA content extraction
-                    if (cdp.ChromePid > 0)
-                        chromeHwnd = FindChromeHwndByPid(cdp.ChromePid);
-                }
-                else
-                {
-                    cdp = null;
-                    reconnectBackoff = Math.Min(reconnectBackoff + 2, 15);
-                    return;
-                }
-            }
-            catch
-            {
-                cdp?.Dispose();
-                cdp = null;
-                reconnectBackoff = Math.Min(reconnectBackoff + 2, 15);
-                return;
-            }
-        }
-
-        // 3. Get URL from CDP (fast, lightweight)
-        string? url = null;
-        try
-        {
-            // Capture ref param in local var for lambda; Task.Run to avoid deadlock
-            var localCdp = cdp!;
-            var urlTask = Task.Run(async () => await localCdp.GetUrlAsync());
-            if (urlTask.Wait(3000))
-                url = urlTask.Result;
-        }
-        catch { }
-
-        // 4. Get content via UIA (Accessibility) — "장애인의 눈"
-        string? content = null;
-        if (chromeHwnd == IntPtr.Zero && cdp?.ChromePid > 0)
-            chromeHwnd = FindChromeHwndByPid(cdp.ChromePid);
-
-        if (chromeHwnd != IntPtr.Zero)
-        {
-            content = ExtractWebContentViaUia(chromeHwnd, 400);
-            if (!string.IsNullOrEmpty(content))
-            {
-                // Log UIA content to console for debugging
-                var preview = content.Length > 80 ? content[..77] + "..." : content;
-                Console.WriteLine($"[SLACK] WebBot [UIA]: {preview}");
-            }
-        }
-
-        if (string.IsNullOrEmpty(url) && string.IsNullOrEmpty(content))
-            return;
-
-        // 5. Check if anything changed
-        bool urlChanged = url != lastUrl;
-        bool contentChanged = content != lastContent;
-        if (!urlChanged && !contentChanged && statusTs != null)
-            return; // nothing new
-
-        lastUrl = url;
-        lastContent = content;
-
-        // 6. Get Claude's current status for the message
-        var claudeStatus = GetClaudeStatusText(promptHelper);
-        var message = FormatWebBotStatus(url, content, claudeStatus);
-
-        // 7. Send or update Slack message
-        if (statusTs == null)
-        {
-            // First message — create new
-            var (ok, ts) = SlackSendViaApi(botToken, channel, message).GetAwaiter().GetResult();
-            if (ok && ts != null)
-            {
-                statusTs = ts;
-                Console.WriteLine($"[SLACK] WebBot: Status message created (ts={ts})");
-            }
-        }
-        else
-        {
-            // Update existing message
-            var (ok, _) = SlackUpdateMessageAsync(botToken, channel, statusTs, message).GetAwaiter().GetResult();
-            if (!ok)
-            {
-                // Message may have been deleted — create new one
-                var (ok2, ts2) = SlackSendViaApi(botToken, channel, message).GetAwaiter().GetResult();
-                if (ok2 && ts2 != null)
-                    statusTs = ts2;
-            }
-        }
     }
 
     /// <summary>Find Chrome main window handle by PID.</summary>
@@ -2107,45 +2070,6 @@ internal partial class Program
         {
             return null;
         }
-    }
-
-    /// <summary>Format WebBot status message for Slack (text only, no images).</summary>
-    static string FormatWebBotStatus(string? url, string? content, string? claudeStatus)
-    {
-        var sb = new System.Text.StringBuilder();
-
-        // Header: Claude status
-        if (!string.IsNullOrEmpty(claudeStatus))
-            sb.AppendLine($"*[{claudeStatus}]* {DateTime.Now:HH:mm:ss}");
-        else
-            sb.AppendLine($"*[현황]* {DateTime.Now:HH:mm:ss}");
-
-        // URL
-        if (!string.IsNullOrEmpty(url))
-        {
-            // Shorten URL for display
-            try
-            {
-                var uri = new Uri(url);
-                var shortUrl = uri.Host + uri.AbsolutePath;
-                if (shortUrl.Length > 60) shortUrl = shortUrl[..57] + "...";
-                sb.AppendLine($"`{shortUrl}`");
-            }
-            catch
-            {
-                sb.AppendLine($"`{url}`");
-            }
-        }
-
-        sb.AppendLine("──────────────────────");
-
-        // Content
-        if (!string.IsNullOrEmpty(content))
-            sb.Append(content);
-        else
-            sb.Append("(페이지 내용 없음)");
-
-        return sb.ToString();
     }
 
     /// <summary>
