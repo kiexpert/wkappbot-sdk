@@ -169,12 +169,27 @@ internal partial class Program
             var host = Environment.MachineName;
             var pid = Environment.ProcessId;
             var startupMsg = $"클봇 온라인! `{host}` pid={pid} `{cwd}`";
-            var (ok, sentTs) = SlackSendViaApi(botToken!, defaultChannel, startupMsg).GetAwaiter().GetResult();
-            if (ok && sentTs != null)
+            try
             {
-                ownMessageTimestamps.Add(sentTs);
-                activeThreads.Add(sentTs);
-                Console.WriteLine($"[SLACK] Startup announcement sent (ts={sentTs})");
+                var sendTask = Task.Run(() => SlackSendViaApi(botToken!, defaultChannel, startupMsg));
+                if (sendTask.Wait(10_000))
+                {
+                    var (ok, sentTs) = sendTask.Result;
+                    if (ok && sentTs != null)
+                    {
+                        ownMessageTimestamps.Add(sentTs);
+                        activeThreads.Add(sentTs);
+                        Console.WriteLine($"[SLACK] Startup announcement sent (ts={sentTs})");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[SLACK] Startup announcement timeout (10s) — skipping");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SLACK] Startup announcement failed: {ex.Message}");
             }
         }
 
@@ -456,33 +471,27 @@ internal partial class Program
         int webBotReconnectBackoff = 0;    // Reconnect backoff counter
         string? webBotStatusChannel = defaultChannel; // Channel for status messages
         IntPtr webBotChromeHwnd = IntPtr.Zero; // Chrome window handle for UIA content extraction
+        var webBotIdlePollSw = Stopwatch.StartNew(); // Throttle idle busy-check to ~2s
 
-        // WebBot: initial CDP connection attempt
+        // WebBot: lazy CDP connection — connect on first busy detection
+        // Avoids sync-over-async deadlock during startup
         if (webBotMode)
         {
-            try
-            {
-                webBotCdp = new CdpClient();
-                webBotCdp.ConnectAsync(9222).GetAwaiter().GetResult();
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("[SLACK] WebBot: Connected to Chrome (port 9222)");
-                Console.ResetColor();
-            }
-            catch
-            {
-                Console.WriteLine("[SLACK] WebBot: Chrome not available yet (will retry)");
-                webBotCdp?.Dispose();
-                webBotCdp = null;
-            }
+            Console.WriteLine("[SLACK] WebBot mode ON — will connect to Chrome on demand");
+            Console.Out.Flush();
         }
 
-        // Wait until cancelled — tick every 2s to check stop signal + hot-reload + keep-awake
+        // Wait until cancelled — fast 100ms tick loop for instant WebBot streaming
+        // UIA/CDP queries themselves take ~50-200ms, acting as natural variable delay
+        // Result: ~0.2-0.3s effective loop = broadcast-like real-time streaming
         try
         {
-            int tickCount = 0;
+            var hotReloadSw = Stopwatch.StartNew();
+            var keepAliveSw = Stopwatch.StartNew();
             while (!cts.Token.IsCancellationRequested)
             {
-                Task.Delay(2_000, cts.Token).GetAwaiter().GetResult();
+                // Fixed 100ms sleep — UIA queries add variable delay on top
+                Task.Delay(100, cts.Token).GetAwaiter().GetResult();
 
                 // Check stop signal file (written by 'slack stop')
                 if (File.Exists(SlackStopSignalFile))
@@ -492,9 +501,10 @@ internal partial class Program
                     break;
                 }
 
-                // Hot-reload: check if a newer EXE exists in publish output
-                if (++tickCount % 5 == 0) // every 10s
+                // Hot-reload: check every ~10s (skip during busy streaming)
+                if (!webBotClaudeBusy && hotReloadSw.ElapsedMilliseconds >= 10_000)
                 {
+                    hotReloadSw.Restart();
                     try
                     {
                         // Look for newer EXE in publish directory (sibling to source)
@@ -535,28 +545,37 @@ internal partial class Program
                     }
                 }
 
-                // WebBot monitoring: check Claude status + stream to Slack (~6 seconds = 3 ticks)
-                if (webBotMode && tickCount % 3 == 1)
+                // WebBot monitoring:
+                // - When busy: every tick (~100ms + UIA ~100ms = ~200ms effective) — broadcast streaming!
+                // - When idle: every ~2s (just busy-check, no heavy UIA/CDP work)
+                if (webBotMode)
                 {
-                    try
+                    bool shouldCheck = webBotClaudeBusy || webBotIdlePollSw.ElapsedMilliseconds >= 2_000;
+                    if (shouldCheck)
                     {
-                        WebBotMonitorTick(
-                            botToken!, webBotStatusChannel!,
-                            ref webBotCdp, ref webBotStatusTs,
-                            ref webBotLastUrl, ref webBotLastContent,
-                            ref webBotClaudeBusy, ref webBotReconnectBackoff,
-                            ref webBotChromeHwnd,
-                            promptHelper);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[SLACK] WebBot monitor error: {ex.Message}");
+                        if (!webBotClaudeBusy)
+                            webBotIdlePollSw.Restart();
+                        try
+                        {
+                            WebBotMonitorTick(
+                                botToken!, webBotStatusChannel!,
+                                ref webBotCdp, ref webBotStatusTs,
+                                ref webBotLastUrl, ref webBotLastContent,
+                                ref webBotClaudeBusy, ref webBotReconnectBackoff,
+                                ref webBotChromeHwnd,
+                                promptHelper);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[SLACK] WebBot monitor error: {ex.Message}");
+                        }
                     }
                 }
 
-                // Refresh keep-awake every 60s (every 30 ticks)
-                if (tickCount % 30 == 0)
+                // Refresh keep-awake every 60s
+                if (keepAliveSw.ElapsedMilliseconds >= 60_000)
                 {
+                    keepAliveSw.Restart();
                     NativeMethods.SetThreadExecutionState(
                         NativeMethods.ES_CONTINUOUS | NativeMethods.ES_SYSTEM_REQUIRED | NativeMethods.ES_DISPLAY_REQUIRED);
                 }
@@ -1884,20 +1903,35 @@ internal partial class Program
             try
             {
                 cdp?.Dispose();
-                cdp = new CdpClient();
-                cdp.ConnectAsync(9222).GetAwaiter().GetResult();
-                Console.WriteLine("[SLACK] WebBot: Reconnected to Chrome");
-                reconnectBackoff = 0;
+                // Task.Run to avoid sync-over-async deadlock in background process
+                var reconnectTask = Task.Run(async () =>
+                {
+                    var c = new CdpClient();
+                    await c.ConnectAsync(9222);
+                    return c;
+                });
+                if (reconnectTask.Wait(5000))
+                {
+                    cdp = reconnectTask.Result;
+                    Console.WriteLine("[SLACK] WebBot: Reconnected to Chrome");
+                    reconnectBackoff = 0;
 
-                // Find Chrome window handle for UIA content extraction
-                if (cdp.ChromePid > 0)
-                    chromeHwnd = FindChromeHwndByPid(cdp.ChromePid);
+                    // Find Chrome window handle for UIA content extraction
+                    if (cdp.ChromePid > 0)
+                        chromeHwnd = FindChromeHwndByPid(cdp.ChromePid);
+                }
+                else
+                {
+                    cdp = null;
+                    reconnectBackoff = Math.Min(reconnectBackoff + 2, 15);
+                    return;
+                }
             }
             catch
             {
                 cdp?.Dispose();
                 cdp = null;
-                reconnectBackoff = Math.Min(reconnectBackoff + 2, 15); // backoff: 4s → 8s → ... → 30s
+                reconnectBackoff = Math.Min(reconnectBackoff + 2, 15);
                 return;
             }
         }
@@ -1906,7 +1940,9 @@ internal partial class Program
         string? url = null;
         try
         {
-            var urlTask = cdp!.GetUrlAsync();
+            // Capture ref param in local var for lambda; Task.Run to avoid deadlock
+            var localCdp = cdp!;
+            var urlTask = Task.Run(async () => await localCdp.GetUrlAsync());
             if (urlTask.Wait(3000))
                 url = urlTask.Result;
         }
