@@ -94,6 +94,8 @@ public static class ChromeLauncher
         arguments += " --renderer-process-limit=2";  // Limit renderer processes
         arguments += " --disable-features=TranslateUI,BlinkGenPropertyTrees";
         arguments += " --disable-hang-monitor --disable-popup-blocking";
+        // Small window (will be minimized anyway, but keeps it unobtrusive if restored)
+        arguments += " --window-size=400,300 --window-position=0,0";
         if (headless)
             arguments += " --headless=new";
 

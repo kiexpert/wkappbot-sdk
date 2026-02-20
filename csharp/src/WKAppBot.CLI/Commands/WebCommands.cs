@@ -214,6 +214,11 @@ Options:
             return 1;
         }
 
+        // Minimize Chrome window — CDP works perfectly when minimized!
+        // User doesn't need to see Chrome; it works in the background
+        cdp.MinimizeChromeWindow();
+        Console.WriteLine("[WEB] Chrome minimized (CDP works in background)");
+
         return 0;
     }
 

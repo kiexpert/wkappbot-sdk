@@ -165,9 +165,12 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     /// </summary>
     public bool InjectWebBotBar { get; set; }
 
-    /// <summary>Navigate to a URL.</summary>
+    /// <summary>Navigate to a URL. Focusless: does NOT steal focus from user's active window.</summary>
     public async Task NavigateAsync(string url)
     {
+        // Save current foreground window BEFORE navigation (focusless principle!)
+        var prevForeground = GetForegroundWindow();
+
         await SendAsync("Page.navigate", new JsonObject { ["url"] = url });
         // Wait for page load
         await SendAsync("Page.enable");
@@ -178,12 +181,27 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         if (InjectWebBotBar)
             await InjectBarAsync();
 
-        // Activate this tab so Chrome window title bar reflects the page title
-        await BringToFrontAsync();
-
         // Force Chrome window title via Win32 (Chrome ignores document.title in some profiles)
         if (InjectWebBotBar)
             await SetWindowTitleAsync();
+
+        // Restore focus to user's previous window (don't steal focus!)
+        RestoreFocus(prevForeground);
+    }
+
+    /// <summary>Restore focus to a previously active window (best-effort, non-blocking).</summary>
+    private static void RestoreFocus(IntPtr prevHwnd)
+    {
+        if (prevHwnd == IntPtr.Zero) return;
+        try
+        {
+            var currentFg = GetForegroundWindow();
+            if (currentFg != prevHwnd && IsWindow(prevHwnd))
+            {
+                SetForegroundWindow(prevHwnd);
+            }
+        }
+        catch { /* best effort */ }
     }
 
     /// <summary>
@@ -557,10 +575,22 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     /// <summary>
     /// Activate this tab in Chrome (bring to front).
     /// Makes Chrome's window title bar show this tab's title.
+    /// WARNING: This steals focus! Only call when user explicitly wants to see the window.
     /// </summary>
     public async Task BringToFrontAsync()
     {
         await SendAsync("Page.bringToFront");
+    }
+
+    /// <summary>
+    /// Minimize Chrome window (focusless — does not steal focus from user's active window).
+    /// CDP still works perfectly when Chrome is minimized!
+    /// </summary>
+    public void MinimizeChromeWindow()
+    {
+        var hwnd = FindChromeMainWindow();
+        if (hwnd != IntPtr.Zero)
+            ShowWindow(hwnd, SW_SHOWMINNOACTIVE);
     }
 
     /// <summary>
@@ -643,6 +673,21 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    private const int SW_MINIMIZE = 6;
+    private const int SW_SHOWMINNOACTIVE = 7;  // Show minimized without activating
 
     /// <summary>Wait for an element to appear (polling).</summary>
     public async Task<bool> WaitForElementAsync(string selector, int timeoutMs = 5000)
