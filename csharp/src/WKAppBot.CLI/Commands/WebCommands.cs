@@ -48,11 +48,12 @@ Usage:
   wkappbot web <subcommand> [options]
 
 Session Management:
-  open [url] [--port N] [--headless] [--no-launch]
+  open [url] [--port N] [--headless] [--no-launch] [--app]
       Open Chrome with CDP and navigate to URL.
       --port N: CDP port (default: 9222)
       --headless: Run Chrome headless (no visible window)
       --no-launch: Connect to already-running Chrome (don't launch)
+      --app: App mode — no Chrome address bar/tabs (clean WebView window)
   close [--port N]
       Disconnect from Chrome (does not close the browser).
   status [--port N]
@@ -107,12 +108,26 @@ Options:
     static int GetPort(string[] args) =>
         int.TryParse(GetArgValue(args, "--port"), out var p) ? p : 9222;
 
-    static CdpClient ConnectCdp(int port, bool withBar = true)
+    static CdpClient ConnectCdp(int port, bool withBar = true, bool verifyWebBot = false)
     {
         var cdp = new CdpClient();
         cdp.ConnectAsync(port).GetAwaiter().GetResult();
         if (withBar)
             cdp.InjectWebBotBar = true;
+
+        // Verify we're connected to a WebBot-managed Chrome, not user's normal browser
+        if (verifyWebBot)
+        {
+            var title = cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "";
+            if (!title.Contains("WKWebBot"))
+            {
+                cdp.Dispose();
+                throw new InvalidOperationException(
+                    "Connected to Chrome but it's not a WebBot window (no 'WKWebBot' in title). " +
+                    "Run 'wkappbot web open <url>' first to launch a WebBot-managed Chrome.");
+            }
+        }
+
         return cdp;
     }
 
@@ -123,16 +138,22 @@ Options:
         int port = GetPort(args);
         bool headless = args.Contains("--headless");
         bool noLaunch = args.Contains("--no-launch");
+        bool appMode = args.Contains("--app");
 
         // Get URL (first non-flag argument)
         string? url = args.FirstOrDefault(a => !a.StartsWith("--") && a != "true" && a != "false");
 
+        bool freshLaunch = false;
         Console.Write($"[WEB] ");
 
         if (!noLaunch)
         {
-            Console.Write($"Launching Chrome (port={port})... ");
-            var process = ChromeLauncher.LaunchAsync(port, url, headless).GetAwaiter().GetResult();
+            Console.Write($"Launching Chrome (port={port}){(appMode ? " [APP mode]" : "")}... ");
+            // In app mode: pass actual URL to --app flag so Chrome opens clean window with it
+            //   (navigating away from --app=about:blank re-enables Chrome UI)
+            // In normal mode: pass about:blank, navigate later via CDP
+            var launchUrl = appMode && !string.IsNullOrEmpty(url) ? url : "about:blank";
+            var process = ChromeLauncher.LaunchAsync(port, launchUrl, headless, appMode: appMode).GetAwaiter().GetResult();
             if (process == null)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
@@ -141,6 +162,7 @@ Options:
             }
             else
             {
+                freshLaunch = true;
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine($"Chrome started (PID={process.Id})");
                 Console.ResetColor();
@@ -154,11 +176,23 @@ Options:
         Console.WriteLine($"Connected ({cdp.WebSocketUrl})");
         Console.ResetColor();
 
-        // Navigate if URL provided and Chrome was already running
-        if (!string.IsNullOrEmpty(url) && noLaunch)
+        // Navigate to URL — always via CDP NavigateAsync so WebBot bar gets injected
+        if (!string.IsNullOrEmpty(url))
         {
-            Console.Write($"[WEB] Navigating to {url}... ");
-            cdp.NavigateAsync(url).GetAwaiter().GetResult();
+            if (freshLaunch)
+                Thread.Sleep(appMode ? 2000 : 1000); // App mode needs extra time for initial load
+
+            if (appMode && freshLaunch)
+            {
+                // App mode: Chrome already loaded URL via --app flag, just inject WebBot bar
+                Console.Write($"[WEB] Injecting WebBot bar... ");
+                cdp.InjectBarAsync().GetAwaiter().GetResult();
+            }
+            else
+            {
+                Console.Write($"[WEB] Navigating to {url}... ");
+                cdp.NavigateAsync(url).GetAwaiter().GetResult();
+            }
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("OK");
             Console.ResetColor();
@@ -169,6 +203,16 @@ Options:
         var pageUrl = cdp.GetUrlAsync().GetAwaiter().GetResult();
         Console.WriteLine($"[WEB] Title: {title}");
         Console.WriteLine($"[WEB] URL:   {pageUrl}");
+
+        // Verify this is our WebBot window, not user's normal Chrome
+        if (title == null || !title.Contains("WKWebBot"))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[WEB] ERROR: WebBot bar not found in title — not a WebBot window!");
+            Console.WriteLine("[WEB] This may be user's normal Chrome. Aborting.");
+            Console.ResetColor();
+            return 1;
+        }
 
         return 0;
     }

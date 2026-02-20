@@ -192,7 +192,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     /// Bottom bar: last action + elapsed time + step counter
     /// Auto-updates URL on SPA navigation (pushState/popstate).
     /// </summary>
-    private async Task InjectBarAsync()
+    public async Task InjectBarAsync()
     {
         try
         {
@@ -244,17 +244,18 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                     status.id = '__wkappbot_status';
                     status.style.cssText = `
                         position: fixed; bottom: 0; left: 0; right: 0; z-index: 2147483647;
-                        height: 22px; background: ${DARK}; color: #888;
-                        font: 11px/22px 'Consolas', 'Courier New', monospace;
+                        height: 28px; background: #2d2d4e; color: #aaa;
+                        font: 12px/28px 'Consolas', 'Courier New', monospace;
                         display: flex; align-items: center; padding: 0 10px;
-                        box-shadow: 0 -1px 4px rgba(0,0,0,0.3);
+                        border-top: 2px solid ${CYAN};
+                        box-shadow: 0 -2px 8px rgba(0,0,0,0.4);
                     `;
 
                     // Status icon (idle/running indicator)
                     const icon = document.createElement('span');
                     icon.id = '__wkappbot_icon';
                     icon.textContent = '\u25CF';
-                    icon.style.cssText = `color:${GREEN};margin-right:6px;font-size:10px;`;
+                    icon.style.cssText = `color:${GREEN};margin-right:6px;font-size:12px;`;
                     icon.title = 'Idle';
 
                     // Last action display
@@ -281,7 +282,9 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                     document.body.style.marginTop = '30px';
                     document.body.style.marginBottom = '26px';
                     document.body.insertBefore(bar, document.body.firstChild);
-                    document.body.appendChild(status);
+                    // Append status bar to <html> instead of <body>
+                    // Some sites (Naver Finance etc) use overflow/scroll on body that clips fixed children
+                    document.documentElement.appendChild(status);
 
                     // Update title (short — no URL)
                     // Even pages with no title get at least "WKWebBot v0.1" in the window title bar
@@ -410,7 +413,18 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             ["expression"] = expression,
             ["returnByValue"] = true,
         });
-        return result?["result"]?["value"]?.ToJsonString()?.Trim('"');
+
+        var valueNode = result?["result"]?["value"];
+        if (valueNode == null) return null;
+
+        // Prefer GetValue<string> for string results (avoids double-escaping JSON.stringify output)
+        try { return valueNode.GetValue<string>(); }
+        catch
+        {
+            // Non-string values (numbers, bools, objects): serialize to JSON
+            var json = valueNode.ToJsonString();
+            return json?.Trim('"');
+        }
     }
 
     /// <summary>Click an element by CSS selector.</summary>
