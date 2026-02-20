@@ -116,6 +116,10 @@ internal partial class Program
             cts.Cancel();
         };
 
+        // Hot-reload: track EXE file timestamp at startup
+        var exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+        var exeStartTime = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.MinValue;
+
         // Polling loop: screenshot → update overlay
         int frameCount = 0;
         var sw = Stopwatch.StartNew();
@@ -241,6 +245,23 @@ internal partial class Program
                 {
                     var fps = frameCount / sw.Elapsed.TotalSeconds;
                     Console.WriteLine($"[MINIVIEW] frame #{frameCount}, {fps:F1} fps, {png?.Length / 1024}KB");
+                }
+
+                // Hot-reload: check if EXE was replaced (every ~5 seconds = 10 frames at 500ms)
+                if (frameCount % 10 == 5 && exeStartTime != DateTime.MinValue)
+                {
+                    try
+                    {
+                        var currentTime = File.GetLastWriteTimeUtc(exePath);
+                        if (currentTime != exeStartTime)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine("[MINIVIEW] Hot-reload: EXE changed — shutting down gracefully");
+                            Console.ResetColor();
+                            break; // exit polling loop → cleanup + exit
+                        }
+                    }
+                    catch { /* best effort */ }
                 }
 
                 // Wait for next frame
