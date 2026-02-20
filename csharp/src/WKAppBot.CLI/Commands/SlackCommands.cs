@@ -161,37 +161,9 @@ internal partial class Program
         // Track message timestamps that THIS bot sent (for ping response thread tracking)
         var ownMessageTimestamps = new HashSet<string>();
 
-        // Announce presence on startup (channel message, not thread)
+        // Channel ID for API calls (no startup announcement — just log locally)
         var defaultChannel = config["channel"]?.GetValue<string>();
-        if (!string.IsNullOrEmpty(defaultChannel))
-        {
-            var cwd = Environment.CurrentDirectory;
-            var host = Environment.MachineName;
-            var pid = Environment.ProcessId;
-            var startupMsg = $"클봇 온라인! `{host}` pid={pid} `{cwd}`";
-            try
-            {
-                var sendTask = Task.Run(async () => await SlackSendViaApi(botToken!, defaultChannel, startupMsg));
-                if (sendTask.Wait(10_000))
-                {
-                    var (ok, sentTs) = sendTask.Result;
-                    if (ok && sentTs != null)
-                    {
-                        ownMessageTimestamps.Add(sentTs);
-                        activeThreads.Add(sentTs);
-                        Console.WriteLine($"[SLACK] Startup announcement sent (ts={sentTs})");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("[SLACK] Startup announcement timeout (10s) — skipping");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SLACK] Startup announcement failed: {ex.Message}");
-            }
-        }
+        Console.WriteLine($"[SLACK] Ready — pid={Environment.ProcessId} channel={defaultChannel}");
 
         // Handle @mentions — always reply in-thread
         slack.OnMention += (msg) =>
@@ -581,24 +553,16 @@ internal partial class Program
         NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
         Console.WriteLine("[SLACK] Display sleep prevention: OFF");
 
-        // Send shutdown/reload message to Slack (in latest thread)
-        try
+        // Log shutdown locally (no Slack spam)
         {
-            var host = Environment.MachineName;
-            var pid = Environment.ProcessId;
             var uptime = DateTime.Now - Process.GetCurrentProcess().StartTime;
             var uptimeStr = uptime.TotalHours >= 1
                 ? $"{uptime.Hours}h{uptime.Minutes}m"
                 : $"{uptime.Minutes}m{uptime.Seconds}s";
-            var shutdownMsg = hotReload
-                ? $"클봇 핫리로드! 새 빌드 감지 → 재시작합니다. `{host}` pid={pid} (uptime {uptimeStr})"
-                : $"클봇 오프라인. `{host}` pid={pid} (uptime {uptimeStr})";
-            var (replyChannel, replyThread) = LoadReplyContext();
-            var ch = replyChannel ?? defaultChannel!;
-            SlackSendViaApi(botToken!, ch, shutdownMsg, replyThread).GetAwaiter().GetResult();
-            Console.WriteLine("[SLACK] Shutdown message sent");
+            Console.WriteLine(hotReload
+                ? $"[SLACK] Hot-reload shutdown (uptime {uptimeStr})"
+                : $"[SLACK] Shutdown (uptime {uptimeStr})");
         }
-        catch { /* best-effort */ }
 
         slack.DisconnectAsync().GetAwaiter().GetResult();
         ai?.Dispose();
