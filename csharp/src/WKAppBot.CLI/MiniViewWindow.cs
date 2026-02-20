@@ -229,6 +229,8 @@ internal sealed class MiniViewOverlay : Window
     }
 
     /// <summary>Update the screenshot thumbnail from CDP PNG data.</summary>
+    /// <remarks>Does NOT reset _lastUpdate — screenshots arrive continuously while WebBot is alive.
+    /// Cloaking is based on content changes (URL/text), not screenshot freshness.</remarks>
     public void UpdateScreenshot(byte[] pngData)
     {
         try
@@ -241,10 +243,7 @@ internal sealed class MiniViewOverlay : Window
             bi.EndInit();
             bi.Freeze(); // thread-safe!
             _image.Source = bi;
-            _lastUpdate = DateTime.Now;
-
-            // Uncloak if hidden
-            if (_isCloaked) Uncloak();
+            // Note: no _lastUpdate here — cloaking tracks content changes, not screenshot refresh
         }
         catch { /* best effort */ }
     }
