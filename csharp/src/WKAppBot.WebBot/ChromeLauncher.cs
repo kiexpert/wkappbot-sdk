@@ -94,6 +94,8 @@ public static class ChromeLauncher
         arguments += " --renderer-process-limit=2";  // Limit renderer processes
         arguments += " --disable-features=TranslateUI,BlinkGenPropertyTrees";
         arguments += " --disable-hang-monitor --disable-popup-blocking";
+        // Force accessibility tree for web content — enables UIA to read page headings, text, links
+        arguments += " --force-renderer-accessibility";
         // Decent viewport for CDP screenshots (minimized anyway, but screenshots use this size)
         arguments += " --window-size=1024,1024 --window-position=0,0";
         if (headless)
