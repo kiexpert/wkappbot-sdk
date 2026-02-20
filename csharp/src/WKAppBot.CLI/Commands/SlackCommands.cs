@@ -171,7 +171,7 @@ internal partial class Program
             var startupMsg = $"클봇 온라인! `{host}` pid={pid} `{cwd}`";
             try
             {
-                var sendTask = Task.Run(() => SlackSendViaApi(botToken!, defaultChannel, startupMsg));
+                var sendTask = Task.Run(async () => await SlackSendViaApi(botToken!, defaultChannel, startupMsg));
                 if (sendTask.Wait(10_000))
                 {
                     var (ok, sentTs) = sendTask.Result;
@@ -362,21 +362,15 @@ internal partial class Program
                 // Prompt mode: forward to Claude Code
                 if (promptHelper != null && promptInfo != null)
                 {
-                    // If this is a reply to bot's own message, include parent context
-                    var parentContext = "";
+                    // Build thread context: bot's original + previous user message
+                    var threadContext = "";
                     if (msg.ThreadTs != null && !ownMessageTimestamps.Contains(msg.ThreadTs))
                     {
-                        // Auto-tracked thread — fetch bot's original message for context
-                        var parentText = GetThreadParentText(botToken!, msg.Channel, msg.ThreadTs);
-                        if (!string.IsNullOrEmpty(parentText))
-                        {
-                            // Truncate long bot messages
-                            if (parentText.Length > 300)
-                                parentText = parentText[..297] + "...";
-                            parentContext = $"\n\n[이전 클봇 메시지]\n{parentText}\n";
-                        }
+                        var ctx = GetThreadContext(botToken!, msg.Channel, msg.ThreadTs, msg.Timestamp);
+                        if (!string.IsNullOrEmpty(ctx))
+                            threadContext = $"\n\n{ctx}\n";
                     }
-                    var promptText = $"{cleanText}{parentContext}\n\n(Slack @{msg.User} #{msg.Channel} thread — reply: wkappbot slack reply \"...\")";
+                    var promptText = $"{cleanText}{threadContext}\n\n(Slack @{msg.User} #{msg.Channel} thread — reply: wkappbot slack reply \"...\")";
                     // reply context auto-saved
                     Console.WriteLine($"[SLACK] >> Typing thread reply into Claude prompt...");
 
@@ -1556,8 +1550,25 @@ internal partial class Program
 
         try
         {
+            // 1. Find Claude Desktop window and bring to foreground
+            var claudeHwnd = FindClaudeDesktopHwnd();
+            if (claudeHwnd == IntPtr.Zero)
+            {
+                Console.WriteLine("[SLACK] >> Claude Desktop window not found!");
+                SlackSendViaApi(botToken, channel, "Claude Desktop 윈도우를 찾을 수 없습니다!", threadTs)
+                    .GetAwaiter().GetResult();
+                return;
+            }
+
+            // Bring Claude Desktop to foreground for SendInput
+            // Use Smart method (AttachThreadInput trick) — background process can't SetForegroundWindow
+            NativeMethods.SmartSetForegroundWindow(claudeHwnd);
+            Thread.Sleep(300); // Wait for focus to settle
+
+            // 2. Send Ctrl+Enter
             KeyboardInput.Hotkey(new[] { "ctrl", "enter" });
-            Console.WriteLine("[SLACK] >> Ctrl+Enter sent!");
+            Thread.Sleep(100);
+            Console.WriteLine("[SLACK] >> Ctrl+Enter sent to Claude Desktop!");
             SlackSendViaApi(botToken, channel, "Ctrl+Enter 전송 완료! 수락 처리했습니다.", threadTs)
                 .GetAwaiter().GetResult();
         }
@@ -2068,13 +2079,19 @@ internal partial class Program
     /// Get the bot's parent message text from a thread (for context when replying).
     /// Returns the first message in the thread (the bot's original message).
     /// </summary>
-    static string? GetThreadParentText(string botToken, string channel, string threadTs)
+    /// <summary>
+    /// Build thread context for Claude prompt: bot's original message + previous user message.
+    /// Returns formatted context string, or null if unavailable.
+    /// Layout: [클봇 원본]\n{parent}\n\n[이전 메시지]\n{prev}
+    /// </summary>
+    static string? GetThreadContext(string botToken, string channel, string threadTs, string currentMsgTs)
     {
         try
         {
             using var http = new HttpClient();
             http.DefaultRequestHeaders.Add("Authorization", $"Bearer {botToken}");
-            var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=1&inclusive=true";
+            // Fetch entire thread (up to 50 messages — enough for context)
+            var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=50&inclusive=true";
             var resp = http.GetAsync(url).GetAwaiter().GetResult();
             var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             var json = JsonNode.Parse(body);
@@ -2083,7 +2100,44 @@ internal partial class Program
             var messages = json["messages"]?.AsArray();
             if (messages == null || messages.Count == 0) return null;
 
-            return messages[0]?["text"]?.GetValue<string>();
+            // 1. Bot's original message (thread parent = first message)
+            var parentText = messages[0]?["text"]?.GetValue<string>();
+
+            // 2. Find previous message (right before current — could be user OR bot)
+            // In a thread, conversation flows: bot→user→bot→user, so prev msg gives context
+            string? prevText = null;
+            bool prevIsBot = false;
+            for (int i = messages.Count - 1; i >= 1; i--)
+            {
+                var msgTs = messages[i]?["ts"]?.GetValue<string>();
+                if (msgTs == currentMsgTs) continue; // skip current message
+
+                prevText = messages[i]?["text"]?.GetValue<string>();
+                prevIsBot = messages[i]?["bot_id"] != null;
+                break;
+            }
+
+            // Build context
+            var sb = new System.Text.StringBuilder();
+
+            if (!string.IsNullOrEmpty(parentText))
+            {
+                if (parentText.Length > 300) parentText = parentText[..297] + "...";
+                sb.AppendLine("[쓰레드 시작]");
+                sb.AppendLine(parentText);
+            }
+
+            if (!string.IsNullOrEmpty(prevText))
+            {
+                if (prevText.Length > 200) prevText = prevText[..197] + "...";
+                var label = prevIsBot ? "[직전 클봇 응답]" : "[직전 메시지]";
+                sb.AppendLine();
+                sb.AppendLine(label);
+                sb.AppendLine(prevText);
+            }
+
+            var result = sb.ToString().Trim();
+            return string.IsNullOrEmpty(result) ? null : result;
         }
         catch
         {
