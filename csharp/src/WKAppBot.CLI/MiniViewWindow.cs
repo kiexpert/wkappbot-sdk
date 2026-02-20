@@ -19,7 +19,8 @@ namespace WKAppBot.CLI;
 ///
 /// Features:
 /// - Semi-transparent dark overlay with cyan border
-/// - CDP screenshot thumbnail refreshed at ~100ms intervals
+/// - CDP screenshot as full background (behind text)
+/// - Accessibility text overlay with larger font + auto-scroll animation
 /// - Click image → restore Chrome window
 /// - Cloaking: fades out after inactivity, fades in on new content
 /// - Drag to move, always on top, never steals focus
@@ -29,18 +30,29 @@ internal sealed class MiniViewOverlay : Window
     private readonly Image _image;
     private readonly TextBlock _urlText;
     private readonly TextBlock _timeText;
-    private readonly TextBlock _axText; // accessibility text display
+    private readonly TextBlock _axText; // accessibility text display (overlay on image)
+    private readonly Canvas _scrollCanvas; // canvas for scroll animation
     private readonly Ellipse _dot;
     private DateTime _lastUpdate = DateTime.MinValue;
     private DispatcherTimer? _cloakTimer;
+    private DispatcherTimer? _scrollTimer; // auto-scroll timer
     private bool _isCloaked;
     private IntPtr _chromeHwnd;
+    private double _scrollOffset; // current scroll Y offset
+    private bool _needsScroll; // text exceeds visible area
 
     // Cloaking thresholds
     private const double ActiveOpacity = 0.85;
     private const double DimOpacity = 0.3;
     private const int DimAfterSeconds = 5;
     private const int CloakAfterSeconds = 10;
+
+    // Scroll settings
+    private const double ScrollSpeed = 0.5; // pixels per tick
+    private const double ScrollPauseTop = 60; // ticks to pause at top
+    private const double ScrollPauseBottom = 120; // ticks to pause at bottom
+    private double _scrollPauseCount;
+    private bool _scrollingDown = true;
 
     public MiniViewOverlay(int width = 320, int height = 220)
     {
@@ -65,12 +77,12 @@ internal sealed class MiniViewOverlay : Window
             BorderThickness = new Thickness(1.5),
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(0),
+            ClipToBounds = true,
         };
 
         var mainGrid = new Grid();
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(22) });  // header
-        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // image
-        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(36) });  // accessibility text
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // content area
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });  // footer
 
         // ── Header: [●] Claude's Eye  [✕] ──
@@ -116,38 +128,51 @@ internal sealed class MiniViewOverlay : Window
         header.Children.Add(closeBtn);
         Grid.SetRow(header, 0);
 
-        // ── Image: CDP screenshot thumbnail ──
+        // ── Content area: Background image + text overlay ──
+        var contentGrid = new Grid();
+
+        // Background: CDP screenshot (fills entire content area, dimmed)
         _image = new Image
         {
             Stretch = Stretch.Uniform,
-            Margin = new Thickness(4, 2, 4, 2),
+            Opacity = 0.35, // dimmed background — text is the star
+            Margin = new Thickness(2),
             Cursor = Cursors.Hand,
         };
         _image.MouseLeftButtonDown += OnImageClick;
+        contentGrid.Children.Add(_image);
 
-        var imageBorder = new Border
+        // Foreground: Accessibility text overlay with semi-transparent dark backdrop
+        var textOverlay = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0x40, 0x00, 0x00, 0x00)),
-            CornerRadius = new CornerRadius(3),
-            Margin = new Thickness(4, 0, 4, 0),
-            Child = _image,
+            Background = new SolidColorBrush(Color.FromArgb(0x88, 0x10, 0x10, 0x20)), // darker backdrop
+            CornerRadius = new CornerRadius(4),
+            Margin = new Thickness(6, 4, 6, 4),
+            Padding = new Thickness(6, 4, 6, 4),
+            ClipToBounds = true,
+            Cursor = Cursors.Hand,
         };
-        Grid.SetRow(imageBorder, 1);
+        textOverlay.MouseLeftButtonDown += OnImageClick;
 
-        // ── Accessibility text overlay ──
+        // Canvas for scrolling text (clips to parent border)
+        _scrollCanvas = new Canvas { ClipToBounds = true };
+
         _axText = new TextBlock
         {
-            Text = "",
+            Text = "connecting...",
             Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0xFF, 0x80)), // light green
             FontFamily = new FontFamily("Consolas"),
-            FontSize = 9,
+            FontSize = 13, // bigger text for readability
             TextWrapping = TextWrapping.Wrap,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxHeight = 36,
-            Margin = new Thickness(6, 0, 6, 0),
-            VerticalAlignment = VerticalAlignment.Top,
+            LineHeight = 18,
         };
-        Grid.SetRow(_axText, 2);
+        Canvas.SetLeft(_axText, 0);
+        Canvas.SetTop(_axText, 0);
+        _scrollCanvas.Children.Add(_axText);
+        textOverlay.Child = _scrollCanvas;
+        contentGrid.Children.Add(textOverlay);
+
+        Grid.SetRow(contentGrid, 1);
 
         // ── Footer: URL + timestamp ──
         var footer = new DockPanel { Margin = new Thickness(6, 0, 6, 2) };
@@ -174,17 +199,24 @@ internal sealed class MiniViewOverlay : Window
 
         footer.Children.Add(_timeText);
         footer.Children.Add(_urlText);
-        Grid.SetRow(footer, 3);
+        Grid.SetRow(footer, 2);
 
         mainGrid.Children.Add(header);
-        mainGrid.Children.Add(imageBorder);
-        mainGrid.Children.Add(_axText);
+        mainGrid.Children.Add(contentGrid);
         mainGrid.Children.Add(footer);
         root.Child = mainGrid;
         Content = root;
 
-        // Start cloaking timer
+        // Wire up canvas size change to update text width
+        _scrollCanvas.SizeChanged += (_, args) =>
+        {
+            if (args.NewSize.Width > 0)
+                _axText.Width = args.NewSize.Width;
+        };
+
+        // Start cloaking timer + scroll timer
         SetupCloakTimer();
+        SetupScrollTimer();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -235,13 +267,30 @@ internal sealed class MiniViewOverlay : Window
         catch { /* best effort */ }
     }
 
-    /// <summary>Update the accessibility text display.</summary>
+    /// <summary>Update the accessibility text display with scroll reset.</summary>
     public void UpdateAccessibilityText(string text)
     {
         try
         {
+            if (_axText.Text == text) return; // no change — don't reset scroll
+
             _axText.Text = text;
             _lastUpdate = DateTime.Now;
+
+            // Reset scroll to top when text changes
+            _scrollOffset = 0;
+            _scrollPauseCount = ScrollPauseTop; // brief pause at top before scrolling
+            _scrollingDown = true;
+            Canvas.SetTop(_axText, 0);
+
+            // Measure text to determine if scrolling is needed
+            _axText.Measure(new Size(_scrollCanvas.ActualWidth > 0 ? _scrollCanvas.ActualWidth : Width - 30, double.PositiveInfinity));
+            _needsScroll = _axText.DesiredSize.Height > (_scrollCanvas.ActualHeight > 0 ? _scrollCanvas.ActualHeight : 120);
+
+            // Set text width to match canvas for proper wrapping
+            if (_scrollCanvas.ActualWidth > 0)
+                _axText.Width = _scrollCanvas.ActualWidth;
+
             if (_isCloaked) Uncloak();
         }
         catch { /* best effort */ }
@@ -271,6 +320,64 @@ internal sealed class MiniViewOverlay : Window
         _cloakTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _cloakTimer.Tick += OnCloakTick;
         _cloakTimer.Start();
+    }
+
+    private void SetupScrollTimer()
+    {
+        _scrollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) }; // ~30fps
+        _scrollTimer.Tick += OnScrollTick;
+        _scrollTimer.Start();
+    }
+
+    private void OnScrollTick(object? sender, EventArgs e)
+    {
+        if (!_needsScroll) return;
+
+        var canvasHeight = _scrollCanvas.ActualHeight;
+        if (canvasHeight <= 0) return;
+
+        // Measure actual text height
+        _axText.Measure(new Size(_scrollCanvas.ActualWidth > 0 ? _scrollCanvas.ActualWidth : Width - 30, double.PositiveInfinity));
+        var textHeight = _axText.DesiredSize.Height;
+        if (textHeight <= canvasHeight)
+        {
+            _needsScroll = false;
+            Canvas.SetTop(_axText, 0);
+            return;
+        }
+
+        var maxScroll = textHeight - canvasHeight;
+
+        // Handle pause at top/bottom
+        if (_scrollPauseCount > 0)
+        {
+            _scrollPauseCount--;
+            return;
+        }
+
+        // Scroll
+        if (_scrollingDown)
+        {
+            _scrollOffset += ScrollSpeed;
+            if (_scrollOffset >= maxScroll)
+            {
+                _scrollOffset = maxScroll;
+                _scrollingDown = false;
+                _scrollPauseCount = ScrollPauseBottom; // longer pause at bottom
+            }
+        }
+        else
+        {
+            _scrollOffset -= ScrollSpeed * 2; // scroll back up faster
+            if (_scrollOffset <= 0)
+            {
+                _scrollOffset = 0;
+                _scrollingDown = true;
+                _scrollPauseCount = ScrollPauseTop;
+            }
+        }
+
+        Canvas.SetTop(_axText, -_scrollOffset);
     }
 
     private void OnCloakTick(object? sender, EventArgs e)
