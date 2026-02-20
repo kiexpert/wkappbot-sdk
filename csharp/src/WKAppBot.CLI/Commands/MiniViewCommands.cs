@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using FlaUI.Core.Conditions;
+using FlaUI.Core.Definitions;
+using FlaUI.UIA3;
 using WKAppBot.WebBot;
 
 namespace WKAppBot.CLI;
@@ -171,71 +174,12 @@ internal partial class Program
                     }
                     catch { /* skip URL update if CDP busy */ }
 
-                    // Get page content snippet for display
+                    // Get page content via UIA (Accessibility) — "장애인의 눈으로 본 웹"
                     try
                     {
-                        var axJs = @"(() => {
-                            // 1. If user is interacting with a form element, show that
-                            const el = document.activeElement;
-                            if (el && el !== document.body && el !== document.documentElement) {
-                                const tag = el.tagName?.toLowerCase() || '';
-                                if (['input','textarea','select'].includes(tag)) {
-                                    const label = el.getAttribute('aria-label') || el.getAttribute('placeholder') || '';
-                                    const val = el.value ? el.value.substring(0, 80) : '';
-                                    return `[${tag}] ${label} = ""${val}""`;
-                                }
-                            }
-
-                            // 2. Extract page content: title + main text
-                            const parts = [];
-
-                            // Title: prefer article headline, fallback to document.title
-                            const h1 = document.querySelector('h1, h2.media_end_head_headline, .article_header h2, #articleTitle, .news_headline h4');
-                            const title = h1 ? h1.textContent.trim() : document.title.replace(/ - WKWebBot.*/, '');
-                            if (title) parts.push(title);
-
-                            // Main content: try common article selectors
-                            const contentSel = [
-                                '#dic_area', '#articleBodyContents', '#articeBody',
-                                'article', '[itemprop=""articleBody""]',
-                                '.article_body', '.news_body', '.article-body',
-                                '.newsct_article', '#newsct_article',
-                                'main', '.content', '#content'
-                            ];
-                            let body = '';
-                            for (const sel of contentSel) {
-                                const node = document.querySelector(sel);
-                                if (node) {
-                                    body = node.innerText?.trim() || '';
-                                    if (body.length > 30) break;
-                                }
-                            }
-
-                            // Fallback: grab visible text from body paragraphs
-                            if (body.length < 30) {
-                                const ps = document.querySelectorAll('p');
-                                const texts = [];
-                                for (const p of ps) {
-                                    const t = p.innerText?.trim();
-                                    if (t && t.length > 20) texts.push(t);
-                                    if (texts.join(' ').length > 500) break;
-                                }
-                                body = texts.join(' ');
-                            }
-
-                            // Truncate to reasonable length for overlay
-                            if (body.length > 500) body = body.substring(0, 497) + '...';
-                            if (body) parts.push(body);
-
-                            return parts.join('\n\n') || document.title;
-                        })()";
-                        var axTask = cdp.EvalAsync(axJs);
-                        if (axTask.Wait(2000))
-                        {
-                            var axText = axTask.Result?.ToString() ?? "";
-                            if (axText.Length > 0)
-                                host.UpdateAccessibilityText(axText);
-                        }
+                        var axText = ExtractWebContentViaUia(chromeHwnd);
+                        if (!string.IsNullOrEmpty(axText))
+                            host.UpdateAccessibilityText(axText);
                     }
                     catch { /* skip content update if busy */ }
                 }
@@ -282,6 +226,188 @@ internal partial class Program
         Console.WriteLine($"[MINIVIEW] Stopped ({frameCount} frames, {sw.Elapsed.TotalSeconds:F1}s)");
         cdp.Dispose();
         return 0;
+    }
+
+    /// <summary>
+    /// Extract web page content via UIA (Accessibility tree) — "장애인의 눈으로 본 웹".
+    /// Reads Chrome's accessibility tree instead of executing JavaScript.
+    /// Requires Chrome launched with --force-renderer-accessibility flag.
+    /// </summary>
+    /// <param name="chromeHwnd">Chrome window handle (for UIA access)</param>
+    /// <param name="maxLen">Maximum content length</param>
+    /// <returns>Page title + body text, or null if not available</returns>
+    internal static string? ExtractWebContentViaUia(IntPtr chromeHwnd, int maxLen = 500)
+    {
+        if (chromeHwnd == IntPtr.Zero) return null;
+
+        try
+        {
+            using var automation = new UIA3Automation();
+            var window = automation.FromHandle(chromeHwnd);
+            if (window == null) return null;
+
+            var cf = new ConditionFactory(new UIA3PropertyLibrary());
+
+            // Find the web document: Document with aid="RootWebArea"
+            var docs = window.FindAllDescendants(
+                cf.ByControlType(ControlType.Document));
+            if (docs == null || docs.Length == 0) return null;
+
+            // Find the Document that is NOT "Claude" (that would be the Claude Desktop overlay)
+            // The web page Document has its title as Name or empty name
+            FlaUI.Core.AutomationElements.AutomationElement? webDoc = null;
+            foreach (var doc in docs)
+            {
+                try
+                {
+                    var name = doc.Name ?? "";
+                    if (name != "Claude" && doc.AutomationId == "RootWebArea")
+                    {
+                        webDoc = doc;
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            // Fallback: if standalone Chrome (not inside Claude Desktop), just take the first Document
+            webDoc ??= docs.FirstOrDefault(d =>
+            {
+                try { return d.AutomationId == "RootWebArea"; }
+                catch { return false; }
+            });
+
+            if (webDoc == null) return null;
+
+            var parts = new List<string>();
+
+            // 1. Try to find article title via known aid patterns
+            string? title = null;
+            try
+            {
+                // Naver news: aid="title_area"
+                var titleElem = webDoc.FindFirstDescendant(
+                    cf.ByAutomationId("title_area"));
+                title = titleElem?.Name?.Trim();
+            }
+            catch { }
+
+            if (string.IsNullOrEmpty(title))
+            {
+                // Fallback: first Heading element
+                try
+                {
+                    var headings = webDoc.FindAllDescendants(
+                        cf.ByControlType(ControlType.Header));
+                    foreach (var h in headings)
+                    {
+                        try
+                        {
+                            var text = h.Name?.Trim();
+                            if (!string.IsNullOrEmpty(text) && text.Length > 5)
+                            {
+                                title = text;
+                                break;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            if (string.IsNullOrEmpty(title))
+            {
+                // Use document name as title (Chrome sets this from <title>)
+                title = webDoc.Name?.Trim();
+                // Remove " - WKWebBot v0.1" suffix
+                if (title != null)
+                {
+                    var idx = title.IndexOf(" - WKWebBot", StringComparison.Ordinal);
+                    if (idx > 0) title = title[..idx];
+                }
+            }
+
+            if (!string.IsNullOrEmpty(title))
+                parts.Add(title);
+
+            // 2. Extract article body text via known aid (dic_area for Naver news)
+            var bodyBuilder = new StringBuilder();
+            try
+            {
+                // Try known article container IDs
+                var articleContainer = webDoc.FindFirstDescendant(cf.ByAutomationId("dic_area"))
+                    ?? webDoc.FindFirstDescendant(cf.ByAutomationId("articleBodyContents"))
+                    ?? webDoc.FindFirstDescendant(cf.ByAutomationId("articeBody"))
+                    ?? webDoc.FindFirstDescendant(cf.ByAutomationId("newsct_article"));
+
+                if (articleContainer != null)
+                {
+                    // Collect all Text elements inside the article container
+                    var texts = articleContainer.FindAllDescendants(
+                        cf.ByControlType(ControlType.Text));
+                    foreach (var t in texts)
+                    {
+                        try
+                        {
+                            var text = t.Name?.Trim();
+                            if (!string.IsNullOrEmpty(text) && text.Length > 1 && text != "\n")
+                            {
+                                bodyBuilder.Append(text);
+                                bodyBuilder.Append(' ');
+                            }
+                            if (bodyBuilder.Length > maxLen) break;
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+
+            // 3. Fallback: collect all visible Text elements from the page
+            if (bodyBuilder.Length < 30)
+            {
+                try
+                {
+                    var allTexts = webDoc.FindAllDescendants(
+                        cf.ByControlType(ControlType.Text));
+                    foreach (var t in allTexts)
+                    {
+                        try
+                        {
+                            var rect = t.BoundingRectangle;
+                            // Only on-screen elements (Y > 0, reasonable position)
+                            if (rect.Y < 0 || rect.Height < 5) continue;
+
+                            var text = t.Name?.Trim();
+                            if (string.IsNullOrEmpty(text) || text.Length <= 2) continue;
+                            // Skip navigation/UI labels
+                            if (text == "|" || text == "WKWebBot") continue;
+                            // Skip already collected title
+                            if (text == title) continue;
+
+                            bodyBuilder.Append(text);
+                            bodyBuilder.Append(' ');
+                            if (bodyBuilder.Length > maxLen) break;
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            var body = bodyBuilder.ToString().Trim();
+            if (body.Length > maxLen)
+                body = body[..(maxLen - 3)] + "...";
+            if (!string.IsNullOrEmpty(body))
+                parts.Add(body);
+
+            return parts.Count > 0 ? string.Join("\n\n", parts) : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Find Chrome main window by PID (for click-to-restore).</summary>

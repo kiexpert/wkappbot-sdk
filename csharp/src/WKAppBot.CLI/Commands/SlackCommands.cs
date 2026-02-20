@@ -428,39 +428,7 @@ internal partial class Program
         bool webBotClaudeBusy = false;     // Claude is currently busy
         int webBotReconnectBackoff = 0;    // Reconnect backoff counter
         string? webBotStatusChannel = defaultChannel; // Channel for status messages
-
-        // WebBot content extraction JS (same as MiniView)
-        const string WebBotContentJs = @"(() => {
-            const parts = [];
-            const h1 = document.querySelector('h1, h2.media_end_head_headline, .article_header h2, #articleTitle, .news_headline h4');
-            const title = h1 ? h1.textContent.trim() : document.title.replace(/ - WKWebBot.*/, '');
-            if (title) parts.push(title);
-            const contentSel = [
-                '#dic_area', '#articleBodyContents', '#articeBody',
-                'article', '[itemprop=""articleBody""]',
-                '.article_body', '.news_body', '.article-body',
-                '.newsct_article', '#newsct_article',
-                'main', '.content', '#content'
-            ];
-            let body = '';
-            for (const sel of contentSel) {
-                const node = document.querySelector(sel);
-                if (node) { body = node.innerText?.trim() || ''; if (body.length > 30) break; }
-            }
-            if (body.length < 30) {
-                const ps = document.querySelectorAll('p');
-                const texts = [];
-                for (const p of ps) {
-                    const t = p.innerText?.trim();
-                    if (t && t.length > 20) texts.push(t);
-                    if (texts.join(' ').length > 400) break;
-                }
-                body = texts.join(' ');
-            }
-            if (body.length > 400) body = body.substring(0, 397) + '...';
-            if (body) parts.push(body);
-            return parts.join('\n\n') || document.title;
-        })()";
+        IntPtr webBotChromeHwnd = IntPtr.Zero; // Chrome window handle for UIA content extraction
 
         // WebBot: initial CDP connection attempt
         if (webBotMode)
@@ -550,7 +518,8 @@ internal partial class Program
                             ref webBotCdp, ref webBotStatusTs,
                             ref webBotLastUrl, ref webBotLastContent,
                             ref webBotClaudeBusy, ref webBotReconnectBackoff,
-                            promptHelper, WebBotContentJs);
+                            ref webBotChromeHwnd,
+                            promptHelper);
                     }
                     catch (Exception ex)
                     {
@@ -1830,13 +1799,15 @@ internal partial class Program
     /// <summary>
     /// WebBot monitor tick — called every ~6 seconds from the listen loop.
     /// Checks if Claude is busy, then streams WebBot page content to Slack.
+    /// Content extracted via UIA (Accessibility) instead of CDP JavaScript.
     /// </summary>
     static void WebBotMonitorTick(
         string botToken, string channel,
         ref CdpClient? cdp, ref string? statusTs,
         ref string? lastUrl, ref string? lastContent,
         ref bool claudeBusy, ref int reconnectBackoff,
-        ClaudePromptHelper? promptHelper, string contentJs)
+        ref IntPtr chromeHwnd,
+        ClaudePromptHelper? promptHelper)
     {
         // 1. Check if Claude is busy (UIA: "중단" button visible)
         bool nowBusy = IsClaudeBusy(promptHelper);
@@ -1874,7 +1845,7 @@ internal partial class Program
         if (!claudeBusy)
             return;
 
-        // 2. Connect to CDP if not connected
+        // 2. Connect to CDP if not connected (for URL retrieval)
         if (cdp == null || !cdp.IsConnected)
         {
             if (reconnectBackoff > 0)
@@ -1890,6 +1861,10 @@ internal partial class Program
                 cdp.ConnectAsync(9222).GetAwaiter().GetResult();
                 Console.WriteLine("[SLACK] WebBot: Reconnected to Chrome");
                 reconnectBackoff = 0;
+
+                // Find Chrome window handle for UIA content extraction
+                if (cdp.ChromePid > 0)
+                    chromeHwnd = FindChromeHwndByPid(cdp.ChromePid);
             }
             catch
             {
@@ -1900,8 +1875,8 @@ internal partial class Program
             }
         }
 
-        // 3. Get URL + content from WebBot
-        string? url = null, content = null;
+        // 3. Get URL from CDP (fast, lightweight)
+        string? url = null;
         try
         {
             var urlTask = cdp!.GetUrlAsync();
@@ -1910,18 +1885,26 @@ internal partial class Program
         }
         catch { }
 
-        try
+        // 4. Get content via UIA (Accessibility) — "장애인의 눈"
+        string? content = null;
+        if (chromeHwnd == IntPtr.Zero && cdp?.ChromePid > 0)
+            chromeHwnd = FindChromeHwndByPid(cdp.ChromePid);
+
+        if (chromeHwnd != IntPtr.Zero)
         {
-            var contentTask = cdp!.EvalAsync(contentJs);
-            if (contentTask.Wait(3000))
-                content = contentTask.Result?.ToString();
+            content = ExtractWebContentViaUia(chromeHwnd, 400);
+            if (!string.IsNullOrEmpty(content))
+            {
+                // Log UIA content to console for debugging
+                var preview = content.Length > 80 ? content[..77] + "..." : content;
+                Console.WriteLine($"[SLACK] WebBot [UIA]: {preview}");
+            }
         }
-        catch { }
 
         if (string.IsNullOrEmpty(url) && string.IsNullOrEmpty(content))
             return;
 
-        // 4. Check if anything changed
+        // 5. Check if anything changed
         bool urlChanged = url != lastUrl;
         bool contentChanged = content != lastContent;
         if (!urlChanged && !contentChanged && statusTs != null)
@@ -1930,11 +1913,11 @@ internal partial class Program
         lastUrl = url;
         lastContent = content;
 
-        // 5. Get Claude's current status for the message
+        // 6. Get Claude's current status for the message
         var claudeStatus = GetClaudeStatusText(promptHelper);
         var message = FormatWebBotStatus(url, content, claudeStatus);
 
-        // 6. Send or update Slack message
+        // 7. Send or update Slack message
         if (statusTs == null)
         {
             // First message — create new
@@ -1957,6 +1940,33 @@ internal partial class Program
                     statusTs = ts2;
             }
         }
+    }
+
+    /// <summary>Find Chrome main window handle by PID.</summary>
+    static IntPtr FindChromeHwndByPid(int pid)
+    {
+        if (pid <= 0) return IntPtr.Zero;
+
+        IntPtr found = IntPtr.Zero;
+        var sb = new System.Text.StringBuilder(256);
+        NativeMethods.EnumWindows((hwnd, _) =>
+        {
+            NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
+            if (sb.ToString() != "Chrome_WidgetWin_1") return true;
+            if (!NativeMethods.IsWindowVisible(hwnd)) return true;
+
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint wpid);
+            if ((int)wpid != pid) return true;
+
+            // Check for WS_CAPTION (main window, not popup)
+            var style = NativeMethods.GetWindowLongW(hwnd, -16);
+            if ((style & 0x00C00000) == 0) return true;
+
+            found = hwnd;
+            return false;
+        }, IntPtr.Zero);
+
+        return found;
     }
 
     /// <summary>Format WebBot status message for Slack (text only, no images).</summary>
