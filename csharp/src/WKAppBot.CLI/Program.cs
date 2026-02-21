@@ -45,7 +45,13 @@ internal partial class Program
         var exeName = Path.GetFileName(exePath);
         var logDir = Path.Combine(DataDir, "logs");
         var pid = Environment.ProcessId;
-        var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.pid={pid}.txt");
+        // Include command name in log filename for easy identification via ls
+        // e.g. "wkappbot.exe.out-20260221_211427.eye.pid=36944.txt"
+        var cmdTag = args.Length > 0 ? args[0].ToLowerInvariant().Replace(" ", "-") : "noargs";
+        // For multi-word commands like "slack send", include subcommand too
+        if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow")
+            cmdTag += $"-{args[1].ToLowerInvariant()}";
+        var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
         using var tee = new TeeTextWriter(Console.Out, logFile);
         Console.SetOut(tee);
 
