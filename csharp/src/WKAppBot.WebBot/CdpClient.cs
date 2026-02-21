@@ -427,13 +427,17 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     }
 
     /// <summary>Evaluate JavaScript and return the result as string.</summary>
-    public async Task<string?> EvalAsync(string expression)
+    public async Task<string?> EvalAsync(string expression, bool awaitPromise = false)
     {
-        var result = await SendAsync("Runtime.evaluate", new JsonObject
+        var parameters = new JsonObject
         {
             ["expression"] = expression,
             ["returnByValue"] = true,
-        });
+        };
+        if (awaitPromise)
+            parameters["awaitPromise"] = true;
+
+        var result = await SendAsync("Runtime.evaluate", parameters);
 
         var valueNode = result?["result"]?["value"];
         if (valueNode == null) return null;
@@ -691,6 +695,49 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
 
     private const int SW_MINIMIZE = 6;
     private const int SW_SHOWMINNOACTIVE = 7;  // Show minimized without activating
+
+    /// <summary>
+    /// Set files on a file input element (e.g., for file upload).
+    /// Uses CDP DOM.setFileInputFiles to programmatically set files without opening a file dialog.
+    /// </summary>
+    public async Task<bool> SetFileInputAsync(string selector, string filePath)
+    {
+        // Enable DOM domain (required for DOM operations)
+        await SendAsync("DOM.enable");
+
+        // Get document root first
+        await SendAsync("DOM.getDocument");
+
+        // Get the element's remote object via Runtime.evaluate
+        var evalResult = await SendAsync("Runtime.evaluate", new JsonObject
+        {
+            ["expression"] = $"document.querySelector('{selector}')",
+            ["returnByValue"] = false
+        });
+
+        var objectId = evalResult?["result"]?["objectId"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(objectId))
+            return false;
+
+        // Request DOM node for the JS object
+        var reqResult = await SendAsync("DOM.requestNode", new JsonObject
+        {
+            ["objectId"] = objectId
+        });
+
+        var nodeId = reqResult?["nodeId"]?.GetValue<int>() ?? 0;
+        if (nodeId == 0)
+            return false;
+
+        // Set the file using DOM.setFileInputFiles with nodeId
+        await SendAsync("DOM.setFileInputFiles", new JsonObject
+        {
+            ["files"] = new JsonArray { filePath },
+            ["nodeId"] = nodeId
+        });
+
+        return true;
+    }
 
     /// <summary>Wait for an element to appear (polling).</summary>
     public async Task<bool> WaitForElementAsync(string selector, int timeoutMs = 5000)

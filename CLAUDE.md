@@ -1,5 +1,52 @@
 # WKAppBot - Windows App Automation Test Framework
 
+## 동료 클롯을 위한 운영 규칙 (필독!)
+
+### 질문/소통
+- **유저에게 질문할 때**: 반드시 **Slack과 Claude Code 여기에 동시에** 전달할 것
+  - `wkappbot slack send "질문 내용"` + 여기(프롬프트)에도 출력
+  - 슬랙만 보내거나 여기에만 물어보면 안 됨!
+- **작업 중 상황 공유**: 슬랙에도 현황을 알려줘야 유저가 모바일에서도 확인 가능
+
+### 앱봇의 눈 (AppBotEye)
+- **항상 떠있어야 함**: 모든 CLI 명령 실행 시 AppBotEye 자동 spawn
+- `eye`, `slack`, `help`, `validate` 제외하고 모든 명령에서 자동 실행
+- AppBotEye = Slack 데몬 통합 → 별도 `slack listen` 불필요
+
+### Slack + 프롬프트 전달
+- Slack 수신 메시지는 **항상** Claude 프롬프트에 전달 (옵션 없음)
+- 키워드 감시("클롯", "claude", "appbot" 등)도 **항상** 활성
+- `--prompt`, `--keywords`, `--no-slack` 같은 옵션은 **존재하지 않음**
+- 프롬프트 입력 실패 시: 전경 윈도우 진단 + Slack에 상황 공유 (계획승인/권한창 가능성)
+
+### 빌드 & 배포
+- 코드 변경 후 **반드시** `dotnet publish` + AppBotEye 재시작까지 완료할 것
+- 빌드 명령: `"$DOTNET_ROOT/dotnet" publish ... --verbosity quiet` (MEMORY.md 참조)
+- 기존 wkappbot 프로세스 kill → publish → `wkappbot eye &`로 재시작
+
+### 문서화 (토큰 안전)
+- **중요 발견/전략은 반드시 CLAUDE.md + 소스 주석에 기록** (컨텍스트 유실 대비!)
+- 다음 세션의 클롯이 처음부터 다시 삽질하지 않게 노하우를 남겨야 함
+- `knowhow.md`도 적극 활용 (컨트롤별 자동화 노하우)
+
+### 에러 대응
+- 방해꾼 창, 프롬프트 유실 등 예외 상황은 항상 **스냅샷(wkappbot snapshot) + Slack 공유**
+- 조용히 실패하지 말고 반드시 진단 결과를 남길 것
+
+### Slack 메시지 스타일
+- 상태 변화는 `chat.update`로 동일 메시지 수정 (채널 스팸 방지)
+- 새 이벤트/에러는 새 메시지로 전송
+
+### HTS 자동화 핵심
+- MFC 컨트롤은 UIA 패턴이 거의 없음 → Win32 메시지(BM_CLICK, WM_LBUTTON 등) 폴백 필수
+- SmartClickButton 3티어: BM_CLICK → WM_LBUTTON → SendInput
+- 영웅문은 owner-drawn → GetWindowText 빈 문자열 → OCR 폴백
+
+### 금지 사항
+- 클롯에게 전달을 차단하는 옵션 절대 만들지 말 것
+- 앱봇의 눈을 안 띄우는 옵션 만들지 말 것
+- 유저에게 여기(프롬프트)에서만 질문하지 말 것 (반드시 슬랙 동시 발송)
+
 ## Overview
 Claude Code 터미널에서 사용하는 범용 Windows 앱 UI 자동화 테스트 도구.
 YAML 시나리오 기반으로 Windows 앱을 자동 조작하고 결과를 검증한다.
@@ -38,6 +85,7 @@ W:/GitHub/WKAppBot/
 │       │   │   ├── ActionExecutor.cs    # 액션 실행기 (click, type, assert 등) + EnsureFocus
 │       │   │   ├── BackgroundWatcher.cs # [WATCH] 패시브 백그라운드 요소 추적
 │       │   │   ├── RuntimeContext.cs    # 런타임 상태 (변수, ActionPoint, StepResult, FocusConfig)
+│       │   │   ├── ActionState.cs       # IPC 상태 모델 — JSON 파일로 AppBotEye와 공유
 │       │   │   └── DialogHandlerManager.cs # [BLOCK] 방해꾼 핸들러 로더/매처/학습
 │       │   └── Scenario/
 │       │       ├── Models.cs            # YAML 데이터 모델 (ScenarioConfig에 focus 설정 포함)
@@ -56,7 +104,7 @@ W:/GitHub/WKAppBot/
 │       │   │   ├── HtsInterop.cs        # HTS MDI 스트레스 테스트 (3패턴)
 │       │   │   └── ControlMap.cs        # 컨트롤 매핑
 │       │   ├── Accessibility/
-│       │   │   └── UiaLocator.cs        # FlaUI UIA 요소 탐색/조작 + PatternMatcher
+│       │   │   └── UiaLocator.cs        # FlaUI UIA 요소 탐색/조작 + PatternMatcher + 9패턴 풀 지원
 │       │   └── Input/
 │       │       ├── MouseInput.cs        # SendInput 마우스 (절대좌표)
 │       │       ├── KeyboardInput.cs     # SendInput 키보드 + VK 매핑
@@ -88,29 +136,26 @@ W:/GitHub/WKAppBot/
 ## Build & Run
 
 ### dotnet 경로
-```
-W:\SDK\dotnet\dotnet.exe
-```
+- 시스템 환경변수 `DOTNET_ROOT` 등록됨 → `$DOTNET_ROOT/dotnet` 사용
 
 ### 빌드 (bash)
 ```bash
-'W:/SDK/dotnet/dotnet.exe' build 'W:/GitHub/WKAppBot/csharp/WKAppBot.sln' -c Release --verbosity quiet
+"$DOTNET_ROOT/dotnet" build 'W:/GitHub/WKAppBot/csharp/WKAppBot.sln' -c Release --verbosity quiet
 ```
 
 ### 빌드 (PowerShell)
 ```powershell
-& 'W:\SDK\dotnet\dotnet.exe' build 'W:\GitHub\WKAppBot\csharp\WKAppBot.sln' -c Release --verbosity quiet
+& "$env:DOTNET_ROOT\dotnet.exe" build 'W:\GitHub\WKAppBot\csharp\WKAppBot.sln' -c Release --verbosity quiet
 ```
 
 ### 실행 (4칙연산 테스트 — bash)
 ```bash
-DOTNET_ROOT='W:/SDK/dotnet' 'W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/bin/Release/net8.0-windows10.0.22621.0/wkappbot.exe' run 'W:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml' -v
+wkappbot run 'W:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml' -v
 ```
 
 ### 실행 (PowerShell)
 ```powershell
-$env:DOTNET_ROOT = 'W:\SDK\dotnet'
-& 'W:\GitHub\WKAppBot\csharp\src\WKAppBot.CLI\bin\Release\net8.0-windows10.0.22621.0\wkappbot.exe' run 'W:\GitHub\WKAppBot\scenarios\calc_four_ops.yaml' -v
+wkappbot run 'W:\GitHub\WKAppBot\scenarios\calc_four_ops.yaml' -v
 ```
 
 ### CLI 명령어
@@ -132,7 +177,10 @@ wkappbot ocr <window-title|image.png> [--save] [-o output.txt]
 wkappbot web <subcommand> [options]   # WebBot CDP 웹 자동화
 wkappbot slack <subcommand>           # Slack Socket Mode 양방향 메시징
 wkappbot knowhow <subcommand>        # 컨트롤별 자동화 노하우 기록/읽기
-wkappbot miniview [--port N] [--interval N] [--size WxH] [--pos X,Y]  # 클롣의 눈 라이브 오버레이
+wkappbot eye [--port N] [--interval N] [--size WxH] [--pos X,Y]  # WK AppBot Eye (Slack+Prompt 항상 ON)
+wkappbot eye --app "투혼" [--interval N] [--size WxH] [--pos X,Y]  # 앱봇의 눈 (일반 앱 UIA 추적 모드)
+wkappbot schedule <subcommand>       # 스케줄 관리 (자동 복구, 예약 프롬프트)
+wkappbot snapshot <window-title> [--tag <name>] [--depth N]  # UIA+스크린샷+OCR 원샷 캡처
 ```
 
 ### knowhow 명령 (컨트롤별 자동화 노하우)
@@ -158,8 +206,8 @@ wkappbot slack test
 
 # Socket Mode 리스너 시작 (@mention에 자동 응답)
 wkappbot slack listen
-wkappbot slack listen --bg --prompt --keywords  # 백그라운드 데몬 (프롬프트 전달 + 키워드 감시)
-wkappbot slack listen --prompt --keywords --webbot  # + WebBot 현황 스트리밍 (Claude busy 시)
+wkappbot slack listen --bg                        # 백그라운드 데몬 (프롬프트 전달 + 키워드 항상 ON)
+wkappbot slack listen --webbot                    # + WebBot 현황 스트리밍 (Claude busy 시)
 
 # 메시지 전송/답장
 wkappbot slack send "Hello from WKAppBot!"
@@ -178,8 +226,7 @@ wkappbot slack catch-up [--prompt]              # 놓친 메시지 따라잡기
 - @mention 이벤트 수신 → 자동 응답 (listen 모드)
 - chat.postMessage API로 메시지 전송
 - files:write 스코프로 파일/스크린샷 업로드 (v2 3단계 API)
-- --prompt: 슬랙 메시지를 Claude Code 프롬프트에 직접 입력
-- --keywords: 키워드(클롯, claude, appbot 등) 감지 시 자동 전달
+- Prompt 전달 + 키워드 감시: 항상 ON (옵션 불필요)
 - 설정: `wkappbot.hq/profiles/slack_exp/webhook.json`
 
 ### web 명령 (Chrome DevTools Protocol 웹 자동화)
@@ -280,6 +327,41 @@ wkappbot scan "영웅문" --ocr --save --detail
 - `--detail`: per-control latest.png + text_history.jsonl 저장 (opt-in, 시간 소요)
 - `--depth N`: 트리 탐색 깊이 (기본 1)
 
+### schedule 명령 (예약 프롬프트 + 자동 복구)
+```bash
+# 시간 지정 1회 실행
+wkappbot schedule add --at "16:00" --prompt "작업 재개"
+wkappbot schedule add --at "09:30" --prompt-file ./recovery.md
+
+# rate limit 리셋 시 자동 실행
+wkappbot schedule add --on-limit-reset --prompt "CLAUDE.md 읽고 작업 재개"
+
+# 반복 실행 (interval: Nm=분, Nh=시간)
+wkappbot schedule add --every 30m --prompt "slack catch-up 확인" --max-runs 3
+
+# 목록/삭제/전체삭제
+wkappbot schedule list
+wkappbot schedule remove <id>
+wkappbot schedule clear [--pending]
+```
+- 스케줄 파일: `wkappbot.hq/runtime/schedule.json`
+- AppBotEye 폴링 루프에서 ~10초마다 체크 → 시간 도래 시 Claude 프롬프트에 자동 입력
+- `on_limit_reset`: rate limit 해제 감지 시 자동 실행 (AppBotEye UIA 감지 연동)
+- `--notify-slack` (기본 true): 실행 시 Slack 알림
+- PC 재부팅 대응: AppBotEye 시작 시 과거 pending 항목 즉시 실행
+
+### snapshot 명령 (진단용 원샷 캡처)
+```bash
+# 기본 사용 (UIA 트리 + 스크린샷 + OCR + info.json)
+wkappbot snapshot "Claude" --tag rate_limit --depth 8
+
+# 간단 캡처
+wkappbot snapshot "영웅문" --tag hts --depth 5
+```
+- 저장: `wkappbot.hq/output/snapshots/{tag}_{yyyyMMdd_HHmmss}/`
+- 4개 파일: `uia_tree.txt`, `screenshot.png`, `ocr.txt`, `info.json`
+- 용도: rate limit 등 특수 상태에서 UIA 구조 기록 → 탐지 로직 보완
+
 ### HTS 스트레스 테스트 옵션
 ```
 wkappbot hts-stress <form.xmf> [options]
@@ -308,8 +390,14 @@ wkappbot hts-stress <form.xmf> [options]
 | Click (좌표) | ❌ NO | SendInput → EnsureFocus |
 | TypeText (UIA Value) | ✅ YES | `Patterns.Value.SetValue()` — 포커스 불필요! |
 | TypeText (SendInput) | ❌ NO | KeyboardInput → EnsureFocus |
+| Toggle (UIA Toggle) | ✅ YES | `TryToggle()` / `TrySetToggle()` — 포커스 불필요! |
+| Expand/Collapse (UIA) | ✅ YES | `TryExpand()` / `TryCollapse()` — 포커스 불필요! |
+| Select (UIA SelectionItem) | ✅ YES | `TrySelect()` — 포커스 불필요! |
+| Scroll (UIA Scroll) | ✅ YES | `TryScroll()` — 포커스 불필요! (SendInput 폴백) |
+| SetRange (UIA RangeValue) | ✅ YES | `TrySetRangeValue()` — 포커스 불필요! |
+| Window Close/Min/Max | ✅ YES | `TryWindowClose()` / `TrySetWindowState()` — 포커스 불필요! |
 | PressKey/Hotkey | ❌ NO | SendInput → EnsureFocus |
-| Scroll | ❌ NO | SendInput → EnsureFocus |
+| Scroll (SendInput) | ❌ NO | MouseInput.Scroll → EnsureFocus |
 | Assert | ✅ YES | UIA GetText — 포커스 불필요 |
 | Screenshot | ✅ YES | PrintWindow/BitBlt — 포커스 불필요 |
 | Wait | ✅ YES | Thread.Sleep |
@@ -531,8 +619,16 @@ teardown:
 | `hotkey` | 복합 키 입력 | - | keys[] |
 | `wait` | 대기 | - | seconds |
 | `assert` | 값 검증 (focusless) | automation_id/name | type, expected |
-| `scroll` | 스크롤 | - | direction, amount |
+| `scroll` | 스크롤 (UIA Scroll 우선, SendInput 폴백) | automation_id/name | direction, amount |
 | `screenshot` | 스크린샷 저장 (focusless — PrintWindow) | - | filename |
+| `toggle` | 체크박스/토글 (UIA Toggle, focusless!) | automation_id/name | checked (bool) |
+| `expand` | 트리/콤보 확장 (UIA ExpandCollapse, focusless!) | automation_id/name | - |
+| `collapse` | 트리/콤보 축소 (UIA ExpandCollapse, focusless!) | automation_id/name | - |
+| `select` | 리스트/탭 선택 (UIA SelectionItem, focusless!) | automation_id/name | item_text |
+| `set_range` | 슬라이더 값 설정 (UIA RangeValue, focusless!) | automation_id/name | value (double) |
+| `window_close` | 윈도우 닫기 (UIA Window, focusless!) | automation_id/name | - |
+| `window_minimize` | 윈도우 최소화 (UIA Window, focusless!) | automation_id/name | - |
+| `window_maximize` | 윈도우 최대화 (UIA Window, focusless!) | automation_id/name | - |
 
 ### Assert 타입
 - `text_contains`, `text_equals`, `text_starts_with`, `text_not_empty`
@@ -579,15 +675,38 @@ teardown:
 - **윈도우 스타일 특성 완료**: GWL_STYLE/GWL_EXSTYLE 수집 → ControlExperience 저장 + info.json per tree folder
 - **Slack Socket Mode 완료**: 양방향 메시징 — WebSocket으로 @mention 수신 + chat.postMessage 전송 (zero deps)
 - **Slack 파일 업로드 완료**: files:write 스코프 + v2 3단계 API (getUploadURL → PUT → complete)
-- **Slack→Claude 프롬프트 브릿지 완료**: --prompt 모드로 슬랙 메시지를 Claude Code 프롬프트에 직접 입력
-- **키워드 감시 완료**: --keywords 모드로 "클롯/claude/appbot" 등 키워드 감지 → 자동 전달
+- **Slack→Claude 프롬프트 브릿지 완료**: 슬랙 메시지를 Claude Code 프롬프트에 직접 입력 (항상 ON)
+- **키워드 감시 완료**: "클롯/claude/appbot" 등 키워드 감지 → 자동 전달 (항상 ON)
 - **웹봇 Slack API 자동화 완료**: CDP로 api.slack.com OAuth 페이지에서 스코프 추가 + 앱 재설치 자동 수행
 - **HandlePromptLost 완료**: 프롬프트 유실 시 전경 윈도우 스크린샷 → Slack 업로드 (원격 진단)
 - **knowhow.md 완료**: 컨트롤별 자동화 노하우 기록 (Win32 + Web) — CLI + SmartClickButton 자동 기록
-- **MiniView 완료**: Claude Desktop 우상단 오버레이 — WebBot 라이브 스크린샷 + 콘텐츠 표시 (cloaking/hot-reload)
+- **AppBotEye 완료**: Claude Desktop 우상단 오버레이 — WebBot 라이브 스크린샷 + 콘텐츠 표시 (cloaking/hot-reload)
+- **AppBotEye App Mode 완료**: `--app` 플래그로 일반 Windows 앱 UIA 요소 실시간 추적 (PrintWindow + 커서 기반 요소 탐지)
+- **ActionState IPC 완료**: JSON 파일 기반 프로세스 간 상태 공유 — 모든 CLI 명령이 "마지막 관심사"를 기록, AppBotEye가 읽기
+- **AppBotEye 통합 모드 완료**: ActionState 최우선 표시 + 커서 기반 폴백 + Claude Desktop UIA 상태 감지 (계획승인/실행중/대기)
+- **ActionState CLI Write 완료**: do/dismiss/input/web/scan 모든 CLI 명령에서 ActionState.Write() 호출
+- **Slack AppBotEye 통합 완료**: `--slack` 플래그로 AppBotEye 프로세스 내 Slack Socket Mode 리스너 동시 실행
+- **Claude 상태 자동 표시 완료**: AppBotEye fallback 시 Claude Desktop UIA 상태를 자동 탐지하여 표시
 - **Slack WebBot 스트리밍 완료**: --webbot 모드로 Claude busy 시 WebBot 현황을 Slack chat.update로 실시간 갱신
 - **Claude busy 감지 완료**: UIA "중단" 버튼 탐지 + StatusBar 텍스트로 현재 작업 상태 추출
 - **UIA 웹 콘텐츠 추출 완료**: --force-renderer-accessibility로 Chrome UIA 트리에서 웹 페이지 텍스트 직접 읽기 (CDP JS 대체)
+- **UIA 패턴 풀 지원 완료**: 8→18 액션, 6개 새 패턴 (Toggle/ExpandCollapse/SelectionItem/Scroll/RangeValue/Window) — 전부 Focusless!
+- **inspect 패턴 표시 완료**: DumpTree에 17개 UIA 패턴 감지 + 출력 (GetSupportedPatterns)
+- **Rate Limit 탐지 완료**: Claude Desktop UIA 텍스트에서 "hit your limit" 감지 + 리셋 시간 파싱 + ActionState 기록 + Slack 알림
+- **Schedule 시스템 완료**: JSON 기반 예약 프롬프트 (once/on_limit_reset/recurring) + CLI + AppBotEye 자동 실행기
+- **Snapshot 명령 완료**: `wkappbot snapshot` — UIA tree + 스크린샷 + OCR + info.json 원샷 진단 캡처
+- **MiniView→AppBotEye 리네이밍 완료**: 모든 파일/클래스/CLI명령/로그태그 통일 (MiniView→AppBotEye)
+- **Slack Block Kit 버튼 완료**: 플랜 승인 시 [수락]/[거절] 인터랙티브 버튼 → Socket Mode로 block_actions 수신 → UIA Invoke로 Claude 승인 클릭
+- **response_url 버튼 비활성 완료**: 버튼 클릭 후 원본 메시지를 결과 텍스트로 교체 (버튼 제거)
+- **Slack+Prompt 항상 ON 완료**: `--slack`/`--no-slack`/`--prompt`/`--keywords` 옵션 전부 제거 → 항상 활성
+- **WK AppBot Eye 브랜딩 완료**: 윈도우 타이틀 + 헤더 "WK AppBot Eye"로 통일
+- **Slack 상태 스트리밍 완료**: Claude 상태 변화를 chat.update로 동일 메시지 수정 (스팸 방지)
+- **키움 OpenAPI+ 설치 완료**: `C:\OpenAPI\KHOpenAPI.ocx` 32비트 ActiveX + COM 등록 확인
+- **ComInspect 도구 완료**: `tools/ComInspect.cs` — OCX TypeLib에서 메서드/이벤트 자동 열거 (32비트 .NET Framework)
+- **키움 COM TypeLib 분석 완료**: 58 methods + 9 events 자동 열거 → `C:\OpenAPI\khopenapi_typelib.md`
+- **옵션 대정리 완료**: `--prompt`/`--keywords`/`--no-slack` 전부 삭제 → Slack+프롬프트+키워드 항상 ON (옵션 없음)
+- **AppBotEye 자동 실행 완료**: 모든 CLI 명령 실행 시 AppBotEye 자동 spawn (eye/slack/help/validate 제외)
+- **프롬프트 실패 진단 완료**: FindPrompt 실패 시 전경 윈도우 진단 + Slack 상황 공유 (계획승인/권한창 가능성 안내)
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -811,17 +930,39 @@ teardown:
   3. "허용" 버튼 클릭
   4. **bot_token은 재설치 후에도 동일** (webhook_url만 변경될 수 있음)
 
-### MiniView — "클롣의 눈" 라이브 오버레이 ✅
-**상태**: 완료
+### AppBotEye — "앱봇의 눈" 라이브 오버레이 ✅
+**상태**: 완료 (통합 모드 + Slack 데몬 통합 포함)
 - Claude Desktop 우상단에 자동 배치되는 반투명 오버레이 윈도우
-- WebBot Chrome 스크린샷 라이브 스트리밍 (~10fps) + 콘텐츠 텍스트 표시
+- **통합 모드** (기본, 플래그 없이 `wkappbot eye`):
+  - ActionState IPC를 최우선 읽어 앱봇의 마지막 관심사 표시 (UIA 정보 + 액션 이름)
+  - ActionState stale(>30초) 또는 없으면 커서 기반 UIA 추적으로 폴백
+  - Claude Desktop UIA 상태 감지: 실행중(중단 버튼)/계획승인 대기/프롬프트 입력 대기
+  - Fallback 모드에서 "(앱봇 대기 중)" 대신 "Claude: 실행 중" / "Claude: 계획승인 대기" / "Claude: 프롬프트 입력 대기" 자동 표시
+  - **모든 CLI 명령에서 AppBotEye 자동 실행** (eye/slack/help/validate 제외, 블랙리스트 방식)
+- **Slack 기본 ON** (`--no-slack`으로 끄기): Slack Socket Mode 리스너 통합 (별도 프로세스 없이 AppBotEye 안에서 Slack 양방향 통신)
+  - `SetupSlackEventHandlers()`로 OnMention/OnMessage 이벤트 핸들러 등록
+  - AppBotEye + Slack 데몬이 하나의 프로세스에서 동시 실행
+- **Block Kit 인터랙티브 버튼**: 플랜 승인 시 [수락]/[거절] 버튼 Slack에 전송
+  - Socket Mode `type: "interactive"` → `block_actions` 페이로드 수신
+  - `OnBlockAction` 이벤트: action_id, value, userId, responseUrl 파싱
+  - 수락 → `ClickApproveButton()` UIA Invoke, 거절 → `TypePlanFeedback()` 입력
+  - `response_url` POST로 원본 메시지 교체 (버튼 제거, 결과 텍스트만 남김)
+- **Slack 상태 스트리밍**: Claude 상태 변화를 chat.update로 동일 메시지 수정 (스팸 방지)
+  - `slackStatusTs` 추적: 첫 메시지 → `SlackSendViaApi`, 이후 → `SlackUpdateMessageAsync`
+  - `lastSlackStatusText` 비교: 텍스트 변경 시에만 업데이트
+- **Web Mode** (`--port N`): WebBot Chrome 스크린샷 + 콘텐츠 텍스트 (CDP + UIA)
+- **App Mode** (`--app "앱이름"`): 일반 Windows 앱 PrintWindow 스크린샷 + 커서 위 UIA 요소 실시간 추적
+- **ActionState IPC** (`wkappbot.hq/runtime/action_state.json`):
+  - 모든 CLI 명령이 "마지막 건드린 요소" 기록 → AppBotEye가 폴링으로 읽기
+  - 원자적 쓰기 (`.tmp` → `File.Move`), best-effort 읽기
+  - ScenarioRunner가 매 스텝 후 자동 기록 (UIA 정보 + 액션 + 진행률)
 - **UIA 콘텐츠 추출**: CDP JavaScript 대신 Chrome Accessibility 트리에서 페이지 텍스트 읽기
   - `--force-renderer-accessibility` Chrome 플래그로 웹 콘텐츠 UIA 노출
   - `ExtractWebContentViaUia()`: Document[aid="RootWebArea"] → title_area → dic_area → Text 수집
 - **Cloaking**: 10초 동안 페이지 변화 없으면 자동 페이드아웃 (타이머 기반)
 - **Hot-reload**: EXE 파일 변경 감지 시 자동 종료 (빌드 후 자동 재시작)
-- **Click-to-restore**: 오버레이 클릭 시 Chrome 원본 윈도우 ShowWindow
-- 파일: `MiniViewCommands.cs`, `MiniViewWindow.cs`, `MiniViewHost.cs`
+- **Click-to-restore**: 오버레이 클릭 시 대상 앱/Chrome 원본 윈도우 ShowWindow
+- 파일: `AppBotEyeCommands.cs`, `AppBotEyeWindow.cs`, `AppBotEyeHost.cs`, `ActionState.cs`
 
 ### Slack WebBot 라이브 스트리밍 — "클롯이 바쁠 때 슬랙에서 현황 확인" ✅
 **상태**: 완료
@@ -842,12 +983,58 @@ teardown:
   2. `aid="dic_area"` 하위 Text → 기사 본문
   3. 폴백: Document 하위 모든 Text 요소 수집 (Y > 0, 2자 이상)
 - **장점**: DOM 셀렉터 의존 없음, 사이트 구조 변경에 강건, 포커스 불필요
-- **용도**: MiniView 오버레이 + Slack 스트리밍 양쪽에서 공용 사용
+- **용도**: AppBotEye 오버레이 + Slack 스트리밍 양쪽에서 공용 사용
 - **Claude Desktop UIA 발견사항**:
   - `[Button] "중단"` = Claude 작업 중 (Stop 버튼)
   - `[StatusBar] → [Text]` = 도구 사용 설명 (e.g., "파일 읽음", "명령 실행함")
   - `[Group] "입력하세요" aid="turn-form"` = 프롬프트 입력 영역
   - `[RadioButton] "Chat"/"Cowork"/"Code"` = 모드 선택기
+
+### WebBot contentEditable 입력 노하우 — "GPT/Gemini 삽질기"
+**상태**: 완료 (ChatGPT + Gemini 실전 검증)
+- **핵심 문제**: ChatGPT(ProseMirror), Gemini(Quill) 등 리치 에디터는 `<input>` 아님 → `el.value=` 무효
+- **CDP TypeAsync 한계**: 내부가 `el.value = text` 기반이라 contentEditable에서 전부 실패
+- **정답 패턴** (범용, 대부분의 contentEditable 에디터에서 동작):
+  ```javascript
+  var el = document.querySelector('.ql-editor'); // or #prompt-textarea
+  el.focus();
+  var sel = window.getSelection();
+  var range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false); // cursor to end
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.execCommand('insertText', false, text);
+  ```
+- **텍스트 지우기**: `document.execCommand('selectAll')` → `document.execCommand('delete')`
+- **ChatGPT 전송**: `button[data-testid='send-button']` 또는 composer 내 SVG 버튼
+- **Gemini 전송**: `button[aria-label='메시지 보내기']`
+- **Gemini 응답 읽기**: `document.querySelectorAll('model-response')` → 마지막 `.textContent`
+- **ChatGPT 응답 읽기**: `[data-message-author-role='assistant']` → 마지막 `.textContent`
+- **AppBotEye 연동**: 웹봇 커맨드마다 WM_APP 시그널 → 미니뷰 자동 Uncloak (클로킹 상태에서도 깨어남)
+
+### Rate Limit 탐지 + Schedule 자동 복구 + Snapshot ✅
+**상태**: 완료
+- **Rate Limit 탐지** (`AppBotEyeClaudeDetector.cs`):
+  - Claude Desktop UIA 텍스트에서 "hit your limit" / "limit" + "reset" 감지
+  - `ParseResetTime()`: "resets 4pm (Asia/Seoul)" → DateTime 변환 (12h/24h 양쪽 지원)
+  - ActionState에 `IsRateLimited`, `RateLimitResetAt` 기록
+  - Slack에 `:warning:` + "Claude 한도 초과" 알림
+- **Schedule 시스템** (`ScheduleManager.cs` + `ScheduleCommands.cs`):
+  - 3종 스케줄: `once` (시간 지정), `on_limit_reset` (리밋 해제 시), `recurring` (반복)
+  - JSON 파일 영속화: `wkappbot.hq/runtime/schedule.json` (atomic .tmp→Move)
+  - CLI: `wkappbot schedule add/list/remove/clear`
+  - `--prompt "텍스트"` 또는 `--prompt-file ./path.md`
+  - 안전장치: `--max-runs N`, `--expires HH:mm`
+- **AppBotEye 스케줄 실행기** (`AppBotEyeAppMode.cs`):
+  - ~10초마다 `GetDueItems()` 체크 → Claude 프롬프트에 자동 입력
+  - `wasRateLimited → !rateLimited` 전환 감지 → `on_limit_reset` 항목 실행
+  - 시작 시 과거 pending 항목 즉시 실행 (PC 재부팅 대응)
+  - 실행 후 Slack 알림
+- **Snapshot 명령** (`SnapshotCommand.cs`):
+  - `wkappbot snapshot "Claude" --tag rate_limit --depth 8`
+  - UIA tree + PrintWindow 스크린샷 + OCR + info.json 원샷 캡처
+  - 다음 리밋 때 UIA 구조 기록 → 탐지 로직 보완용
 
 ### Phase 11B: 웹봇 고급 기능 — "크롬이 할 수 있는 건 다 한다"
 **상태**: 로드맵
@@ -859,6 +1046,78 @@ teardown:
 - **이벤트 리스닝**: CDP 이벤트 구독 (페이지 로드, 다이얼로그 등)
 - **프록시/인증**: Chrome 실행 인자로 프록시 설정
 - **활용 시나리오**: GPT 웹 활용, 포털 자동화, 웹 크롤링, API 테스트
+
+### Phase 13: 키움 OpenAPI+ 프록시봇 — "32비트 ActiveX를 64비트에서"
+**상태**: 설치 완료 + COM TypeLib 분석 완료, 프록시봇 구현 진행 중
+
+#### 설치 정보 (실측)
+- **설치 경로**: `C:\OpenAPI\KHOpenAPI.ocx` (492KB, 32비트)
+- **ProgID**: `KHOPENAPI.KHOpenAPICtrl.1`
+- **CLSID**: `{A1574A0D-6BFA-4BD7-9020-DED88711818D}`
+- **TypeLib GUID**: `{6D8C2B4D-EF41-4750-8AD4-C299033833FB}` v1.2
+- **Dispatch IID**: `{CF20FBB6-EDD4-4BE5-A473-FEF91977DEB6}` (메서드)
+- **Event IID**: `{7335F12D-8973-4BD5-B7F0-12DF03D175B7}` (이벤트)
+- **ThreadingModel**: Apartment (STA 필수!)
+- **레지스트리**: `HKCR\WOW6432Node\CLSID\{A1574A0D-...}` (32비트 전용)
+- **필수 조건**: 키움 계좌 + OpenAPI 서비스 등록 + 모의투자 신청
+- **개발 도구**: KOA Studio (`C:\OpenAPI\KOAStudioSA.exe`) — TR 테스트, FID 조회
+
+#### COM 인터페이스 (TypeLib 자동 열거)
+```
+KHOpenAPI (COCLASS)
+├── [default] _DKHOpenAPI (58 methods) — IDispatch
+└── [source]  _DKHOpenAPIEvents (9 events) — ConnectionPoint
+```
+
+**주요 메서드 (58개)**:
+| 카테고리 | 메서드 |
+|---------|--------|
+| 연결 | `CommConnect()`, `CommTerminate()`, `GetConnectState()` |
+| 로그인 | `GetLoginInfo(tag)` — ACCNO/USER_ID/SERVER_TYPE 등 |
+| 주문 | `SendOrder(9 params)`, `SendOrderFO(10)`, `SendOrderCredit(11)` |
+| 조회 | `SetInputValue(id,val)` → `CommRqData(name,tr,next,scr)` → `GetCommData(tr,rec,idx,item)` |
+| 실시간 | `SetRealReg(scr,codes,fids,opt)`, `GetCommRealData(tr,fid)`, `SetRealRemove(scr,code)` |
+| 종목 | `GetMasterCodeName(code)`, `GetCodeListByMarket(mkt)`, `GetMasterLastPrice(code)` |
+| 조건검색 | `GetConditionLoad()`, `SendCondition(scr,name,idx,search)`, `GetConditionNameList()` |
+| 선물옵션 | `GetFutureList()`, `GetOptionCode(...)`, `GetSFutureList(...)` 등 다수 |
+| 유틸 | `KOA_Functions(name,param)`, `GetAPIModulePath()`, `CommKwRqData(codes,...)` |
+
+**이벤트 (9개)**:
+| 이벤트 | 파라미터 | 용도 |
+|--------|---------|------|
+| `OnEventConnect` | nErrCode | 로그인 결과 |
+| `OnReceiveTrData` | scrNo, rqName, trCode, recName, prevNext, ... | TR 조회 응답 |
+| `OnReceiveRealData` | realKey, realType, realData | 실시간 시세 |
+| `OnReceiveMsg` | scrNo, rqName, trCode, msg | 서버 메시지 |
+| `OnReceiveChejanData` | gubun, itemCnt, fidList | 체결/잔고 |
+| `OnReceiveConditionVer` | ret, msg | 조건식 로드 완료 |
+| `OnReceiveTrCondition` | scrNo, codeList, condName, idx, next | 조건검색 결과 |
+| `OnReceiveRealCondition` | trCode, type, condName, condIdx | 실시간 조건 |
+| `OnReceiveInvestRealData` | realKey | 투자자 실시간 |
+
+#### ComInspect 도구
+- `tools/ComInspect.cs` — .NET Framework 4 / C# 5 / 32비트
+- 빌드: `csc /platform:x86 ComInspect.cs`
+- 실행: `ComInspect.exe [ocx-path] [output-path]`
+- 임의의 OCX/DLL → TypeLib 로드 → 메서드/이벤트/프로퍼티 자동 열거
+- 결과: `C:\OpenAPI\khopenapi_typelib.md`
+
+#### 아키텍처
+```
+[앱봇 64비트] ←─ Named Pipe ──→ [프록시봇 32비트] ←─ COM ──→ [키움 OpenAPI+]
+   .NET 8 x64                      .NET 8 x86            KHOpenAPI.ocx
+```
+- **32비트 .NET 런타임 필요**: 현재 시스템에 64비트만 설치됨 → self-contained publish 필요
+- **IPC 후보** (우선순위):
+  1. Named Pipe (가장 깔끔, 양방향, .NET 기본 지원)
+  2. WM_COPYDATA (이미 앱봇에 인프라 있음, 단방향성)
+  3. gRPC (복잡한 양방향 스트리밍 필요 시)
+- **프록시봇 역할**: COM 초기화(STA) + IDispatch.Invoke + ConnectionPoint 이벤트 수신 + Named Pipe 서버
+- **앱봇 역할**: Named Pipe 클라이언트 → 프록시에 조회/주문 명령 전달 + 결과 수신 + UI 자동화 병행
+- **Phase A**: 프록시봇 스켈레톤 (32비트 EXE + COM 호스팅 + Named Pipe 서버)
+- **Phase B**: 앱봇 클라이언트 (Named Pipe 연결 + 명령/응답 프로토콜)
+- **Phase C**: 키움 OpenAPI+ 연동 (로그인, 조건검색, 실시간 시세, 주문)
+- **활용**: HTS UI 자동화(Phase 1~7)와 API 직접 호출을 병행 → 최강 조합
 
 ### 앱봇의 눈 — 장기 비전 (Vision Roadmap)
 
@@ -926,12 +1185,15 @@ W:/SDK/bin/                          # PATH에 등록된 유틸 폴더
     │                   └── Button_3785/
     │                       ├── latest.png       # 컨트롤 스크린샷
     │                       └── text_history.jsonl
+    ├── runtime/                     # 런타임 IPC 파일
+    │   ├── action_state.json        # ActionState — CLI→AppBotEye 상태 공유
+    │   └── schedule.json            # 예약 프롬프트 (once/on_limit_reset/recurring)
     ├── logs/                        # 실행 로그
     └── output/                      # 스크린샷, 차트 분석 결과, toolbar 캡처
 ```
 
 - `dotnet publish` → csproj PostPublish가 EXE + handlers 자동 복사
-- `DOTNET_ROOT='W:/SDK/dotnet' wkappbot <command>` — 어디서든 실행 가능
+- `wkappbot <command>` — 어디서든 실행 가능 (DOTNET_ROOT 시스템 환경변수 등록됨)
 
 ## HTS 영웅문 자동화 노하우
 
@@ -1026,4 +1288,4 @@ candle[i] = columns[floor(i*dX) .. floor((i+1)*dX))
 ## Important Notes
 - Windows 전용 (.NET 8.0 `net8.0-windows10.0.22621.0`)
 - 한국어 UI 지원 (UTF-8 출력, Unicode Win32 API)
-- **dotnet.exe 경로**: `W:\SDK\dotnet\dotnet.exe`
+- **dotnet.exe 경로**: `$DOTNET_ROOT/dotnet` (시스템 환경변수)

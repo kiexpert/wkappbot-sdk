@@ -115,7 +115,7 @@ public static class WebKnowhow
             .ToList()!;
     }
 
-    internal static string SanitizeDomain(string domain)
+    public static string SanitizeDomain(string domain)
         => string.Join("_", domain.Split(Path.GetInvalidFileNameChars()))
            .Replace(":", "_").Replace("/", "_").Replace("\\", "_");
 

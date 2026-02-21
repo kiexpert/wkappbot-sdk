@@ -138,6 +138,39 @@ public sealed class ActionExecutor : IDisposable
                     DoScroll(step, result);
                     break;
 
+                // ── UIA Pattern actions (all focusless!) ──────────────
+                case "toggle":
+                    DoToggle(step, result);
+                    break;
+
+                case "expand":
+                    DoExpandCollapse(step, result, expand: true);
+                    break;
+
+                case "collapse":
+                    DoExpandCollapse(step, result, expand: false);
+                    break;
+
+                case "select":
+                    DoSelect(step, result);
+                    break;
+
+                case "set_range":
+                    DoSetRange(step, result);
+                    break;
+
+                case "window_close":
+                    DoWindowAction(step, result, "close");
+                    break;
+
+                case "window_minimize":
+                    DoWindowAction(step, result, "minimize");
+                    break;
+
+                case "window_maximize":
+                    DoWindowAction(step, result, "maximize");
+                    break;
+
                 default:
                     throw new InvalidOperationException($"Unknown action: {step.Action}");
             }
@@ -270,12 +303,14 @@ public sealed class ActionExecutor : IDisposable
         var text = _ctx.Resolve(step.Params!.Text);
         SetActionPointToWindowCenter(step.Name, "type_text", $"type \"{text}\"");
 
-        // Focusless attempt: UIA Value pattern (no focus needed!)
+        FlaUI.Core.AutomationElements.AutomationElement? element = null;
+
+        // ── Tier 1: UIA Value pattern (focusless — no focus needed!) ──
         if (_ctx.PreferFocusless && step.Target != null)
         {
             try
             {
-                var (element, _) = LocateElement(step);
+                (element, _) = LocateElement(step);
                 if (element?.Patterns.Value.IsSupported == true)
                 {
                     element.Patterns.Value.Pattern.SetValue(text);
@@ -284,14 +319,100 @@ public sealed class ActionExecutor : IDisposable
                     return;
                 }
             }
-            catch { /* UIA Value not available — fall through to SendInput */ }
+            catch { /* UIA Value not available — fall through */ }
         }
 
-        // SendInput path: focus required
+        // ── Tier 2: WM_CHAR PostMessage (cross-process, queued to target) ──
+        // Best for MFC CMaskEdit, owner-drawn inputs (Gemini recommendation)
+        var hWnd = GetTargetHwnd(step, element);
+        if (hWnd != IntPtr.Zero)
+        {
+            try
+            {
+                // Set focus to target window first (WM_CHAR needs focus on the control)
+                WKAppBot.Win32.Native.NativeMethods.SetFocus(hWnd);
+                Thread.Sleep(50);
+
+                if (KeyboardInput.TypeTextViaWmChar(hWnd, text))
+                {
+                    // Verify: read back text to confirm
+                    Thread.Sleep(100);
+                    var readBack = WKAppBot.Win32.Native.NativeMethods.GetWindowTextW(hWnd);
+                    if (!string.IsNullOrEmpty(readBack) && readBack.Contains(text.Replace(",", "")))
+                    {
+                        result.ActionDetail = $"Type \"{text}\" (WM_CHAR)";
+                        Log($"  Typed via WM_CHAR: \"{text}\"");
+                        return;
+                    }
+                    // WM_CHAR sent but verification failed — try next tier
+                    Log($"  WM_CHAR sent but verify failed (got \"{readBack}\"), trying next...");
+                }
+            }
+            catch { /* WM_CHAR failed — fall through */ }
+        }
+
+        // ── Tier 3: EM_REPLACESEL (Edit control text insertion) ──
+        if (hWnd != IntPtr.Zero)
+        {
+            try
+            {
+                // Select all existing text first, then replace
+                WKAppBot.Win32.Native.NativeMethods.SendMessageW(hWnd,
+                    0x00B1 /*EM_SETSEL*/, IntPtr.Zero, (IntPtr)(-1)); // select all
+                if (KeyboardInput.TypeTextViaEmReplaceSel(hWnd, text))
+                {
+                    Thread.Sleep(50);
+                    var readBack = WKAppBot.Win32.Native.NativeMethods.GetWindowTextW(hWnd);
+                    if (!string.IsNullOrEmpty(readBack) && readBack.Contains(text.Replace(",", "")))
+                    {
+                        result.ActionDetail = $"Type \"{text}\" (EM_REPLACESEL)";
+                        Log($"  Typed via EM_REPLACESEL: \"{text}\"");
+                        return;
+                    }
+                    Log($"  EM_REPLACESEL sent but verify failed (got \"{readBack}\"), trying next...");
+                }
+            }
+            catch { /* EM_REPLACESEL failed — fall through */ }
+        }
+
+        // ── Tier 4: SendInput Unicode (physical input, most reliable, needs focus) ──
         EnsureFocus();
         KeyboardInput.TypeText(text);
-        result.ActionDetail = $"Type \"{text}\"";
-        Log($"  Typed: \"{text}\"");
+        result.ActionDetail = $"Type \"{text}\" (SendInput)";
+        Log($"  Typed via SendInput: \"{text}\"");
+    }
+
+    /// <summary>
+    /// Get the native window handle for the target element.
+    /// Used by WM_CHAR/EM_REPLACESEL tiers.
+    /// </summary>
+    private IntPtr GetTargetHwnd(StepDefinition step, FlaUI.Core.AutomationElements.AutomationElement? element)
+    {
+        try
+        {
+            // Try UIA element's native window handle first
+            if (element != null)
+            {
+                var hwndProp = element.Properties.NativeWindowHandle;
+                if (hwndProp.IsSupported)
+                    return hwndProp.Value;
+            }
+
+            // Try locating element if not already done
+            if (element == null && step.Target != null)
+            {
+                var (el, _) = LocateElement(step);
+                if (el != null)
+                {
+                    var hwndProp = el.Properties.NativeWindowHandle;
+                    if (hwndProp.IsSupported)
+                        return hwndProp.Value;
+                }
+            }
+        }
+        catch { }
+
+        return IntPtr.Zero;
     }
 
     private void DoPressKey(StepDefinition step, StepResult result)
@@ -391,11 +512,290 @@ public sealed class ActionExecutor : IDisposable
     {
         var direction = step.Params?.Direction ?? "down";
         var amount = step.Params?.Amount ?? 3;
+
+        // ── Try UIA Scroll pattern first (focusless!) ──
+        if (_ctx.PreferFocusless && step.Target != null)
+        {
+            try
+            {
+                var (element, method) = LocateElement(step);
+                if (element != null)
+                {
+                    var hAmount = FlaUI.Core.Definitions.ScrollAmount.NoAmount;
+                    var vAmount = FlaUI.Core.Definitions.ScrollAmount.NoAmount;
+
+                    switch (direction.ToLowerInvariant())
+                    {
+                        case "down":
+                            vAmount = amount > 3
+                                ? FlaUI.Core.Definitions.ScrollAmount.LargeIncrement
+                                : FlaUI.Core.Definitions.ScrollAmount.SmallIncrement;
+                            break;
+                        case "up":
+                            vAmount = amount > 3
+                                ? FlaUI.Core.Definitions.ScrollAmount.LargeDecrement
+                                : FlaUI.Core.Definitions.ScrollAmount.SmallDecrement;
+                            break;
+                        case "right":
+                            hAmount = FlaUI.Core.Definitions.ScrollAmount.SmallIncrement;
+                            break;
+                        case "left":
+                            hAmount = FlaUI.Core.Definitions.ScrollAmount.SmallDecrement;
+                            break;
+                    }
+
+                    if (UiaLocator.TryScroll(element, hAmount, vAmount))
+                    {
+                        var elemDesc = step.Target.AutomationId ?? step.Target.Name ?? "?";
+                        result.ActionDetail = $"Scroll {direction} {amount} on {elemDesc} (UIA Scroll, {method}, focusless)";
+                        Log($"  Scrolled {direction} via UIA Scroll ({method}, focusless)");
+                        return;
+                    }
+                }
+            }
+            catch { /* UIA Scroll not available — fall through to SendInput */ }
+        }
+
+        // ── Fallback: SendInput mouse wheel (requires focus) ──
         int clicks = direction.ToLowerInvariant() == "up" ? amount : -amount;
-        EnsureFocus();  // SendInput required
+        EnsureFocus();
         MouseInput.Scroll(clicks);
         result.ActionDetail = $"Scroll {direction} {amount}";
         Log($"  Scrolled {direction} {amount}");
+    }
+
+    // ── UIA Pattern actions (all focusless!) ─────────────────────
+
+    /// <summary>
+    /// Toggle a checkbox or toggle button.
+    /// Focusless via UIA Toggle pattern, click fallback.
+    /// </summary>
+    private void DoToggle(StepDefinition step, StepResult result)
+    {
+        var (element, method) = LocateElement(step);
+        if (element == null)
+            throw new InvalidOperationException($"Cannot locate element for toggle: {step.Target?.AutomationId ?? step.Target?.Name ?? "(no target)"}");
+
+        var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
+
+        // Read current state first
+        var beforeState = UiaLocator.GetToggleState(element);
+        var stateStr = beforeState?.ToString() ?? "?";
+
+        // If specific state requested, use TrySetToggle
+        if (step.Params?.Checked != null)
+        {
+            if (UiaLocator.TrySetToggle(element, step.Params.Checked.Value))
+            {
+                var afterState = UiaLocator.GetToggleState(element);
+                result.ActionDetail = $"Toggle {elemDesc} → {(step.Params.Checked.Value ? "ON" : "OFF")} ({method}, focusless)";
+                Log($"  Toggle set to {(step.Params.Checked.Value ? "ON" : "OFF")} via UIA ({method}, focusless) [{stateStr} → {afterState}]");
+                return;
+            }
+        }
+        else
+        {
+            // Just toggle (no specific target state)
+            if (UiaLocator.TryToggle(element))
+            {
+                var afterState = UiaLocator.GetToggleState(element);
+                result.ActionDetail = $"Toggle {elemDesc} ({method}, focusless) [{stateStr} → {afterState}]";
+                Log($"  Toggled via UIA ({method}, focusless) [{stateStr} → {afterState}]");
+                return;
+            }
+        }
+
+        // Fallback: click the element
+        var center = UiaLocator.GetCenter(element);
+        if (center != null)
+        {
+            var verify = VerifiedEnsureFocus(center.Value.x, center.Value.y,
+                expectedAid: step.Target?.AutomationId);
+            MouseInput.Click(center.Value.x, center.Value.y);
+            result.ActionDetail = $"Toggle {elemDesc} ({center.Value.x},{center.Value.y}) ({method}, click fallback, {verify})";
+            Log($"  Toggled via click fallback ({verify})");
+            return;
+        }
+
+        throw new InvalidOperationException($"Toggle failed: no UIA Toggle pattern and no click target for {elemDesc}");
+    }
+
+    /// <summary>
+    /// Expand or collapse a tree node, combo box, or group.
+    /// Focusless via UIA ExpandCollapse pattern.
+    /// </summary>
+    private void DoExpandCollapse(StepDefinition step, StepResult result, bool expand)
+    {
+        var (element, method) = LocateElement(step);
+        if (element == null)
+            throw new InvalidOperationException($"Cannot locate element for {(expand ? "expand" : "collapse")}");
+
+        var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
+        var action = expand ? "Expand" : "Collapse";
+
+        var beforeState = UiaLocator.GetExpandCollapseState(element);
+
+        bool success = expand
+            ? UiaLocator.TryExpand(element)
+            : UiaLocator.TryCollapse(element);
+
+        if (success)
+        {
+            var afterState = UiaLocator.GetExpandCollapseState(element);
+            result.ActionDetail = $"{action} {elemDesc} ({method}, focusless) [{beforeState} → {afterState}]";
+            Log($"  {action}ed via UIA ({method}, focusless) [{beforeState} → {afterState}]");
+            return;
+        }
+
+        // Fallback: click + arrow key for expand, click for collapse
+        var center = UiaLocator.GetCenter(element);
+        if (center != null)
+        {
+            var verify = VerifiedEnsureFocus(center.Value.x, center.Value.y,
+                expectedAid: step.Target?.AutomationId);
+            MouseInput.Click(center.Value.x, center.Value.y);
+            result.ActionDetail = $"{action} {elemDesc} ({center.Value.x},{center.Value.y}) ({method}, click fallback, {verify})";
+            return;
+        }
+
+        throw new InvalidOperationException($"{action} failed for {elemDesc}");
+    }
+
+    /// <summary>
+    /// Select an item in a list, combo, or tab.
+    /// Focusless via UIA SelectionItem pattern.
+    /// Params: itemText (find child by name), or target directly identifies the item.
+    /// </summary>
+    private void DoSelect(StepDefinition step, StepResult result)
+    {
+        var (element, method) = LocateElement(step);
+        if (element == null)
+            throw new InvalidOperationException("Cannot locate element for select");
+
+        var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
+
+        // If itemText specified, find the child item to select
+        if (step.Params?.ItemText != null)
+        {
+            // Search children for the item with matching name
+            var itemText = step.Params.ItemText;
+            AutomationElement? item = null;
+
+            try
+            {
+                var children = element.FindAllChildren();
+                foreach (var child in children)
+                {
+                    try
+                    {
+                        if (string.Equals(child.Name, itemText, StringComparison.OrdinalIgnoreCase))
+                        {
+                            item = child;
+                            break;
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            if (item != null && UiaLocator.TrySelect(item))
+            {
+                result.ActionDetail = $"Select \"{itemText}\" in {elemDesc} ({method}, focusless)";
+                Log($"  Selected \"{itemText}\" via UIA SelectionItem ({method}, focusless)");
+                return;
+            }
+
+            throw new InvalidOperationException($"Cannot select item \"{itemText}\" in {elemDesc}");
+        }
+
+        // Direct selection (target is the item itself)
+        if (UiaLocator.TrySelect(element))
+        {
+            result.ActionDetail = $"Select {elemDesc} ({method}, focusless)";
+            Log($"  Selected via UIA SelectionItem ({method}, focusless)");
+            return;
+        }
+
+        // Fallback: click
+        var center = UiaLocator.GetCenter(element);
+        if (center != null)
+        {
+            var verify = VerifiedEnsureFocus(center.Value.x, center.Value.y,
+                expectedAid: step.Target?.AutomationId);
+            MouseInput.Click(center.Value.x, center.Value.y);
+            result.ActionDetail = $"Select {elemDesc} ({center.Value.x},{center.Value.y}) ({method}, click fallback, {verify})";
+            return;
+        }
+
+        throw new InvalidOperationException($"Select failed for {elemDesc}");
+    }
+
+    /// <summary>
+    /// Set a range value (slider, progress bar, spinner).
+    /// Focusless via UIA RangeValue pattern.
+    /// </summary>
+    private void DoSetRange(StepDefinition step, StepResult result)
+    {
+        var (element, method) = LocateElement(step);
+        if (element == null)
+            throw new InvalidOperationException("Cannot locate element for set_range");
+
+        var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
+        var value = step.Params?.Value ?? throw new InvalidOperationException("set_range requires params.value");
+
+        var before = UiaLocator.GetRangeValueInfo(element);
+        if (UiaLocator.TrySetRangeValue(element, value))
+        {
+            var after = UiaLocator.GetRangeValueInfo(element);
+            result.ActionDetail = $"SetRange {elemDesc} → {value} ({method}, focusless) [{before?.Value} → {after?.Value}]";
+            Log($"  Set range to {value} via UIA RangeValue ({method}, focusless)");
+            return;
+        }
+
+        throw new InvalidOperationException($"SetRange failed for {elemDesc} (value={value}, range={before})");
+    }
+
+    /// <summary>
+    /// Close, minimize, or maximize a window.
+    /// Focusless via UIA Window pattern.
+    /// </summary>
+    private void DoWindowAction(StepDefinition step, StepResult result, string action)
+    {
+        var (element, method) = LocateElement(step);
+        if (element == null)
+            throw new InvalidOperationException($"Cannot locate element for window_{action}");
+
+        var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
+
+        bool success = action switch
+        {
+            "close" => UiaLocator.TryWindowClose(element),
+            "minimize" => UiaLocator.TrySetWindowState(element,
+                FlaUI.Core.Definitions.WindowVisualState.Minimized),
+            "maximize" => UiaLocator.TrySetWindowState(element,
+                FlaUI.Core.Definitions.WindowVisualState.Maximized),
+            _ => false
+        };
+
+        if (success)
+        {
+            result.ActionDetail = $"Window {action} {elemDesc} ({method}, focusless)";
+            Log($"  Window {action} via UIA ({method}, focusless)");
+            return;
+        }
+
+        // Fallback for close: Alt+F4
+        if (action == "close")
+        {
+            EnsureFocus();
+            KeyboardInput.Hotkey(new[] { "alt", "F4" });
+            result.ActionDetail = $"Window close {elemDesc} (Alt+F4 fallback)";
+            Log($"  Window close via Alt+F4 fallback");
+            return;
+        }
+
+        throw new InvalidOperationException($"Window {action} failed for {elemDesc}");
     }
 
     // ── Element location (5-tier chain) ────────────────────────

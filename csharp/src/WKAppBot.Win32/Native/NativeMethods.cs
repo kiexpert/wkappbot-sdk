@@ -53,6 +53,38 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+    // ── GUI thread info (cross-validate focus target) ────────────
+    [StructLayout(LayoutKind.Sequential)]
+    public struct GUITHREADINFO
+    {
+        public int cbSize;
+        public int flags;
+        public IntPtr hwndActive;
+        public IntPtr hwndFocus;
+        public IntPtr hwndCapture;
+        public IntPtr hwndMenuOwner;
+        public IntPtr hwndMoveSize;
+        public IntPtr hwndCaret;
+        public RECT rcCaret;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO pgui);
+
+    /// <summary>
+    /// Get the currently focused window in a target process's GUI thread.
+    /// Returns IntPtr.Zero if not available.
+    /// </summary>
+    public static IntPtr GetFocusedHwndInProcess(IntPtr anyHwndInProcess)
+    {
+        GetWindowThreadProcessId(anyHwndInProcess, out _);
+        uint threadId = GetWindowThreadProcessId(anyHwndInProcess, out _);
+        var gti = new GUITHREADINFO { cbSize = Marshal.SizeOf<GUITHREADINFO>() };
+        if (GetGUIThreadInfo(threadId, ref gti))
+            return gti.hwndFocus;
+        return IntPtr.Zero;
+    }
+
     // ── Window rect / state ──────────────────────────────────────
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
@@ -65,6 +97,9 @@ public static partial class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern IntPtr WindowFromPoint(POINT point);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetFocus(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -87,6 +122,9 @@ public static partial class NativeMethods
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr SendMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, StringBuilder lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr SendMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, string lParam);
 
     [DllImport("user32.dll")]
     public static extern bool PostMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
@@ -429,6 +467,14 @@ public static partial class NativeMethods
         }
 
         return IsWindowForeground(hWnd);
+    }
+
+    /// <summary>Get window text as string (convenience wrapper).</summary>
+    public static string GetWindowTextW(IntPtr hWnd)
+    {
+        var sb = new System.Text.StringBuilder(1024);
+        GetWindowTextW(hWnd, sb, sb.Capacity);
+        return sb.ToString();
     }
 }
 

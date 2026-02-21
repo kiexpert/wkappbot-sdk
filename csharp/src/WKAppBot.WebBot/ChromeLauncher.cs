@@ -60,7 +60,8 @@ public static class ChromeLauncher
     /// <param name="url">Initial URL to open (default: about:blank)</param>
     /// <param name="headless">Run headless (no visible window)</param>
     /// <param name="userDataDir">Custom user data dir (null = temp dir for isolation)</param>
-    /// <param name="appMode">Launch in app mode (no address bar/tabs — clean WebView-like window)</param>
+    /// <param name="appMode">Launch in app mode (no address bar/tabs — clean WebView-like window).
+    /// ★ MUST be true by default to avoid mixing with user's normal browser sessions!</param>
     /// <returns>The launched Process, or null if Chrome was already running on that port.</returns>
     public static async Task<Process?> LaunchAsync(
         int port = 9222,

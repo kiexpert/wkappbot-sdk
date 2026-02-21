@@ -48,6 +48,9 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     /// <summary>Fired on any event (raw JSON for extensibility).</summary>
     public event Action<string, JsonNode?>? OnEvent;
 
+    /// <summary>Fired when a Block Kit interactive button is clicked (action_id, user, value, envelope for response_url).</summary>
+    public event Action<SlackBlockAction>? OnBlockAction;
+
     /// <summary>
     /// Connect to Slack via Socket Mode.
     /// </summary>
@@ -221,6 +224,10 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
                     HandleEventsApi(json);
                     break;
 
+                case "interactive":
+                    HandleInteractive(json);
+                    break;
+
                 default:
                     // Unknown type — acknowledge anyway
                     AcknowledgeEnvelope(json);
@@ -250,6 +257,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         var ts = eventNode["ts"]?.GetValue<string>();
         var subtype = eventNode["subtype"]?.GetValue<string>();
         var threadTs = eventNode["thread_ts"]?.GetValue<string>();
+        var botId = eventNode["bot_id"]?.GetValue<string>();
 
         // Skip bot's own messages
         if (user == _botUserId) return;
@@ -267,7 +275,8 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             Text = text ?? "",
             Timestamp = ts ?? "",
             EventType = eventType ?? "",
-            ThreadTs = threadTs
+            ThreadTs = threadTs,
+            BotId = botId
         };
 
         switch (eventType)
@@ -281,6 +290,48 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
                 Console.WriteLine($"[SLACK] Message from {user} in {channel}: {text}");
                 OnMessage?.Invoke(msg);
                 break;
+        }
+    }
+
+    /// <summary>Handle interactive envelope (Block Kit button clicks, etc.).</summary>
+    private void HandleInteractive(JsonNode envelope)
+    {
+        // Must acknowledge within 3 seconds
+        AcknowledgeEnvelope(envelope);
+
+        var payload = envelope["payload"];
+        if (payload == null) return;
+
+        var payloadType = payload["type"]?.GetValue<string>();
+        if (payloadType != "block_actions") return;
+
+        var user = payload["user"]?["id"]?.GetValue<string>() ?? "";
+        var userName = payload["user"]?["username"]?.GetValue<string>() ?? user;
+        var channel = payload["channel"]?["id"]?.GetValue<string>() ?? "";
+        var messageTs = payload["message"]?["ts"]?.GetValue<string>();
+        var responseUrl = payload["response_url"]?.GetValue<string>();
+
+        var actions = payload["actions"]?.AsArray();
+        if (actions == null || actions.Count == 0) return;
+
+        foreach (var action in actions)
+        {
+            if (action == null) continue;
+            var actionId = action["action_id"]?.GetValue<string>() ?? "";
+            var value = action["value"]?.GetValue<string>() ?? "";
+
+            Console.WriteLine($"[SLACK] Block action: {actionId}={value} from {userName} in {channel}");
+
+            OnBlockAction?.Invoke(new SlackBlockAction
+            {
+                ActionId = actionId,
+                Value = value,
+                UserId = user,
+                UserName = userName,
+                Channel = channel,
+                MessageTs = messageTs,
+                ResponseUrl = responseUrl
+            });
         }
     }
 
@@ -345,4 +396,20 @@ public record SlackMessage
     public string EventType { get; init; } = "";
     /// <summary>Thread parent timestamp. Present when this message is a thread reply.</summary>
     public string? ThreadTs { get; init; }
+    /// <summary>Bot ID. Non-null when the message was sent by a bot (used to filter own messages).</summary>
+    public string? BotId { get; init; }
+}
+
+/// <summary>Slack Block Kit interactive action (button click, etc.).</summary>
+public record SlackBlockAction
+{
+    public string ActionId { get; init; } = "";
+    public string Value { get; init; } = "";
+    public string UserId { get; init; } = "";
+    public string UserName { get; init; } = "";
+    public string Channel { get; init; } = "";
+    /// <summary>Timestamp of the message containing the button.</summary>
+    public string? MessageTs { get; init; }
+    /// <summary>URL for responding to the interaction (can update the original message).</summary>
+    public string? ResponseUrl { get; init; }
 }
