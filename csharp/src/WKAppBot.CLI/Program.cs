@@ -59,6 +59,16 @@ internal partial class Program
             var command = args[0].ToLowerInvariant();
             var restArgs = args.Skip(1).ToArray();
 
+            // Auto-launch AppBotEye for all commands except eye/slack/help/validate
+            // 앱봇이 뭔가 하면 눈은 항상 떠있어야!
+            var noEyeCommands = new HashSet<string> {
+                "eye", "slack", "help", "--help", "-h", "validate"
+            };
+            if (!noEyeCommands.Contains(command))
+            {
+                try { LaunchAppBotEyeIfNeeded(); } catch { /* best-effort */ }
+            }
+
             return command switch
             {
                 "run" => RunCommand(restArgs),
@@ -81,8 +91,12 @@ internal partial class Program
                 "slack" => SlackCommand(restArgs),
                 "knowhow" => KnowhowCommand(restArgs),
                 "stock-scan" => StockScanCommand(restArgs),
-                "miniview" => MiniViewCommand(restArgs),
+                "eye" => AppBotEyeCommand(restArgs),
+                "ask" => AskCommand(restArgs),
+                "input" => InputCommand(restArgs),
                 "dialog-click" => DialogClickCommand(restArgs),
+                "schedule" => ScheduleCommand(restArgs),
+                "snapshot" => SnapshotCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
             };

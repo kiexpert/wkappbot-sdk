@@ -185,6 +185,9 @@ public sealed class ScenarioRunner
 
                 // ── Result line ────────────────────────────────────
                 ctx.StepResults.Add(stepResult);
+
+                // ── ActionState IPC: share step info with AppBotEye ──
+                WriteActionState(doc, step, stepResult, ctx, i, doc.Steps.Count);
                 var statusStr = stepResult.Status == StepStatus.Pass ? "PASS" : "FAIL";
                 var color = stepResult.Status == StepStatus.Pass ? ConsoleColor.Green : ConsoleColor.Red;
 
@@ -404,6 +407,69 @@ public sealed class ScenarioRunner
     private static int SafeWindowWidth()
     {
         try { return Console.WindowWidth; } catch { return 120; }
+    }
+
+    /// <summary>
+    /// Write ActionState IPC file for AppBotEye to read.
+    /// Best-effort: never blocks the main scenario flow.
+    /// </summary>
+    private static void WriteActionState(
+        ScenarioDocument doc, StepDefinition step, StepResult stepResult,
+        RuntimeContext ctx, int stepIndex, int totalSteps)
+    {
+        try
+        {
+            var state = new ActionState
+            {
+                Source = "scenario",
+                WindowTitle = ctx.AppTitle,
+                ProcessName = null, // TODO: extract from ctx if available
+
+                // UIA element info from the last action point
+                ActionName = step.Action,
+                ActionDetail = stepResult.ActionDetail,
+                StepName = step.Name,
+                Status = stepResult.Status switch
+                {
+                    StepStatus.Pass => "pass",
+                    StepStatus.Fail => "fail",
+                    StepStatus.Skip => "skip",
+                    _ => "error"
+                },
+                LocatorMethod = stepResult.LocatorMethod,
+
+                // Scenario progress
+                ScenarioName = doc.Scenario.Name,
+                Progress = $"{stepIndex + 1}/{totalSteps}"
+            };
+
+            // Extract UIA info from target definition
+            if (step.Target != null)
+            {
+                if (!string.IsNullOrEmpty(step.Target.AutomationId))
+                    state.AutomationId = step.Target.AutomationId;
+                if (!string.IsNullOrEmpty(step.Target.Name))
+                    state.ElementName = step.Target.Name;
+                if (!string.IsNullOrEmpty(step.Target.ControlType))
+                    state.ControlType = $"[{step.Target.ControlType}]";
+                // Use automation_id as element name fallback
+                if (string.IsNullOrEmpty(state.ElementName) && !string.IsNullOrEmpty(step.Target.AutomationId))
+                    state.ElementName = step.Target.AutomationId;
+            }
+
+            // Enrich from action point if available (has runtime UIA info)
+            var ap = ctx.LastActionPoint;
+            if (ap != null)
+            {
+                state.ElementName ??= ap.ElementDescription;
+            }
+
+            ActionState.Write(state);
+        }
+        catch
+        {
+            // Best-effort: never crash the scenario
+        }
     }
 }
 

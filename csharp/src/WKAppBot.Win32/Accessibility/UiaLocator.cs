@@ -227,6 +227,358 @@ public sealed class UiaLocator : IDisposable
         return false;
     }
 
+    // ── Toggle Pattern (Checkbox/ToggleButton — focusless!) ──────
+
+    /// <summary>
+    /// Toggle a checkbox or toggle button. Returns true if toggled.
+    /// Focusless — no mouse or focus needed!
+    /// </summary>
+    public static bool TryToggle(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.Toggle;
+            if (pattern.IsSupported)
+            {
+                pattern.Pattern.Toggle();
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Set a toggle to a specific state (on/off).
+    /// Toggles until desired state is reached (max 3 attempts).
+    /// Returns true if final state matches desired state.
+    /// </summary>
+    public static bool TrySetToggle(AutomationElement element, bool desiredOn)
+    {
+        try
+        {
+            var pattern = element.Patterns.Toggle;
+            if (!pattern.IsSupported) return false;
+
+            for (int i = 0; i < 3; i++)
+            {
+                var state = pattern.Pattern.ToggleState.Value;
+                bool isOn = state == FlaUI.Core.Definitions.ToggleState.On;
+                if (isOn == desiredOn) return true;
+                pattern.Pattern.Toggle();
+                Thread.Sleep(50); // brief settle
+            }
+            // Final check
+            var finalState = pattern.Pattern.ToggleState.Value;
+            return (finalState == FlaUI.Core.Definitions.ToggleState.On) == desiredOn;
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Get toggle state: On, Off, or Indeterminate. Null if not supported.
+    /// </summary>
+    public static FlaUI.Core.Definitions.ToggleState? GetToggleState(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.Toggle;
+            if (pattern.IsSupported)
+                return pattern.Pattern.ToggleState.Value;
+        }
+        catch { }
+        return null;
+    }
+
+    // ── ExpandCollapse Pattern (ComboBox/TreeNode — focusless!) ──
+
+    /// <summary>
+    /// Expand a tree node, combo box, or group. Focusless!
+    /// </summary>
+    public static bool TryExpand(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.ExpandCollapse;
+            if (pattern.IsSupported)
+            {
+                pattern.Pattern.Expand();
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Collapse a tree node, combo box, or group. Focusless!
+    /// </summary>
+    public static bool TryCollapse(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.ExpandCollapse;
+            if (pattern.IsSupported)
+            {
+                pattern.Pattern.Collapse();
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Get expand/collapse state. Null if not supported.
+    /// </summary>
+    public static FlaUI.Core.Definitions.ExpandCollapseState? GetExpandCollapseState(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.ExpandCollapse;
+            if (pattern.IsSupported)
+                return pattern.Pattern.ExpandCollapseState.Value;
+        }
+        catch { }
+        return null;
+    }
+
+    // ── SelectionItem Pattern (ListItem/TabItem/ComboItem — focusless!) ──
+
+    /// <summary>
+    /// Select an item in a list, tab, or combo box. Focusless!
+    /// </summary>
+    public static bool TrySelect(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.SelectionItem;
+            if (pattern.IsSupported)
+            {
+                pattern.Pattern.Select();
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Check if an item is currently selected.
+    /// </summary>
+    public static bool? IsSelected(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.SelectionItem;
+            if (pattern.IsSupported)
+                return pattern.Pattern.IsSelected.Value;
+        }
+        catch { }
+        return null;
+    }
+
+    // ── Scroll Pattern (ScrollableContainer — focusless!) ──
+
+    /// <summary>
+    /// Scroll a container in a direction. Focusless!
+    /// Direction: horizontal (true) or vertical (false).
+    /// Amount: SmallIncrement, LargeIncrement, SmallDecrement, LargeDecrement.
+    /// </summary>
+    public static bool TryScroll(AutomationElement element,
+        FlaUI.Core.Definitions.ScrollAmount horizontalAmount,
+        FlaUI.Core.Definitions.ScrollAmount verticalAmount)
+    {
+        try
+        {
+            var pattern = element.Patterns.Scroll;
+            if (pattern.IsSupported)
+            {
+                pattern.Pattern.Scroll(horizontalAmount, verticalAmount);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Set scroll position to a percentage (0-100). Focusless!
+    /// </summary>
+    public static bool TrySetScrollPercent(AutomationElement element,
+        double horizontalPercent, double verticalPercent)
+    {
+        try
+        {
+            var pattern = element.Patterns.Scroll;
+            if (pattern.IsSupported)
+            {
+                pattern.Pattern.SetScrollPercent(horizontalPercent, verticalPercent);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Get scroll info (horizontal/vertical percentages, scrollability).
+    /// Returns null if not supported.
+    /// </summary>
+    public static ScrollInfo? GetScrollInfo(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.Scroll;
+            if (pattern.IsSupported)
+            {
+                return new ScrollInfo
+                {
+                    HorizontalPercent = pattern.Pattern.HorizontalScrollPercent.Value,
+                    VerticalPercent = pattern.Pattern.VerticalScrollPercent.Value,
+                    HorizontallyScrollable = pattern.Pattern.HorizontallyScrollable.Value,
+                    VerticallyScrollable = pattern.Pattern.VerticallyScrollable.Value,
+                    HorizontalViewSize = pattern.Pattern.HorizontalViewSize.Value,
+                    VerticalViewSize = pattern.Pattern.VerticalViewSize.Value,
+                };
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    // ── Window Pattern (Window close/minimize/maximize — focusless!) ──
+
+    /// <summary>
+    /// Close a window via UIA Window pattern. Focusless!
+    /// </summary>
+    public static bool TryWindowClose(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.Window;
+            if (pattern.IsSupported)
+            {
+                pattern.Pattern.Close();
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Set window visual state (Normal, Minimized, Maximized). Focusless!
+    /// </summary>
+    public static bool TrySetWindowState(AutomationElement element,
+        FlaUI.Core.Definitions.WindowVisualState state)
+    {
+        try
+        {
+            var pattern = element.Patterns.Window;
+            if (pattern.IsSupported)
+            {
+                pattern.Pattern.SetWindowVisualState(state);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Get window interaction state (Ready, NotResponding, etc.).
+    /// </summary>
+    public static FlaUI.Core.Definitions.WindowInteractionState? GetWindowInteractionState(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.Window;
+            if (pattern.IsSupported)
+                return pattern.Pattern.WindowInteractionState.Value;
+        }
+        catch { }
+        return null;
+    }
+
+    // ── RangeValue Pattern (Slider/ProgressBar — focusless!) ──
+
+    /// <summary>
+    /// Set a range value (slider, progress bar). Focusless!
+    /// </summary>
+    public static bool TrySetRangeValue(AutomationElement element, double value)
+    {
+        try
+        {
+            var pattern = element.Patterns.RangeValue;
+            if (pattern.IsSupported)
+            {
+                var min = pattern.Pattern.Minimum.Value;
+                var max = pattern.Pattern.Maximum.Value;
+                if (value < min || value > max) return false;
+                pattern.Pattern.SetValue(value);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Get range value info (value, min, max, step). Null if not supported.
+    /// </summary>
+    public static RangeValueInfo? GetRangeValueInfo(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.RangeValue;
+            if (pattern.IsSupported)
+            {
+                return new RangeValueInfo
+                {
+                    Value = pattern.Pattern.Value.Value,
+                    Minimum = pattern.Pattern.Minimum.Value,
+                    Maximum = pattern.Pattern.Maximum.Value,
+                    SmallChange = pattern.Pattern.SmallChange.Value,
+                    LargeChange = pattern.Pattern.LargeChange.Value,
+                    IsReadOnly = pattern.Pattern.IsReadOnly.Value,
+                };
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    // ── Pattern Enumeration (for diagnostics) ──────────────────
+
+    /// <summary>
+    /// Get all supported pattern names for an element.
+    /// Also includes Window pattern which was missing from the original 8.
+    /// </summary>
+    public static List<string> GetSupportedPatterns(AutomationElement element)
+    {
+        var patterns = new List<string>();
+        try { if (element.Patterns.Invoke.IsSupported) patterns.Add("Invoke"); } catch { }
+        try { if (element.Patterns.Value.IsSupported) patterns.Add("Value"); } catch { }
+        try { if (element.Patterns.Toggle.IsSupported) patterns.Add("Toggle"); } catch { }
+        try { if (element.Patterns.SelectionItem.IsSupported) patterns.Add("SelectionItem"); } catch { }
+        try { if (element.Patterns.ExpandCollapse.IsSupported) patterns.Add("ExpandCollapse"); } catch { }
+        try { if (element.Patterns.Scroll.IsSupported) patterns.Add("Scroll"); } catch { }
+        try { if (element.Patterns.Text.IsSupported) patterns.Add("Text"); } catch { }
+        try { if (element.Patterns.RangeValue.IsSupported) patterns.Add("RangeValue"); } catch { }
+        try { if (element.Patterns.Window.IsSupported) patterns.Add("Window"); } catch { }
+        try { if (element.Patterns.Selection.IsSupported) patterns.Add("Selection"); } catch { }
+        try { if (element.Patterns.Grid.IsSupported) patterns.Add("Grid"); } catch { }
+        try { if (element.Patterns.Table.IsSupported) patterns.Add("Table"); } catch { }
+        try { if (element.Patterns.Transform.IsSupported) patterns.Add("Transform"); } catch { }
+        try { if (element.Patterns.ScrollItem.IsSupported) patterns.Add("ScrollItem"); } catch { }
+        try { if (element.Patterns.ItemContainer.IsSupported) patterns.Add("ItemContainer"); } catch { }
+        try { if (element.Patterns.VirtualizedItem.IsSupported) patterns.Add("VirtualizedItem"); } catch { }
+        try { if (element.Patterns.LegacyIAccessible.IsSupported) patterns.Add("LegacyIA"); } catch { }
+        return patterns;
+    }
+
     /// <summary>
     /// Get the text value of an element (Name or Value pattern).
     /// For web elements: if Name and Value are empty, collects text from child Text elements.
@@ -570,7 +922,17 @@ public sealed class UiaLocator : IDisposable
         }
         catch { rectStr = "(?)"; }
 
-        sb.AppendLine($"{indent}[{ctStr}] \"{name}\" aid=\"{aid}\" {rectStr}");
+        // Gather supported patterns for this element
+        var patternStr = "";
+        try
+        {
+            var patterns = GetSupportedPatterns(element);
+            if (patterns.Count > 0)
+                patternStr = $" ({string.Join(",", patterns)})";
+        }
+        catch { }
+
+        sb.AppendLine($"{indent}[{ctStr}] \"{name}\" aid=\"{aid}\" {rectStr}{patternStr}");
 
         try
         {
@@ -692,4 +1054,37 @@ public sealed class PatternMatcher
 
     public override string ToString() =>
         _regex != null ? $"pattern({_regex})" : $"literal({_literal})";
+}
+
+/// <summary>
+/// Scroll position and capability info for Scroll pattern.
+/// </summary>
+public sealed class ScrollInfo
+{
+    public double HorizontalPercent { get; init; }
+    public double VerticalPercent { get; init; }
+    public bool HorizontallyScrollable { get; init; }
+    public bool VerticallyScrollable { get; init; }
+    public double HorizontalViewSize { get; init; }
+    public double VerticalViewSize { get; init; }
+
+    public override string ToString() =>
+        $"H={HorizontalPercent:F0}%({(HorizontallyScrollable ? "scrollable" : "fixed")}) " +
+        $"V={VerticalPercent:F0}%({(VerticallyScrollable ? "scrollable" : "fixed")})";
+}
+
+/// <summary>
+/// Range value info for Slider/ProgressBar.
+/// </summary>
+public sealed class RangeValueInfo
+{
+    public double Value { get; init; }
+    public double Minimum { get; init; }
+    public double Maximum { get; init; }
+    public double SmallChange { get; init; }
+    public double LargeChange { get; init; }
+    public bool IsReadOnly { get; init; }
+
+    public override string ToString() =>
+        $"{Value} [{Minimum}~{Maximum}] step={SmallChange}/{LargeChange}{(IsReadOnly ? " RO" : "")}";
 }

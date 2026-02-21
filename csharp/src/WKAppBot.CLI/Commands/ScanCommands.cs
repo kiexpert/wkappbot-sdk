@@ -1,4 +1,5 @@
 using System.Text;
+using WKAppBot.Core.Runner;
 using WKAppBot.Vision;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
@@ -346,6 +347,21 @@ internal partial class Program
             Console.WriteLine($"Profile saved: {Path.Combine(profileStore.ProfileDir, profileName + ".json")}");
             Console.ResetColor();
         }
+
+        // ── ActionState IPC: share scan info with AppBotEye ──
+        try
+        {
+            var formCount = scanResult.Forms.Count;
+            ActionState.Write(new ActionState
+            {
+                Source = "scan",
+                WindowTitle = win.Title,
+                ActionName = "scan",
+                ActionDetail = $"Scan: {formCount} forms found" + (save ? " (saved)" : ""),
+                Status = "pass",
+            });
+        }
+        catch { /* best-effort */ }
 
         return 0;
     }

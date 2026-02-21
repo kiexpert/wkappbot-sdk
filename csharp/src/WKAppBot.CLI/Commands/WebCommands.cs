@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
+using WKAppBot.Core.Runner;
 using WKAppBot.WebBot;
+using WKAppBot.Win32.Window;
 using NativeMethods = WKAppBot.Win32.Native.NativeMethods;
 
 namespace WKAppBot.CLI;
@@ -15,6 +17,18 @@ internal partial class Program
 
         var sub = args[0].ToLowerInvariant();
         var restArgs = args.Skip(1).ToArray();
+
+        // Auto-launch AppBotEye for all CDP commands (not just "open")
+        // "open" handles it internally, help/status don't need it
+        if (sub != "open" && sub != "--help" && sub != "-h" && sub != "help" && sub != "status")
+        {
+            // Parse port from args (--port N pattern)
+            int mvPort = 9222;
+            for (int i = 0; i < restArgs.Length; i++)
+                if (restArgs[i] == "--port" && i + 1 < restArgs.Length)
+                    int.TryParse(restArgs[i + 1], out mvPort);
+            LaunchAppBotEyeIfNeeded(mvPort);
+        }
 
         return sub switch
         {
@@ -34,7 +48,9 @@ internal partial class Program
             "title" => WebTitleCommand(restArgs),
             "close" => WebCloseCommand(restArgs),
             "status" => WebStatusCommand(restArgs),
+            "restore" or "show" => WebRestoreCommand(restArgs),
             "run" => WebRunCommand(restArgs),
+            "file" => WebFileInputCommand(restArgs),
             "--help" or "-h" or "help" => WebUsage(),
             _ => Error($"Unknown web subcommand: {sub}")
         };
@@ -49,12 +65,16 @@ Usage:
   wkappbot web <subcommand> [options]
 
 Session Management:
-  open [url] [--port N] [--headless] [--no-launch] [--app]
+  open [url] [--port N] [--headless] [--no-launch] [--browser] [--no-minimize] [--show]
       Open Chrome with CDP and navigate to URL.
+      App mode is DEFAULT — clean window without address bar/tabs.
       --port N: CDP port (default: 9222)
       --headless: Run Chrome headless (no visible window)
       --no-launch: Connect to already-running Chrome (don't launch)
-      --app: App mode — no Chrome address bar/tabs (clean WebView window)
+      --browser: Normal Chrome UI with address bar/tabs (for debugging)
+      --no-minimize / --show: Keep Chrome window visible (default: minimize)
+  restore / show [--port N]
+      Restore minimized Chrome window (UIA Window pattern → Win32 fallback).
   close [--port N]
       Disconnect from Chrome (does not close the browser).
   status [--port N]
@@ -133,13 +153,22 @@ Options:
     }
 
     // ── open ─────────────────────────────────────────────────────
+    // ★ IMPORTANT: App mode (--app) is the DEFAULT and MUST stay that way!
+    //   - App mode creates an isolated Chrome window: no address bar, no tabs, no extensions
+    //   - This prevents mixing with user's normal Chrome sessions/profiles
+    //   - User's bookmarks, history, and cookies stay completely separate
+    //   - WebBot uses its own temp user-data-dir for session isolation
+    //   - Use --browser ONLY for debugging (address bar visible, tabs enabled)
 
     static int WebOpenCommand(string[] args)
     {
         int port = GetPort(args);
         bool headless = args.Contains("--headless");
         bool noLaunch = args.Contains("--no-launch");
-        bool appMode = args.Contains("--app");
+        // ★ App mode is DEFAULT — MUST open as app mode to avoid mixing with user's browser!
+        // Normal Chrome UI (tabs, address bar) risks session contamination and confusion.
+        // Only use --browser flag for debugging purposes.
+        bool appMode = !args.Contains("--browser");
 
         // Get URL (first non-flag argument)
         string? url = args.FirstOrDefault(a => !a.StartsWith("--") && a != "true" && a != "false");
@@ -215,53 +244,75 @@ Options:
             return 1;
         }
 
-        // Minimize Chrome window — CDP works perfectly when minimized!
-        // User doesn't need to see Chrome; it works in the background
-        cdp.MinimizeChromeWindow();
-        Console.WriteLine("[WEB] Chrome minimized (CDP works in background)");
+        // Minimize Chrome window (unless --no-minimize)
+        if (!args.Contains("--no-minimize") && !args.Contains("--show"))
+        {
+            cdp.MinimizeChromeWindow();
+            Console.WriteLine("[WEB] Chrome minimized (CDP works in background)");
+        }
+        else
+        {
+            Console.WriteLine("[WEB] Chrome window visible");
+        }
 
-        // Auto-launch MiniView overlay if not already running
-        LaunchMiniViewIfNeeded(port);
+        // Show past knowhow for this domain
+        if (pageUrl != null)
+            ShowDomainKnowhow(pageUrl);
+
+        // Auto-launch AppBotEye overlay if not already running
+        LaunchAppBotEyeIfNeeded(port);
 
         return 0;
     }
 
     /// <summary>
-    /// Auto-launch MiniView overlay process if not already running.
-    /// MiniView shows live WebBot screenshot on Claude Desktop — "클롯의 눈".
+    /// Auto-launch AppBotEye overlay process if not already running.
+    /// AppBotEye shows live WebBot screenshot on Claude Desktop — "앱봇의 눈".
+    /// With port: uses --port flag (Web Mode). Without: uses unified ActionState mode.
     /// </summary>
-    static void LaunchMiniViewIfNeeded(int port)
+    static void LaunchAppBotEyeIfNeeded(int port) => LaunchAppBotEyeIfNeededCore($"--port {port}");
+
+    /// <summary>
+    /// Auto-launch AppBotEye in unified mode (ActionState IPC).
+    /// Called by run/do/scan/dismiss/input commands.
+    /// </summary>
+    static void LaunchAppBotEyeIfNeeded() => LaunchAppBotEyeIfNeededCore("");
+
+    private static void LaunchAppBotEyeIfNeededCore(string extraArgs)
     {
         try
         {
-            // Check for existing MiniView window by title "Claude's Eye"
-            bool miniviewExists = false;
+            // Check for existing AppBotEye window by title "AppBot Eye"
+            IntPtr eyeHwnd = IntPtr.Zero;
             var sb = new System.Text.StringBuilder(256);
             WKAppBot.Win32.Native.NativeMethods.EnumWindows((hwnd, _) =>
             {
                 NativeMethods.GetWindowTextW(hwnd, sb, sb.Capacity);
-                if (sb.ToString() == "Claude's Eye")
+                if (sb.ToString() == "WK AppBot Eye")
                 {
-                    miniviewExists = true;
+                    eyeHwnd = hwnd;
                     return false; // stop enumeration
                 }
                 return true;
             }, IntPtr.Zero);
 
-            if (miniviewExists)
+            if (eyeHwnd != IntPtr.Zero)
             {
-                Console.WriteLine("[WEB] MiniView already running");
-                return;
+                // Send WM_APP to wake up AppBotEye (uncloak + reset idle timer)
+                const uint WM_APP = 0x8000;
+                NativeMethods.SendMessageW(eyeHwnd, WM_APP, IntPtr.Zero, IntPtr.Zero);
+                return; // silently wake up — no log needed for non-web commands
             }
 
-            // Launch miniview as detached background process
+            // Launch AppBotEye as detached background process
             var exePath = Environment.ProcessPath;
             if (string.IsNullOrEmpty(exePath)) return;
 
+            var arguments = string.IsNullOrEmpty(extraArgs) ? "eye" : $"eye {extraArgs}";
             var psi = new ProcessStartInfo
             {
                 FileName = exePath,
-                Arguments = $"miniview --port {port}",
+                Arguments = arguments,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = false,
@@ -275,11 +326,11 @@ Options:
 
             var proc2 = Process.Start(psi);
             if (proc2 != null)
-                Console.WriteLine($"[WEB] MiniView launched (PID={proc2.Id})");
+                Console.WriteLine($"[EYE] Launched (PID={proc2.Id})");
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"[WEB] MiniView auto-launch failed: {ex.Message}");
+            // Best-effort: never block the main command
         }
     }
 
@@ -306,6 +357,12 @@ Options:
         Console.ResetColor();
         Console.WriteLine($"[WEB] Title: {title}");
 
+        // Show past knowhow for this domain
+        ShowDomainKnowhow(url);
+
+        // ── ActionState IPC ──
+        try { ActionState.Write(new ActionState { Source = "web", WebUrl = url, WebTitle = title, ActionName = "navigate", ActionDetail = $"Navigate: {url}", Status = "pass" }); } catch { }
+
         return 0;
     }
 
@@ -322,7 +379,9 @@ Options:
 
         using var cdp = ConnectCdp(port);
 
-        var result = cdp.EvalAsync(expression).GetAwaiter().GetResult();
+        // Auto-detect async expressions (async () => ...) and await the Promise
+        bool isAsync = expression.TrimStart().StartsWith("(async") || expression.TrimStart().StartsWith("async");
+        var result = cdp.EvalAsync(expression, awaitPromise: isAsync).GetAwaiter().GetResult();
         Console.WriteLine($"[WEB] eval: {result}");
 
         return 0;
@@ -348,6 +407,9 @@ Options:
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("OK");
         Console.ResetColor();
+
+        // ── ActionState IPC ──
+        try { ActionState.Write(new ActionState { Source = "web", ElementName = selector, ActionName = "click", ActionDetail = $"Click: {selector}", Status = "pass" }); } catch { }
 
         return 0;
     }
@@ -375,6 +437,9 @@ Options:
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("OK");
         Console.ResetColor();
+
+        // ── ActionState IPC ──
+        try { ActionState.Write(new ActionState { Source = "web", ElementName = selector, ActionName = "type_text", ActionDetail = $"Type: \"{text}\" → {selector}", Status = "pass" }); } catch { }
 
         return 0;
     }
@@ -619,6 +684,90 @@ Options:
         return 0;
     }
 
+    // ── restore/show ──────────────────────────────────────────────
+
+    static int WebRestoreCommand(string[] args)
+    {
+        // Restore (un-minimize) the Chrome WebBot window — Accessibility compatible
+        // Uses UIA Window pattern first (focusless!), falls back to Win32 ShowWindow
+        int port = GetPort(args);
+
+        try
+        {
+            // Find Chrome window by title pattern
+            var windows = WindowFinder.FindByTitle("WKWebBot");
+            if (windows.Count == 0)
+                windows = WindowFinder.FindByTitle("Chrome");
+            if (windows.Count == 0)
+                return Error("[WEB] Chrome window not found");
+
+            var win = windows[0];
+            bool restored = false;
+
+            // Try UIA Window pattern first (Accessibility compatible, focusless!)
+            try
+            {
+                using var automation = new FlaUI.UIA3.UIA3Automation();
+                var uiaEl = automation.FromHandle(win.Handle);
+                if (uiaEl != null)
+                {
+                    var windowPattern = uiaEl.Patterns.Window.PatternOrDefault;
+                    if (windowPattern != null)
+                    {
+                        var state = windowPattern.WindowVisualState.Value;
+                        if (state == FlaUI.Core.Definitions.WindowVisualState.Minimized)
+                        {
+                            windowPattern.SetWindowVisualState(FlaUI.Core.Definitions.WindowVisualState.Normal);
+                            Thread.Sleep(200);
+                            restored = true;
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.Write("[WEB] Restored via UIA Window pattern ");
+                            Console.ResetColor();
+                        }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkGray;
+                            Console.Write($"[WEB] Already visible (state={state}) ");
+                            Console.ResetColor();
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // UIA failed, fall back to Win32
+            }
+
+            // Fallback: Win32 ShowWindow(SW_RESTORE)
+            if (!restored && NativeMethods.IsIconic(win.Handle))
+            {
+                NativeMethods.ShowWindow(win.Handle, 9 /*SW_RESTORE*/);
+                Thread.Sleep(200);
+                restored = true;
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write("[WEB] Restored via ShowWindow ");
+                Console.ResetColor();
+            }
+
+            // Bring to foreground
+            NativeMethods.SmartSetForegroundWindow(win.Handle);
+            Thread.Sleep(100);
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"→ [{win.Handle:X8}] \"{win.Title}\" ({win.Rect.Width}x{win.Rect.Height})");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[WEB] Restore failed: {ex.Message}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        return 0;
+    }
+
     // ── status ───────────────────────────────────────────────────
 
     static int WebStatusCommand(string[] args)
@@ -664,6 +813,53 @@ Options:
         }
 
         return 0;
+    }
+
+    // ── file (set file input) ──────────────────────────────────
+
+    static int WebFileInputCommand(string[] args)
+    {
+        if (args.Length < 2)
+            return Error("Usage: wkappbot web file <selector> <file-path> [--port N]");
+
+        string selector = args[0];
+        string filePath = args[1];
+        int port = GetPort(args);
+
+        if (!File.Exists(filePath))
+            return Error($"File not found: {filePath}");
+
+        // Convert to absolute path (CDP requires absolute)
+        filePath = Path.GetFullPath(filePath);
+
+        Console.Write($"[WEB] Setting file on {selector}... ");
+
+        try
+        {
+            using var cdp = ConnectCdp(port);
+            var ok = cdp.SetFileInputAsync(selector, filePath).GetAwaiter().GetResult();
+            if (ok)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"OK ({Path.GetFileName(filePath)})");
+                Console.ResetColor();
+                return 0;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("FAILED (element not found)");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Error: {ex.Message}");
+            Console.ResetColor();
+            return 1;
+        }
     }
 
     // ── run (batch) ──────────────────────────────────────────────
@@ -733,6 +929,7 @@ Options:
                     "title" => WebTitleCommand(subRest),
                     "close" => WebCloseCommand(subRest),
                     "status" => WebStatusCommand(subRest),
+                    "restore" or "show" => WebRestoreCommand(subRest),
                     _ => Error($"Unknown step: {sub}")
                 };
 
@@ -797,5 +994,65 @@ Options:
             args.Add(current.ToString());
 
         return args.ToArray();
+    }
+
+    /// <summary>
+    /// Show domain knowhow when navigating to a URL.
+    /// "선배의 메모" — future Claude sessions see past lessons automatically.
+    /// </summary>
+    static void ShowDomainKnowhow(string url)
+    {
+        try
+        {
+            // Extract domain from URL
+            string domain;
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                domain = uri.Host;
+            else if (url.Contains('.'))
+                domain = url.Split('/')[0]; // bare domain like "naver.com"
+            else
+                return;
+
+            if (string.IsNullOrEmpty(domain)) return;
+
+            // Read site-level knowhow (not element-level — too verbose)
+            var sitePath = Path.Combine(WebProfilesDir, WebKnowhow.SanitizeDomain(domain), "knowhow.md");
+            if (!File.Exists(sitePath)) return;
+
+            var content = File.ReadAllText(sitePath).Trim();
+            if (string.IsNullOrEmpty(content)) return;
+
+            // Count entries (## headers)
+            var entryCount = content.Split('\n').Count(l => l.StartsWith("## "));
+
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"[KNOWHOW] {domain} — {entryCount} note(s) from past sessions:");
+            Console.ResetColor();
+
+            // Show compact summary: each ## header as bullet
+            foreach (var line in content.Split('\n'))
+            {
+                if (line.StartsWith("## "))
+                {
+                    // Strip timestamp: "## [2026-02-21 03:18:45] category" → "category"
+                    var header = line[3..].Trim();
+                    var bracketEnd = header.IndexOf(']');
+                    if (bracketEnd > 0 && header.StartsWith('['))
+                        header = header[(bracketEnd + 1)..].Trim();
+
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.Write("  * ");
+                    Console.ResetColor();
+                    Console.WriteLine(header);
+                }
+            }
+
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"  read:  wkappbot knowhow web-read {domain}");
+            Console.WriteLine($"  add:   wkappbot knowhow web {domain} \"lesson\" [--category \"...\"]");
+            Console.WriteLine($"  file:  {sitePath}");
+            Console.ResetColor();
+        }
+        catch { /* best-effort */ }
     }
 }

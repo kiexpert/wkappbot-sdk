@@ -155,4 +155,17 @@ public sealed class StepParams
     // scroll
     public string? Direction { get; set; }
     public int? Amount { get; set; }
+
+    // toggle — desired checkbox state (true=on, false=off, null=just toggle)
+    public bool? Checked { get; set; }
+
+    // expand/collapse, window_close/minimize/maximize — target state
+    public string? State { get; set; }
+
+    // set_range — target value for slider/progress bar
+    public double? Value { get; set; }
+
+    // select — item text or index to select in list/combo
+    public string? ItemText { get; set; }
+    public int? ItemIndex { get; set; }
 }

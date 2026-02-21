@@ -727,6 +727,20 @@ internal partial class Program
         Console.WriteLine($"\n  {closedCount} window(s) dismissed.");
         Console.ResetColor();
 
+        // ── ActionState IPC: share dismiss info with AppBotEye ──
+        try
+        {
+            ActionState.Write(new ActionState
+            {
+                Source = "dismiss",
+                WindowTitle = win.Title,
+                ActionName = "dismiss",
+                ActionDetail = $"Dismiss: {closedCount} window(s) closed ({string.Join(",", keywords)})",
+                Status = closedCount > 0 ? "pass" : "fail",
+            });
+        }
+        catch { /* best-effort */ }
+
         return 0;
     }
 

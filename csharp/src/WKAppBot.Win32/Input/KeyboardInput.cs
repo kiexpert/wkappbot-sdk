@@ -37,6 +37,60 @@ public static class KeyboardInput
     }
 
     /// <summary>
+    /// Type text by posting WM_CHAR messages to target window's message queue.
+    /// Cross-process capable — messages go directly to the target window's queue,
+    /// bypassing UIPI issues that affect SendInput.
+    ///
+    /// Best for: MFC CMaskEdit, owner-drawn inputs, admin-to-user process input.
+    /// Gemini recommendation: WM_CHAR + focus + 10-30ms delay per character.
+    /// </summary>
+    public static bool TypeTextViaWmChar(IntPtr hWnd, string text, int charDelayMs = 20)
+    {
+        if (hWnd == IntPtr.Zero || string.IsNullOrEmpty(text))
+            return false;
+
+        foreach (char ch in text)
+        {
+            // WM_CHAR lParam: repeat=1, scan=0, extended=0, context=0, previous=0, transition=0
+            NativeMethods.PostMessageW(hWnd, NativeMethods.WM_CHAR, (IntPtr)ch, IntPtr.Zero);
+            if (charDelayMs > 0)
+                Thread.Sleep(charDelayMs);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Set text on an Edit control via WM_SETTEXT.
+    /// Replaces entire content. Works cross-process without SendInput.
+    ///
+    /// Best for: Standard Edit controls, RichEdit, some MFC derivatives.
+    /// Not suitable for owner-drawn controls that don't process WM_SETTEXT.
+    /// </summary>
+    public static bool TypeTextViaWmSetText(IntPtr hWnd, string text)
+    {
+        if (hWnd == IntPtr.Zero) return false;
+
+        // WM_SETTEXT = 0x000C, uses string overload (marshalled by P/Invoke)
+        NativeMethods.SendMessageW(hWnd, 0x000C, IntPtr.Zero, text);
+        return true;
+    }
+
+    /// <summary>
+    /// Append text to an Edit control via EM_REPLACESEL.
+    /// Inserts at current cursor position without replacing entire content.
+    ///
+    /// Best for: Inserting text at cursor in Edit/RichEdit controls.
+    /// </summary>
+    public static bool TypeTextViaEmReplaceSel(IntPtr hWnd, string text)
+    {
+        if (hWnd == IntPtr.Zero) return false;
+
+        // EM_REPLACESEL = 0x00C2, wParam=1 (can undo), string overload
+        NativeMethods.SendMessageW(hWnd, 0x00C2, (IntPtr)1, text);
+        return true;
+    }
+
+    /// <summary>
     /// Press and release a single key by name.
     /// </summary>
     public static void PressKey(string keyName)

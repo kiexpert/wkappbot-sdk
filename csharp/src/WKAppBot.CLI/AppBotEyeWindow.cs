@@ -14,7 +14,7 @@ using System.Windows.Threading;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// "Claude's Eye" — semi-transparent WPF overlay that shows what the WebBot sees.
+/// "AppBot Eye" — semi-transparent WPF overlay that shows what the WebBot sees.
 /// Programmatic UI (no XAML). Runs on a dedicated STA thread.
 ///
 /// Features:
@@ -22,10 +22,10 @@ namespace WKAppBot.CLI;
 /// - CDP screenshot as full background (behind text)
 /// - Accessibility text overlay with larger font + auto-scroll animation
 /// - Click image → restore Chrome window
-/// - Cloaking: fades out after inactivity, fades in on new content
+/// - Cloaking: ghosts (10% alpha) after inactivity, fades in on new content
 /// - Drag to move, always on top, never steals focus
 /// </summary>
-internal sealed class MiniViewOverlay : Window
+internal sealed class AppBotEyeOverlay : Window
 {
     private readonly Image _image;
     private readonly TextBlock _urlText;
@@ -41,11 +41,11 @@ internal sealed class MiniViewOverlay : Window
     private double _scrollOffset; // current scroll Y offset
     private bool _needsScroll; // text exceeds visible area
 
-    // Cloaking thresholds
+    // Cloaking thresholds — 50s idle → dim, 60s → 10s fade-out → ghost (10%)
     private const double ActiveOpacity = 0.85;
     private const double DimOpacity = 0.3;
-    private const int DimAfterSeconds = 5;
-    private const int CloakAfterSeconds = 10;
+    private const int DimAfterSeconds = 50;
+    private const int CloakAfterSeconds = 60;
 
     // Scroll settings
     private const double ScrollSpeed = 0.5; // pixels per tick
@@ -54,10 +54,10 @@ internal sealed class MiniViewOverlay : Window
     private double _scrollPauseCount;
     private bool _scrollingDown = true;
 
-    public MiniViewOverlay(int width = 320, int height = 220)
+    public AppBotEyeOverlay(int width = 320, int height = 220)
     {
         // Window properties — semi-transparent overlay
-        Title = "Claude's Eye";
+        Title = "WK AppBot Eye";
         Width = width;
         Height = height;
         WindowStyle = WindowStyle.None;
@@ -85,7 +85,7 @@ internal sealed class MiniViewOverlay : Window
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // content area
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });  // footer
 
-        // ── Header: [●] Claude's Eye  [✕] ──
+        // ── Header: [●] AppBot Eye  [✕] ──
         var header = new DockPanel { Margin = new Thickness(6, 2, 6, 0) };
         header.MouseLeftButtonDown += (_, _) => DragMove(); // drag to move
 
@@ -100,7 +100,7 @@ internal sealed class MiniViewOverlay : Window
 
         var titleText = new TextBlock
         {
-            Text = "Claude's Eye",
+            Text = "WK AppBot Eye",
             Foreground = new SolidColorBrush(Color.FromRgb(0x4F, 0xC3, 0xF7)),
             FontFamily = new FontFamily("Consolas"),
             FontSize = 11,
@@ -222,10 +222,36 @@ internal sealed class MiniViewOverlay : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        // Set WS_EX_NOACTIVATE so clicking the overlay doesn't steal focus from other windows
         var helper = new WindowInteropHelper(this);
+
+        // Set WS_EX_NOACTIVATE so clicking the overlay doesn't steal focus from other windows
         var exStyle = GetWindowLongPtr(helper.Handle, GWL_EXSTYLE);
         SetWindowLongPtr(helper.Handle, GWL_EXSTYLE, new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE));
+
+        // Hook WndProc to receive WM_APP "wake up" signal from WebBot commands
+        var source = HwndSource.FromHwnd(helper.Handle);
+        source?.AddHook(WndProc);
+    }
+
+    /// <summary>WM_APP handler — external "wake up" signal from WebBot commands.</summary>
+    private const int WM_APP = 0x8000;
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_APP)
+        {
+            // WebBot command sent us a wake-up signal — reset idle timer and uncloak
+            _lastUpdate = DateTime.Now;
+            if (_isCloaked) Uncloak();
+            else if (Opacity < ActiveOpacity)
+            {
+                BeginAnimation(OpacityProperty, null);
+                var anim = new DoubleAnimation(Opacity, ActiveOpacity, TimeSpan.FromSeconds(0.3));
+                BeginAnimation(OpacityProperty, anim);
+            }
+            handled = true;
+        }
+        return IntPtr.Zero;
     }
 
     /// <summary>Update the screenshot thumbnail from CDP PNG data.</summary>
@@ -387,13 +413,9 @@ internal sealed class MiniViewOverlay : Window
 
         if (elapsed >= CloakAfterSeconds && !_isCloaked)
         {
-            // Full cloak — fade to invisible
-            var anim = new DoubleAnimation(Opacity, 0.0, TimeSpan.FromSeconds(3));
-            anim.Completed += (_, _) =>
-            {
-                _isCloaked = true;
-                Visibility = Visibility.Hidden;
-            };
+            // Ghost mode — 10s fade to 10% alpha (still visible, just very faint)
+            var anim = new DoubleAnimation(Opacity, 0.1, TimeSpan.FromSeconds(10));
+            anim.Completed += (_, _) => { _isCloaked = true; };
             BeginAnimation(OpacityProperty, anim);
         }
         else if (elapsed >= DimAfterSeconds && elapsed < CloakAfterSeconds && Opacity > DimOpacity + 0.05)
@@ -436,14 +458,14 @@ internal sealed class MiniViewOverlay : Window
 }
 
 /// <summary>
-/// Manages the STA thread for the MiniView WPF overlay window.
+/// Manages the STA thread for the AppBotEye WPF overlay window.
 /// Bridge between CLI main thread and WPF Dispatcher thread.
 /// When ownerHwnd is set, the overlay follows its parent window (e.g. Claude Desktop).
 /// </summary>
-internal sealed class MiniViewHost : IDisposable
+internal sealed class AppBotEyeHost : IDisposable
 {
     private Thread? _uiThread;
-    private MiniViewOverlay? _window;
+    private AppBotEyeOverlay? _window;
     private Dispatcher? _dispatcher;
     private readonly ManualResetEventSlim _ready = new();
 
@@ -455,7 +477,7 @@ internal sealed class MiniViewHost : IDisposable
     {
         _uiThread = new Thread(() =>
         {
-            _window = new MiniViewOverlay(width, height);
+            _window = new AppBotEyeOverlay(width, height);
 
             // Position: default to bottom-right, above the prompt area
             if (x >= 0 && y >= 0)
@@ -491,7 +513,7 @@ internal sealed class MiniViewHost : IDisposable
         });
         _uiThread.SetApartmentState(ApartmentState.STA);
         _uiThread.IsBackground = true;
-        _uiThread.Name = "MiniView-STA";
+        _uiThread.Name = "AppBotEye-STA";
         _uiThread.Start();
         _ready.Wait(5000);
     }

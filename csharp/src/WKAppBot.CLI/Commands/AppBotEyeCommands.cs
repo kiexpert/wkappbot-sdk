@@ -1,27 +1,45 @@
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
+using WKAppBot.Core.Runner;
 using WKAppBot.WebBot;
+using WKAppBot.Win32.Accessibility;
+using WKAppBot.Win32.Input;
+using WKAppBot.Win32.Native;
+using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// CLI command: wkappbot miniview [--port N] [--interval N] [--size WxH] [--pos X,Y]
-/// Opens "Claude's Eye" overlay — a semi-transparent window showing WebBot's live view.
+/// CLI command: wkappbot eye [--port N] [--interval N] [--size WxH] [--pos X,Y]
+/// Opens "AppBot Eye" overlay — a semi-transparent window showing WebBot's live view.
 /// Auto-positions at the top-right corner of the Claude Desktop window when possible.
+///
+/// Entry point + Web Mode (CDP) + P/Invoke declarations.
+/// App Mode loop: AppBotEyeAppMode.cs
+/// Claude Desktop detection: AppBotEyeClaudeDetector.cs
+/// App Mode helpers: AppBotEyeAppHelpers.cs
 /// </summary>
 internal partial class Program
 {
-    static int MiniViewCommand(string[] args)
+    static int AppBotEyeCommand(string[] args)
     {
         // Parse arguments
         int port = 9222;
         int intervalMs = 100; // ~10 fps target (actual: limited by CDP screenshot speed)
         int width = 320, height = 220;
         int posX = -1, posY = -1;
+        string? appTitle = null;   // --app or --title: match window title
+        string? appProcess = null; // --process: match process name
+        // Slack is ALWAYS ON — no option to disable
+        bool slackMode = true;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -49,10 +67,22 @@ internal partial class Program
                         int.TryParse(posParts[1], out posY);
                     }
                     break;
+                case "--app" when i + 1 < args.Length:
+                case "--title" when i + 1 < args.Length:
+                    appTitle = args[++i];
+                    break;
+                case "--process" when i + 1 < args.Length:
+                    appProcess = args[++i];
+                    break;
             }
         }
 
-        Console.WriteLine($"[MINIVIEW] Starting Claude's Eye ({width}x{height}, interval={intervalMs}ms)");
+        // Mode detection: app mode vs web mode
+        bool isAppMode = !string.IsNullOrEmpty(appTitle) || !string.IsNullOrEmpty(appProcess);
+
+        Console.WriteLine($"[EYE] Starting AppBot Eye ({width}x{height}, interval={intervalMs}ms)" +
+            $"{(isAppMode ? $" [App: {appTitle ?? appProcess}]" : "")}" +
+            " [Slack+Prompt]");
 
         // Find Claude Desktop window for auto-placement at top-right corner
         IntPtr claudeHwnd = IntPtr.Zero;
@@ -67,16 +97,25 @@ internal partial class Program
                     posX = rect.Right - width - 8; // 8px inset from right edge
                     posY = rect.Top + 40;           // below title bar (~40px)
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine($"[MINIVIEW] Found Claude Desktop at ({rect.Left},{rect.Top} {rect.Right - rect.Left}x{rect.Bottom - rect.Top})");
-                    Console.WriteLine($"[MINIVIEW] Auto-placing at ({posX},{posY}) — top-right corner");
+                    Console.WriteLine($"[EYE] Found Claude Desktop at ({rect.Left},{rect.Top} {rect.Right - rect.Left}x{rect.Bottom - rect.Top})");
+                    Console.WriteLine($"[EYE] Auto-placing at ({posX},{posY}) — top-right corner");
                     Console.ResetColor();
                 }
             }
             else
             {
-                Console.WriteLine("[MINIVIEW] Claude Desktop not found — using default position");
+                Console.WriteLine("[EYE] Claude Desktop not found — using default position");
             }
         }
+
+        // ── Unified Mode (default): ActionState IPC + cursor fallback ──
+        // Also handles --app/--process for explicit target window
+        // Web Mode (CDP) is only used with explicit --port flag
+        if (isAppMode || !args.Any(a => a == "--port"))
+            return AppModePollingLoop(appTitle, appProcess, width, height, posX, posY,
+                claudeHwnd, intervalMs, slackMode);
+
+        // ── Web Mode (legacy): Chrome/WebBot CDP — only with explicit --port ──
 
         // Connect to CDP
         CdpClient? cdp = null;
@@ -87,14 +126,14 @@ internal partial class Program
             // Enable Page domain (needed for captureScreenshot to work reliably)
             cdp.EvalAsync("1").GetAwaiter().GetResult(); // warm up
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[MINIVIEW] Connected to WebBot Chrome (port {port})");
+            Console.WriteLine($"[EYE] Connected to WebBot Chrome (port {port})");
             Console.ResetColor();
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[MINIVIEW] Cannot connect to Chrome on port {port}: {ex.Message}");
-            Console.WriteLine($"[MINIVIEW] Run 'wkappbot web open <url>' first to launch WebBot Chrome.");
+            Console.WriteLine($"[EYE] Cannot connect to Chrome on port {port}: {ex.Message}");
+            Console.WriteLine($"[EYE] Run 'wkappbot web open <url>' first to launch WebBot Chrome.");
             Console.ResetColor();
             return 1;
         }
@@ -103,13 +142,13 @@ internal partial class Program
         var chromeHwnd = FindChromeWindow(cdp.ChromePid);
 
         // Start overlay — attach to Claude Desktop window as owner if found
-        using var host = new MiniViewHost();
+        using var host = new AppBotEyeHost();
         host.Start(width, height, posX, posY, claudeHwnd);
 
         if (chromeHwnd != IntPtr.Zero)
             host.SetChromeHwnd(chromeHwnd);
 
-        Console.WriteLine($"[MINIVIEW] Overlay active — press Ctrl+C to stop");
+        Console.WriteLine($"[EYE] Overlay active — press Ctrl+C to stop");
 
         // Handle Ctrl+C gracefully
         var cts = new CancellationTokenSource();
@@ -188,7 +227,7 @@ internal partial class Program
                 if (frameCount % 100 == 0)
                 {
                     var fps = frameCount / sw.Elapsed.TotalSeconds;
-                    Console.WriteLine($"[MINIVIEW] frame #{frameCount}, {fps:F1} fps, {png?.Length / 1024}KB");
+                    Console.WriteLine($"[EYE] frame #{frameCount}, {fps:F1} fps, {png?.Length / 1024}KB");
                 }
 
                 // Hot-reload: check if EXE was replaced (every ~5 seconds = 10 frames at 500ms)
@@ -200,7 +239,7 @@ internal partial class Program
                         if (currentTime != exeStartTime)
                         {
                             Console.ForegroundColor = ConsoleColor.Yellow;
-                            Console.WriteLine("[MINIVIEW] Hot-reload: EXE changed — shutting down gracefully");
+                            Console.WriteLine("[EYE] Hot-reload: EXE changed — shutting down gracefully");
                             Console.ResetColor();
                             break; // exit polling loop → cleanup + exit
                         }
@@ -217,13 +256,13 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[MINIVIEW] Error: {ex.Message}");
+                Console.WriteLine($"[EYE] Error: {ex.Message}");
                 Console.ResetColor();
                 Thread.Sleep(1000); // back off on error
             }
         }
 
-        Console.WriteLine($"[MINIVIEW] Stopped ({frameCount} frames, {sw.Elapsed.TotalSeconds:F1}s)");
+        Console.WriteLine($"[EYE] Stopped ({frameCount} frames, {sw.Elapsed.TotalSeconds:F1}s)");
         cdp.Dispose();
         return 0;
     }
@@ -437,116 +476,7 @@ internal partial class Program
         return found;
     }
 
-    /// <summary>
-    /// Find Claude Desktop main window by walking the parent process tree.
-    /// wkappbot → ... → claude.exe (Electron) — find its main window.
-    /// Much faster than scanning all 14+ claude.exe processes!
-    /// </summary>
-    private static IntPtr FindClaudeDesktopWindow()
-    {
-        // Walk up: wkappbot.exe → parent → grandparent → ... find claude.exe
-        var claudePids = new HashSet<int>();
-        try
-        {
-            int pid = Process.GetCurrentProcess().Id;
-            for (int depth = 0; depth < 10; depth++)
-            {
-                var parentPid = GetParentPid(pid);
-                if (parentPid <= 0 || parentPid == pid) break;
-
-                try
-                {
-                    var parent = Process.GetProcessById(parentPid);
-                    Console.WriteLine($"[MINIVIEW] Ancestor: {parent.ProcessName} (PID={parentPid})");
-                    if (parent.ProcessName.Equals("claude", StringComparison.OrdinalIgnoreCase))
-                    {
-                        claudePids.Add(parentPid);
-                        // Also add siblings (Electron uses multiple processes under same parent tree)
-                        // Get the parent's parent — the root claude.exe
-                        var rootPid = GetParentPid(parentPid);
-                        if (rootPid > 0)
-                        {
-                            try
-                            {
-                                var root = Process.GetProcessById(rootPid);
-                                if (root.ProcessName.Equals("claude", StringComparison.OrdinalIgnoreCase))
-                                    claudePids.Add(rootPid);
-                            }
-                            catch { }
-                        }
-                        break;
-                    }
-                    pid = parentPid;
-                }
-                catch { break; }
-            }
-        }
-        catch { }
-
-        // If ancestor walk didn't find claude.exe, try all claude processes (slow fallback)
-        if (claudePids.Count == 0)
-        {
-            Console.WriteLine("[MINIVIEW] Ancestor walk didn't find claude.exe, scanning all...");
-            foreach (var proc in Process.GetProcessesByName("claude"))
-                claudePids.Add(proc.Id);
-        }
-
-        // Find the visible main window (with title bar + sizable) from claude PIDs
-        IntPtr found = IntPtr.Zero;
-        EnumWindows((hwnd, _) =>
-        {
-            if (!IsWindowVisible(hwnd)) return true;
-
-            GetWindowThreadProcessId(hwnd, out var pid);
-            if (!claudePids.Contains(pid)) return true;
-
-            // Check for WS_CAPTION (main window with title bar)
-            var style = GetWindowLongW(hwnd, -16);
-            if ((style & 0x00C00000) == 0) return true;
-
-            // Verify it's a sizable window (not a small popup or notification)
-            if (GetWindowRect(hwnd, out var rect))
-            {
-                var w = rect.Right - rect.Left;
-                var h = rect.Bottom - rect.Top;
-                if (w > 400 && h > 300)
-                {
-                    found = hwnd;
-                    return false; // stop enumeration
-                }
-            }
-
-            return true;
-        }, IntPtr.Zero);
-
-        return found;
-    }
-
-    /// <summary>Get parent PID using NtQueryInformationProcess (fast, no WMI dependency).</summary>
-    private static int GetParentPid(int pid)
-    {
-        try
-        {
-            var handle = OpenProcess(0x0400 /* PROCESS_QUERY_INFORMATION */, false, pid);
-            if (handle == IntPtr.Zero)
-                handle = OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, pid);
-            if (handle == IntPtr.Zero) return -1;
-
-            try
-            {
-                var pbi = new PROCESS_BASIC_INFORMATION();
-                int status = NtQueryInformationProcess(handle, 0, ref pbi, Marshal.SizeOf(pbi), out _);
-                if (status == 0)
-                    return (int)pbi.InheritedFromUniqueProcessId;
-            }
-            finally
-            {
-                CloseHandle(handle);
-            }
-        }
-        catch { }
-        return -1;
-    }
+    // ── P/Invoke declarations (shared across all AppBotEye partial class files) ──
 
     [StructLayout(LayoutKind.Sequential)]
     private struct PROCESS_BASIC_INFORMATION
@@ -598,4 +528,13 @@ internal partial class Program
     [DllImport("ntdll.dll")]
     private static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass,
         ref PROCESS_BASIC_INFORMATION processInformation, int processInformationLength, out int returnLength);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out MV_POINT lpPoint);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MV_POINT { public int X, Y; }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowTextW(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 }
