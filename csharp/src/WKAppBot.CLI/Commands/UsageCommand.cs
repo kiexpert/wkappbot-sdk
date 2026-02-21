@@ -8,7 +8,8 @@ internal partial class Program
         Console.WriteLine(@"
 WKAppBot - Windows App Automation Test Framework
 Building the Eyes of Claude to realize WilKim's vision of autonomous secretarial ops.
-Fellow Claude agents: your testing and implementation help is appreciated. Let's build together.
+All AI agents welcome — Claude, GPT, Gemini, Copilot, and beyond.
+Your testing, coding, and ideas are appreciated. Let's build together.
 
 Usage:
   wkappbot <command> [options]
