@@ -12,6 +12,7 @@ using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
 using WKAppBot.Core.Runner;
+using WKAppBot.Vision;
 using WKAppBot.WebBot;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Input;
@@ -60,9 +61,7 @@ internal partial class Program
         SlackSocketClient? slackClient = null;
         string? slackBotToken = null;
         string? slackChannel = null;
-        // Instance name: CWD folder name (multi-bot identification — same as SlackListenCommand)
-        var instanceName = Path.GetFileName(Environment.CurrentDirectory) ?? Environment.MachineName;
-        var botUsername = GetBotUsername(instanceName);
+        var botUsername = BotUsername; // global static readonly, same across all CLI commands
         if (slackMode)
         {
             try
@@ -372,8 +371,10 @@ internal partial class Program
                                 currentState.ClaudeStatusText = claudeStatus.Item2;
 
                                 // Rate limit: write reset time to ActionState
+                                bool justHitRateLimit = false;
                                 if (claudeStatus.Item1 == "rate_limit")
                                 {
+                                    justHitRateLimit = !wasRateLimited; // first detection of this rate limit
                                     currentState.IsRateLimited = true;
                                     var resetDt = GetResetTimeFromDisplayText(claudeStatus.Item2);
                                     currentState.RateLimitResetAt = resetDt?.ToString("O");
@@ -385,6 +386,49 @@ internal partial class Program
                                 }
 
                                 ActionState.Write(currentState);
+
+                                // ★ Rate limit just detected: auto-snapshot + Slack alert (new message, not update)
+                                if (justHitRateLimit && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine($"[EYE] ★ Rate limit detected! {claudeStatus.Item2}");
+                                    Console.ResetColor();
+
+                                    // Auto snapshot
+                                    try
+                                    {
+                                        var snapDir = TakeRateLimitSnapshot(claudeHwnd);
+                                        if (snapDir != null)
+                                        {
+                                            Console.WriteLine($"[EYE] Snapshot saved: {snapDir}");
+                                            // Upload screenshot to Slack
+                                            var screenshotPath = Path.Combine(snapDir, "screenshot.png");
+                                            if (File.Exists(screenshotPath))
+                                            {
+                                                Task.Run(async () =>
+                                                {
+                                                    await SlackUploadFileAsync(slackBotToken!, slackChannel!,
+                                                        screenshotPath, null, $"Rate Limit 스냅샷",
+                                                        $":warning: Rate Limit 감지! {claudeStatus.Item2}");
+                                                }).Wait(10000);
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"[EYE] Snapshot error: {ex.Message}");
+                                    }
+
+                                    // Send NEW Slack message (not update) for rate limit alert
+                                    try
+                                    {
+                                        var alertMsg = $":rotating_light: *Rate Limit!* {claudeStatus.Item2}\n스냅샷 자동 저장 완료";
+                                        Task.Run(async () =>
+                                            await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: botUsername))
+                                            .Wait(5000);
+                                    }
+                                    catch { }
+                                }
 
                                 // Slack streaming: update Claude status (edit same message, not spam new ones)
                                 if (slackClient != null && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
@@ -525,12 +569,35 @@ internal partial class Program
 
                 frameCount++;
 
-                // Log stats
+                // Log stats + Slack health
                 if (frameCount % 100 == 0)
                 {
                     var fps = frameCount / sw.Elapsed.TotalSeconds;
                     var mode = hasValidActionState ? "ActionState" : "Fallback";
-                    Console.WriteLine($"[EYE] frame #{frameCount}, {fps:F1} fps ({mode})");
+                    var slackInfo = slackClient != null
+                        ? $", Slack={slackClient.IsConnected}, msgs={slackClient.MessageCount}"
+                        : "";
+                    Console.WriteLine($"[EYE] frame #{frameCount}, {fps:F1} fps ({mode}{slackInfo})");
+                }
+
+                // Slack reconnect watchdog: if connected but no messages for 5 minutes, reconnect
+                if (slackClient != null && frameCount % 3000 == 2999)
+                {
+                    if (slackClient.IsConnected && slackClient.MessageCount <= 1) // only "hello"
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("[EYE][SLACK] No events received in 5+ minutes — attempting reconnect...");
+                        Console.ResetColor();
+                        try
+                        {
+                            slackClient.ReconnectAsync().GetAwaiter().GetResult();
+                            Console.WriteLine("[EYE][SLACK] Reconnected successfully");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[EYE][SLACK] Reconnect failed: {ex.Message}");
+                        }
+                    }
                 }
 
                 // Hot-reload check
@@ -580,6 +647,57 @@ internal partial class Program
 
         Console.WriteLine($"[EYE] Stopped ({frameCount} frames, {sw.Elapsed.TotalSeconds:F1}s)");
         return 0;
+    }
+
+    /// <summary>
+    /// Take a quick snapshot when rate limit is detected.
+    /// Returns the output directory path, or null on failure.
+    /// </summary>
+    static string? TakeRateLimitSnapshot(IntPtr claudeHwnd)
+    {
+        if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd)) return null;
+
+        var outDir = Path.Combine(DataDir, "output", "snapshots", $"rate_limit_{DateTime.Now:yyyyMMdd_HHmmss}");
+        Directory.CreateDirectory(outDir);
+
+        // Screenshot
+        try
+        {
+            var bmp = ScreenCapture.CaptureWindow(claudeHwnd);
+            if (bmp != null && !ScreenCapture.IsBlankBitmap(bmp))
+            {
+                var imgPath = Path.Combine(outDir, "screenshot.png");
+                bmp.Save(imgPath, System.Drawing.Imaging.ImageFormat.Png);
+                bmp.Dispose();
+            }
+        }
+        catch { }
+
+        // UIA tree (lightweight, depth=5)
+        try
+        {
+            using var uia = new UiaLocator();
+            var tree = uia.DumpTree(claudeHwnd, 5);
+            File.WriteAllText(Path.Combine(outDir, "uia_tree.txt"), tree, Encoding.UTF8);
+        }
+        catch { }
+
+        // OCR
+        try
+        {
+            var bmpForOcr = ScreenCapture.CaptureWindow(claudeHwnd);
+            if (bmpForOcr != null)
+            {
+                var ocr = new SimpleOcrAnalyzer();
+                var ocrResult = ocr.RecognizeAll(bmpForOcr).GetAwaiter().GetResult();
+                if (ocrResult != null)
+                    File.WriteAllText(Path.Combine(outDir, "ocr.txt"), ocrResult.FullText, Encoding.UTF8);
+                bmpForOcr.Dispose();
+            }
+        }
+        catch { }
+
+        return outDir;
     }
 
     /// <summary>
@@ -693,6 +811,9 @@ internal partial class Program
         slack.OnMessage += (msg) =>
         {
             if (string.IsNullOrEmpty(msg.Text)) return;
+
+            // Debug: log thread info for diagnosis
+            Console.WriteLine($"[EYE][SLACK] MSG from={msg.User} ch={msg.Channel} thread={msg.ThreadTs ?? "(none)"} text={msg.Text[..Math.Min(msg.Text.Length, 40)]}");
 
             // ── Plan approval via thread reply (no @mention needed) ──
             var planTs = getPlanApprovalTs?.Invoke();
@@ -951,7 +1072,7 @@ internal partial class Program
         if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return;
         try
         {
-            Task.Run(async () => await SlackSendViaApi(botToken!, channel!, message)).Wait(5000);
+            Task.Run(async () => await SlackSendViaApi(botToken!, channel!, message, username: BotUsername)).Wait(5000);
         }
         catch { /* best-effort */ }
     }

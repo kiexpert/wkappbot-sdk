@@ -21,7 +21,7 @@ internal partial class Program
     /// Also writes the original message to inbox as fallback.
     /// </summary>
     static void HandlePromptLost(string botToken, string channel, string threadTs,
-        string user, string cleanText, string ts)
+        string user, string cleanText, string ts, string? username = null)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("[SLACK] >> Prompt lost! Claude 프롬프트를 찾을 수 없습니다.");
@@ -76,7 +76,7 @@ internal partial class Program
                         $"전경 윈도우: \"{fgTitle}\" (class={fgClass})\n" +
                         $"원래 메시지: {cleanText}\n\n" +
                         $"승인 다이얼로그가 떠있으면 수락해주세요!";
-                    SlackSendViaApi(botToken, channel, msg, threadTs).GetAwaiter().GetResult();
+                    SlackSendViaApi(botToken, channel, msg, threadTs, username: username).GetAwaiter().GetResult();
                 }
             }
             else
@@ -84,7 +84,7 @@ internal partial class Program
                 // No foreground window — just notify
                 SlackSendViaApi(botToken, channel,
                     $"Claude 프롬프트를 찾을 수 없어요! 원래 메시지: {cleanText}",
-                    threadTs).GetAwaiter().GetResult();
+                    threadTs, username: username).GetAwaiter().GetResult();
             }
         }
         catch (Exception ex)
@@ -95,7 +95,7 @@ internal partial class Program
             {
                 SlackSendViaApi(botToken, channel,
                     $"Claude 프롬프트를 찾을 수 없어요! (진단 실패: {ex.Message})\n원래 메시지: {cleanText}",
-                    threadTs).GetAwaiter().GetResult();
+                    threadTs, username: username).GetAwaiter().GetResult();
             }
             catch { }
         }
@@ -137,7 +137,7 @@ internal partial class Program
                     {
                         // 1. Reply in old thread (acknowledge) — only for thread replies
                         var ackMsg = "(이 쓰레드의 스트리밍은 새 메시지로 이동했어요!)";
-                        Task.Run(async () => await SlackSendViaApi(botToken, channel, ackMsg, reply.threadTs)).Wait(3000);
+                        Task.Run(async () => await SlackSendViaApi(botToken, channel, ackMsg, reply.threadTs, username: GetBotUsername(instanceName))).Wait(3000);
                     }
 
                     // 2. Delete old status message (clean channel) or update if thread reply
@@ -283,10 +283,12 @@ internal partial class Program
         _ => "Claude"
     };
 
-    /// <summary>Build Slack username override from instance name. null = use default bot name.
+    /// <summary>Bot username for Slack messages — computed once at startup from CWD folder name.
     /// Requires chat:write.customize scope — Slack silently ignores if scope missing.
-    /// When scope works: Slack shows "클봇 [WKAppBot]" as sender name (clean, no text prefix needed).
-    /// When scope missing: username is ignored, but text prefix still shows instance name.</summary>
+    /// Multiple bot instances identify themselves by folder name: "클봇 [WKAppBot]", "클봇 [HTS]", etc.</summary>
+    static readonly string BotUsername = $"클봇 [{Path.GetFileName(Environment.CurrentDirectory) ?? Environment.MachineName}]";
+
+    /// <summary>Build Slack username override from instance name. null = use default bot name.</summary>
     static string? GetBotUsername(string? instanceName) =>
         instanceName != null ? $"클봇 [{instanceName}]" : null;
 
@@ -333,7 +335,11 @@ internal partial class Program
             var resp = http.GetAsync(url).GetAwaiter().GetResult();
             var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             var json = JsonNode.Parse(body);
-            if (json?["ok"]?.GetValue<bool>() != true) return false;
+            if (json?["ok"]?.GetValue<bool>() != true)
+            {
+                Console.WriteLine($"[SLACK] IsOwnThread API failed: {json?["error"]}");
+                return false;
+            }
 
             var messages = json["messages"]?.AsArray();
             if (messages == null || messages.Count == 0) return false;
@@ -341,10 +347,14 @@ internal partial class Program
             var parent = messages[0];
             // Bot messages have "bot_id" field
             var botId = parent?["bot_id"]?.GetValue<string>();
-            return !string.IsNullOrEmpty(botId);
+            var result = !string.IsNullOrEmpty(botId);
+            if (result)
+                Console.WriteLine($"[SLACK] IsOwnThread: YES (bot_id={botId}, ts={threadTs})");
+            return result;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[SLACK] IsOwnThread exception: {ex.Message}");
             return false;
         }
     }

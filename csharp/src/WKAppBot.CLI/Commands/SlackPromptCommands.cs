@@ -131,7 +131,7 @@ internal partial class Program
             return 1;
         }
 
-        var (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs).GetAwaiter().GetResult();
+        var (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: BotUsername).GetAwaiter().GetResult();
 
         var threadNote = !string.IsNullOrEmpty(threadTs) ? " (in-thread)" : "";
         if (ok)

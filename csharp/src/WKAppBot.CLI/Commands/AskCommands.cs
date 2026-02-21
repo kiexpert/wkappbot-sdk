@@ -415,7 +415,7 @@ Examples:
 
             var truncated = answer.Length > 1500 ? answer[..1500] + "\n... (truncated)" : answer;
             var msg = $"*[{aiName} 답변]*\n> Q: {question}\n\n{truncated}";
-            var (ok, _) = SlackSendViaApi(botToken, channel, msg).GetAwaiter().GetResult();
+            var (ok, _) = SlackSendViaApi(botToken, channel, msg, username: BotUsername).GetAwaiter().GetResult();
             if (ok)
                 Console.WriteLine($"[ASK] Reported to Slack");
         }

@@ -36,8 +36,10 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     private string? _botToken;
     private string? _appToken;
     private string? _botUserId;  // our bot's user ID (to ignore own messages)
+    private int _messageCount;   // total WebSocket messages received (for diagnostics)
 
     public bool IsConnected => _ws?.State == WebSocketState.Open;
+    public int MessageCount => _messageCount;
 
     /// <summary>Fired when a message is posted in a subscribed channel.</summary>
     public event Action<SlackMessage>? OnMessage;
@@ -63,6 +65,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
 
         // Resolve our bot's user ID (to filter out own messages)
         _botUserId = await GetBotUserIdAsync();
+        Console.WriteLine($"[SLACK] Bot user ID: {_botUserId}");
 
         // Step 1: Get WebSocket URL from apps.connections.open
         var wsUrl = await OpenConnectionAsync();
@@ -70,6 +73,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         // Step 2: Connect WebSocket
         _ws = new ClientWebSocket();
         await _ws.ConnectAsync(new Uri(wsUrl), CancellationToken.None);
+        Console.WriteLine($"[SLACK] WebSocket state: {_ws.State}");
 
         // Step 3: Start receive loop
         _receiveCts = new CancellationTokenSource();
@@ -146,6 +150,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         var url = json?["url"]?.GetValue<string>()
             ?? throw new InvalidOperationException("No WebSocket URL in response");
 
+        Console.WriteLine($"[SLACK] WebSocket URL obtained (len={url.Length})");
         return url;
     }
 
@@ -167,6 +172,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     {
         var buffer = new byte[64 * 1024];  // 64KB buffer
         var messageBuffer = new StringBuilder();
+        Console.WriteLine($"[SLACK] Receive loop started (ws.State={_ws?.State})");
 
         while (!ct.IsCancellationRequested && _ws?.State == WebSocketState.Open)
         {
@@ -186,6 +192,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
                 {
                     var message = messageBuffer.ToString();
                     messageBuffer.Clear();
+                    Interlocked.Increment(ref _messageCount);
                     ProcessMessage(message);
                 }
             }
@@ -197,7 +204,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             }
         }
 
-        Console.WriteLine("[SLACK] Receive loop ended");
+        Console.WriteLine($"[SLACK] Receive loop ended (ws.State={_ws?.State}, msgCount={_messageCount})");
     }
 
     /// <summary>Process a received WebSocket message.</summary>
@@ -209,6 +216,13 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             if (json == null) return;
 
             var type = json["type"]?.GetValue<string>();
+
+            // Diagnostic: log every received message type (except hello which is already logged)
+            if (type != "hello")
+            {
+                var preview = rawJson.Length > 120 ? rawJson[..120] + "..." : rawJson;
+                Console.WriteLine($"[SLACK] WS recv #{_messageCount} type={type}: {preview}");
+            }
 
             switch (type)
             {
@@ -346,6 +360,35 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
 
         // Fire and forget — must be fast
         _ = _ws?.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+    }
+
+    /// <summary>Reconnect by closing current WebSocket and opening a new one.
+    /// Preserves event handlers. Use when connection goes stale.</summary>
+    public async Task ReconnectAsync()
+    {
+        Console.WriteLine("[SLACK] Reconnecting...");
+        _receiveCts?.Cancel();
+        if (_ws?.State == WebSocketState.Open)
+        {
+            try { await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "reconnect", CancellationToken.None); }
+            catch { }
+        }
+        if (_receiveTask != null)
+        {
+            try { await _receiveTask; } catch { }
+        }
+        _ws?.Dispose();
+
+        // Open new connection
+        var wsUrl = await OpenConnectionAsync();
+        _ws = new ClientWebSocket();
+        await _ws.ConnectAsync(new Uri(wsUrl), CancellationToken.None);
+        Console.WriteLine($"[SLACK] Reconnected (ws.State={_ws.State})");
+
+        // Restart receive loop
+        _receiveCts = new CancellationTokenSource();
+        _messageCount = 0;
+        _receiveTask = Task.Run(() => ReceiveLoopAsync(_receiveCts.Token));
     }
 
     /// <summary>Disconnect and clean up.</summary>

@@ -132,8 +132,7 @@ internal partial class Program
             var startupMsg = $"클봇 온라인! `{host}` pid={pid}";
             try
             {
-                var botUser = GetBotUsername(instanceName);
-                var sendTask = Task.Run(async () => await SlackSendViaApi(botToken!, defaultChannel, startupMsg, username: botUser));
+                var sendTask = Task.Run(async () => await SlackSendViaApi(botToken!, defaultChannel, startupMsg, username: BotUsername));
                 if (sendTask.Wait(10_000))
                 {
                     var (ok, sentTs) = sendTask.Result;
@@ -193,7 +192,7 @@ internal partial class Program
                 else
                 {
                     HandlePromptLost(botToken!, msg.Channel, threadKey,
-                        msg.User, cleanText, msg.Timestamp);
+                        msg.User, cleanText, msg.Timestamp, username: BotUsername);
                 }
                 return;
             }
@@ -246,7 +245,7 @@ internal partial class Program
                     var pid = Environment.ProcessId;
                     var pingReply = $"퐁! `{host}` pid={pid} `{cwd}`";
 
-                    var (ok, sentTs) = SlackSendViaApi(botToken!, msg.Channel, pingReply, username: GetBotUsername(instanceName)).GetAwaiter().GetResult();
+                    var (ok, sentTs) = SlackSendViaApi(botToken!, msg.Channel, pingReply, username: BotUsername).GetAwaiter().GetResult();
                     if (ok && sentTs != null)
                     {
                         // Track our own response so thread replies come to US
@@ -330,7 +329,7 @@ internal partial class Program
                     else
                     {
                         HandlePromptLost(botToken!, msg.Channel, msg.ThreadTs!,
-                            msg.User, cleanText, msg.Timestamp);
+                            msg.User, cleanText, msg.Timestamp, username: BotUsername);
                     }
                     return;
                 }
@@ -372,7 +371,7 @@ internal partial class Program
                         else
                         {
                             HandlePromptLost(botToken!, msg.Channel, threadKey,
-                                msg.User, cleanText, msg.Timestamp);
+                                msg.User, cleanText, msg.Timestamp, username: BotUsername);
                         }
                         return;
                     }
@@ -538,8 +537,7 @@ internal partial class Program
                 : $"클봇 오프라인. `{host}` (uptime {uptimeStr})";
             var (replyChannel, replyThread) = LoadReplyContext();
             var ch = replyChannel ?? defaultChannel!;
-            var botUser = GetBotUsername(instanceName);
-            Task.Run(async () => await SlackSendViaApi(botToken!, ch, shutdownMsg, replyThread, username: botUser)).Wait(5000);
+            Task.Run(async () => await SlackSendViaApi(botToken!, ch, shutdownMsg, replyThread, username: BotUsername)).Wait(5000);
             Console.WriteLine("[SLACK] Shutdown message sent");
         }
         catch { /* best-effort */ }
