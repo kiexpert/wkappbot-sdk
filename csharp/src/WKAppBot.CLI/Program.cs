@@ -44,7 +44,8 @@ internal partial class Program
         var exePath = Environment.ProcessPath ?? "wkappbot.exe";
         var exeName = Path.GetFileName(exePath);
         var logDir = Path.Combine(DataDir, "logs");
-        var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+        var pid = Environment.ProcessId;
+        var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.pid={pid}.txt");
         using var tee = new TeeTextWriter(Console.Out, logFile);
         Console.SetOut(tee);
 
