@@ -378,29 +378,8 @@ internal partial class Program
                 return Tuple.Create("executing", statusText ?? "실행 중");
             }
 
-            // 2. Check for plan approval dialog (ExitPlanMode)
-            // Look for specific button patterns that indicate plan approval
-            var approveButton = window.FindFirstDescendant(
-                cf.ByControlType(ControlType.Button).And(cf.ByName("Approve")));
-            if (approveButton != null)
-                return Tuple.Create("plan_approval_pending", "계획승인 대기");
-
-            // 3. Check for turn-form (prompt input ready)
-            var turnForm = window.FindFirstDescendant(
-                cf.ByAutomationId("turn-form"));
-            if (turnForm != null)
-            {
-                // Verify it's in a visible, active state
-                try
-                {
-                    var rect = turnForm.BoundingRectangle;
-                    if (rect.Height > 30)
-                        return Tuple.Create("prompt_ready", "프롬프트 입력 대기");
-                }
-                catch { }
-            }
-
-            // 4. Check for rate limit screen
+            // 2. Check for rate limit FIRST (before turn-form!)
+            // ★ Rate limit screen often still has turn-form visible → would be mis-detected as "prompt_ready"
             // Text: "You've hit your limit · resets 4pm (Asia/Seoul)"
             try
             {
@@ -416,6 +395,7 @@ internal partial class Program
                             if (string.IsNullOrEmpty(name)) continue;
 
                             if (name.Contains("hit your limit", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("You've hit your usage limit", StringComparison.OrdinalIgnoreCase) ||
                                 (name.Contains("limit", StringComparison.OrdinalIgnoreCase) &&
                                  name.Contains("reset", StringComparison.OrdinalIgnoreCase)))
                             {
@@ -450,6 +430,28 @@ internal partial class Program
                 }
             }
             catch { }
+
+            // 3. Check for plan approval dialog (ExitPlanMode)
+            // Look for specific button patterns that indicate plan approval
+            var approveButton = window.FindFirstDescendant(
+                cf.ByControlType(ControlType.Button).And(cf.ByName("Approve")));
+            if (approveButton != null)
+                return Tuple.Create("plan_approval_pending", "계획승인 대기");
+
+            // 4. Check for turn-form (prompt input ready)
+            var turnForm = window.FindFirstDescendant(
+                cf.ByAutomationId("turn-form"));
+            if (turnForm != null)
+            {
+                // Verify it's in a visible, active state
+                try
+                {
+                    var rect = turnForm.BoundingRectangle;
+                    if (rect.Height > 30)
+                        return Tuple.Create("prompt_ready", "프롬프트 입력 대기");
+                }
+                catch { }
+            }
 
             // 5. Idle — no special state detected
             return null;

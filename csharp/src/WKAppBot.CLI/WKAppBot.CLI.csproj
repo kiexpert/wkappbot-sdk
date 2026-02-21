@@ -25,12 +25,11 @@
     <Content Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="handlers" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
-  <!-- Post-publish: deploy as wkappbot.new.exe → daemon hot-reloads, or rename if not running -->
+  <!-- Post-publish: copy EXE + handlers to W:\SDK\bin\ (try direct copy, fallback to .new.exe for hot-reload) -->
   <Target Name="DeployToSdkBin" AfterTargets="Publish">
-    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="W:\SDK\bin\wkappbot.new.exe" OverwriteReadOnlyFiles="true" />
     <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
-    <!-- If daemon is not running, swap immediately -->
-    <Exec Command="if not exist &quot;W:\SDK\bin\wkappbot.hq\slack.pid&quot; ( if exist &quot;W:\SDK\bin\wkappbot.old.exe&quot; del &quot;W:\SDK\bin\wkappbot.old.exe&quot; &amp; if exist &quot;W:\SDK\bin\wkappbot.exe&quot; ren &quot;W:\SDK\bin\wkappbot.exe&quot; wkappbot.old.exe &amp; ren &quot;W:\SDK\bin\wkappbot.new.exe&quot; wkappbot.exe )" IgnoreExitCode="true" />
+    <!-- Try direct overwrite first (works when EXE is not running) -->
+    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot; >nul 2>&amp;1 &amp;&amp; echo [Deploy] wkappbot.exe updated || ( copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.new.exe&quot; >nul 2>&amp;1 &amp;&amp; echo [Deploy] Staged as wkappbot.new.exe — kill process and run: copy /Y wkappbot.new.exe wkappbot.exe )" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
     <_HandlersPublish Include="$(PublishDir)handlers\**\*.*" />

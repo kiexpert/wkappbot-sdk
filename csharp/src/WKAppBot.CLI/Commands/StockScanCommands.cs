@@ -293,7 +293,7 @@ Options:
             // Load reply context for thread
             var (_, replyThread) = LoadReplyContext();
 
-            SlackSendViaApi(botToken, channel, sb.ToString(), replyThread)
+            SlackSendViaApi(botToken, channel, sb.ToString(), replyThread, username: BotUsername)
                 .GetAwaiter().GetResult();
             Console.WriteLine("[STOCK] Results sent to Slack");
         }

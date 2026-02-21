@@ -194,7 +194,7 @@ internal partial class Program
             return 1;
         }
 
-        var (ok, _) = SlackSendViaApi(botToken, channel, message).GetAwaiter().GetResult();
+        var (ok, _) = SlackSendViaApi(botToken, channel, message, username: BotUsername).GetAwaiter().GetResult();
 
         if (ok)
             Console.WriteLine($"[SLACK] Sent: {message}");
@@ -244,7 +244,7 @@ internal partial class Program
         // Test send
         if (!string.IsNullOrEmpty(channel))
         {
-            var (sendOk, _) = SlackSendViaApi(botToken!, channel, "WKAppBot test — connection verified!").GetAwaiter().GetResult();
+            var (sendOk, _) = SlackSendViaApi(botToken!, channel, "WKAppBot test — connection verified!", username: BotUsername).GetAwaiter().GetResult();
             Console.WriteLine(sendOk ? "[SLACK] send OK" : "[SLACK] send FAILED");
         }
 
@@ -655,7 +655,7 @@ internal partial class Program
             if (claudeHwnd == IntPtr.Zero)
             {
                 Console.WriteLine("[SLACK] >> Claude Desktop window not found!");
-                SlackSendViaApi(botToken, channel, "Claude Desktop 윈도우를 찾을 수 없습니다!", threadTs)
+                SlackSendViaApi(botToken, channel, "Claude Desktop 윈도우를 찾을 수 없습니다!", threadTs, username: BotUsername)
                     .GetAwaiter().GetResult();
                 return;
             }
@@ -669,13 +669,13 @@ internal partial class Program
             KeyboardInput.Hotkey(new[] { "ctrl", "enter" });
             Thread.Sleep(100);
             Console.WriteLine("[SLACK] >> Ctrl+Enter sent to Claude Desktop!");
-            SlackSendViaApi(botToken, channel, "Ctrl+Enter 전송 완료! 수락 처리했습니다.", threadTs)
+            SlackSendViaApi(botToken, channel, "Ctrl+Enter 전송 완료! 수락 처리했습니다.", threadTs, username: BotUsername)
                 .GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[SLACK] >> Accept keystroke failed: {ex.Message}");
-            SlackSendViaApi(botToken, channel, $"수락 전송 실패: {ex.Message}", threadTs)
+            SlackSendViaApi(botToken, channel, $"수락 전송 실패: {ex.Message}", threadTs, username: BotUsername)
                 .GetAwaiter().GetResult();
         }
     }
