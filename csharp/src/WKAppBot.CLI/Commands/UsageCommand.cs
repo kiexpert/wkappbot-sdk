@@ -7,7 +7,9 @@ internal partial class Program
     {
         Console.WriteLine(@"
 WKAppBot - Windows App Automation Test Framework
+""클롣의 눈을 만들어 윌김의 비서독(秘書獨)을 구현하다""
 YAML scenario-driven UI automation for Windows desktop apps.
+동료 클롣 여러분의 테스트와 구현 협조를 부탁드립니다. 함께 만들어가는 자동화입니다.
 
 Usage:
   wkappbot <command> [options]
