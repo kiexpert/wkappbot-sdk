@@ -32,7 +32,7 @@ public sealed class TeeTextWriter : TextWriter
         };
 
         // Write header
-        _file.WriteLine($"# WKAppBot Console Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        _file.WriteLine($"# WKAppBot Console Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss} (PID={Environment.ProcessId})");
         _file.WriteLine($"# Command: {Environment.CommandLine}");
         _file.WriteLine();
     }

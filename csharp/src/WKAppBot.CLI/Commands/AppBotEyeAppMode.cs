@@ -188,6 +188,9 @@ internal partial class Program
         IntPtr lastActionStateHwnd = IntPtr.Zero;
         string? cachedClaudeStatusText = null; // Cached Claude Desktop status for fallback display
         bool wasRateLimited = false; // Track rate_limit -> reset transition for on_limit_reset schedules
+        DateTime? rateLimitDetectedAt = null; // When rate limit was first detected (for cooldown debounce)
+        DateTime? rateLimitResetTime = null;  // Parsed reset time from Claude status text
+        const int RateLimitCooldownMinutes = 5; // Don't clear wasRateLimited for at least this long
 
         // ── Startup: execute overdue schedules (PC reboot recovery) ──
         try
@@ -356,9 +359,11 @@ internal partial class Program
                         var claudeStatus = DetectClaudeDesktopStatus(claudeHwnd);
 
                         // Always update cached status for fallback display
-                        cachedClaudeStatusText = claudeStatus != null
-                            ? $"Claude: {claudeStatus.Item2}"
-                            : null;
+                        // But don't wipe it during rate limit debounce (UIA may intermittently fail)
+                        if (claudeStatus != null)
+                            cachedClaudeStatusText = $"Claude: {claudeStatus.Item2}";
+                        else if (!wasRateLimited)
+                            cachedClaudeStatusText = null;
 
                         if (claudeStatus != null)
                         {
@@ -371,18 +376,68 @@ internal partial class Program
                                 currentState.ClaudeStatusText = claudeStatus.Item2;
 
                                 // Rate limit: write reset time to ActionState
+                                // Debounce: once detected, don't clear for RateLimitCooldownMinutes
+                                // (UIA text scan is intermittently unreliable → prevents flapping)
                                 bool justHitRateLimit = false;
                                 if (claudeStatus.Item1 == "rate_limit")
                                 {
                                     justHitRateLimit = !wasRateLimited; // first detection of this rate limit
-                                    wasRateLimited = true; // update immediately to prevent duplicate snapshots
+                                    wasRateLimited = true;
+                                    if (rateLimitDetectedAt == null)
+                                        rateLimitDetectedAt = DateTime.Now;
                                     currentState.IsRateLimited = true;
                                     var resetDt = GetResetTimeFromDisplayText(claudeStatus.Item2);
-                                    currentState.RateLimitResetAt = resetDt?.ToString("O");
+                                    if (resetDt != null)
+                                        rateLimitResetTime = resetDt;
+                                    currentState.RateLimitResetAt = rateLimitResetTime?.ToString("O");
+                                }
+                                else if (wasRateLimited)
+                                {
+                                    // Rate limit was active — check if we should clear it
+                                    // Don't clear if: (a) cooldown hasn't passed, AND (b) reset time hasn't passed
+                                    var now = DateTime.Now;
+                                    bool cooldownPassed = rateLimitDetectedAt != null &&
+                                        (now - rateLimitDetectedAt.Value).TotalMinutes >= RateLimitCooldownMinutes;
+                                    bool resetTimePassed = rateLimitResetTime != null && now >= rateLimitResetTime.Value;
+
+                                    if (cooldownPassed || resetTimePassed)
+                                    {
+                                        // Genuinely cleared — reset everything
+                                        wasRateLimited = false;
+                                        rateLimitDetectedAt = null;
+                                        rateLimitResetTime = null;
+                                        currentState.IsRateLimited = false;
+                                        currentState.RateLimitResetAt = null;
+                                        Console.ForegroundColor = ConsoleColor.Green;
+                                        Console.WriteLine($"[EYE] Rate limit cleared (cooldown={cooldownPassed}, resetTime={resetTimePassed})");
+                                        Console.ResetColor();
+
+                                        // Execute on_limit_reset schedules
+                                        try
+                                        {
+                                            Console.WriteLine("[SCHEDULE] Rate limit cleared! Checking on_limit_reset schedules...");
+                                            Thread.Sleep(3000); // Let Claude Desktop settle
+                                            var resetItems = ScheduleManager.GetOnLimitResetItems();
+                                            foreach (var resetItem in resetItems)
+                                            {
+                                                ExecuteScheduleItem(resetItem, slackBotToken, slackChannel);
+                                                Thread.Sleep(2000);
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Console.WriteLine($"[SCHEDULE] on_limit_reset error: {ex.Message}");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Still in cooldown — keep wasRateLimited = true (UIA scan probably just missed the text)
+                                        currentState.IsRateLimited = true;
+                                        currentState.RateLimitResetAt = rateLimitResetTime?.ToString("O");
+                                    }
                                 }
                                 else
                                 {
-                                    wasRateLimited = false;
                                     currentState.IsRateLimited = false;
                                     currentState.RateLimitResetAt = null;
                                 }
@@ -540,28 +595,9 @@ internal partial class Program
                         foreach (var dueItem in dueItems)
                             ExecuteScheduleItem(dueItem, slackBotToken, slackChannel);
 
-                        // 6b. Check on_limit_reset trigger (rate_limit -> any other state)
-                        var currentClaudeStatus = cachedClaudeStatusText?.Contains("한도 초과") == true
-                            ? "rate_limit" : null;
-                        // Also check from ActionState
-                        if (lastActionState?.ClaudeStatus == "rate_limit")
-                            currentClaudeStatus = "rate_limit";
-
-                        if (wasRateLimited && currentClaudeStatus != "rate_limit")
-                        {
-                            Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine("[SCHEDULE] Rate limit cleared! Checking on_limit_reset schedules...");
-                            Console.ResetColor();
-
-                            Thread.Sleep(3000); // Let Claude Desktop settle
-                            var resetItems = ScheduleManager.GetOnLimitResetItems();
-                            foreach (var resetItem in resetItems)
-                            {
-                                ExecuteScheduleItem(resetItem, slackBotToken, slackChannel);
-                                Thread.Sleep(2000);
-                            }
-                        }
-                        wasRateLimited = (currentClaudeStatus == "rate_limit");
+                        // 6b. on_limit_reset trigger — wasRateLimited is managed by Section 5
+                        // with debounce (won't flap). We just check if it transitioned to false.
+                        // Note: Section 5 already printed "[EYE] Rate limit cleared" on transition.
                     }
                     catch (Exception ex)
                     {
