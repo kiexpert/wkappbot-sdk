@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PlatformTarget>x86</PlatformTarget>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>WKAppBot.KiwoomProxy</RootNamespace>
+    <AssemblyName>WKAppBot.KiwoomProxy</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- COM message pump requires WinForms for Application.DoEvents -->
+  <!-- SelfContained=true: system only has 64-bit .NET runtime, we need 32-bit -->
+  <!-- PublishSingleFile=false: COM late binding needs DLLs accessible in same dir -->
+</Project>

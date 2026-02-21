@@ -349,6 +349,102 @@ internal partial class Program
             or "좋아" or "진행" or "시작" or "go" or "lgtm" or "ㅎㅎ";
     }
 
+    /// <summary>
+    /// Click a permission button by matching button name via UIA.
+    /// Used when Slack user clicks a permission button (Allow/Deny/etc).
+    /// Returns true if button was found and invoked.
+    /// </summary>
+    static bool ClickPermissionButton(IntPtr claudeHwnd, string buttonText)
+    {
+        if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd))
+            return false;
+
+        try
+        {
+            using var automation = new UIA3Automation();
+            var window = automation.FromHandle(claudeHwnd);
+            if (window == null) return false;
+
+            var cf = new ConditionFactory(new UIA3PropertyLibrary());
+            var buttons = window.FindAllDescendants(cf.ByControlType(ControlType.Button));
+            if (buttons == null) return false;
+
+            foreach (var btn in buttons)
+            {
+                try
+                {
+                    var name = btn.Name;
+                    if (string.IsNullOrEmpty(name)) continue;
+
+                    // Exact match on button text
+                    if (name.Equals(buttonText, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (btn.Patterns.Invoke.IsSupported)
+                        {
+                            btn.Patterns.Invoke.Pattern.Invoke();
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"[EYE] Permission button clicked via UIA: \"{name}\"");
+                            Console.ResetColor();
+                            return true;
+                        }
+                    }
+                }
+                catch { continue; }
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE] ClickPermissionButton error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Extract current permission button names from Claude Desktop.
+    /// Returns list of button names for permission-related actions.
+    /// </summary>
+    static List<string> GetPermissionButtons(IntPtr claudeHwnd)
+    {
+        var result = new List<string>();
+        if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd))
+            return result;
+
+        try
+        {
+            using var automation = new UIA3Automation();
+            var window = automation.FromHandle(claudeHwnd);
+            if (window == null) return result;
+
+            var cf = new ConditionFactory(new UIA3PropertyLibrary());
+            var buttons = window.FindAllDescendants(cf.ByControlType(ControlType.Button));
+            if (buttons == null) return result;
+
+            foreach (var btn in buttons)
+            {
+                try
+                {
+                    var name = btn.Name;
+                    if (string.IsNullOrEmpty(name)) continue;
+
+                    if (name.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains("Deny", StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains("거부", StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains("수락", StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.Add(name);
+                    }
+                }
+                catch { continue; }
+            }
+        }
+        catch { }
+
+        return result;
+    }
+
     // ── Claude Desktop UIA Status Detection ──────────────────────
 
     /// <summary>
@@ -381,9 +477,16 @@ internal partial class Program
             // 2. Check for rate limit FIRST (before turn-form!)
             // ★ Rate limit screen often still has turn-form visible → would be mis-detected as "prompt_ready"
             // Text: "You've hit your limit · resets 4pm (Asia/Seoul)"
+            // ★ IMPORTANT: Must filter out AppBotEye's own overlay text!
+            //   AppBotEye is a child window of Claude Desktop → its Text elements appear in FindAllDescendants
+            //   If AppBotEye displays "rate limit" text → false positive self-detection loop!
+            //   Solution: Search only inside "RootWebArea" Document (Claude's actual web content)
             try
             {
-                var allTexts = window.FindAllDescendants(
+                // Find the RootWebArea Document first — limits search to Claude's web content only
+                var rootWebArea = window.FindFirstDescendant(cf.ByAutomationId("RootWebArea"));
+                var searchRoot = rootWebArea ?? window; // fallback to full window if not found
+                var allTexts = searchRoot.FindAllDescendants(
                     cf.ByControlType(ControlType.Text));
                 if (allTexts != null)
                 {
@@ -394,10 +497,21 @@ internal partial class Program
                             var name = textElem.Name;
                             if (string.IsNullOrEmpty(name)) continue;
 
+                            // ★ Skip AppBotEye overlay text (prevents self-detection loop!)
+                            // AppBotEye text elements are multi-line with URLs, action details, etc.
+                            // Real rate limit text is a single short phrase like "You've hit your limit"
+                            if (name.Contains("AppBot", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("navigate →", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("Claude:", StringComparison.OrdinalIgnoreCase) ||
+                                name.Length > 200) // Real rate limit text is short
+                                continue;
+
+                            // Only match the exact Claude rate limit phrases
+                            // "limit" + "reset" was too broad → matched AppBotEye overlay text!
                             if (name.Contains("hit your limit", StringComparison.OrdinalIgnoreCase) ||
                                 name.Contains("You've hit your usage limit", StringComparison.OrdinalIgnoreCase) ||
-                                (name.Contains("limit", StringComparison.OrdinalIgnoreCase) &&
-                                 name.Contains("reset", StringComparison.OrdinalIgnoreCase)))
+                                name.Contains("한도를 초과", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("사용 한도", StringComparison.OrdinalIgnoreCase))
                             {
                                 // Try to extract reset time from this element or siblings
                                 var resetTime = ParseResetTime(name);
@@ -431,24 +545,112 @@ internal partial class Program
             }
             catch { }
 
-            // 3. Check for plan approval dialog (ExitPlanMode)
-            // Look for specific button patterns that indicate plan approval
+            // 3. Check for plan approval dialog via Button search
             var approveButton = window.FindFirstDescendant(
                 cf.ByControlType(ControlType.Button).And(cf.ByName("Approve")));
             if (approveButton != null)
                 return Tuple.Create("plan_approval_pending", "계획승인 대기");
 
-            // 4. Check for turn-form (prompt input ready)
+            // 3.5. Check for permission/approval prompt via Button search
+            try
+            {
+                var buttons = window.FindAllDescendants(cf.ByControlType(ControlType.Button));
+                if (buttons != null && buttons.Length > 0)
+                {
+                    var permButtons = new List<string>();
+                    foreach (var btn in buttons)
+                    {
+                        try
+                        {
+                            var name = btn.Name;
+                            if (string.IsNullOrEmpty(name)) continue;
+
+                            if (name.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("Deny", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("거부", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("수락", StringComparison.OrdinalIgnoreCase))
+                            {
+                                permButtons.Add(name);
+                            }
+                        }
+                        catch { continue; }
+                    }
+
+                    if (permButtons.Count >= 2)
+                    {
+                        var btnList = string.Join(" / ", permButtons);
+                        return Tuple.Create("permission_prompt", $"수락 요구: [{btnList}]");
+                    }
+                }
+            }
+            catch { }
+
+            // 4. ★ turn-form Name fallback — Electron webview buttons often aren't exposed as UIA buttons
+            // turn-form Name contains concatenated text of all child elements, e.g.:
+            //   " 메뉴 토글 권한 요청 Opus 4.6 중단"  → executing + permission prompt
+            //   " 메뉴 토글 Opus 4.6"                 → prompt ready (normal)
+            //   "계획" button visible nearby           → plan approval pending
             var turnForm = window.FindFirstDescendant(
                 cf.ByAutomationId("turn-form"));
             if (turnForm != null)
             {
-                // Verify it's in a visible, active state
                 try
                 {
                     var rect = turnForm.BoundingRectangle;
                     if (rect.Height > 30)
+                    {
+                        var turnFormName = turnForm.Name ?? "";
+
+                        // 4a. "중단" in turn-form Name → executing (Button search missed it)
+                        if (turnFormName.Contains("중단"))
+                        {
+                            // Also check for permission prompt within executing state
+                            if (turnFormName.Contains("권한 요청") || turnFormName.Contains("권한요청"))
+                            {
+                                return Tuple.Create("permission_prompt", "권한 요청 대기 (실행 중)");
+                            }
+                            var statusText = GetLatestStatusBarText(window, cf);
+                            return Tuple.Create("executing", statusText ?? "실행 중");
+                        }
+
+                        // 4b. "권한 요청" in turn-form Name → permission prompt
+                        if (turnFormName.Contains("권한 요청") || turnFormName.Contains("권한요청"))
+                        {
+                            return Tuple.Create("permission_prompt", "권한 요청 대기");
+                        }
+
+                        // 4c. Check for plan approval: look for "계획" button nearby
+                        // Claude Desktop shows "계획" tab/button when in plan mode
+                        try
+                        {
+                            var planButtons = window.FindAllDescendants(cf.ByControlType(ControlType.Button));
+                            if (planButtons != null)
+                            {
+                                bool hasPlanButton = false;
+                                bool hasApproveKorean = false;
+                                foreach (var btn in planButtons)
+                                {
+                                    try
+                                    {
+                                        var name = btn.Name;
+                                        if (string.IsNullOrEmpty(name)) continue;
+                                        if (name.Contains("계획 승인")) hasApproveKorean = true;
+                                        if (name == "계획") hasPlanButton = true;
+                                    }
+                                    catch { }
+                                }
+                                if (hasApproveKorean)
+                                    return Tuple.Create("plan_approval_pending", "계획승인 대기");
+                                if (hasPlanButton)
+                                    return Tuple.Create("plan_mode", "계획 모드 (피드백 입력 대기)");
+                            }
+                        }
+                        catch { }
+
+                        // 4d. Normal prompt ready
                         return Tuple.Create("prompt_ready", "프롬프트 입력 대기");
+                    }
                 }
                 catch { }
             }
@@ -524,9 +726,9 @@ internal partial class Program
             if (isPm && hour < 12) hour += 12;
             else if (!isPm && hour == 12) hour = 0;
 
+            // ★ DO NOT roll over to next day! The reset time is for TODAY.
+            // If it already passed, return it as-is so callers can detect it's in the past.
             var resetTime = DateTime.Today.AddHours(hour);
-            if (resetTime <= DateTime.Now)
-                resetTime = resetTime.AddDays(1);
             return resetTime;
         }
 
@@ -536,9 +738,8 @@ internal partial class Program
         {
             int hour = int.Parse(match.Groups[1].Value);
             int min = int.Parse(match.Groups[2].Value);
+            // ★ DO NOT roll over to next day!
             var resetTime = DateTime.Today.AddHours(hour).AddMinutes(min);
-            if (resetTime <= DateTime.Now)
-                resetTime = resetTime.AddDays(1);
             return resetTime;
         }
 
@@ -557,8 +758,8 @@ internal partial class Program
         var match = Regex.Match(displayText, @"(\d{1,2}:\d{2})에 리셋");
         if (match.Success && TimeOnly.TryParse(match.Groups[1].Value, out var time))
         {
+            // ★ DO NOT roll over to next day — return today's time so callers can detect it's past
             var resetDt = DateTime.Today.Add(time.ToTimeSpan());
-            if (resetDt <= DateTime.Now) resetDt = resetDt.AddDays(1);
             return resetDt;
         }
         return null;

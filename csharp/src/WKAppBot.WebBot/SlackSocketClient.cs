@@ -53,6 +53,9 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     /// <summary>Fired when a Block Kit interactive button is clicked (action_id, user, value, envelope for response_url).</summary>
     public event Action<SlackBlockAction>? OnBlockAction;
 
+    /// <summary>Fired when the bot's own message appears in a thread (for ack cleanup etc.).</summary>
+    public event Action<SlackMessage>? OnSelfMessage;
+
     /// <summary>
     /// Connect to Slack via Socket Mode.
     /// </summary>
@@ -273,10 +276,24 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         var threadTs = eventNode["thread_ts"]?.GetValue<string>();
         var botId = eventNode["bot_id"]?.GetValue<string>();
 
-        // Skip bot's own messages
-        if (user == _botUserId) return;
+        // Bot's own messages → fire OnSelfMessage for ack cleanup, then skip normal processing
+        if (user == _botUserId || (subtype == "bot_message" && botId != null))
+        {
+            if (threadTs != null && OnSelfMessage != null)
+            {
+                OnSelfMessage.Invoke(new SlackMessage
+                {
+                    Channel = channel ?? "",
+                    User = user ?? "",
+                    Text = text ?? "",
+                    Timestamp = ts ?? "",
+                    ThreadTs = threadTs
+                });
+            }
+            return;
+        }
 
-        // Skip message subtypes (bot_message, channel_join, etc.)
+        // Skip message subtypes (channel_join, etc.)
         if (subtype != null) return;
 
         // Fire raw event

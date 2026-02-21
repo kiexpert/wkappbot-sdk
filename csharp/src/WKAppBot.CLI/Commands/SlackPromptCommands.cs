@@ -131,6 +131,10 @@ internal partial class Program
             return 1;
         }
 
+        // Delete pending "전달했습니다" ack before replying (file-based IPC from AppBotEye)
+        if (!string.IsNullOrEmpty(threadTs))
+            DeletePendingAckFromFile(botToken, threadTs);
+
         var (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: BotUsername).GetAwaiter().GetResult();
 
         var threadNote = !string.IsNullOrEmpty(threadTs) ? " (in-thread)" : "";

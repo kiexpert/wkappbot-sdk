@@ -707,6 +707,12 @@ teardown:
 - **옵션 대정리 완료**: `--prompt`/`--keywords`/`--no-slack` 전부 삭제 → Slack+프롬프트+키워드 항상 ON (옵션 없음)
 - **AppBotEye 자동 실행 완료**: 모든 CLI 명령 실행 시 AppBotEye 자동 spawn (eye/slack/help/validate 제외)
 - **프롬프트 실패 진단 완료**: FindPrompt 실패 시 전경 윈도우 진단 + Slack 상황 공유 (계획승인/권한창 가능성 안내)
+- **Rate Limit 자기감지 루프 수정 완료**: AppBotEye 오버레이 텍스트가 UIA에 노출 → 자기 텍스트를 rate limit으로 오인하는 무한 루프 → RootWebArea 스코프 제한 + 엄격한 패턴 매칭으로 해결
+- **Rate Limit ParseResetTime 수정 완료**: 리셋 시간이 지나면 다음날로 롤오버하는 버그 제거 + null 상태 캐시 잔류 수정
+- **Slack 봇 이름 "클롯" 완료**: BotUsername "클봇" → "클롯"으로 변경 (chat:write.customize 스코프)
+- **Slack 스레드 맥락 전달 완료**: 프롬프트 전달 시 [쓰레드 시작] + [직전 메시지/클롯 응답] 맥락 포함 (GetThreadContext 연동)
+- **Slack "전달했습니다" 자동 삭제 완료**: OnSelfMessage 이벤트 + pending_acks.json 파일 IPC → 봇 응답 시 ack 메시지 자동 삭제
+- **키움 프록시봇 Phase A 완료**: 32비트 프록시 EXE + COM 호스팅 + Named Pipe 서버 + 이벤트 싱크 (KiwoomProxy)
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
