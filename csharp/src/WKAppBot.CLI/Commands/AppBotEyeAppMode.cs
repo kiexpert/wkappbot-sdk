@@ -60,6 +60,9 @@ internal partial class Program
         SlackSocketClient? slackClient = null;
         string? slackBotToken = null;
         string? slackChannel = null;
+        // Instance name: CWD folder name (multi-bot identification — same as SlackListenCommand)
+        var instanceName = Path.GetFileName(Environment.CurrentDirectory) ?? Environment.MachineName;
+        var botUsername = GetBotUsername(instanceName);
         if (slackMode)
         {
             try
@@ -80,17 +83,20 @@ internal partial class Program
                         Console.WriteLine("[EYE] Slack Socket Mode connected");
                         Console.ResetColor();
 
-                        // Announce presence
+                        // Announce presence + track startup message for thread reply forwarding
+                        string? startupTs = null;
                         if (!string.IsNullOrEmpty(slackChannel))
                         {
                             var startupMsg = $"AppBotEye+Slack 온라인! `{Environment.MachineName}` pid={Environment.ProcessId}";
-                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel, startupMsg))
-                                .Wait(5000);
+                            var (startOk, sTs) = Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel, startupMsg, username: botUsername))
+                                .GetAwaiter().GetResult();
+                            if (startOk && sTs != null)
+                                startupTs = sTs;
                         }
 
-                        // Set up event handlers (pass claudeHwnd + plan approval state for plan approval flow)
+                        // Set up event handlers (pass claudeHwnd + plan approval state + startup ts + bot username)
                         SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
-                            claudeHwnd, () => pendingPlanApprovalSlackTs);
+                            claudeHwnd, () => pendingPlanApprovalSlackTs, startupTs, botUsername);
 
                         // Block Kit button handler (plan approve/reject)
                         slackClient.OnBlockAction += (action) =>
@@ -107,7 +113,7 @@ internal partial class Program
                                 var reply = approved
                                     ? ":white_check_mark: 플랜 승인 완료! Claude가 코딩을 시작합니다."
                                     : ":x: 승인 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
-                                Task.Run(async () => await SlackSendViaApi(slackBotToken!, action.Channel, reply, thread))
+                                Task.Run(async () => await SlackSendViaApi(slackBotToken!, action.Channel, reply, thread, username: botUsername))
                                     .Wait(5000);
 
                                 // Update original message: remove buttons, show result
@@ -126,7 +132,7 @@ internal partial class Program
                                 var reply = feedbackOk
                                     ? ":no_entry_sign: 플랜 거절 피드백을 Claude에 전달했습니다."
                                     : ":x: 피드백 입력란을 찾을 수 없습니다";
-                                Task.Run(async () => await SlackSendViaApi(slackBotToken!, action.Channel, reply, thread))
+                                Task.Run(async () => await SlackSendViaApi(slackBotToken!, action.Channel, reply, thread, username: botUsername))
                                     .Wait(5000);
 
                                 // Update original message: remove buttons, show rejection
@@ -414,7 +420,7 @@ internal partial class Program
                                             {
                                                 // First message — create new
                                                 var (ok, ts) = Task.Run(async () =>
-                                                    await SlackSendViaApi(slackBotToken!, slackChannel!, slackText))
+                                                    await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
                                                     .GetAwaiter().GetResult();
                                                 if (ok && ts != null) slackStatusTs = ts;
                                             }
@@ -564,7 +570,7 @@ internal partial class Program
             {
                 if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
                 {
-                    Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!, "AppBotEye+Slack 종료"))
+                    Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!, "AppBotEye+Slack 종료", username: botUsername))
                         .Wait(3000);
                 }
                 slackClient.Dispose();
@@ -578,11 +584,23 @@ internal partial class Program
 
     /// <summary>
     /// Set up Slack event handlers for AppBotEye-integrated Slack daemon.
-    /// Handles @mentions, keyword monitoring, and plan approval responses.
+    /// Handles @mentions, keyword monitoring, thread reply forwarding, and plan approval responses.
+    /// RULE: User replies to bot messages are ALWAYS forwarded to Claude prompt.
     /// </summary>
     private static void SetupSlackEventHandlers(SlackSocketClient slack, string botToken, string? channel,
-        IntPtr claudeHwnd = default, Func<string?>? getPlanApprovalTs = null)
+        IntPtr claudeHwnd = default, Func<string?>? getPlanApprovalTs = null,
+        string? startupTs = null, string? botUsername = null)
     {
+        // Track threads where bot is engaged (for thread reply forwarding)
+        // RULE: User replies to bot messages are ALWAYS forwarded to Claude prompt.
+        var activeThreads = new HashSet<string>();
+        if (!string.IsNullOrEmpty(startupTs))
+            activeThreads.Add(startupTs);
+
+        // Local helper: send with bot username (multi-instance identification)
+        async Task<(bool ok, string? ts)> Send(string ch, string text, string? threadTs = null)
+            => await SlackSendViaApi(botToken, ch, text, threadTs, username: botUsername);
+
         // Handle @mentions
         slack.OnMention += (msg) =>
         {
@@ -590,12 +608,14 @@ internal partial class Program
                 msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
             Console.WriteLine($"[EYE][SLACK] @mention from {msg.User}: {cleanText}");
 
+            // Track this thread so ALL follow-up messages come through
+            var threadKey = msg.ThreadTs ?? msg.Timestamp;
+            activeThreads.Add(threadKey);
+
             // ── Plan approval via Slack @mention ──
-            // Check if this is a response to the plan approval thread
             var planTs = getPlanApprovalTs?.Invoke();
             if (!string.IsNullOrEmpty(planTs) && msg.ThreadTs == planTs && claudeHwnd != IntPtr.Zero)
             {
-                var threadKey = msg.ThreadTs ?? msg.Timestamp;
                 if (IsPlanApprovalKeyword(cleanText))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
@@ -606,12 +626,11 @@ internal partial class Program
                     var reply = approved
                         ? ":white_check_mark: 플랜 승인 완료! Claude가 코딩을 시작합니다."
                         : ":x: 승인 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
-                    Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel, reply, threadKey)).Wait(5000);
+                    Task.Run(async () => await Send(msg.Channel, reply, threadKey)).Wait(5000);
                     return;
                 }
                 else
                 {
-                    // Not a keyword — treat as feedback/modification request
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine($"[EYE] Plan feedback via Slack: {cleanText}");
                     Console.ResetColor();
@@ -620,7 +639,7 @@ internal partial class Program
                     var reply = feedbackOk
                         ? $":pencil2: 피드백 전달 완료: \"{cleanText}\""
                         : ":x: 피드백 입력란을 찾을 수 없습니다";
-                    Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel, reply, threadKey)).Wait(5000);
+                    Task.Run(async () => await Send(msg.Channel, reply, threadKey)).Wait(5000);
                     return;
                 }
             }
@@ -634,21 +653,19 @@ internal partial class Program
                 promptHelper.TypeAndSubmit(promptInfo, promptText);
                 Console.WriteLine("[EYE][SLACK] >> Sent to Claude prompt");
 
-                // Reply acknowledgment
                 var ackThread = msg.ThreadTs ?? msg.Timestamp;
-                Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel,
-                    "Claude에 전달했습니다!", ackThread)).Wait(5000);
+                var (ackOk, ackTs) = Task.Run(async () => await Send(msg.Channel,
+                    "Claude에 전달했습니다!", ackThread)).GetAwaiter().GetResult();
+                if (ackOk && ackTs != null)
+                    activeThreads.Add(ackTs);
             }
             else
             {
-                // No prompt — diagnose and take snapshot
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("[EYE][SLACK] Prompt not found! 계획승인 중이거나 권한 묻는 창이 떠있을 수 있습니다.");
-                Console.WriteLine("[EYE][SLACK] → 전경 윈도우 스냅샷 + Slack 전송으로 대응합니다.");
                 Console.ResetColor();
 
                 var ackThread = msg.ThreadTs ?? msg.Timestamp;
-                // Capture foreground window for diagnosis
                 try
                 {
                     var fgWindow = NativeMethods.GetForegroundWindow();
@@ -661,18 +678,17 @@ internal partial class Program
                         $"전경 윈도우: \"{fgTitle}\" (class={fgClass})\n" +
                         $"가능한 원인: 계획승인 중 / 권한 묻는 창 / Claude 비활성\n" +
                         $"받은 메시지: {cleanText}";
-                    Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel,
-                        diagMsg, ackThread)).Wait(5000);
+                    Task.Run(async () => await Send(msg.Channel, diagMsg, ackThread)).Wait(5000);
                 }
                 catch
                 {
-                    Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel,
+                    Task.Run(async () => await Send(msg.Channel,
                         $"(Claude 프롬프트 없음) 받은 메시지: {cleanText}", ackThread)).Wait(5000);
                 }
             }
         };
 
-        // Handle channel messages (keyword monitoring + plan approval without @mention)
+        // Handle channel messages (thread reply forwarding + keyword monitoring + plan approval)
         var keywords = new[] { "클롯", "클봇", "claude", "appbot", "wkappbot" };
         slack.OnMessage += (msg) =>
         {
@@ -695,7 +711,7 @@ internal partial class Program
                     var reply = approved
                         ? ":white_check_mark: 플랜 승인 완료! Claude가 코딩을 시작합니다."
                         : ":x: 승인 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
-                    Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel, reply, msg.ThreadTs)).Wait(5000);
+                    Task.Run(async () => await Send(msg.Channel, reply, msg.ThreadTs)).Wait(5000);
                     return;
                 }
                 else if (cleanText.Length > 0)
@@ -708,9 +724,81 @@ internal partial class Program
                     var reply = feedbackOk
                         ? $":pencil2: 피드백 전달 완료: \"{cleanText}\""
                         : ":x: 피드백 입력란을 찾을 수 없습니다";
-                    Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel, reply, msg.ThreadTs)).Wait(5000);
+                    Task.Run(async () => await Send(msg.Channel, reply, msg.ThreadTs)).Wait(5000);
                     return;
                 }
+            }
+
+            // ── Auto-track threads on bot's own messages (API check) ──
+            if (msg.ThreadTs != null && !activeThreads.Contains(msg.ThreadTs))
+            {
+                if (IsOwnThread(botToken, msg.Channel, msg.ThreadTs))
+                {
+                    activeThreads.Add(msg.ThreadTs);
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"[EYE][SLACK] Auto-tracking thread on bot's message (ts={msg.ThreadTs})");
+                    Console.ResetColor();
+                }
+            }
+
+            // ── Thread reply to bot's message → ALWAYS forward to Claude prompt ──
+            if (msg.ThreadTs != null && activeThreads.Contains(msg.ThreadTs))
+            {
+                var cleanText = System.Text.RegularExpressions.Regex.Replace(
+                    msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
+                if (string.IsNullOrEmpty(cleanText)) return;
+
+                // "그만" / "stop" → stop tracking this thread
+                var trimmedLower = cleanText.Trim().ToLowerInvariant();
+                if (trimmedLower == "그만" || trimmedLower == "stop" || trimmedLower == "ㄱㅁ")
+                {
+                    activeThreads.Remove(msg.ThreadTs);
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.WriteLine($"[EYE][SLACK] << thread stopped by {msg.User} (ts={msg.ThreadTs})");
+                    Console.ResetColor();
+                    Task.Run(async () => await Send(msg.Channel,
+                        "알겠습니다~ 이 쓰레드에서 물러납니다!", msg.ThreadTs)).Wait(5000);
+                    return;
+                }
+
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"[EYE][SLACK] << thread reply from {msg.User}: {cleanText}");
+                Console.ResetColor();
+
+                var trPromptHelper = new ClaudePromptHelper();
+                var trPromptInfo = trPromptHelper.FindPrompt();
+                if (trPromptInfo != null)
+                {
+                    var promptText = $"{cleanText}\n\n(Slack thread reply @{msg.User} — via AppBotEye)";
+                    trPromptHelper.TypeAndSubmit(trPromptInfo, promptText);
+                    Console.WriteLine("[EYE][SLACK] >> Thread reply sent to Claude prompt");
+
+                    Task.Run(async () => await Send(msg.Channel,
+                        "Claude에 전달했습니다!", msg.ThreadTs)).Wait(5000);
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("[EYE][SLACK] >> Thread reply: Prompt not found!");
+                    Console.ResetColor();
+
+                    try
+                    {
+                        var fgW = NativeMethods.GetForegroundWindow();
+                        var fgT = fgW != IntPtr.Zero
+                            ? WKAppBot.Win32.Window.WindowFinder.GetWindowText(fgW) : "(없음)";
+                        var diagMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
+                            $"전경: \"{fgT}\"\n" +
+                            $"스레드 답장: {cleanText}";
+                        Task.Run(async () => await Send(msg.Channel, diagMsg, msg.ThreadTs)).Wait(5000);
+                    }
+                    catch
+                    {
+                        Task.Run(async () => await Send(msg.Channel,
+                            $"(Claude 프롬프트 없음) 스레드 답장: {cleanText}", msg.ThreadTs)).Wait(5000);
+                    }
+                }
+                return;
             }
 
             // ── Keyword monitoring → forward to Claude prompt ──
@@ -721,6 +809,10 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Magenta;
                 Console.WriteLine($"[EYE][SLACK] keyword \"{matchedKw}\" from {msg.User}: {msg.Text}");
                 Console.ResetColor();
+
+                // Start tracking this thread so follow-up messages also come through
+                var kwThreadKey = msg.ThreadTs ?? msg.Timestamp;
+                activeThreads.Add(kwThreadKey);
 
                 var cleanKwText = System.Text.RegularExpressions.Regex.Replace(
                     msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
@@ -734,9 +826,10 @@ internal partial class Program
                     kwPromptHelper.TypeAndSubmit(kwPromptInfo, promptText);
                     Console.WriteLine("[EYE][SLACK] >> Keyword match sent to Claude prompt");
 
-                    var kwThread = msg.ThreadTs ?? msg.Timestamp;
-                    Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel,
-                        "Claude에 전달했습니다!", kwThread)).Wait(5000);
+                    var (kwOk, kwTs) = Task.Run(async () => await Send(msg.Channel,
+                        "Claude에 전달했습니다!", kwThreadKey)).GetAwaiter().GetResult();
+                    if (kwOk && kwTs != null)
+                        activeThreads.Add(kwTs);
                 }
                 else
                 {
@@ -744,7 +837,6 @@ internal partial class Program
                     Console.WriteLine("[EYE][SLACK] >> Keyword match: Prompt not found! 계획승인/권한창 가능성");
                     Console.ResetColor();
 
-                    var kwThread = msg.ThreadTs ?? msg.Timestamp;
                     try
                     {
                         var fgW = NativeMethods.GetForegroundWindow();
@@ -757,13 +849,12 @@ internal partial class Program
                             $"전경: \"{fgT}\" (class={fgC})\n" +
                             $"원인: 계획승인 중 / 권한 묻는 창 / Claude 비활성\n" +
                             $"키워드 \"{matchedKw}\" 감지: {cleanKwText}";
-                        Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel,
-                            diagMsg, kwThread)).Wait(5000);
+                        Task.Run(async () => await Send(msg.Channel, diagMsg, kwThreadKey)).Wait(5000);
                     }
                     catch
                     {
-                        Task.Run(async () => await SlackSendViaApi(botToken, msg.Channel,
-                            $"(Claude 프롬프트 없음) 키워드 \"{matchedKw}\" 감지: {cleanKwText}", kwThread)).Wait(5000);
+                        Task.Run(async () => await Send(msg.Channel,
+                            $"(Claude 프롬프트 없음) 키워드 \"{matchedKw}\" 감지: {cleanKwText}", kwThreadKey)).Wait(5000);
                     }
                 }
             }
