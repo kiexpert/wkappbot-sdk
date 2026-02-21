@@ -53,6 +53,10 @@ internal partial class Program
         bool planApprovalSentToSlack = false;
         string? pendingPlanApprovalSlackTs = null;
 
+        // Permission prompt tracking (Allow/Deny buttons)
+        bool permissionPromptSentToSlack = false;
+        string? pendingPermissionSlackTs = null;
+
         // Slack status streaming — edit same message instead of spamming new ones
         string? slackStatusTs = null;       // current status message timestamp
         string? lastSlackStatusText = null;  // cached text for change detection
@@ -125,6 +129,27 @@ internal partial class Program
                                         .Wait(3000);
                                 }
                             }
+                            else if (action.ActionId.StartsWith("perm_") && claudeHwnd != IntPtr.Zero)
+                            {
+                                // Permission button clicked — value = exact UIA button text
+                                var buttonText = action.Value;
+                                var clicked = ClickPermissionButton(claudeHwnd, buttonText);
+                                var reply = clicked
+                                    ? $":white_check_mark: \"{buttonText}\" 클릭 완료!"
+                                    : $":x: \"{buttonText}\" 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
+                                Task.Run(async () => await SlackSendViaApi(slackBotToken!, action.Channel, reply, thread, username: botUsername))
+                                    .Wait(5000);
+
+                                // Update original message: remove buttons, show result
+                                if (!string.IsNullOrEmpty(action.ResponseUrl))
+                                {
+                                    var updateText = clicked
+                                        ? $":white_check_mark: *\"{buttonText}\" 처리됨* — by {action.UserName}"
+                                        : $":warning: \"{buttonText}\" 버튼을 찾지 못함";
+                                    Task.Run(async () => await SlackRespondViaUrl(action.ResponseUrl, updateText))
+                                        .Wait(3000);
+                                }
+                            }
                             else if (action.ActionId == "plan_reject" && claudeHwnd != IntPtr.Zero)
                             {
                                 var feedbackOk = TypePlanFeedback(claudeHwnd, "이 플랜을 거절합니다. 다시 검토해주세요.");
@@ -190,7 +215,12 @@ internal partial class Program
         bool wasRateLimited = false; // Track rate_limit -> reset transition for on_limit_reset schedules
         DateTime? rateLimitDetectedAt = null; // When rate limit was first detected (for cooldown debounce)
         DateTime? rateLimitResetTime = null;  // Parsed reset time from Claude status text
-        const int RateLimitCooldownMinutes = 5; // Don't clear wasRateLimited for at least this long
+        DateTime? lastRateLimitAlertTime = null; // When last Slack alert was sent (prevent spam)
+        const int RateLimitCooldownMinutes = 30; // Don't clear wasRateLimited for at least this long (prevents flapping)
+        const int RateLimitAlertCooldownMinutes = 30; // Don't send Slack alert more than once per 30 min
+        DateTime? lastDiagSnapshotTime = null; // Debounce for UIA detection failure snapshots
+        const int DiagSnapshotCooldownMinutes = 5; // Min interval between diagnostic snapshots
+        int consecutiveUiaFailures = 0; // Count consecutive null returns from DetectClaudeDesktopStatus
 
         // ── Startup: execute overdue schedules (PC reboot recovery) ──
         try
@@ -359,11 +389,119 @@ internal partial class Program
                         var claudeStatus = DetectClaudeDesktopStatus(claudeHwnd);
 
                         // Always update cached status for fallback display
-                        // But don't wipe it during rate limit debounce (UIA may intermittently fail)
                         if (claudeStatus != null)
                             cachedClaudeStatusText = $"Claude: {claudeStatus.Item2}";
-                        else if (!wasRateLimited)
-                            cachedClaudeStatusText = null;
+                        else
+                        {
+                            // UIA returned null — check if rate limit should be auto-cleared
+                            // (reset time passed OR cooldown expired → stop showing stale "한도 초과")
+                            if (wasRateLimited)
+                            {
+                                var now = DateTime.Now;
+                                bool cooldownPassed = rateLimitDetectedAt != null &&
+                                    (now - rateLimitDetectedAt.Value).TotalMinutes >= RateLimitCooldownMinutes;
+                                bool resetTimePassed = rateLimitResetTime != null && now >= rateLimitResetTime.Value;
+
+                                if (cooldownPassed || resetTimePassed)
+                                {
+                                    // Rate limit expired — clear everything
+                                    wasRateLimited = false;
+                                    rateLimitDetectedAt = null;
+                                    rateLimitResetTime = null;
+                                    cachedClaudeStatusText = null;
+                                    Console.ForegroundColor = ConsoleColor.Green;
+                                    Console.WriteLine($"[EYE] Rate limit auto-cleared (null status, cooldown={cooldownPassed}, resetTime={resetTimePassed})");
+                                    Console.ResetColor();
+
+                                    // Update ActionState
+                                    var currentState = lastActionState ?? new ActionState { Source = "eye" };
+                                    currentState.IsRateLimited = false;
+                                    currentState.RateLimitResetAt = null;
+                                    currentState.ClaudeStatus = null;
+                                    currentState.ClaudeStatusText = null;
+                                    ActionState.Write(currentState);
+
+                                    // Execute on_limit_reset schedules
+                                    try
+                                    {
+                                        Console.WriteLine("[SCHEDULE] Rate limit cleared! Checking on_limit_reset schedules...");
+                                        Thread.Sleep(3000);
+                                        var resetItems = ScheduleManager.GetOnLimitResetItems();
+                                        foreach (var resetItem in resetItems)
+                                        {
+                                            ExecuteScheduleItem(resetItem, slackBotToken, slackChannel);
+                                            Thread.Sleep(2000);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"[SCHEDULE] on_limit_reset error: {ex.Message}");
+                                    }
+                                }
+                                // else: still in cooldown — keep cachedClaudeStatusText as "한도 초과" (but it will clear when cooldown passes)
+                            }
+                            else
+                            {
+                                cachedClaudeStatusText = null;
+                            }
+                        }
+
+                        // ── UIA detection failure diagnostic snapshot ──
+                        // If Claude window exists but UIA can't detect any status → something unusual
+                        // (e.g. unknown dialog, crash screen, update prompt, etc.)
+                        if (claudeStatus == null && IsWindow(claudeHwnd))
+                        {
+                            consecutiveUiaFailures++;
+                            // After 3 consecutive failures (~15 sec), take diagnostic snapshot
+                            if (consecutiveUiaFailures >= 3)
+                            {
+                                var now = DateTime.Now;
+                                bool snapshotCooldownOk = lastDiagSnapshotTime == null ||
+                                    (now - lastDiagSnapshotTime.Value).TotalMinutes >= DiagSnapshotCooldownMinutes;
+
+                                if (snapshotCooldownOk)
+                                {
+                                    lastDiagSnapshotTime = now;
+                                    Console.ForegroundColor = ConsoleColor.Yellow;
+                                    Console.WriteLine($"[EYE] Claude 창 UIA 감지 실패 ({consecutiveUiaFailures}회 연속) — 진단 스냅샷 촬영");
+                                    Console.ResetColor();
+
+                                    try
+                                    {
+                                        var snapDir = TakeRateLimitSnapshot(claudeHwnd, "uia_diag");
+                                        if (snapDir != null)
+                                        {
+                                            Console.WriteLine($"[EYE] Diagnostic snapshot: {snapDir}");
+
+                                            // Upload to Slack
+                                            if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                                            {
+                                                var screenshotPath = Path.Combine(snapDir, "screenshot.png");
+                                                if (File.Exists(screenshotPath))
+                                                {
+                                                    Task.Run(async () =>
+                                                    {
+                                                        await SlackUploadFileAsync(slackBotToken!, slackChannel!,
+                                                            screenshotPath, null, "UIA 감지 실패 진단",
+                                                            $":mag: Claude 창 UIA 상태 감지 실패 ({consecutiveUiaFailures}회 연속)\n" +
+                                                            "중단/승인/프롬프트 어느 것도 감지 안 됨 → 알 수 없는 상태");
+                                                    }).Wait(10000);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"[EYE] Diagnostic snapshot error: {ex.Message}");
+                                    }
+                                }
+                                consecutiveUiaFailures = 0; // reset after snapshot attempt
+                            }
+                        }
+                        else
+                        {
+                            consecutiveUiaFailures = 0; // reset on successful detection
+                        }
 
                         if (claudeStatus != null)
                         {
@@ -445,8 +583,12 @@ internal partial class Program
                                 ActionState.Write(currentState);
 
                                 // ★ Rate limit just detected: auto-snapshot + Slack alert (new message, not update)
-                                if (justHitRateLimit && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                                // Alert cooldown: don't spam Slack (max once per 30 min)
+                                bool alertCooldownOk = lastRateLimitAlertTime == null ||
+                                    (DateTime.Now - lastRateLimitAlertTime.Value).TotalMinutes >= RateLimitAlertCooldownMinutes;
+                                if (justHitRateLimit && alertCooldownOk && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
                                 {
+                                    lastRateLimitAlertTime = DateTime.Now;
                                     Console.ForegroundColor = ConsoleColor.Red;
                                     Console.WriteLine($"[EYE] ★ Rate limit detected! {claudeStatus.Item2}");
                                     Console.ResetColor();
@@ -496,6 +638,8 @@ internal partial class Program
                                         {
                                             "executing" => ":gear:",
                                             "plan_approval_pending" => ":clipboard:",
+                                            "plan_mode" => ":memo:",
+                                            "permission_prompt" => ":lock:",
                                             "prompt_ready" => ":speech_balloon:",
                                             "rate_limit" => ":warning:",
                                             _ => ":robot_face:"
@@ -577,6 +721,46 @@ internal partial class Program
                                     {
                                         planApprovalSentToSlack = false;
                                         pendingPlanApprovalSlackTs = null;
+                                    }
+
+                                    // ── Permission prompt: send buttons to Slack (once per prompt) ──
+                                    if (claudeStatus.Item1 == "permission_prompt" && !permissionPromptSentToSlack)
+                                    {
+                                        try
+                                        {
+                                            var permButtons = GetPermissionButtons(claudeHwnd);
+                                            if (permButtons.Count >= 2)
+                                            {
+                                                // Build Block Kit message with dynamic permission buttons
+                                                var btnList = string.Join(" / ", permButtons);
+                                                var fallbackText = $":lock: 수락 요구: [{btnList}]";
+
+                                                var blocks = BuildPermissionBlocks(permButtons, claudeStatus.Item2);
+                                                var (sendOk, sendTs) = Task.Run(async () =>
+                                                    await SlackSendBlocksViaApi(slackBotToken!, slackChannel!, fallbackText, blocks))
+                                                    .GetAwaiter().GetResult();
+
+                                                if (sendOk)
+                                                {
+                                                    pendingPermissionSlackTs = sendTs;
+                                                    permissionPromptSentToSlack = true;
+                                                    Console.ForegroundColor = ConsoleColor.Cyan;
+                                                    Console.WriteLine($"[EYE] Permission buttons sent to Slack: [{btnList}] (ts={sendTs})");
+                                                    Console.ResetColor();
+                                                }
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Console.WriteLine($"[EYE] Permission Slack share error: {ex.Message}");
+                                        }
+                                    }
+
+                                    // Reset permission tracking when status changes away
+                                    if (claudeStatus.Item1 != "permission_prompt" && permissionPromptSentToSlack)
+                                    {
+                                        permissionPromptSentToSlack = false;
+                                        pendingPermissionSlackTs = null;
                                     }
                                 }
                             }
@@ -688,14 +872,14 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Take a quick snapshot when rate limit is detected.
+    /// Take a quick snapshot of Claude window for diagnostics.
     /// Returns the output directory path, or null on failure.
     /// </summary>
-    static string? TakeRateLimitSnapshot(IntPtr claudeHwnd)
+    static string? TakeRateLimitSnapshot(IntPtr claudeHwnd, string tag = "rate_limit")
     {
         if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd)) return null;
 
-        var outDir = Path.Combine(DataDir, "output", "snapshots", $"rate_limit_{DateTime.Now:yyyyMMdd_HHmmss}");
+        var outDir = Path.Combine(DataDir, "output", "snapshots", $"{tag}_{DateTime.Now:yyyyMMdd_HHmmss}");
         Directory.CreateDirectory(outDir);
 
         // Screenshot
@@ -711,11 +895,11 @@ internal partial class Program
         }
         catch { }
 
-        // UIA tree (lightweight, depth=5)
+        // UIA tree (depth=10 — Electron needs at least 8 to reach RootWebArea + buttons)
         try
         {
             using var uia = new UiaLocator();
-            var tree = uia.DumpTree(claudeHwnd, 5);
+            var tree = uia.DumpTree(claudeHwnd, 10);
             File.WriteAllText(Path.Combine(outDir, "uia_tree.txt"), tree, Encoding.UTF8);
         }
         catch { }
@@ -753,9 +937,40 @@ internal partial class Program
         if (!string.IsNullOrEmpty(startupTs))
             activeThreads.Add(startupTs);
 
+        // Track "전달했습니다" ack messages per thread → delete when Claude responds via this bot
+        // Key: threadTs, Value: (channel, ackMessageTs)
+        var pendingAcks = new Dictionary<string, (string channel, string ackTs)>();
+
         // Local helper: send with bot username (multi-instance identification)
         async Task<(bool ok, string? ts)> Send(string ch, string text, string? threadTs = null)
             => await SlackSendViaApi(botToken, ch, text, threadTs, username: botUsername);
+
+        // Local helper: delete previous "전달했습니다" ack in a thread (file-based IPC)
+        void DeletePendingAck(string threadKey)
+        {
+            // In-memory cleanup
+            if (pendingAcks.TryGetValue(threadKey, out var ack))
+            {
+                pendingAcks.Remove(threadKey);
+                Task.Run(async () => await SlackDeleteMessageAsync(botToken, ack.channel, ack.ackTs)).Wait(3000);
+            }
+            // File-based cleanup (for cross-process sharing with CLI)
+            DeletePendingAckFromFile(botToken, threadKey);
+        }
+
+        // Local helper: send ack "전달했습니다" and track it for later deletion (memory + file)
+        void SendAndTrackAck(string ch, string threadKey)
+        {
+            var (ackOk, ackTs) = Task.Run(async () => await Send(ch,
+                "Claude에 전달했습니다!", threadKey)).GetAwaiter().GetResult();
+            if (ackOk && ackTs != null)
+            {
+                pendingAcks[threadKey] = (ch, ackTs);
+                activeThreads.Add(ackTs);
+                // Persist to file for cross-process access (CLI can delete when replying)
+                SavePendingAck(threadKey, ch, ackTs);
+            }
+        }
 
         // Handle @mentions
         slack.OnMention += (msg) =>
@@ -782,6 +997,7 @@ internal partial class Program
                     var reply = approved
                         ? ":white_check_mark: 플랜 승인 완료! Claude가 코딩을 시작합니다."
                         : ":x: 승인 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
+                    DeletePendingAck(threadKey);
                     Task.Run(async () => await Send(msg.Channel, reply, threadKey)).Wait(5000);
                     return;
                 }
@@ -795,6 +1011,7 @@ internal partial class Program
                     var reply = feedbackOk
                         ? $":pencil2: 피드백 전달 완료: \"{cleanText}\""
                         : ":x: 피드백 입력란을 찾을 수 없습니다";
+                    DeletePendingAck(threadKey);
                     Task.Run(async () => await Send(msg.Channel, reply, threadKey)).Wait(5000);
                     return;
                 }
@@ -805,34 +1022,40 @@ internal partial class Program
             var promptInfo = promptHelper.FindPrompt();
             if (promptInfo != null)
             {
-                var promptText = $"{cleanText}\n\n(Slack @{msg.User} — via AppBotEye+Slack)";
-                promptHelper.TypeAndSubmit(promptInfo, promptText);
-                Console.WriteLine("[EYE][SLACK] >> Sent to Claude prompt");
-
+                // Build thread context (starter + previous message) for Claude
+                var threadContext = "";
                 var ackThread = msg.ThreadTs ?? msg.Timestamp;
-                var (ackOk, ackTs) = Task.Run(async () => await Send(msg.Channel,
-                    "Claude에 전달했습니다!", ackThread)).GetAwaiter().GetResult();
-                if (ackOk && ackTs != null)
-                    activeThreads.Add(ackTs);
+                if (msg.ThreadTs != null)
+                {
+                    var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
+                    if (!string.IsNullOrEmpty(ctx))
+                        threadContext = $"\n{ctx}\n";
+                }
+
+                var promptText = $"{cleanText}{threadContext}\n(Slack @{msg.User} — via AppBotEye+Slack)";
+                promptHelper.TypeAndSubmit(promptInfo, promptText);
+                Console.WriteLine("[EYE][SLACK] >> Sent to Claude prompt (with thread context)");
+
+                DeletePendingAck(ackThread);
+                SendAndTrackAck(msg.Channel, ackThread);
             }
             else
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("[EYE][SLACK] Prompt not found! 계획승인 중이거나 권한 묻는 창이 떠있을 수 있습니다.");
+                Console.WriteLine("[EYE][SLACK] Prompt not found! Claude 상태 확인 중...");
                 Console.ResetColor();
 
                 var ackThread = msg.ThreadTs ?? msg.Timestamp;
                 try
                 {
-                    var fgWindow = NativeMethods.GetForegroundWindow();
-                    var fgTitle = fgWindow != IntPtr.Zero
-                        ? WKAppBot.Win32.Window.WindowFinder.GetWindowText(fgWindow) : "(없음)";
-                    var fgClass = fgWindow != IntPtr.Zero
-                        ? WKAppBot.Win32.Window.WindowFinder.GetClassName(fgWindow) : "?";
+                    // Check Claude Desktop status for better diagnosis
+                    var claudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
+                    var statusInfo = claudeStatus != null
+                        ? $"Claude 상태: {claudeStatus.Item2}"
+                        : "Claude 상태: 감지 불가";
 
                     var diagMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
-                        $"전경 윈도우: \"{fgTitle}\" (class={fgClass})\n" +
-                        $"가능한 원인: 계획승인 중 / 권한 묻는 창 / Claude 비활성\n" +
+                        $"{statusInfo}\n" +
                         $"받은 메시지: {cleanText}";
                     Task.Run(async () => await Send(msg.Channel, diagMsg, ackThread)).Wait(5000);
                 }
@@ -841,6 +1064,18 @@ internal partial class Program
                     Task.Run(async () => await Send(msg.Channel,
                         $"(Claude 프롬프트 없음) 받은 메시지: {cleanText}", ackThread)).Wait(5000);
                 }
+            }
+        };
+
+        // Handle bot's own messages in threads → delete pending "전달했습니다" ack
+        slack.OnSelfMessage += (msg) =>
+        {
+            if (string.IsNullOrEmpty(msg.ThreadTs)) return;
+            // If this bot just posted a REAL response (not ack), delete the pending ack
+            if (msg.Text != "Claude에 전달했습니다!")
+            {
+                DeletePendingAck(msg.ThreadTs);
+                Console.WriteLine($"[EYE][SLACK] Deleted ack in thread {msg.ThreadTs} (bot replied)");
             }
         };
 
@@ -870,6 +1105,7 @@ internal partial class Program
                     var reply = approved
                         ? ":white_check_mark: 플랜 승인 완료! Claude가 코딩을 시작합니다."
                         : ":x: 승인 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
+                    DeletePendingAck(msg.ThreadTs!);
                     Task.Run(async () => await Send(msg.Channel, reply, msg.ThreadTs)).Wait(5000);
                     return;
                 }
@@ -883,6 +1119,7 @@ internal partial class Program
                     var reply = feedbackOk
                         ? $":pencil2: 피드백 전달 완료: \"{cleanText}\""
                         : ":x: 피드백 입력란을 찾을 수 없습니다";
+                    DeletePendingAck(msg.ThreadTs!);
                     Task.Run(async () => await Send(msg.Channel, reply, msg.ThreadTs)).Wait(5000);
                     return;
                 }
@@ -928,12 +1165,21 @@ internal partial class Program
                 var trPromptInfo = trPromptHelper.FindPrompt();
                 if (trPromptInfo != null)
                 {
-                    var promptText = $"{cleanText}\n\n(Slack thread reply @{msg.User} — via AppBotEye)";
-                    trPromptHelper.TypeAndSubmit(trPromptInfo, promptText);
-                    Console.WriteLine("[EYE][SLACK] >> Thread reply sent to Claude prompt");
+                    // Build thread context (starter + previous message) for Claude
+                    var threadContext = "";
+                    if (msg.ThreadTs != null)
+                    {
+                        var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
+                        if (!string.IsNullOrEmpty(ctx))
+                            threadContext = $"\n{ctx}\n";
+                    }
 
-                    Task.Run(async () => await Send(msg.Channel,
-                        "Claude에 전달했습니다!", msg.ThreadTs)).Wait(5000);
+                    var promptText = $"{cleanText}{threadContext}\n(Slack thread reply @{msg.User} — via AppBotEye)";
+                    trPromptHelper.TypeAndSubmit(trPromptInfo, promptText);
+                    Console.WriteLine("[EYE][SLACK] >> Thread reply sent to Claude prompt (with context)");
+
+                    DeletePendingAck(msg.ThreadTs!);
+                    SendAndTrackAck(msg.Channel, msg.ThreadTs!);
                 }
                 else
                 {
@@ -943,11 +1189,12 @@ internal partial class Program
 
                     try
                     {
-                        var fgW = NativeMethods.GetForegroundWindow();
-                        var fgT = fgW != IntPtr.Zero
-                            ? WKAppBot.Win32.Window.WindowFinder.GetWindowText(fgW) : "(없음)";
+                        var trClaudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
+                        var trStatusInfo = trClaudeStatus != null
+                            ? $"Claude 상태: {trClaudeStatus.Item2}"
+                            : "Claude 상태: 감지 불가";
                         var diagMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
-                            $"전경: \"{fgT}\"\n" +
+                            $"{trStatusInfo}\n" +
                             $"스레드 답장: {cleanText}";
                         Task.Run(async () => await Send(msg.Channel, diagMsg, msg.ThreadTs)).Wait(5000);
                     }
@@ -981,32 +1228,36 @@ internal partial class Program
                 var kwPromptInfo = kwPromptHelper.FindPrompt();
                 if (kwPromptInfo != null)
                 {
-                    var promptText = $"{cleanKwText}\n\n(Slack keyword:\"{matchedKw}\" @{msg.User} — via AppBotEye)";
-                    kwPromptHelper.TypeAndSubmit(kwPromptInfo, promptText);
-                    Console.WriteLine("[EYE][SLACK] >> Keyword match sent to Claude prompt");
+                    // Build thread context (starter + previous message) for Claude
+                    var threadContext = "";
+                    if (msg.ThreadTs != null)
+                    {
+                        var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
+                        if (!string.IsNullOrEmpty(ctx))
+                            threadContext = $"\n{ctx}\n";
+                    }
 
-                    var (kwOk, kwTs) = Task.Run(async () => await Send(msg.Channel,
-                        "Claude에 전달했습니다!", kwThreadKey)).GetAwaiter().GetResult();
-                    if (kwOk && kwTs != null)
-                        activeThreads.Add(kwTs);
+                    var promptText = $"{cleanKwText}{threadContext}\n(Slack keyword:\"{matchedKw}\" @{msg.User} — via AppBotEye)";
+                    kwPromptHelper.TypeAndSubmit(kwPromptInfo, promptText);
+                    Console.WriteLine("[EYE][SLACK] >> Keyword match sent to Claude prompt (with context)");
+
+                    DeletePendingAck(kwThreadKey);
+                    SendAndTrackAck(msg.Channel, kwThreadKey);
                 }
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("[EYE][SLACK] >> Keyword match: Prompt not found! 계획승인/권한창 가능성");
+                    Console.WriteLine("[EYE][SLACK] >> Keyword match: Prompt not found!");
                     Console.ResetColor();
 
                     try
                     {
-                        var fgW = NativeMethods.GetForegroundWindow();
-                        var fgT = fgW != IntPtr.Zero
-                            ? WKAppBot.Win32.Window.WindowFinder.GetWindowText(fgW) : "(없음)";
-                        var fgC = fgW != IntPtr.Zero
-                            ? WKAppBot.Win32.Window.WindowFinder.GetClassName(fgW) : "?";
-
+                        var kwClaudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
+                        var kwStatusInfo = kwClaudeStatus != null
+                            ? $"Claude 상태: {kwClaudeStatus.Item2}"
+                            : "Claude 상태: 감지 불가";
                         var diagMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
-                            $"전경: \"{fgT}\" (class={fgC})\n" +
-                            $"원인: 계획승인 중 / 권한 묻는 창 / Claude 비활성\n" +
+                            $"{kwStatusInfo}\n" +
                             $"키워드 \"{matchedKw}\" 감지: {cleanKwText}";
                         Task.Run(async () => await Send(msg.Channel, diagMsg, kwThreadKey)).Wait(5000);
                     }

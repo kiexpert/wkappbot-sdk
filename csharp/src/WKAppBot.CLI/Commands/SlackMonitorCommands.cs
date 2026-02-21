@@ -286,11 +286,11 @@ internal partial class Program
     /// <summary>Bot username for Slack messages — computed once at startup from CWD folder name.
     /// Requires chat:write.customize scope — Slack silently ignores if scope missing.
     /// Multiple bot instances identify themselves by folder name: "클봇 [WKAppBot]", "클봇 [HTS]", etc.</summary>
-    static readonly string BotUsername = $"클봇 [{Path.GetFileName(Environment.CurrentDirectory) ?? Environment.MachineName}]";
+    static readonly string BotUsername = $"클롯 [{Path.GetFileName(Environment.CurrentDirectory) ?? Environment.MachineName}]";
 
     /// <summary>Build Slack username override from instance name. null = use default bot name.</summary>
     static string? GetBotUsername(string? instanceName) =>
-        instanceName != null ? $"클봇 [{instanceName}]" : null;
+        instanceName != null ? $"클롯 [{instanceName}]" : null;
 
     /// <summary>Find Chrome main window handle by PID.</summary>
     static IntPtr FindChromeHwndByPid(int pid)
@@ -389,6 +389,7 @@ internal partial class Program
 
             // 2. Find previous message (right before current — could be user OR bot)
             // In a thread, conversation flows: bot→user→bot→user, so prev msg gives context
+            // Skip ack messages ("전달했습니다") — they are transient and not meaningful context
             string? prevText = null;
             bool prevIsBot = false;
             for (int i = messages.Count - 1; i >= 1; i--)
@@ -396,7 +397,11 @@ internal partial class Program
                 var msgTs = messages[i]?["ts"]?.GetValue<string>();
                 if (msgTs == currentMsgTs) continue; // skip current message
 
-                prevText = messages[i]?["text"]?.GetValue<string>();
+                var candidateText = messages[i]?["text"]?.GetValue<string>();
+                // Skip ack messages (not useful context for Claude)
+                if (candidateText == "Claude에 전달했습니다!") continue;
+
+                prevText = candidateText;
                 prevIsBot = messages[i]?["bot_id"] != null;
                 break;
             }
@@ -404,7 +409,7 @@ internal partial class Program
             // Build context
             var sb = new System.Text.StringBuilder();
 
-            if (!string.IsNullOrEmpty(parentText))
+            if (!string.IsNullOrEmpty(parentText) && parentText != "Claude에 전달했습니다!")
             {
                 if (parentText.Length > 300) parentText = parentText[..297] + "...";
                 sb.AppendLine("[쓰레드 시작]");
@@ -414,7 +419,7 @@ internal partial class Program
             if (!string.IsNullOrEmpty(prevText))
             {
                 if (prevText.Length > 200) prevText = prevText[..197] + "...";
-                var label = prevIsBot ? "[직전 클봇 응답]" : "[직전 메시지]";
+                var label = prevIsBot ? "[직전 클롯 응답]" : "[직전 메시지]";
                 sb.AppendLine();
                 sb.AppendLine(label);
                 sb.AppendLine(prevText);
@@ -478,5 +483,94 @@ internal partial class Program
             Console.WriteLine($"[SLACK] chat.delete error: {json?["error"]}");
 
         return ok;
+    }
+
+    // ── Pending Ack file-based IPC ──────────────────────────────
+    // Shared between AppBotEye (writes ack ts) and CLI (reads + deletes ack before replying)
+    // File: wkappbot.hq/runtime/pending_acks.json
+    // Format: { "threadTs": { "channel": "C...", "ackTs": "1234.5678" }, ... }
+
+    static string PendingAcksFilePath
+    {
+        get
+        {
+            var exeDir = Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".";
+            return Path.Combine(exeDir, "wkappbot.hq", "runtime", "pending_acks.json");
+        }
+    }
+
+    /// <summary>Save a pending ack ts for a thread (atomic write).</summary>
+    static void SavePendingAck(string threadTs, string channel, string ackTs)
+    {
+        try
+        {
+            var all = LoadPendingAcks();
+            all[threadTs] = new PendingAckEntry { Channel = channel, AckTs = ackTs };
+            WritePendingAcks(all);
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>Delete a pending ack for a thread and remove the Slack message. Returns true if deleted.</summary>
+    static bool DeletePendingAckFromFile(string botToken, string threadTs)
+    {
+        try
+        {
+            var all = LoadPendingAcks();
+            if (!all.TryGetValue(threadTs, out var entry)) return false;
+
+            all.Remove(threadTs);
+            WritePendingAcks(all);
+
+            // Actually delete the Slack message
+            var deleted = Task.Run(async () =>
+                await SlackDeleteMessageAsync(botToken, entry.Channel, entry.AckTs)).GetAwaiter().GetResult();
+            if (deleted)
+                Console.WriteLine($"[SLACK] Deleted pending ack in thread {threadTs}");
+            return deleted;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Delete ALL pending acks for a channel (cleanup after bot replies).</summary>
+    static void DeleteAllPendingAcksInThread(string botToken, string threadTs)
+    {
+        DeletePendingAckFromFile(botToken, threadTs);
+    }
+
+    static Dictionary<string, PendingAckEntry> LoadPendingAcks()
+    {
+        try
+        {
+            var path = PendingAcksFilePath;
+            if (!File.Exists(path)) return new();
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<Dictionary<string, PendingAckEntry>>(json, _pendingAckJsonOpts) ?? new();
+        }
+        catch { return new(); }
+    }
+
+    static void WritePendingAcks(Dictionary<string, PendingAckEntry> data)
+    {
+        var path = PendingAcksFilePath;
+        var dir = Path.GetDirectoryName(path)!;
+        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+        var json = JsonSerializer.Serialize(data, _pendingAckJsonOpts);
+        var tmp = path + ".tmp";
+        File.WriteAllText(tmp, json);
+        File.Move(tmp, path, overwrite: true);
+    }
+
+    static readonly JsonSerializerOptions _pendingAckJsonOpts = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+    };
+
+    sealed class PendingAckEntry
+    {
+        public string Channel { get; set; } = "";
+        public string AckTs { get; set; } = "";
     }
 }

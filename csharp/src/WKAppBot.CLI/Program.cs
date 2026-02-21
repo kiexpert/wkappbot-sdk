@@ -104,6 +104,7 @@ internal partial class Program
                 "dialog-click" => DialogClickCommand(restArgs),
                 "schedule" => ScheduleCommand(restArgs),
                 "snapshot" => SnapshotCommand(restArgs),
+                "kiwoom" => KiwoomCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
             };

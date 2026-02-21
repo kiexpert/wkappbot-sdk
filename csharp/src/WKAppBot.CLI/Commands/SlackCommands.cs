@@ -441,6 +441,89 @@ internal partial class Program
         return blocks.ToJsonString();
     }
 
+    /// <summary>
+    /// Build Block Kit blocks JSON for permission prompt message.
+    /// Dynamically creates buttons from the permission button names found via UIA.
+    /// action_id = "perm_{buttonText}" so OnBlockAction can identify the click.
+    /// </summary>
+    static string BuildPermissionBlocks(List<string> buttonNames, string statusText)
+    {
+        var buttonElements = new JsonArray();
+        foreach (var name in buttonNames)
+        {
+            // "Allow" style buttons → primary (green), "Deny" → danger (red), else default
+            string? style = null;
+            if (name.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("수락", StringComparison.OrdinalIgnoreCase))
+                style = "primary";
+            else if (name.Contains("Deny", StringComparison.OrdinalIgnoreCase) ||
+                     name.Contains("거부", StringComparison.OrdinalIgnoreCase))
+                style = "danger";
+
+            var btn = new JsonObject
+            {
+                ["type"] = "button",
+                ["text"] = new JsonObject
+                {
+                    ["type"] = "plain_text",
+                    ["text"] = name
+                },
+                ["action_id"] = $"perm_{name.Replace(" ", "_").ToLowerInvariant()}",
+                ["value"] = name // exact button text for UIA matching
+            };
+            if (style != null)
+                btn["style"] = style;
+
+            buttonElements.Add(btn);
+        }
+
+        var blocks = new JsonArray
+        {
+            // Header
+            new JsonObject
+            {
+                ["type"] = "header",
+                ["text"] = new JsonObject
+                {
+                    ["type"] = "plain_text",
+                    ["text"] = "🔒 수락 요구"
+                }
+            },
+            // Status text
+            new JsonObject
+            {
+                ["type"] = "section",
+                ["text"] = new JsonObject
+                {
+                    ["type"] = "mrkdwn",
+                    ["text"] = statusText
+                }
+            },
+            // Dynamic permission buttons
+            new JsonObject
+            {
+                ["type"] = "actions",
+                ["elements"] = buttonElements
+            },
+            // Context
+            new JsonObject
+            {
+                ["type"] = "context",
+                ["elements"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["type"] = "mrkdwn",
+                        ["text"] = "버튼을 눌러 Claude에 응답하세요"
+                    }
+                }
+            }
+        };
+
+        return blocks.ToJsonString();
+    }
+
     /// <summary>Schedule a message via chat.scheduleMessage API.</summary>
     static async Task<(bool ok, string? scheduledId)> SlackScheduleMessageAsync(
         string botToken, string channel, string text, long postAtUnix)
