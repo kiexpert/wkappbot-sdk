@@ -375,12 +375,14 @@ internal partial class Program
                                 if (claudeStatus.Item1 == "rate_limit")
                                 {
                                     justHitRateLimit = !wasRateLimited; // first detection of this rate limit
+                                    wasRateLimited = true; // update immediately to prevent duplicate snapshots
                                     currentState.IsRateLimited = true;
                                     var resetDt = GetResetTimeFromDisplayText(claudeStatus.Item2);
                                     currentState.RateLimitResetAt = resetDt?.ToString("O");
                                 }
                                 else
                                 {
+                                    wasRateLimited = false;
                                     currentState.IsRateLimited = false;
                                     currentState.RateLimitResetAt = null;
                                 }
