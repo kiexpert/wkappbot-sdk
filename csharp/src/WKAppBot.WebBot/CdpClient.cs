@@ -452,20 +452,96 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         }
     }
 
-    /// <summary>Click an element by CSS selector.</summary>
+    /// <summary>
+    /// Click an element by CSS selector.
+    /// Primary path uses CDP mouse dispatch (trusted-like user gesture),
+    /// then falls back to DOM click for compatibility.
+    /// </summary>
     public async Task ClickAsync(string selector)
     {
-        var js = $$"""
+        var escapedSelector = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+
+        // Resolve a visible clickable point first.
+        var pointJson = await EvalAsync($$"""
             (() => {
-                const el = document.querySelector('{{selector}}');
-                if (!el) return 'NOT_FOUND';
-                el.click();
-                return 'OK';
+                const el = document.querySelector('{{escapedSelector}}');
+                if (!el) return JSON.stringify({ ok:false, reason:'NOT_FOUND' });
+
+                el.scrollIntoView({ block:'center', inline:'center' });
+                const r = el.getBoundingClientRect();
+                if (!r || r.width <= 0 || r.height <= 0)
+                    return JSON.stringify({ ok:false, reason:'NO_RECT' });
+
+                const x = r.left + Math.min(r.width / 2, Math.max(1, r.width - 1));
+                const y = r.top + Math.min(r.height / 2, Math.max(1, r.height - 1));
+                return JSON.stringify({ ok:true, x, y });
             })()
-            """;
-        var result = await EvalAsync(js);
-        if (result == "NOT_FOUND")
-            throw new InvalidOperationException($"Element not found: {selector}");
+            """);
+
+        if (string.IsNullOrWhiteSpace(pointJson))
+            throw new InvalidOperationException($"Failed to resolve click point: {selector}");
+
+        JsonNode? point;
+        try { point = JsonNode.Parse(pointJson); }
+        catch { point = null; }
+
+        var ok = point?["ok"]?.GetValue<bool>() ?? false;
+        var reason = point? ["reason"]?.GetValue<string>();
+        if (!ok)
+        {
+            if (reason == "NOT_FOUND")
+                throw new InvalidOperationException($"Element not found: {selector}");
+            throw new InvalidOperationException($"Element not clickable: {selector} ({reason ?? "unknown"})");
+        }
+
+        var x = point?["x"]?.GetValue<double>() ?? 0;
+        var y = point?["y"]?.GetValue<double>() ?? 0;
+
+        // Trusted-like path via CDP input events.
+        try
+        {
+            await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            {
+                ["type"] = "mouseMoved",
+                ["x"] = x,
+                ["y"] = y,
+                ["button"] = "none"
+            });
+
+            await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            {
+                ["type"] = "mousePressed",
+                ["x"] = x,
+                ["y"] = y,
+                ["button"] = "left",
+                ["clickCount"] = 1
+            });
+
+            await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            {
+                ["type"] = "mouseReleased",
+                ["x"] = x,
+                ["y"] = y,
+                ["button"] = "left",
+                ["clickCount"] = 1
+            });
+            return;
+        }
+        catch
+        {
+            // Fallback for pages where CDP click sequence fails.
+            var js = $$"""
+                (() => {
+                    const el = document.querySelector('{{escapedSelector}}');
+                    if (!el) return 'NOT_FOUND';
+                    el.click();
+                    return 'OK';
+                })()
+                """;
+            var result = await EvalAsync(js);
+            if (result == "NOT_FOUND")
+                throw new InvalidOperationException($"Element not found: {selector}");
+        }
     }
 
     /// <summary>

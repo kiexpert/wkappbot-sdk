@@ -296,72 +296,86 @@ Subcommands:
         if (setupMode)
             PrintKiwoomLoginSetupGuide();
 
-        // Ensure proxy is alive
+        // State machine: EnsureProxy -> Connecting -> WaitingConnect -> Connected/Failed
         if (!EnsureProxy())
             return 1;
 
-        // Try connect if not already connected
         var stateResp = SendPipeRequest("GetConnectState");
         var connected = ParseConnectState(stateResp.Result) == 1;
-        if (!connected)
+        if (connected)
+            Console.WriteLine("[KIWOOM][STATE] Connected (already)");
+
+        var deadline = DateTime.UtcNow.AddSeconds(timeoutSec);
+        var attempts = 0;
+        string? lastError = null;
+
+        while (!connected && attempts < 3 && DateTime.UtcNow < deadline)
         {
-            Console.WriteLine("[KIWOOM] Not connected, calling CommConnect()...");
+            attempts++;
+            Console.WriteLine($"[KIWOOM][STATE] Connecting attempt {attempts}/3...");
+
             var loginResp = SendPipeRequest("CommConnect");
             if (loginResp.Error != null)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[KIWOOM] CommConnect failed: {loginResp.Error}");
+                lastError = loginResp.Error;
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[KIWOOM] CommConnect attempt {attempts} failed: {loginResp.Error}");
                 Console.ResetColor();
-                Console.WriteLine("[KIWOOM] Hint: run with --setup and complete manual login/update once.");
-                PrintKiwoomLoginSetupGuide();
-                return 1;
-            }
-        }
-        else
-        {
-            Console.WriteLine("[KIWOOM] Already connected");
-        }
 
-        // Wait until connected
-        var sw = Stopwatch.StartNew();
-        while (sw.Elapsed.TotalSeconds < timeoutSec)
-        {
-            Thread.Sleep(1000);
-            stateResp = SendPipeRequest("GetConnectState");
-            if (stateResp.Error != null)
+                // Backoff before retry (1s, 2s, 4s)
+                var backoffSec = (int)Math.Pow(2, attempts - 1);
+                Thread.Sleep(TimeSpan.FromSeconds(backoffSec));
                 continue;
+            }
 
-            if (ParseConnectState(stateResp.Result) == 1)
+            Console.WriteLine("[KIWOOM][STATE] Waiting for connection event...");
+            while (DateTime.UtcNow < deadline)
             {
-                connected = true;
-                break;
+                Thread.Sleep(1000);
+                stateResp = SendPipeRequest("GetConnectState");
+                if (stateResp.Error != null)
+                {
+                    lastError = stateResp.Error;
+                    continue;
+                }
+
+                if (ParseConnectState(stateResp.Result) == 1)
+                {
+                    connected = true;
+                    break;
+                }
+            }
+
+            if (!connected)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[KIWOOM] Still disconnected after attempt {attempts}");
+                Console.ResetColor();
             }
         }
 
         if (!connected)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("[KIWOOM] Login wait timeout (still disconnected)");
+            Console.WriteLine("[KIWOOM][STATE] Failed (disconnected)");
             Console.ResetColor();
+            if (!string.IsNullOrWhiteSpace(lastError))
+                Console.WriteLine($"[KIWOOM] Last error: {lastError}");
             Console.WriteLine("[KIWOOM] Hint: check login window/update popup and retry.");
             PrintKiwoomLoginSetupGuide();
             return 1;
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("[KIWOOM] Connected");
+        Console.WriteLine("[KIWOOM][STATE] Connected");
         Console.ResetColor();
 
         // Print account list
         var accResp = SendPipeRequest("GetLoginInfo", "ACCNO");
         if (accResp.Error != null)
-        {
             Console.WriteLine($"[KIWOOM] GetLoginInfo(ACCNO) failed: {accResp.Error}");
-        }
         else
-        {
             Console.WriteLine($"[KIWOOM] ACCNO: {FormatResult(accResp.Result)}");
-        }
 
         var userResp = SendPipeRequest("GetLoginInfo", "USER_ID");
         if (userResp.Error == null)
@@ -375,9 +389,14 @@ Subcommands:
         {
             var showResp = SendPipeRequest("KOA_Functions", "ShowAccountWindow", "");
             if (showResp.Error != null)
+            {
                 Console.WriteLine($"[KIWOOM] ShowAccountWindow failed: {showResp.Error}");
+                Console.WriteLine("[KIWOOM] Hint: if update/login popup is open, finish that first then retry --setup.");
+            }
             else
+            {
                 Console.WriteLine("[KIWOOM] ShowAccountWindow requested (set account password + AUTO login if needed)");
+            }
         }
 
         if (setupMode)
