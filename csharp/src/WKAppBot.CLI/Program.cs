@@ -108,6 +108,7 @@ internal partial class Program
                 "snapshot" => SnapshotCommand(restArgs),
                 "kiwoom" => KiwoomCommand(restArgs),
                 "com" => ComCommand(restArgs),
+                "telegram" => TelegramCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
             };
