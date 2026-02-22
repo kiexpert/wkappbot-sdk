@@ -10,7 +10,7 @@ internal partial class Program
         public string Profile { get; set; } = "kiwoom";
     }
 
-    static readonly string[] ComProfiles = ["kiwoom"];
+    static readonly string[] ComProfiles = ["kiwoom", "sapi"];
 
     static string ComSessionDir => Path.Combine(Environment.CurrentDirectory, ".wkcom");
     static string ComSessionPath => Path.Combine(ComSessionDir, "session.json");
@@ -64,6 +64,8 @@ Examples:
   wkappbot com methods
   wkappbot com call GetConnectState
   wkappbot com call GetLoginInfo ACCNO
+  wkappbot com use sapi
+  wkappbot com call Speak ""테스트 음성""
 ");
         return 1;
     }
@@ -121,6 +123,18 @@ Examples:
             Console.WriteLine("  - SetInputValue <key> <val>");
             Console.WriteLine("  - CommRqData <rqName> <trCode> <prevNext> <screenNo>");
             Console.WriteLine("  - SetRealReg <screenNo> <codeList> <fidList> <opt>");
+            return 0;
+        }
+
+        if (session.Profile == "sapi")
+        {
+            EnsureComProfileDocs(session.Profile);
+            Console.WriteLine("[COM] sapi methods (common):");
+            Console.WriteLine("  - Speak <text> [flags:int]");
+            Console.WriteLine("  - GetVoices");
+            Console.WriteLine("  - GetAudioOutputs");
+            Console.WriteLine("  - Pause");
+            Console.WriteLine("  - Resume");
             return 0;
         }
 
@@ -188,6 +202,83 @@ Examples:
             return 0;
         }
 
+        if (session.Profile == "sapi")
+        {
+            EnsureComProfileDocs(session.Profile);
+            Console.WriteLine($"[COM:{session.Profile}] Calling {method}({string.Join(", ", paramStrings)})...");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            string? err = null;
+            string? resultText = null;
+            try
+            {
+                var t = Type.GetTypeFromProgID("SAPI.SpVoice", throwOnError: true)!;
+                var obj = Activator.CreateInstance(t)!;
+
+                object?[] invokeParams = method.Equals("Speak", StringComparison.OrdinalIgnoreCase)
+                    ? BuildSapiSpeakParams(paramStrings)
+                    : paramStrings.Cast<object?>().ToArray();
+
+                var result = t.InvokeMember(method,
+                    System.Reflection.BindingFlags.InvokeMethod,
+                    binder: null,
+                    target: obj,
+                    args: invokeParams);
+
+                if (method.Equals("GetVoices", StringComparison.OrdinalIgnoreCase) || method.Equals("GetAudioOutputs", StringComparison.OrdinalIgnoreCase))
+                {
+                    // return count if possible (ISpeechObjectTokens)
+                    try
+                    {
+                        var cnt = result?.GetType().InvokeMember("Count", System.Reflection.BindingFlags.GetProperty, null, result, null);
+                        resultText = cnt?.ToString() ?? "0";
+                    }
+                    catch { resultText = result?.ToString(); }
+                }
+                else
+                {
+                    resultText = result?.ToString() ?? "";
+                }
+            }
+            catch (Exception ex)
+            {
+                err = ex.GetBaseException().Message;
+            }
+            sw.Stop();
+
+            var ok = err == null;
+            var rec = new ComCallRecord
+            {
+                Profile = session.Profile,
+                Method = method,
+                Params = paramStrings,
+                Ok = ok,
+                Result = resultText,
+                Error = err,
+                ElapsedMs = sw.ElapsedMilliseconds
+            };
+            var callLogPath = AppendComCallRecord(session.Profile, rec);
+
+            if (!ok)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[COM:{session.Profile}] FAIL: {err} ({sw.ElapsedMilliseconds}ms)");
+                Console.ResetColor();
+                Console.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
+                Console.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=false elapsedMs={sw.ElapsedMilliseconds}");
+                Console.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
+                return 1;
+            }
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"[COM:{session.Profile}] OK: {resultText} ({sw.ElapsedMilliseconds}ms)");
+            Console.ResetColor();
+            Console.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
+            Console.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=true elapsedMs={sw.ElapsedMilliseconds}");
+            Console.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
+            return 0;
+        }
+
         return Error($"Profile not supported yet: {session.Profile}");
     }
 
@@ -211,6 +302,13 @@ Examples:
                         source = "C:/OpenAPI/khopenapi_typelib.md",
                         notes = "Generated baseline for COM session usage"
                     },
+                    "sapi" => new
+                    {
+                        profile,
+                        progId = "SAPI.SpVoice",
+                        source = "Windows built-in Speech API COM",
+                        notes = "General COM profile sample for v1.1"
+                    },
                     _ => new { profile }
                 };
                 File.WriteAllText(interfacePath, JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true }));
@@ -224,14 +322,21 @@ $"# {profile} knowhow\n\n- Keep interface/version notes here.\n- Updated: {DateT
             }
 
             var methodsPath = Path.Combine(dir, "methods.json");
-            if (!File.Exists(methodsPath) && profile == "kiwoom")
+            if (!File.Exists(methodsPath))
             {
-                var methods = new[]
+                string[]? methods = profile switch
                 {
-                    "CommConnect","GetConnectState","GetLoginInfo","KOA_Functions",
-                    "SetInputValue","CommRqData","SetRealReg"
+                    "kiwoom" => new[]
+                    {
+                        "CommConnect","GetConnectState","GetLoginInfo","KOA_Functions",
+                        "SetInputValue","CommRqData","SetRealReg"
+                    },
+                    "sapi" => new[] { "Speak", "GetVoices", "GetAudioOutputs", "Pause", "Resume" },
+                    _ => null
                 };
-                File.WriteAllText(methodsPath, JsonSerializer.Serialize(methods, new JsonSerializerOptions { WriteIndented = true }));
+
+                if (methods != null)
+                    File.WriteAllText(methodsPath, JsonSerializer.Serialize(methods, new JsonSerializerOptions { WriteIndented = true }));
             }
         }
         catch { }
@@ -246,6 +351,20 @@ $"# {profile} knowhow\n\n- Keep interface/version notes here.\n- Updated: {DateT
         var line = JsonSerializer.Serialize(rec);
         File.AppendAllText(path, line + Environment.NewLine);
         return path;
+    }
+
+    static object?[] BuildSapiSpeakParams(string[] paramStrings)
+    {
+        // SAPI Speak(text, flags=0)
+        if (paramStrings.Length == 0)
+            return new object?[] { "", 0 };
+
+        var text = paramStrings[0];
+        var flags = 0;
+        if (paramStrings.Length > 1)
+            int.TryParse(paramStrings[1], out flags);
+
+        return new object?[] { text, flags };
     }
 
     static ComSession LoadComSession()

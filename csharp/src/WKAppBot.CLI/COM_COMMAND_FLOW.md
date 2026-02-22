@@ -16,7 +16,8 @@
 
 ## v1 Adapter
 - `kiwoom` (via existing Named Pipe + KiwoomProxy)
-- Reuses existing pipe request path and response formatting.
+- `sapi` (Windows built-in Speech API `SAPI.SpVoice`, direct COM invoke)
+- Reuses existing call-record + AI_NOTICE flow.
 
 ## Example
 ```bash
