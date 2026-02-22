@@ -9,6 +9,7 @@ internal partial class Program
     {
         public int ParentPid { get; set; }
         public string ParentName { get; set; } = "";
+        public string ParentTitle { get; set; } = "";
         public string LastTag { get; set; } = "";
         public string LastStatus { get; set; } = "";
         public DateTime LastTsUtc { get; set; }
@@ -43,7 +44,10 @@ internal partial class Program
                     foreach (var c in cards.OrderByDescending(x => x.LastTsUtc).Take(8))
                     {
                         var age = Math.Max(0, (int)(DateTime.UtcNow - c.LastTsUtc).TotalSeconds);
-                        sb.AppendLine($"[{c.ParentName}:{c.ParentPid}] {c.LastTag}  {c.LastStatus}  -{age}s");
+                        var head = string.IsNullOrWhiteSpace(c.ParentTitle)
+                            ? $"{c.ParentName}:{c.ParentPid}"
+                            : $"{c.ParentTitle} ({c.ParentName}:{c.ParentPid})";
+                        sb.AppendLine($"[{head}] {c.LastTag}  {c.LastStatus}  -{age}s");
                     }
                 }
 
@@ -80,8 +84,11 @@ internal partial class Program
                 if (!DateTime.TryParse(t.Ts, out var tsLocal)) continue;
                 var tsUtc = tsLocal.ToUniversalTime();
 
-                var ppid = t.ParentPid > 0 ? t.ParentPid : t.Pid;
-                var pname = string.IsNullOrWhiteSpace(t.ParentName) ? "unknown" : t.ParentName;
+                var ppid = t.HostPid > 0 ? t.HostPid : (t.ParentPid > 0 ? t.ParentPid : t.Pid);
+                var pname = !string.IsNullOrWhiteSpace(t.HostName)
+                    ? t.HostName
+                    : (string.IsNullOrWhiteSpace(t.ParentName) ? "unknown" : t.ParentName);
+                var ptitle = t.HostTitle ?? "";
 
                 if (!cards.TryGetValue(ppid, out var c) || tsUtc > c.LastTsUtc)
                 {
@@ -89,6 +96,7 @@ internal partial class Program
                     {
                         ParentPid = ppid,
                         ParentName = pname,
+                        ParentTitle = ptitle,
                         LastTag = t.Tag,
                         LastStatus = t.Status,
                         LastTsUtc = tsUtc
