@@ -219,6 +219,9 @@ internal partial class Program
         public int Pid { get; set; }
         public int ParentPid { get; set; }
         public string ParentName { get; set; } = "";
+        public int HostPid { get; set; }
+        public string HostName { get; set; } = "";
+        public string HostTitle { get; set; } = "";
         public string Command { get; set; } = "";
         public string Tag { get; set; } = "";
         public string Status { get; set; } = "";
@@ -241,11 +244,16 @@ internal partial class Program
                 try { parentName = System.Diagnostics.Process.GetProcessById(ppid).ProcessName; } catch { }
             }
 
+            var (hostPid, hostName, hostTitle) = FindLogicalHost(pid, ppid);
+
             var tick = new EyeTick
             {
                 Pid = pid,
                 ParentPid = ppid,
                 ParentName = parentName,
+                HostPid = hostPid,
+                HostName = hostName,
+                HostTitle = hostTitle,
                 Command = command,
                 Tag = tag,
                 Status = status,
@@ -257,6 +265,49 @@ internal partial class Program
         {
             // best effort
         }
+    }
+
+    static (int hostPid, string hostName, string hostTitle) FindLogicalHost(int selfPid, int directParentPid)
+    {
+        static bool IsShell(string n)
+        {
+            var x = (n ?? "").ToLowerInvariant();
+            return x is "powershell" or "pwsh" or "cmd" or "conhost" or "node" or "wkappbot";
+        }
+
+        int cur = directParentPid;
+        int depth = 0;
+        while (cur > 0 && depth < 12)
+        {
+            depth++;
+            try
+            {
+                var p = System.Diagnostics.Process.GetProcessById(cur);
+                var name = p.ProcessName ?? "unknown";
+                var title = p.MainWindowTitle ?? "";
+
+                if (!IsShell(name) && !string.IsNullOrWhiteSpace(title))
+                    return (cur, name, title);
+
+                var next = GetParentPid(cur);
+                if (next <= 0 || next == cur)
+                    break;
+                cur = next;
+            }
+            catch { break; }
+        }
+
+        if (directParentPid > 0)
+        {
+            try
+            {
+                var p = System.Diagnostics.Process.GetProcessById(directParentPid);
+                return (directParentPid, p.ProcessName ?? "unknown", p.MainWindowTitle ?? "");
+            }
+            catch { }
+        }
+
+        return (selfPid, "wkappbot", "");
     }
 
     // ── run ────────────────────────────────────────────────────
