@@ -56,7 +56,7 @@ Subcommands:
   status             Show proxy + connection status
   login              CommConnect (auto-starts proxy if needed)
   bootstrap          Start proxy → login wait → print account info
-                     Options: --timeout N(sec, default 120), --show-account-window
+                     Options: --timeout N(sec, default 120), --show-account-window, --setup
   call <method> [p]  Invoke any COM method with params
   query <tr> --input key=val [--screen N]
                      SetInputValue + CommRqData
@@ -280,7 +280,8 @@ Subcommands:
     static int KiwoomBootstrapCommand(string[] rest)
     {
         int timeoutSec = 120;
-        bool showAccountWindow = rest.Contains("--show-account-window");
+        bool setupMode = rest.Contains("--setup");
+        bool showAccountWindow = rest.Contains("--show-account-window") || setupMode;
 
         for (int i = 0; i < rest.Length; i++)
         {
@@ -292,6 +293,8 @@ Subcommands:
         }
 
         Console.WriteLine($"[KIWOOM] Bootstrap start (timeout={timeoutSec}s)...");
+        if (setupMode)
+            PrintKiwoomLoginSetupGuide();
 
         // Ensure proxy is alive
         if (!EnsureProxy())
@@ -309,6 +312,8 @@ Subcommands:
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"[KIWOOM] CommConnect failed: {loginResp.Error}");
                 Console.ResetColor();
+                Console.WriteLine("[KIWOOM] Hint: run with --setup and complete manual login/update once.");
+                PrintKiwoomLoginSetupGuide();
                 return 1;
             }
         }
@@ -338,6 +343,8 @@ Subcommands:
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("[KIWOOM] Login wait timeout (still disconnected)");
             Console.ResetColor();
+            Console.WriteLine("[KIWOOM] Hint: check login window/update popup and retry.");
+            PrintKiwoomLoginSetupGuide();
             return 1;
         }
 
@@ -360,16 +367,39 @@ Subcommands:
         if (userResp.Error == null)
             Console.WriteLine($"[KIWOOM] USER_ID: {FormatResult(userResp.Result)}");
 
+        var cntResp = SendPipeRequest("GetLoginInfo", "ACCOUNT_CNT");
+        if (cntResp.Error == null)
+            Console.WriteLine($"[KIWOOM] ACCOUNT_CNT: {FormatResult(cntResp.Result)}");
+
         if (showAccountWindow)
         {
             var showResp = SendPipeRequest("KOA_Functions", "ShowAccountWindow", "");
             if (showResp.Error != null)
                 Console.WriteLine($"[KIWOOM] ShowAccountWindow failed: {showResp.Error}");
             else
-                Console.WriteLine("[KIWOOM] ShowAccountWindow requested");
+                Console.WriteLine("[KIWOOM] ShowAccountWindow requested (set account password + AUTO login if needed)");
+        }
+
+        if (setupMode)
+        {
+            Console.WriteLine("[KIWOOM] Setup checklist done?");
+            Console.WriteLine("  1) Logged in successfully");
+            Console.WriteLine("  2) Opened account password window (ShowAccountWindow)");
+            Console.WriteLine("  3) Saved account password and optional AUTO login");
         }
 
         return 0;
+    }
+
+    static void PrintKiwoomLoginSetupGuide()
+    {
+        Console.WriteLine("[KIWOOM][SETUP] Login setup guide:");
+        Console.WriteLine("  1) OpenAPI login window appears after CommConnect()");
+        Console.WriteLine("  2) Complete version/update popup first if shown");
+        Console.WriteLine("  3) Login with account/password + cert password");
+        Console.WriteLine("  4) Open account password window via KOA_Functions(ShowAccountWindow)");
+        Console.WriteLine("  5) Save account password (and AUTO login if desired)");
+        Console.WriteLine("  6) Retry: wkappbot kiwoom bootstrap --setup");
     }
 
     static int ParseConnectState(object? result)
