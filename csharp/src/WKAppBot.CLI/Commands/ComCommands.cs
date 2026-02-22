@@ -174,6 +174,8 @@ Examples:
                 Console.WriteLine($"[COM:{session.Profile}] FAIL: {resp.Error} ({sw.ElapsedMilliseconds}ms)");
                 Console.ResetColor();
                 Console.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
+                Console.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=false elapsedMs={sw.ElapsedMilliseconds}");
+                Console.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
                 return 1;
             }
 
@@ -181,6 +183,8 @@ Examples:
             Console.WriteLine($"[COM:{session.Profile}] OK: {resultText} ({sw.ElapsedMilliseconds}ms)");
             Console.ResetColor();
             Console.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
+            Console.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=true elapsedMs={sw.ElapsedMilliseconds}");
+            Console.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
             return 0;
         }
 
