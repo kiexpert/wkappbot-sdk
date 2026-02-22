@@ -468,24 +468,79 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             throw new InvalidOperationException($"Element not found: {selector}");
     }
 
-    /// <summary>Type text into an element by CSS selector (sets value + dispatches input event).</summary>
+    /// <summary>
+    /// Type text into an element by CSS selector.
+    /// Supports both input/textarea and contentEditable editors (e.g., Quill).
+    /// </summary>
     public async Task TypeAsync(string selector, string text)
     {
+        var escapedSelector = selector.Replace("\\", "\\\\").Replace("'", "\\'");
         var escapedText = text.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n");
         var js = $$"""
             (() => {
-                const el = document.querySelector('{{selector}}');
+                const el = document.querySelector('{{escapedSelector}}');
                 if (!el) return 'NOT_FOUND';
+
+                const text = '{{escapedText}}';
+                const tag = (el.tagName || '').toLowerCase();
+                const isInputLike = tag === 'input' || tag === 'textarea';
+                const isContentEditable = !!el.isContentEditable;
+
                 el.focus();
-                el.value = '{{escapedText}}';
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                return 'OK';
+
+                if (isInputLike) {
+                    el.value = text;
+                    if (typeof el.setSelectionRange === 'function') {
+                        const n = text.length;
+                        el.setSelectionRange(n, n);
+                    }
+                    try {
+                        el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }));
+                    } catch {
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return 'OK_INPUT';
+                }
+
+                if (isContentEditable) {
+                    const doc = el.ownerDocument || document;
+                    const win = doc.defaultView || window;
+
+                    // Place caret inside editor and replace existing content.
+                    const sel = win.getSelection();
+                    const range = doc.createRange();
+                    range.selectNodeContents(el);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+
+                    // Framework-friendly path first.
+                    try { doc.execCommand('selectAll', false, null); } catch {}
+                    let inserted = false;
+                    try { inserted = doc.execCommand('insertText', false, text); } catch {}
+
+                    // Fallback for editors that block execCommand.
+                    if (!inserted) {
+                        el.textContent = text;
+                    }
+
+                    try {
+                        el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }));
+                    } catch {
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return 'OK_CONTENTEDITABLE';
+                }
+
+                return 'UNSUPPORTED';
             })()
             """;
         var result = await EvalAsync(js);
         if (result == "NOT_FOUND")
             throw new InvalidOperationException($"Element not found: {selector}");
+        if (result == "UNSUPPORTED")
+            throw new InvalidOperationException($"Element is neither input/textarea nor contentEditable: {selector}");
     }
 
     /// <summary>Get text content of an element by CSS selector.</summary>

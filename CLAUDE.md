@@ -672,6 +672,7 @@ teardown:
 - **캡처 검증 완료**: IsBlankBitmap(9-point 샘플링) + .fail.png(실제 화면 크롭) + .fail-iconic.png(최소화 태스크바 아이콘) + IsIconic 사전 체크
 - **Web UI 자동화 완료**: Chrome UIA Accessibility로 웹페이지 자동화 (Phase 1: 21/21 PASS, Phase 2: 19/19 PASS)
 - **WebBot (Phase 11A) 완료**: CDP 기반 웹 자동화 — `wkappbot web` CLI (27/27 배치 테스트 PASS)
+- **WebBot TypeAsync 개선 완료**: contentEditable(Quill/ProseMirror) 입력 지원 + fallback 이벤트 체인 (Gemini 실측 검증)
 - **윈도우 스타일 특성 완료**: GWL_STYLE/GWL_EXSTYLE 수집 → ControlExperience 저장 + info.json per tree folder
 - **Slack Socket Mode 완료**: 양방향 메시징 — WebSocket으로 @mention 수신 + chat.postMessage 전송 (zero deps)
 - **Slack 파일 업로드 완료**: files:write 스코프 + v2 3단계 API (getUploadURL → PUT → complete)
@@ -999,7 +1000,10 @@ teardown:
 ### WebBot contentEditable 입력 노하우 — "GPT/Gemini 삽질기"
 **상태**: 완료 (ChatGPT + Gemini 실전 검증)
 - **핵심 문제**: ChatGPT(ProseMirror), Gemini(Quill) 등 리치 에디터는 `<input>` 아님 → `el.value=` 무효
-- **CDP TypeAsync 한계**: 내부가 `el.value = text` 기반이라 contentEditable에서 전부 실패
+- **과거 CDP TypeAsync 한계**: 내부가 `el.value = text` 기반이라 contentEditable에서 실패했음
+- **현재 상태 (수정 완료)**: `CdpClient.TypeAsync()`가 input/textarea + contentEditable(Quill/ProseMirror) 분기 지원
+  - focus → selection 설정 → `execCommand('insertText')` 우선
+  - 실패 시 `textContent` fallback + `InputEvent('input')`/`change` dispatch
 - **정답 패턴** (범용, 대부분의 contentEditable 에디터에서 동작):
   ```javascript
   var el = document.querySelector('.ql-editor'); // or #prompt-textarea
