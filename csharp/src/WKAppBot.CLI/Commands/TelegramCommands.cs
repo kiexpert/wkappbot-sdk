@@ -85,14 +85,26 @@ Examples:
 
         Thread.Sleep(150);
 
-        // Pick compose input edit: prefer name containing 메시지 작성
-        var edits = targetWindow.FindAllDescendants(cf => cf.ByControlType(ControlType.Edit));
-        var compose = edits.FirstOrDefault(e =>
+        // Pick compose input edit: prefer placeholder name, then bottom-most wide edit.
+        var edits = targetWindow.FindAllDescendants(cf => cf.ByControlType(ControlType.Edit)).ToList();
+        var composeCandidates = edits
+            .Where(e => e.BoundingRectangle.Width > 200)
+            .OrderByDescending(e => e.BoundingRectangle.Bottom)
+            .ThenByDescending(e => e.BoundingRectangle.Width)
+            .ToList();
+
+        var compose = composeCandidates.FirstOrDefault(e =>
             (e.Name ?? "").Contains("메시지 작성", StringComparison.OrdinalIgnoreCase))
+            ?? composeCandidates.FirstOrDefault()
             ?? edits.LastOrDefault();
 
         if (compose == null)
             return Error("compose edit not found");
+
+        var cbox = compose.BoundingRectangle;
+        Console.WriteLine($"[TELEGRAM] compose rect=({cbox.Left:0},{cbox.Top:0},{cbox.Width:0}x{cbox.Height:0}) name='{compose.Name}'");
+
+        var before = ReadElementValue(compose);
 
         bool typed = false;
         try
@@ -111,7 +123,6 @@ Examples:
 
         if (!typed)
         {
-            // Minimal fallback for typing (still not sending yet)
             compose.Focus();
             Thread.Sleep(80);
             KeyboardInput.TypeText(text);
@@ -119,26 +130,40 @@ Examples:
             Console.WriteLine("[TELEGRAM] fallback type via SendInput OK");
         }
 
-        // Accessibility-first send: try invoke a nearby button on the right of compose box.
+        var afterType = ReadElementValue(compose);
+        var typedVerified = !string.Equals(Norm(afterType), Norm(before), StringComparison.Ordinal);
+        Console.WriteLine($"[TELEGRAM] typed-verify={(typedVerified ? "ok" : "weak")} before='{TrimForLog(before)}' after='{TrimForLog(afterType)}'");
+
         bool sent = false;
+
+        // Accessibility-first send: invoke right-side nearby button, then verify input changed.
         try
         {
-            var cbox = compose.BoundingRectangle;
             var buttons = targetWindow.FindAllDescendants(cf => cf.ByControlType(ControlType.Button));
-
-            var sendCandidate = buttons
+            var sendCandidates = buttons
                 .Where(b => b.IsEnabled)
                 .Select(b => new { Btn = b, R = b.BoundingRectangle })
-                .Where(x => x.R.Left > cbox.Right - 20 && Math.Abs(((x.R.Top + x.R.Bottom) / 2.0) - ((cbox.Top + cbox.Bottom) / 2.0)) < 70)
+                .Where(x => x.R.Left > cbox.Right - 30 && Math.Abs(((x.R.Top + x.R.Bottom) / 2.0) - ((cbox.Top + cbox.Bottom) / 2.0)) < 80)
                 .OrderByDescending(x => x.R.Left)
                 .Select(x => x.Btn)
-                .FirstOrDefault();
+                .ToList();
 
-            if (sendCandidate != null && sendCandidate.Patterns.Invoke.TryGetPattern(out var inv))
+            foreach (var sendCandidate in sendCandidates)
             {
+                if (!sendCandidate.Patterns.Invoke.TryGetPattern(out var inv))
+                    continue;
+
                 inv.Invoke();
-                sent = true;
-                Console.WriteLine("[TELEGRAM] UIA Invoke send button OK");
+                Console.WriteLine("[TELEGRAM] UIA Invoke candidate clicked");
+                Thread.Sleep(180);
+
+                var afterSend = ReadElementValue(compose);
+                // Verification only when value can be observed. If not observable, keep trying and fallback to Enter.
+                if (typedVerified && (string.IsNullOrWhiteSpace(afterSend) || !string.Equals(Norm(afterSend), Norm(afterType), StringComparison.Ordinal)))
+                {
+                    sent = true;
+                    break;
+                }
             }
         }
         catch (Exception ex)
@@ -146,11 +171,15 @@ Examples:
             Console.WriteLine($"[TELEGRAM] UIA send invoke failed: {ex.Message}");
         }
 
+        if (!sent && !typedVerified)
+            Console.WriteLine("[TELEGRAM] value verification unavailable; using Enter fallback for reliable send");
+
         if (!sent && fallbackEnter)
         {
             compose.Focus();
             Thread.Sleep(80);
             KeyboardInput.PressKey("enter");
+            Thread.Sleep(150);
             sent = true;
             Console.WriteLine("[TELEGRAM] fallback Enter send OK");
         }
@@ -162,5 +191,27 @@ Examples:
         Console.WriteLine($"[TELEGRAM] sent: \"{text}\"");
         Console.ResetColor();
         return 0;
+    }
+
+    static string? ReadElementValue(FlaUI.Core.AutomationElements.AutomationElement el)
+    {
+        try
+        {
+            if (el.Patterns.Value.TryGetPattern(out var vp))
+                return vp.Value;
+        }
+        catch { }
+
+        try { return el.Name; } catch { }
+        return null;
+    }
+
+    static string Norm(string? s) => (s ?? "").Trim().Replace("\r", "").Replace("\n", "");
+
+    static string TrimForLog(string? s)
+    {
+        var t = Norm(s);
+        if (t.Length > 40) t = t[..40] + "...";
+        return t;
     }
 }
