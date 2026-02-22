@@ -54,7 +54,7 @@ internal partial class Program
         if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow")
             cmdTag += $"-{args[1].ToLowerInvariant()}";
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
-        using var tee = new TeeTextWriter(Console.Out, logFile);
+        var tee = new TeeTextWriter(Console.Out, logFile);
         Console.SetOut(tee);
 
         try
@@ -122,6 +122,7 @@ internal partial class Program
         finally
         {
             Console.SetOut(tee.OriginalConsole);
+            tee.Dispose(); // normal-exit atexit-style move to logs/old
             Console.WriteLine($"Log saved: {tee.LogPath}");
         }
     }
