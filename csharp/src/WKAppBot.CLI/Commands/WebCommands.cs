@@ -309,7 +309,7 @@ Options:
             if (string.IsNullOrEmpty(exePath)) return;
 
             // Default to global single-window monitor for stability.
-            var arguments = "eye --global";
+            var arguments = "eye";
             var psi = new ProcessStartInfo
             {
                 FileName = exePath,
