@@ -130,7 +130,7 @@ Examples:
                 .Where(b => b.IsEnabled)
                 .Select(b => new { Btn = b, R = b.BoundingRectangle })
                 .Where(x => x.R.Left > cbox.Right - 20 && Math.Abs(((x.R.Top + x.R.Bottom) / 2.0) - ((cbox.Top + cbox.Bottom) / 2.0)) < 70)
-                .OrderBy(x => x.R.Left)
+                .OrderByDescending(x => x.R.Left)
                 .Select(x => x.Btn)
                 .FirstOrDefault();
 
