@@ -17,11 +17,14 @@ internal partial class Program
         // Collect question (everything after AI name, excluding flags)
         var questionParts = new List<string>();
         bool slackReport = false;
+        bool newTab = false;
         int timeoutSec = 30;
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--slack")
                 slackReport = true;
+            else if (args[i] == "--new-tab")
+                newTab = true;
             else if (args[i] == "--timeout" && i + 1 < args.Length)
                 int.TryParse(args[++i], out timeoutSec);
             else
@@ -33,8 +36,8 @@ internal partial class Program
 
         return ai switch
         {
-            "gemini" => AskGemini(question, slackReport, timeoutSec),
-            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec),
+            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab),
+            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab),
             _ => Error($"Unknown AI: {ai} (use gemini or gpt)")
         };
     }
@@ -45,44 +48,86 @@ internal partial class Program
 WKAppBot Ask — one-command AI Q&A via WebBot
 
 Usage:
-  wkappbot ask gemini ""question""  [--slack] [--timeout 30]
-  wkappbot ask gpt ""question""     [--slack] [--timeout 30]
+  wkappbot ask gemini ""question""  [--slack] [--timeout 30] [--new-tab]
+  wkappbot ask gpt ""question""     [--slack] [--timeout 30] [--new-tab]
 
 Options:
   --slack       Report answer to Slack channel
   --timeout N   Max seconds to wait for response (default: 30)
+  --new-tab     Open in a new tab (default: reuse existing tab)
 
 Examples:
   wkappbot ask gemini ""오늘 코스피 특징주 알려줘""
   wkappbot ask gpt ""이 패턴 분석해줘"" --slack
+  wkappbot ask gpt ""새 탭으로 테스트"" --new-tab
 ");
         return 1;
     }
 
-    /// <summary>Connect to CDP, launch Chrome if needed. Returns CdpClient or null.</summary>
-    static CdpClient? EnsureCdpConnection(int port = 9222)
+    sealed record CdpPageTarget(string Url, string Title, string WebSocketDebuggerUrl);
+
+    /// <summary>
+    /// Connect to CDP, launching Chrome if needed.
+    /// Default behavior: reuse an existing matching tab (single-tab friendly).
+    /// </summary>
+    static CdpClient? EnsureCdpConnection(int port = 9222, string? preferredHost = null, bool newTab = false)
     {
         var task = Task.Run(async () =>
         {
-            // Try direct connect first (Chrome may already be running)
-            try
+            // Ensure Chrome/CDP is alive first
+            var active = await ChromeLauncher.IsPortActiveAsync(port);
+            if (!active)
             {
-                var cdp = new CdpClient();
-                await cdp.ConnectAsync(port, timeoutMs: 3000);
-                return (CdpClient?)cdp;
+                Console.WriteLine("[ASK] Launching Chrome...");
+                await ChromeLauncher.LaunchAsync(port: port);
+                await Task.Delay(1500);
             }
-            catch { /* Chrome not available, try launching */ }
 
-            // Launch Chrome
-            Console.WriteLine("[ASK] Launching Chrome...");
-            await ChromeLauncher.LaunchAsync(port: port);
-            await Task.Delay(3000);
+            // Discover page targets
+            var pages = await GetPageTargetsAsync(port);
+            if (pages.Count == 0)
+            {
+                Console.WriteLine("[ASK] No page target found on CDP");
+                return (CdpClient?)null;
+            }
 
-            // Retry connect
+            int targetIndex = 0;
+
+            // Reuse existing tab by default
+            if (!string.IsNullOrWhiteSpace(preferredHost))
+            {
+                for (int i = 0; i < pages.Count; i++)
+                {
+                    var u = pages[i].Url ?? "";
+                    if (u.Contains(preferredHost, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            // Optional: open a new tab explicitly
+            if (newTab)
+            {
+                var newTargetUrl = "about:blank";
+                try
+                {
+                    using var http = new HttpClient();
+                    _ = await http.GetStringAsync($"http://localhost:{port}/json/new?{Uri.EscapeDataString(newTargetUrl)}");
+                    pages = await GetPageTargetsAsync(port);
+                    targetIndex = Math.Max(0, pages.Count - 1); // newest page target
+                }
+                catch
+                {
+                    // Fallback silently to reuse mode
+                }
+            }
+
             try
             {
                 var cdp = new CdpClient();
-                await cdp.ConnectAsync(port, timeoutMs: 5000);
+                await cdp.ConnectAsync(port, tabIndex: targetIndex, timeoutMs: 5000);
                 return (CdpClient?)cdp;
             }
             catch (Exception ex)
@@ -92,6 +137,35 @@ Examples:
             }
         });
         return task.GetAwaiter().GetResult();
+    }
+
+    static async Task<List<CdpPageTarget>> GetPageTargetsAsync(int port)
+    {
+        var result = new List<CdpPageTarget>();
+        try
+        {
+            using var http = new HttpClient();
+            var json = await http.GetStringAsync($"http://localhost:{port}/json");
+            var arr = JsonSerializer.Deserialize<JsonArray>(json);
+            if (arr == null) return result;
+
+            foreach (var node in arr)
+            {
+                var type = node?["type"]?.GetValue<string>() ?? "";
+                if (!string.Equals(type, "page", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var ws = node?["webSocketDebuggerUrl"]?.GetValue<string>() ?? "";
+                if (string.IsNullOrWhiteSpace(ws))
+                    continue;
+
+                var url = node?["url"]?.GetValue<string>() ?? "";
+                var title = node?["title"]?.GetValue<string>() ?? "";
+                result.Add(new CdpPageTarget(url, title, ws));
+            }
+        }
+        catch { }
+        return result;
     }
 
     /// <summary>Insert text into contentEditable editor (Quill/ProseMirror universal pattern).</summary>
@@ -133,11 +207,11 @@ Examples:
 
     // ── Gemini ──
 
-    static int AskGemini(string question, bool slackReport, int timeoutSec)
+    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab)
     {
         Console.WriteLine($"[ASK] Gemini: {question}");
 
-        var cdp = EnsureCdpConnection();
+        var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab);
         if (cdp == null) return 1;
 
         LaunchAppBotEyeIfNeeded(9222);
@@ -267,11 +341,11 @@ Examples:
 
     // ── ChatGPT ──
 
-    static int AskChatGpt(string question, bool slackReport, int timeoutSec)
+    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab)
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
 
-        var cdp = EnsureCdpConnection();
+        var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab);
         if (cdp == null) return 1;
 
         LaunchAppBotEyeIfNeeded(9222);
