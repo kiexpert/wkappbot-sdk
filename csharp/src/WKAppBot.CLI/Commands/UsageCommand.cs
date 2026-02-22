@@ -124,6 +124,13 @@ Utility Commands:
       One-shot diagnostic capture: UIA tree + screenshot + OCR.
   input <window-title> <text>      Type text into a window.
 
+COM Commands (session per current folder):
+  com ls                           List available COM profiles/adapters.
+  com use <name>                   Select profile for this folder (.wkcom/session.json).
+  com current                      Show current profile.
+  com methods                      Show methods for current profile.
+  com call <method> [params...]    Call method through selected adapter.
+
 General Options:
   -v, --verbose   Verbose output
   --report <dir>  Generate HTML report in directory

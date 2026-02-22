@@ -107,6 +107,7 @@ internal partial class Program
                 "schedule" => ScheduleCommand(restArgs),
                 "snapshot" => SnapshotCommand(restArgs),
                 "kiwoom" => KiwoomCommand(restArgs),
+                "com" => ComCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
             };
