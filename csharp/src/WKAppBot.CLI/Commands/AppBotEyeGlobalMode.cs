@@ -30,7 +30,7 @@ internal partial class Program
         {
             try
             {
-                var cards = ReadEyeCards(staleSeconds: 25);
+                var cards = ReadEyeCards(staleSeconds: 180);
 
                 var sb = new StringBuilder();
                 sb.AppendLine($"Global Eye  {DateTime.Now:HH:mm:ss}");
@@ -101,7 +101,6 @@ internal partial class Program
         var now = DateTime.UtcNow;
         return cards.Values
             .Where(c => (now - c.LastTsUtc).TotalSeconds <= staleSeconds)
-            .Where(c => IsProcessAlive(c.ParentPid))
             .ToList();
     }
 }
