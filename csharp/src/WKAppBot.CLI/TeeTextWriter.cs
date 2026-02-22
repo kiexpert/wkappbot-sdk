@@ -12,13 +12,17 @@ public sealed class TeeTextWriter : TextWriter
 {
     private readonly TextWriter _console;
     private readonly StreamWriter _file;
+    private readonly bool _moveToOldOnDispose;
+    private string _logPath;
 
     public TextWriter OriginalConsole => _console;
     public override Encoding Encoding => Encoding.UTF8;
 
-    public TeeTextWriter(TextWriter console, string logPath)
+    public TeeTextWriter(TextWriter console, string logPath, bool moveToOldOnDispose = true)
     {
         _console = console ?? throw new ArgumentNullException(nameof(console));
+        _moveToOldOnDispose = moveToOldOnDispose;
+        _logPath = logPath;
 
         var dir = Path.GetDirectoryName(logPath);
         if (!string.IsNullOrEmpty(dir))
@@ -37,7 +41,7 @@ public sealed class TeeTextWriter : TextWriter
         _file.WriteLine();
     }
 
-    public string LogPath => (_file.BaseStream as FileStream)?.Name ?? "";
+    public string LogPath => _logPath;
 
     // ── Core overrides ──────────────────────────────────────────
 
@@ -83,6 +87,34 @@ public sealed class TeeTextWriter : TextWriter
         {
             _file.Flush();
             _file.Dispose();
+
+            if (_moveToOldOnDispose)
+            {
+                try
+                {
+                    var dir = Path.GetDirectoryName(_logPath);
+                    if (!string.IsNullOrWhiteSpace(dir))
+                    {
+                        var oldDir = Path.Combine(dir, "old");
+                        Directory.CreateDirectory(oldDir);
+
+                        var fileName = Path.GetFileName(_logPath);
+                        var dest = Path.Combine(oldDir, fileName);
+                        if (File.Exists(dest))
+                        {
+                            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                            dest = Path.Combine(oldDir, $"{Path.GetFileNameWithoutExtension(fileName)}.{stamp}{Path.GetExtension(fileName)}");
+                        }
+
+                        File.Move(_logPath, dest);
+                        _logPath = dest;
+                    }
+                }
+                catch
+                {
+                    // Best-effort on normal exit only.
+                }
+            }
         }
         base.Dispose(disposing);
     }
