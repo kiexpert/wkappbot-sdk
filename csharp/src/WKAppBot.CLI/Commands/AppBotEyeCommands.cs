@@ -29,6 +29,25 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal partial class Program
 {
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetConsoleWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    private const int SW_HIDE = 0;
+
+    static void TryHideConsoleWindow()
+    {
+        try
+        {
+            var h = GetConsoleWindow();
+            if (h != IntPtr.Zero)
+                ShowWindow(h, SW_HIDE);
+        }
+        catch { }
+    }
+
     static int AppBotEyeCommand(string[] args)
     {
         // Parse arguments
@@ -40,7 +59,8 @@ internal partial class Program
         string? appProcess = null; // --process: match process name
         // Slack is ALWAYS ON — no option to disable
         bool slackMode = true;
-        bool globalMode = args.Any(a => string.Equals(a, "--global", StringComparison.OrdinalIgnoreCase));
+        bool legacyMode = args.Any(a => string.Equals(a, "--legacy", StringComparison.OrdinalIgnoreCase));
+        bool globalMode = !legacyMode;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -78,10 +98,11 @@ internal partial class Program
             }
         }
 
-        // Global single-window monitor mode (multi-parent cards)
+        // Global single-window monitor mode (multi-parent cards) — default mode
         if (globalMode)
         {
-            Console.WriteLine("[EYE] Global mode enabled");
+            TryHideConsoleWindow();
+            Console.WriteLine("[EYE] Global mode enabled (default)");
             return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs);
         }
 
