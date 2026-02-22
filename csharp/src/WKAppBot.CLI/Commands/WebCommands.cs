@@ -308,7 +308,8 @@ Options:
             var exePath = Environment.ProcessPath;
             if (string.IsNullOrEmpty(exePath)) return;
 
-            var arguments = string.IsNullOrEmpty(extraArgs) ? "eye" : $"eye {extraArgs}";
+            // Default to global single-window monitor for stability.
+            var arguments = "eye --global";
             var psi = new ProcessStartInfo
             {
                 FileName = exePath,
