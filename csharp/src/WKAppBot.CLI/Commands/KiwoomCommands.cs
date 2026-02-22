@@ -36,6 +36,7 @@ internal partial class Program
             "stop" => KiwoomStopCommand(),
             "status" => KiwoomStatusCommand(),
             "login" => KiwoomLoginCommand(rest),
+            "bootstrap" => KiwoomBootstrapCommand(rest),
             "call" => KiwoomCallCommand(rest),
             "query" => KiwoomQueryCommand(rest),
             "realtime" => KiwoomRealtimeCommand(rest),
@@ -54,6 +55,8 @@ Subcommands:
   stop               Stop KiwoomProxy
   status             Show proxy + connection status
   login              CommConnect (auto-starts proxy if needed)
+  bootstrap          Start proxy → login wait → print account info
+                     Options: --timeout N(sec, default 120), --show-account-window
   call <method> [p]  Invoke any COM method with params
   query <tr> --input key=val [--screen N]
                      SetInputValue + CommRqData
@@ -272,6 +275,116 @@ Subcommands:
         Console.WriteLine("[KIWOOM] Waiting for OnEventConnect event... (login dialog will appear)");
         Console.WriteLine("[KIWOOM] Use 'wkappbot kiwoom status' to check connection state after login");
         return 0;
+    }
+
+    static int KiwoomBootstrapCommand(string[] rest)
+    {
+        int timeoutSec = 120;
+        bool showAccountWindow = rest.Contains("--show-account-window");
+
+        for (int i = 0; i < rest.Length; i++)
+        {
+            if (rest[i] == "--timeout" && i + 1 < rest.Length)
+            {
+                if (int.TryParse(rest[++i], out var t) && t > 0)
+                    timeoutSec = t;
+            }
+        }
+
+        Console.WriteLine($"[KIWOOM] Bootstrap start (timeout={timeoutSec}s)...");
+
+        // Ensure proxy is alive
+        if (!EnsureProxy())
+            return 1;
+
+        // Try connect if not already connected
+        var stateResp = SendPipeRequest("GetConnectState");
+        var connected = ParseConnectState(stateResp.Result) == 1;
+        if (!connected)
+        {
+            Console.WriteLine("[KIWOOM] Not connected, calling CommConnect()...");
+            var loginResp = SendPipeRequest("CommConnect");
+            if (loginResp.Error != null)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[KIWOOM] CommConnect failed: {loginResp.Error}");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+        else
+        {
+            Console.WriteLine("[KIWOOM] Already connected");
+        }
+
+        // Wait until connected
+        var sw = Stopwatch.StartNew();
+        while (sw.Elapsed.TotalSeconds < timeoutSec)
+        {
+            Thread.Sleep(1000);
+            stateResp = SendPipeRequest("GetConnectState");
+            if (stateResp.Error != null)
+                continue;
+
+            if (ParseConnectState(stateResp.Result) == 1)
+            {
+                connected = true;
+                break;
+            }
+        }
+
+        if (!connected)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("[KIWOOM] Login wait timeout (still disconnected)");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("[KIWOOM] Connected");
+        Console.ResetColor();
+
+        // Print account list
+        var accResp = SendPipeRequest("GetLoginInfo", "ACCNO");
+        if (accResp.Error != null)
+        {
+            Console.WriteLine($"[KIWOOM] GetLoginInfo(ACCNO) failed: {accResp.Error}");
+        }
+        else
+        {
+            Console.WriteLine($"[KIWOOM] ACCNO: {FormatResult(accResp.Result)}");
+        }
+
+        var userResp = SendPipeRequest("GetLoginInfo", "USER_ID");
+        if (userResp.Error == null)
+            Console.WriteLine($"[KIWOOM] USER_ID: {FormatResult(userResp.Result)}");
+
+        if (showAccountWindow)
+        {
+            var showResp = SendPipeRequest("KOA_Functions", "ShowAccountWindow", "");
+            if (showResp.Error != null)
+                Console.WriteLine($"[KIWOOM] ShowAccountWindow failed: {showResp.Error}");
+            else
+                Console.WriteLine("[KIWOOM] ShowAccountWindow requested");
+        }
+
+        return 0;
+    }
+
+    static int ParseConnectState(object? result)
+    {
+        if (result == null) return 0;
+
+        if (result is JsonElement je)
+        {
+            if (je.ValueKind == JsonValueKind.Number && je.TryGetInt32(out var n))
+                return n;
+            if (je.ValueKind == JsonValueKind.String && int.TryParse(je.GetString(), out n))
+                return n;
+        }
+
+        return int.TryParse(result.ToString(), out var parsed) ? parsed : 0;
     }
 
     // ── Generic COM Method Call ──
