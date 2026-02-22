@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using WKAppBot.Core.Scenario;
 using WKAppBot.Core.Runner;
 
@@ -57,6 +58,7 @@ internal partial class Program
         var tee = new TeeTextWriter(Console.Out, logFile);
         Console.SetOut(tee);
 
+        int exitCode = 1;
         try
         {
             if (args.Length == 0)
@@ -68,6 +70,9 @@ internal partial class Program
             var command = args[0].ToLowerInvariant();
             var restArgs = args.Skip(1).ToArray();
 
+            // Global Eye tick (for eye --global multi-parent monitor)
+            try { EmitEyeTick(command, cmdTag, "start"); } catch { }
+
             // Auto-launch AppBotEye for all commands except eye/slack/help/validate
             // 앱봇이 뭔가 하면 눈은 항상 떠있어야!
             var noEyeCommands = new HashSet<string> {
@@ -78,7 +83,7 @@ internal partial class Program
                 try { LaunchAppBotEyeIfNeeded(); } catch { /* best-effort */ }
             }
 
-            return command switch
+            exitCode = command switch
             {
                 "run" => RunCommand(restArgs),
                 "validate" => ValidateCommand(restArgs),
@@ -112,6 +117,8 @@ internal partial class Program
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ => Error($"Unknown command: {command}")
             };
+
+            return exitCode;
         }
         catch (Exception ex)
         {
@@ -122,6 +129,7 @@ internal partial class Program
         }
         finally
         {
+            try { EmitEyeTick(args.Length > 0 ? args[0].ToLowerInvariant() : "noargs", cmdTag, $"end:{exitCode}"); } catch { }
             Console.SetOut(tee.OriginalConsole);
             tee.Dispose(); // normal-exit atexit-style move to logs/old
             Console.WriteLine($"Log saved: {tee.LogPath}");
@@ -202,6 +210,52 @@ internal partial class Program
         catch
         {
             return false;
+        }
+    }
+
+    sealed class EyeTick
+    {
+        public string Ts { get; set; } = DateTime.UtcNow.ToString("O");
+        public int Pid { get; set; }
+        public int ParentPid { get; set; }
+        public string ParentName { get; set; } = "";
+        public string Command { get; set; } = "";
+        public string Tag { get; set; } = "";
+        public string Status { get; set; } = "";
+    }
+
+    static string EyeTicksPath => Path.Combine(DataDir, "runtime", "eye_ticks.jsonl");
+
+    static void EmitEyeTick(string command, string tag, string status)
+    {
+        try
+        {
+            var runtimeDir = Path.Combine(DataDir, "runtime");
+            Directory.CreateDirectory(runtimeDir);
+
+            var pid = Environment.ProcessId;
+            var ppid = GetParentPid(pid);
+            var parentName = "unknown";
+            if (ppid > 0)
+            {
+                try { parentName = System.Diagnostics.Process.GetProcessById(ppid).ProcessName; } catch { }
+            }
+
+            var tick = new EyeTick
+            {
+                Pid = pid,
+                ParentPid = ppid,
+                ParentName = parentName,
+                Command = command,
+                Tag = tag,
+                Status = status,
+            };
+
+            File.AppendAllText(EyeTicksPath, JsonSerializer.Serialize(tick) + Environment.NewLine);
+        }
+        catch
+        {
+            // best effort
         }
     }
 

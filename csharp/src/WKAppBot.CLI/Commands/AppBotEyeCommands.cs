@@ -40,6 +40,7 @@ internal partial class Program
         string? appProcess = null; // --process: match process name
         // Slack is ALWAYS ON — no option to disable
         bool slackMode = true;
+        bool globalMode = args.Any(a => string.Equals(a, "--global", StringComparison.OrdinalIgnoreCase));
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -75,6 +76,13 @@ internal partial class Program
                     appProcess = args[++i];
                     break;
             }
+        }
+
+        // Global single-window monitor mode (multi-parent cards)
+        if (globalMode)
+        {
+            Console.WriteLine("[EYE] Global mode enabled");
+            return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs);
         }
 
         // Mode detection: app mode vs web mode
