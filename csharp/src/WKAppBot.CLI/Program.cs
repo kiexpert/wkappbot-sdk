@@ -44,6 +44,8 @@ internal partial class Program
         var exePath = Environment.ProcessPath ?? "wkappbot.exe";
         var exeName = Path.GetFileName(exePath);
         var logDir = Path.Combine(DataDir, "logs");
+        Directory.CreateDirectory(logDir);
+        RotateOldLogs(logDir, keepLatest: 120, maxAgeDays: 3);
         var pid = Environment.ProcessId;
         // Include command name in log filename for easy identification via ls
         // e.g. "wkappbot.exe.out-20260221_211427.eye.pid=36944.txt"
@@ -120,6 +122,51 @@ internal partial class Program
         {
             Console.SetOut(tee.OriginalConsole);
             Console.WriteLine($"Log saved: {tee.LogPath}");
+        }
+    }
+
+    static void RotateOldLogs(string logDir, int keepLatest = 120, int maxAgeDays = 3)
+    {
+        try
+        {
+            var oldDir = Path.Combine(logDir, "old");
+            var now = DateTime.UtcNow;
+
+            var files = Directory
+                .GetFiles(logDir, "*.out-*.txt", SearchOption.TopDirectoryOnly)
+                .Select(p => new FileInfo(p))
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .ToList();
+
+            for (int i = 0; i < files.Count; i++)
+            {
+                var f = files[i];
+                var tooOld = (now - f.LastWriteTimeUtc).TotalDays > maxAgeDays;
+                var overflow = i >= keepLatest;
+                if (!tooOld && !overflow)
+                    continue;
+
+                try
+                {
+                    Directory.CreateDirectory(oldDir);
+                    var dest = Path.Combine(oldDir, f.Name);
+                    if (File.Exists(dest))
+                    {
+                        var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                        dest = Path.Combine(oldDir, $"{Path.GetFileNameWithoutExtension(f.Name)}.{stamp}{f.Extension}");
+                    }
+
+                    File.Move(f.FullName, dest);
+                }
+                catch
+                {
+                    // Another process may still hold the file; skip silently.
+                }
+            }
+        }
+        catch
+        {
+            // Best-effort log housekeeping only.
         }
     }
 
