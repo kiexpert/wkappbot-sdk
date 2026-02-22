@@ -45,7 +45,7 @@ internal partial class Program
         var exeName = Path.GetFileName(exePath);
         var logDir = Path.Combine(DataDir, "logs");
         Directory.CreateDirectory(logDir);
-        RotateOldLogs(logDir, keepLatest: 120, maxAgeDays: 3);
+        RotateOldLogs(logDir, staleHours: 24);
         var pid = Environment.ProcessId;
         // Include command name in log filename for easy identification via ls
         // e.g. "wkappbot.exe.out-20260221_211427.eye.pid=36944.txt"
@@ -125,7 +125,7 @@ internal partial class Program
         }
     }
 
-    static void RotateOldLogs(string logDir, int keepLatest = 120, int maxAgeDays = 3)
+    static void RotateOldLogs(string logDir, int staleHours = 24)
     {
         try
         {
@@ -135,15 +135,19 @@ internal partial class Program
             var files = Directory
                 .GetFiles(logDir, "*.out-*.txt", SearchOption.TopDirectoryOnly)
                 .Select(p => new FileInfo(p))
-                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .OrderBy(f => f.CreationTimeUtc)
                 .ToList();
 
-            for (int i = 0; i < files.Count; i++)
+            foreach (var f in files)
             {
-                var f = files[i];
-                var tooOld = (now - f.LastWriteTimeUtc).TotalDays > maxAgeDays;
-                var overflow = i >= keepLatest;
-                if (!tooOld && !overflow)
+                // Only sweep logs older than threshold.
+                if ((now - f.CreationTimeUtc).TotalHours < staleHours)
+                    continue;
+
+                // PID-based safety: move only when process is no longer alive.
+                if (!TryGetPidFromLogName(f.Name, out var pid))
+                    continue;
+                if (IsProcessAlive(pid))
                     continue;
 
                 try
@@ -160,13 +164,41 @@ internal partial class Program
                 }
                 catch
                 {
-                    // Another process may still hold the file; skip silently.
+                    // File may be in use or already moved by another process.
                 }
             }
         }
         catch
         {
             // Best-effort log housekeeping only.
+        }
+    }
+
+    static bool TryGetPidFromLogName(string fileName, out int pid)
+    {
+        pid = 0;
+        const string key = ".pid=";
+        var idx = fileName.LastIndexOf(key, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0) return false;
+        idx += key.Length;
+
+        var end = idx;
+        while (end < fileName.Length && char.IsDigit(fileName[end])) end++;
+        if (end <= idx) return false;
+
+        return int.TryParse(fileName[idx..end], out pid);
+    }
+
+    static bool IsProcessAlive(int pid)
+    {
+        try
+        {
+            var p = System.Diagnostics.Process.GetProcessById(pid);
+            return !p.HasExited;
+        }
+        catch
+        {
+            return false;
         }
     }
 
