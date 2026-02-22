@@ -131,6 +131,10 @@ COM Commands (session per current folder):
   com methods                      Show methods for current profile.
   com call <method> [params...]    Call method through selected adapter.
 
+Telegram Commands:
+  telegram send ""text"" [--window WkQuant] [--no-fallback-enter]
+                                   Accessibility-first send, Enter fallback.
+
 General Options:
   -v, --verbose   Verbose output
   --report <dir>  Generate HTML report in directory
