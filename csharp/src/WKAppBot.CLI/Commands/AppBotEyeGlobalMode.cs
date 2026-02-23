@@ -28,8 +28,8 @@ internal partial class Program
 
         using var host = new AppBotEyeHost();
         host.Start(width, height, posX, posY, ownerHwnd: IntPtr.Zero);
-        host.UpdateInfo("global", "WK AppBot Eye Global");
-        host.UpdateAccessibilityText("Starting global monitor...");
+        host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
+        host.UpdateAccessibilityText(string.Empty);
 
         Console.WriteLine("[EYE] Global monitor active — press Ctrl+C to stop");
 
@@ -42,8 +42,9 @@ internal partial class Program
             {
                 var cards = ReadEyeCards(staleSeconds: 180);
 
+                host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
+
                 var sb = new StringBuilder();
-                sb.AppendLine($"Global Eye  {DateTime.Now:HH:mm:ss}");
 
                 var latest = ReadLatestTick();
                 if (latest != null)
