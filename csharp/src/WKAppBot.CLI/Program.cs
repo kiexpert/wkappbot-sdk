@@ -138,6 +138,42 @@ internal partial class Program
                 else Console.WriteLine($"[FALLBACK] result=fail code={exitCode} cmd={command}");
             }
             catch { }
+
+            // Auto snapshot+blend on A11Y action failure (experience DB accumulation)
+            try
+            {
+                if (exitCode != 0)
+                {
+                    var a11yFailCommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        "input", "click", "do", "inspect", "dialog-click"
+                    };
+                    if (a11yFailCommands.Contains(command) && restArgs.Length > 0)
+                    {
+                        var winTitle = restArgs[0];
+                        if (!string.IsNullOrWhiteSpace(winTitle))
+                        {
+                            Console.WriteLine($"[FALLBACK] auto snapshot+blend trigger (cmd={command})");
+                            Console.WriteLine($"[A11Y] unavailable (cmd={command}, reason=action-failed, text=(none), role=(none), action=(none))");
+                            var cidArg = "";
+                            for (int i = 0; i < restArgs.Length - 1; i++)
+                            {
+                                if (string.Equals(restArgs[i], "--cid", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    cidArg = restArgs[i + 1];
+                                    break;
+                                }
+                            }
+                            if (!string.IsNullOrWhiteSpace(cidArg))
+                                SnapshotCommand(new[] { winTitle, "--tag", $"a11y_fail_{command}", "--depth", "2", "--cid", cidArg });
+                            else
+                                SnapshotCommand(new[] { winTitle, "--tag", $"a11y_fail_{command}", "--depth", "2" });
+                        }
+                    }
+                }
+            }
+            catch { }
+
             return exitCode;
         }
         catch (Exception ex)

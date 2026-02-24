@@ -122,8 +122,8 @@ Utility Commands:
       Extract text from window/image using Windows.Media.Ocr.
   knowhow write|read|web|web-read  Record/read per-control automation notes.
   schedule add|list|remove|clear   Manage scheduled prompts for auto-recovery.
-  snapshot <window-title> [--tag N] [--depth N]
-      One-shot diagnostic capture: UIA tree + screenshot + OCR.
+  snapshot <window-title> [--tag N] [--depth N] [--cid N]
+      One-shot diagnostic capture: UIA tree + screenshot + OCR (+experience blend).
   screen off [--no-check]          Turn off monitor immediately; optional skip health check.
   win-move <window-title> [--right-top] [--x N --y N] [--margin N]
       Move a window (default: right-top on the right-most monitor).

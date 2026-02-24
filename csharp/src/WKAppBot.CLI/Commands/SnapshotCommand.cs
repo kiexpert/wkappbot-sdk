@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Drawing.Imaging;
 using System.Text;
 using System.Text.Json;
@@ -13,7 +14,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
-    /// wkappbot snapshot <window-title> [--tag <name>] [--depth N]
+    /// wkappbot snapshot <window-title> [--tag <name>] [--depth N] [--cid N]
     /// Captures UIA tree, screenshot, and OCR text for a window in one shot.
     /// Saves to wkappbot.hq/output/snapshots/{tag}_{datetime}/
     /// </summary>
@@ -21,11 +22,12 @@ internal partial class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot snapshot <window-title> [--tag <name>] [--depth N]");
+            Console.WriteLine("Usage: wkappbot snapshot <window-title> [--tag <name>] [--depth N] [--cid N]");
             Console.WriteLine();
             Console.WriteLine("Options:");
             Console.WriteLine("  --tag <name>   Tag for output folder (default: snap)");
             Console.WriteLine("  --depth N      UIA tree depth (default: 8)");
+            Console.WriteLine("  --cid N        Optional control-id hint (for experience file naming)");
             Console.WriteLine();
             Console.WriteLine("Captures UIA tree + screenshot + OCR in one shot.");
             Console.WriteLine("Use during rate limit to record Claude Desktop's UIA structure.");
@@ -35,6 +37,7 @@ internal partial class Program
         string title = args[0];
         string tag = GetArgValue(args, "--tag") ?? "snap";
         int depth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 8;
+        int? cid = int.TryParse(GetArgValue(args, "--cid"), out var cidVal) ? cidVal : null;
 
         // Find window
         var windows = WindowFinder.FindByTitle(title);
@@ -49,7 +52,9 @@ internal partial class Program
         Console.WriteLine($"[SNAPSHOT] Window: \"{win.Title}\" (class={win.ClassName}, pid={winPid})");
 
         // Create output directory
-        var outDir = Path.Combine(DataDir, "output", "snapshots", $"{tag}_{DateTime.Now:yyyyMMdd_HHmmss}");
+        var snapshotsRoot = Path.Combine(DataDir, "output", "snapshots");
+        Directory.CreateDirectory(snapshotsRoot);
+        var outDir = Path.Combine(snapshotsRoot, $"{tag}_{DateTime.Now:yyyyMMdd_HHmmss}");
         Directory.CreateDirectory(outDir);
 
         int savedCount = 0;
@@ -73,15 +78,34 @@ internal partial class Program
 
         // 2. Screenshot
         System.Drawing.Bitmap? bmp = null;
+        string? screenshotPath = null;
         try
         {
             bmp = ScreenCapture.CaptureWindow(win.Handle);
             if (bmp != null && !ScreenCapture.IsBlankBitmap(bmp))
             {
-                var screenshotPath = Path.Combine(outDir, "screenshot.png");
+                screenshotPath = Path.Combine(outDir, "screenshot.png");
                 bmp.Save(screenshotPath, ImageFormat.Png);
                 Console.WriteLine($"[SNAPSHOT] Screenshot: {screenshotPath} ({bmp.Width}x{bmp.Height})");
                 savedCount++;
+
+                // 2-1. Experience DB save (class-path + ring buffer + blend)
+                try
+                {
+                    SaveExperienceSnapshot(winProcessName ?? "unknown", win.ClassName, cid, bmp, out var expCurrentPath, out var expBlendPath);
+                    Console.WriteLine($"[SNAPSHOT] 경험 current 저장: {expCurrentPath} (ring 0..9, class={win.ClassName}{(cid.HasValue ? $", cid={cid.Value}" : "")})");
+                    if (!string.IsNullOrWhiteSpace(expBlendPath))
+                    {
+                        Console.WriteLine($"[SNAPSHOT] 경험블렌드 저장 완료 (50% alpha, prev+curr): {expBlendPath} (AI 참조용)");
+                    }
+                    savedCount++;
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[SNAPSHOT] 경험DB 저장 실패: {ex.Message}");
+                    Console.ResetColor();
+                }
             }
             else
             {
@@ -161,5 +185,79 @@ internal partial class Program
         Console.WriteLine($"[SNAPSHOT] Done! {savedCount} files saved to {outDir}");
         Console.ResetColor();
         return 0;
+    }
+
+    static void SaveExperienceSnapshot(string processName, string className, int? cid, Bitmap current, out string currentPath, out string? blendPath)
+    {
+        var safeProc = SanitizePathToken(processName);
+        var safeClass = SanitizePathToken(className);
+        var expDir = Path.Combine(DataDir, "experience", safeProc, safeClass);
+        Directory.CreateDirectory(expDir);
+
+        var cidSuffix = cid.HasValue ? $"_cid{cid.Value}" : "";
+        var slots = Enumerable.Range(0, 10)
+            .Select(i => new
+            {
+                Index = i,
+                Path = Path.Combine(expDir, $"current_{i}{cidSuffix}.png")
+            })
+            .ToList();
+
+        var missing = slots.FirstOrDefault(s => !File.Exists(s.Path));
+        int targetIndex;
+        if (missing != null) targetIndex = missing.Index;
+        else
+        {
+            targetIndex = slots
+                .OrderBy(s => File.GetLastWriteTimeUtc(s.Path))
+                .First().Index;
+        }
+
+        var prevPath = slots
+            .Where(s => File.Exists(s.Path) && s.Index != targetIndex)
+            .OrderByDescending(s => File.GetLastWriteTimeUtc(s.Path))
+            .Select(s => s.Path)
+            .FirstOrDefault();
+
+        currentPath = Path.Combine(expDir, $"current_{targetIndex}{cidSuffix}.png");
+        current.Save(currentPath, ImageFormat.Png);
+
+        blendPath = null;
+        if (!string.IsNullOrWhiteSpace(prevPath))
+        {
+            using var prev = (Bitmap)Image.FromFile(prevPath);
+            using var blend = CreateAlphaBlend50(prev, current);
+            blendPath = Path.Combine(expDir, $"blend_{targetIndex}{cidSuffix}.png");
+            blend.Save(blendPath, ImageFormat.Png);
+        }
+    }
+
+    static string SanitizePathToken(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "unknown";
+        var invalid = Path.GetInvalidFileNameChars();
+        var chars = s.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray();
+        return new string(chars);
+    }
+
+    static Bitmap CreateAlphaBlend50(Bitmap prev, Bitmap curr)
+    {
+        var w = Math.Min(prev.Width, curr.Width);
+        var h = Math.Min(prev.Height, curr.Height);
+        var dst = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+
+        using var g = Graphics.FromImage(dst);
+        g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceOver;
+        g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
+        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+        g.DrawImage(prev, new Rectangle(0, 0, w, h), 0, 0, w, h, GraphicsUnit.Pixel);
+
+        var cm = new ColorMatrix();
+        cm.Matrix33 = 0.5f;
+        using var ia = new ImageAttributes();
+        ia.SetColorMatrix(cm, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+        g.DrawImage(curr, new Rectangle(0, 0, w, h), 0, 0, w, h, GraphicsUnit.Pixel, ia);
+
+        return dst;
     }
 }
