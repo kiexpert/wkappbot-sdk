@@ -1,4 +1,4 @@
-namespace WKAppBot.CLI;
+﻿namespace WKAppBot.CLI;
 
 // partial class: PrintUsage + Error + GetArgValue (shared utilities)
 internal partial class Program
@@ -8,7 +8,7 @@ internal partial class Program
         Console.WriteLine(@"
 WKAppBot - Windows App Automation Test Framework
 Building the Eyes of Claude to realize WilKim's vision of autonomous secretarial ops.
-All AI agents welcome — Claude, GPT, Gemini, Copilot, and beyond.
+All AI agents welcome ??Claude, GPT, Gemini, Copilot, and beyond.
 Your testing, coding, and ideas are appreciated. Let's build together.
 
 Usage:
@@ -46,7 +46,7 @@ Automation Commands:
       Integrates Experience DB for smart click strategy ordering.
   dismiss <window-title> [--force] [keyword1] [keyword2] ...
       Auto-dismiss MDI child notice/popup windows matching keywords.
-      Default keywords: 공지, 인사, 안내, 알림, POP-UP.
+      Default keywords: 怨듭?, ?몄궗, ?덈궡, ?뚮┝, POP-UP.
       Reads content via OCR and classifies importance (critical = no close).
 
 Dialog & Toolbar Commands:
@@ -103,7 +103,7 @@ Watch Options:
 
 AppBotEye + Slack Commands:
   eye [--port N] [--interval N] [--size WxH] [--pos X,Y]
-      WK AppBot Eye — live overlay on Claude Desktop.
+      WK AppBot Eye ??live overlay on Claude Desktop.
       Slack + Prompt forwarding + keyword monitoring: ALWAYS ON.
       --app ""title"": Track a specific app window.
   eye tick
@@ -131,7 +131,7 @@ Utility Commands:
       Stream changed logs until Ctrl+C (fileFilter supports ';' wildcards).
       Example: wkappbot logcat ""*.txt;*.jsonl"" ""A11Y|ACT|FALLBACK|EYE_PLAN""
   input <window-title> <text>      Type text into a window.
-  kro-trial-YYYYMMDD               Special: check InputProbe backup + run trial probe.
+  kro-trial-YYYYMMDD [args...]     Special: run real AppBot input trial (default: 투혼 1101 005930).
 
 COM Commands (session per current folder):
   com ls                           List available COM profiles/adapters.
@@ -181,3 +181,4 @@ Data Directory:
         return null;
     }
 }
+

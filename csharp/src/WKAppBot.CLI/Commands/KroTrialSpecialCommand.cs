@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace WKAppBot.CLI;
@@ -13,8 +12,9 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("[KRO-TRIAL] Invalid command format.");
             Console.ResetColor();
-            Console.WriteLine("Usage: wkappbot kro-trial-YYYYMMDD");
+            Console.WriteLine("Usage: wkappbot kro-trial-YYYYMMDD [window-title form-id text --cid N --enter --method N]");
             Console.WriteLine("Example: wkappbot kro-trial-20260225");
+            Console.WriteLine("Example: wkappbot kro-trial-20260225 \"투혼\" 1101 \"005930\" --cid 3780 --enter");
             return 1;
         }
 
@@ -22,61 +22,32 @@ internal partial class Program
         var baseDir = Directory.GetCurrentDirectory();
         var probeDir = FindInputProbeDir(baseDir) ?? Path.Combine(baseDir, "tools", "InputProbe");
         var bakPath = Path.Combine(probeDir, $"Program.success.{yyyymmdd}.cs.bak");
-        var probeProj = Path.Combine(probeDir, "InputProbe.csproj");
 
-        if (!File.Exists(bakPath))
+        // historical breadcrumb only (non-blocking)
+        if (File.Exists(bakPath))
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[KRO-TRIAL] 역사 코드 없음: {bakPath}");
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"[KRO-TRIAL] history found: {bakPath}");
             Console.ResetColor();
-            Console.WriteLine("Usage: wkappbot kro-trial-YYYYMMDD");
-            Console.WriteLine("Example: wkappbot kro-trial-20260225");
-            return 1;
         }
 
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[KRO-TRIAL] 역사 코드 발견: {bakPath}");
-        Console.ResetColor();
-
-        if (!File.Exists(probeProj))
+        // Real AppBot command path (not InputProbe)
+        // default target: 투혼 1101 005930 --cid 3780 --enter
+        string[] inputArgs;
+        if (args.Length >= 3)
         {
-            Console.WriteLine("[KRO-TRIAL] InputProbe 프로젝트를 찾지 못했습니다.");
-            Console.WriteLine($"[KRO-TRIAL] 수동 실행: W:\\SDK\\dotnet\\dotnet.exe run --project \"{probeProj}\" -- \"메모장\" \"KRO-TRIAL-{yyyymmdd}\"");
-            return 0;
+            inputArgs = args;
         }
-
-        var dotnetExe = @"W:\SDK\dotnet\dotnet.exe";
-        if (!File.Exists(dotnetExe))
-            dotnetExe = "dotnet";
-
-        var runArgs = $"run --project \"{probeProj}\" -- \"메모장\" \"KRO-TRIAL-{yyyymmdd}\"";
-        Console.WriteLine($"[KRO-TRIAL] InputProbe 실행: {dotnetExe} {runArgs}");
-
-        try
+        else
         {
-            using var proc = Process.Start(new ProcessStartInfo
-            {
-                FileName = dotnetExe,
-                Arguments = runArgs,
-                UseShellExecute = false,
-                WorkingDirectory = baseDir
-            });
-
-            if (proc is null)
-            {
-                Console.WriteLine("[KRO-TRIAL] InputProbe 실행 시작 실패. 위 명령으로 수동 실행하세요.");
-                return 0;
-            }
-
-            proc.WaitForExit();
-            return proc.ExitCode;
+            inputArgs = new[] { "투혼", "1101", "005930", "--cid", "3780", "--enter" };
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("[KRO-TRIAL] using default real input scenario: 투혼 1101 005930 --cid 3780 --enter");
+            Console.ResetColor();
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[KRO-TRIAL] InputProbe 즉시 실행 실패: {ex.Message}");
-            Console.WriteLine($"[KRO-TRIAL] 수동 실행: {dotnetExe} {runArgs}");
-            return 0;
-        }
+
+        Console.WriteLine($"[KRO-TRIAL] delegating to real input command (date={yyyymmdd})");
+        return InputCommand(inputArgs);
     }
 
     static string? FindInputProbeDir(string startDir)
