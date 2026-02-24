@@ -127,6 +127,9 @@ Utility Commands:
   screen off [--no-check]          Turn off monitor immediately; optional skip health check.
   win-move <window-title> [--right-top] [--x N --y N] [--margin N]
       Move a window (default: right-top on the right-most monitor).
+  logcat <fileFilter> <messageFilter>
+      Stream changed logs until Ctrl+C (fileFilter supports ';' wildcards).
+      Example: wkappbot logcat ""*.txt;*.jsonl"" ""A11Y|ACT|FALLBACK|EYE_PLAN""
   input <window-title> <text>      Type text into a window.
 
 COM Commands (session per current folder):
