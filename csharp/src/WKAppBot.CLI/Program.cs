@@ -432,6 +432,7 @@ internal partial class Program
             Directory.CreateDirectory(expDir);
             var actionToken = SanitizePathTokenForExp(string.IsNullOrWhiteSpace(stdAction) ? "General" : stdAction);
             var logPath = Path.Combine(expDir, $"a11y_fail_{actionToken}.jsonl");
+            var knowhowPath = Path.Combine(expDir, "knowhow.md");
 
             int? cid = int.TryParse(cidArg, out var c) ? c : null;
             var rec = new
@@ -450,6 +451,7 @@ internal partial class Program
 
             File.AppendAllText(logPath, JsonSerializer.Serialize(rec) + Environment.NewLine, Encoding.UTF8);
             Console.WriteLine($"[A11Y] 경험 기록 저장: {logPath}");
+            Console.WriteLine($"[KNOWHOW] hint: {knowhowPath}");
         }
         catch { }
     }
