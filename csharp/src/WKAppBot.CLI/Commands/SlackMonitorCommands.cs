@@ -485,6 +485,30 @@ internal partial class Program
         return ok;
     }
 
+    /// <summary>
+    /// Get the timestamp of the latest message in a channel.
+    /// Used to check if our status streaming message is still at the bottom.
+    /// Returns null if channel is empty or API call fails.
+    /// </summary>
+    static async Task<string?> GetChannelLatestMessageTs(string botToken, string channel)
+    {
+        using var http = new HttpClient();
+        using var req = new HttpRequestMessage(HttpMethod.Get,
+            $"https://slack.com/api/conversations.history?channel={channel}&limit=1");
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+
+        var resp = await http.SendAsync(req);
+        var body = await resp.Content.ReadAsStringAsync();
+        var json = JsonSerializer.Deserialize<JsonNode>(body);
+        var ok = json?["ok"]?.GetValue<bool>() ?? false;
+        if (!ok) return null;
+
+        var messages = json?["messages"]?.AsArray();
+        if (messages == null || messages.Count == 0) return null;
+
+        return messages[0]?["ts"]?.GetValue<string>();
+    }
+
     // ── Pending Ack file-based IPC ──────────────────────────────
     // Shared between AppBotEye (writes ack ts) and CLI (reads + deletes ack before replying)
     // File: wkappbot.hq/runtime/pending_acks.json

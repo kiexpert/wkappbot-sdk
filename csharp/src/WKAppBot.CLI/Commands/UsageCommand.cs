@@ -106,6 +106,8 @@ AppBotEye + Slack Commands:
       WK AppBot Eye — live overlay on Claude Desktop.
       Slack + Prompt forwarding + keyword monitoring: ALWAYS ON.
       --app ""title"": Track a specific app window.
+  eye tick
+      Run one immediate info-acquire tick and print Kro card snapshot.
   slack listen [--bg] [--ai] [--claude|--webbot] [--name N]
       Slack Socket Mode: listen for @mentions and forward to Claude.
       Prompt + keyword monitoring always enabled.
@@ -122,6 +124,7 @@ Utility Commands:
   schedule add|list|remove|clear   Manage scheduled prompts for auto-recovery.
   snapshot <window-title> [--tag N] [--depth N]
       One-shot diagnostic capture: UIA tree + screenshot + OCR.
+  screen off [--no-check]          Turn off monitor immediately; optional skip health check.
   input <window-title> <text>      Type text into a window.
 
 COM Commands (session per current folder):
