@@ -136,6 +136,9 @@ internal partial class Program
             {
                 if (exitCode == 0) Console.WriteLine($"[ACT] result=ok cmd={command}");
                 else Console.WriteLine($"[FALLBACK] result=fail code={exitCode} cmd={command}");
+
+                var stdAction = ResolveStandardAction(command, restArgs);
+                WriteStandardActionLog(stdAction, command, exitCode == 0 ? "ok" : "fail", exitCode, string.Join(" ", restArgs));
             }
             catch { }
 
@@ -155,6 +158,7 @@ internal partial class Program
                         {
                             Console.WriteLine($"[FALLBACK] auto snapshot+blend trigger (cmd={command})");
                             Console.WriteLine($"[A11Y] unavailable (cmd={command}, reason=action-failed, text=(none), role=(none), action=(none))");
+                            WriteStandardActionLog("Unavailable", command, "a11y-unavailable", exitCode, "text=(none) role=(none) action=(none)");
                             var cidArg = "";
                             for (int i = 0; i < restArgs.Length - 1; i++)
                             {
@@ -397,6 +401,35 @@ internal partial class Program
     }
 
     // ── run ────────────────────────────────────────────────────
+
+    static string ResolveStandardAction(string command, string[] restArgs)
+    {
+        return (command ?? "").ToLowerInvariant() switch
+        {
+            "input" => "SetValue",
+            "click" => "Invoke",
+            "do" => "Invoke",
+            "dialog-click" => "Invoke",
+            "inspect" => "Inspect",
+            "snapshot" => "Snapshot",
+            "scan" => "Scan",
+            _ => "General"
+        };
+    }
+
+    static void WriteStandardActionLog(string action, string command, string result, int code, string detail)
+    {
+        try
+        {
+            var logsDir = Path.Combine(DataDir, "logs");
+            Directory.CreateDirectory(logsDir);
+            var safeAction = string.IsNullOrWhiteSpace(action) ? "General" : action;
+            var path = Path.Combine(logsDir, $"a11y_{safeAction}.log");
+            var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] cmd={command} result={result} code={code} detail={detail}";
+            File.AppendAllText(path, line + Environment.NewLine, Encoding.UTF8);
+        }
+        catch { }
+    }
 
     static int RunCommand(string[] args)
     {
