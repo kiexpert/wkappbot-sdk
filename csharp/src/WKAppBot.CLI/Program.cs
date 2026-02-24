@@ -169,7 +169,8 @@ internal partial class Program
                             else
                                 SnapshotCommand(new[] { winTitle, "--tag", $"a11y_fail_{command}", "--depth", "2" });
 
-                            WriteA11yFailExperienceRecord(winTitle, command, cidArg, "action-failed", "(none)", "(none)", "(none)");
+                            var stdAction = ResolveStandardAction(command, restArgs);
+                            WriteA11yFailExperienceRecord(winTitle, command, stdAction, cidArg, "action-failed", "(none)", "(none)", "(none)");
                         }
                     }
                 }
@@ -400,7 +401,22 @@ internal partial class Program
 
     // ── run ────────────────────────────────────────────────────
 
-    static void WriteA11yFailExperienceRecord(string windowTitle, string command, string cidArg, string reason, string text, string role, string action)
+    static string ResolveStandardAction(string command, string[] restArgs)
+    {
+        return (command ?? "").ToLowerInvariant() switch
+        {
+            "input" => "SetValue",
+            "click" => "Invoke",
+            "do" => "Invoke",
+            "dialog-click" => "Invoke",
+            "inspect" => "Inspect",
+            "snapshot" => "Snapshot",
+            "scan" => "Scan",
+            _ => "General"
+        };
+    }
+
+    static void WriteA11yFailExperienceRecord(string windowTitle, string command, string stdAction, string cidArg, string reason, string text, string role, string action)
     {
         try
         {
@@ -414,7 +430,8 @@ internal partial class Program
 
             var expDir = Path.Combine(DataDir, "experience", SanitizePathTokenForExp(procName), SanitizePathTokenForExp(win.ClassName));
             Directory.CreateDirectory(expDir);
-            var logPath = Path.Combine(expDir, "a11y_fail.jsonl");
+            var actionToken = SanitizePathTokenForExp(string.IsNullOrWhiteSpace(stdAction) ? "General" : stdAction);
+            var logPath = Path.Combine(expDir, $"a11y_fail_{actionToken}.jsonl");
 
             int? cid = int.TryParse(cidArg, out var c) ? c : null;
             var rec = new
