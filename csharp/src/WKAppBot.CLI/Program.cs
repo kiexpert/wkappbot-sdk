@@ -72,6 +72,14 @@ internal partial class Program
 
             // Global Eye tick (for eye --global multi-parent monitor)
             try { EmitEyeTick(command, cmdTag, "start"); } catch { }
+            try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
+            try
+            {
+                var promptPreview = BuildPromptPreview(command, restArgs);
+                if (!string.IsNullOrWhiteSpace(promptPreview))
+                    EmitEyeTick(command, cmdTag, $"prompt:{promptPreview}");
+            }
+            catch { }
 
             // Auto-launch AppBotEye for all commands except eye/slack/help/validate
             // 앱봇이 뭔가 하면 눈은 항상 떠있어야!
@@ -82,6 +90,8 @@ internal partial class Program
             {
                 try { LaunchAppBotEyeIfNeeded(); } catch { /* best-effort */ }
             }
+
+            try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
 
             exitCode = command switch
             {
@@ -111,6 +121,7 @@ internal partial class Program
                 "dialog-click" => DialogClickCommand(restArgs),
                 "schedule" => ScheduleCommand(restArgs),
                 "snapshot" => SnapshotCommand(restArgs),
+                "screen" => ScreenCommand(restArgs),
                 "kiwoom" => KiwoomCommand(restArgs),
                 "com" => ComCommand(restArgs),
                 "telegram" => TelegramCommand(restArgs),
@@ -129,7 +140,14 @@ internal partial class Program
         }
         finally
         {
-            try { EmitEyeTick(args.Length > 0 ? args[0].ToLowerInvariant() : "noargs", cmdTag, $"end:{exitCode}"); } catch { }
+            try
+            {
+                var cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "noargs";
+                if (exitCode == 0) EmitEyeTick(cmd, cmdTag, "done:작업 완료");
+                else EmitEyeTick(cmd, cmdTag, "step:3/3:오류 처리");
+                EmitEyeTick(cmd, cmdTag, $"end:{exitCode}");
+            }
+            catch { }
             Console.SetOut(tee.OriginalConsole);
             tee.Dispose(); // normal-exit atexit-style move to logs/old
             Console.WriteLine($"Log saved: {tee.LogPath}");
@@ -211,6 +229,29 @@ internal partial class Program
         {
             return false;
         }
+    }
+
+    static string BuildPromptPreview(string command, string[] restArgs)
+    {
+        if (restArgs == null || restArgs.Length == 0)
+            return string.Empty;
+
+        // Only surface raw prompt-like commands to reduce noise.
+        var c = (command ?? "").ToLowerInvariant();
+        if (c is not ("ask" or "web" or "kiwoom" or "com" or "telegram" or "schedule" or "knowhow"))
+            return string.Empty;
+
+        var raw = string.Join(" ", restArgs).Trim();
+        if (string.IsNullOrWhiteSpace(raw))
+            return string.Empty;
+
+        var first = raw.Split(new[] { '\r', '\n', '.', '!', '?', '。' }, StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault()?.Trim() ?? raw;
+
+        if (first.Length > 80)
+            first = first[..80] + "...";
+
+        return first;
     }
 
     sealed class EyeTick

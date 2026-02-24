@@ -399,23 +399,27 @@ Examples:
         bool autoConfirm = args.Contains("--confirm");
 
         var postFgHwnd = NativeMethods.GetForegroundWindow();
-        if (postFgHwnd != win.Handle && postFgHwnd != IntPtr.Zero)
+        if (postFgHwnd != IntPtr.Zero)
         {
-            var popupInfo = WindowInfo.FromHwnd(postFgHwnd);
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("  New foreground: ");
+            var fgInfo = WindowInfo.FromHwnd(postFgHwnd);
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write("  Foreground: ");
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine($"[{popupInfo.ClassName}] \"{popupInfo.Title}\" ({popupInfo.Rect.Width}x{popupInfo.Rect.Height})");
+            Console.WriteLine($"[{fgInfo.ClassName}] \"{fgInfo.Title}\" ({fgInfo.Rect.Width}x{fgInfo.Rect.Height})");
             Console.ResetColor();
-            ReadDialogContents(postFgHwnd);
-            anyReaction = true;
 
-            // Try handler-based auto-handling first, then --confirm fallback
-            var (handled, shouldRetry) = TryHandleBlocker(win.Handle, handlerMgr);
-            if (!handled && autoConfirm && popupInfo.ClassName == "#32770")
+            if (postFgHwnd != win.Handle)
             {
-                // Legacy --confirm fallback: click first button in #32770 dialogs
-                ClickFirstButtonInDialog(postFgHwnd, "confirm");
+                ReadDialogContents(postFgHwnd);
+                anyReaction = true;
+
+                // Try handler-based auto-handling first, then --confirm fallback
+                var (handled, shouldRetry) = TryHandleBlocker(win.Handle, handlerMgr);
+                if (!handled && autoConfirm && fgInfo.ClassName == "#32770")
+                {
+                    // Legacy --confirm fallback: click first button in #32770 dialogs
+                    ClickFirstButtonInDialog(postFgHwnd, "confirm");
+                }
             }
         }
 
