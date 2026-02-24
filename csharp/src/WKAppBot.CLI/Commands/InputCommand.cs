@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using WKAppBot.Core.Runner;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Native;
@@ -13,9 +13,11 @@ internal partial class Program
     // input — Type text into a specific control (MDI form + control ID)
     //
     // Tries multiple strategies:
-    //   1. WM_CHAR (focusless, sends char by char via SendMessage)
-    //   2. Click + Ctrl+A + SendInput keyboard + Enter
-    //   3. WM_SETTEXT + WM_KEYDOWN(VK_RETURN) (last resort)
+    //   3. WM_SETTEXT (focusless/direct text replacement)
+    //   4. PostMessage WM_KEYDOWN/WM_CHAR (focus + message hybrid)
+    //   5. Click + PostMessage WM_CHAR (physical focus + message)
+    //   1. Focus + WM_CHAR (AttachThread + SetFocus + SendMessage)
+    //   2. Click + VK-Type (physical keyboard input)
     // ═══════════════════════════════════════════════════════════════════════
     static int InputCommand(string[] args)
     {
@@ -24,11 +26,11 @@ internal partial class Program
   Types text into a control in an MDI form.
 
 Strategies (tried in order, or specify --method):
-  1: Focus+WM_CHAR — AttachThread + SetFocus + SendMessage WM_CHAR
-  2: Click+Type    — physical click on field → Home+Shift+End → SendInput VK
   3: WM_SETTEXT    — direct text replacement (updates Win32 text, not internal buffer)
   4: PostMsg       — SetFocus + PostMessage WM_KEYDOWN/WM_CHAR with proper lParam
   5: Click+PostMsg — physical click (left area) → PostMessage WM_CHAR (hybrid, best for CMaskEdit)
+  1: Focus+WM_CHAR — AttachThread + SetFocus + SendMessage WM_CHAR
+  2: Click+Type    — physical click on field → Home+Shift+End → SendInput VK
 
 Options:
   --cid N     Target control ID (default: 3780, the stock code field)
@@ -174,207 +176,6 @@ Examples:
         Console.ResetColor();
 
         bool success = false;
-
-        // ── Method 1: SetFocus + WM_CHAR (needs foreground, but sends chars via message) ──
-        if (methodOnly == null || methodOnly == 1)
-        {
-            Console.ForegroundColor = ConsoleColor.Blue;
-            Console.Write("  [1] Focus+WM_CHAR: ");
-            Console.ResetColor();
-
-            try
-            {
-                // Bring parent window to foreground
-                NativeMethods.SmartSetForegroundWindow(win.Handle);
-                Thread.Sleep(200);
-
-                // AttachThreadInput to target thread → SetFocus → Detach
-                uint targetThread = NativeMethods.GetWindowThreadProcessId(targetHwnd, out _);
-                uint ourThread = NativeMethods.GetCurrentThreadId();
-                bool attached = false;
-                if (targetThread != ourThread)
-                {
-                    attached = NativeMethods.AttachThreadInput(ourThread, targetThread, true);
-                }
-                NativeMethods.SetFocus(targetHwnd);
-                Thread.Sleep(100);
-
-                // Select all existing text (EM_SETSEL 0,-1 = select all)
-                NativeMethods.SendMessageW(targetHwnd, 0x00B1 /*EM_SETSEL*/, IntPtr.Zero, (IntPtr)(-1));
-                Thread.Sleep(50);
-
-                // Delete selected text first (backspace to clear)
-                NativeMethods.SendMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)0x08 /*VK_BACK*/, IntPtr.Zero);
-                Thread.Sleep(50);
-
-                // Send each character via WM_CHAR
-                foreach (char ch in text)
-                {
-                    NativeMethods.SendMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, IntPtr.Zero);
-                    Thread.Sleep(20);
-                }
-
-                // Send Enter via WM_KEYDOWN/UP if requested (triggers RunEventCommTR in HTS)
-                if (sendEnter)
-                {
-                    Thread.Sleep(100);
-                    NativeMethods.SendMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x0D /*VK_RETURN*/, IntPtr.Zero);
-                    Thread.Sleep(50);
-                    NativeMethods.SendMessageW(targetHwnd, 0x0101 /*WM_KEYUP*/, (IntPtr)0x0D, IntPtr.Zero);
-                }
-
-                // Detach thread input
-                if (attached)
-                    NativeMethods.AttachThreadInput(ourThread, targetThread, false);
-
-                // Read back to verify
-                Thread.Sleep(200);
-                var verifySb = new StringBuilder(256);
-                var vLen = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
-                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vLen + 1), verifySb);
-                var newText = verifySb.ToString();
-
-                if (newText.Contains(text))
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ \"{newText}\"");
-                    Console.ResetColor();
-                    success = true;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"? \"{newText}\" (expected \"{text}\")");
-                    Console.ResetColor();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
-                Console.ResetColor();
-            }
-        }
-
-        // ── Method 2: Click + Home + Shift+End + VK-based SendInput + Enter ──
-        // CMaskEdit (CWnd-based) doesn't respond to WM_CHAR/WM_SETTEXT —
-        // only real physical keyboard input works. Use Home→Shift+End to select all.
-        if (!success && (methodOnly == null || methodOnly == 2))
-        {
-            Console.ForegroundColor = ConsoleColor.Blue;
-            Console.Write("  [2] Click+VK-Type: ");
-            Console.ResetColor();
-
-            try
-            {
-                // Click on the LEFT portion (text input area, not right-side buttons)
-                int cx = ctlRect.Left + clickXOffset;
-                int cy = ctlRect.Top + ctlRect.Height / 2;
-
-                // Activate the specific MDI child form first
-                NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
-                Thread.Sleep(200);
-
-                // Bring main window to front + click field
-                NativeMethods.SmartSetForegroundWindow(win.Handle);
-                Thread.Sleep(300);
-                MouseInput.Click(cx, cy);
-                Thread.Sleep(300);
-
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($"[click({cx},{cy})] ");
-                Console.ResetColor();
-
-                // Home key → move caret to start
-                KeyboardInput.PressKey("home");
-                Thread.Sleep(50);
-
-                // Shift+End → select all text
-                KeyboardInput.Hotkey(new[] { "shift", "end" });
-                Thread.Sleep(100);
-
-                // Type each digit (replaces selected text)
-                foreach (char ch in text)
-                {
-                    if (ch >= '0' && ch <= '9')
-                    {
-                        KeyboardInput.PressKey(ch.ToString());
-                        Thread.Sleep(40);
-                    }
-                    else if (char.IsLetter(ch))
-                    {
-                        KeyboardInput.PressKey(ch.ToString());
-                        Thread.Sleep(40);
-                    }
-                }
-                Thread.Sleep(200);
-
-                if (sendEnter)
-                {
-                    KeyboardInput.PressKey("enter");
-                    Thread.Sleep(500);
-                }
-
-                // Verify: WM_GETTEXT (may return "" for CMaskEdit/CWnd controls)
-                var verifySb = new StringBuilder(256);
-                var vLen = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
-                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vLen + 1), verifySb);
-                var wmText = verifySb.ToString();
-
-                // Also check UIA Name (CMaskEdit exposes text via UIA even when WM_GETTEXT fails)
-                string? uiaName = null;
-                try
-                {
-                    using var automation = new FlaUI.UIA3.UIA3Automation();
-                    var uiaEl = automation.FromHandle(targetHwnd);
-                    uiaName = uiaEl?.Name;
-                }
-                catch { }
-
-                // Take screenshot for visual verification
-                try
-                {
-                    using var bmp = ScreenCapture.CaptureWindow(win.Handle);
-                    var ssPath = Path.Combine(DataDir, "logs", $"input_verify_{DateTime.Now:HHmmss}.png");
-                    bmp.Save(ssPath);
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write($"[screenshot: {Path.GetFileName(ssPath)}] ");
-                    Console.ResetColor();
-                }
-                catch { }
-
-                var checkText = !string.IsNullOrEmpty(wmText) ? wmText : uiaName ?? "";
-                if (checkText.Contains(text))
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ \"{checkText}\" (via {(!string.IsNullOrEmpty(wmText) ? "WM_GETTEXT" : "UIA")})");
-                    Console.ResetColor();
-                    success = true;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Write($"? WM_GETTEXT=\"{wmText}\"");
-                    if (uiaName != null) Console.Write($" UIA=\"{uiaName}\"");
-                    Console.WriteLine($" (expected \"{text}\")");
-                    Console.ResetColor();
-                    // If UIA shows something different from before, it might have worked
-                    if (!string.IsNullOrEmpty(uiaName) && uiaName != currentText)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"  → UIA changed: \"{currentText}\" → \"{uiaName}\" (likely success!)");
-                        Console.ResetColor();
-                        success = true;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
-                Console.ResetColor();
-            }
-        }
 
         // ── Method 3: WM_SETTEXT + VK_RETURN ──
         if (!success && (methodOnly == null || methodOnly == 3))
@@ -776,6 +577,207 @@ Examples:
             }
         }
 
+        // ── Method 1: SetFocus + WM_CHAR (needs foreground, but sends chars via message) ──
+        if (!success && (methodOnly == null || methodOnly == 1))
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write("  [1] Focus+WM_CHAR: ");
+            Console.ResetColor();
+
+            try
+            {
+                // Bring parent window to foreground
+                NativeMethods.SmartSetForegroundWindow(win.Handle);
+                Thread.Sleep(200);
+
+                // AttachThreadInput to target thread → SetFocus → Detach
+                uint targetThread = NativeMethods.GetWindowThreadProcessId(targetHwnd, out _);
+                uint ourThread = NativeMethods.GetCurrentThreadId();
+                bool attached = false;
+                if (targetThread != ourThread)
+                {
+                    attached = NativeMethods.AttachThreadInput(ourThread, targetThread, true);
+                }
+                NativeMethods.SetFocus(targetHwnd);
+                Thread.Sleep(100);
+
+                // Select all existing text (EM_SETSEL 0,-1 = select all)
+                NativeMethods.SendMessageW(targetHwnd, 0x00B1 /*EM_SETSEL*/, IntPtr.Zero, (IntPtr)(-1));
+                Thread.Sleep(50);
+
+                // Delete selected text first (backspace to clear)
+                NativeMethods.SendMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)0x08 /*VK_BACK*/, IntPtr.Zero);
+                Thread.Sleep(50);
+
+                // Send each character via WM_CHAR
+                foreach (char ch in text)
+                {
+                    NativeMethods.SendMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, IntPtr.Zero);
+                    Thread.Sleep(20);
+                }
+
+                // Send Enter via WM_KEYDOWN/UP if requested (triggers RunEventCommTR in HTS)
+                if (sendEnter)
+                {
+                    Thread.Sleep(100);
+                    NativeMethods.SendMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x0D /*VK_RETURN*/, IntPtr.Zero);
+                    Thread.Sleep(50);
+                    NativeMethods.SendMessageW(targetHwnd, 0x0101 /*WM_KEYUP*/, (IntPtr)0x0D, IntPtr.Zero);
+                }
+
+                // Detach thread input
+                if (attached)
+                    NativeMethods.AttachThreadInput(ourThread, targetThread, false);
+
+                // Read back to verify
+                Thread.Sleep(200);
+                var verifySb = new StringBuilder(256);
+                var vLen = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
+                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vLen + 1), verifySb);
+                var newText = verifySb.ToString();
+
+                if (newText.Contains(text))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ \"{newText}\"");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"? \"{newText}\" (expected \"{text}\")");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"✗ {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
+        // ── Method 2: Click + Home + Shift+End + VK-based SendInput + Enter ──
+        // CMaskEdit (CWnd-based) doesn't respond to WM_CHAR/WM_SETTEXT —
+        // only real physical keyboard input works. Use Home→Shift+End to select all.
+        if (!success && (methodOnly == null || methodOnly == 2))
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write("  [2] Click+VK-Type: ");
+            Console.ResetColor();
+
+            try
+            {
+                // Click on the LEFT portion (text input area, not right-side buttons)
+                int cx = ctlRect.Left + clickXOffset;
+                int cy = ctlRect.Top + ctlRect.Height / 2;
+
+                // Activate the specific MDI child form first
+                NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
+                Thread.Sleep(200);
+
+                // Bring main window to front + click field
+                NativeMethods.SmartSetForegroundWindow(win.Handle);
+                Thread.Sleep(300);
+                MouseInput.Click(cx, cy);
+                Thread.Sleep(300);
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[click({cx},{cy})] ");
+                Console.ResetColor();
+
+                // Home key → move caret to start
+                KeyboardInput.PressKey("home");
+                Thread.Sleep(50);
+
+                // Shift+End → select all text
+                KeyboardInput.Hotkey(new[] { "shift", "end" });
+                Thread.Sleep(100);
+
+                // Type each digit (replaces selected text)
+                foreach (char ch in text)
+                {
+                    if (ch >= '0' && ch <= '9')
+                    {
+                        KeyboardInput.PressKey(ch.ToString());
+                        Thread.Sleep(40);
+                    }
+                    else if (char.IsLetter(ch))
+                    {
+                        KeyboardInput.PressKey(ch.ToString());
+                        Thread.Sleep(40);
+                    }
+                }
+                Thread.Sleep(200);
+
+                if (sendEnter)
+                {
+                    KeyboardInput.PressKey("enter");
+                    Thread.Sleep(500);
+                }
+
+                // Verify: WM_GETTEXT (may return "" for CMaskEdit/CWnd controls)
+                var verifySb = new StringBuilder(256);
+                var vLen = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
+                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vLen + 1), verifySb);
+                var wmText = verifySb.ToString();
+
+                // Also check UIA Name (CMaskEdit exposes text via UIA even when WM_GETTEXT fails)
+                string? uiaName = null;
+                try
+                {
+                    using var automation = new FlaUI.UIA3.UIA3Automation();
+                    var uiaEl = automation.FromHandle(targetHwnd);
+                    uiaName = uiaEl?.Name;
+                }
+                catch { }
+
+                // Take screenshot for visual verification
+                try
+                {
+                    using var bmp = ScreenCapture.CaptureWindow(win.Handle);
+                    var ssPath = Path.Combine(DataDir, "logs", $"input_verify_{DateTime.Now:HHmmss}.png");
+                    bmp.Save(ssPath);
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($"[screenshot: {Path.GetFileName(ssPath)}] ");
+                    Console.ResetColor();
+                }
+                catch { }
+
+                var checkText = !string.IsNullOrEmpty(wmText) ? wmText : uiaName ?? "";
+                if (checkText.Contains(text))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ \"{checkText}\" (via {(!string.IsNullOrEmpty(wmText) ? "WM_GETTEXT" : "UIA")})");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write($"? WM_GETTEXT=\"{wmText}\"");
+                    if (uiaName != null) Console.Write($" UIA=\"{uiaName}\"");
+                    Console.WriteLine($" (expected \"{text}\")");
+                    Console.ResetColor();
+                    // If UIA shows something different from before, it might have worked
+                    if (!string.IsNullOrEmpty(uiaName) && uiaName != currentText)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"  → UIA changed: \"{currentText}\" → \"{uiaName}\" (likely success!)");
+                        Console.ResetColor();
+                        success = true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"✗ {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
         // Summary
         Console.WriteLine();
         if (success)
@@ -839,3 +841,4 @@ Examples:
         return 0;
     }
 }
+
