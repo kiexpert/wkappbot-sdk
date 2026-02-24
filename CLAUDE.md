@@ -38,6 +38,12 @@
   - Ctrl+C graceful 종료
   - 자기 프로세스 pid 로그는 자동 제외(에코 폭주 방지)
   - 추천 예시: `wkappbot logcat "*.txt;*.jsonl" "A11Y|ACT|FALLBACK|EYE_PLAN"`
+
+- A11Y 액션 실패 자동 누적 (경험 DB)
+  - 대상 명령 실패 시 자동 발동: `input`, `click`, `do`, `inspect`, `dialog-click`
+  - 자동 실행: snapshot + experience current(0~9 ring) + 50% blend
+  - 경험 폴더 기록: `experience/<process>/<class>/a11y_fail.jsonl`
+  - 콘솔 안내: `[A11Y] 경험 기록 저장: <path>`
 - 파일 읽기 원칙(DoS/락 방지):
   - `FileShare.ReadWrite | FileShare.Delete`
   - 필요한 tail만 읽고 즉시 닫기

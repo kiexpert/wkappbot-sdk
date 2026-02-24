@@ -168,6 +168,8 @@ internal partial class Program
                                 SnapshotCommand(new[] { winTitle, "--tag", $"a11y_fail_{command}", "--depth", "2", "--cid", cidArg });
                             else
                                 SnapshotCommand(new[] { winTitle, "--tag", $"a11y_fail_{command}", "--depth", "2" });
+
+                            WriteA11yFailExperienceRecord(winTitle, command, cidArg, "action-failed", "(none)", "(none)", "(none)");
                         }
                     }
                 }
@@ -397,6 +399,51 @@ internal partial class Program
     }
 
     // ── run ────────────────────────────────────────────────────
+
+    static void WriteA11yFailExperienceRecord(string windowTitle, string command, string cidArg, string reason, string text, string role, string action)
+    {
+        try
+        {
+            var windows = WKAppBot.Win32.Window.WindowFinder.FindByTitle(windowTitle);
+            if (windows.Count == 0) return;
+            var win = windows[0];
+
+            WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(win.Handle, out uint pid);
+            var procName = "unknown";
+            try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+
+            var expDir = Path.Combine(DataDir, "experience", SanitizePathTokenForExp(procName), SanitizePathTokenForExp(win.ClassName));
+            Directory.CreateDirectory(expDir);
+            var logPath = Path.Combine(expDir, "a11y_fail.jsonl");
+
+            int? cid = int.TryParse(cidArg, out var c) ? c : null;
+            var rec = new
+            {
+                ts = DateTime.Now.ToString("O"),
+                cmd = command,
+                window = win.Title,
+                @class = win.ClassName,
+                pid,
+                cid,
+                reason,
+                text,
+                role,
+                action
+            };
+
+            File.AppendAllText(logPath, JsonSerializer.Serialize(rec) + Environment.NewLine, Encoding.UTF8);
+            Console.WriteLine($"[A11Y] 경험 기록 저장: {logPath}");
+        }
+        catch { }
+    }
+
+    static string SanitizePathTokenForExp(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "unknown";
+        var invalid = Path.GetInvalidFileNameChars();
+        var chars = s.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray();
+        return new string(chars);
+    }
 
     static int RunCommand(string[] args)
     {
