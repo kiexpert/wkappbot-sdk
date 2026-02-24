@@ -21,6 +21,23 @@
 - 최근 생각(source of truth): OpenClaw sessions jsonl.
   - assistant 우선, user fallback
   - 노이즈 필터: `NO_REPLY`, `send ㄱㄱ`, `telegram send ㄱㄱ`, `ㄱㄱ`
+- 계획(목차) 출력 규칙 (Eye parser friendly):
+  - 응답 상단에 가능하면 아래 포맷 사용
+    - `[KRO_PLAN_BEGIN]`
+    - `PLAN: <짧은 제목>`
+    - `- <항목1>`
+    - `- <항목2>`
+    - `- <항목3>`
+    - `[KRO_PLAN_END]`
+  - EyeTick은 위 블록을 우선 추출하며, 최신 플랜 블록이 나오면 이전 플랜과 혼합하지 않고 교체
+
+- logcat 명령 (실시간 로그 추적)
+  - `wkappbot logcat <fileFilter> <messageFilter>`
+  - fileFilter: 세미콜론 다중 와일드카드 지원 (예: `*.txt;*.jsonl`)
+  - messageFilter: 정규식 패턴 (예: `A11Y|ACT|FALLBACK|EYE_PLAN`)
+  - Ctrl+C graceful 종료
+  - 자기 프로세스 pid 로그는 자동 제외(에코 폭주 방지)
+  - 추천 예시: `wkappbot logcat "*.txt;*.jsonl" "A11Y|ACT|FALLBACK|EYE_PLAN"`
 - 파일 읽기 원칙(DoS/락 방지):
   - `FileShare.ReadWrite | FileShare.Delete`
   - 필요한 tail만 읽고 즉시 닫기

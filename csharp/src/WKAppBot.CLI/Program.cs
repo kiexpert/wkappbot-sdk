@@ -84,7 +84,7 @@ internal partial class Program
             // Auto-launch AppBotEye for all commands except eye/slack/help/validate
             // 앱봇이 뭔가 하면 눈은 항상 떠있어야!
             var noEyeCommands = new HashSet<string> {
-                "eye", "slack", "help", "--help", "-h", "validate", "win-move"
+                "eye", "slack", "help", "--help", "-h", "validate", "win-move", "logcat"
             };
             if (!noEyeCommands.Contains(command))
             {
@@ -92,6 +92,7 @@ internal partial class Program
             }
 
             try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
+            try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
 
             exitCode = command switch
             {
@@ -123,6 +124,7 @@ internal partial class Program
                 "snapshot" => SnapshotCommand(restArgs),
                 "screen" => ScreenCommand(restArgs),
                 "win-move" => WindowMoveCommand(restArgs),
+                "logcat" => LogcatCommand(restArgs),
                 "kiwoom" => KiwoomCommand(restArgs),
                 "com" => ComCommand(restArgs),
                 "telegram" => TelegramCommand(restArgs),
@@ -130,6 +132,12 @@ internal partial class Program
                 _ => Error($"Unknown command: {command}")
             };
 
+            try
+            {
+                if (exitCode == 0) Console.WriteLine($"[ACT] result=ok cmd={command}");
+                else Console.WriteLine($"[FALLBACK] result=fail code={exitCode} cmd={command}");
+            }
+            catch { }
             return exitCode;
         }
         catch (Exception ex)

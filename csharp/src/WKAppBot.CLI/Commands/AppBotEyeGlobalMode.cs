@@ -43,6 +43,12 @@ internal partial class Program
     static string _lastEyeTickFile = "";
     static int _lastEyeTickLineIndex = -1;
 
+    static string _lastPlanSessionFile = "";
+    static int _lastPlanLineIndex = -1;
+    static long _lastPlanSessionLength = -1;
+    static DateTime _lastPlanSessionWriteUtc = DateTime.MinValue;
+    static List<string> _lastPlanItemsCache = new();
+
     static EyeTick? _cachedLatestTick;
     static string _cachedPromptPreview = "";
     static List<EyeParentCard> _cachedCards = new();
@@ -276,6 +282,15 @@ internal partial class Program
             if (!string.IsNullOrWhiteSpace(prompt))
                 Console.WriteLine($"[EYE_TICK] recent={prompt}");
 
+            var plans = ExtractRecentPlanItems(maxItems: 3);
+            if (plans.Count > 0)
+            {
+                for (int i = 0; i < plans.Count; i++)
+                    Console.WriteLine($"[EYE_PLAN] —:— {plans[i]}");
+                if (_lastPlanItemsCache.Count > plans.Count)
+                    Console.WriteLine($"[EYE_PLAN] —:— 그 외 {_lastPlanItemsCache.Count - plans.Count}건...");
+            }
+
             var execIdle = (DateTime.UtcNow - _lastTickActivityUtc).TotalSeconds;
             var aiIdle = (DateTime.UtcNow - _lastAiActivityUtc).TotalSeconds;
             var cooldown = _lastAutoGogoUtc == DateTime.MinValue ? 9999 : (DateTime.UtcNow - _lastAutoGogoUtc).TotalSeconds;
@@ -300,6 +315,12 @@ internal partial class Program
     static string BuildEyeSummary(List<EyeParentCard> cards, EyeTick? latest, string prompt)
     {
         var sb = new StringBuilder();
+
+        var (a11y, act, fallback) = ReadLatestActionTriplet();
+        if (!string.IsNullOrWhiteSpace(a11y)) sb.AppendLine($"엑빌: {a11y}");
+        if (!string.IsNullOrWhiteSpace(act)) sb.AppendLine($"액션: {act}");
+        if (!string.IsNullOrWhiteSpace(fallback)) sb.AppendLine($"폴백: {fallback}");
+
         if (!string.IsNullOrWhiteSpace(prompt))
             sb.AppendLine($"최근 생각: {prompt}");
 
@@ -309,6 +330,16 @@ internal partial class Program
             sb.AppendLine($"크로 진행: {progress}");
             sb.AppendLine($"크로 완료: {done}");
             sb.AppendLine($"크로 예정: {next}");
+
+            var plans = ExtractRecentPlanItems(maxItems: 3);
+            if (plans.Count > 0)
+            {
+                for (int i = 0; i < plans.Count; i++)
+                    sb.AppendLine($"- —:— {plans[i]}");
+                if (_lastPlanItemsCache.Count > plans.Count)
+                    sb.AppendLine($"- —:— 그 외 {_lastPlanItemsCache.Count - plans.Count}건...");
+            }
+
             if (!string.IsNullOrWhiteSpace(block))
                 sb.AppendLine($"크로 이슈: {block}");
             sb.AppendLine("----");
@@ -535,6 +566,165 @@ internal partial class Program
         if (t.Equals("ㄱㄱ", StringComparison.OrdinalIgnoreCase)) return "";
         if (t.Length > 160) t = t[..160] + "...";
         return t;
+    }
+
+    static string CompressPlanTitle(string s, int maxLen = 34)
+    {
+        var t = s.Replace("\r", " ").Replace("\n", " ").Trim();
+        if (t.Length > maxLen) t = t[..maxLen] + "...";
+        return t;
+    }
+
+    static List<string> ExtractPlanOutlineItems(string text, int maxItems)
+    {
+        var items = new List<string>();
+        if (string.IsNullOrWhiteSpace(text)) return items;
+
+        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                        .Select(x => x.Trim())
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .ToList();
+
+        bool inBlock = false;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var ln = lines[i];
+            if (ln.Equals("[KRO_PLAN_BEGIN]", StringComparison.OrdinalIgnoreCase)) { inBlock = true; continue; }
+            if (ln.Equals("[KRO_PLAN_END]", StringComparison.OrdinalIgnoreCase)) break;
+
+            if (ln.StartsWith("PLAN:", StringComparison.OrdinalIgnoreCase))
+            {
+                var head = ln[5..].Trim();
+                if (!string.IsNullOrWhiteSpace(head))
+                {
+                    // support single-line style: PLAN: title - item1 - item2 ...
+                    var parts = head.Split(" - ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    if (parts.Length > 0)
+                    {
+                        items.Add(CompressPlanTitle(parts[0]));
+                        for (int p = 1; p < parts.Length && items.Count < maxItems; p++)
+                            items.Add(CompressPlanTitle(parts[p]));
+                    }
+                    else
+                    {
+                        items.Add(CompressPlanTitle(head));
+                    }
+                }
+                inBlock = true;
+                continue;
+            }
+
+            if (inBlock && (ln.StartsWith("-") || ln.StartsWith("•") || ln.StartsWith("1)") || ln.StartsWith("2)") || ln.StartsWith("3)")))
+            {
+                var body = ln.TrimStart('-', '•', ' ').Trim();
+                if (!string.IsNullOrWhiteSpace(body)) items.Add(CompressPlanTitle(body));
+                if (items.Count >= maxItems) break;
+            }
+        }
+
+        return items.Take(maxItems).ToList();
+    }
+
+    static List<string> ExtractRecentPlanItems(int maxItems = 3)
+    {
+        try
+        {
+            var sessionsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "agents", "main", "sessions");
+            if (!Directory.Exists(sessionsDir)) return new List<string>();
+
+            var latestFile = Directory.GetFiles(sessionsDir, "*.jsonl")
+                .OrderByDescending(p => File.GetLastWriteTimeUtc(p))
+                .FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(latestFile)) return new List<string>();
+
+            var fi = new FileInfo(latestFile);
+            if (latestFile == _lastPlanSessionFile && fi.Length == _lastPlanSessionLength && fi.LastWriteTimeUtc == _lastPlanSessionWriteUtc)
+                return _lastPlanItemsCache.Take(maxItems).ToList();
+
+            var lines = ReadTailLinesShared(latestFile, 256 * 1024);
+            var start = latestFile == _lastPlanSessionFile ? Math.Max(0, _lastPlanLineIndex - 2) : 0;
+            if (start >= lines.Length) start = 0;
+
+            var outItems = new List<string>();
+            int foundLine = -1;
+            for (int i = lines.Length - 1; i >= start; i--)
+            {
+                var line = lines[i];
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (!line.Contains("assistant", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!TryExtractRoleAndText(line, out var role, out var text)) continue;
+                if (!string.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase)) continue;
+
+                // 1) preferred: explicit plan-format outline
+                var outline = ExtractPlanOutlineItems(text, maxItems);
+                if (outline.Count > 0)
+                {
+                    // newest valid plan block wins: do not mix with older plans
+                    outItems.Clear();
+                    foreach (var it in outline.Take(maxItems))
+                        outItems.Add(it);
+                    foundLine = i;
+                    break;
+                }
+
+                // 2) strict mode: no heuristic promotion
+                // only explicit plan-format outputs are allowed for EYE_PLAN
+                continue;
+            }
+
+            _lastPlanSessionFile = latestFile;
+            _lastPlanLineIndex = foundLine;
+            _lastPlanSessionLength = fi.Length;
+            _lastPlanSessionWriteUtc = fi.LastWriteTimeUtc;
+            _lastPlanItemsCache = outItems;
+
+            return outItems.Take(maxItems).ToList();
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+
+    static (string a11y, string act, string fallback) ReadLatestActionTriplet()
+    {
+        try
+        {
+            var logDir = Path.Combine(DataDir, "logs");
+            if (!Directory.Exists(logDir)) return ("", "", "");
+
+            var files = Directory.GetFiles(logDir, "*.txt", SearchOption.TopDirectoryOnly)
+                .Where(p => !Path.GetFileName(p).Contains(".eye."))
+                .OrderByDescending(p => File.GetLastWriteTimeUtc(p))
+                .Take(3)
+                .ToList();
+
+            string a11y = "", act = "", fallback = "";
+            foreach (var f in files)
+            {
+                var lines = ReadTailLinesShared(f, 32 * 1024);
+                for (int i = lines.Length - 1; i >= 0; i--)
+                {
+                    var ln = lines[i].Trim();
+                    if (string.IsNullOrWhiteSpace(a11y) && ln.StartsWith("[A11Y]")) a11y = ln[6..].Trim();
+                    if (string.IsNullOrWhiteSpace(act) && ln.StartsWith("[ACT]")) act = ln[5..].Trim();
+                    if (string.IsNullOrWhiteSpace(fallback) && ln.StartsWith("[FALLBACK]")) fallback = ln[10..].Trim();
+                    if (!string.IsNullOrWhiteSpace(a11y) && !string.IsNullOrWhiteSpace(act) && !string.IsNullOrWhiteSpace(fallback))
+                        break;
+                }
+                if (!string.IsNullOrWhiteSpace(a11y) && !string.IsNullOrWhiteSpace(act) && !string.IsNullOrWhiteSpace(fallback))
+                    break;
+            }
+
+            a11y = CompressPlanTitle(a11y, 46);
+            act = CompressPlanTitle(act, 46);
+            fallback = CompressPlanTitle(fallback, 46);
+            return (a11y, act, fallback);
+        }
+        catch
+        {
+            return ("", "", "");
+        }
     }
 
     static string[] ReadTailLinesShared(string path, int tailBytes)

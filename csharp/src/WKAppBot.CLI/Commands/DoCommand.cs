@@ -129,6 +129,7 @@ Examples:
             return 1;
         }
         Console.WriteLine($"Form: [{targetForm.FormId}] {targetForm.FormName}");
+        Console.WriteLine($"[A11Y] form={targetForm.FormId} name='{targetForm.FormName}' role=MDIForm");
         Console.WriteLine();
 
         // Find the target button (with blocker retry loop)
