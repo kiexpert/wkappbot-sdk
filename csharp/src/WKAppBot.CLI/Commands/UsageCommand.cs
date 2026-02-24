@@ -131,6 +131,7 @@ Utility Commands:
       Stream changed logs until Ctrl+C (fileFilter supports ';' wildcards).
       Example: wkappbot logcat ""*.txt;*.jsonl"" ""A11Y|ACT|FALLBACK|EYE_PLAN""
   input <window-title> <text>      Type text into a window.
+  kro-trial-YYYYMMDD               Special: check InputProbe backup + run trial probe.
 
 COM Commands (session per current folder):
   com ls                           List available COM profiles/adapters.

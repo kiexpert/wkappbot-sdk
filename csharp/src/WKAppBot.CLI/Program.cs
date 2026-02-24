@@ -129,6 +129,7 @@ internal partial class Program
                 "com" => ComCommand(restArgs),
                 "telegram" => TelegramCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
+                _ when command.StartsWith("kro-trial-", StringComparison.OrdinalIgnoreCase) => KroTrialSpecialCommand(command, restArgs),
                 _ => Error($"Unknown command: {command}")
             };
 
