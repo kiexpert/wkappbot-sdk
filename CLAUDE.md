@@ -10,8 +10,25 @@
 
 ### 앱봇의 눈 (AppBotEye)
 - **항상 떠있어야 함**: 모든 CLI 명령 실행 시 AppBotEye 자동 spawn
-- `eye`, `slack`, `help`, `validate` 제외하고 모든 명령에서 자동 실행
+- `eye`, `slack`, `help`, `validate`, `win-move` 제외하고 자동 실행 (`win-move`는 중복 Eye 생성 방지 예외)
 - AppBotEye = Slack 데몬 통합 → 별도 `slack listen` 불필요
+
+### 2026-02-24 EyeTick 복구/운영 메모 (중요)
+- `wkappbot eye tick`은 반드시 **one-shot 진단 명령**이어야 함 (글로벌 루프 진입 금지).
+- Eye 루프 정책:
+  - 0.1초 주기: 고속 dirty-check (eye_ticks + sessions 최신 파일 size/mtime)
+  - 1초 주기: dirty와 무관하게 full-load 1회 (누락 복구)
+- 최근 생각(source of truth): OpenClaw sessions jsonl.
+  - assistant 우선, user fallback
+  - 노이즈 필터: `NO_REPLY`, `send ㄱㄱ`, `telegram send ㄱㄱ`, `ㄱㄱ`
+- 파일 읽기 원칙(DoS/락 방지):
+  - `FileShare.ReadWrite | FileShare.Delete`
+  - 필요한 tail만 읽고 즉시 닫기
+  - 원본 진단 시에는 먼저 사본 생성 후 분석
+- EyeTick 필수 진단 출력:
+  - `[EYE_TICK]` 세분화 구간(ms)
+  - `[EYE_GUARD]` 무응답 대응 상태
+  - `[EYE_LOOP]` keepAwakeAge / promptSource / latestTickAge
 
 ### Slack + 프롬프트 전달
 - Slack 수신 메시지는 **항상** Claude 프롬프트에 전달 (옵션 없음)

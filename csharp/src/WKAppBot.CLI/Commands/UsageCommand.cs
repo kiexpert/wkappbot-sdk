@@ -125,6 +125,8 @@ Utility Commands:
   snapshot <window-title> [--tag N] [--depth N]
       One-shot diagnostic capture: UIA tree + screenshot + OCR.
   screen off [--no-check]          Turn off monitor immediately; optional skip health check.
+  win-move <window-title> [--right-top] [--x N --y N] [--margin N]
+      Move a window (default: right-top on the right-most monitor).
   input <window-title> <text>      Type text into a window.
 
 COM Commands (session per current folder):

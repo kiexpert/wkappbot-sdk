@@ -84,7 +84,7 @@ internal partial class Program
             // Auto-launch AppBotEye for all commands except eye/slack/help/validate
             // 앱봇이 뭔가 하면 눈은 항상 떠있어야!
             var noEyeCommands = new HashSet<string> {
-                "eye", "slack", "help", "--help", "-h", "validate"
+                "eye", "slack", "help", "--help", "-h", "validate", "win-move"
             };
             if (!noEyeCommands.Contains(command))
             {
@@ -122,6 +122,7 @@ internal partial class Program
                 "schedule" => ScheduleCommand(restArgs),
                 "snapshot" => SnapshotCommand(restArgs),
                 "screen" => ScreenCommand(restArgs),
+                "win-move" => WindowMoveCommand(restArgs),
                 "kiwoom" => KiwoomCommand(restArgs),
                 "com" => ComCommand(restArgs),
                 "telegram" => TelegramCommand(restArgs),

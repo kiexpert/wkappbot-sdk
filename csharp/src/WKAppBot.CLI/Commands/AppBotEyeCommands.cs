@@ -50,6 +50,10 @@ internal partial class Program
 
     static int AppBotEyeCommand(string[] args)
     {
+        // one-shot diagnostic tick (must not enter global loop)
+        if (args.Length > 0 && string.Equals(args[0], "tick", StringComparison.OrdinalIgnoreCase))
+            return EyeTickCommand(args.Skip(1).ToArray());
+
         // Parse arguments
         int port = 9222;
         int intervalMs = 100; // ~10 fps target (actual: limited by CDP screenshot speed)
