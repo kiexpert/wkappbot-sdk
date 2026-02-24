@@ -33,22 +33,45 @@ Strategies (tried in order, or specify --method):
   2: Click+Type    — physical click on field → Home+Shift+End → SendInput VK
 
 Options:
-  --cid N     Target control ID (default: 3780, the stock code field)
-  --enter     Send Enter after typing (trigger data request)
-  --method N  Use only method N (1-5)
-  --click-x N Override click X offset from control left edge (default: 30)
+  --cid N           Target control ID (default: 3780, the stock code field)
+  --enter           Send Enter after typing (trigger data request)
+  --method M        Use only one method (number or keyword)
+                    Numbers: 1..5
+                    Keywords: settext|postmsg|click-post|focus-char|click-type
+  --click-x N       Override click X offset from control left edge (default: 30)
 
 Examples:
   wkappbot input ""투혼"" 1101 ""000660"" --enter
-  wkappbot input ""투혼"" 1101 ""005930"" --cid 3780 --enter --method 5");
+  wkappbot input ""투혼"" 1101 ""005930"" --cid 3780 --enter --method 5
+  wkappbot input ""투혼"" 1101 ""005930"" --cid 3780 --enter --method settext");
 
         string title = args[0];
         string targetFormId = args[1];
         string text = args[2];
         int targetCid = int.TryParse(GetArgValue(args, "--cid"), out var cid) ? cid : 3780;
         bool sendEnter = args.Contains("--enter");
-        int? methodOnly = int.TryParse(GetArgValue(args, "--method"), out var m) ? m : null;
+        int? methodOnly = ParseMethodOption(GetArgValue(args, "--method"));
         int clickXOffset = int.TryParse(GetArgValue(args, "--click-x"), out var cx2) ? cx2 : 30;
+
+        var methodRaw = GetArgValue(args, "--method");
+        if (!string.IsNullOrWhiteSpace(methodRaw) && methodOnly == null)
+            return Error($"Invalid --method: {methodRaw} (use 1..5 or settext|postmsg|click-post|focus-char|click-type)");
+
+        static int? ParseMethodOption(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            if (int.TryParse(raw, out var n) && n >= 1 && n <= 5) return n;
+
+            return raw.Trim().ToLowerInvariant() switch
+            {
+                "focus-char" => 1,
+                "click-type" => 2,
+                "settext" => 3,
+                "postmsg" => 4,
+                "click-post" => 5,
+                _ => null,
+            };
+        }
 
         // Find target window
         var windows = WindowFinder.FindByTitle(title);
@@ -176,6 +199,43 @@ Examples:
         Console.ResetColor();
 
         bool success = false;
+        const bool RequireOcrForNonA11y = true;
+
+        bool ConfirmByOcrContains(string methodTag)
+        {
+            try
+            {
+                NativeMethods.GetWindowRect(targetHwnd, out var verifyRect);
+                using var formBmp = ScreenCapture.CaptureWindow(targetForm.Handle);
+                if (formBmp == null) return false;
+
+                NativeMethods.GetWindowRect(targetForm.Handle, out var formRect);
+                int rx = verifyRect.Left - formRect.Left;
+                int ry = verifyRect.Top - formRect.Top;
+                int rw = Math.Min(verifyRect.Width, formBmp.Width - rx);
+                int rh = Math.Min(verifyRect.Height, formBmp.Height - ry);
+                if (rx < 0 || ry < 0 || rw <= 0 || rh <= 0) return false;
+
+                using var cropBmp = ScreenCapture.CropRegion(formBmp, rx, ry, rw, rh);
+                var ssPath = Path.Combine(DataDir, "logs", $"input_{methodTag}_ocr_{DateTime.Now:HHmmss}.png");
+                cropBmp.Save(ssPath);
+                var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
+                var ocrResult = ocr.RecognizeAll(cropBmp).GetAwaiter().GetResult();
+                var ocrText = ocrResult.FullText?.Trim() ?? "";
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[ocr:{ocrText}] ");
+                Console.ResetColor();
+                return !string.IsNullOrEmpty(ocrText) && ocrText.Contains(text);
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[ocr-err:{ex.Message}] ");
+                Console.ResetColor();
+                return false;
+            }
+        }
 
         // ── Method 3: WM_SETTEXT + VK_RETURN ──
         if (!success && (methodOnly == null || methodOnly == 3))
@@ -400,7 +460,7 @@ Examples:
                     Console.ResetColor();
                     success = true;
                 }
-                else if (!string.IsNullOrEmpty(wmText) && wmText.Contains(text))
+                else if (!RequireOcrForNonA11y && !string.IsNullOrEmpty(wmText) && wmText.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine($"✓ WM_GETTEXT confirmed \"{text}\"");
@@ -555,7 +615,7 @@ Examples:
                     Console.ResetColor();
                     success = true;
                 }
-                else if (!string.IsNullOrEmpty(wmText5) && wmText5.Contains(text))
+                else if (!RequireOcrForNonA11y && !string.IsNullOrEmpty(wmText5) && wmText5.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine($"✓ WM_GETTEXT confirmed \"{text}\"");
@@ -638,10 +698,20 @@ Examples:
 
                 if (newText.Contains(text))
                 {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ \"{newText}\"");
-                    Console.ResetColor();
-                    success = true;
+                    var ocrOk = !RequireOcrForNonA11y || ConfirmByOcrContains("m1");
+                    if (ocrOk)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"✓ \"{newText}\" (+OCR)");
+                        Console.ResetColor();
+                        success = true;
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("? text ok but OCR mismatch");
+                        Console.ResetColor();
+                    }
                 }
                 else
                 {
@@ -748,10 +818,20 @@ Examples:
                 var checkText = !string.IsNullOrEmpty(wmText) ? wmText : uiaName ?? "";
                 if (checkText.Contains(text))
                 {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ \"{checkText}\" (via {(!string.IsNullOrEmpty(wmText) ? "WM_GETTEXT" : "UIA")})");
-                    Console.ResetColor();
-                    success = true;
+                    var ocrOk = !RequireOcrForNonA11y || ConfirmByOcrContains("m2");
+                    if (ocrOk)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"✓ \"{checkText}\" (via {(!string.IsNullOrEmpty(wmText) ? "WM_GETTEXT" : "UIA")} +OCR)");
+                        Console.ResetColor();
+                        success = true;
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("? text ok but OCR mismatch");
+                        Console.ResetColor();
+                    }
                 }
                 else
                 {
@@ -760,14 +840,6 @@ Examples:
                     if (uiaName != null) Console.Write($" UIA=\"{uiaName}\"");
                     Console.WriteLine($" (expected \"{text}\")");
                     Console.ResetColor();
-                    // If UIA shows something different from before, it might have worked
-                    if (!string.IsNullOrEmpty(uiaName) && uiaName != currentText)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"  → UIA changed: \"{currentText}\" → \"{uiaName}\" (likely success!)");
-                        Console.ResetColor();
-                        success = true;
-                    }
                 }
             }
             catch (Exception ex)
