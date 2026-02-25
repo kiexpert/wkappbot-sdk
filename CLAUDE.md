@@ -128,6 +128,7 @@ W:/GitHub/WKAppBot/
 │   └── src/
 │       ├── WKAppBot.CLI/              # CLI 진입점 (run/validate/inspect/focus/watch/capture/hts-stress)
 │       │   ├── Program.cs
+│       │   ├── InputZoomOverlay.cs    # [ZOOM] 돋보기 중계방송 — 3모드 적응형 오버레이 (Magnifier/HighlightBox/Relay)
 │       │   └── TooltipProbe.cs        # tooltip 윈도우 진단 (EnumWindows + PrintWindow + OCR)
 │       ├── WKAppBot.Core/             # 핵심 로직
 │       │   ├── Runner/
@@ -230,7 +231,8 @@ wkappbot slack <subcommand>           # Slack Socket Mode 양방향 메시징
 wkappbot knowhow <subcommand>        # 컨트롤별 자동화 노하우 기록/읽기
 wkappbot eye [--port N] [--interval N] [--size WxH] [--pos X,Y]  # WK AppBot Eye (Slack+Prompt 항상 ON)
 wkappbot eye --app "투혼" [--interval N] [--size WxH] [--pos X,Y]  # 앱봇의 눈 (일반 앱 UIA 추적 모드)
-wkappbot input <window-title> <form-id> <text> [--cid N] [--enter] [--method N]  # MFC 에디트 입력 (10=Focusless!)
+wkappbot input <window-title> <form-id> <text> [--cid N] [--enter] [--method N] [--no-zoom]  # MFC 에디트 입력 (돋보기 기본 ON)
+wkappbot zoom-demo <window-title> [text]   # 돋보기 데모 — 아무 앱에서 적응형 줌 테스트
 wkappbot schedule <subcommand>       # 스케줄 관리 (자동 복구, 예약 프롬프트)
 wkappbot snapshot <window-title> [--tag <name>] [--depth N]  # UIA+스크린샷+OCR 원샷 캡처
 ```
@@ -505,6 +507,7 @@ Phase 3: Timeout → 스텝 Fail
 - **[STRESS]**: HTS 스트레스 테스트 메모리 테이블 행
 - **[BLOCK]**: 방해꾼 다이얼로그 감지/처리/학습 출력
 - **[GUARD]**: InputFocusGuard 포커스 간섭 감지/복구/재시작 출력
+- **[ZOOM]**: 돋보기 중계방송 오버레이 (3x/HL/1:1 모드, 기본 ON)
 - **[TOOLTIP]**: 툴팁 캘리브레이션 프로빙/결과 출력
 
 ### 5. BackgroundWatcher Nudge/Ack 핸드셰이크
@@ -780,6 +783,14 @@ teardown:
   - Method 5: SendInput 구간만 guard, PostMessage 구간은 focusless이므로 불필요
   - Method 1: advisory 경고만 (SendMessage는 hwnd-directed)
   - `[GUARD]` 태그: 간섭 감지/복구/재시작 출력
+- **InputZoom 돋보기 완료**: 입력 자동화 시 적응형 시각 오버레이 — "돋보기 중계방송"
+  - 3모드 자동 선택: Magnifier(3x, 소형 컨트롤) / HighlightBox(테두리만, 대형+전경) / Relay(1:1, 대형+가림)
+  - WPF STA 스레드 독립 실행 (IsBackground=true, fire-and-forget 페이드아웃)
+  - WS_EX_NOACTIVATE(포커스 안뺏음) + WS_EX_TRANSPARENT(HighlightBox 클릭관통)
+  - PrintWindow 기반 실시간 캡처 (Z-order 안전, 오버레이 자기캡처 방지)
+  - 기본 ON (`--no-zoom`으로 끔), 경험DB에 zoom_input.png 자동 저장
+  - `[ZOOM]` 태그: `[ZOOM:3x]`/`[ZOOM:HL]`/`[ZOOM:1:1]` 모드별 출력
+  - `zoom-demo` 커맨드: 아무 앱에서 적응형 줌 데모 (SendInput 타이핑)
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
