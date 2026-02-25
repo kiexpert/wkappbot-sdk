@@ -47,7 +47,7 @@ Options:
                     Numbers: 1..10
                     Keywords: replacesel|settext-notify|settext|atomic|postpipe|focusless|postmsg|click-post|focus-char|click-type
   --click-x N       Override click X offset from control left edge (default: 30)
-  --zoom            Show 2x magnifier overlay on the target control during input
+  --no-zoom         Hide the adaptive zoom overlay (shown by default)
 
 Examples:
   wkappbot input ""투혼"" 1101 ""000660"" --enter
@@ -61,7 +61,7 @@ Examples:
         bool sendEnter = args.Contains("--enter");
         int? methodOnly = ParseMethodOption(GetArgValue(args, "--method"));
         int clickXOffset = int.TryParse(GetArgValue(args, "--click-x"), out var cx2) ? cx2 : 30;
-        bool showZoom = args.Contains("--zoom");
+        bool showZoom = !args.Contains("--no-zoom");
 
         var methodRaw = GetArgValue(args, "--method");
         if (!string.IsNullOrWhiteSpace(methodRaw) && methodOnly == null)
