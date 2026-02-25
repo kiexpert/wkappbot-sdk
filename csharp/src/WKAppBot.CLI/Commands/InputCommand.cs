@@ -476,29 +476,82 @@ Examples:
                 NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
                 Thread.Sleep(200);
 
-                // [ZOOM] Hook 1: Create magnifier overlay centered on control
+                // [ZOOM] Hook 1: Create adaptive overlay centered on control
+                // Adaptive mode selection:
+                //   Small control (w<200 && h<60): 3x magnifier overlay
+                //   Large control + foreground:     highlight box (cyan 3px border only)
+                //   Large control + obscured:       1:1 relay overlay (no magnification)
                 if (showZoom)
                 {
                     try
                     {
                         NativeMethods.GetWindowRect(targetHwnd, out var zCtl);
-                        // 3x control size + generous padding for header/status/border
-                        int zW = Math.Max(zCtl.Width * 3 + 40, 400);
-                        int zH = Math.Max(zCtl.Height * 3 + 80, 180);
-                        int zX = zCtl.Left + (zCtl.Width / 2) - (zW / 2);
-                        int zY = zCtl.Top + (zCtl.Height / 2) - (zH / 2);
+                        bool isSmall = zCtl.Width < 200 && zCtl.Height < 60;
+
+                        ZoomMode zoomMode;
+                        int zW, zH, zX, zY;
+
+                        if (isSmall)
+                        {
+                            // Magnifier: 3x + generous padding for header/status/border
+                            zoomMode = ZoomMode.Magnifier;
+                            zW = Math.Max(zCtl.Width * 3 + 40, 400);
+                            zH = Math.Max(zCtl.Height * 3 + 80, 180);
+                            zX = zCtl.Left + (zCtl.Width / 2) - (zW / 2);
+                            zY = zCtl.Top + (zCtl.Height / 2) - (zH / 2);
+                        }
+                        else
+                        {
+                            // Large control — check if foreground (visible) or obscured
+                            var fgHwnd = NativeMethods.GetForegroundWindow();
+                            NativeMethods.GetWindowThreadProcessId(targetHwnd, out uint zTargetPid);
+                            NativeMethods.GetWindowThreadProcessId(fgHwnd, out uint zFgPid);
+                            bool isForeground = (zFgPid == zTargetPid);
+
+                            if (isForeground)
+                            {
+                                // HighlightBox: exact control size + small padding for border
+                                zoomMode = ZoomMode.HighlightBox;
+                                int pad = 6; // 3px border on each side
+                                zW = zCtl.Width + pad;
+                                zH = zCtl.Height + pad + 20; // +20 for status tag
+                                zX = zCtl.Left - pad / 2;
+                                zY = zCtl.Top - pad / 2;
+                            }
+                            else
+                            {
+                                // Relay: 1:1 size + small header/status
+                                zoomMode = ZoomMode.Relay;
+                                zW = Math.Max(zCtl.Width + 20, 300);
+                                zH = zCtl.Height + 50; // header + status
+                                zX = zCtl.Left + (zCtl.Width / 2) - (zW / 2);
+                                zY = zCtl.Top + (zCtl.Height / 2) - (zH / 2);
+                            }
+                        }
+
                         // Clamp to screen bounds
                         if (zX < 0) zX = 0;
                         if (zY < 0) zY = 0;
 
-                        zoomHost = new InputZoomHost();
-                        zoomHost.Start(zX, zY, zW, zH);
-                        zoomHost.UpdateHeader($"[ZOOM] input_m10 \"{text}\"");
-                        Console.Write($"[ZOOM@{zX},{zY} {zW}x{zH}] ");
+                        string modeName = zoomMode switch
+                        {
+                            ZoomMode.Magnifier => "3x",
+                            ZoomMode.HighlightBox => "HL",
+                            ZoomMode.Relay => "1:1",
+                            _ => "?"
+                        };
 
-                        // Initial capture
-                        var initPng = CaptureControlPng(targetForm.Handle, targetHwnd);
-                        if (initPng != null) zoomHost.UpdateImage(initPng);
+                        zoomHost = new InputZoomHost();
+                        zoomHost.Start(zX, zY, zW, zH, zoomMode);
+                        zoomHost.UpdateHeader($"[ZOOM:{modeName}] input_m10 \"{text}\"");
+                        Console.Write($"[ZOOM:{modeName}@{zX},{zY} {zW}x{zH}] ");
+
+                        // Initial capture (Magnifier/Relay only — HighlightBox is transparent)
+                        if (zoomMode != ZoomMode.HighlightBox)
+                        {
+                            var initPng = CaptureControlPng(targetForm.Handle, targetHwnd);
+                            if (initPng != null) zoomHost.UpdateImage(initPng);
+                        }
                         zoomHost.UpdateStatus($"Ready: \"{text}\" ({text.Length} chars)");
                     }
                     catch (Exception zex)
