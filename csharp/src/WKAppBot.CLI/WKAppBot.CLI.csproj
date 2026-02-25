@@ -32,11 +32,15 @@
     <Content Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="handlers" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
-  <!-- Post-publish: copy EXE + handlers to W:\SDK\bin\ (try direct copy, fallback to .new.exe for hot-reload) -->
+  <!-- Post-publish: kill AppBotEye → copy EXE + handlers to W:\SDK\bin\ -->
   <Target Name="DeployToSdkBin" AfterTargets="Publish">
     <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
-    <!-- Try direct overwrite first (works when EXE is not running) -->
-    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot; >nul 2>&amp;1 &amp;&amp; echo [Deploy] wkappbot.exe updated || ( copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.new.exe&quot; >nul 2>&amp;1 &amp;&amp; echo [Deploy] Staged as wkappbot.new.exe — kill process and run: copy /Y wkappbot.new.exe wkappbot.exe )" IgnoreExitCode="true" />
+    <!-- Kill running AppBotEye so EXE is not locked (best-effort, ignore if not running) -->
+    <Exec Command="taskkill /IM wkappbot.exe /F >nul 2>&amp;1 || echo [Deploy] No running wkappbot to kill" IgnoreExitCode="true" />
+    <!-- Brief pause for file lock release -->
+    <Exec Command="timeout /t 1 /nobreak >nul 2>&amp;1" IgnoreExitCode="true" />
+    <!-- Copy EXE (should succeed now that process is killed) -->
+    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot; >nul 2>&amp;1 &amp;&amp; echo [Deploy] wkappbot.exe updated || ( copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.new.exe&quot; >nul 2>&amp;1 &amp;&amp; echo [Deploy] Staged as wkappbot.new.exe — manual copy needed )" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
     <_HandlersPublish Include="$(PublishDir)handlers\**\*.*" />
