@@ -128,6 +128,7 @@ internal partial class Program
                 "kiwoom" => KiwoomCommand(restArgs),
                 "com" => ComCommand(restArgs),
                 "telegram" => TelegramCommand(restArgs),
+                "zoom-demo" => ZoomDemoCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ when command.StartsWith("kro-trial-", StringComparison.OrdinalIgnoreCase) => KroTrialSpecialCommand(command, restArgs),
                 _ => Error($"Unknown command: {command}")
