@@ -545,23 +545,20 @@ Examples:
                 Console.Write($"[typed {text.Length} chars, NO focus] ");
                 Console.ResetColor();
 
-                // [ZOOM] Hook 2b: After typing, capture from DESKTOP (real screen, not PrintWindow)
-                // Shows what the control looks like on the actual screen — "중계방송 스샷"
+                // [ZOOM] Hook 2b: After typing — PrintWindow capture (Z-order safe, ignores overlay)
+                // Desktop capture would show the overlay itself → use PrintWindow for display
                 if (zoomHost?.IsAlive == true)
                 {
                     try
                     {
-                        NativeMethods.GetWindowRect(targetHwnd, out var deskRect);
-                        using var deskBmp = ScreenCapture.CaptureScreenRegion(
-                            deskRect.Left, deskRect.Top, deskRect.Width, deskRect.Height);
-                        if (deskBmp != null && !ScreenCapture.IsBlankBitmap(deskBmp))
+                        var typedPng = CaptureControlPng(targetForm.Handle, targetHwnd);
+                        if (typedPng != null)
                         {
-                            var deskPng = ScreenCapture.ToPngBytes(deskBmp);
-                            zoomHost.UpdateImage(deskPng);
+                            zoomHost.UpdateImage(typedPng);
                             zoomHost.UpdateStatus($"Typed: \"{text}\" — verifying...");
                         }
                     }
-                    catch { /* best-effort desktop capture */ }
+                    catch { /* best-effort */ }
                 }
 
                 // Step 2b: OCR verify BEFORE Enter
@@ -671,14 +668,11 @@ Examples:
                         string zoomText = zoomPass ? $"✓ PASS \"{text}\"" : $"? \"{preOcr10 ?? "?"}\"";
                         zoomHost.ShowResult(zoomPass, zoomText);
 
-                        // Final desktop screenshot — show the real screen result
+                        // Final control capture via PrintWindow (Z-order safe, ignores overlay on top)
                         try
                         {
-                            NativeMethods.GetWindowRect(targetHwnd, out var finalRect);
-                            using var finalBmp = ScreenCapture.CaptureScreenRegion(
-                                finalRect.Left, finalRect.Top, finalRect.Width, finalRect.Height);
-                            if (finalBmp != null && !ScreenCapture.IsBlankBitmap(finalBmp))
-                                zoomHost.UpdateImage(ScreenCapture.ToPngBytes(finalBmp));
+                            var finalPng = CaptureControlPng(targetForm.Handle, targetHwnd);
+                            if (finalPng != null) zoomHost.UpdateImage(finalPng);
                         }
                         catch { }
 
