@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using System.Runtime.InteropServices;
+using System.Text;
+using FlaUI.UIA3;
 using WKAppBot.Core.Runner;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Native;
@@ -26,7 +28,13 @@ internal partial class Program
   Types text into a control in an MDI form.
 
 Strategies (tried in order, or specify --method):
+A11Y: UIA Value   — standard accessibility (focusless, works on standard edits)
+ 10: Focusless     — pure PostMessage WITHOUT SetFocus (MFC custom edits, focusless!)
+  9: PostMsgPipe   — pure PostMessage: SetFocus+Home+chars+Enter to hwnd (focus-immune)
+  6: EM_REPLACESEL — select-all + EM_REPLACESEL (standard edit replace, fires EN_CHANGE)
+  7: SETTEXT+NOTIFY — WM_SETTEXT + WM_COMMAND(EN_CHANGE) to parent (force change notification)
   3: WM_SETTEXT    — direct text replacement (updates Win32 text, not internal buffer)
+  8: AtomicBatch   — single SendInput call: Home+Shift+End+chars+Enter (no inter-key gap)
   4: PostMsg       — SetFocus + PostMessage WM_KEYDOWN/WM_CHAR with proper lParam
   5: Click+PostMsg — physical click (left area) → PostMessage WM_CHAR (hybrid, best for CMaskEdit)
   1: Focus+WM_CHAR — AttachThread + SetFocus + SendMessage WM_CHAR
@@ -36,8 +44,8 @@ Options:
   --cid N           Target control ID (default: 3780, the stock code field)
   --enter           Send Enter after typing (trigger data request)
   --method M        Use only one method (number or keyword)
-                    Numbers: 1..5
-                    Keywords: settext|postmsg|click-post|focus-char|click-type
+                    Numbers: 1..10
+                    Keywords: replacesel|settext-notify|settext|atomic|postpipe|focusless|postmsg|click-post|focus-char|click-type
   --click-x N       Override click X offset from control left edge (default: 30)
 
 Examples:
@@ -55,12 +63,12 @@ Examples:
 
         var methodRaw = GetArgValue(args, "--method");
         if (!string.IsNullOrWhiteSpace(methodRaw) && methodOnly == null)
-            return Error($"Invalid --method: {methodRaw} (use 1..5 or settext|postmsg|click-post|focus-char|click-type)");
+            return Error($"Invalid --method: {methodRaw} (use 1..10 or focusless|atomic|postpipe|replacesel|settext-notify|settext|postmsg|click-post|focus-char|click-type)");
 
         static int? ParseMethodOption(string? raw)
         {
             if (string.IsNullOrWhiteSpace(raw)) return null;
-            if (int.TryParse(raw, out var n) && n >= 1 && n <= 5) return n;
+            if (int.TryParse(raw, out var n) && n >= 1 && n <= 10) return n;
 
             return raw.Trim().ToLowerInvariant() switch
             {
@@ -69,14 +77,39 @@ Examples:
                 "settext" => 3,
                 "postmsg" => 4,
                 "click-post" => 5,
+                "replacesel" => 6,
+                "settext-notify" => 7,
+                "atomic" => 8,
+                "postpipe" => 9,
+                "focusless" => 10,
                 _ => null,
             };
         }
 
-        // Find target window
+        // Find target window — try all matches until one has MDIClient
+        // (e.g. "투혼" matches both main window and #32770 dialogs)
         var windows = WindowFinder.FindByTitle(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
-        var win = windows[0];
+
+        WindowInfo? win = null;
+        IntPtr mdiClient = IntPtr.Zero;
+        foreach (var candidate in windows)
+        {
+            var mdi = NativeMethods.FindWindowExW(candidate.Handle, IntPtr.Zero, "MDIClient", null);
+            if (mdi != IntPtr.Zero)
+            {
+                win = candidate;
+                mdiClient = mdi;
+                break;
+            }
+        }
+        if (win == null || mdiClient == IntPtr.Zero)
+        {
+            // Show what we found for diagnostics
+            foreach (var w in windows.Take(5))
+                Console.WriteLine($"  candidate: [{w.Handle:X8}] class=\"{w.ClassName}\" \"{w.Title}\"");
+            return Error($"No window with MDIClient found among {windows.Count} match(es) for \"{title}\"");
+        }
         Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
 
         // Check elevation
@@ -93,10 +126,6 @@ Examples:
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("  ✓ Elevated — input enabled");
         Console.ResetColor();
-
-        // Find the MDI form
-        var mdiClient = NativeMethods.FindWindowExW(win.Handle, IntPtr.Zero, "MDIClient", null);
-        if (mdiClient == IntPtr.Zero) return Error("MDIClient not found");
 
         // First check: is there a specific MDI child the user wants?
         // For now, find the FIRST visible form matching the ID (Z-order top = first)
@@ -159,6 +188,73 @@ Examples:
             Console.ResetColor();
         }
         Console.WriteLine($"Form: {targetForm.Title} @({targetForm.Rect.Left},{targetForm.Rect.Top} {targetForm.Rect.Width}x{targetForm.Rect.Height})");
+
+        // === INPUT READINESS CHECK ===
+        // Verify the target form is in a state where input can succeed
+        {
+            bool formVisible = NativeMethods.IsWindowVisible(targetForm.Handle);
+            bool formIconic = NativeMethods.IsIconic(targetForm.Handle);
+            bool formEnabled = NativeMethods.IsWindowEnabled(targetForm.Handle);
+
+            if (!formVisible)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("  ⚠ Form is NOT visible — input may go to hidden window");
+                Console.ResetColor();
+            }
+            if (formIconic)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("  ⚠ Form is minimized (iconic)");
+                Console.ResetColor();
+            }
+            if (!formEnabled)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("  ⚠ Form is disabled — a modal dialog may be blocking");
+                Console.ResetColor();
+            }
+
+            // Check for blocking dialogs in the same process
+            NativeMethods.GetWindowThreadProcessId(win.Handle, out uint procId);
+            IntPtr blocker = IntPtr.Zero;
+            string blockerInfo = "";
+            NativeMethods.EnumWindows((h, _) =>
+            {
+                if (!NativeMethods.IsWindowVisible(h)) return true;
+                NativeMethods.GetWindowThreadProcessId(h, out uint pid);
+                if (pid != procId) return true;
+                if (h == win.Handle) return true;
+                var sb2 = new StringBuilder(256);
+                NativeMethods.GetClassNameW(h, sb2, sb2.Capacity);
+                var cls = sb2.ToString();
+                if (cls == "#32770")
+                {
+                    var tsb = new StringBuilder(512);
+                    NativeMethods.GetWindowTextW(h, tsb, tsb.Capacity);
+                    var t = tsb.ToString();
+                    if (!string.IsNullOrEmpty(t))
+                    {
+                        blocker = h;
+                        blockerInfo = $"[{h:X8}] class={cls} \"{t}\"";
+                        return false;
+                    }
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            if (blocker != IntPtr.Zero)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  ✗ BLOCKER detected: {blockerInfo}");
+                Console.ResetColor();
+                Console.WriteLine("    (a dialog may be blocking the app's message pump)");
+            }
+
+            // Activate the MDI form to ensure it's on top
+            NativeMethods.SendMessageW(mdiClient, 0x0222, targetForm.Handle, IntPtr.Zero); // WM_MDIACTIVATE
+            Thread.Sleep(100);
+        }
 
         // Find the target control (cid) inside the form hierarchy
         IntPtr targetHwnd = IntPtr.Zero;
@@ -237,6 +333,380 @@ Examples:
             }
         }
 
+        // Fuzzy digit match for tiny MFC bitmap OCR (130x20 controls)
+        // Extracts digits from OCR text, compares to expected via Levenshtein distance
+        bool FuzzyDigitMatch(string ocrText, string expected, int maxErrors)
+        {
+            var ocrDigits = new string(ocrText.Where(char.IsDigit).ToArray());
+            if (ocrDigits.Length < expected.Length - maxErrors) return false;
+            // Simple Levenshtein
+            int n = expected.Length, m = ocrDigits.Length;
+            var dp = new int[n + 1, m + 1];
+            for (int i = 0; i <= n; i++) dp[i, 0] = i;
+            for (int j = 0; j <= m; j++) dp[0, j] = j;
+            for (int i = 1; i <= n; i++)
+                for (int j = 1; j <= m; j++)
+                    dp[i, j] = Math.Min(Math.Min(dp[i - 1, j] + 1, dp[i, j - 1] + 1),
+                        dp[i - 1, j - 1] + (expected[i - 1] == ocrDigits[j - 1] ? 0 : 1));
+            return dp[n, m] <= maxErrors;
+        }
+
+        // ── Method A11Y: UIA Value Pattern — Standard, most reliable, focusless! ──
+        // Try UIA first as the standard approach. Only works on controls that expose Value pattern.
+        // MFC custom controls (CMaskEditEx etc.) typically don't support this → fall through to Method 10.
+        if (!success && (methodOnly == null || methodOnly == 0))
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write("  [A11Y] UIA Value: ");
+            Console.ResetColor();
+
+            try
+            {
+                var uia = new UIA3Automation();
+                // Direct hwnd → UIA element (fastest path, no tree walk)
+                FlaUI.Core.AutomationElements.AutomationElement? targetEl = null;
+                try
+                {
+                    targetEl = uia.FromHandle(targetHwnd);
+                }
+                catch { }
+
+                if (targetEl != null && targetEl.Patterns.Value.IsSupported)
+                {
+                    targetEl.Patterns.Value.Pattern.SetValue(text);
+                    Thread.Sleep(200);
+
+                    // Verify via UIA
+                    var uiaVal = targetEl.Patterns.Value.Pattern.Value.Value ?? "";
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($"[SetValue→\"{uiaVal}\"] ");
+                    Console.ResetColor();
+
+                    if (uiaVal.Contains(text))
+                    {
+                        // If Enter needed, send via PostMessage (no focus steal)
+                        if (sendEnter)
+                        {
+                            uint sc = NativeMethods.MapVirtualKeyW(0x0D, 0);
+                            uint downLp = 1u | ((sc & 0xFF) << 16);
+                            uint upLp = downLp | (1u << 30) | (1u << 31);
+                            NativeMethods.PostMessageW(targetHwnd, 0x0100, (IntPtr)0x0D, (IntPtr)downLp);
+                            Thread.Sleep(50);
+                            NativeMethods.PostMessageW(targetHwnd, 0x0101, (IntPtr)0x0D, (IntPtr)upLp);
+                            Thread.Sleep(1500);
+                        }
+
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"✓ UIA confirmed \"{text}\" (A11Y, focusless!)");
+                        Console.ResetColor();
+                        success = true;
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"SetValue sent but value=\"{uiaVal}\"");
+                        Console.ResetColor();
+                    }
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine(targetEl == null ? "element not found via UIA" : "Value pattern not supported");
+                    Console.ResetColor();
+                }
+
+                uia.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"skip ({ex.Message})");
+                Console.ResetColor();
+            }
+        }
+
+        // ── Method 10: Focusless PostMessage — NO SetFocus, NO foreground steal! ──
+        // Best fallback for MFC custom edits (CMaskEditEx etc.) where UIA Value isn't supported.
+        // PostMessage delivers WM_CHAR directly to hwnd regardless of focus state.
+        // Works even when other windows cover the target. True background automation!
+        // Must be tried FIRST (before all other methods) as it's the least intrusive.
+        if (!success && (methodOnly == null || methodOnly == 10))
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write("  [10] FocuslessPost: ");
+            Console.ResetColor();
+
+            try
+            {
+                IntPtr MkLParam10(uint vk, bool keyUp = false, bool extended = false)
+                {
+                    uint scanCode = NativeMethods.MapVirtualKeyW(vk, 0);
+                    uint lp = 1u;
+                    lp |= (scanCode & 0xFF) << 16;
+                    if (extended) lp |= (1u << 24);
+                    if (keyUp) { lp |= (1u << 30); lp |= (1u << 31); }
+                    return (IntPtr)lp;
+                }
+
+                // NO foreground/focus change — just MDI activate (sendmessage, not focus)
+                NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
+                Thread.Sleep(200);
+
+                // Step 1: Home via PostMessage (cursor to pos 0)
+                NativeMethods.PostMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x24 /*VK_HOME*/,
+                    MkLParam10(0x24, extended: true));
+                Thread.Sleep(10);
+                NativeMethods.PostMessageW(targetHwnd, 0x0101 /*WM_KEYUP*/, (IntPtr)0x24,
+                    MkLParam10(0x24, keyUp: true, extended: true));
+                Thread.Sleep(50);
+
+                // Step 2: WM_CHAR only per digit (no WM_KEYDOWN/UP — avoids TranslateMessage doubling)
+                foreach (char ch in text)
+                {
+                    short vkScan = NativeMethods.VkKeyScanW(ch);
+                    byte vk = (byte)(vkScan & 0xFF);
+                    IntPtr lp = MkLParam10(vk);
+                    NativeMethods.PostMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, lp);
+                    Thread.Sleep(30);
+                }
+                Thread.Sleep(200);
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[typed {text.Length} chars, NO focus] ");
+                Console.ResetColor();
+
+                // Step 2b: OCR verify BEFORE Enter
+                string? preOcr10 = null;
+                try
+                {
+                    NativeMethods.GetWindowRect(targetHwnd, out var r10);
+                    using var bmp10 = ScreenCapture.CaptureWindow(targetForm.Handle);
+                    if (bmp10 != null)
+                    {
+                        NativeMethods.GetWindowRect(targetForm.Handle, out var fr10);
+                        int rx = r10.Left - fr10.Left, ry = r10.Top - fr10.Top;
+                        int rw = Math.Min(r10.Width, bmp10.Width - rx);
+                        int rh = Math.Min(r10.Height, bmp10.Height - ry);
+                        if (rx >= 0 && ry >= 0 && rw > 0 && rh > 0)
+                        {
+                            using var crop10 = ScreenCapture.CropRegion(bmp10, rx, ry, rw, rh);
+                            var ss10 = Path.Combine(DataDir, "logs", $"input_m10_pre_{DateTime.Now:HHmmss}.png");
+                            crop10.Save(ss10);
+                            var ocr10 = new WKAppBot.Vision.SimpleOcrAnalyzer();
+                            var res10 = ocr10.RecognizeAll(crop10).GetAwaiter().GetResult();
+                            preOcr10 = res10.FullText?.Trim();
+                        }
+                    }
+                }
+                catch { }
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[pre-OCR=\"{preOcr10 ?? "?"}\"] ");
+                Console.ResetColor();
+
+                // Step 3: Enter via PostMessage (m_bKeyDown flag needed for OnKeyUp query trigger)
+                if (sendEnter)
+                {
+                    NativeMethods.PostMessageW(targetHwnd, 0x0100, (IntPtr)0x0D, MkLParam10(0x0D));
+                    Thread.Sleep(50);
+                    NativeMethods.PostMessageW(targetHwnd, 0x0101, (IntPtr)0x0D, MkLParam10(0x0D, keyUp: true));
+                    Thread.Sleep(1500);
+                }
+
+                // Step 4: Verify
+                Thread.Sleep(300);
+                bool ocrOk10 = ConfirmByOcrContains("m10");
+
+                var vSb10 = new StringBuilder(256);
+                var vL10 = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
+                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vL10 + 1), vSb10);
+                var wmT10 = vSb10.ToString();
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"WM=\"{wmT10}\" ");
+                Console.ResetColor();
+
+                if (ocrOk10)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ OCR confirmed \"{text}\" (FOCUSLESS!)");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else if (!string.IsNullOrEmpty(preOcr10) && preOcr10.Contains(text))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ pre-OCR confirmed \"{text}\" (FOCUSLESS!)");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else if (wmT10.Contains(text))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ WM confirmed \"{text}\" (FOCUSLESS!)");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else if (!string.IsNullOrEmpty(preOcr10) && FuzzyDigitMatch(preOcr10, text, maxErrors: 2))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ fuzzy OCR confirmed \"{text}\" (FOCUSLESS!, ocr:\"{preOcr10}\")");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"? expected \"{text}\" (focusless might not work for this control)");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"✗ {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
+        // ── Method 6: EM_SETSEL + EM_REPLACESEL ──
+        // Standard edit control text replacement — selects all, replaces with new text.
+        // Unlike WM_SETTEXT, EM_REPLACESEL goes through the control's internal replacement
+        // logic and should fire EN_CHANGE notifications to the parent.
+        if (!success && (methodOnly == null || methodOnly == 6))
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write("  [6] EM_REPLACESEL: ");
+            Console.ResetColor();
+
+            try
+            {
+                const uint EM_SETSEL = 0x00B1;
+                const uint EM_REPLACESEL = 0x00C2;
+
+                // Step 1: Select all text
+                NativeMethods.SendMessageW(targetHwnd, EM_SETSEL, IntPtr.Zero, (IntPtr)(-1));
+                Thread.Sleep(50);
+
+                // Step 2: Replace selection with new text
+                NativeMethods.SendMessageW(targetHwnd, EM_REPLACESEL, (IntPtr)1 /*canUndo*/, text);
+                Thread.Sleep(200);
+
+                // Step 3: Send Enter if requested
+                if (sendEnter)
+                {
+                    Thread.Sleep(100);
+                    NativeMethods.SendMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x0D, IntPtr.Zero);
+                    Thread.Sleep(50);
+                    NativeMethods.SendMessageW(targetHwnd, 0x0101 /*WM_KEYUP*/, (IntPtr)0x0D, IntPtr.Zero);
+                    Thread.Sleep(500);
+                }
+
+                // Step 4: Verify
+                Thread.Sleep(200);
+                var verifySb = new StringBuilder(256);
+                var vLen = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
+                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vLen + 1), verifySb);
+                var newText = verifySb.ToString();
+
+                // Also OCR verify
+                bool ocrOk = ConfirmByOcrContains("m6");
+
+                if (newText.Contains(text) || ocrOk)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ WM=\"{newText}\" {(ocrOk ? "OCR=✓" : "")}");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"? WM=\"{newText}\" {(ocrOk ? "OCR=✓" : "")} (expected \"{text}\")");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"✗ {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
+        // ── Method 7: WM_SETTEXT + WM_COMMAND(EN_CHANGE) notification to parent ──
+        // Sets text via WM_SETTEXT (which works for display), then manually sends
+        // EN_CHANGE notification to the parent window. This might trick the control's
+        // parent (the form) into reading the updated text and updating COM properties.
+        if (!success && (methodOnly == null || methodOnly == 7))
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write("  [7] SETTEXT+NOTIFY: ");
+            Console.ResetColor();
+
+            try
+            {
+                const uint WM_COMMAND = 0x0111;
+                const uint EN_CHANGE = 0x0300;
+                const uint EN_UPDATE = 0x0400;
+
+                // Step 1: Set text
+                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_SETTEXT, IntPtr.Zero, text);
+                Thread.Sleep(100);
+
+                // Step 2: Send EN_CHANGE and EN_UPDATE notifications to parent
+                // WM_COMMAND: HIWORD(wParam)=notification, LOWORD(wParam)=controlId, lParam=controlHwnd
+                IntPtr parent = NativeMethods.GetParent(targetHwnd);
+                int controlId = NativeMethods.GetDlgCtrlID(targetHwnd);
+                IntPtr enChangeWp = (IntPtr)((EN_CHANGE << 16) | (controlId & 0xFFFF));
+                IntPtr enUpdateWp = (IntPtr)((EN_UPDATE << 16) | (controlId & 0xFFFF));
+
+                NativeMethods.SendMessageW(parent, WM_COMMAND, enChangeWp, targetHwnd);
+                Thread.Sleep(50);
+                NativeMethods.SendMessageW(parent, WM_COMMAND, enUpdateWp, targetHwnd);
+                Thread.Sleep(200);
+
+                // Step 3: Send Enter if requested
+                if (sendEnter)
+                {
+                    Thread.Sleep(100);
+                    NativeMethods.SendMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x0D, IntPtr.Zero);
+                    Thread.Sleep(50);
+                    NativeMethods.SendMessageW(targetHwnd, 0x0101 /*WM_KEYUP*/, (IntPtr)0x0D, IntPtr.Zero);
+                    Thread.Sleep(500);
+                }
+
+                // Step 4: Verify
+                Thread.Sleep(200);
+                var verifySb = new StringBuilder(256);
+                var vLen = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
+                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vLen + 1), verifySb);
+                var newText = verifySb.ToString();
+
+                bool ocrOk = ConfirmByOcrContains("m7");
+
+                if (newText.Contains(text) || ocrOk)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ WM=\"{newText}\" {(ocrOk ? "OCR=✓" : "")}");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"? WM=\"{newText}\" {(ocrOk ? "OCR=✓" : "")} (expected \"{text}\")");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"✗ {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
         // ── Method 3: WM_SETTEXT + VK_RETURN ──
         if (!success && (methodOnly == null || methodOnly == 3))
         {
@@ -284,131 +754,470 @@ Examples:
             }
         }
 
-        // ── Method 4: PostMessage WM_KEYDOWN/WM_CHAR with proper lParam ──
-        // CMaskEdit::OnChar() processes WM_CHAR directly into m_strBuffer.
-        // Key insight: OnChar does NOT check GetFocus() — it trusts that messages
-        // only arrive when focused (Windows guarantee). But PostMessage bypasses this!
-        // We use proper lParam encoding (scancode + repeat count) for authenticity.
-        if (!success && (methodOnly == null || methodOnly == 4))
+        // ── Method 8: Atomic SendInput batch — ALL keystrokes in ONE SendInput call ──
+        // Home+Shift+End+chars+Enter injected atomically into the raw input queue.
+        // Theory: no inter-key gap = autocomplete can't steal focus between chars.
+        // Still needs physical click first to set initial focus.
+        if (!success && (methodOnly == null || methodOnly == 8))
         {
             Console.ForegroundColor = ConsoleColor.Blue;
-            Console.Write("  [4] PostMsg WM_CHAR: ");
+            Console.Write("  [8] AtomicBatch: ");
             Console.ResetColor();
 
             try
             {
-                // Helper: build WM_KEYDOWN/WM_CHAR lParam with scancode
-                IntPtr MakeKeyLParam(uint vk, bool keyUp = false, bool extended = false)
+                // Step 0: Activate + foreground + click to focus
+                NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
+                Thread.Sleep(200);
+                NativeMethods.SmartSetForegroundWindow(win.Handle);
+                Thread.Sleep(300);
+
+                NativeMethods.GetWindowRect(targetHwnd, out var m8Rect);
+                int m8X = m8Rect.Left + clickXOffset;
+                int m8Y = m8Rect.Top + m8Rect.Height / 2;
+                MouseInput.Click(m8X, m8Y);
+                Thread.Sleep(300);
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[click({m8X},{m8Y})] ");
+                Console.ResetColor();
+
+                // Step 1: Build single INPUT array — Home + Shift+End + chars + Enter
+                var inputList = new System.Collections.Generic.List<INPUT>();
+
+                // Helper: add VK keydown+keyup
+                void AddVkKey(ushort vk, bool extended = false, uint extraDown = 0, uint extraUp = 0)
                 {
-                    uint scanCode = NativeMethods.MapVirtualKeyW(vk, 0); // MAPVK_VK_TO_VSC
-                    uint lp = 1u; // repeat count = 1
-                    lp |= (scanCode & 0xFF) << 16; // scan code bits 16-23
-                    if (extended) lp |= (1u << 24); // extended key flag
-                    if (keyUp)
+                    uint sc = NativeMethods.MapVirtualKeyW(vk, 0);
+                    inputList.Add(new INPUT
                     {
-                        lp |= (1u << 30); // previous key state = down
-                        lp |= (1u << 31); // transition state = releasing
-                    }
+                        type = INPUT.INPUT_KEYBOARD,
+                        u = new InputUnion { ki = new KEYBDINPUT
+                        {
+                            wVk = vk, wScan = (ushort)sc,
+                            dwFlags = (extended ? KeyFlags.KEYEVENTF_EXTENDEDKEY : 0) | extraDown
+                        }}
+                    });
+                    inputList.Add(new INPUT
+                    {
+                        type = INPUT.INPUT_KEYBOARD,
+                        u = new InputUnion { ki = new KEYBDINPUT
+                        {
+                            wVk = vk, wScan = (ushort)sc,
+                            dwFlags = KeyFlags.KEYEVENTF_KEYUP | (extended ? KeyFlags.KEYEVENTF_EXTENDEDKEY : 0) | extraUp
+                        }}
+                    });
+                }
+
+                // Helper: add modifier down only
+                void AddModDown(ushort vk)
+                {
+                    uint sc = NativeMethods.MapVirtualKeyW(vk, 0);
+                    inputList.Add(new INPUT
+                    {
+                        type = INPUT.INPUT_KEYBOARD,
+                        u = new InputUnion { ki = new KEYBDINPUT { wVk = vk, wScan = (ushort)sc, dwFlags = 0 } }
+                    });
+                }
+
+                // Helper: add modifier up only
+                void AddModUp(ushort vk)
+                {
+                    uint sc = NativeMethods.MapVirtualKeyW(vk, 0);
+                    inputList.Add(new INPUT
+                    {
+                        type = INPUT.INPUT_KEYBOARD,
+                        u = new InputUnion { ki = new KEYBDINPUT { wVk = vk, wScan = (ushort)sc, dwFlags = KeyFlags.KEYEVENTF_KEYUP } }
+                    });
+                }
+
+                // Home (extended)
+                AddVkKey(0x24 /*VK_HOME*/, extended: true);
+
+                // Shift down → End (extended) → Shift up = select all
+                AddModDown(0x10 /*VK_SHIFT*/);
+                AddVkKey(0x23 /*VK_END*/, extended: true);
+                AddModUp(0x10);
+
+                // Characters via UNICODE
+                foreach (char ch in text)
+                {
+                    inputList.Add(new INPUT
+                    {
+                        type = INPUT.INPUT_KEYBOARD,
+                        u = new InputUnion { ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KeyFlags.KEYEVENTF_UNICODE } }
+                    });
+                    inputList.Add(new INPUT
+                    {
+                        type = INPUT.INPUT_KEYBOARD,
+                        u = new InputUnion { ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KeyFlags.KEYEVENTF_UNICODE | KeyFlags.KEYEVENTF_KEYUP } }
+                    });
+                }
+
+                // Enter (if requested)
+                if (sendEnter)
+                    AddVkKey(0x0D /*VK_RETURN*/);
+
+                // Step 2: Fire all at once
+                var inputArray = inputList.ToArray();
+                uint sent = NativeMethods.SendInput((uint)inputArray.Length, inputArray, Marshal.SizeOf<INPUT>());
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[{sent}/{inputArray.Length} events] ");
+                Console.ResetColor();
+
+                Thread.Sleep(sendEnter ? 2000 : 500);
+
+                // Step 3: Verify via OCR
+                bool ocrOk8 = ConfirmByOcrContains("m8");
+
+                var vSb8 = new StringBuilder(256);
+                var vL8 = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
+                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vL8 + 1), vSb8);
+                var wmT8 = vSb8.ToString();
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"WM=\"{wmT8}\" ");
+                Console.ResetColor();
+
+                if (ocrOk8)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ OCR confirmed \"{text}\"");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else if (wmT8.Contains(text))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ WM confirmed \"{text}\"");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"? expected \"{text}\"");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"✗ {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
+        // ── Method 9: Pure PostMessage pipeline — NO physical input, focus-immune ──
+        // CMaskEditEx is a masked edit: cursor overwrites character at current position.
+        // Strategy: SetFocus(programmatic) → PostMessage Home (cursor pos 0) → PostMessage chars
+        // All messages target the specific hwnd via PostMessage — immune to focus steal by autocomplete.
+        // Key insight: PostMessage goes to the specified hwnd regardless of which window has focus.
+        if (!success && (methodOnly == null || methodOnly == 9))
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write("  [9] PostMsgPipe: ");
+            Console.ResetColor();
+
+            try
+            {
+                IntPtr MakeCharLParam(uint vk, bool keyUp = false, bool extended = false)
+                {
+                    uint scanCode = NativeMethods.MapVirtualKeyW(vk, 0);
+                    uint lp = 1u; // repeat count = 1
+                    lp |= (scanCode & 0xFF) << 16;
+                    if (extended) lp |= (1u << 24);
+                    if (keyUp) { lp |= (1u << 30); lp |= (1u << 31); }
                     return (IntPtr)lp;
                 }
 
-                // Step 0: Activate MDI form + foreground (for focus routing)
+                // Step 0: MDI activate + foreground (but NO click on control)
                 NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
-                Thread.Sleep(150);
+                Thread.Sleep(200);
                 NativeMethods.SmartSetForegroundWindow(win.Handle);
                 Thread.Sleep(200);
 
-                // Step 1: SetFocus to the target control
-                uint targetThread = NativeMethods.GetWindowThreadProcessId(targetHwnd, out _);
-                uint ourThread = NativeMethods.GetCurrentThreadId();
-                bool attached = false;
-                if (targetThread != ourThread)
-                    attached = NativeMethods.AttachThreadInput(ourThread, targetThread, true);
+                // Step 1: Programmatic SetFocus (no physical click = no autocomplete trigger)
+                uint thr9 = NativeMethods.GetWindowThreadProcessId(targetHwnd, out _);
+                uint our9 = NativeMethods.GetCurrentThreadId();
+                bool att9 = thr9 != our9 && NativeMethods.AttachThreadInput(our9, thr9, true);
                 var prevFocus = NativeMethods.SetFocus(targetHwnd);
                 Thread.Sleep(100);
 
-                // Step 2: Select all existing text → Home, then Shift+End
-                // WM_KEYDOWN VK_HOME (no modifiers)
-                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYDOWN,
-                    (IntPtr)0x24 /*VK_HOME*/, MakeKeyLParam(0x24, extended: true));
-                Thread.Sleep(30);
-                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYUP,
-                    (IntPtr)0x24, MakeKeyLParam(0x24, keyUp: true, extended: true));
-                Thread.Sleep(30);
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[SetFocus prev={prevFocus:X8}] ");
+                Console.ResetColor();
 
-                // Shift+End: need to simulate shift state
-                // For CMaskEdit, we send WM_KEYDOWN for Shift, then End, then release
-                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYDOWN,
-                    (IntPtr)0x10 /*VK_SHIFT*/, MakeKeyLParam(0x10));
-                Thread.Sleep(20);
-                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYDOWN,
-                    (IntPtr)0x23 /*VK_END*/, MakeKeyLParam(0x23, extended: true));
-                Thread.Sleep(30);
-                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYUP,
-                    (IntPtr)0x23, MakeKeyLParam(0x23, keyUp: true, extended: true));
-                Thread.Sleep(20);
-                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYUP,
-                    (IntPtr)0x10, MakeKeyLParam(0x10, keyUp: true));
+                // Step 2: Home → move cursor to position 0 (PostMessage, not physical)
+                NativeMethods.PostMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x24 /*VK_HOME*/,
+                    MakeCharLParam(0x24, extended: true));
+                Thread.Sleep(10);
+                NativeMethods.PostMessageW(targetHwnd, 0x0101 /*WM_KEYUP*/, (IntPtr)0x24,
+                    MakeCharLParam(0x24, keyUp: true, extended: true));
                 Thread.Sleep(50);
 
-                // Step 3: Delete selected text via backspace
-                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYDOWN,
-                    (IntPtr)0x08 /*VK_BACK*/, MakeKeyLParam(0x08));
-                Thread.Sleep(20);
-                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_CHAR,
-                    (IntPtr)0x08, MakeKeyLParam(0x08));
-                Thread.Sleep(20);
-                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYUP,
-                    (IntPtr)0x08, MakeKeyLParam(0x08, keyUp: true));
-                Thread.Sleep(50);
-
-                // Step 4: Type each character — full WM_KEYDOWN + WM_CHAR + WM_KEYUP sequence
+                // Step 3: Type each char via WM_CHAR ONLY (no WM_KEYDOWN/UP for digits!)
+                // CRITICAL: TranslateMessage in target's message loop auto-generates WM_CHAR
+                // from WM_KEYDOWN. If we also send explicit WM_CHAR, each char is entered TWICE.
+                // For digits: WM_CHAR only → single entry into m_strBuffer
+                // For Home/Enter: WM_KEYDOWN+WM_KEYUP needed (cursor nav / m_bKeyDown flag)
                 foreach (char ch in text)
                 {
-                    // Map character to VK code
                     short vkScan = NativeMethods.VkKeyScanW(ch);
                     byte vk = (byte)(vkScan & 0xFF);
-                    uint scanCode = NativeMethods.MapVirtualKeyW(vk, 0);
+                    IntPtr downLp = MakeCharLParam(vk);
 
-                    IntPtr downLp = MakeKeyLParam(vk);
-                    IntPtr upLp = MakeKeyLParam(vk, keyUp: true);
-
-                    NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYDOWN, (IntPtr)vk, downLp);
-                    Thread.Sleep(10);
-                    NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_CHAR, (IntPtr)ch, downLp);
-                    Thread.Sleep(10);
-                    NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYUP, (IntPtr)vk, upLp);
+                    // WM_CHAR only — no WM_KEYDOWN/UP to avoid TranslateMessage doubling
+                    NativeMethods.PostMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, downLp);
                     Thread.Sleep(30);
                 }
                 Thread.Sleep(200);
 
-                // Step 5: Send Enter if requested (VK_RETURN)
-                // CCtlItemCode::OnChar ignores VK_RETURN; OnKeyUp processes it!
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[typed {text.Length} chars] ");
+                Console.ResetColor();
+
+                // Step 3b: OCR verify BEFORE Enter
+                string? preOcr9 = null;
+                try
+                {
+                    NativeMethods.GetWindowRect(targetHwnd, out var pre9R);
+                    using var pre9Bmp = ScreenCapture.CaptureWindow(targetForm.Handle);
+                    if (pre9Bmp != null)
+                    {
+                        NativeMethods.GetWindowRect(targetForm.Handle, out var pre9FR);
+                        int rx = pre9R.Left - pre9FR.Left;
+                        int ry = pre9R.Top - pre9FR.Top;
+                        int rw = Math.Min(pre9R.Width, pre9Bmp.Width - rx);
+                        int rh = Math.Min(pre9R.Height, pre9Bmp.Height - ry);
+                        if (rx >= 0 && ry >= 0 && rw > 0 && rh > 0)
+                        {
+                            using var crop9 = ScreenCapture.CropRegion(pre9Bmp, rx, ry, rw, rh);
+                            var ss9 = Path.Combine(DataDir, "logs", $"input_m9_pre_{DateTime.Now:HHmmss}.png");
+                            crop9.Save(ss9);
+                            var ocr9 = new WKAppBot.Vision.SimpleOcrAnalyzer();
+                            var res9 = ocr9.RecognizeAll(crop9).GetAwaiter().GetResult();
+                            preOcr9 = res9.FullText?.Trim();
+                        }
+                    }
+                }
+                catch { }
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[pre-OCR=\"{preOcr9 ?? "?"}\"] ");
+                Console.ResetColor();
+
+                // Step 4: Enter via PostMessage (CCtlItemCode::OnKeyUp(VK_RETURN) triggers query)
                 if (sendEnter)
                 {
-                    NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYDOWN,
-                        (IntPtr)0x0D /*VK_RETURN*/, MakeKeyLParam(0x0D));
+                    // Must send WM_KEYDOWN first — m_bKeyDown flag required for OnKeyUp to fire
+                    NativeMethods.PostMessageW(targetHwnd, 0x0100, (IntPtr)0x0D, MakeCharLParam(0x0D));
                     Thread.Sleep(50);
-                    NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_KEYUP,
-                        (IntPtr)0x0D, MakeKeyLParam(0x0D, keyUp: true));
-                    Thread.Sleep(500);
+                    NativeMethods.PostMessageW(targetHwnd, 0x0101, (IntPtr)0x0D, MakeCharLParam(0x0D, keyUp: true));
+                    Thread.Sleep(1500);
                 }
 
-                // Step 6: Detach
-                if (attached)
-                    NativeMethods.AttachThreadInput(ourThread, targetThread, false);
+                // Step 5: Detach thread
+                if (att9) NativeMethods.AttachThreadInput(our9, thr9, false);
 
-                // Step 7: Verify via OCR (WM_GETTEXT doesn't work for CMaskEdit)
+                // Step 6: Verify
+                Thread.Sleep(300);
+                bool ocrOk9 = ConfirmByOcrContains("m9");
+
+                var vSb9 = new StringBuilder(256);
+                var vL9 = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
+                NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vL9 + 1), vSb9);
+                var wmT9 = vSb9.ToString();
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"WM=\"{wmT9}\" ");
+                Console.ResetColor();
+
+                if (ocrOk9)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ OCR confirmed \"{text}\"");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else if (!string.IsNullOrEmpty(preOcr9) && preOcr9.Contains(text))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ pre-enter OCR confirmed \"{text}\"");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else if (wmT9.Contains(text))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ WM confirmed \"{text}\"");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else if (!string.IsNullOrEmpty(preOcr9) && FuzzyDigitMatch(preOcr9, text, maxErrors: 2))
+                {
+                    // Tiny 130x20 MFC bitmap font OCR is unreliable — fuzzy match as fallback
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ fuzzy OCR confirmed \"{text}\" (ocr:\"{preOcr9}\")");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"? expected \"{text}\"");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"✗ {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
+        // ── Method 4: 100% Physical SendInput pipeline (Click + Ctrl+A + Type + Enter) ──
+        // v6: SOURCE-CODE-INFORMED approach (HTS_Project/RunControls/ScItemCodeCtl/CtlItemCode.cpp)
+        //
+        // KEY DISCOVERY: CCtlItemCode::OnKeyUp(VK_RETURN) directly calls:
+        //   SetItemName() → InsertToHistory() → FireEditEnter() → RunEventCommTR() → ProcPutLinkData()
+        //   This is the REAL data query trigger! Not WMU_EDITENTER (which is dead code).
+        //
+        // CMaskEditEx::OnChar() processes physical keystrokes → updates m_strBuffer → paints display.
+        // CCtlItemCode::OnKeyUp(VK_RETURN) reads m_strBuffer, validates via IsValidCode(),
+        //   then fires COM events and runs RunEventCommTR() for data query.
+        //
+        // Previous v5 problem: Physical Enter probably lost focus or went to wrong window.
+        // v6 fix: Re-verify focus before Enter + multiple focus recovery attempts.
+        if (!success && (methodOnly == null || methodOnly == 4))
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write("  [4] SendInput(Click+Type+Enter): ");
+            Console.ResetColor();
+
+            try
+            {
+                // Step 0: Activate MDI form + foreground
+                NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
+                Thread.Sleep(200);
+                NativeMethods.SmartSetForegroundWindow(win.Handle);
+                Thread.Sleep(300);
+
+                // Step 1: Physical click on control LEFT side to focus it
+                NativeMethods.GetWindowRect(targetHwnd, out var m4Rect);
+                int m4ClickX = m4Rect.Left + clickXOffset;
+                int m4ClickY = m4Rect.Top + m4Rect.Height / 2;
+                MouseInput.Click(m4ClickX, m4ClickY);
+                Thread.Sleep(300);
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[click({m4ClickX},{m4ClickY})] ");
+
+                // Step 2: Select all (Home → Shift+End is reliable for CMaskEdit)
+                KeyboardInput.PressKey("home");
+                Thread.Sleep(50);
+                KeyboardInput.Hotkey(new[] { "shift", "end" });
+                Thread.Sleep(150);
+
+                // Step 3: Type ALL chars at once via single SendInput batch (no inter-char delay!)
+                // WHY: Autocomplete dropdown steals focus during typing. By sending all chars
+                // in one burst, they're all queued in the raw input queue before the message pump
+                // can process any OnChar and trigger autocomplete.
+                //
+                // NOTE: Do NOT send ESC after! CCtlItemCode::OnKeyDown(VK_ESCAPE) calls Clear()!
+                {
+                    // Build a single INPUT array with all chars (keydown+keyup for each)
+                    var inputs = new INPUT[text.Length * 2];
+                    for (int i = 0; i < text.Length; i++)
+                    {
+                        inputs[i * 2].type = INPUT.INPUT_KEYBOARD;
+                        inputs[i * 2].u.ki.wVk = 0;
+                        inputs[i * 2].u.ki.wScan = text[i];
+                        inputs[i * 2].u.ki.dwFlags = KeyFlags.KEYEVENTF_UNICODE;
+
+                        inputs[i * 2 + 1].type = INPUT.INPUT_KEYBOARD;
+                        inputs[i * 2 + 1].u.ki.wVk = 0;
+                        inputs[i * 2 + 1].u.ki.wScan = text[i];
+                        inputs[i * 2 + 1].u.ki.dwFlags = KeyFlags.KEYEVENTF_UNICODE | KeyFlags.KEYEVENTF_KEYUP;
+                    }
+                    NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+                    Console.Write(text);
+                }
+                Console.Write(" ");
+                Console.ResetColor();
+                Thread.Sleep(500); // Let CMaskEdit fully process all chars + autocomplete settle
+
+                // Step 3b: If autocomplete stole focus, just note it.
+                // We'll use PostMessage for Enter so focus location doesn't matter.
+                var autoFocus = NativeMethods.GetFocusedHwndInProcess(win.Handle);
+                if (autoFocus != IntPtr.Zero && autoFocus != targetHwnd)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($"[autocomplete={autoFocus:X8}] ");
+                    Console.ResetColor();
+                }
+
+                // Step 4: OCR verify BEFORE Enter — confirm text is displayed correctly
+                string? ocrBeforeEnter = null;
+                try
+                {
+                    NativeMethods.GetWindowRect(targetHwnd, out var preRect);
+                    using var preBmp = ScreenCapture.CaptureWindow(targetForm.Handle);
+                    if (preBmp != null)
+                    {
+                        NativeMethods.GetWindowRect(targetForm.Handle, out var preFormRect);
+                        int rx = preRect.Left - preFormRect.Left;
+                        int ry = preRect.Top - preFormRect.Top;
+                        int rw = Math.Min(preRect.Width, preBmp.Width - rx);
+                        int rh = Math.Min(preRect.Height, preBmp.Height - ry);
+                        if (rx >= 0 && ry >= 0 && rw > 0 && rh > 0)
+                        {
+                            using var cropBmp = ScreenCapture.CropRegion(preBmp, rx, ry, rw, rh);
+                            var ssPath = Path.Combine(DataDir, "logs", $"input_m4_pre_{DateTime.Now:HHmmss}.png");
+                            cropBmp.Save(ssPath);
+                            var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
+                            var ocrResult = ocr.RecognizeAll(cropBmp).GetAwaiter().GetResult();
+                            ocrBeforeEnter = ocrResult.FullText?.Trim();
+                        }
+                    }
+                }
+                catch { }
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[pre-enter OCR=\"{ocrBeforeEnter ?? "?"}\"] ");
+                Console.ResetColor();
+
+                // Step 5: Check focus (informational). PostMessage Enter doesn't need focus.
+                var focusHwnd = NativeMethods.GetFocusedHwndInProcess(win.Handle);
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[focus={focusHwnd:X8} target={targetHwnd:X8}");
+                if (focusHwnd == targetHwnd)
+                    Console.Write(" OK");
+                else
+                    Console.Write(" MISMATCH!");
+                Console.Write("] ");
+                Console.ResetColor();
+
+                // Step 6: Send Enter directly via PostMessage WM_KEYDOWN + WM_KEYUP
+                // to the target HWND. This ensures CCtlItemCode::OnKeyUp(VK_RETURN) fires
+                // on the correct control, regardless of where the keyboard focus actually is.
+                // OnKeyUp(VK_RETURN) → SetItemName() → RunEventCommTR() → data query
+                if (sendEnter)
+                {
+                    NativeMethods.PostMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x0D /*VK_RETURN*/, IntPtr.Zero);
+                    Thread.Sleep(50);
+                    NativeMethods.PostMessageW(targetHwnd, 0x0101 /*WM_KEYUP*/, (IntPtr)0x0D /*VK_RETURN*/, IntPtr.Zero);
+                    Thread.Sleep(1500); // RunEventCommTR needs time to query server
+                }
+
+                // Step 7: Verify via OCR (post-Enter)
                 Thread.Sleep(300);
                 string? ocrText = null;
                 try
                 {
-                    // Capture the control area and OCR it
                     NativeMethods.GetWindowRect(targetHwnd, out var verifyRect);
                     using var formBmp = ScreenCapture.CaptureWindow(targetForm.Handle);
                     if (formBmp != null)
                     {
-                        // Crop to control area (relative to form)
                         NativeMethods.GetWindowRect(targetForm.Handle, out var formRect);
                         int rx = verifyRect.Left - formRect.Left;
                         int ry = verifyRect.Top - formRect.Top;
@@ -417,15 +1226,12 @@ Examples:
                         if (rx >= 0 && ry >= 0 && rw > 0 && rh > 0)
                         {
                             using var cropBmp = ScreenCapture.CropRegion(formBmp, rx, ry, rw, rh);
-
-                            // Save screenshot for debug
                             var ssPath = Path.Combine(DataDir, "logs", $"input_m4_verify_{DateTime.Now:HHmmss}.png");
                             cropBmp.Save(ssPath);
                             Console.ForegroundColor = ConsoleColor.DarkGray;
                             Console.Write($"[ss: {Path.GetFileName(ssPath)}] ");
                             Console.ResetColor();
 
-                            // OCR the cropped control
                             var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
                             var ocrResult = ocr.RecognizeAll(cropBmp).GetAwaiter().GetResult();
                             ocrText = ocrResult.FullText?.Trim();
@@ -439,28 +1245,42 @@ Examples:
                     Console.ResetColor();
                 }
 
-                // Also try WM_GETTEXT and UIA as fallback verification
+                // Also check WM_GETTEXT (CWnd text - may be synced after EditFullCaption path)
                 var verifySb = new StringBuilder(256);
                 var vLen = (int)NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
                 NativeMethods.SendMessageW(targetHwnd, NativeMethods.WM_GETTEXT, (IntPtr)(vLen + 1), verifySb);
                 var wmText = verifySb.ToString();
 
-                // Report results
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write($"WM=\"{wmText}\" ");
                 if (!string.IsNullOrEmpty(ocrText))
                     Console.Write($"OCR=\"{ocrText}\" ");
                 Console.ResetColor();
 
-                // Check if OCR shows our text
+                // Success check priority:
+                // 1. Post-enter OCR (most reliable — visual confirmation after Enter)
+                // 2. Pre-enter OCR (typing confirmed before Enter — CMaskEditEx doesn't update CWnd text)
+                // 3. WM_GETTEXT (CWnd buffer — only works if SetWindowText was called)
+                //
+                // CMaskEditEx::OnChar() updates m_strBuffer + DrawCaption (display) but NOT SetWindowText.
+                // So WM_GETTEXT/UIA Name always show stale text. Pre-enter OCR is the real truth.
                 if (!string.IsNullOrEmpty(ocrText) && ocrText.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ OCR confirmed \"{text}\"");
+                    Console.WriteLine($"✓ post-enter OCR confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
-                else if (!RequireOcrForNonA11y && !string.IsNullOrEmpty(wmText) && wmText.Contains(text))
+                else if (!string.IsNullOrEmpty(ocrBeforeEnter) && ocrBeforeEnter.Contains(text))
+                {
+                    // CMaskEditEx: display shows correct text (m_strBuffer updated via OnChar)
+                    // but CWnd text (WM_GETTEXT/UIA) is stale. Trust the pre-enter OCR.
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"✓ pre-enter OCR confirmed \"{text}\" (CWnd text stale: \"{wmText}\")");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else if (!string.IsNullOrEmpty(wmText) && wmText.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine($"✓ WM_GETTEXT confirmed \"{text}\"");

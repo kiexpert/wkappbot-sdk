@@ -229,6 +229,7 @@ wkappbot slack <subcommand>           # Slack Socket Mode 양방향 메시징
 wkappbot knowhow <subcommand>        # 컨트롤별 자동화 노하우 기록/읽기
 wkappbot eye [--port N] [--interval N] [--size WxH] [--pos X,Y]  # WK AppBot Eye (Slack+Prompt 항상 ON)
 wkappbot eye --app "투혼" [--interval N] [--size WxH] [--pos X,Y]  # 앱봇의 눈 (일반 앱 UIA 추적 모드)
+wkappbot input <window-title> <form-id> <text> [--cid N] [--enter] [--method N]  # MFC 에디트 입력 (10=Focusless!)
 wkappbot schedule <subcommand>       # 스케줄 관리 (자동 복구, 예약 프롬프트)
 wkappbot snapshot <window-title> [--tag <name>] [--depth N]  # UIA+스크린샷+OCR 원샷 캡처
 ```
@@ -440,6 +441,7 @@ wkappbot hts-stress <form.xmf> [options]
 | Click (좌표) | ❌ NO | SendInput → EnsureFocus |
 | TypeText (UIA Value) | ✅ YES | `Patterns.Value.SetValue()` — 포커스 불필요! |
 | TypeText (SendInput) | ❌ NO | KeyboardInput → EnsureFocus |
+| TypeText (PostMessage WM_CHAR) | ✅ YES | MFC 커스텀 에디트(CMaskEditEx 등) — 포커스 불필요! |
 | Toggle (UIA Toggle) | ✅ YES | `TryToggle()` / `TrySetToggle()` — 포커스 불필요! |
 | Expand/Collapse (UIA) | ✅ YES | `TryExpand()` / `TryCollapse()` — 포커스 불필요! |
 | Select (UIA SelectionItem) | ✅ YES | `TrySelect()` — 포커스 불필요! |
@@ -764,6 +766,11 @@ teardown:
 - **Slack 스레드 맥락 전달 완료**: 프롬프트 전달 시 [쓰레드 시작] + [직전 메시지/클롯 응답] 맥락 포함 (GetThreadContext 연동)
 - **Slack "전달했습니다" 자동 삭제 완료**: OnSelfMessage 이벤트 + pending_acks.json 파일 IPC → 봇 응답 시 ack 메시지 자동 삭제
 - **키움 프록시봇 Phase A 완료**: 32비트 프록시 EXE + COM 호스팅 + Named Pipe 서버 + 이벤트 싱크 (KiwoomProxy)
+- **Focusless PostMessage 입력 완료**: Method 9 (PostMsgPipe) + Method 10 (Focusless) — CMaskEditEx 종목코드 입력 해결
+  - TranslateMessage WM_CHAR 이중입력 버그 발견 + 수정 (숫자키 WM_CHAR만 전송)
+  - Method 10: SetFocus 없이 순수 PostMessage만으로 완전 Focusless 입력 달성
+  - 다른 창이 가려도(Z-order 무관), 포커스 없어도 작동 — 진정한 백그라운드 자동화
+  - FuzzyDigitMatch: 130x20 MFC 비트맵 폰트 OCR 불안정 대응 (Levenshtein ≤2)
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -1267,6 +1274,19 @@ W:/SDK/bin/                          # PATH에 등록된 유틸 폴더
   - `toolbar-ocr` 커맨드: 메뉴툴바/화면툴바/쾌속주문툴바 자동 인식
 - **버튼 텍스트 3티어 폴백**: GetWindowText → WM_GETTEXT → OCR (단일 버튼이면 텍스트 불일치해도 클릭)
 - **공지/팝업 자동 닫기**: `dismiss` 커맨드 — MDI 자식 키워드 매칭 + 내용 OCR 읽기 + 중요도 분류
+
+### CMaskEditEx (투혼 종목코드 입력) — Focusless PostMessage 전략
+- **CMaskEditEx**: CWnd 기반 마스크 에디트 (NOT CEdit) — EM_SETSEL/WM_SETTEXT 무효
+- **3중 버퍼**: m_strBuffer(내부/COM) ↔ CWnd text(WM_GETTEXT, 항상 stale) ↔ Display(OnPaint)
+- **핵심 발견**: TranslateMessage가 WM_KEYDOWN에서 WM_CHAR 자동 생성 → 글자 이중 입력!
+  - 해결: 숫자키는 WM_CHAR만 전송 (WM_KEYDOWN/UP 제거)
+  - Home/Enter는 WM_KEYDOWN+WM_KEYUP 유지 (커서이동/m_bKeyDown 플래그 필요)
+- **Method 10 (Focusless PostMessage)**: SetFocus 없이 순수 PostMessage만으로 완전 백그라운드 입력
+  - PostMessage(hwnd, WM_CHAR, ch, lParam) — hwnd 직접 전달, 포커스/Z-order/Visibility 무관
+  - 다른 창이 가려도, 포커스가 다른 앱에 있어도 입력+Enter+조회 트리거 가능
+  - `wkappbot input "투혼" 1101 "000660" --cid 3780 --enter --method 10`
+- **OCR 검증**: PrintWindow 기반 (가려진 상태에서도 캡처) + FuzzyDigitMatch (Levenshtein ≤2)
+- **input 커맨드 기본 순서**: Method 10(Focusless) → 9(PostPipe) → 6(EM_REPLACESEL) → 나머지 폴백
 
 ## ChartAnalyzer — 차트 스크린샷 OHLC 추출 ("눈의 진화")
 
