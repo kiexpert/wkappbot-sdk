@@ -158,6 +158,7 @@ W:/GitHub/WKAppBot/
 │       │   └── Input/
 │       │       ├── MouseInput.cs        # SendInput 마우스 (절대좌표)
 │       │       ├── KeyboardInput.cs     # SendInput 키보드 + VK 매핑
+│       │       ├── InputFocusGuard.cs   # [GUARD] 매 키스트로크 포커스 검증 (SendInput 메서드용)
 │       │       └── ScreenCapture.cs     # 스크린샷 (PrintWindow + SWP_NOACTIVATE 폴백)
 │       ├── WKAppBot.Vision/           # Vision 계층 (OCR + Claude API + 캐시 + 차트분석)
 │       │   ├── ChartAnalyzer.cs         # 차트 스크린샷 → OHLC 추출 (3전략: body-first/column-scan/HTS-style)
@@ -503,6 +504,7 @@ Phase 3: Timeout → 스텝 Fail
 - **[VERIFY]**: SendInput 전 대상 좌표 검증 출력 (렉트/오버레이/요소 변화)
 - **[STRESS]**: HTS 스트레스 테스트 메모리 테이블 행
 - **[BLOCK]**: 방해꾼 다이얼로그 감지/처리/학습 출력
+- **[GUARD]**: InputFocusGuard 포커스 간섭 감지/복구/재시작 출력
 - **[TOOLTIP]**: 툴팁 캘리브레이션 프로빙/결과 출력
 
 ### 5. BackgroundWatcher Nudge/Ack 핸드셰이크
@@ -771,6 +773,13 @@ teardown:
   - Method 10: SetFocus 없이 순수 PostMessage만으로 완전 Focusless 입력 달성
   - 다른 창이 가려도(Z-order 무관), 포커스 없어도 작동 — 진정한 백그라운드 자동화
   - FuzzyDigitMatch: 130x20 MFC 비트맵 폰트 OCR 불안정 대응 (Levenshtein ≤2)
+- **InputFocusGuard 완료**: 매 키스트로크 포커스 검증 가드 — SendInput 메서드(1,2,4,5,8) 통합
+  - GetGUIThreadInfo 하드웨어 포커스 검증 + InterferenceType 분류 (Autocomplete/Dialog/DifferentApp/FocusDrifted/Overlay)
+  - IsChildOf/IsSiblingOf: MFC 자식/형제 윈도우 false positive 방지
+  - Method 2: per-char detect-only → 즉시 재시작, Method 4/8: pre-batch detect+recover → retry loop
+  - Method 5: SendInput 구간만 guard, PostMessage 구간은 focusless이므로 불필요
+  - Method 1: advisory 경고만 (SendMessage는 hwnd-directed)
+  - `[GUARD]` 태그: 간섭 감지/복구/재시작 출력
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -1287,6 +1296,10 @@ W:/SDK/bin/                          # PATH에 등록된 유틸 폴더
   - `wkappbot input "투혼" 1101 "000660" --cid 3780 --enter --method 10`
 - **OCR 검증**: PrintWindow 기반 (가려진 상태에서도 캡처) + FuzzyDigitMatch (Levenshtein ≤2)
 - **input 커맨드 기본 순서**: Method 10(Focusless) → 9(PostPipe) → 6(EM_REPLACESEL) → 나머지 폴백
+- **InputFocusGuard**: SendInput 메서드(1,2,4,5,8) 전용 — 매 키스트로크 포커스 검증 + 간섭 감지 + 재시작
+  - GetGUIThreadInfo → hwndFocus 확인, 간섭 시 InterferenceType 분류 (Autocomplete/Dialog/DifferentApp 등)
+  - CMaskEditEx 교훈: 클릭 시 autocomplete Edit 스폰 → SendInput(Method 2) 근본 불가, Method 10 사용
+  - `[GUARD]` 태그: 간섭 감지/복구/재시작 출력
 
 ## ChartAnalyzer — 차트 스크린샷 OHLC 추출 ("눈의 진화")
 
