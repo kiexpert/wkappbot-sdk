@@ -709,11 +709,12 @@ Examples:
                         }
                         catch { }
 
-                        zoomHost.BeginFadeOut(3000, 800); // 3s hold + 0.8s fade
-                        Thread.Sleep(4000); // wait for fade animation to complete
+                        // Fire-and-forget: overlay fades on its own STA thread
+                        // No Thread.Sleep — main thread proceeds immediately for fast successive inputs
+                        zoomHost.BeginFadeOut(3000, 800); // 3s hold + 0.8s fade → auto InvokeShutdown
+                        zoomHost = null; // hand off lifecycle to STA thread (IsBackground=true)
                     }
-                    catch { }
-                    finally { zoomHost?.Dispose(); zoomHost = null; }
+                    catch { zoomHost?.Dispose(); zoomHost = null; }
                 }
             }
             catch (Exception ex)
