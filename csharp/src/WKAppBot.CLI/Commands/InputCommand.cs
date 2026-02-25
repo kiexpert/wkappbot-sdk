@@ -47,6 +47,7 @@ Options:
                     Numbers: 1..10
                     Keywords: replacesel|settext-notify|settext|atomic|postpipe|focusless|postmsg|click-post|focus-char|click-type
   --click-x N       Override click X offset from control left edge (default: 30)
+  --zoom            Show 2x magnifier overlay on the target control during input
 
 Examples:
   wkappbot input ""투혼"" 1101 ""000660"" --enter
@@ -60,6 +61,7 @@ Examples:
         bool sendEnter = args.Contains("--enter");
         int? methodOnly = ParseMethodOption(GetArgValue(args, "--method"));
         int clickXOffset = int.TryParse(GetArgValue(args, "--click-x"), out var cx2) ? cx2 : 30;
+        bool showZoom = args.Contains("--zoom");
 
         var methodRaw = GetArgValue(args, "--method");
         if (!string.IsNullOrWhiteSpace(methodRaw) && methodOnly == null)
@@ -333,6 +335,27 @@ Examples:
             }
         }
 
+        // [ZOOM] Capture a control as PNG bytes (PrintWindow + CropRegion, Z-order safe)
+        byte[]? CaptureControlPng(IntPtr formHandle, IntPtr controlHandle)
+        {
+            try
+            {
+                NativeMethods.GetWindowRect(controlHandle, out var cr);
+                using var formBmp = ScreenCapture.CaptureWindow(formHandle);
+                if (formBmp == null || ScreenCapture.IsBlankBitmap(formBmp)) return null;
+
+                NativeMethods.GetWindowRect(formHandle, out var fr);
+                int rx = cr.Left - fr.Left, ry = cr.Top - fr.Top;
+                int rw = Math.Min(cr.Width, formBmp.Width - rx);
+                int rh = Math.Min(cr.Height, formBmp.Height - ry);
+                if (rx < 0 || ry < 0 || rw <= 0 || rh <= 0) return null;
+
+                using var crop = ScreenCapture.CropRegion(formBmp, rx, ry, rw, rh);
+                return ScreenCapture.ToPngBytes(crop);
+            }
+            catch { return null; }
+        }
+
         // Fuzzy digit match for tiny MFC bitmap OCR (130x20 controls)
         // Extracts digits from OCR text, compares to expected via Levenshtein distance
         bool FuzzyDigitMatch(string ocrText, string expected, int maxErrors)
@@ -436,6 +459,7 @@ Examples:
             Console.Write("  [10] FocuslessPost: ");
             Console.ResetColor();
 
+            InputZoomHost? zoomHost = null;
             try
             {
                 IntPtr MkLParam10(uint vk, bool keyUp = false, bool extended = false)
@@ -452,6 +476,38 @@ Examples:
                 NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
                 Thread.Sleep(200);
 
+                // [ZOOM] Hook 1: Create magnifier overlay centered on control
+                if (showZoom)
+                {
+                    try
+                    {
+                        NativeMethods.GetWindowRect(targetHwnd, out var zCtl);
+                        // 3x control size + generous padding for header/status/border
+                        int zW = Math.Max(zCtl.Width * 3 + 40, 400);
+                        int zH = Math.Max(zCtl.Height * 3 + 80, 180);
+                        int zX = zCtl.Left + (zCtl.Width / 2) - (zW / 2);
+                        int zY = zCtl.Top + (zCtl.Height / 2) - (zH / 2);
+                        // Clamp to screen bounds
+                        if (zX < 0) zX = 0;
+                        if (zY < 0) zY = 0;
+
+                        zoomHost = new InputZoomHost();
+                        zoomHost.Start(zX, zY, zW, zH);
+                        zoomHost.UpdateHeader($"[ZOOM] input_m10 \"{text}\"");
+                        Console.Write($"[ZOOM@{zX},{zY} {zW}x{zH}] ");
+
+                        // Initial capture
+                        var initPng = CaptureControlPng(targetForm.Handle, targetHwnd);
+                        if (initPng != null) zoomHost.UpdateImage(initPng);
+                        zoomHost.UpdateStatus($"Ready: \"{text}\" ({text.Length} chars)");
+                    }
+                    catch (Exception zex)
+                    {
+                        Console.Write($"[ZOOM:ERR {zex.GetType().Name}: {zex.Message}] ");
+                        zoomHost = null;
+                    }
+                }
+
                 // Step 1: Home via PostMessage (cursor to pos 0)
                 NativeMethods.PostMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x24 /*VK_HOME*/,
                     MkLParam10(0x24, extended: true));
@@ -461,19 +517,52 @@ Examples:
                 Thread.Sleep(50);
 
                 // Step 2: WM_CHAR only per digit (no WM_KEYDOWN/UP — avoids TranslateMessage doubling)
+                int charIdx10 = 0;
                 foreach (char ch in text)
                 {
                     short vkScan = NativeMethods.VkKeyScanW(ch);
                     byte vk = (byte)(vkScan & 0xFF);
                     IntPtr lp = MkLParam10(vk);
                     NativeMethods.PostMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, lp);
+                    charIdx10++;
                     Thread.Sleep(30);
+
+                    // [ZOOM] Hook 2: Update magnifier after each character
+                    if (zoomHost?.IsAlive == true)
+                    {
+                        try
+                        {
+                            var png = CaptureControlPng(targetForm.Handle, targetHwnd);
+                            if (png != null) zoomHost.UpdateImage(png);
+                            zoomHost.UpdateStatus($"Typing: {charIdx10}/{text.Length}  \"{text[..charIdx10]}\"");
+                        }
+                        catch { /* best-effort */ }
+                    }
                 }
                 Thread.Sleep(200);
 
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write($"[typed {text.Length} chars, NO focus] ");
                 Console.ResetColor();
+
+                // [ZOOM] Hook 2b: After typing, capture from DESKTOP (real screen, not PrintWindow)
+                // Shows what the control looks like on the actual screen — "중계방송 스샷"
+                if (zoomHost?.IsAlive == true)
+                {
+                    try
+                    {
+                        NativeMethods.GetWindowRect(targetHwnd, out var deskRect);
+                        using var deskBmp = ScreenCapture.CaptureScreenRegion(
+                            deskRect.Left, deskRect.Top, deskRect.Width, deskRect.Height);
+                        if (deskBmp != null && !ScreenCapture.IsBlankBitmap(deskBmp))
+                        {
+                            var deskPng = ScreenCapture.ToPngBytes(deskBmp);
+                            zoomHost.UpdateImage(deskPng);
+                            zoomHost.UpdateStatus($"Typed: \"{text}\" — verifying...");
+                        }
+                    }
+                    catch { /* best-effort desktop capture */ }
+                }
 
                 // Step 2b: OCR verify BEFORE Enter
                 string? preOcr10 = null;
@@ -495,6 +584,18 @@ Examples:
                             var ocr10 = new WKAppBot.Vision.SimpleOcrAnalyzer();
                             var res10 = ocr10.RecognizeAll(crop10).GetAwaiter().GetResult();
                             preOcr10 = res10.FullText?.Trim();
+
+                            // [ZOOM] Hook 3: Show OCR verification image
+                            if (zoomHost?.IsAlive == true)
+                            {
+                                try
+                                {
+                                    var ocrPng = ScreenCapture.ToPngBytes(crop10);
+                                    zoomHost.UpdateImage(ocrPng);
+                                    zoomHost.UpdateStatus($"OCR: \"{preOcr10 ?? "?"}\"");
+                                }
+                                catch { }
+                            }
                         }
                     }
                 }
@@ -560,9 +661,73 @@ Examples:
                     Console.WriteLine($"? expected \"{text}\" (focusless might not work for this control)");
                     Console.ResetColor();
                 }
+
+                // [ZOOM] Hook 4: Show pass/fail result + desktop screenshot + slow fade
+                if (zoomHost?.IsAlive == true)
+                {
+                    try
+                    {
+                        bool zoomPass = success;
+                        string zoomText = zoomPass ? $"✓ PASS \"{text}\"" : $"? \"{preOcr10 ?? "?"}\"";
+                        zoomHost.ShowResult(zoomPass, zoomText);
+
+                        // Final desktop screenshot — show the real screen result
+                        try
+                        {
+                            NativeMethods.GetWindowRect(targetHwnd, out var finalRect);
+                            using var finalBmp = ScreenCapture.CaptureScreenRegion(
+                                finalRect.Left, finalRect.Top, finalRect.Width, finalRect.Height);
+                            if (finalBmp != null && !ScreenCapture.IsBlankBitmap(finalBmp))
+                                zoomHost.UpdateImage(ScreenCapture.ToPngBytes(finalBmp));
+                        }
+                        catch { }
+
+                        // Save zoom overlay screenshot (from desktop — captures the overlay itself)
+                        try
+                        {
+                            NativeMethods.GetWindowRect(targetHwnd, out var zShotRect);
+                            int zShotW = Math.Max(zShotRect.Width * 3 + 40, 400);
+                            int zShotH = Math.Max(zShotRect.Height * 3 + 80, 180);
+                            int zShotX = zShotRect.Left + (zShotRect.Width / 2) - (zShotW / 2);
+                            int zShotY = zShotRect.Top + (zShotRect.Height / 2) - (zShotH / 2);
+                            if (zShotX < 0) zShotX = 0;
+                            if (zShotY < 0) zShotY = 0;
+                            Thread.Sleep(300); // brief wait for WPF to render result state
+                            using var zShotBmp = ScreenCapture.CaptureScreenRegion(zShotX, zShotY, zShotW, zShotH);
+                            // Save to logs
+                            var zShotPath = Path.Combine(DataDir, "logs", $"zoom_result_{DateTime.Now:HHmmss}.png");
+                            ScreenCapture.SaveToFile(zShotBmp, zShotPath);
+                            Console.Write($"[ZOOM:saved {zShotPath}] ");
+
+                            // Also save to ExperienceDB control folder
+                            try
+                            {
+                                // Construct exp dir: profiles/{process}_exp/form_{formId}/controls/cid_{cid}/
+                                var proc = System.Diagnostics.Process.GetProcessById(
+                                    NativeMethods.GetWindowThreadProcessId(targetHwnd, out var zPid) > 0 ? (int)zPid : 0);
+                                var expDir = Path.Combine(DataDir, "profiles", $"{proc?.ProcessName?.ToLower()}_exp",
+                                    $"form_{targetFormId}", "controls", $"cid_{targetCid}");
+                                if (!Directory.Exists(expDir)) Directory.CreateDirectory(expDir);
+                                var expPath = Path.Combine(expDir, "zoom_input.png");
+                                ScreenCapture.SaveToFile(zShotBmp, expPath);
+                            }
+                            catch { /* best-effort exp save */ }
+                        }
+                        catch { }
+
+                        zoomHost.BeginFadeOut(3000, 800); // 3s hold + 0.8s fade
+                        Thread.Sleep(4000); // wait for fade animation to complete
+                    }
+                    catch { }
+                    finally { zoomHost?.Dispose(); zoomHost = null; }
+                }
             }
             catch (Exception ex)
             {
+                // [ZOOM] Hook 5: Cleanup on error
+                zoomHost?.Dispose();
+                zoomHost = null;
+
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"✗ {ex.Message}");
                 Console.ResetColor();
