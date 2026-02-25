@@ -766,6 +766,12 @@ Examples:
 
             try
             {
+                // InputFocusGuard — pre/post batch focus verification with retry
+                var guard8 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+                bool m8InputDone = false;
+
+                while (!m8InputDone)
+                {
                 // Step 0: Activate + foreground + click to focus
                 NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
                 Thread.Sleep(200);
@@ -780,6 +786,15 @@ Examples:
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write($"[click({m8X},{m8Y})] ");
                 Console.ResetColor();
+
+                // [GUARD] Verify focus before atomic batch
+                if (!guard8.EnsureBeforeKeystroke(maxWaitMs: 2000))
+                {
+                    if (!guard8.CanRetry()) break;
+                    guard8.ClearFieldForRestart();
+                    Thread.Sleep(100);
+                    continue; // retry from click
+                }
 
                 // Step 1: Build single INPUT array — Home + Shift+End + chars + Enter
                 var inputList = new System.Collections.Generic.List<INPUT>();
@@ -863,6 +878,9 @@ Examples:
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write($"[{sent}/{inputArray.Length} events] ");
                 Console.ResetColor();
+
+                m8InputDone = true; // batch sent, exit retry loop
+                } // end while(!m8InputDone)
 
                 Thread.Sleep(sendEnter ? 2000 : 500);
 
@@ -1097,6 +1115,12 @@ Examples:
 
             try
             {
+                // InputFocusGuard — pre-batch focus verification with retry
+                var guard4 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+                bool m4InputDone = false;
+
+                while (!m4InputDone)
+                {
                 // Step 0: Activate MDI form + foreground
                 NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
                 Thread.Sleep(200);
@@ -1117,6 +1141,16 @@ Examples:
                 Thread.Sleep(50);
                 KeyboardInput.Hotkey(new[] { "shift", "end" });
                 Thread.Sleep(150);
+
+                // [GUARD] Verify focus before atomic SendInput batch
+                if (!guard4.EnsureBeforeKeystroke(maxWaitMs: 2000))
+                {
+                    Console.ResetColor();
+                    if (!guard4.CanRetry()) break;
+                    guard4.ClearFieldForRestart();
+                    Thread.Sleep(100);
+                    continue; // retry from activation
+                }
 
                 // Step 3: Type ALL chars at once via single SendInput batch (no inter-char delay!)
                 // WHY: Autocomplete dropdown steals focus during typing. By sending all chars
@@ -1144,6 +1178,10 @@ Examples:
                 }
                 Console.Write(" ");
                 Console.ResetColor();
+
+                m4InputDone = true; // batch sent, exit retry loop
+                } // end while(!m4InputDone)
+
                 Thread.Sleep(500); // Let CMaskEdit fully process all chars + autocomplete settle
 
                 // Step 3b: If autocomplete stole focus, just note it.
@@ -1323,6 +1361,12 @@ Examples:
                     return (IntPtr)lp;
                 }
 
+                // InputFocusGuard — verify focus before SendInput portion
+                var guard5 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+                bool m5InputDone = false;
+
+                while (!m5InputDone)
+                {
                 // Step 0: Activate MDI form + bring to front
                 NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
                 Thread.Sleep(200);
@@ -1340,6 +1384,15 @@ Examples:
                 Console.Write($"[click({clickX},{clickY})] ");
                 Console.ResetColor();
 
+                // [GUARD] Verify focus before SendInput selection/delete
+                if (!guard5.EnsureBeforeKeystroke(maxWaitMs: 2000))
+                {
+                    if (!guard5.CanRetry()) break;
+                    guard5.ClearFieldForRestart();
+                    Thread.Sleep(100);
+                    continue; // retry from activation
+                }
+
                 // Step 2: Select all via Ctrl+A (CMaskEdit::PreTranslateMessage handles Ctrl shortcuts)
                 // Actually use Home + Shift+End which is more reliable for CMaskEdit
                 KeyboardInput.PressKey("home");
@@ -1350,6 +1403,9 @@ Examples:
                 // Step 3: Delete selected text
                 KeyboardInput.PressKey("delete");
                 Thread.Sleep(100);
+
+                m5InputDone = true; // SendInput part done, PostMessage below is focusless
+                } // end while(!m5InputDone)
 
                 // Step 4: Now PostMessage WM_CHAR for each digit
                 // Since physical click already set focus, PostMessage should work
@@ -1466,6 +1522,9 @@ Examples:
 
             try
             {
+                // InputFocusGuard — verify focus after SetFocus
+                var guard1 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+
                 // Bring parent window to foreground
                 NativeMethods.SmartSetForegroundWindow(win.Handle);
                 Thread.Sleep(200);
@@ -1481,6 +1540,15 @@ Examples:
                 NativeMethods.SetFocus(targetHwnd);
                 Thread.Sleep(100);
 
+                // [GUARD] Verify focus after SetFocus
+                // Note: Method 1 uses SendMessage (not SendInput) for WM_CHAR, so guard is
+                // advisory — SendMessage goes to specified hwnd regardless of focus.
+                // But SetFocus failure means the control may not process input correctly.
+                if (!guard1.CheckBeforeKeystroke().Ok)
+                {
+                    Console.WriteLine("[GUARD] Warning: focus not on target after SetFocus (SendMessage may still work)");
+                }
+
                 // Select all existing text (EM_SETSEL 0,-1 = select all)
                 NativeMethods.SendMessageW(targetHwnd, 0x00B1 /*EM_SETSEL*/, IntPtr.Zero, (IntPtr)(-1));
                 Thread.Sleep(50);
@@ -1489,7 +1557,7 @@ Examples:
                 NativeMethods.SendMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)0x08 /*VK_BACK*/, IntPtr.Zero);
                 Thread.Sleep(50);
 
-                // Send each character via WM_CHAR
+                // Send each character via WM_CHAR (SendMessage — goes to specified hwnd)
                 foreach (char ch in text)
                 {
                     NativeMethods.SendMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, IntPtr.Zero);
@@ -1563,47 +1631,89 @@ Examples:
                 int cx = ctlRect.Left + clickXOffset;
                 int cy = ctlRect.Top + ctlRect.Height / 2;
 
-                // Activate the specific MDI child form first
-                NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
-                Thread.Sleep(200);
+                // InputFocusGuard — per-keystroke focus verification
+                var guard = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+                bool m2InputDone = false;
 
-                // Bring main window to front + click field
-                NativeMethods.SmartSetForegroundWindow(win.Handle);
-                Thread.Sleep(300);
-                MouseInput.Click(cx, cy);
-                Thread.Sleep(300);
-
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($"[click({cx},{cy})] ");
-                Console.ResetColor();
-
-                // Home key → move caret to start
-                KeyboardInput.PressKey("home");
-                Thread.Sleep(50);
-
-                // Shift+End → select all text
-                KeyboardInput.Hotkey(new[] { "shift", "end" });
-                Thread.Sleep(100);
-
-                // Type each digit (replaces selected text)
-                foreach (char ch in text)
+                while (!m2InputDone)
                 {
-                    if (ch >= '0' && ch <= '9')
+                    // Activate the specific MDI child form first
+                    NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
+                    Thread.Sleep(200);
+
+                    // Bring main window to front + click field
+                    NativeMethods.SmartSetForegroundWindow(win.Handle);
+                    Thread.Sleep(300);
+                    MouseInput.Click(cx, cy);
+                    Thread.Sleep(300);
+
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($"[click({cx},{cy})] ");
+                    Console.ResetColor();
+
+                    // Home key → move caret to start
+                    KeyboardInput.PressKey("home");
+                    Thread.Sleep(50);
+
+                    // Shift+End → select all text
+                    KeyboardInput.Hotkey(new[] { "shift", "end" });
+                    Thread.Sleep(100);
+
+                    // Type each digit with per-keystroke guard
+                    // IMPORTANT: Use CheckBeforeKeystroke (detect-only, no recovery).
+                    // If ANY interference detected, immediately restart the entire input.
+                    // Reason: Autocomplete dropdown destroys selection state (Home+Shift+End)
+                    // so even if focus is restored, cursor position is wrong — must restart.
+                    bool interrupted = false;
+                    foreach (char ch in text)
                     {
-                        KeyboardInput.PressKey(ch.ToString());
-                        Thread.Sleep(40);
+                        // [GUARD] Check focus before each keystroke — detect only
+                        var guardCheck = guard.CheckBeforeKeystroke();
+                        if (!guardCheck.Ok)
+                        {
+                            Console.WriteLine($"[GUARD] Interrupted: {guardCheck.Type} — {guardCheck.Detail}");
+                            interrupted = true;
+                            break;
+                        }
+
+                        if (ch >= '0' && ch <= '9')
+                        {
+                            KeyboardInput.PressKey(ch.ToString());
+                            Thread.Sleep(40);
+                        }
+                        else if (char.IsLetter(ch))
+                        {
+                            KeyboardInput.PressKey(ch.ToString());
+                            Thread.Sleep(40);
+                        }
                     }
-                    else if (char.IsLetter(ch))
+
+                    if (interrupted)
                     {
-                        KeyboardInput.PressKey(ch.ToString());
-                        Thread.Sleep(40);
+                        // Interference during typing — dismiss autocomplete + clear + retry
+                        if (!guard.CanRetry()) break;
+                        // Dismiss autocomplete dropdown with ESC via PostMessage
+                        NativeMethods.PostMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x1B /*VK_ESCAPE*/, IntPtr.Zero);
+                        Thread.Sleep(50);
+                        NativeMethods.PostMessageW(targetHwnd, 0x0101 /*WM_KEYUP*/, (IntPtr)0x1B, IntPtr.Zero);
+                        Thread.Sleep(200);
+                        guard.ClearFieldForRestart();
+                        Thread.Sleep(100);
+                        continue; // restart the while loop (click + Home + Shift+End + type)
                     }
+
+                    m2InputDone = true; // all chars typed successfully
                 }
+
                 Thread.Sleep(200);
 
                 if (sendEnter)
                 {
-                    KeyboardInput.PressKey("enter");
+                    // [GUARD] Final focus check before Enter
+                    if (guard.EnsureBeforeKeystroke(maxWaitMs: 1000))
+                        KeyboardInput.PressKey("enter");
+                    else
+                        Console.WriteLine("[GUARD] Focus lost before Enter — skipping Enter key");
                     Thread.Sleep(500);
                 }
 
