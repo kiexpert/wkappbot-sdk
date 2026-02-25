@@ -38,12 +38,12 @@ internal sealed class InputZoomWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false; // CRITICAL: never steal focus from target app
         ResizeMode = ResizeMode.NoResize;
-        Opacity = 0.92;
+        Opacity = 0.98; // nearly opaque — input text must be clearly visible
 
         // Build visual tree programmatically (no XAML)
         _outerBorder = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xDD, 0x1A, 0x1A, 0x2E)),
+            Background = new SolidColorBrush(Color.FromArgb(0xF5, 0x1A, 0x1A, 0x2E)), // near-opaque dark bg
             BorderBrush = new SolidColorBrush(Color.FromRgb(0x4F, 0xC3, 0xF7)), // cyan
             BorderThickness = new Thickness(2),
             CornerRadius = new CornerRadius(4),
