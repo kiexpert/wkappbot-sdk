@@ -105,7 +105,6 @@ internal partial class Program
         // ── Slack status streaming ──
         string? slackStatusTs = null;
         string? lastSlackStatusText = null;
-        DateTime lastRelocateCheck = DateTime.MinValue;
 
         // ── Claude status tracking ──
         string? cachedClaudeStatusText = null;
@@ -387,47 +386,17 @@ internal partial class Program
                                     var slackText = $"{statusEmoji} Claude: {claudeStatus.Item2}";
                                     bool textChanged = slackText != lastSlackStatusText;
 
-                                    if (slackStatusTs != null)
+                                    // Reuse existing status message via chat.update (no relocate spam!)
+                                    // Thread reply detection (resetStatusStreaming) handles new message creation
+                                    if (slackStatusTs != null && textChanged)
                                     {
-                                        bool shouldRelocate = false;
-                                        var now = DateTime.Now;
-                                        if ((now - lastRelocateCheck).TotalSeconds >= 5.0)
-                                        {
-                                            lastRelocateCheck = now;
-                                            try
-                                            {
-                                                var latestTs = Task.Run(async () =>
-                                                    await GetChannelLatestMessageTs(slackBotToken!, slackChannel!))
-                                                    .GetAwaiter().GetResult();
-                                                if (latestTs != null && latestTs != slackStatusTs)
-                                                    shouldRelocate = true;
-                                            }
-                                            catch { }
-                                        }
-
-                                        if (shouldRelocate)
-                                        {
-                                            // Don't delete — old message may be thread parent!
-                                            // Update old message to dim text, then send new one
-                                            var oldTs = slackStatusTs;
-                                            Task.Run(async () => await SlackUpdateMessageAsync(
-                                                slackBotToken!, slackChannel!, oldTs, "_(상태 이동됨)_")).Wait(3000);
-                                            var (ok2, ts2) = Task.Run(async () =>
-                                                await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
-                                                .GetAwaiter().GetResult();
-                                            if (ok2 && ts2 != null) slackStatusTs = ts2;
-                                            lastSlackStatusText = slackText;
-                                        }
-                                        else if (textChanged)
-                                        {
-                                            var localTs = slackStatusTs;
-                                            Task.Run(async () => await SlackUpdateMessageAsync(
-                                                slackBotToken!, slackChannel!, localTs, slackText))
-                                                .Wait(3000);
-                                            lastSlackStatusText = slackText;
-                                        }
+                                        var localTs = slackStatusTs;
+                                        Task.Run(async () => await SlackUpdateMessageAsync(
+                                            slackBotToken!, slackChannel!, localTs, slackText))
+                                            .Wait(3000);
+                                        lastSlackStatusText = slackText;
                                     }
-                                    else if (textChanged)
+                                    else if (slackStatusTs == null && textChanged)
                                     {
                                         var (ok, ts) = Task.Run(async () =>
                                             await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
