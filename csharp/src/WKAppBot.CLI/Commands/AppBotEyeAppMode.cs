@@ -124,9 +124,10 @@ internal partial class Program
                                 startupTs = sTs;
                         }
 
-                        // Set up event handlers (pass claudeHwnd + plan approval state + startup ts + bot username)
+                        // Set up event handlers (pass claudeHwnd + plan/permission approval state + startup ts + bot username)
                         SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
-                            claudeHwnd, () => pendingPlanApprovalSlackTs, startupTs, botUsername);
+                            claudeHwnd, () => pendingPlanApprovalSlackTs,
+                            () => pendingPermissionSlackTs, startupTs, botUsername);
 
                         // Block Kit button handler (plan approve/reject)
                         slackClient.OnBlockAction += (action) =>
@@ -989,6 +990,7 @@ internal partial class Program
     /// </summary>
     private static void SetupSlackEventHandlers(SlackSocketClient slack, string botToken, string? channel,
         IntPtr claudeHwnd = default, Func<string?>? getPlanApprovalTs = null,
+        Func<string?>? getPermissionApprovalTs = null,
         string? startupTs = null, string? botUsername = null)
     {
         // Track threads where bot is engaged (for thread reply forwarding)
@@ -1080,6 +1082,36 @@ internal partial class Program
                     var reply = feedbackOk
                         ? $":pencil2: 피드백 전달 완료: \"{cleanText}\""
                         : ":x: 피드백 입력란을 찾을 수 없습니다";
+                    DeletePendingAck(threadKey);
+                    Task.Run(async () => await Send(msg.Channel, reply, threadKey)).Wait(5000);
+                    return;
+                }
+            }
+
+            // ── Permission approval via Slack @mention or thread reply ──
+            var permTs = getPermissionApprovalTs?.Invoke();
+            if (!string.IsNullOrEmpty(permTs) && msg.ThreadTs == permTs && claudeHwnd != IntPtr.Zero)
+            {
+                if (IsPlanApprovalKeyword(cleanText)) // "승인", "ㄱㄱ", "ㅇㅇ" etc
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"[EYE] Permission APPROVED via Slack by {msg.User}");
+                    Console.ResetColor();
+
+                    var permButtons = GetPermissionButtons(claudeHwnd);
+                    var allowBtn = permButtons.FirstOrDefault(b =>
+                        b.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
+                        b.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
+                        b.Contains("수락", StringComparison.OrdinalIgnoreCase));
+                    allowBtn ??= permButtons.FirstOrDefault(); // fallback to first button
+
+                    bool clicked = false;
+                    if (allowBtn != null)
+                        clicked = ClickPermissionButton(claudeHwnd, allowBtn);
+
+                    var reply = clicked
+                        ? $":white_check_mark: 권한 승인 완료! (\"{allowBtn}\")"
+                        : ":x: 권한 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
                     DeletePendingAck(threadKey);
                     Task.Run(async () => await Send(msg.Channel, reply, threadKey)).Wait(5000);
                     return;
@@ -1188,6 +1220,39 @@ internal partial class Program
                     var reply = feedbackOk
                         ? $":pencil2: 피드백 전달 완료: \"{cleanText}\""
                         : ":x: 피드백 입력란을 찾을 수 없습니다";
+                    DeletePendingAck(msg.ThreadTs!);
+                    Task.Run(async () => await Send(msg.Channel, reply, msg.ThreadTs)).Wait(5000);
+                    return;
+                }
+            }
+
+            // ── Permission approval via thread reply (no @mention needed) ──
+            var permTs2 = getPermissionApprovalTs?.Invoke();
+            if (!string.IsNullOrEmpty(permTs2) && msg.ThreadTs == permTs2 && claudeHwnd != IntPtr.Zero)
+            {
+                var cleanPerm = System.Text.RegularExpressions.Regex.Replace(
+                    msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
+
+                if (IsPlanApprovalKeyword(cleanPerm))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"[EYE] Permission APPROVED via Slack thread by {msg.User}");
+                    Console.ResetColor();
+
+                    var permBtns = GetPermissionButtons(claudeHwnd);
+                    var allowBtn = permBtns.FirstOrDefault(b =>
+                        b.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
+                        b.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
+                        b.Contains("수락", StringComparison.OrdinalIgnoreCase));
+                    allowBtn ??= permBtns.FirstOrDefault();
+
+                    bool clicked = false;
+                    if (allowBtn != null)
+                        clicked = ClickPermissionButton(claudeHwnd, allowBtn);
+
+                    var reply = clicked
+                        ? $":white_check_mark: 권한 승인 완료! (\"{allowBtn}\")"
+                        : ":x: 권한 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
                     DeletePendingAck(msg.ThreadTs!);
                     Task.Run(async () => await Send(msg.Channel, reply, msg.ThreadTs)).Wait(5000);
                     return;
