@@ -244,13 +244,25 @@ public sealed class ClaudePromptHelper : IDisposable
     }
 
     /// <summary>
-    /// Try to submit the prompt focuslessly: UIA Invoke on send button, or brief focus for Enter.
+    /// Try to submit the prompt focuslessly using multiple strategies:
+    ///   1. MSAA: accDoDefaultAction on contentEditable parent
+    ///   2. MSAA: Walk tree to find Send button → accDoDefaultAction
+    ///   3. UIA: Invoke pattern on Send button
+    ///   4. PostMessage VK_RETURN to Chrome renderer hwnd
+    ///   5. Fallback: brief focus steal for Enter key
     /// </summary>
     private bool TryFocuslessSubmit(PromptInfo prompt, AutomationElement turnForm)
     {
         Thread.Sleep(100);
 
-        // Look for a submit/send button in turn-form with Invoke pattern
+        // === Strategy 1: MSAA accDoDefaultAction on contentEditable ===
+        if (TryMsaaSubmit(prompt))
+        {
+            Console.WriteLine("  [PROMPT] Submitted via MSAA (fully focusless!)");
+            return true;
+        }
+
+        // === Strategy 2: UIA Invoke on Send button ===
         try
         {
             var allElements = turnForm.FindAllDescendants();
@@ -274,7 +286,14 @@ public sealed class ClaudePromptHelper : IDisposable
         }
         catch { }
 
-        // No submit button — brief focus steal for Enter key only
+        // === Strategy 3: PostMessage VK_RETURN to Chrome renderer hwnd ===
+        if (TryPostMessageEnter(prompt))
+        {
+            Console.WriteLine("  [PROMPT] Submitted via PostMessage VK_RETURN (focusless!)");
+            return true;
+        }
+
+        // === Strategy 4: brief focus steal for Enter key only ===
         Console.WriteLine("  [PROMPT] Text set focuslessly! Brief focus for Enter key...");
         var prevFg = NativeMethods.GetForegroundWindow();
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
@@ -288,6 +307,197 @@ public sealed class ClaudePromptHelper : IDisposable
         }
         Console.WriteLine("  [PROMPT] Submitted (text=focusless, Enter=brief focus)");
         return true;
+    }
+
+    /// <summary>
+    /// Try to submit via MSAA: accDoDefaultAction on contentEditable, or find Send button in MSAA tree.
+    /// </summary>
+    private bool TryMsaaSubmit(PromptInfo prompt)
+    {
+        try
+        {
+            var centerX = prompt.PromptRect.X + prompt.PromptRect.Width / 2;
+            var centerY = prompt.PromptRect.Y + prompt.PromptRect.Height / 2;
+            var pt = new Native.POINT(centerX, centerY);
+
+            int hr = AccessibleObjectFromPoint(pt, out object? acc, out object? _childId);
+            if (hr != 0 || acc == null) return false;
+
+            try
+            {
+                if (acc is not IAccessibleVtbl selfV) return false;
+
+                // Navigate to parent (the contentEditable "입력하세요")
+                selfV.get_accParent(out object? parentObj);
+                if (parentObj is not IAccessibleVtbl parentV) return false;
+
+                // === Try 1: accDoDefaultAction on the contentEditable parent ===
+                string? parentAction = null;
+                try { parentV.get_accDefaultAction(0, out parentAction); } catch { }
+                Console.WriteLine($"  [PROMPT] MSAA submit: parent defaultAction=\"{parentAction ?? "null"}\"");
+
+                if (parentAction != null)
+                {
+                    int daHr = parentV.accDoDefaultAction(0);
+                    Console.WriteLine($"  [PROMPT] MSAA submit: accDoDefaultAction on parent hr=0x{daHr:X8}");
+                    if (daHr == 0) return true;
+                }
+
+                // === Try 2: accDoDefaultAction on self (the inner grouping) ===
+                string? selfAction = null;
+                try { selfV.get_accDefaultAction(0, out selfAction); } catch { }
+                if (selfAction != null)
+                {
+                    Console.WriteLine($"  [PROMPT] MSAA submit: self defaultAction=\"{selfAction}\"");
+                    int daHr = selfV.accDoDefaultAction(0);
+                    Console.WriteLine($"  [PROMPT] MSAA submit: accDoDefaultAction on self hr=0x{daHr:X8}");
+                    if (daHr == 0) return true;
+                }
+
+                // === Try 3: Walk MSAA tree from turn-form to find Send/Submit button ===
+                // Go up to grandparent (turn-form level) and search for buttons
+                parentV.get_accParent(out object? grandparentObj);
+                if (grandparentObj is IAccessibleVtbl gpV)
+                {
+                    // Search siblings and cousins for a button with "send"/"submit" action
+                    if (TryFindAndClickSubmitButton(gpV, 0, 4))
+                        return true;
+                }
+
+                return false;
+            }
+            finally
+            {
+                try { Marshal.ReleaseComObject(acc); } catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] MSAA submit error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Recursively search MSAA tree for a button element and trigger its default action.
+    /// Looks for role=ROLE_SYSTEM_PUSHBUTTON(43) with accDoDefaultAction.
+    /// </summary>
+    private bool TryFindAndClickSubmitButton(IAccessibleVtbl node, int depth, int maxDepth)
+    {
+        if (depth > maxDepth) return false;
+
+        try
+        {
+            node.get_accRole(0, out object? roleObj);
+            int role = roleObj is int r ? r : -1;
+
+            node.get_accName(0, out string? name);
+            string nameLower = (name ?? "").ToLowerInvariant();
+
+            // ROLE_SYSTEM_PUSHBUTTON = 43
+            if (role == 43)
+            {
+                // Skip stop/cancel buttons
+                if (nameLower.Contains("중단") || nameLower.Contains("stop") || nameLower.Contains("cancel"))
+                    return false;
+
+                string? action = null;
+                try { node.get_accDefaultAction(0, out action); } catch { }
+
+                Console.WriteLine($"  [PROMPT] MSAA button: \"{name}\" action=\"{action ?? "null"}\" role={role}");
+
+                if (action != null)
+                {
+                    int hr = node.accDoDefaultAction(0);
+                    Console.WriteLine($"  [PROMPT] MSAA submit: accDoDefaultAction on button \"{name}\" hr=0x{hr:X8}");
+                    if (hr == 0) return true;
+                }
+            }
+
+            // Recurse into children
+            node.get_accChildCount(out int childCount);
+            for (int i = 1; i <= Math.Min(childCount, 30); i++)
+            {
+                try
+                {
+                    int hr = node.get_accChild(i, out object? child);
+                    if (hr == 0 && child is IAccessibleVtbl childV)
+                    {
+                        if (TryFindAndClickSubmitButton(childV, depth + 1, maxDepth))
+                            return true;
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Try to submit by posting VK_RETURN to the Chrome renderer child window.
+    /// Chrome_RenderWidgetHostHWND is the actual input handler inside the Electron window.
+    /// </summary>
+    private bool TryPostMessageEnter(PromptInfo prompt)
+    {
+        try
+        {
+            // Find Chrome_RenderWidgetHostHWND child window
+            var rendererHwnd = NativeMethods.FindWindowExW(
+                prompt.WindowHandle, IntPtr.Zero,
+                "Chrome_RenderWidgetHostHWND", null);
+
+            if (rendererHwnd == IntPtr.Zero)
+            {
+                // Try intermediate child: Chrome_WidgetWin_1 → Chrome_RenderWidgetHostHWND
+                var widgetWin = NativeMethods.FindWindowExW(
+                    prompt.WindowHandle, IntPtr.Zero,
+                    "Chrome_WidgetWin_1", null);
+                if (widgetWin != IntPtr.Zero)
+                {
+                    rendererHwnd = NativeMethods.FindWindowExW(
+                        widgetWin, IntPtr.Zero,
+                        "Chrome_RenderWidgetHostHWND", null);
+                }
+            }
+
+            if (rendererHwnd == IntPtr.Zero)
+            {
+                Console.WriteLine("  [PROMPT] PostMessage: Chrome_RenderWidgetHostHWND not found");
+                return false;
+            }
+
+            Console.WriteLine($"  [PROMPT] PostMessage: Found renderer hwnd=0x{rendererHwnd:X}");
+
+            // Post WM_KEYDOWN + WM_KEYUP for VK_RETURN
+            const int WM_KEYDOWN = 0x0100;
+            const int WM_KEYUP = 0x0101;
+            const int VK_RETURN = 0x0D;
+
+            // lParam for VK_RETURN: repeat=1, scancode=0x1C, extended=0
+            uint scanCode = NativeMethods.MapVirtualKeyW((uint)VK_RETURN, 0);
+            IntPtr lParamDown = (IntPtr)((scanCode << 16) | 1); // repeat=1
+            IntPtr lParamUp = (IntPtr)((scanCode << 16) | 1 | (1 << 30) | (1 << 31)); // prev=down, transition=release
+
+            bool ok1 = NativeMethods.PostMessageW(rendererHwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, lParamDown);
+            Thread.Sleep(30);
+            bool ok2 = NativeMethods.PostMessageW(rendererHwnd, WM_KEYUP, (IntPtr)VK_RETURN, lParamUp);
+
+            Console.WriteLine($"  [PROMPT] PostMessage: VK_RETURN down={ok1} up={ok2}");
+
+            if (ok1 && ok2)
+            {
+                Thread.Sleep(200); // Wait for submit to register
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] PostMessage error: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>
