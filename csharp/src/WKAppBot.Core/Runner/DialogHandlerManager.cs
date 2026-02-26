@@ -1,4 +1,5 @@
 using WKAppBot.Core.Scenario;
+using WKAppBot.Win32.Accessibility;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -97,25 +98,62 @@ public sealed class DialogHandlerManager
             if (!matchBase.Contains(normalizedKeyword, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            // Step 2: precise match conditions
+            // Step 2: precise match conditions (supports GitHub-style glob patterns)
             var m = config.Match;
             if (m != null)
             {
-                if (m.TitleContains != null &&
-                    !windowTitle.Contains(m.TitleContains, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                // title: glob pattern → full match; literal → contains
+                if (m.TitleContains != null)
+                {
+                    if (PatternMatcher.IsPattern(m.TitleContains))
+                    {
+                        if (!PatternMatcher.Create(m.TitleContains).IsMatch(windowTitle))
+                            continue;
+                    }
+                    else if (!windowTitle.Contains(m.TitleContains, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
 
-                if (m.Class != null &&
-                    !string.Equals(m.Class, className, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                // class: path glob (/ or **) → match vs classPath; standard glob → match vs className; literal → exact vs className
+                if (m.Class != null)
+                {
+                    if (PatternMatcher.IsPathGlob(m.Class))
+                    {
+                        if (!PatternMatcher.CreatePathGlob(m.Class).IsMatch(classPath))
+                            continue;
+                    }
+                    else if (PatternMatcher.IsPattern(m.Class))
+                    {
+                        if (!PatternMatcher.Create(m.Class).IsMatch(className))
+                            continue;
+                    }
+                    else if (!string.Equals(m.Class, className, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
 
-                if (m.Process != null &&
-                    !string.Equals(m.Process, processName, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                // process: glob pattern → full match; literal → exact
+                if (m.Process != null)
+                {
+                    if (PatternMatcher.IsPattern(m.Process))
+                    {
+                        if (!PatternMatcher.Create(m.Process).IsMatch(processName))
+                            continue;
+                    }
+                    else if (!string.Equals(m.Process, processName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
 
-                if (m.MessageContains != null && messageText != null &&
-                    !messageText.Contains(m.MessageContains, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                // message: glob pattern → full match; literal → contains
+                if (m.MessageContains != null && messageText != null)
+                {
+                    if (PatternMatcher.IsPattern(m.MessageContains))
+                    {
+                        if (!PatternMatcher.Create(m.MessageContains).IsMatch(messageText))
+                            continue;
+                    }
+                    else if (!messageText.Contains(m.MessageContains, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
             }
 
             return config;

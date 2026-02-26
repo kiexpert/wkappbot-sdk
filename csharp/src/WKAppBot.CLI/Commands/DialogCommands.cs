@@ -166,19 +166,307 @@ internal partial class Program
 
         if (success && handler.Params != null)
         {
-            // Wait after handling
-            if (handler.Params.WaitAfter > 0)
+            // Active patrol loop: handle blockers while waiting for condition
+            // Replaces passive Thread.Sleep — "핸들러 개입환영" (welcomes handler intervention)
+            var waitUntil = handler.Params.WaitUntil;
+            int patrolMs = handler.Params.WaitAfter > 0
+                ? handler.Params.WaitAfter
+                : (waitUntil != null ? waitUntil.Timeout * 1000 : 0);
+
+            if (waitUntil != null)
+                patrolMs = Math.Max(patrolMs, waitUntil.Timeout * 1000);
+
+            if (patrolMs > 0)
             {
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"[BLOCK] Waiting {handler.Params.WaitAfter}ms after handling...");
-                Console.ResetColor();
-                Thread.Sleep(handler.Params.WaitAfter);
+                PatrolWaitLoop(
+                    expectedFgWindow, handlerMgr,
+                    blockerHwnd, waitUntil, patrolMs);
             }
 
             return (true, handler.Params.Retry);
         }
 
         return (success, false);
+    }
+
+    /// <summary>
+    /// Active patrol loop: checks condition + handles blockers while waiting.
+    /// "핸들러 개입환영" — instead of sleeping, we patrol for more blockers.
+    /// Level 0: Thread.Sleep (멍) → Level 1: Patrol (순찰) → Level 2: Patrol+StableHash (눈뜨고감시)
+    /// </summary>
+    private static void PatrolWaitLoop(
+        IntPtr expectedFgWindow, DialogHandlerManager? handlerMgr,
+        IntPtr handledDialogHwnd, WaitUntilCondition? condition, int totalMs)
+    {
+        int pollInterval = condition?.StableFrames > 0
+            ? Math.Max(condition.StableInterval, 200)
+            : 500;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // Determine what we're waiting for
+        bool hasWindowCondition = condition?.WindowExists != null;
+        bool hasDialogGoneCondition = condition?.DialogGone == true
+            || (condition != null && !hasWindowCondition && condition.DialogGone != false);
+        bool hasStableCondition = condition?.StableFrames > 0;
+        bool hasResponsiveCondition = condition?.Responsive == true;
+        int stableTarget = condition?.StableFrames ?? 0;
+
+        // Build description
+        var parts = new List<string>();
+        if (hasWindowCondition) parts.Add($"window \"{condition!.WindowExists}\"");
+        if (hasDialogGoneCondition) parts.Add("dialog gone");
+        if (hasStableCondition) parts.Add($"stable×{stableTarget}");
+        if (hasResponsiveCondition) parts.Add("responsive");
+        if (parts.Count == 0) parts.Add($"{totalMs}ms patrol");
+        string condDesc = string.Join(" + ", parts);
+
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.WriteLine($"[BLOCK] Patrol wait: {condDesc} (max {totalMs / 1000.0:F1}s)");
+        Console.ResetColor();
+
+        int blockerCount = 0;
+        long lastProgressSec = -1; // track last progress output second
+        bool windowFound = false;
+        bool responsiveConfirmed = false; // SendMessageTimeout responsive check
+
+        // Frame stability tracking (Level 2)
+        string? lastFrameHash = null;
+        int consecutiveStable = 0;
+        IntPtr stableTargetHwnd = IntPtr.Zero; // window to capture for stability check
+
+        while (sw.ElapsedMilliseconds < totalMs)
+        {
+            Thread.Sleep(pollInterval);
+
+            // ── Per-second progress output (overwrite same line) ──
+            long currentSec = sw.ElapsedMilliseconds / 1000;
+            if (currentSec > lastProgressSec)
+            {
+                lastProgressSec = currentSec;
+                var sb = new System.Text.StringBuilder();
+                sb.Append($"\r[BLOCK] Patrol {currentSec}s/{totalMs / 1000}s");
+                if (hasWindowCondition)
+                    sb.Append(windowFound ? " window=✓" : " window=…");
+                if (hasStableCondition)
+                    sb.Append($" stable={consecutiveStable}/{stableTarget}");
+                if (hasResponsiveCondition)
+                    sb.Append(responsiveConfirmed ? " responsive=✓" : " responsive=…");
+                if (blockerCount > 0)
+                    sb.Append($" blockers={blockerCount}");
+                sb.Append("   "); // clear trailing chars
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write(sb.ToString());
+                Console.ResetColor();
+            }
+
+            // ── Check condition: window exists? ──
+            if (hasWindowCondition)
+            {
+                var found = WindowFinder.FindByTitle(condition!.WindowExists!);
+                if (found.Count > 0)
+                {
+                    windowFound = true;
+                    stableTargetHwnd = found[0].Handle; // use this for stability + responsive check
+
+                    if (!hasStableCondition && !hasResponsiveCondition)
+                    {
+                        Console.WriteLine(); // newline after \r progress
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"[BLOCK] Patrol done: window found \"{found[0].Title}\" ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
+                        Console.ResetColor();
+                        return;
+                    }
+                    // If stable/responsive check is also required, continue below
+                }
+            }
+
+            // ── Check condition: original dialog gone? ──
+            if (hasDialogGoneCondition && handledDialogHwnd != IntPtr.Zero)
+            {
+                bool gone = !NativeMethods.IsWindow(handledDialogHwnd)
+                    || !NativeMethods.IsWindowVisible(handledDialogHwnd);
+                if (gone && !hasWindowCondition && !hasStableCondition)
+                {
+                    Console.WriteLine(); // newline after \r progress
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"[BLOCK] Patrol done: dialog gone ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
+                    Console.ResetColor();
+                    return;
+                }
+            }
+
+            // ── Check condition: frame stability (Level 2) ──
+            if (hasStableCondition && stableTargetHwnd != IntPtr.Zero)
+            {
+                string? frameHash = CaptureFrameHash(stableTargetHwnd);
+                if (frameHash != null)
+                {
+                    if (frameHash == lastFrameHash)
+                    {
+                        consecutiveStable++;
+                        if (consecutiveStable >= stableTarget)
+                        {
+                            Console.WriteLine(); // newline after \r progress
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"[BLOCK] Patrol done: stable ×{consecutiveStable} ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
+                            Console.ResetColor();
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        consecutiveStable = 1; // new frame = reset, but count this one
+                        lastFrameHash = frameHash;
+                    }
+                }
+            }
+            else if (hasStableCondition && stableTargetHwnd == IntPtr.Zero)
+            {
+                // No target window yet for stability — use expectedFgWindow as fallback
+                if (expectedFgWindow != IntPtr.Zero && NativeMethods.IsWindow(expectedFgWindow))
+                    stableTargetHwnd = expectedFgWindow;
+            }
+
+            // ── Check condition: responsive (SendMessageTimeout WM_NULL) ──
+            // "마지막 변화후 센드메시지 보내서 리턴될때까지 기다려봐도 되겠다"
+            // SMTO_ABORTIFHUNG: returns 0 if the target message loop is hung (not pumping messages).
+            // WM_NULL: no-op message — zero side effects, pure liveness check.
+            // This detects when HTS finishes heavy initialization and starts processing messages again.
+            if (hasResponsiveCondition && !responsiveConfirmed)
+            {
+                IntPtr checkHwnd = stableTargetHwnd != IntPtr.Zero ? stableTargetHwnd : expectedFgWindow;
+                if (checkHwnd != IntPtr.Zero && NativeMethods.IsWindow(checkHwnd))
+                {
+                    IntPtr result;
+                    IntPtr sent = NativeMethods.SendMessageTimeoutW(
+                        checkHwnd, NativeMethods.WM_NULL, IntPtr.Zero, IntPtr.Zero,
+                        NativeMethods.SMTO_ABORTIFHUNG, 3000, out result);
+
+                    if (sent != IntPtr.Zero)
+                    {
+                        // Message loop responded within timeout — app is alive!
+                        responsiveConfirmed = true;
+
+                        // Check if this is the final remaining condition
+                        bool stableDone = !hasStableCondition || consecutiveStable >= stableTarget;
+                        bool windowDone = !hasWindowCondition || windowFound;
+                        bool dialogDone = !hasDialogGoneCondition || (handledDialogHwnd != IntPtr.Zero &&
+                            (!NativeMethods.IsWindow(handledDialogHwnd) || !NativeMethods.IsWindowVisible(handledDialogHwnd)));
+
+                        if (windowDone && stableDone && dialogDone)
+                        {
+                            Console.WriteLine(); // newline after \r progress
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"[BLOCK] Patrol done: responsive ✓ ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
+                            Console.ResetColor();
+                            return;
+                        }
+                    }
+                    // sent == 0 means hung/timeout — keep waiting
+                }
+            }
+
+            // ── Patrol: check for new blockers and handle them ──
+            var (handled, _) = TryHandleBlocker(expectedFgWindow, handlerMgr);
+            if (handled)
+            {
+                blockerCount++;
+                // Blocker handled = screen changed → reset stability + responsive counters
+                consecutiveStable = 0;
+                lastFrameHash = null;
+                responsiveConfirmed = false; // app may hang again after popup dismiss
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.WriteLine($"[BLOCK] Patrol: handled blocker #{blockerCount} (stable reset)");
+                Console.ResetColor();
+            }
+        }
+
+        Console.WriteLine(); // newline after \r progress
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        var extras = new List<string>();
+        if (hasStableCondition) extras.Add($"stable={consecutiveStable}/{stableTarget}");
+        if (hasResponsiveCondition) extras.Add($"responsive={responsiveConfirmed}");
+        string extra = extras.Count > 0 ? ", " + string.Join(", ", extras) : "";
+        Console.WriteLine($"[BLOCK] Patrol timeout: {totalMs / 1000.0:F1}s elapsed, {blockerCount} blockers handled{extra}");
+        Console.ResetColor();
+    }
+
+    /// <summary>
+    /// Helper for dismiss Step 0: run patrol wait + write ActionState after handler success.
+    /// </summary>
+    private static void RunStep0Patrol(
+        IntPtr dialogHwnd, string dialogTitle,
+        DialogActionParams? prms, DialogHandlerManager? handlerMgr)
+    {
+        // Patrol wait loop (if configured)
+        var waitUntil = prms?.WaitUntil;
+        int patrolMs = prms?.WaitAfter > 0 ? prms.WaitAfter
+            : (waitUntil != null ? waitUntil.Timeout * 1000 : 0);
+        if (waitUntil != null)
+            patrolMs = Math.Max(patrolMs, waitUntil.Timeout * 1000);
+
+        if (patrolMs > 0)
+        {
+            // Use the process's main window as expectedFgWindow for blocker detection
+            NativeMethods.GetWindowThreadProcessId(dialogHwnd, out uint pid);
+            IntPtr expectedFg = IntPtr.Zero;
+            try { expectedFg = Process.GetProcessById((int)pid).MainWindowHandle; } catch { }
+            if (expectedFg == IntPtr.Zero) expectedFg = dialogHwnd;
+
+            PatrolWaitLoop(expectedFg, handlerMgr, dialogHwnd, waitUntil, patrolMs);
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"\n  1 window(s) dismissed (handler: {prms?.ButtonText ?? "action"}).");
+        Console.ResetColor();
+
+        try
+        {
+            ActionState.Write(new ActionState
+            {
+                Source = "dismiss",
+                WindowTitle = dialogTitle,
+                ActionName = "dismiss",
+                ActionDetail = $"Handler: click_button on \"{dialogTitle}\"" +
+                    (patrolMs > 0 ? " + patrol" : ""),
+                Status = "pass",
+            });
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Capture a window via PrintWindow and return SHA256 hash of the pixel data.
+    /// Used for frame stability detection — consecutive identical hashes = stable content.
+    /// Returns null on capture failure (best-effort, non-blocking).
+    /// </summary>
+    private static string? CaptureFrameHash(IntPtr hWnd)
+    {
+        try
+        {
+            using var bmp = ScreenCapture.CaptureWindow(hWnd);
+            if (bmp == null || ScreenCapture.IsBlankBitmap(bmp)) return null;
+
+            // Fast hash: lock bits and compute SHA256 over raw pixel data
+            var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
+            var data = bmp.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, bmp.PixelFormat);
+            try
+            {
+                int byteCount = Math.Abs(data.Stride) * data.Height;
+                var pixels = new byte[byteCount];
+                System.Runtime.InteropServices.Marshal.Copy(data.Scan0, pixels, 0, byteCount);
+                var hash = System.Security.Cryptography.SHA256.HashData(pixels);
+                return Convert.ToHexString(hash, 0, 8); // first 8 bytes = 16 hex chars (enough)
+            }
+            finally
+            {
+                bmp.UnlockBits(data);
+            }
+        }
+        catch
+        {
+            return null; // best-effort
+        }
     }
 
     /// <summary>
@@ -612,6 +900,65 @@ internal partial class Program
         // Load dialog handlers
         var handlersDir = Path.Combine(DataDir, "handlers");
         var handlerMgr = Directory.Exists(handlersDir) ? new DialogHandlerManager(handlersDir) : null;
+
+        // Step 0: If target window itself IS a #32770 dialog, try handler matching directly
+        // This handles cases like login dialogs where the dialog IS the top-level match
+        {
+            var targetClsSb = new StringBuilder(256);
+            NativeMethods.GetClassNameW(win.Handle, targetClsSb, 256);
+            var targetCls = targetClsSb.ToString();
+
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"  [Step0] class=\"{targetCls}\" handlers={handlerMgr?.Count ?? -1}");
+            Console.ResetColor();
+
+            if (targetCls == "#32770" && handlerMgr != null && handlerMgr.Count > 0)
+            {
+                var classPath = BuildClassPath(win.Handle);
+                NativeMethods.GetWindowThreadProcessId(win.Handle, out uint tPid);
+                string tProcName = "";
+                try { tProcName = Process.GetProcessById((int)tPid).ProcessName; } catch { }
+                var msgText = GetDialogMessageText(win.Handle);
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"  [Step0] classPath=\"{classPath}\" proc=\"{tProcName}\" msg=\"{(msgText?.Replace("\n"," ") ?? "").Substring(0, Math.Min(msgText?.Length ?? 0, 60))}\"");
+                Console.ResetColor();
+
+                var handler = handlerMgr.FindHandler(win.Title, classPath, targetCls, tProcName, msgText);
+                if (handler != null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"  [DISMISS] Target is #32770 dialog — handler matched: {handler.Action}");
+                    Console.ResetColor();
+
+                    if (handler.Action == "click_button")
+                    {
+                        bool ok = ExecuteClickButton(win.Handle, handler.Params);
+                        if (ok)
+                        {
+                            // Run patrol wait loop if configured
+                            RunStep0Patrol(win.Handle, win.Title, handler.Params, handlerMgr);
+                            return 0;
+                        }
+                    }
+                    else if (handler.Action == "dismiss")
+                    {
+                        NativeMethods.SendMessageW(win.Handle, NativeMethods.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                        Thread.Sleep(300);
+                        bool gone = !NativeMethods.IsWindow(win.Handle) || !NativeMethods.IsWindowVisible(win.Handle);
+                        Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
+                        Console.WriteLine(gone ? "  ← closed" : "  ← still visible");
+                        Console.ResetColor();
+                        if (gone)
+                        {
+                            // Run patrol wait loop if configured
+                            RunStep0Patrol(win.Handle, win.Title, handler.Params, handlerMgr);
+                            return 0;
+                        }
+                    }
+                }
+            }
+        }
 
         // Step 1: Scan MDI children for matching titles
         var scanResult = AppScanner.Scan(win.Handle);

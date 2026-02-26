@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Native;
 
 namespace WKAppBot.Win32.Window;
@@ -7,21 +8,31 @@ namespace WKAppBot.Win32.Window;
 /// <summary>
 /// Find windows by title, class name, process, or HWND.
 /// All Unicode (W) functions for Korean text.
+/// Supports glob patterns: * (single segment), ** (any depth), ? (single char).
 /// </summary>
 public static class WindowFinder
 {
     /// <summary>
-    /// Find all visible top-level windows matching a title substring.
+    /// Find all visible top-level windows matching a title pattern.
+    /// Supports: literal substring, glob (* ? **), regex: prefix.
+    /// Literal = Contains check (backward compatible).
+    /// Glob/regex = full match.
     /// </summary>
-    public static List<WindowInfo> FindByTitle(string titleSubstring)
+    public static List<WindowInfo> FindByTitle(string titlePattern)
     {
+        var isPattern = PatternMatcher.IsPattern(titlePattern);
+        var matcher = isPattern ? PatternMatcher.Create(titlePattern) : null;
+
         var results = new List<WindowInfo>();
         NativeMethods.EnumWindows((hWnd, _) =>
         {
             if (!NativeMethods.IsWindowVisible(hWnd)) return true;
 
             var title = GetWindowText(hWnd);
-            if (title.Contains(titleSubstring, StringComparison.OrdinalIgnoreCase))
+            bool match = isPattern
+                ? matcher!.IsMatch(title)
+                : title.Contains(titlePattern, StringComparison.OrdinalIgnoreCase);
+            if (match)
             {
                 results.Add(WindowInfo.FromHwnd(hWnd));
             }

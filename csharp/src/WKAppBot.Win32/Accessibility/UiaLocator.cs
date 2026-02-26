@@ -1035,12 +1035,55 @@ public sealed class PatternMatcher
     }
 
     /// <summary>
+    /// Create a path-aware glob matcher (GitHub-style).
+    /// <c>*</c>  = matches anything except <c>/</c> (single path segment).
+    /// <c>**</c> = matches anything including <c>/</c> (any depth / multiple segments).
+    /// <c>?</c>  = matches single character except <c>/</c>.
+    /// Also supports <c>regex:</c> prefix for explicit regex.
+    /// </summary>
+    /// <example>
+    /// "*/#32770"          → any single parent + #32770
+    /// "**/#32770"         → #32770 at any depth
+    /// "E*Trade*/#32770"   → parent starts with E*Trade + #32770
+    /// "*_59648/**/Button_*" → CID 59648 parent, Button at any depth below
+    /// </example>
+    public static PatternMatcher CreatePathGlob(string pattern)
+    {
+        // regex: prefix → pass through
+        if (pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase))
+        {
+            var regexStr = pattern[6..];
+            return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
+        }
+
+        // Path-aware glob → regex conversion
+        // Process order: **/ first (special: zero-or-more segments), then standalone **, then *, then ?
+        var escaped = Regex.Escape(pattern);
+        escaped = escaped
+            .Replace(@"\*\*/", "(.*/)?")   // **/ → zero or more path segments (GitHub-style: matches empty too)
+            .Replace(@"\*\*", ".*")        // **  → match anything including / (at end or standalone)
+            .Replace(@"\*", "[^/]*")       // *   → match within single segment (no /)
+            .Replace(@"\?", "[^/]");       // ?   → single char within segment (no /)
+
+        var rx = "^" + escaped + "$";
+        return new PatternMatcher(new Regex(rx, RegexOptions.IgnoreCase | RegexOptions.Compiled));
+    }
+
+    /// <summary>
     /// Does the given pattern string use pattern syntax (wildcard/regex)?
     /// If false, it's a plain literal and can use fast UIA PropertyCondition.
     /// </summary>
     public static bool IsPattern(string text) =>
         text.StartsWith("regex:", StringComparison.OrdinalIgnoreCase) ||
         text.Contains('*') || text.Contains('?');
+
+    /// <summary>
+    /// Does the pattern use path-aware glob syntax?
+    /// True if it contains <c>/</c> or <c>**</c> — should match against full classPath hierarchy.
+    /// False means match against leaf className only (backward compatible).
+    /// </summary>
+    public static bool IsPathGlob(string pattern) =>
+        pattern.Contains('/') || pattern.Contains("**");
 
     /// <summary>
     /// Test if a value matches this pattern.
