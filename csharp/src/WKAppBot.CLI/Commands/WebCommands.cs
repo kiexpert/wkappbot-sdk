@@ -282,7 +282,7 @@ Options:
     {
         try
         {
-            // Check for existing AppBotEye window by title "AppBot Eye"
+            // Check for existing AppBotEye window by title "WK AppBot Eye"
             IntPtr eyeHwnd = IntPtr.Zero;
             var sb = new System.Text.StringBuilder(256);
             WKAppBot.Win32.Native.NativeMethods.EnumWindows((hwnd, _) =>
@@ -302,6 +302,24 @@ Options:
                 const uint WM_APP = 0x8000;
                 NativeMethods.SendMessageW(eyeHwnd, WM_APP, IntPtr.Zero, IntPtr.Zero);
                 return; // silently wake up — no log needed for non-web commands
+            }
+
+            // Fallback: check if any wkappbot.exe "eye" process already running
+            // (GlobalMode has no WPF window, so FindWindow above will miss it)
+            var myPid = Environment.ProcessId;
+            var myName = Path.GetFileNameWithoutExtension(Environment.ProcessPath ?? "wkappbot");
+            foreach (var p in Process.GetProcessesByName(myName))
+            {
+                try
+                {
+                    if (p.Id == myPid) continue; // skip self
+                    // Check if command line contains "eye" (not "eye tick")
+                    // Use MainModule.FileName match + StartInfo is unavailable for other processes
+                    // Simple heuristic: another wkappbot.exe running = likely eye
+                    p.Dispose();
+                    return; // another wkappbot already running — skip launch
+                }
+                catch { p.Dispose(); }
             }
 
             // Launch AppBotEye as detached background process
