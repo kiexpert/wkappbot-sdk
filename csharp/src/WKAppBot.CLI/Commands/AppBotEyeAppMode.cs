@@ -124,10 +124,11 @@ internal partial class Program
                                 startupTs = sTs;
                         }
 
-                        // Set up event handlers (pass claudeHwnd + plan/permission approval state + startup ts + bot username)
+                        // Set up event handlers (pass claudeHwnd + plan/permission approval + status streaming + startup ts)
                         SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
                             claudeHwnd, () => pendingPlanApprovalSlackTs,
-                            () => pendingPermissionSlackTs, startupTs, botUsername);
+                            () => pendingPermissionSlackTs, startupTs, botUsername,
+                            () => slackStatusTs, () => { slackStatusTs = null; lastSlackStatusText = null; });
 
                         // Block Kit button handler (plan approve/reject)
                         slackClient.OnBlockAction += (action) =>
@@ -991,7 +992,8 @@ internal partial class Program
     private static void SetupSlackEventHandlers(SlackSocketClient slack, string botToken, string? channel,
         IntPtr claudeHwnd = default, Func<string?>? getPlanApprovalTs = null,
         Func<string?>? getPermissionApprovalTs = null,
-        string? startupTs = null, string? botUsername = null)
+        string? startupTs = null, string? botUsername = null,
+        Func<string?>? getStatusStreamingTs = null, Action? resetStatusStreaming = null)
     {
         // Track threads where bot is engaged (for thread reply forwarding)
         // RULE: User replies to bot messages are ALWAYS forwarded to Claude prompt.
@@ -1053,6 +1055,16 @@ internal partial class Program
             // Track this thread so ALL follow-up messages come through
             var threadKey = msg.ThreadTs ?? msg.Timestamp;
             activeThreads.Add(threadKey);
+
+            // ── Status message thread reply → force new channel message for next status update ──
+            var statusTs = getStatusStreamingTs?.Invoke();
+            if (!string.IsNullOrEmpty(statusTs) && msg.ThreadTs == statusTs && resetStatusStreaming != null)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[EYE][SLACK] Status thread @mention → next status will be new channel message");
+                Console.ResetColor();
+                resetStatusStreaming();
+            }
 
             // ── Plan approval via Slack @mention ──
             var planTs = getPlanApprovalTs?.Invoke();
@@ -1188,6 +1200,17 @@ internal partial class Program
 
             // Debug: log thread info for diagnosis
             Console.WriteLine($"[EYE][SLACK] MSG from={msg.User} ch={msg.Channel} thread={msg.ThreadTs ?? "(none)"} text={msg.Text[..Math.Min(msg.Text.Length, 40)]}");
+
+            // ── Status message thread reply → force new channel message for next status update ──
+            var statusTs = getStatusStreamingTs?.Invoke();
+            if (!string.IsNullOrEmpty(statusTs) && msg.ThreadTs == statusTs && resetStatusStreaming != null)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[EYE][SLACK] Status thread reply detected → next status will be new channel message");
+                Console.ResetColor();
+                resetStatusStreaming();
+                // Don't return — continue to forward the message to Claude prompt as well
+            }
 
             // ── Plan approval via thread reply (no @mention needed) ──
             var planTs = getPlanApprovalTs?.Invoke();

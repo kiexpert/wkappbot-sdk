@@ -150,10 +150,11 @@ internal partial class Program
                             startupTs = sTs;
                     }
 
-                    // Set up event handlers (Slack → Claude prompt forwarding, plan/permission approval)
+                    // Set up event handlers (Slack → Claude prompt forwarding, plan/permission approval, status streaming)
                     SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
                         claudeHwnd, () => pendingPlanApprovalSlackTs,
-                        () => pendingPermissionSlackTs, startupTs, botUsername);
+                        () => pendingPermissionSlackTs, startupTs, botUsername,
+                        () => slackStatusTs, () => { slackStatusTs = null; lastSlackStatusText = null; });
 
                     // Block Kit button handler (plan approve/reject, permission buttons)
                     slackClient.OnBlockAction += (action) =>
