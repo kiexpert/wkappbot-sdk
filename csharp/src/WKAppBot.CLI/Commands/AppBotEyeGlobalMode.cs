@@ -100,6 +100,7 @@ internal partial class Program
         string? pendingPlanApprovalSlackTs = null;
         bool permissionPromptSentToSlack = false;
         string? pendingPermissionSlackTs = null;
+        DateTime? permissionPromptFirstSeen = null; // debounce: 3s before Slack notification
 
         // ── Slack status streaming ──
         string? slackStatusTs = null;
@@ -368,6 +369,11 @@ internal partial class Program
                             {
                                 try
                                 {
+                                    // Skip status streaming for permission_prompt during debounce window (auto-approved vanish quickly)
+                                    if (claudeStatus.Item1 == "permission_prompt" && permissionPromptFirstSeen != null
+                                        && (DateTime.Now - permissionPromptFirstSeen.Value).TotalSeconds < 3.0)
+                                        goto skipStatusStreaming;
+
                                     var statusEmoji = claudeStatus.Item1 switch
                                     {
                                         "executing" => ":gear:",
@@ -431,6 +437,7 @@ internal partial class Program
                                     }
                                 }
                                 catch { /* best-effort */ }
+                                skipStatusStreaming:
 
                                 // Plan approval → Slack
                                 if (claudeStatus.Item1 == "plan_approval_pending" && !planApprovalSentToSlack)
@@ -474,39 +481,49 @@ internal partial class Program
                                     pendingPlanApprovalSlackTs = null;
                                 }
 
-                                // Permission prompt → Slack
+                                // Permission prompt → Slack (3s debounce: auto-approved prompts vanish quickly)
                                 if (claudeStatus.Item1 == "permission_prompt" && !permissionPromptSentToSlack)
                                 {
-                                    try
+                                    if (permissionPromptFirstSeen == null)
+                                        permissionPromptFirstSeen = DateTime.Now;
+
+                                    if ((DateTime.Now - permissionPromptFirstSeen.Value).TotalSeconds >= 3.0)
                                     {
-                                        var permButtons = GetPermissionButtons(claudeHwnd);
-                                        if (permButtons.Count >= 2)
+                                        try
                                         {
-                                            var btnList = string.Join(" / ", permButtons);
-                                            var fallbackText = $":lock: 수락 요구: [{btnList}]";
-                                            var blocks = BuildPermissionBlocks(permButtons, claudeStatus.Item2);
-                                            var (sendOk, sendTs) = Task.Run(async () =>
-                                                await SlackSendBlocksViaApi(slackBotToken!, slackChannel!, fallbackText, blocks))
-                                                .GetAwaiter().GetResult();
-                                            if (sendOk)
+                                            var permButtons = GetPermissionButtons(claudeHwnd);
+                                            if (permButtons.Count >= 2)
                                             {
-                                                pendingPermissionSlackTs = sendTs;
-                                                permissionPromptSentToSlack = true;
-                                                Console.ForegroundColor = ConsoleColor.Cyan;
-                                                Console.WriteLine($"[EYE] Permission buttons sent to Slack: [{btnList}] (ts={sendTs})");
-                                                Console.ResetColor();
+                                                var btnList = string.Join(" / ", permButtons);
+                                                var fallbackText = $":lock: 수락 요구: [{btnList}]";
+                                                var blocks = BuildPermissionBlocks(permButtons, claudeStatus.Item2);
+                                                var (sendOk, sendTs) = Task.Run(async () =>
+                                                    await SlackSendBlocksViaApi(slackBotToken!, slackChannel!, fallbackText, blocks))
+                                                    .GetAwaiter().GetResult();
+                                                if (sendOk)
+                                                {
+                                                    pendingPermissionSlackTs = sendTs;
+                                                    permissionPromptSentToSlack = true;
+                                                    Console.ForegroundColor = ConsoleColor.Cyan;
+                                                    Console.WriteLine($"[EYE] Permission buttons sent to Slack: [{btnList}] (ts={sendTs})");
+                                                    Console.ResetColor();
+                                                }
                                             }
                                         }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine($"[EYE] Permission Slack share error: {ex.Message}");
+                                        catch (Exception ex)
+                                        {
+                                            Console.WriteLine($"[EYE] Permission Slack share error: {ex.Message}");
+                                        }
                                     }
                                 }
-                                if (claudeStatus.Item1 != "permission_prompt" && permissionPromptSentToSlack)
+                                if (claudeStatus.Item1 != "permission_prompt")
                                 {
-                                    permissionPromptSentToSlack = false;
-                                    pendingPermissionSlackTs = null;
+                                    permissionPromptFirstSeen = null; // reset debounce
+                                    if (permissionPromptSentToSlack)
+                                    {
+                                        permissionPromptSentToSlack = false;
+                                        pendingPermissionSlackTs = null;
+                                    }
                                 }
                             }
                         }
