@@ -102,10 +102,9 @@ Watch Options:
   --save <file>   Save log to specific file
 
 AppBotEye + Slack Commands:
-  eye [--port N] [--interval N] [--size WxH] [--pos X,Y]
-      WK AppBot Eye ??live overlay on Claude Desktop.
+  eye [--interval N] [--size WxH] [--pos X,Y]
+      WK AppBot Eye (GlobalMode) ??live text overlay on Claude Desktop.
       Slack + Prompt forwarding + keyword monitoring: ALWAYS ON.
-      --app ""title"": Track a specific app window.
   eye tick
       Run one immediate info-acquire tick and print Kro card snapshot.
   slack listen [--bg] [--ai] [--claude|--webbot] [--name N]
@@ -161,6 +160,41 @@ Data Directory:
   Runtime data (profiles, logs, handlers, output) stored in:
   {exe_dir}/wkappbot.hq/
 ");
+        return 0;
+    }
+
+    /// <summary>
+    /// Lightweight tick emitter — advertise work being done on the card.
+    /// Usage: wkappbot tick <tag> [status] [--find-host]
+    /// --find-host: auto-detect the most recent Claude session from eye_ticks.jsonl
+    ///   (for PostPublish where process tree doesn't reach Claude Desktop)
+    /// Not a meta tag, so it won't be filtered out of cards.
+    /// </summary>
+    static int TickCommand(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.WriteLine("Usage: wkappbot tick <tag> [status] [--find-host]");
+            Console.WriteLine("  e.g. wkappbot tick build \"CardCache 시스템 구현\"");
+            Console.WriteLine("  --find-host: auto-attach to most recent Claude session card");
+            return 1;
+        }
+
+        var findHost = args.Any(a => a == "--find-host");
+        var filtered = args.Where(a => a != "--find-host").ToArray();
+        var tag = filtered.Length > 0 ? filtered[0] : "tick";
+        var status = filtered.Length > 1 ? string.Join(" ", filtered.Skip(1)) : "done";
+
+        if (findHost)
+        {
+            // Find most recent Claude host from eye_ticks.jsonl and emit tick with that host
+            EmitEyeTickWithHost("tick", tag, status);
+        }
+        else
+        {
+            EmitEyeTick("tick", tag, status);
+        }
+        Console.WriteLine($"[TICK] tag={tag} status={status}");
         return 0;
     }
 

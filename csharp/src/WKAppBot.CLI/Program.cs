@@ -86,7 +86,7 @@ internal partial class Program
             // eye tick은 one-shot이라 Eye를 띄워도 cascade 안 됨 → 자동 실행 대상!
             // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
             var isEyeGlobal = command == "eye" && (restArgs.Length == 0 || restArgs[0] != "tick");
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" || isEyeGlobal;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" || isEyeGlobal;
             if (!isExcluded)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
@@ -110,6 +110,7 @@ internal partial class Program
                 "do" => DoCommand(restArgs),
                 "dismiss" => DismissCommand(restArgs),
                 "toolbar-ocr" => ToolbarOcrCommand(restArgs),
+                "titlebar" => TitlebarCommand(restArgs),
                 "chart-analyze" => ChartAnalyzeCommand(restArgs),
                 "tooltip-probe" => TooltipProbeCommand(restArgs),
                 "ocr" => OcrCommand(restArgs),
@@ -130,6 +131,7 @@ internal partial class Program
                 "com" => ComCommand(restArgs),
                 "telegram" => TelegramCommand(restArgs),
                 "zoom-demo" => ZoomDemoCommand(restArgs),
+                "tick" => TickCommand(restArgs),
                 "prompt-test" => PromptTestCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 _ when command.StartsWith("kro-trial-", StringComparison.OrdinalIgnoreCase) => KroTrialSpecialCommand(command, restArgs),
@@ -318,6 +320,7 @@ internal partial class Program
         public string Command { get; set; } = "";
         public string Tag { get; set; } = "";
         public string Status { get; set; } = "";
+        public string Cwd { get; set; } = "";  // working directory of the CLI process
     }
 
     static string EyeTicksPath => Path.Combine(DataDir, "runtime", "eye_ticks.jsonl");
@@ -350,6 +353,7 @@ internal partial class Program
                 Command = command,
                 Tag = tag,
                 Status = status,
+                Cwd = Environment.CurrentDirectory,
             };
 
             File.AppendAllText(EyeTicksPath, JsonSerializer.Serialize(tick) + Environment.NewLine);
@@ -360,12 +364,93 @@ internal partial class Program
         }
     }
 
+    /// <summary>
+    /// Emit eye tick with auto-detected host from eye_ticks.jsonl.
+    /// For use in PostPublish where process tree doesn't reach Claude Desktop.
+    /// Scans recent ticks for most recent Claude/Code host and adopts that host PID.
+    /// </summary>
+    static void EmitEyeTickWithHost(string command, string tag, string status)
+    {
+        try
+        {
+            var runtimeDir = Path.Combine(DataDir, "runtime");
+            Directory.CreateDirectory(runtimeDir);
+
+            // Find most recent host from eye_ticks.jsonl (tail 8KB = ~last 30 ticks)
+            int hostPid = 0;
+            string hostName = "", hostTitle = "";
+            try
+            {
+                if (File.Exists(EyeTicksPath))
+                {
+                    var lines = ReadTailBytes(EyeTicksPath, 8192);
+                    // Scan in reverse — most recent first
+                    for (int i = lines.Length - 1; i >= 0; i--)
+                    {
+                        if (string.IsNullOrWhiteSpace(lines[i])) continue;
+                        var t = System.Text.Json.JsonSerializer.Deserialize<EyeTick>(lines[i]);
+                        if (t?.HostPid > 0 && !string.IsNullOrWhiteSpace(t.HostTitle))
+                        {
+                            // Found a tick with a real host (e.g. claude, Code) — adopt it
+                            hostPid = t.HostPid;
+                            hostName = t.HostName ?? "";
+                            hostTitle = t.HostTitle ?? "";
+                            break;
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // Fallback to normal host detection if no host found in ticks
+            if (hostPid <= 0)
+            {
+                var pid = Environment.ProcessId;
+                var ppid = GetParentPid(pid);
+                (hostPid, hostName, hostTitle) = FindLogicalHost(pid, ppid);
+            }
+
+            var tick = new EyeTick
+            {
+                Pid = Environment.ProcessId,
+                ParentPid = GetParentPid(Environment.ProcessId),
+                ParentName = "build",
+                HostPid = hostPid,
+                HostName = hostName,
+                HostTitle = hostTitle,
+                Command = command,
+                Tag = tag,
+                Status = status,
+                Cwd = Environment.CurrentDirectory,
+            };
+
+            File.AppendAllText(EyeTicksPath, JsonSerializer.Serialize(tick) + Environment.NewLine);
+        }
+        catch { }
+    }
+
+    /// <summary>Read tail bytes from a file and split into lines (shared read, no lock)</summary>
+    static string[] ReadTailBytes(string path, int byteCount)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            if (fs.Length > byteCount) fs.Seek(-byteCount, SeekOrigin.End);
+            using var sr = new StreamReader(fs);
+            var text = sr.ReadToEnd();
+            return text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        }
+        catch { return Array.Empty<string>(); }
+    }
+
     static (int hostPid, string hostName, string hostTitle) FindLogicalHost(int selfPid, int directParentPid)
     {
         static bool IsShell(string n)
         {
             var x = (n ?? "").ToLowerInvariant();
-            return x is "powershell" or "pwsh" or "cmd" or "conhost" or "node" or "wkappbot";
+            // Include build tools (dotnet, msbuild) so PostPublish ticks walk past them to Claude
+            return x is "powershell" or "pwsh" or "cmd" or "conhost" or "node" or "wkappbot"
+                or "dotnet" or "msbuild";
         }
 
         int cur = directParentPid;

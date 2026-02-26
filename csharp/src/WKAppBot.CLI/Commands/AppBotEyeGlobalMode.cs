@@ -19,6 +19,7 @@ internal partial class Program
         public string LastTag { get; set; } = "";
         public string LastStatus { get; set; } = "";
         public DateTime LastTsUtc { get; set; }
+        public string Cwd { get; set; } = "";    // working directory for display
     }
 
     sealed class PromptDiag
@@ -57,6 +58,9 @@ internal partial class Program
     static string _cachedPromptPreview = "";
     static List<EyeParentCard> _cachedCards = new();
     static DateTime _lastForceFullLoadUtc = DateTime.MinValue;
+    // Card cache: content + changedUtc per card, persisted to disk
+    static string _cardCacheDir = "";
+    static Dictionary<string, (string content, DateTime changedUtc)> _cardCache = new();
     static string _dirtyTickFile = "";
     static long _dirtyTickLength = -1;
     static DateTime _dirtyTickWriteUtc = DateTime.MinValue;
@@ -105,6 +109,7 @@ internal partial class Program
         // ── Slack status streaming ──
         string? slackStatusTs = null;
         string? lastSlackStatusText = null;
+        string? lastExecutingText = null; // remember last "executing" status for prompt_ready transition
         var statusTsFile = Path.Combine(DataDir, "runtime", "status_streaming_ts.txt");
 
         // Restore previous status message ts (reuse on restart instead of creating new)
@@ -155,16 +160,8 @@ internal partial class Program
                     Console.WriteLine("[EYE] Slack Socket Mode connected (GlobalMode)");
                     Console.ResetColor();
 
-                    // Announce presence
+                    // Startup — no Slack announcement (reduces channel spam on hot-reload restarts)
                     string? startupTs = null;
-                    if (!string.IsNullOrEmpty(slackChannel))
-                    {
-                        var startupMsg = $"AppBotEye Global+Slack 온라인! `{Environment.MachineName}` pid={Environment.ProcessId}";
-                        var (startOk, sTs) = Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel, startupMsg, username: botUsername))
-                            .GetAwaiter().GetResult();
-                        if (startOk && sTs != null)
-                            startupTs = sTs;
-                    }
 
                     // Set up event handlers (Slack → Claude prompt forwarding, plan/permission approval, status streaming)
                     SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
@@ -314,6 +311,21 @@ internal partial class Program
 
                         if (claudeStatus != null)
                         {
+                            // Remember last executing text for "XX 후 프롬프트 입력 대기" transition
+                            if (claudeStatus.Item1 == "executing")
+                                lastExecutingText = claudeStatus.Item2;
+
+                            // Enrich prompt_ready with previous task context
+                            if (claudeStatus.Item1 == "prompt_ready" && lastExecutingText != null)
+                            {
+                                // Shorten: "Updated WKAppBot.CLI project file configuration" → first 30 chars
+                                var prev = lastExecutingText.Length > 30
+                                    ? lastExecutingText.Substring(0, 30) + "..."
+                                    : lastExecutingText;
+                                claudeStatus = Tuple.Create("prompt_ready", $"{prev} 후 입력 대기");
+                                lastExecutingText = null; // consume
+                            }
+
                             cachedClaudeStatusText = $"Claude: {claudeStatus.Item2}";
 
                             // Rate limit detection
@@ -387,9 +399,9 @@ internal partial class Program
                             {
                                 try
                                 {
-                                    // Skip status streaming for permission_prompt during debounce window (auto-approved vanish quickly)
-                                    if (claudeStatus.Item1 == "permission_prompt" && permissionPromptFirstSeen != null
-                                        && (DateTime.Now - permissionPromptFirstSeen.Value).TotalSeconds < 3.0)
+                                    // Never show permission_prompt in status stream — handled by Block Kit buttons separately.
+                                    // When permission clears, idle handler uses lastExecutingText → "XX 후 프롬프트 대기"
+                                    if (claudeStatus.Item1 == "permission_prompt")
                                         goto skipStatusStreaming;
 
                                     var statusEmoji = claudeStatus.Item1 switch
@@ -543,6 +555,26 @@ internal partial class Program
                         }
                         else
                         {
+                            // Claude status null (idle) — update to "XX 후 프롬프트 대기"
+                            // Use lastExecutingText (real work), skip transient states (permission, plan approval)
+                            if (slackStatusTs != null && lastExecutingText != null
+                                && !lastSlackStatusText?.Contains("프롬프트 대기") == true)
+                            {
+                                try
+                                {
+                                    var prev = lastExecutingText.Length > 30
+                                        ? lastExecutingText.Substring(0, 30) + "..."
+                                        : lastExecutingText;
+                                    var idleText = $":speech_balloon: {prev} 후 프롬프트 대기";
+                                    Task.Run(async () => await SlackUpdateMessageAsync(
+                                        slackBotToken!, slackChannel!, slackStatusTs, idleText))
+                                        .Wait(3000);
+                                    lastSlackStatusText = idleText;
+                                }
+                                catch { }
+                            }
+                            cachedClaudeStatusText = null;
+
                             // Claude status null — auto-clear stale rate limit
                             if (wasRateLimited)
                             {
@@ -630,11 +662,36 @@ internal partial class Program
             }
 
             // ── Hot-reload check (~every 5 sec) ──
+            // Detects: (1) EXE timestamp change (direct overwrite), (2) .new.exe staged (locked EXE fallback)
             if (frameCount % 50 == 0 && exeStartTime != DateTime.MinValue)
             {
                 try
                 {
-                    if (File.GetLastWriteTimeUtc(exePath) != exeStartTime)
+                    var newExePath = Path.Combine(Path.GetDirectoryName(exePath) ?? "", "wkappbot.new.exe");
+                    if (File.Exists(newExePath))
+                    {
+                        // .new.exe staged by PostPublish (EXE was locked) — swap and restart
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("[EYE] Hot-reload: wkappbot.new.exe detected — swapping");
+                        Console.ResetColor();
+                        bool swapped = false;
+                        try
+                        {
+                            File.Delete(exePath);
+                            File.Move(newExePath, exePath);
+                            Console.WriteLine("[EYE] Hot-reload: EXE swapped successfully");
+                            swapped = true;
+                        }
+                        catch (Exception swapEx)
+                        {
+                            Console.WriteLine($"[EYE] Hot-reload: swap failed ({swapEx.Message})");
+                            // Delete .new.exe to prevent infinite restart loop
+                            try { File.Delete(newExePath); } catch { }
+                            Console.WriteLine("[EYE] Hot-reload: deleted .new.exe to prevent restart loop — continuing");
+                        }
+                        if (swapped) break; // only restart if swap succeeded
+                    }
+                    else if (File.GetLastWriteTimeUtc(exePath) != exeStartTime)
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine("[EYE] Hot-reload: EXE changed — shutting down");
@@ -666,11 +723,7 @@ internal partial class Program
         {
             try
             {
-                if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
-                {
-                    Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!, "AppBotEye Global+Slack 종료", username: botUsername))
-                        .Wait(3000);
-                }
+                // Shutdown — no Slack announcement (reduces channel spam on hot-reload restarts)
                 slackClient.Dispose();
             }
             catch { }
@@ -862,6 +915,12 @@ internal partial class Program
                 latestAge = (DateTime.UtcNow - ts.ToUniversalTime()).TotalSeconds;
             var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastKeepAwakeUtc).TotalSeconds;
             Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
+
+            // ── Build final card display (same as eye overlay) and print ──
+            var summary = BuildEyeSummary(cards, latest, prompt);
+            Console.WriteLine($"[EYE_TICK] ── card display ──");
+            foreach (var line in summary.Split('\n'))
+                Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
 
             // ── Slack inbox check + forward to Claude prompt ──
             EyeTickForwardSlackInbox();
@@ -1161,48 +1220,236 @@ internal partial class Program
     {
         var sb = new StringBuilder();
 
+        // ── Action triplet (always on top — real-time accessibility probe) ──
         var (a11y, act, fallback) = ReadLatestActionTriplet();
         if (!string.IsNullOrWhiteSpace(a11y)) sb.AppendLine($"엑빌: {a11y}");
         if (!string.IsNullOrWhiteSpace(act)) sb.AppendLine($"액션: {act}");
         if (!string.IsNullOrWhiteSpace(fallback)) sb.AppendLine($"폴백: {fallback}");
 
         if (!string.IsNullOrWhiteSpace(prompt))
-            sb.AppendLine($"최근 생각: {prompt}");
+        {
+            // Truncate to ~60 chars to keep overlay compact — cards must stay visible
+            var truncated = prompt.Length > 60 ? prompt[..60] + "..." : prompt;
+            sb.AppendLine($"최근 생각: {truncated}");
+        }
 
+        // ── Build KRO section text (rendered inline with cards by recency) ──
+        // KRO timestamp = time when prompt CONTENT last changed (not file mtime, not eye tick time)
+        // File mtime can update without content change; eye tick is CLI's time, not KRO's.
+        string kroBlock = "";
+        DateTime kroTsUtc = DateTime.MinValue;
         if (latest != null)
         {
+            // KRO timestamp from file-based card cache (content-change detection)
+            var kroContent = prompt ?? "";
+            kroTsUtc = CardCacheGetTimestamp("kro", kroContent);
+
+            var kroSb = new StringBuilder();
+            // KRO's home is ~/.openclaw/, not the CLI command's CWD
+            var openClawDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw");
+            var kroCwd = AbbreviateCwd(openClawDir);
             var (progress, done, next, block) = BuildKroStatus3(latest);
-            sb.AppendLine($"크로 진행: {progress}");
-            sb.AppendLine($"크로 완료: {done}");
-            sb.AppendLine($"크로 예정: {next}");
+            kroSb.AppendLine($"크로 진행: {progress}" + (string.IsNullOrWhiteSpace(kroCwd) ? "" : $" [{kroCwd}]"));
+            kroSb.AppendLine($"크로 완료: {done}");
+            kroSb.AppendLine($"크로 예정: {next}");
 
             var plans = ExtractRecentPlanItems(maxItems: 3);
             if (plans.Count > 0)
             {
                 for (int i = 0; i < plans.Count; i++)
-                    sb.AppendLine($"- —:— {plans[i]}");
+                    kroSb.AppendLine($"- —:— {plans[i]}");
                 if (_lastPlanItemsCache.Count > plans.Count)
-                    sb.AppendLine($"- —:— 그 외 {_lastPlanItemsCache.Count - plans.Count}건...");
+                    kroSb.AppendLine($"- —:— 그 외 {_lastPlanItemsCache.Count - plans.Count}건...");
             }
 
             if (!string.IsNullOrWhiteSpace(block))
-                sb.AppendLine($"크로 이슈: {block}");
-            sb.AppendLine("----");
+                kroSb.AppendLine($"크로 이슈: {block}");
+            kroBlock = kroSb.ToString().TrimEnd();
         }
 
-        if (cards.Count == 0)
-            sb.AppendLine("(active parent cards: 0)");
+        // ── Apply CardCache to 클롣 cards — timestamp reflects content change, not tick time ──
+        // If tag/status hasn't changed, the card keeps its old timestamp (won't jump to top)
+        foreach (var c in cards)
+        {
+            var clotContent = $"{c.LastTag}|{c.LastStatus}";
+            var clotKey = $"clot_{c.ParentPid}";
+            var cachedTs = CardCacheGetTimestamp(clotKey, clotContent);
+            if (cachedTs == DateTime.MinValue)
+            {
+                // First encounter — seed with tick timestamp (new card should appear at correct position)
+                cachedTs = c.LastTsUtc;
+                _cardCache[clotKey] = (clotContent, cachedTs);
+                CardCacheSave(clotKey, clotContent, cachedTs);
+            }
+            c.LastTsUtc = cachedTs;
+        }
+
+        // ── Sort ALL cards (including KRO) by recency — newest on top ──
+        // KRO = Claude Code itself (~/.openclaw/), cards = individual CLI commands (each with own CWD)
+        // They share the same Claude Desktop host but are separate entities — no dedup needed
+        // Hide KRO if its tick is older than 24h (stale — KRO not active)
+        bool kroStale = kroTsUtc != DateTime.MinValue && (DateTime.UtcNow - kroTsUtc).TotalHours > 24;
+        bool hasKro = !string.IsNullOrWhiteSpace(kroBlock) && !kroStale;
+        var sortedCards = cards.OrderByDescending(x => x.LastTsUtc).Take(6).ToList();
+        bool kroRendered = !hasKro;  // if no KRO or stale, mark as already rendered
+
+        if (sortedCards.Count == 0 && !hasKro)
+        {
+            sb.AppendLine("(active cards: 0)");
+        }
         else
         {
-            foreach (var c in cards.OrderByDescending(x => x.LastTsUtc).Take(6))
+            // Interleave: render each item in time order (newest first)
+            int cardIdx = 0;
+            while (cardIdx < sortedCards.Count || !kroRendered)
             {
-                var age = Math.Max(0, (int)(DateTime.UtcNow - c.LastTsUtc).TotalSeconds);
-                var head = string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : $"{c.ParentTitle} ({c.ParentName}:{c.ParentPid})";
-                sb.AppendLine($"[{head}] {c.LastTag} {c.LastStatus} -{age}s");
+                bool renderKroNow = false;
+                if (!kroRendered)
+                {
+                    if (cardIdx >= sortedCards.Count)
+                        renderKroNow = true;
+                    else if (kroTsUtc > sortedCards[cardIdx].LastTsUtc)
+                        renderKroNow = true;
+                }
+
+                if (renderKroNow)
+                {
+                    sb.AppendLine(kroBlock);
+                    sb.AppendLine("----");
+                    kroRendered = true;
+                }
+                else if (cardIdx < sortedCards.Count)
+                {
+                    var c = sortedCards[cardIdx++];
+                    var age = Math.Max(0, (int)(DateTime.UtcNow - c.LastTsUtc).TotalSeconds);
+                    var cwdTag = AbbreviateCwd(c.Cwd);
+                    var ageText = age < 60 ? $"{age}초 전" : age < 3600 ? $"{age / 60}분 전" : $"{age / 3600}시간 전";
+
+                    // Header: [CWD] or process info
+                    var header = string.IsNullOrWhiteSpace(cwdTag)
+                        ? (string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : c.ParentTitle)
+                        : cwdTag;
+                    sb.AppendLine($"[{header}] {c.ParentName}:{c.ParentPid}");
+                    sb.AppendLine($"클롣 작업: {c.LastTag}");
+                    sb.AppendLine($"클롣 상태: {c.LastStatus} ({ageText})");
+                    sb.AppendLine("----");
+                }
+                else
+                {
+                    break;
+                }
             }
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Abbreviate a working directory path for compact display.
+    /// Drive letter + first letter of each intermediate folder + "-" + leaf folder.
+    /// e.g. "W:\GitHub\WKAppBot" → "WG-WKAppBot"
+    ///      "W:\HTS-Project\Source\Main\MainLib" → "WHSM-MainLib"
+    ///      "W:\VIGSOne" → "W-VIGSOne"
+    /// </summary>
+    static string AbbreviateCwd(string? cwd)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return "";
+        var path = cwd.Replace('\\', '/').TrimEnd('/');
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return "";
+        var drive = parts[0].TrimEnd(':').ToUpperInvariant();  // "W:" → "W"
+        if (parts.Length <= 1) return drive;
+        var leaf = parts[^1];
+        // Middle folders → take first char of each as uppercase initial
+        var initials = "";
+        for (int i = 1; i < parts.Length - 1; i++)
+            if (parts[i].Length > 0) initials += char.ToUpperInvariant(parts[i][0]);
+        return $"{drive}{initials}-{leaf}";
+    }
+
+    /// <summary>
+    /// File-based card cache: stores each card's content + last-changed timestamp.
+    /// Content-change detection: timestamp only updates when content actually differs.
+    /// Survives process restarts (one-shot eye tick, eye restart, etc.)
+    /// Files: wkappbot.hq/runtime/card_cache/{cardKey}.json
+    /// </summary>
+    static string GetCardCacheDir()
+    {
+        if (string.IsNullOrEmpty(_cardCacheDir))
+        {
+            _cardCacheDir = Path.Combine(DataDir, "runtime", "card_cache");
+            Directory.CreateDirectory(_cardCacheDir);
+        }
+        return _cardCacheDir;
+    }
+
+    /// <summary>
+    /// Get the cached changedUtc for a card, updating if content changed.
+    /// Returns DateTime.MinValue if card has never been seen.
+    /// </summary>
+    static DateTime CardCacheGetTimestamp(string cardKey, string currentContent)
+    {
+        // Memory cache first
+        if (_cardCache.TryGetValue(cardKey, out var cached))
+        {
+            if (cached.content == currentContent)
+                return cached.changedUtc;
+            // Content changed — update
+            var now = DateTime.UtcNow;
+            _cardCache[cardKey] = (currentContent, now);
+            CardCacheSave(cardKey, currentContent, now);
+            return now;
+        }
+
+        // Cold start — load from disk
+        var diskEntry = CardCacheLoad(cardKey);
+        if (diskEntry.HasValue)
+        {
+            if (diskEntry.Value.content == currentContent)
+            {
+                _cardCache[cardKey] = diskEntry.Value;
+                return diskEntry.Value.changedUtc;
+            }
+            // Disk content differs from current — content changed
+            var now = DateTime.UtcNow;
+            _cardCache[cardKey] = (currentContent, now);
+            CardCacheSave(cardKey, currentContent, now);
+            return now;
+        }
+
+        // Never seen — first encounter, use MinValue (card goes to bottom)
+        _cardCache[cardKey] = (currentContent, DateTime.MinValue);
+        CardCacheSave(cardKey, currentContent, DateTime.MinValue);
+        return DateTime.MinValue;
+    }
+
+    static void CardCacheSave(string cardKey, string content, DateTime changedUtc)
+    {
+        try
+        {
+            var file = Path.Combine(GetCardCacheDir(), $"{cardKey}.json");
+            var json = JsonSerializer.Serialize(new { content, changedUtc = changedUtc.ToString("O") });
+            var tmp = file + ".tmp";
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, file, overwrite: true);
+        }
+        catch { }
+    }
+
+    static (string content, DateTime changedUtc)? CardCacheLoad(string cardKey)
+    {
+        try
+        {
+            var file = Path.Combine(GetCardCacheDir(), $"{cardKey}.json");
+            if (!File.Exists(file)) return null;
+            var node = JsonNode.Parse(File.ReadAllText(file));
+            var content = node?["content"]?.GetValue<string>() ?? "";
+            var tsStr = node?["changedUtc"]?.GetValue<string>() ?? "";
+            if (DateTime.TryParse(tsStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out var ts))
+                return (content, ts.ToUniversalTime());
+            return (content, DateTime.MinValue);
+        }
+        catch { return null; }
     }
 
     static (int x, int y) GetRightmostMonitorAnchor(int width, int height)
@@ -1627,6 +1874,14 @@ internal partial class Program
         return (report, "상태 대기", "상태 갱신 대기", "");
     }
 
+    // Meta tags: diagnostic/overhead commands that shouldn't hide meaningful work in cards
+    // e.g. "eye tick" checks status, "snapshot" captures state — not the real work itself
+    static readonly HashSet<string> _metaTags = new(StringComparer.OrdinalIgnoreCase)
+    { "eye", "snapshot", "eye tick", "validate", "help" };
+
+    static bool IsMetaTag(string? tag) =>
+        !string.IsNullOrWhiteSpace(tag) && _metaTags.Contains(tag!);
+
     static List<EyeParentCard> ReadEyeCards(int staleSeconds = 25)
     {
         var cards = new Dictionary<int, EyeParentCard>();
@@ -1650,8 +1905,11 @@ internal partial class Program
                 var pname = !string.IsNullOrWhiteSpace(t.HostName) ? t.HostName : (string.IsNullOrWhiteSpace(t.ParentName) ? "unknown" : t.ParentName);
                 var ptitle = t.HostTitle ?? "";
 
-                if (!cards.TryGetValue(ppid, out var c) || tsUtc > c.LastTsUtc)
+                // Always update timestamp with latest tick
+                // But for tag/status: meta tags (eye, snapshot) don't overwrite meaningful work tags
+                if (!cards.TryGetValue(ppid, out var c))
                 {
+                    // First tick for this PID — always accept
                     cards[ppid] = new EyeParentCard
                     {
                         ParentPid = ppid,
@@ -1659,8 +1917,26 @@ internal partial class Program
                         ParentTitle = ptitle,
                         LastTag = t.Tag,
                         LastStatus = t.Status,
-                        LastTsUtc = tsUtc
+                        LastTsUtc = tsUtc,
+                        Cwd = t.Cwd ?? "",
                     };
+                }
+                else if (tsUtc > c.LastTsUtc)
+                {
+                    // Newer tick — always update timestamp and process info
+                    c.LastTsUtc = tsUtc;
+                    c.ParentName = pname;
+                    c.ParentTitle = ptitle;
+                    if (!string.IsNullOrWhiteSpace(t.Cwd)) c.Cwd = t.Cwd;
+
+                    // Only update tag/status if:
+                    // 1. New tick is non-meta (real work always wins), OR
+                    // 2. Existing tag is also meta (meta→meta is fine)
+                    if (!IsMetaTag(t.Tag) || IsMetaTag(c.LastTag))
+                    {
+                        c.LastTag = t.Tag;
+                        c.LastStatus = t.Status;
+                    }
                 }
             }
             catch { }

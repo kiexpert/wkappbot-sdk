@@ -250,7 +250,22 @@ Examples:
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"  ✗ BLOCKER detected: {blockerInfo}");
                 Console.ResetColor();
-                Console.WriteLine("    (a dialog may be blocking the app's message pump)");
+
+                // Try to auto-dismiss using dialog handlers (login, alert, etc.)
+                var handlersDir2 = Path.Combine(DataDir, "handlers");
+                var preHandlerMgr = Directory.Exists(handlersDir2) ? new DialogHandlerManager(handlersDir2) : null;
+                var (preHandled, _) = TryHandleBlocker(win.Handle, preHandlerMgr);
+                if (preHandled)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("  ✓ [BLOCK] Pre-input blocker auto-dismissed");
+                    Console.ResetColor();
+                    Thread.Sleep(300); // wait for app to recover
+                }
+                else
+                {
+                    Console.WriteLine("    (a dialog may be blocking the app's message pump)");
+                }
             }
 
             // Activate the MDI form to ensure it's on top
@@ -1992,6 +2007,23 @@ Examples:
                 Console.ResetColor();
             }
         }
+
+        // Post-input: check for alert/popup dialogs that may have appeared
+        // (e.g., "알림!!" after invalid input, "로그인" reconnection, etc.)
+        Thread.Sleep(200); // brief wait for dialog to appear
+        try
+        {
+            var handlersDir = Path.Combine(DataDir, "handlers");
+            var postHandlerMgr = Directory.Exists(handlersDir) ? new DialogHandlerManager(handlersDir) : null;
+            var (handled, _) = TryHandleBlocker(win.Handle, postHandlerMgr);
+            if (handled)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("[INPUT] Post-input alert dialog auto-dismissed");
+                Console.ResetColor();
+            }
+        }
+        catch { /* best-effort — don't fail input because of dismiss failure */ }
 
         // Summary
         Console.WriteLine();
