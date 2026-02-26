@@ -55,7 +55,7 @@ internal partial class Program
     /// <summary>Default keywords for keyword monitoring (Korean typos + English variants).</summary>
     static readonly string[] DefaultKeywords = new[]
     {
-        "클롯", "클롣", "클로드", "앱봇",          // Korean + typos
+        "클롣", "클롯", "클로드", "앱봇",          // Korean + typos (클롣 = primary)
         "claude", "appbot", "wkappbot", "클봇",    // English + mixed
     };
 

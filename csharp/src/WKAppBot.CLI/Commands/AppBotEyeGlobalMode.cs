@@ -925,7 +925,7 @@ internal partial class Program
                 if (ts == lastTs)
                 {
                     var ctxClean = System.Text.RegularExpressions.Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
-                    var who = user == botUserId ? "클롯" : $"@{user}";
+                    var who = user == botUserId ? "클롣" : $"@{user}";
                     contextLine = $"[직전 대화] {who}: {ctxClean}";
                     continue;
                 }
@@ -1015,7 +1015,7 @@ internal partial class Program
 
     /// <summary>
     /// Check recent bot messages for new thread replies from users.
-    /// Responds when: (1) parent is from bot (클롯) → any user reply, or (2) @mention in reply.
+    /// Responds when: (1) parent is from bot (클롣) → any user reply, or (2) @mention in reply.
     /// </summary>
     static void EyeTickCheckThreadReplies(List<System.Text.Json.Nodes.JsonNode> channelMessages,
         string botToken, string channel, string? botUserId, ClaudePromptHelper helper)
@@ -1098,7 +1098,7 @@ internal partial class Program
                     if (cleanParent.Length > 80) cleanParent = cleanParent[..80] + "…";
 
                     var replyCmd = $"wkappbot slack reply \"response\" --channel {channel} --thread {threadTs}";
-                    var promptText = $"[쓰레드 시작] 클롯: {cleanParent}\n\n@{rUser}: {cleanReply}\n\n(Slack thread reply — {replyCmd})";
+                    var promptText = $"[쓰레드 시작] 클롣: {cleanParent}\n\n@{rUser}: {cleanReply}\n\n(Slack thread reply — {replyCmd})";
 
                     var fresh = helper.FindPrompt();
                     if (fresh == null)
