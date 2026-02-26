@@ -81,15 +81,10 @@ internal partial class Program
             }
             catch { }
 
-            // Auto-launch AppBotEye for all commands except eye/help/validate/win-move/logcat
-            // 앱봇이 뭔가 하면 눈은 항상 떠있어야!
-            // slack은 listen/stop만 제외 (send/reply/upload/screenshot 등은 눈 띄워야!)
-            var noEyeCommands = new HashSet<string> {
-                "eye", "help", "--help", "-h", "validate", "win-move", "logcat"
-            };
-            var isSlackListenOrStop = command == "slack" && restArgs.Length > 0 &&
-                (restArgs[0] == "listen" || restArgs[0] == "stop" || restArgs[0] == "status");
-            if (!noEyeCommands.Contains(command) && !isSlackListenOrStop)
+            // Auto-launch AppBotEye for ALL commands except help only
+            // 앱봇이 뭔가 하면 눈은 항상 떠있어야! (도움말만 제외)
+            var isHelp = command is "help" or "--help" or "-h";
+            if (!isHelp)
             {
                 try { LaunchAppBotEyeIfNeeded(); } catch { /* best-effort */ }
             }
