@@ -349,8 +349,10 @@ internal partial class Program
             // Get last processed timestamp
             var lastTs = LoadLastTs(channel);
 
-            // Fetch recent messages via conversations.history
-            var messages = SlackFetchHistoryAsync(botToken, channel, oldest: lastTs, limit: 5)
+            // Fetch recent messages via conversations.history (inclusive=true to get context msg at lastTs)
+            var hasLastTs = !string.IsNullOrEmpty(lastTs);
+            var messages = SlackFetchHistoryAsync(botToken, channel, oldest: lastTs,
+                limit: hasLastTs ? 6 : 5, inclusive: hasLastTs)
                 .GetAwaiter().GetResult();
 
             if (messages.Count == 0)
@@ -359,7 +361,8 @@ internal partial class Program
                 return;
             }
 
-            // Filter: skip bot's own messages, skip old ones, newest first → reverse for chronological
+            // Separate context message (at lastTs) from new messages
+            string? contextLine = null; // last processed message for conversation context
             var newMsgs = new List<(string user, string text, string ts)>();
             foreach (var msg in messages)
             {
@@ -368,13 +371,21 @@ internal partial class Program
                 var ts = msg["ts"]?.GetValue<string>() ?? "";
                 var subtype = msg["subtype"]?.GetValue<string>();
 
-                // Skip bot's own messages
-                if (user == botUserId) continue;
                 // Skip subtypes (bot_message, channel_join, etc.)
                 if (!string.IsNullOrEmpty(subtype)) continue;
-                // Skip if same as lastTs (already processed)
-                if (ts == lastTs) continue;
                 if (string.IsNullOrWhiteSpace(text)) continue;
+
+                // Message at lastTs = context (already processed, include for conversation flow)
+                if (ts == lastTs)
+                {
+                    var ctxClean = System.Text.RegularExpressions.Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
+                    var who = user == botUserId ? "클롯" : $"@{user}";
+                    contextLine = $"[직전 대화] {who}: {ctxClean}";
+                    continue;
+                }
+
+                // Skip bot's own messages (for new messages only)
+                if (user == botUserId) continue;
 
                 newMsgs.Add((user, text, ts));
             }
@@ -408,7 +419,9 @@ internal partial class Program
                 if (string.IsNullOrWhiteSpace(cleanText)) continue;
 
                 var replyCmd = $"wkappbot slack reply \"response\" --channel {channel} --thread {ts}";
-                var promptText = $"{cleanText}\n\n(Slack @{user} — reply: {replyCmd})";
+                // Include context from last processed message for conversation flow
+                var contextPrefix = (contextLine != null && forwarded == 0) ? $"{contextLine}\n\n" : "";
+                var promptText = $"{contextPrefix}{cleanText}\n\n(Slack @{user} — reply: {replyCmd})";
 
                 // Re-find prompt each time (window may shift)
                 var fresh = helper.FindPrompt();
