@@ -1,6 +1,6 @@
 # WKAppBot - Windows App Automation Test Framework
 
-## 동료 클롯을 위한 운영 규칙 (필독!)
+## 동료 클롣을 위한 운영 규칙 (필독!)
 
 ### 질문/소통
 - **유저에게 질문할 때**: 반드시 **Slack과 Claude Code 여기에 동시에** 전달할 것
@@ -40,7 +40,7 @@
   - 프롬프트 못찾으면: 다음 tick에서 재시도 (lastTs 미갱신)
   - **슬랙 메시지를 받았으면 반드시 슬랙으로 응답할 것!** (`wkappbot slack send` 또는 `wkappbot slack reply`)
   - **쓰레드 댓글 감지**: conversations.replies API로 봇 메시지의 쓰레드 댓글 자동 조회
-    - 클롯이 보낸 메시지(bot_id/botUserId)에 유저 댓글 → 자동 전달
+    - 클롣이 보낸 메시지(bot_id/botUserId)에 유저 댓글 → 자동 전달
     - @WKAppBot 태깅 포함 시 → 무조건 전달 (어느 쓰레드든)
     - per-thread lastTs 추적 (`{channel}_t_{threadTs}` 키)
 
@@ -68,7 +68,7 @@
 
 ### Slack + 프롬프트 전달
 - Slack 수신 메시지는 **항상** Claude 프롬프트에 전달 (옵션 없음)
-- 키워드 감시("클롯", "claude", "appbot" 등)도 **항상** 활성
+- 키워드 감시("클롣", "claude", "appbot" 등)도 **항상** 활성
 - `--prompt`, `--keywords`, `--no-slack` 같은 옵션은 **존재하지 않음**
 - 프롬프트 입력 실패 시: 전경 윈도우 진단 + Slack에 상황 공유 (계획승인/권한창 가능성)
 
@@ -79,7 +79,7 @@
 
 ### 문서화 (토큰 안전)
 - **중요 발견/전략은 반드시 CLAUDE.md + 소스 주석에 기록** (컨텍스트 유실 대비!)
-- 다음 세션의 클롯이 처음부터 다시 삽질하지 않게 노하우를 남겨야 함
+- 다음 세션의 클롣이 처음부터 다시 삽질하지 않게 노하우를 남겨야 함
 - `knowhow.md`도 적극 활용 (컨트롤별 자동화 노하우)
 
 ### 에러 대응
@@ -106,7 +106,7 @@
 - 영웅문은 owner-drawn → GetWindowText 빈 문자열 → OCR 폴백
 
 ### 금지 사항
-- 클롯에게 전달을 차단하는 옵션 절대 만들지 말 것
+- 클롣에게 전달을 차단하는 옵션 절대 만들지 말 것
 - 앱봇의 눈을 안 띄우는 옵션 만들지 말 것
 - 유저에게 여기(프롬프트)에서만 질문하지 말 것 (반드시 슬랙 동시 발송)
 
@@ -261,7 +261,7 @@ wkappbot knowhow web <domain> "lesson" [--selector "..."] [--category "..."]
 wkappbot knowhow web-read <domain> [--selector "..."]
 wkappbot knowhow web-list
 ```
-- knowhow.md = "클롯→미래 클롯" 노트 (한번 실수한 건 다시 안 한다!)
+- knowhow.md = "클롣→미래 클롣" 노트 (한번 실수한 건 다시 안 한다!)
 - Win32: 각 컨트롤 폴더에 knowhow.md append (form-level + control-level)
 - Web: `wkappbot.hq/web_profiles/{domain}/knowhow.md` + 요소별 하위 폴더
 - SmartClickButton 전략 폴백 시 자동 기록 (왜 실패했는지)
@@ -747,7 +747,7 @@ teardown:
 - **Slack Socket Mode 완료**: 양방향 메시징 — WebSocket으로 @mention 수신 + chat.postMessage 전송 (zero deps)
 - **Slack 파일 업로드 완료**: files:write 스코프 + v2 3단계 API (getUploadURL → PUT → complete)
 - **Slack→Claude 프롬프트 브릿지 완료**: 슬랙 메시지를 Claude Code 프롬프트에 직접 입력 (항상 ON)
-- **키워드 감시 완료**: "클롯/claude/appbot" 등 키워드 감지 → 자동 전달 (항상 ON)
+- **키워드 감시 완료**: "클롣/claude/appbot" 등 키워드 감지 → 자동 전달 (항상 ON)
 - **웹봇 Slack API 자동화 완료**: CDP로 api.slack.com OAuth 페이지에서 스코프 추가 + 앱 재설치 자동 수행
 - **HandlePromptLost 완료**: 프롬프트 유실 시 전경 윈도우 스크린샷 → Slack 업로드 (원격 진단)
 - **knowhow.md 완료**: 컨트롤별 자동화 노하우 기록 (Win32 + Web) — CLI + SmartClickButton 자동 기록
@@ -780,8 +780,8 @@ teardown:
 - **프롬프트 실패 진단 완료**: FindPrompt 실패 시 전경 윈도우 진단 + Slack 상황 공유 (계획승인/권한창 가능성 안내)
 - **Rate Limit 자기감지 루프 수정 완료**: AppBotEye 오버레이 텍스트가 UIA에 노출 → 자기 텍스트를 rate limit으로 오인하는 무한 루프 → RootWebArea 스코프 제한 + 엄격한 패턴 매칭으로 해결
 - **Rate Limit ParseResetTime 수정 완료**: 리셋 시간이 지나면 다음날로 롤오버하는 버그 제거 + null 상태 캐시 잔류 수정
-- **Slack 봇 이름 "클롯" 완료**: BotUsername "클봇" → "클롯"으로 변경 (chat:write.customize 스코프)
-- **Slack 스레드 맥락 전달 완료**: 프롬프트 전달 시 [쓰레드 시작] + [직전 메시지/클롯 응답] 맥락 포함 (GetThreadContext 연동)
+- **Slack 봇 이름 "클롣" 완료**: BotUsername "클봇" → "클롣"으로 변경 (chat:write.customize 스코프)
+- **Slack 스레드 맥락 전달 완료**: 프롬프트 전달 시 [쓰레드 시작] + [직전 메시지/클롣 응답] 맥락 포함 (GetThreadContext 연동)
 - **Slack "전달했습니다" 자동 삭제 완료**: OnSelfMessage 이벤트 + pending_acks.json 파일 IPC → 봇 응답 시 ack 메시지 자동 삭제
 - **키움 프록시봇 Phase A 완료**: 32비트 프록시 EXE + COM 호스팅 + Named Pipe 서버 + 이벤트 싱크 (KiwoomProxy)
 - **Focusless PostMessage 입력 완료**: Method 9 (PostMsgPipe) + Method 10 (Focusless) — CMaskEditEx 종목코드 입력 해결
@@ -1068,7 +1068,7 @@ teardown:
 - **Click-to-restore**: 오버레이 클릭 시 대상 앱/Chrome 원본 윈도우 ShowWindow
 - 파일: `AppBotEyeCommands.cs`, `AppBotEyeWindow.cs`, `AppBotEyeHost.cs`, `ActionState.cs`
 
-### Slack WebBot 라이브 스트리밍 — "클롯이 바쁠 때 슬랙에서 현황 확인" ✅
+### Slack WebBot 라이브 스트리밍 — "클롣이 바쁠 때 슬랙에서 현황 확인" ✅
 **상태**: 완료
 - `--webbot` 플래그로 Slack 데몬에 WebBot 모니터링 모드 활성화
 - **Claude busy 감지**: UIA "중단" 버튼 존재 여부로 Claude 작업 상태 탐지

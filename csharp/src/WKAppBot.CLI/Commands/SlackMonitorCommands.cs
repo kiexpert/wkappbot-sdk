@@ -286,11 +286,11 @@ internal partial class Program
     /// <summary>Bot username for Slack messages — computed once at startup from CWD folder name.
     /// Requires chat:write.customize scope — Slack silently ignores if scope missing.
     /// Multiple bot instances identify themselves by folder name: "클봇 [WKAppBot]", "클봇 [HTS]", etc.</summary>
-    static readonly string BotUsername = $"클롯 [{Path.GetFileName(Environment.CurrentDirectory) ?? Environment.MachineName}]";
+    static readonly string BotUsername = $"클롣 [{Path.GetFileName(Environment.CurrentDirectory) ?? Environment.MachineName}]";
 
     /// <summary>Build Slack username override from instance name. null = use default bot name.</summary>
     static string? GetBotUsername(string? instanceName) =>
-        instanceName != null ? $"클롯 [{instanceName}]" : null;
+        instanceName != null ? $"클롣 [{instanceName}]" : null;
 
     /// <summary>Find Chrome main window handle by PID.</summary>
     static IntPtr FindChromeHwndByPid(int pid)
@@ -419,7 +419,7 @@ internal partial class Program
             if (!string.IsNullOrEmpty(prevText))
             {
                 if (prevText.Length > 200) prevText = prevText[..197] + "...";
-                var label = prevIsBot ? "[직전 클롯 응답]" : "[직전 메시지]";
+                var label = prevIsBot ? "[직전 클롣 응답]" : "[직전 메시지]";
                 sb.AppendLine();
                 sb.AppendLine(label);
                 sb.AppendLine(prevText);

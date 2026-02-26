@@ -1176,7 +1176,7 @@ internal partial class Program
         };
 
         // Handle channel messages (thread reply forwarding + keyword monitoring + plan approval)
-        var keywords = new[] { "클롯", "클봇", "claude", "appbot", "wkappbot" };
+        var keywords = new[] { "클롣", "클롯", "클봇", "claude", "appbot", "wkappbot" };
         slack.OnMessage += (msg) =>
         {
             if (string.IsNullOrEmpty(msg.Text)) return;
