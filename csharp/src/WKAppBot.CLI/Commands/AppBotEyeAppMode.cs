@@ -1007,8 +1007,9 @@ internal partial class Program
         // Auto-deletes after 15 seconds — ack purpose is instant receipt confirmation only
         void SendAndTrackAck(string ch, string threadKey)
         {
+            var ackText = $"Claude에 전달했습니다! (thread={threadKey})";
             var (ackOk, ackTs) = Task.Run(async () => await Send(ch,
-                "Claude에 전달했습니다!", threadKey)).GetAwaiter().GetResult();
+                ackText, threadKey)).GetAwaiter().GetResult();
             if (ackOk && ackTs != null)
             {
                 pendingAcks[threadKey] = (ch, ackTs);
@@ -1126,7 +1127,8 @@ internal partial class Program
                         threadContext = $"\n{ctx}\n";
                 }
 
-                var promptText = $"{cleanText}{threadContext}\n(Slack @{msg.User} — via AppBotEye+Slack)";
+                var replyThread = msg.ThreadTs ?? msg.Timestamp;
+                var promptText = $"{cleanText}{threadContext}\n(Slack @{msg.User} thread={replyThread} — via AppBotEye)";
                 promptHelper.TypeAndSubmit(promptInfo, promptText);
                 Console.WriteLine("[EYE][SLACK] >> Sent to Claude prompt (with thread context)");
 
@@ -1166,7 +1168,7 @@ internal partial class Program
         {
             if (string.IsNullOrEmpty(msg.ThreadTs)) return;
             // If this bot just posted a REAL response (not ack), delete the pending ack
-            if (msg.Text != "Claude에 전달했습니다!")
+            if (!msg.Text.StartsWith("Claude에 전달했습니다!"))
             {
                 DeletePendingAck(msg.ThreadTs);
                 Console.WriteLine($"[EYE][SLACK] Deleted ack in thread {msg.ThreadTs} (bot replied)");
@@ -1312,7 +1314,7 @@ internal partial class Program
                             threadContext = $"\n{ctx}\n";
                     }
 
-                    var promptText = $"{cleanText}{threadContext}\n(Slack thread reply @{msg.User} — via AppBotEye)";
+                    var promptText = $"{cleanText}{threadContext}\n(Slack thread reply @{msg.User} thread={msg.ThreadTs} — via AppBotEye)";
                     trPromptHelper.TypeAndSubmit(trPromptInfo, promptText);
                     Console.WriteLine("[EYE][SLACK] >> Thread reply sent to Claude prompt (with context)");
 
@@ -1375,7 +1377,8 @@ internal partial class Program
                             threadContext = $"\n{ctx}\n";
                     }
 
-                    var promptText = $"{cleanKwText}{threadContext}\n(Slack keyword:\"{matchedKw}\" @{msg.User} — via AppBotEye)";
+                    var kwReplyThread = msg.ThreadTs ?? msg.Timestamp;
+                    var promptText = $"{cleanKwText}{threadContext}\n(Slack keyword:\"{matchedKw}\" @{msg.User} thread={kwReplyThread} — via AppBotEye)";
                     kwPromptHelper.TypeAndSubmit(kwPromptInfo, promptText);
                     Console.WriteLine("[EYE][SLACK] >> Keyword match sent to Claude prompt (with context)");
 
