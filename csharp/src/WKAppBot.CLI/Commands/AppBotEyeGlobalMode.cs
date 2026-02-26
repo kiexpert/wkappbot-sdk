@@ -398,9 +398,11 @@ internal partial class Program
 
                                         if (shouldRelocate)
                                         {
+                                            // Don't delete — old message may be thread parent!
+                                            // Update old message to dim text, then send new one
                                             var oldTs = slackStatusTs;
-                                            Task.Run(async () => await SlackDeleteMessageAsync(
-                                                slackBotToken!, slackChannel!, oldTs)).Wait(3000);
+                                            Task.Run(async () => await SlackUpdateMessageAsync(
+                                                slackBotToken!, slackChannel!, oldTs, "_(상태 이동됨)_")).Wait(3000);
                                             var (ok2, ts2) = Task.Run(async () =>
                                                 await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
                                                 .GetAwaiter().GetResult();
