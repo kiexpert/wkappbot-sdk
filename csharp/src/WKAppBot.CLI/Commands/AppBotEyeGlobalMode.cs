@@ -105,6 +105,22 @@ internal partial class Program
         // ── Slack status streaming ──
         string? slackStatusTs = null;
         string? lastSlackStatusText = null;
+        var statusTsFile = Path.Combine(DataDir, "runtime", "status_streaming_ts.txt");
+
+        // Restore previous status message ts (reuse on restart instead of creating new)
+        try
+        {
+            if (File.Exists(statusTsFile))
+            {
+                var savedTs = File.ReadAllText(statusTsFile).Trim();
+                if (!string.IsNullOrEmpty(savedTs))
+                {
+                    slackStatusTs = savedTs;
+                    Console.WriteLine($"[EYE] Restored previous status message (ts={savedTs})");
+                }
+            }
+        }
+        catch { }
 
         // ── Claude status tracking ──
         string? cachedClaudeStatusText = null;
@@ -154,7 +170,10 @@ internal partial class Program
                     SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
                         claudeHwnd, () => pendingPlanApprovalSlackTs,
                         () => pendingPermissionSlackTs, startupTs, botUsername,
-                        () => slackStatusTs, () => { slackStatusTs = null; lastSlackStatusText = null; });
+                        () => slackStatusTs, () => {
+                            slackStatusTs = null; lastSlackStatusText = null;
+                            try { File.WriteAllText(statusTsFile, ""); } catch { }
+                        });
 
                     // Block Kit button handler (plan approve/reject, permission buttons)
                     slackClient.OnBlockAction += (action) =>
@@ -401,7 +420,11 @@ internal partial class Program
                                         var (ok, ts) = Task.Run(async () =>
                                             await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
                                             .GetAwaiter().GetResult();
-                                        if (ok && ts != null) slackStatusTs = ts;
+                                        if (ok && ts != null)
+                                        {
+                                            slackStatusTs = ts;
+                                            try { File.WriteAllText(statusTsFile, ts); } catch { }
+                                        }
                                         lastSlackStatusText = slackText;
                                     }
                                 }
