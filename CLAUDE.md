@@ -31,6 +31,13 @@
     - `[KRO_PLAN_END]`
   - EyeTick은 위 블록을 우선 추출하며, 최신 플랜 블록이 나오면 이전 플랜과 혼합하지 않고 교체
 
+- **EyeTick 슬랙 인박스 전달 (MUST!)**
+  - `wkappbot eye tick` 실행 시 `slack_inbox.jsonl` 자동 체크 → Claude 프롬프트에 전달
+  - 인박스 비어있으면: `[EYE_TICK] slack_inbox=empty`
+  - 메시지 있으면: FindPrompt → TypeAndSubmit → 인박스 클리어
+  - 프롬프트 못찾으면: 인박스 보존 (다음 tick에서 재시도)
+  - **슬랙 메시지를 받았으면 반드시 슬랙으로 응답할 것!** (`wkappbot slack send` 또는 `wkappbot slack reply`)
+
 - logcat 명령 (실시간 로그 추적)
   - `wkappbot logcat <fileFilter> <messageFilter>`
   - fileFilter: 세미콜론 다중 와일드카드 지원 (예: `*.txt;*.jsonl`)
