@@ -1003,12 +1003,14 @@ internal partial class Program
                     break;
                 }
 
+                Console.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → Claude prompt");
+                Console.WriteLine($"[EYE_TICK] [GUIDELINE] When replying via Slack, AI MUST also print the reply content to console for the user watching the app screen.");
                 var ok = helper.TypeAndSubmit(fresh, promptText);
                 if (ok)
                 {
                     forwarded++;
                     latestTs = ts;
-                    Console.WriteLine($"[EYE_TICK] >> Slack @{user}: {cleanText}");
+                    Console.WriteLine($"[EYE_TICK] [DELIVERED] Slack @{user}: {cleanText}");
                     if (newMsgs.Count > 1)
                         Thread.Sleep(2000);
                 }
@@ -1129,12 +1131,14 @@ internal partial class Program
                         return;
                     }
 
+                    Console.WriteLine($"[EYE_TICK] [FORWARD] Thread @{rUser} → Claude prompt");
+                    Console.WriteLine($"[EYE_TICK] [GUIDELINE] When replying via Slack, AI MUST also print the reply content to console for the user watching the app screen.");
                     var ok = helper.TypeAndSubmit(fresh, promptText);
                     if (ok)
                     {
                         threadReplies++;
                         latestReplyTs = rTs;
-                        Console.WriteLine($"[EYE_TICK] >> Thread @{rUser}: {cleanReply}");
+                        Console.WriteLine($"[EYE_TICK] [DELIVERED] Thread @{rUser}: {cleanReply}");
                         Thread.Sleep(2000);
                     }
                 }

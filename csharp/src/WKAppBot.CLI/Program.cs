@@ -81,11 +81,13 @@ internal partial class Program
             }
             catch { }
 
-            // Auto-launch AppBotEye for ALL commands except help and eye itself
-            // 앱봇이 뭔가 하면 눈은 항상 떠있어야! (도움말, eye 자신은 제외 — 무한 cascade 방지)
+            // Auto-launch AppBotEye for ALL commands except help and eye global mode
+            // 앱봇이 뭔가 하면 눈은 항상 떠있어야! (도움말, eye 글로벌모드는 제외 — 무한 cascade 방지)
+            // eye tick은 one-shot이라 Eye를 띄워도 cascade 안 됨 → 자동 실행 대상!
             // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
-            var isEyeOrHelp = command is "help" or "--help" or "-h" or "eye" or "prompt-test";
-            if (!isEyeOrHelp)
+            var isEyeGlobal = command == "eye" && (restArgs.Length == 0 || restArgs[0] != "tick");
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" || isEyeGlobal;
+            if (!isExcluded)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
             }
