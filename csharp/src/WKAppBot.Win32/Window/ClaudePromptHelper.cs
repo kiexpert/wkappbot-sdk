@@ -87,39 +87,275 @@ public sealed class ClaudePromptHelper : IDisposable
 
     /// <summary>
     /// Type text into the Claude prompt and submit with Enter.
-    /// Strategy: SetForegroundWindow → Click prompt → Clipboard paste → Enter.
-    /// Note: Electron contentEditable doesn't support WM_SETTEXT/WM_PASTE focusless,
-    /// so we must bring the window to foreground + use SendInput clipboard paste.
+    /// Strategy (2-tier):
+    ///   1. Focusless: UIA LegacyIAccessible.SetValue (no focus steal!)
+    ///   2. Fallback: SetForegroundWindow → Click → Paste → Enter → Restore previous foreground
+    /// Note: Electron contentEditable may not support UIA SetValue,
+    /// so fallback saves/restores the previous foreground window to minimize disruption.
     /// </summary>
     public bool TypeAndSubmit(PromptInfo prompt, string text)
     {
-        // 1. Bring the Claude window to foreground (required for Electron input)
-        Console.WriteLine($"  [PROMPT] Activating: {prompt.WindowTitle}");
-        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
-        Thread.Sleep(300);
+        // === Strategy 1: Try fully focusless input ===
+        if (TryFocuslessInput(prompt, text))
+            return true;
 
-        // 2. Click the prompt area to focus the contentEditable div
+        // === Strategy 2: Focus-stealing with auto-restore (minimal disruption) ===
+        var prevForeground = NativeMethods.GetForegroundWindow();
+        Console.WriteLine($"  [PROMPT] Activating: {prompt.WindowTitle} (will restore focus)");
+        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+        Thread.Sleep(200);
+
+        // Click the prompt area to focus the contentEditable div
         var centerX = prompt.PromptRect.X + prompt.PromptRect.Width / 2;
         var centerY = prompt.PromptRect.Y + prompt.PromptRect.Height / 2;
         MouseInput.Click(centerX, centerY);
-        Thread.Sleep(200);
+        Thread.Sleep(150);
 
-        // 3. Clear existing text
+        // Clear existing text
         KeyboardInput.Hotkey(new[] { "ctrl", "a" });
-        Thread.Sleep(50);
+        Thread.Sleep(30);
         KeyboardInput.PressKey("delete");
-        Thread.Sleep(50);
+        Thread.Sleep(30);
 
-        // 4. Paste via clipboard (fast, supports multiline + unicode)
+        // Paste via clipboard (fast, supports multiline + unicode)
         Console.WriteLine($"  [PROMPT] Pasting ({text.Length} chars)");
         SetClipboardText(text);
         Thread.Sleep(50);
         KeyboardInput.Hotkey(new[] { "ctrl", "v" });
-        Thread.Sleep(300);
+        Thread.Sleep(200);
 
-        // 5. Submit with Enter
+        // Submit with Enter
         KeyboardInput.PressKey("enter");
         Console.WriteLine("  [PROMPT] Submitted");
+
+        // Restore previous foreground window (minimize user disruption)
+        if (prevForeground != IntPtr.Zero && prevForeground != prompt.WindowHandle)
+        {
+            Thread.Sleep(300); // Brief pause to let Claude register the submit
+            NativeMethods.SmartSetForegroundWindow(prevForeground);
+            Console.WriteLine("  [PROMPT] Focus restored to previous window");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Try to input text into the Claude prompt WITHOUT stealing focus.
+    /// Uses UIA LegacyIAccessible.SetValue if available on the contentEditable group.
+    /// Returns true if text was successfully inserted AND submitted.
+    /// </summary>
+    private bool TryFocuslessInput(PromptInfo prompt, string text)
+    {
+        try
+        {
+            Console.WriteLine("  [PROMPT] Trying focusless input (LegacyIAccessible)...");
+            var root = _automation.FromHandle(prompt.WindowHandle);
+            if (root == null) return false;
+
+            var turnForm = root.FindFirstDescendant(
+                new PropertyCondition(
+                    _automation.PropertyLibrary.Element.AutomationId,
+                    "turn-form"));
+            if (turnForm == null)
+            {
+                Console.WriteLine("  [PROMPT] Focusless: turn-form not found");
+                return false;
+            }
+
+            // Find the input group (contentEditable div)
+            var inputGroup = turnForm.FindFirstChild(
+                new PropertyCondition(
+                    _automation.PropertyLibrary.Element.ControlType,
+                    ControlType.Group));
+            if (inputGroup == null)
+            {
+                var children = turnForm.FindAllChildren();
+                inputGroup = children.FirstOrDefault(c =>
+                    c.ControlType == ControlType.Group &&
+                    c.BoundingRectangle.Width > 100);
+            }
+            if (inputGroup == null)
+            {
+                Console.WriteLine("  [PROMPT] Focusless: inputGroup not found");
+                return false;
+            }
+
+            // Try LegacyIAccessible.SetValue
+            var legacy = inputGroup.Patterns.LegacyIAccessible;
+            if (!legacy.IsSupported)
+            {
+                Console.WriteLine("  [PROMPT] Focusless: LegacyIA not supported");
+                return false;
+            }
+
+            // Method 1: LegacyIAccessible.SetValue
+            try
+            {
+                legacy.Pattern.SetValue(text);
+                Console.WriteLine($"  [PROMPT] LegacyIA.SetValue succeeded! ({text.Length} chars, focusless!)");
+                // If we get here, text was set — try to submit and return
+                return TryFocuslessSubmit(prompt, turnForm);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [PROMPT] LegacyIA.SetValue failed: {ex.Message}");
+            }
+
+            // NOTE: PostMessage WM_PASTE to Chrome_RenderWidgetHostHWND was tested (2026-02-26)
+            // and does NOT work — Chrome renderer ignores WM_PASTE when window is not foreground.
+            // LegacyIAccessible.SetValue also returns E_NOTIMPL for Electron contentEditable.
+            // True focusless input is not possible for Electron/Chrome apps.
+            // The fallback (TypeAndSubmit) uses focus-steal with auto-restore to minimize disruption.
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] Focusless error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Try to submit the prompt focuslessly: UIA Invoke on send button, or brief focus for Enter.
+    /// </summary>
+    private bool TryFocuslessSubmit(PromptInfo prompt, AutomationElement turnForm)
+    {
+        Thread.Sleep(100);
+
+        // Look for a submit/send button in turn-form with Invoke pattern
+        try
+        {
+            var allElements = turnForm.FindAllDescendants();
+            foreach (var el in allElements)
+            {
+                if (el.ControlType != ControlType.Button) continue;
+                var name = (el.Name ?? "").ToLowerInvariant();
+                var aid = (el.AutomationId ?? "").ToLowerInvariant();
+                if (name.Contains("중단") || name.Contains("stop") || name.Contains("cancel")) continue;
+                if (name.Contains("send") || name.Contains("submit") || name.Contains("전송") ||
+                    aid.Contains("send") || aid.Contains("submit"))
+                {
+                    if (el.Patterns.Invoke.IsSupported)
+                    {
+                        el.Patterns.Invoke.Pattern.Invoke();
+                        Console.WriteLine($"  [PROMPT] Submitted via UIA Invoke on \"{el.Name}\" (fully focusless!)");
+                        return true;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        // No submit button — brief focus steal for Enter key only
+        Console.WriteLine("  [PROMPT] Text set focuslessly! Brief focus for Enter key...");
+        var prevFg = NativeMethods.GetForegroundWindow();
+        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+        Thread.Sleep(100);
+        KeyboardInput.PressKey("enter");
+        Thread.Sleep(100);
+        if (prevFg != IntPtr.Zero && prevFg != prompt.WindowHandle)
+        {
+            NativeMethods.SmartSetForegroundWindow(prevFg);
+            Console.WriteLine("  [PROMPT] Focus restored after Enter");
+        }
+        Console.WriteLine("  [PROMPT] Submitted (text=focusless, Enter=brief focus)");
+        return true;
+    }
+
+    /// <summary>
+    /// Type text into the prompt WITHOUT submitting (no Enter).
+    /// For testing/dry-run: verify text insertion works.
+    /// Tries focusless first, then focus-stealing with restore.
+    /// </summary>
+    public bool TypeWithoutSubmit(PromptInfo prompt, string text)
+    {
+        // Try focusless text insertion via LegacyIAccessible
+        try
+        {
+            Console.WriteLine("  [PROMPT] TypeWithoutSubmit: trying focusless...");
+            var root = _automation.FromHandle(prompt.WindowHandle);
+            if (root != null)
+            {
+                var turnForm = root.FindFirstDescendant(
+                    new PropertyCondition(
+                        _automation.PropertyLibrary.Element.AutomationId,
+                        "turn-form"));
+                if (turnForm != null)
+                {
+                    var inputGroup = turnForm.FindFirstChild(
+                        new PropertyCondition(
+                            _automation.PropertyLibrary.Element.ControlType,
+                            ControlType.Group));
+                    if (inputGroup == null)
+                    {
+                        var children = turnForm.FindAllChildren();
+                        inputGroup = children.FirstOrDefault(c =>
+                            c.ControlType == ControlType.Group &&
+                            c.BoundingRectangle.Width > 100);
+                    }
+
+                    if (inputGroup != null)
+                    {
+                        var legacy = inputGroup.Patterns.LegacyIAccessible;
+                        if (legacy.IsSupported)
+                        {
+                            try
+                            {
+                                legacy.Pattern.SetValue(text);
+                                Console.WriteLine($"  [PROMPT] LegacyIA.SetValue succeeded! ({text.Length} chars, focusless, no submit)");
+                                return true;
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"  [PROMPT] LegacyIA.SetValue failed: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("  [PROMPT] LegacyIA not supported on inputGroup");
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] Focusless probe error: {ex.Message}");
+        }
+
+        // Fallback: focus-steal to paste text, but no Enter
+        Console.WriteLine("  [PROMPT] Falling back to focus-steal paste (no submit)...");
+        var prevForeground = NativeMethods.GetForegroundWindow();
+        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+        Thread.Sleep(200);
+
+        var centerX = prompt.PromptRect.X + prompt.PromptRect.Width / 2;
+        var centerY = prompt.PromptRect.Y + prompt.PromptRect.Height / 2;
+        MouseInput.Click(centerX, centerY);
+        Thread.Sleep(150);
+
+        KeyboardInput.Hotkey(new[] { "ctrl", "a" });
+        Thread.Sleep(30);
+        KeyboardInput.PressKey("delete");
+        Thread.Sleep(30);
+
+        Console.WriteLine($"  [PROMPT] Pasting ({text.Length} chars, no submit)");
+        SetClipboardText(text);
+        Thread.Sleep(50);
+        KeyboardInput.Hotkey(new[] { "ctrl", "v" });
+        Thread.Sleep(200);
+
+        // NO Enter key — dry run!
+        Console.WriteLine("  [PROMPT] Text pasted (no Enter, dry-run)");
+
+        // Restore previous foreground
+        if (prevForeground != IntPtr.Zero && prevForeground != prompt.WindowHandle)
+        {
+            Thread.Sleep(200);
+            NativeMethods.SmartSetForegroundWindow(prevForeground);
+            Console.WriteLine("  [PROMPT] Focus restored");
+        }
 
         return true;
     }
