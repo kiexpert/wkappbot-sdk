@@ -18,13 +18,18 @@ namespace WKAppBot.Win32.Window;
 ///   1. Find the parent process of wkappbot.exe (claude.exe or code.exe)
 ///   2. Walk up to the main window of that process
 ///   3. Find the prompt input via UIA: aid="turn-form" → child Group "입력하세요"
-///   4. Insert text via MSAA put_accValue (focusless!) → brief focus for Enter
+///   4. Insert text via MSAA put_accValue (focusless!)
+///   5. Submit via UIA Invoke on "제출" button (focusless!) — NO focus steal needed!
 ///
-/// Key Discovery (2026-02-26):
-///   Direct MSAA vtable put_accValue() on the contentEditable's parent MSAA element
-///   (name="입력하세요", ROLE_SYSTEM_GROUPING=20) returns S_OK and successfully inserts text,
-///   even though FlaUI's UIA LegacyIAccessible.SetValue returns E_NOTIMPL for the same element.
-///   The difference: direct MSAA vtable call bypasses the UIA-to-MSAA proxy bridge.
+/// Key Discoveries (2026-02-26):
+///   1. Direct MSAA vtable put_accValue() on the contentEditable's parent MSAA element
+///      (name="입력하세요", ROLE_SYSTEM_GROUPING=20) returns S_OK and successfully inserts text,
+///      even though FlaUI's UIA LegacyIAccessible.SetValue returns E_NOTIMPL for the same element.
+///      The difference: direct MSAA vtable call bypasses the UIA-to-MSAA proxy bridge.
+///   2. The submit button in Claude Desktop is named "제출" (Korean for "submit") with
+///      UIA Invoke pattern. accDoDefaultAction("활성화") on contentEditable is a false positive
+///      — it only activates/focuses the element, doesn't submit.
+///   3. MSAA tree walk pitfall: GROUPING(role=20) with action "상위 개체 클릭" is NOT a button!
 /// </summary>
 public sealed class ClaudePromptHelper : IDisposable
 {
@@ -245,24 +250,16 @@ public sealed class ClaudePromptHelper : IDisposable
 
     /// <summary>
     /// Try to submit the prompt focuslessly using multiple strategies:
-    ///   1. MSAA: accDoDefaultAction on contentEditable parent
+    ///   1. UIA: Invoke pattern on Submit/Send button (most reliable!)
     ///   2. MSAA: Walk tree to find Send button → accDoDefaultAction
-    ///   3. UIA: Invoke pattern on Send button
-    ///   4. PostMessage VK_RETURN to Chrome renderer hwnd
-    ///   5. Fallback: brief focus steal for Enter key
+    ///   3. PostMessage VK_RETURN to Chrome renderer hwnd
+    ///   4. Fallback: brief focus steal for Enter key
     /// </summary>
     private bool TryFocuslessSubmit(PromptInfo prompt, AutomationElement turnForm)
     {
         Thread.Sleep(100);
 
-        // === Strategy 1: MSAA accDoDefaultAction on contentEditable ===
-        if (TryMsaaSubmit(prompt))
-        {
-            Console.WriteLine("  [PROMPT] Submitted via MSAA (fully focusless!)");
-            return true;
-        }
-
-        // === Strategy 2: UIA Invoke on Send button ===
+        // === Strategy 1: UIA Invoke on Submit/Send button (best — fully focusless!) ===
         try
         {
             var allElements = turnForm.FindAllDescendants();
@@ -271,8 +268,11 @@ public sealed class ClaudePromptHelper : IDisposable
                 if (el.ControlType != ControlType.Button) continue;
                 var name = (el.Name ?? "").ToLowerInvariant();
                 var aid = (el.AutomationId ?? "").ToLowerInvariant();
+                // Skip stop/cancel/중단 buttons
                 if (name.Contains("중단") || name.Contains("stop") || name.Contains("cancel")) continue;
+                // Match submit/send buttons (Claude Desktop uses "제출" = Korean for "submit")
                 if (name.Contains("send") || name.Contains("submit") || name.Contains("전송") ||
+                    name.Contains("제출") ||
                     aid.Contains("send") || aid.Contains("submit"))
                 {
                     if (el.Patterns.Invoke.IsSupported)
@@ -285,6 +285,13 @@ public sealed class ClaudePromptHelper : IDisposable
             }
         }
         catch { }
+
+        // === Strategy 2: MSAA accDoDefaultAction on Send button ===
+        if (TryMsaaSubmit(prompt))
+        {
+            Console.WriteLine("  [PROMPT] Submitted via MSAA (fully focusless!)");
+            return true;
+        }
 
         // === Strategy 3: PostMessage VK_RETURN to Chrome renderer hwnd ===
         if (TryPostMessageEnter(prompt))
@@ -310,7 +317,9 @@ public sealed class ClaudePromptHelper : IDisposable
     }
 
     /// <summary>
-    /// Try to submit via MSAA: accDoDefaultAction on contentEditable, or find Send button in MSAA tree.
+    /// Try to submit via MSAA: find Send button in MSAA tree → accDoDefaultAction.
+    /// Note: accDoDefaultAction("활성화") on contentEditable only activates/focuses the element,
+    /// it does NOT submit. So we must find the actual Send button.
     /// </summary>
     private bool TryMsaaSubmit(PromptInfo prompt)
     {
@@ -327,43 +336,31 @@ public sealed class ClaudePromptHelper : IDisposable
             {
                 if (acc is not IAccessibleVtbl selfV) return false;
 
-                // Navigate to parent (the contentEditable "입력하세요")
+                // Navigate up to turn-form level (grandparent → great-grandparent)
+                // and search the MSAA tree for a Send/Submit button
                 selfV.get_accParent(out object? parentObj);
                 if (parentObj is not IAccessibleVtbl parentV) return false;
 
-                // === Try 1: accDoDefaultAction on the contentEditable parent ===
-                string? parentAction = null;
-                try { parentV.get_accDefaultAction(0, out parentAction); } catch { }
-                Console.WriteLine($"  [PROMPT] MSAA submit: parent defaultAction=\"{parentAction ?? "null"}\"");
-
-                if (parentAction != null)
+                // Walk up several levels to cover the turn-form area
+                IAccessibleVtbl searchRoot = parentV;
+                for (int i = 0; i < 5; i++)
                 {
-                    int daHr = parentV.accDoDefaultAction(0);
-                    Console.WriteLine($"  [PROMPT] MSAA submit: accDoDefaultAction on parent hr=0x{daHr:X8}");
-                    if (daHr == 0) return true;
+                    try
+                    {
+                        searchRoot.get_accParent(out object? upper);
+                        if (upper is IAccessibleVtbl upperV)
+                            searchRoot = upperV;
+                        else
+                            break;
+                    }
+                    catch { break; }
                 }
 
-                // === Try 2: accDoDefaultAction on self (the inner grouping) ===
-                string? selfAction = null;
-                try { selfV.get_accDefaultAction(0, out selfAction); } catch { }
-                if (selfAction != null)
-                {
-                    Console.WriteLine($"  [PROMPT] MSAA submit: self defaultAction=\"{selfAction}\"");
-                    int daHr = selfV.accDoDefaultAction(0);
-                    Console.WriteLine($"  [PROMPT] MSAA submit: accDoDefaultAction on self hr=0x{daHr:X8}");
-                    if (daHr == 0) return true;
-                }
+                Console.WriteLine("  [PROMPT] MSAA submit: Searching for Send button in MSAA tree...");
+                if (TryFindAndClickSubmitButton(searchRoot, 0, 8))
+                    return true;
 
-                // === Try 3: Walk MSAA tree from turn-form to find Send/Submit button ===
-                // Go up to grandparent (turn-form level) and search for buttons
-                parentV.get_accParent(out object? grandparentObj);
-                if (grandparentObj is IAccessibleVtbl gpV)
-                {
-                    // Search siblings and cousins for a button with "send"/"submit" action
-                    if (TryFindAndClickSubmitButton(gpV, 0, 4))
-                        return true;
-                }
-
+                Console.WriteLine("  [PROMPT] MSAA submit: No Send button found in MSAA tree");
                 return false;
             }
             finally
@@ -380,7 +377,9 @@ public sealed class ClaudePromptHelper : IDisposable
 
     /// <summary>
     /// Recursively search MSAA tree for a button element and trigger its default action.
-    /// Looks for role=ROLE_SYSTEM_PUSHBUTTON(43) with accDoDefaultAction.
+    /// Looks for ROLE_SYSTEM_PUSHBUTTON(43) or ROLE_SYSTEM_BUTTONDROPDOWN(56).
+    /// Also accepts elements with "press"/"누르기" action but NOT generic "상위 개체 클릭".
+    /// Skips stop/cancel/중단 buttons.
     /// </summary>
     private bool TryFindAndClickSubmitButton(IAccessibleVtbl node, int depth, int maxDepth)
     {
@@ -394,23 +393,41 @@ public sealed class ClaudePromptHelper : IDisposable
             node.get_accName(0, out string? name);
             string nameLower = (name ?? "").ToLowerInvariant();
 
-            // ROLE_SYSTEM_PUSHBUTTON = 43
-            if (role == 43)
+            string? action = null;
+            try { node.get_accDefaultAction(0, out action); } catch { }
+            string actionLower = (action ?? "").ToLowerInvariant();
+
+            // ROLE_SYSTEM_PUSHBUTTON=43, ROLE_SYSTEM_BUTTONDROPDOWN=56, ROLE_SYSTEM_LINK=30
+            bool isButtonRole = role == 43 || role == 56 || role == 30;
+            // Accept press/click actions but NOT "상위 개체 클릭" (generic parent click = false positive)
+            bool hasClickAction = (actionLower.Contains("press") || actionLower.Contains("누르기")) &&
+                                  !actionLower.Contains("상위");
+            // For "클릭" action, only accept actual button roles (not GROUPING=20)
+            if (!hasClickAction && isButtonRole && actionLower.Contains("클릭"))
+                hasClickAction = true;
+
+            if (isButtonRole || hasClickAction)
             {
-                // Skip stop/cancel buttons
-                if (nameLower.Contains("중단") || nameLower.Contains("stop") || nameLower.Contains("cancel"))
-                    return false;
-
-                string? action = null;
-                try { node.get_accDefaultAction(0, out action); } catch { }
-
-                Console.WriteLine($"  [PROMPT] MSAA button: \"{name}\" action=\"{action ?? "null"}\" role={role}");
-
-                if (action != null)
+                // Skip stop/cancel/중단/collapse/expand/menu/model selector buttons
+                if (nameLower.Contains("중단") || nameLower.Contains("stop") || nameLower.Contains("cancel") ||
+                    nameLower.Contains("collapse") || nameLower.Contains("expand") ||
+                    nameLower.Contains("접기") || nameLower.Contains("펼치기") ||
+                    nameLower.Contains("메뉴") || nameLower.Contains("menu") ||
+                    nameLower.Contains("opus") || nameLower.Contains("sonnet") || nameLower.Contains("haiku") ||
+                    nameLower.Contains("권한") || nameLower.Contains("permission"))
                 {
-                    int hr = node.accDoDefaultAction(0);
-                    Console.WriteLine($"  [PROMPT] MSAA submit: accDoDefaultAction on button \"{name}\" hr=0x{hr:X8}");
-                    if (hr == 0) return true;
+                    // Don't return false — continue to children
+                }
+                else
+                {
+                    Console.WriteLine($"  [PROMPT] MSAA button: \"{name}\" action=\"{action}\" role={role}(0x{role:X2}) depth={depth}");
+
+                    if (action != null)
+                    {
+                        int hr = node.accDoDefaultAction(0);
+                        Console.WriteLine($"  [PROMPT] MSAA submit: accDoDefaultAction on \"{name}\" hr=0x{hr:X8}");
+                        if (hr == 0) return true;
+                    }
                 }
             }
 
