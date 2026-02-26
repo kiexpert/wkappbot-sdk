@@ -62,28 +62,21 @@ internal partial class Program
         string? slackStatusTs = null;       // current status message timestamp
         string? lastSlackStatusText = null;  // cached text for change detection
 
-        // Restore previous status message ts from file (so restart can clean up old message)
+        // Restore previous status message ts (reuse on restart — chat.update instead of new spam)
         var statusTsFile = Path.Combine(DataDir, "runtime", "status_streaming_ts.txt");
         try
         {
             if (File.Exists(statusTsFile))
             {
-                var parts = File.ReadAllText(statusTsFile).Trim().Split('|');
-                if (parts.Length >= 2)
+                var savedTs = File.ReadAllText(statusTsFile).Trim();
+                // Handle legacy format (channel|ts) and new format (ts only)
+                if (savedTs.Contains('|'))
+                    savedTs = savedTs.Split('|').Last();
+                if (!string.IsNullOrEmpty(savedTs))
                 {
-                    var oldChannel = parts[0];
-                    var oldTs = parts[1];
-                    // Delete the old status message from previous session
-                    if (!string.IsNullOrEmpty(oldTs))
-                    {
-                        Console.WriteLine($"[EYE] Cleaning up previous status message (ts={oldTs})");
-                        // Will delete after Slack is connected (need botToken)
-                        slackStatusTs = null; // don't reuse — we'll delete it below after Slack init
-                        // Stash for deferred cleanup
-                        Environment.SetEnvironmentVariable("_WKAPPBOT_OLD_STATUS_TS", $"{oldChannel}|{oldTs}");
-                    }
+                    slackStatusTs = savedTs;
+                    Console.WriteLine($"[EYE] Restored previous status message (ts={savedTs})");
                 }
-                File.Delete(statusTsFile);
             }
         }
         catch { }
@@ -128,7 +121,10 @@ internal partial class Program
                         SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
                             claudeHwnd, () => pendingPlanApprovalSlackTs,
                             () => pendingPermissionSlackTs, startupTs, botUsername,
-                            () => slackStatusTs, () => { slackStatusTs = null; lastSlackStatusText = null; });
+                            () => slackStatusTs, () => {
+                                slackStatusTs = null; lastSlackStatusText = null;
+                                try { File.WriteAllText(statusTsFile, ""); } catch { }
+                            });
 
                         // Block Kit button handler (plan approve/reject)
                         slackClient.OnBlockAction += (action) =>
@@ -700,7 +696,11 @@ internal partial class Program
                                             var (ok, ts) = Task.Run(async () =>
                                                 await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
                                                 .GetAwaiter().GetResult();
-                                            if (ok && ts != null) slackStatusTs = ts;
+                                            if (ok && ts != null)
+                                            {
+                                                slackStatusTs = ts;
+                                                try { File.WriteAllText(statusTsFile, ts); } catch { }
+                                            }
                                             lastSlackStatusText = slackText;
                                         }
                                     }
