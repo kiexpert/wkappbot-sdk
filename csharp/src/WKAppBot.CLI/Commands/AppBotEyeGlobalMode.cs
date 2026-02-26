@@ -318,112 +318,131 @@ internal partial class Program
     }
 
     /// <summary>
-    /// EyeTick one-shot: check Slack inbox and forward messages to Claude prompt.
-    /// Reads slack_inbox.jsonl, types each message into Claude prompt, then clears inbox.
-    /// If prompt not found, messages stay in inbox for next tick.
+    /// EyeTick one-shot: check Slack for new messages via conversations.history API
+    /// and forward them to Claude prompt. Uses slack_last_ts.txt to track position.
+    /// Also checks slack_inbox.jsonl as fallback (from standalone slack listen).
     /// </summary>
     static void EyeTickForwardSlackInbox()
     {
         try
         {
-            if (!File.Exists(SlackInboxFile))
+            // Load Slack config
+            var configPath = Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
+            if (!File.Exists(configPath))
             {
-                Console.WriteLine("[EYE_TICK] slack_inbox=empty");
+                Console.WriteLine("[EYE_TICK] slack=no_config");
                 return;
             }
 
-            string[] lines;
-            try
+            var json = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(configPath));
+            var botToken = json?["bot_token"]?.GetValue<string>();
+            var channel = json?["channel"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
             {
-                lines = File.ReadAllLines(SlackInboxFile);
-            }
-            catch
-            {
-                Console.WriteLine("[EYE_TICK] slack_inbox=read_error");
+                Console.WriteLine("[EYE_TICK] slack=missing_token_or_channel");
                 return;
             }
 
-            // Filter empty lines
-            lines = lines.Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
-            if (lines.Length == 0)
+            // Get bot user ID to filter self-messages
+            var botUserId = SlackGetBotUserId(botToken);
+
+            // Get last processed timestamp
+            var lastTs = LoadLastTs(channel);
+
+            // Fetch recent messages via conversations.history
+            var messages = SlackFetchHistoryAsync(botToken, channel, oldest: lastTs, limit: 5)
+                .GetAwaiter().GetResult();
+
+            if (messages.Count == 0)
             {
-                try { File.Delete(SlackInboxFile); } catch { }
-                Console.WriteLine("[EYE_TICK] slack_inbox=empty");
+                Console.WriteLine("[EYE_TICK] slack=no_new_messages");
                 return;
             }
 
-            Console.WriteLine($"[EYE_TICK] slack_inbox={lines.Length} message(s) — forwarding to Claude prompt...");
+            // Filter: skip bot's own messages, skip old ones, newest first → reverse for chronological
+            var newMsgs = new List<(string user, string text, string ts)>();
+            foreach (var msg in messages)
+            {
+                var user = msg["user"]?.GetValue<string>() ?? "";
+                var text = msg["text"]?.GetValue<string>() ?? "";
+                var ts = msg["ts"]?.GetValue<string>() ?? "";
+                var subtype = msg["subtype"]?.GetValue<string>();
+
+                // Skip bot's own messages
+                if (user == botUserId) continue;
+                // Skip subtypes (bot_message, channel_join, etc.)
+                if (!string.IsNullOrEmpty(subtype)) continue;
+                // Skip if same as lastTs (already processed)
+                if (ts == lastTs) continue;
+                if (string.IsNullOrWhiteSpace(text)) continue;
+
+                newMsgs.Add((user, text, ts));
+            }
+
+            if (newMsgs.Count == 0)
+            {
+                Console.WriteLine("[EYE_TICK] slack=no_new_messages");
+                return;
+            }
+
+            // Reverse so oldest first (API returns newest first)
+            newMsgs.Reverse();
+
+            Console.WriteLine($"[EYE_TICK] slack={newMsgs.Count} new message(s) — forwarding to Claude prompt...");
 
             // Find Claude prompt
             using var helper = new ClaudePromptHelper();
             var promptInfo = helper.FindPrompt();
             if (promptInfo == null)
             {
-                Console.WriteLine("[EYE_TICK] WARNING: Claude prompt not found — inbox preserved for next tick");
-                return;  // Don't delete inbox — try again next tick
+                Console.WriteLine("[EYE_TICK] WARNING: Claude prompt not found — will retry next tick");
+                return;
             }
 
             int forwarded = 0;
-            foreach (var line in lines)
+            string? latestTs = null;
+            foreach (var (user, text, ts) in newMsgs)
             {
-                try
+                // Clean @mention tags
+                var cleanText = System.Text.RegularExpressions.Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
+                if (string.IsNullOrWhiteSpace(cleanText)) continue;
+
+                var replyCmd = $"wkappbot slack reply \"response\" --channel {channel} --thread {ts}";
+                var promptText = $"{cleanText}\n\n(Slack @{user} — reply: {replyCmd})";
+
+                // Re-find prompt each time (window may shift)
+                var fresh = helper.FindPrompt();
+                if (fresh == null)
                 {
-                    var msg = JsonSerializer.Deserialize<JsonNode>(line);
-                    var user = msg?["user"]?.GetValue<string>() ?? "unknown";
-                    var text = msg?["text"]?.GetValue<string>() ?? "";
-                    var channel = msg?["channel"]?.GetValue<string>() ?? "";
-                    var msgTs = msg?["ts"]?.GetValue<string>() ?? "";
-
-                    if (string.IsNullOrWhiteSpace(text)) continue;
-
-                    // Clean @mention tags
-                    var cleanText = System.Text.RegularExpressions.Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
-                    if (string.IsNullOrWhiteSpace(cleanText)) continue;
-
-                    var replyCmd = $"wkappbot slack reply \"response\" --channel {channel} --thread {msgTs}";
-                    var promptText = $"{cleanText}\n\n(Slack @{user} — reply: {replyCmd})";
-
-                    // Re-find prompt each time (window may shift)
-                    var fresh = helper.FindPrompt();
-                    if (fresh == null)
-                    {
-                        Console.WriteLine("[EYE_TICK] WARNING: Lost prompt — stopping forward");
-                        break;
-                    }
-
-                    var ok = helper.TypeAndSubmit(fresh, promptText);
-                    if (ok)
-                    {
-                        forwarded++;
-                        Console.WriteLine($"[EYE_TICK] >> Slack @{user}: {cleanText}");
-                        if (lines.Length > 1)
-                            Thread.Sleep(2000);  // Pause between messages for Claude to process
-                    }
-                    else
-                    {
-                        Console.WriteLine($"[EYE_TICK] WARNING: TypeAndSubmit failed for @{user}");
-                    }
+                    Console.WriteLine("[EYE_TICK] WARNING: Lost prompt — stopping forward");
+                    break;
                 }
-                catch (Exception ex)
+
+                var ok = helper.TypeAndSubmit(fresh, promptText);
+                if (ok)
                 {
-                    Console.WriteLine($"[EYE_TICK] inbox parse error: {ex.Message}");
+                    forwarded++;
+                    latestTs = ts;
+                    Console.WriteLine($"[EYE_TICK] >> Slack @{user}: {cleanText}");
+                    if (newMsgs.Count > 1)
+                        Thread.Sleep(2000);
+                }
+                else
+                {
+                    Console.WriteLine($"[EYE_TICK] WARNING: TypeAndSubmit failed for @{user}");
                 }
             }
 
-            // Clear inbox after processing
-            if (forwarded > 0)
+            // Save last processed timestamp
+            if (latestTs != null)
             {
-                try { File.Delete(SlackInboxFile); } catch { }
-                Console.WriteLine($"[EYE_TICK] slack_inbox forwarded={forwarded}/{lines.Length} — inbox cleared");
-            }
-            else
-            {
-                Console.WriteLine("[EYE_TICK] slack_inbox forwarded=0 — inbox preserved");
+                SaveLastTs(channel, latestTs);
+                Console.WriteLine($"[EYE_TICK] slack forwarded={forwarded}/{newMsgs.Count} — lastTs updated");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE_TICK] slack forward error: {ex.Message}");
+            Console.WriteLine($"[EYE_TICK] slack error: {ex.Message}");
         }
     }
 
