@@ -3,6 +3,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows.Forms;
+using WKAppBot.Core.Runner;
+using WKAppBot.WebBot;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
@@ -84,6 +86,178 @@ internal partial class Program
         if (_lastTickActivityUtc == DateTime.MinValue) _lastTickActivityUtc = DateTime.UtcNow;
         if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
 
+        // ── Find Claude Desktop window (for plan approval UIA clicks) ──
+        IntPtr claudeHwnd = FindClaudeDesktopWindow();
+        if (claudeHwnd != IntPtr.Zero)
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"[EYE] Found Claude Desktop (hwnd=0x{claudeHwnd:X8})");
+            Console.ResetColor();
+        }
+
+        // ── Plan/Permission approval tracking ──
+        bool planApprovalSentToSlack = false;
+        string? pendingPlanApprovalSlackTs = null;
+        bool permissionPromptSentToSlack = false;
+
+        // ── Slack status streaming ──
+        string? slackStatusTs = null;
+        string? lastSlackStatusText = null;
+        DateTime lastRelocateCheck = DateTime.MinValue;
+
+        // ── Claude status tracking ──
+        string? cachedClaudeStatusText = null;
+        bool wasRateLimited = false;
+        DateTime? rateLimitDetectedAt = null;
+        DateTime? rateLimitResetTime = null;
+        DateTime? lastRateLimitAlertTime = null;
+        const int RateLimitCooldownMinutes = 30;
+        const int RateLimitAlertCooldownMinutes = 30;
+
+        // ── Slack Socket Mode daemon (always ON) ──
+        SlackSocketClient? slackClient = null;
+        string? slackBotToken = null;
+        string? slackChannel = null;
+        var botUsername = BotUsername;
+
+        try
+        {
+            var configPath = Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
+            if (File.Exists(configPath))
+            {
+                var json = JsonNode.Parse(File.ReadAllText(configPath));
+                var appToken = json?["app_token"]?.GetValue<string>();
+                slackBotToken = json?["bot_token"]?.GetValue<string>();
+                slackChannel = json?["channel"]?.GetValue<string>();
+
+                if (!string.IsNullOrEmpty(appToken) && !string.IsNullOrEmpty(slackBotToken))
+                {
+                    slackClient = new SlackSocketClient();
+                    slackClient.ConnectAsync(appToken, slackBotToken).GetAwaiter().GetResult();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("[EYE] Slack Socket Mode connected (GlobalMode)");
+                    Console.ResetColor();
+
+                    // Announce presence
+                    string? startupTs = null;
+                    if (!string.IsNullOrEmpty(slackChannel))
+                    {
+                        var startupMsg = $"AppBotEye Global+Slack 온라인! `{Environment.MachineName}` pid={Environment.ProcessId}";
+                        var (startOk, sTs) = Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel, startupMsg, username: botUsername))
+                            .GetAwaiter().GetResult();
+                        if (startOk && sTs != null)
+                            startupTs = sTs;
+                    }
+
+                    // Set up event handlers (Slack → Claude prompt forwarding)
+                    SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
+                        claudeHwnd, () => pendingPlanApprovalSlackTs, startupTs, botUsername);
+
+                    // Block Kit button handler (plan approve/reject, permission buttons)
+                    slackClient.OnBlockAction += (action) =>
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"[EYE][SLACK] Button: {action.ActionId}={action.Value} by {action.UserName}");
+                        Console.ResetColor();
+
+                        var thread = action.MessageTs ?? pendingPlanApprovalSlackTs;
+
+                        if (action.ActionId == "plan_approve" && claudeHwnd != IntPtr.Zero)
+                        {
+                            var approved = ClickApproveButton(claudeHwnd);
+                            var reply = approved
+                                ? ":white_check_mark: 플랜 승인 완료! Claude가 코딩을 시작합니다."
+                                : ":x: 승인 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
+                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, action.Channel, reply, thread, username: botUsername))
+                                .Wait(5000);
+
+                            if (!string.IsNullOrEmpty(action.ResponseUrl))
+                            {
+                                var updateText = approved
+                                    ? $":white_check_mark: *플랜 승인됨* — by {action.UserName}"
+                                    : ":warning: 승인 시도했으나 버튼을 찾지 못함";
+                                Task.Run(async () => await SlackRespondViaUrl(action.ResponseUrl, updateText))
+                                    .Wait(3000);
+                            }
+                        }
+                        else if (action.ActionId.StartsWith("perm_") && claudeHwnd != IntPtr.Zero)
+                        {
+                            var buttonText = action.Value;
+                            var clicked = ClickPermissionButton(claudeHwnd, buttonText);
+                            var reply = clicked
+                                ? $":white_check_mark: \"{buttonText}\" 클릭 완료!"
+                                : $":x: \"{buttonText}\" 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
+                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, action.Channel, reply, thread, username: botUsername))
+                                .Wait(5000);
+
+                            if (!string.IsNullOrEmpty(action.ResponseUrl))
+                            {
+                                var updateText = clicked
+                                    ? $":white_check_mark: *\"{buttonText}\" 처리됨* — by {action.UserName}"
+                                    : $":warning: \"{buttonText}\" 버튼을 찾지 못함";
+                                Task.Run(async () => await SlackRespondViaUrl(action.ResponseUrl, updateText))
+                                    .Wait(3000);
+                            }
+                        }
+                        else if (action.ActionId == "plan_reject" && claudeHwnd != IntPtr.Zero)
+                        {
+                            var feedbackOk = TypePlanFeedback(claudeHwnd, "이 플랜을 거절합니다. 다시 검토해주세요.");
+                            var reply = feedbackOk
+                                ? ":no_entry_sign: 플랜 거절 피드백을 Claude에 전달했습니다."
+                                : ":x: 피드백 입력란을 찾을 수 없습니다";
+                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, action.Channel, reply, thread, username: botUsername))
+                                .Wait(5000);
+
+                            if (!string.IsNullOrEmpty(action.ResponseUrl))
+                            {
+                                var updateText = $":no_entry_sign: *플랜 거절됨* — by {action.UserName}";
+                                Task.Run(async () => await SlackRespondViaUrl(action.ResponseUrl, updateText))
+                                    .Wait(3000);
+                            }
+                        }
+                    };
+                }
+                else
+                {
+                    Console.WriteLine("[EYE] Slack config missing tokens — Slack disabled");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[EYE] Slack config not found — Slack disabled");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE] Slack init error: {ex.Message} — continuing without Slack");
+        }
+
+        // ── Startup: execute overdue schedules (PC reboot recovery) ──
+        try
+        {
+            var overdueItems = ScheduleManager.GetDueItems();
+            if (overdueItems.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[SCHEDULE] {overdueItems.Count} overdue schedule(s) from before restart");
+                Console.ResetColor();
+                Thread.Sleep(5000);
+                foreach (var item in overdueItems)
+                {
+                    ExecuteScheduleItem(item, slackBotToken, slackChannel);
+                    Thread.Sleep(2000);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SCHEDULE] Startup recovery error: {ex.Message}");
+        }
+
+        // ── Hot-reload: track EXE timestamp ──
+        var exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+        var exeStartTime = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.MinValue;
+
         var keepAwakeSw = Stopwatch.StartNew();
         WKAppBot.Win32.Native.NativeMethods.SetThreadExecutionState(
             WKAppBot.Win32.Native.NativeMethods.ES_CONTINUOUS |
@@ -91,16 +265,299 @@ internal partial class Program
             WKAppBot.Win32.Native.NativeMethods.ES_DISPLAY_REQUIRED);
         _lastKeepAwakeUtc = DateTime.UtcNow;
 
+        int frameCount = 0;
         while (host.IsAlive && !cts.IsCancellationRequested)
         {
+            // ── Core tick: read ticks + sessions ──
             var forceFull = ShouldForceFullLoad();
             var (tickDirty, promptDirty) = CheckGlobalDirtyFlags();
             if (!TryRunOneGlobalTick(host, timeoutMs: 3000, forceFull, tickDirty, promptDirty))
             {
                 Console.WriteLine("[EYE] tick timeout (>3s) - self terminate");
-                return 2;
+                break;
             }
 
+            // ── Claude Desktop status detection (~every 5 sec) ──
+            if (frameCount % 50 == 0)
+            {
+                // Re-find Claude window if lost
+                if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd))
+                    claudeHwnd = FindClaudeDesktopWindow();
+
+                if (claudeHwnd != IntPtr.Zero)
+                {
+                    try
+                    {
+                        var claudeStatus = DetectClaudeDesktopStatus(claudeHwnd);
+
+                        if (claudeStatus != null)
+                        {
+                            cachedClaudeStatusText = $"Claude: {claudeStatus.Item2}";
+
+                            // Rate limit detection
+                            bool justHitRateLimit = false;
+                            if (claudeStatus.Item1 == "rate_limit")
+                            {
+                                justHitRateLimit = !wasRateLimited;
+                                wasRateLimited = true;
+                                if (rateLimitDetectedAt == null)
+                                    rateLimitDetectedAt = DateTime.Now;
+                                var resetDt = GetResetTimeFromDisplayText(claudeStatus.Item2);
+                                if (resetDt != null)
+                                    rateLimitResetTime = resetDt;
+                            }
+                            else if (wasRateLimited)
+                            {
+                                var now = DateTime.Now;
+                                bool cooldownPassed = rateLimitDetectedAt != null &&
+                                    (now - rateLimitDetectedAt.Value).TotalMinutes >= RateLimitCooldownMinutes;
+                                bool resetTimePassed = rateLimitResetTime != null && now >= rateLimitResetTime.Value;
+
+                                if (cooldownPassed || resetTimePassed)
+                                {
+                                    wasRateLimited = false;
+                                    rateLimitDetectedAt = null;
+                                    rateLimitResetTime = null;
+                                    Console.ForegroundColor = ConsoleColor.Green;
+                                    Console.WriteLine($"[EYE] Rate limit cleared (cooldown={cooldownPassed}, resetTime={resetTimePassed})");
+                                    Console.ResetColor();
+
+                                    // Execute on_limit_reset schedules
+                                    try
+                                    {
+                                        Console.WriteLine("[SCHEDULE] Rate limit cleared! Checking on_limit_reset schedules...");
+                                        Thread.Sleep(3000);
+                                        var resetItems = ScheduleManager.GetOnLimitResetItems();
+                                        foreach (var resetItem in resetItems)
+                                        {
+                                            ExecuteScheduleItem(resetItem, slackBotToken, slackChannel);
+                                            Thread.Sleep(2000);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"[SCHEDULE] on_limit_reset error: {ex.Message}");
+                                    }
+                                }
+                            }
+
+                            // Rate limit alert to Slack (new message, not update)
+                            bool alertCooldownOk = lastRateLimitAlertTime == null ||
+                                (DateTime.Now - lastRateLimitAlertTime.Value).TotalMinutes >= RateLimitAlertCooldownMinutes;
+                            if (justHitRateLimit && alertCooldownOk && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                            {
+                                lastRateLimitAlertTime = DateTime.Now;
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine($"[EYE] ★ Rate limit detected! {claudeStatus.Item2}");
+                                Console.ResetColor();
+                                try
+                                {
+                                    var alertMsg = $":rotating_light: *Rate Limit!* {claudeStatus.Item2}";
+                                    Task.Run(async () =>
+                                        await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: botUsername))
+                                        .Wait(5000);
+                                }
+                                catch { }
+                            }
+
+                            // Slack status streaming (edit same message)
+                            if (slackClient != null && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                            {
+                                try
+                                {
+                                    var statusEmoji = claudeStatus.Item1 switch
+                                    {
+                                        "executing" => ":gear:",
+                                        "plan_approval_pending" => ":clipboard:",
+                                        "plan_mode" => ":memo:",
+                                        "permission_prompt" => ":lock:",
+                                        "prompt_ready" => ":speech_balloon:",
+                                        "rate_limit" => ":warning:",
+                                        _ => ":robot_face:"
+                                    };
+                                    var slackText = $"{statusEmoji} Claude: {claudeStatus.Item2}";
+                                    bool textChanged = slackText != lastSlackStatusText;
+
+                                    if (slackStatusTs != null)
+                                    {
+                                        bool shouldRelocate = false;
+                                        var now = DateTime.Now;
+                                        if ((now - lastRelocateCheck).TotalSeconds >= 5.0)
+                                        {
+                                            lastRelocateCheck = now;
+                                            try
+                                            {
+                                                var latestTs = Task.Run(async () =>
+                                                    await GetChannelLatestMessageTs(slackBotToken!, slackChannel!))
+                                                    .GetAwaiter().GetResult();
+                                                if (latestTs != null && latestTs != slackStatusTs)
+                                                    shouldRelocate = true;
+                                            }
+                                            catch { }
+                                        }
+
+                                        if (shouldRelocate)
+                                        {
+                                            var oldTs = slackStatusTs;
+                                            Task.Run(async () => await SlackDeleteMessageAsync(
+                                                slackBotToken!, slackChannel!, oldTs)).Wait(3000);
+                                            var (ok2, ts2) = Task.Run(async () =>
+                                                await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
+                                                .GetAwaiter().GetResult();
+                                            if (ok2 && ts2 != null) slackStatusTs = ts2;
+                                            lastSlackStatusText = slackText;
+                                        }
+                                        else if (textChanged)
+                                        {
+                                            var localTs = slackStatusTs;
+                                            Task.Run(async () => await SlackUpdateMessageAsync(
+                                                slackBotToken!, slackChannel!, localTs, slackText))
+                                                .Wait(3000);
+                                            lastSlackStatusText = slackText;
+                                        }
+                                    }
+                                    else if (textChanged)
+                                    {
+                                        var (ok, ts) = Task.Run(async () =>
+                                            await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
+                                            .GetAwaiter().GetResult();
+                                        if (ok && ts != null) slackStatusTs = ts;
+                                        lastSlackStatusText = slackText;
+                                    }
+                                }
+                                catch { /* best-effort */ }
+
+                                // Plan approval → Slack
+                                if (claudeStatus.Item1 == "plan_approval_pending" && !planApprovalSentToSlack)
+                                {
+                                    try
+                                    {
+                                        var plan = ExtractPlanContent(claudeHwnd);
+                                        if (plan != null)
+                                        {
+                                            var planContent = plan.Value.content;
+                                            if (planContent.Length > 3500)
+                                                planContent = planContent[..3500] + "\n\n... (truncated)";
+                                            var sourceLabel = plan.Value.source == "UIA" ? "UIA" : $"`{plan.Value.source}`";
+                                            var fallbackText = $":clipboard: 플랜 승인 대기 (via {sourceLabel})\n\n{planContent}";
+                                            var blocks = BuildPlanApprovalBlocks(planContent, sourceLabel);
+                                            var (sendOk, sendTs) = Task.Run(async () =>
+                                                await SlackSendBlocksViaApi(slackBotToken!, slackChannel!, fallbackText, blocks))
+                                                .GetAwaiter().GetResult();
+                                            if (sendOk)
+                                            {
+                                                pendingPlanApprovalSlackTs = sendTs;
+                                                planApprovalSentToSlack = true;
+                                                Console.ForegroundColor = ConsoleColor.Cyan;
+                                                Console.WriteLine($"[EYE] Plan sent to Slack via {plan.Value.source} (ts={sendTs})");
+                                                Console.ResetColor();
+                                            }
+                                        }
+                                        else
+                                        {
+                                            planApprovalSentToSlack = true; // don't retry
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"[EYE] Plan Slack share error: {ex.Message}");
+                                    }
+                                }
+                                if (claudeStatus.Item1 != "plan_approval_pending" && planApprovalSentToSlack)
+                                {
+                                    planApprovalSentToSlack = false;
+                                    pendingPlanApprovalSlackTs = null;
+                                }
+
+                                // Permission prompt → Slack
+                                if (claudeStatus.Item1 == "permission_prompt" && !permissionPromptSentToSlack)
+                                {
+                                    try
+                                    {
+                                        var permButtons = GetPermissionButtons(claudeHwnd);
+                                        if (permButtons.Count >= 2)
+                                        {
+                                            var btnList = string.Join(" / ", permButtons);
+                                            var fallbackText = $":lock: 수락 요구: [{btnList}]";
+                                            var blocks = BuildPermissionBlocks(permButtons, claudeStatus.Item2);
+                                            var (sendOk, sendTs) = Task.Run(async () =>
+                                                await SlackSendBlocksViaApi(slackBotToken!, slackChannel!, fallbackText, blocks))
+                                                .GetAwaiter().GetResult();
+                                            if (sendOk)
+                                            {
+                                                permissionPromptSentToSlack = true;
+                                                Console.ForegroundColor = ConsoleColor.Cyan;
+                                                Console.WriteLine($"[EYE] Permission buttons sent to Slack: [{btnList}] (ts={sendTs})");
+                                                Console.ResetColor();
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"[EYE] Permission Slack share error: {ex.Message}");
+                                    }
+                                }
+                                if (claudeStatus.Item1 != "permission_prompt" && permissionPromptSentToSlack)
+                                    permissionPromptSentToSlack = false;
+                            }
+                        }
+                        else
+                        {
+                            // Claude status null — auto-clear stale rate limit
+                            if (wasRateLimited)
+                            {
+                                var now = DateTime.Now;
+                                bool cooldownPassed = rateLimitDetectedAt != null &&
+                                    (now - rateLimitDetectedAt.Value).TotalMinutes >= RateLimitCooldownMinutes;
+                                bool resetTimePassed = rateLimitResetTime != null && now >= rateLimitResetTime.Value;
+                                if (cooldownPassed || resetTimePassed)
+                                {
+                                    wasRateLimited = false;
+                                    rateLimitDetectedAt = null;
+                                    rateLimitResetTime = null;
+                                    cachedClaudeStatusText = null;
+                                    Console.ForegroundColor = ConsoleColor.Green;
+                                    Console.WriteLine($"[EYE] Rate limit auto-cleared (null status)");
+                                    Console.ResetColor();
+
+                                    try
+                                    {
+                                        var resetItems = ScheduleManager.GetOnLimitResetItems();
+                                        foreach (var resetItem in resetItems)
+                                        {
+                                            ExecuteScheduleItem(resetItem, slackBotToken, slackChannel);
+                                            Thread.Sleep(2000);
+                                        }
+                                    }
+                                    catch { }
+                                }
+                            }
+                            else
+                            {
+                                cachedClaudeStatusText = null;
+                            }
+                        }
+                    }
+                    catch { /* best-effort */ }
+                }
+            }
+
+            // ── Schedule executor (~every 10 seconds) ──
+            if (frameCount % 100 == 50)
+            {
+                try
+                {
+                    var dueItems = ScheduleManager.GetDueItems();
+                    foreach (var dueItem in dueItems)
+                        ExecuteScheduleItem(dueItem, slackBotToken, slackChannel);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SCHEDULE] Error: {ex.Message}");
+                }
+            }
+
+            // ── Keep-awake ──
             if (keepAwakeSw.ElapsedMilliseconds >= 60_000)
             {
                 keepAwakeSw.Restart();
@@ -112,11 +569,72 @@ internal partial class Program
                 Console.WriteLine("[EYE] keep-awake tick");
             }
 
+            // ── Slack reconnect watchdog (~every 5 min) ──
+            if (slackClient != null && frameCount % 3000 == 2999)
+            {
+                if (slackClient.IsConnected && slackClient.MessageCount <= 1)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("[EYE][SLACK] No events received in 5+ minutes — attempting reconnect...");
+                    Console.ResetColor();
+                    try
+                    {
+                        slackClient.ReconnectAsync().GetAwaiter().GetResult();
+                        Console.WriteLine("[EYE][SLACK] Reconnected successfully");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[EYE][SLACK] Reconnect failed: {ex.Message}");
+                    }
+                }
+            }
+
+            // ── Hot-reload check (~every 5 sec) ──
+            if (frameCount % 50 == 0 && exeStartTime != DateTime.MinValue)
+            {
+                try
+                {
+                    if (File.GetLastWriteTimeUtc(exePath) != exeStartTime)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("[EYE] Hot-reload: EXE changed — shutting down");
+                        Console.ResetColor();
+                        break;
+                    }
+                }
+                catch { }
+            }
+
+            // ── Stats logging ──
+            if (frameCount % 100 == 0 && frameCount > 0)
+            {
+                var slackInfo = slackClient != null
+                    ? $", Slack={slackClient.IsConnected}, msgs={slackClient.MessageCount}"
+                    : "";
+                Console.WriteLine($"[EYE] frame #{frameCount} ({(slackClient != null ? "Socket+API" : "API-only")}{slackInfo})");
+            }
+
+            frameCount++;
             Thread.Sleep(Math.Max(100, intervalMs));
         }
 
+        // ── Cleanup ──
         WKAppBot.Win32.Native.NativeMethods.SetThreadExecutionState(
             WKAppBot.Win32.Native.NativeMethods.ES_CONTINUOUS);
+
+        if (slackClient != null)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                {
+                    Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!, "AppBotEye Global+Slack 종료", username: botUsername))
+                        .Wait(3000);
+                }
+                slackClient.Dispose();
+            }
+            catch { }
+        }
 
         return 0;
     }

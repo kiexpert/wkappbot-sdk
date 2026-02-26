@@ -804,6 +804,12 @@ teardown:
   - 기본 ON (`--no-zoom`으로 끔), 경험DB에 zoom_input.png 자동 저장
   - `[ZOOM]` 태그: `[ZOOM:3x]`/`[ZOOM:HL]`/`[ZOOM:1:1]` 모드별 출력
   - `zoom-demo` 커맨드: 아무 앱에서 적응형 줌 데모 (SendInput 타이핑)
+- **GlobalMode Socket Mode 완료**: EyeGlobalPollingLoop에 SlackSocketClient 실시간 WebSocket 통합
+  - 기존 API 폴링(EyeTickForwardSlackInbox)은 one-shot `eye tick` 전용, GlobalMode는 Socket Mode
+  - SetupSlackEventHandlers: @mention → Claude 프롬프트 전달, 쓰레드 댓글 감지
+  - Block Kit 버튼: 플랜 승인/거절, 권한 프롬프트 원격 처리
+  - Claude Desktop UIA 감지: 실행중/계획승인/권한/rate limit 상태 + Slack 스트리밍
+  - 스케줄 실행기(~10초), 핫리로드, Slack 워치독(~5분) 주기적 체크
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
@@ -1030,13 +1036,14 @@ teardown:
 ### AppBotEye — "앱봇의 눈" 라이브 오버레이 ✅
 **상태**: 완료 (통합 모드 + Slack 데몬 통합 포함)
 - Claude Desktop 우상단에 자동 배치되는 반투명 오버레이 윈도우
-- **통합 모드** (기본, 플래그 없이 `wkappbot eye`):
-  - ActionState IPC를 최우선 읽어 앱봇의 마지막 관심사 표시 (UIA 정보 + 액션 이름)
-  - ActionState stale(>30초) 또는 없으면 커서 기반 UIA 추적으로 폴백
-  - Claude Desktop UIA 상태 감지: 실행중(중단 버튼)/계획승인 대기/프롬프트 입력 대기
-  - Fallback 모드에서 "(앱봇 대기 중)" 대신 "Claude: 실행 중" / "Claude: 계획승인 대기" / "Claude: 프롬프트 입력 대기" 자동 표시
+- **GlobalMode** (기본, 플래그 없이 `wkappbot eye`):
+  - 텍스트 기반 요약 (eye_ticks + sessions 파일 읽기), 멀티 parent card 표시
+  - **Socket Mode 통합**: Slack WebSocket 실시간 이벤트 수신 + Claude 프롬프트 전달
+  - Claude Desktop UIA 감지: 실행중/계획승인/권한프롬프트/rate limit 상태 + Slack 스트리밍
+  - 스케줄 실행기(~10초), 핫리로드, Slack 워치독(~5분), keep-awake(60초)
   - **모든 CLI 명령에서 AppBotEye 자동 실행** (eye/slack/help/validate 제외, 블랙리스트 방식)
-- **Slack 기본 ON** (`--no-slack`으로 끄기): Slack Socket Mode 리스너 통합 (별도 프로세스 없이 AppBotEye 안에서 Slack 양방향 통신)
+- **AppMode** (`--app/--process/--legacy`): ActionState IPC + 커서 기반 UIA + PrintWindow 스크린샷
+- **Slack 기본 ON**: 양 모드(GlobalMode/AppMode) 모두 Socket Mode 리스너 내장 (별도 프로세스 불필요)
   - `SetupSlackEventHandlers()`로 OnMention/OnMessage 이벤트 핸들러 등록
   - AppBotEye + Slack 데몬이 하나의 프로세스에서 동시 실행
 - **Block Kit 인터랙티브 버튼**: 플랜 승인 시 [수락]/[거절] 버튼 Slack에 전송
