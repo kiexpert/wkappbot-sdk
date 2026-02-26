@@ -450,4 +450,33 @@ internal partial class Program
 
         return messages.Where(m => m != null).Select(m => m!).ToList();
     }
+
+    /// <summary>
+    /// Fetch thread replies via Slack conversations.replies API.
+    /// Returns all messages in the thread (parent first, then replies oldest→newest).
+    /// </summary>
+    static async Task<List<JsonNode>> SlackFetchRepliesAsync(string botToken, string channel,
+        string threadTs, int limit = 20)
+    {
+        using var http = new HttpClient();
+        var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit={limit}";
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+
+        var resp = await http.SendAsync(req);
+        var body = await resp.Content.ReadAsStringAsync();
+        var json = JsonSerializer.Deserialize<JsonNode>(body);
+
+        if (json?["ok"]?.GetValue<bool>() != true)
+        {
+            Console.WriteLine($"[SLACK] conversations.replies failed: {json?["error"]}");
+            return new List<JsonNode>();
+        }
+
+        var messages = json["messages"]?.AsArray();
+        if (messages == null) return new List<JsonNode>();
+
+        return messages.Where(m => m != null).Select(m => m!).ToList();
+    }
 }

@@ -364,6 +364,9 @@ internal partial class Program
                 return;
             }
 
+            // Thread reply check uses ClaudePromptHelper — create early for shared use
+            using var helper = new ClaudePromptHelper();
+
             // Separate: context message (last processed) vs new messages (after lastTs)
             string? contextLine = null; // last processed message for conversation context
             var newMsgs = new List<(string user, string text, string ts)>();
@@ -403,6 +406,8 @@ internal partial class Program
             if (newMsgs.Count == 0)
             {
                 Console.WriteLine("[EYE_TICK] slack=no_new_messages");
+                // Still check thread replies even if no new channel messages
+                EyeTickCheckThreadReplies(messages, botToken, channel, botUserId, helper);
                 return;
             }
 
@@ -412,7 +417,6 @@ internal partial class Program
             Console.WriteLine($"[EYE_TICK] slack={newMsgs.Count} new message(s) — forwarding to Claude prompt...");
 
             // Find Claude prompt
-            using var helper = new ClaudePromptHelper();
             var promptInfo = helper.FindPrompt();
             if (promptInfo == null)
             {
@@ -462,10 +466,132 @@ internal partial class Program
                 SaveLastTs(channel, latestTs);
                 Console.WriteLine($"[EYE_TICK] slack forwarded={forwarded}/{newMsgs.Count} — lastTs updated");
             }
+
+            // ── Thread reply detection ──
+            // Check recent bot messages for user thread replies
+            EyeTickCheckThreadReplies(messages, botToken, channel, botUserId, helper);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[EYE_TICK] slack error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Check recent bot messages for new thread replies from users.
+    /// Responds when: (1) parent is from bot (클롯) → any user reply, or (2) @mention in reply.
+    /// </summary>
+    static void EyeTickCheckThreadReplies(List<System.Text.Json.Nodes.JsonNode> channelMessages,
+        string botToken, string channel, string? botUserId, ClaudePromptHelper helper)
+    {
+        try
+        {
+            // Find bot messages with replies (max 5 threads to check)
+            var botThreads = new List<(string threadTs, string parentText)>();
+            foreach (var msg in channelMessages)
+            {
+                var user = msg["user"]?.GetValue<string>() ?? "";
+                var botId = msg["bot_id"]?.GetValue<string>();
+                var subtype = msg["subtype"]?.GetValue<string>();
+                var replyCount = msg["reply_count"]?.GetValue<int>() ?? 0;
+                var ts = msg["ts"]?.GetValue<string>() ?? "";
+                var text = msg["text"]?.GetValue<string>() ?? "";
+
+                if (replyCount <= 0) continue;
+
+                // Is this a bot message? (either user==botUserId or has bot_id or subtype==bot_message)
+                bool isBotMsg = user == botUserId
+                    || !string.IsNullOrEmpty(botId)
+                    || subtype == "bot_message";
+                if (!isBotMsg) continue;
+
+                botThreads.Add((ts, text));
+                if (botThreads.Count >= 5) break;
+            }
+
+            if (botThreads.Count == 0) return;
+
+            int threadReplies = 0;
+            foreach (var (threadTs, parentText) in botThreads)
+            {
+                // Load per-thread last reply ts
+                var threadKey = $"{channel}_t_{threadTs}";
+                var lastReplyTs = LoadLastTs(threadKey);
+                double lastReplyTsDouble = 0;
+                if (!string.IsNullOrEmpty(lastReplyTs))
+                    double.TryParse(lastReplyTs, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out lastReplyTsDouble);
+
+                // Fetch thread replies
+                var replies = SlackFetchRepliesAsync(botToken, channel, threadTs, limit: 10)
+                    .GetAwaiter().GetResult();
+
+                string? latestReplyTs = null;
+                foreach (var reply in replies)
+                {
+                    var rTs = reply["ts"]?.GetValue<string>() ?? "";
+                    var rUser = reply["user"]?.GetValue<string>() ?? "";
+                    var rText = reply["text"]?.GetValue<string>() ?? "";
+                    var rBotId = reply["bot_id"]?.GetValue<string>();
+                    var rSubtype = reply["subtype"]?.GetValue<string>();
+
+                    // Skip parent message itself
+                    if (rTs == threadTs) continue;
+                    // Skip bot's own replies
+                    if (rUser == botUserId || !string.IsNullOrEmpty(rBotId) || rSubtype == "bot_message") continue;
+                    // Skip empty
+                    if (string.IsNullOrWhiteSpace(rText)) continue;
+
+                    // Skip already processed
+                    double.TryParse(rTs, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var rTsDouble);
+                    if (lastReplyTsDouble > 0 && rTsDouble <= lastReplyTsDouble) continue;
+
+                    // Check: @mention tag → always respond
+                    bool hasMention = !string.IsNullOrEmpty(botUserId) && rText.Contains($"<@{botUserId}>");
+
+                    // For non-mention replies, parent must be from bot (already filtered above)
+                    // Both cases pass — bot thread reply OR @mention
+
+                    // Clean text
+                    var cleanReply = System.Text.RegularExpressions.Regex.Replace(rText, @"<@[A-Z0-9]+>\s*", "").Trim();
+                    if (string.IsNullOrWhiteSpace(cleanReply)) continue;
+
+                    // Build context: bot's original message (truncated)
+                    var cleanParent = System.Text.RegularExpressions.Regex.Replace(parentText, @"<@[A-Z0-9]+>\s*", "").Trim();
+                    if (cleanParent.Length > 80) cleanParent = cleanParent[..80] + "…";
+
+                    var replyCmd = $"wkappbot slack reply \"response\" --channel {channel} --thread {threadTs}";
+                    var promptText = $"[쓰레드 시작] 클롯: {cleanParent}\n\n@{rUser}: {cleanReply}\n\n(Slack thread reply — {replyCmd})";
+
+                    var fresh = helper.FindPrompt();
+                    if (fresh == null)
+                    {
+                        Console.WriteLine("[EYE_TICK] WARNING: Lost prompt — stopping thread reply forward");
+                        return;
+                    }
+
+                    var ok = helper.TypeAndSubmit(fresh, promptText);
+                    if (ok)
+                    {
+                        threadReplies++;
+                        latestReplyTs = rTs;
+                        Console.WriteLine($"[EYE_TICK] >> Thread @{rUser}: {cleanReply}");
+                        Thread.Sleep(2000);
+                    }
+                }
+
+                // Update per-thread last reply ts
+                if (latestReplyTs != null)
+                    SaveLastTs(threadKey, latestReplyTs);
+            }
+
+            if (threadReplies > 0)
+                Console.WriteLine($"[EYE_TICK] thread_replies={threadReplies} forwarded");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE_TICK] thread check error: {ex.Message}");
         }
     }
 

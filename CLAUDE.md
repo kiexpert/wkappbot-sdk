@@ -39,6 +39,10 @@
   - 맥락 포함: `[직전 대화] @user: text` 형태로 첫 번째 새 메시지 앞에 붙여 대화 흐름 파악 가능
   - 프롬프트 못찾으면: 다음 tick에서 재시도 (lastTs 미갱신)
   - **슬랙 메시지를 받았으면 반드시 슬랙으로 응답할 것!** (`wkappbot slack send` 또는 `wkappbot slack reply`)
+  - **쓰레드 댓글 감지**: conversations.replies API로 봇 메시지의 쓰레드 댓글 자동 조회
+    - 클롯이 보낸 메시지(bot_id/botUserId)에 유저 댓글 → 자동 전달
+    - @WKAppBot 태깅 포함 시 → 무조건 전달 (어느 쓰레드든)
+    - per-thread lastTs 추적 (`{channel}_t_{threadTs}` 키)
 
 - logcat 명령 (실시간 로그 추적)
   - `wkappbot logcat <fileFilter> <messageFilter>`
