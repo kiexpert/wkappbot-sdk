@@ -818,6 +818,13 @@ teardown:
 - **Slack 쓰레드 ID 프롬프트 전달 완료**: `thread=<ts>` 포함 → `slack reply --thread <ts>`로 정확한 쓰레드 답글
 - **"전달했습니다" 쓰레드 ID 표시 완료**: ack 메시지에 `(thread=<ts>)` 표시 → 유저도 어느 쓰레드인지 확인 가능
 - **봇 이름 클롣 확정**: Claude→클롣 (de=ㄷ종성), 키워드/코드/문서 전부 통일
+- **Claude 프롬프트 Focusless 입력 완료**: MSAA put_accValue 직접 vtable 호출로 포커스 없이 텍스트 삽입
+  - FlaUI LegacyIAccessible.SetValue → E_NOTIMPL (UIA→MSAA 브릿지가 거부)
+  - IAccessibleEditableText.insertText → E_NOINTERFACE (contentEditable = ROLE_GROUPING, not TEXT)
+  - 직접 MSAA vtable put_accValue → S_OK! (UIA 프록시 우회, 진짜 focusless)
+  - MSAA 트리: grandparent → parent(name="입력하세요") ← put_accValue 타겟 → self(AccessibleObjectFromPoint)
+  - `wkappbot prompt-test "text" [--dry-run]` CLI로 검증 가능
+  - 텍스트 삽입은 완전 focusless, Enter만 잠깐 포커스 확보 후 즉시 복원
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
