@@ -810,6 +810,14 @@ teardown:
   - Block Kit 버튼: 플랜 승인/거절, 권한 프롬프트 원격 처리
   - Claude Desktop UIA 감지: 실행중/계획승인/권한/rate limit 상태 + Slack 스트리밍
   - 스케줄 실행기(~10초), 핫리로드, Slack 워치독(~5분) 주기적 체크
+- **Slack 권한승인 텍스트 답글 완료**: `:lock:` 쓰레드에 "승인"/"ㄱㄱ" 텍스트로 UIA Allow 클릭 (Block Kit 버튼 대안)
+- **상태 쓰레드 댓글 감지 완료**: 상태 메시지에 유저 댓글 → slackStatusTs 리셋 → 다음 상태는 새 채널 메시지
+- **권한요청 3초 디바운스 완료**: auto-approved 권한이 순간 깜빡여도 `:lock:` Slack 알림 안 보냄 (false positive 방지)
+- **상태메시지 도배 수정 완료**: relocate 로직 삭제 → 항상 chat.update로 동일 메시지 수정 (스팸 방지)
+- **상태 ts 영속화 완료**: `status_streaming_ts.txt` 파일로 Eye 재시작 후에도 이전 상태 메시지 재활용
+- **Slack 쓰레드 ID 프롬프트 전달 완료**: `thread=<ts>` 포함 → `slack reply --thread <ts>`로 정확한 쓰레드 답글
+- **"전달했습니다" 쓰레드 ID 표시 완료**: ack 메시지에 `(thread=<ts>)` 표시 → 유저도 어느 쓰레드인지 확인 가능
+- **봇 이름 클롣 확정**: Claude→클롣 (de=ㄷ종성), 키워드/코드/문서 전부 통일
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)
