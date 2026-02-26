@@ -1,0 +1,23 @@
+# Dialog handler: 투혼 로그인 다이얼로그 (NXT session reconnection)
+# Triggers when title contains "로그인" — catches "투혼 고객용 로그인" etc.
+# Clicks "확인" button to dismiss. PostMessage BM_CLICK is fully focusless.
+# After clicking: patrol loop waits for main window while handling popups/notices.
+# Note: process name varies by HTS build (nkrunlite / XingQSmartMain) — no process filter.
+# Note: stable_frames NOT used here — HTS main window has live data, never stabilizes.
+#       Use stable_frames for specific MDI form loading instead.
+# Note: responsive=true uses SendMessageTimeout(WM_NULL, SMTO_ABORTIFHUNG) to detect
+#       when HTS finishes loading and starts processing messages (message loop alive).
+
+match:
+  title_contains: "로그인"
+  class: "#32770"
+
+action: click_button
+
+params:
+  button_text: "확인"
+  retry: true
+  wait_until:
+    window_exists: "*투혼*"
+    responsive: true
+    timeout: 120

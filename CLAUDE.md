@@ -12,6 +12,9 @@
 - **항상 떠있어야 함**: 모든 CLI 명령 실행 시 AppBotEye 자동 spawn
 - `eye`, `slack`, `help`, `validate`, `win-move` 제외하고 자동 실행 (`win-move`는 중복 Eye 생성 방지 예외)
 - AppBotEye = Slack 데몬 통합 → 별도 `slack listen` 불필요
+- **크로 카드 터치 금지!**: 크로(OpenClaw)는 별도 서비스 → 클롣이 상태 탐지/조합 불가 → BuildKroStatus3 등 크로 카드 로직 수정 금지
+- **클롣 카드만 개선 가능**: 클롣(wkappbot CLI)의 카드 표시/포맷은 자유롭게 개선 OK
+- **CWD 약식 표시**: 드라이브+중간폴더 이니셜+`-`+마지막 폴더 (예: `W:\GitHub\WKAppBot` → `WG-WKAppBot`)
 
 ### 2026-02-24 EyeTick 복구/운영 메모 (중요)
 - `wkappbot eye tick`은 반드시 **one-shot 진단 명령**이어야 함 (글로벌 루프 진입 금지).
@@ -236,6 +239,7 @@ wkappbot scan <window-title> [--save] [--ocr] [--detail] [--depth N]
 wkappbot do <window-title> [form-id] <button-text> [--confirm]
 wkappbot dismiss <window-title> [keywords...]
 wkappbot toolbar-ocr <window-title> [--click "text"] [--save]
+wkappbot titlebar <window-title> <form-id> [button-index] [--ocr] [--save]  # MDI 타이틀바 커스텀 버튼 (focusless!)
 wkappbot chart-analyze <window-title|image.png> [--form <id>] [--candles N] [-o output.json] [--debug] [--tooltip]
 wkappbot tooltip-probe <process-name> [--capture]
 wkappbot ocr <window-title|image.png> [--save] [-o output.txt]
@@ -624,11 +628,24 @@ UIA Name/AutomationId에 와일드카드/정규식 매칭 지원:
 | 리터럴 | `"plusButton"` | 정확 일치 (기본, 하위호환) |
 | 와일드카드 | `"*Button*"`, `"결과*"`, `"?u?"` | glob 스타일 (* = 0+문자, ? = 1문자) |
 | 정규식 | `"regex:btn_\\d+"` | 정규식 (대소문자 무시) |
+| **경로 glob** | `"*/#32770"`, `"**/#32770"` | **GitHub-style** (* = 슬래시민감, ** = 슬래시둔감) |
 
 - `PatternMatcher.IsPattern()`: 패턴 구문 감지 → 리터럴이면 빠른 UIA PropertyCondition 사용
+- `PatternMatcher.CreatePathGlob()`: 경로 인식 glob (classPath 매칭용)
+  - `*` = `/` 안 넘어감 (단일 경로 세그먼트 내)
+  - `**` = `/` 포함 아무 것이나 매칭 (0개 이상의 세그먼트)
+  - `**/` = 0개 이상의 중간 경로 (빈 경로도 OK)
+  - `?` = `/` 제외 한 글자
+- `PatternMatcher.IsPathGlob()`: `/` 또는 `**` 포함 시 true → classPath 전체 매칭
 - 패턴이면 `FindAllDescendants` BFS 트리 워크 → predicate 필터 (maxDepth=6)
 - `FindElement()`에서 자동 분기: exact match 먼저 → 패턴이면 BFS 폴백
 - 반환 메서드: `"automation_id_pattern"`, `"name_pattern"` (기존 `"automation_id"`, `"name"`과 구분)
+- **핸들러 YAML 매칭**: 모든 match 필드(title_contains/class/process/message_contains)에 glob 지원
+  - `class: "*/#32770"` → classPath 전체 글롭 매칭
+  - `class: "#32770"` → 기존 동작 (leaf className 정확 매칭)
+  - `title_contains: "*투혼*"` → 타이틀 글롭 풀매치
+  - `process: "Xing*"` → 프로세스명 글롭 매치
+- **FindByTitle 글롭**: `WindowFinder.FindByTitle`도 글롭 패턴 인식 (리터럴=Contains, 글롭=풀매치)
 
 ### 13. VisionAnalyzer (Claude API — 고비용 최종 폴백)
 - `ANTHROPIC_API_KEY` 환경변수 필요 (없으면 이 티어 스킵)
@@ -731,9 +748,21 @@ teardown:
 - **TouchControl 완료**: 모든 경로에서 컨트롤 만나면 자동 경험 축적 (스크린샷+텍스트, best-effort)
 - **배포 구조 완료**: single-file EXE + wkappbot.hq/ (handlers, profiles, logs, output 통합 본부)
 - **Dialog Handlers 완료**: YAML 기반 방해꾼 자동처리 + EnumWindows 감지 + 마우스 호버 인터랙티브 학습
+- **Patrol Wait Loop 완료**: 핸들러 후 "핸들러 개입환영" 순찰 대기 — wait_until 조건(window_exists/dialog_gone) + 프레임 안정화(stable_frames PrintWindow SHA256) + 대기 중 TryHandleBlocker 순찰
+- **dismiss #32770 직접 매칭 완료**: 대상 윈도우 자체가 #32770이면 핸들러 YAML 자동 매칭 (로그인 다이얼로그 등)
+- **GitHub-style Path Glob 완료**: PatternMatcher.CreatePathGlob — `*`(단일세그먼트) `**`(아무깊이) `?`(한글자) 지원
+  - classPath 매칭: `*/#32770`, `**/#32770`, `E*Trade*/#32770`, `*_59648/**/Button_*` 등
+  - FindByTitle/DialogHandler match 전부 glob 패턴 지원 (하위호환: 리터럴은 기존 동작 유지)
+  - title_contains/class/process/message_contains 모든 필드에 glob/regex 사용 가능
+- **PatrolWaitLoop responsive 체크 완료**: `wait_until responsive: true` — SendMessageTimeout(WM_NULL, SMTO_ABORTIFHUNG)
+  - HTS 초기화 완료 감지: 메시지 루프가 응답 가능할 때 = "로딩 끝" (stable_frames 대안)
+  - window_exists + responsive 조합: 먼저 윈도우 찾고 → 그 윈도우가 응답할 때까지 대기
+  - 3초 타임아웃으로 SendMessageTimeout, 응답 없으면 hung → 계속 대기
+  - 유저 쓰레드 병목 주의: SendMessageTimeout이 3초간 블록 → pollInterval과 합산 고려
 - **dismiss 완료**: MDI 공지/팝업 자동 닫기 + 내용 읽기 + 중요도 분류 (긴급→닫지 않음)
 - **OCR 자동 업스케일 완료**: 작은 이미지 2~4x 업스케일 → MFC 비트맵 폰트 인식률 향상
 - **toolbar-ocr 완료**: MFC Pane 기반 툴바 OCR 스캔 + X-overlap 단어 그룹핑 + 텍스트 클릭
+- **titlebar 완료**: ETK_CHILDFRAME 커스텀 타이틀바 버튼 — WM_NCHITTEST probe + PostMessage 음수 client-y 클릭 (Focusless!)
 - **ChartAnalyzer v11**: 차트 스크린샷 → OHLC 추출 (3전략 + deltaX 기반 ultra-dense 배치)
 - **Phase B 완료**: 툴팁 기반 Y축 재캘리브레이션 — 마우스 호버 → tooltips_class32 캡처 → OCR → OHLC 파싱 → Y축 교정
 - **Volume 추출 완료**: volume 패널 바 높이 추출 + tooltip 거래량 기반 절대값 캘리브레이션
@@ -1424,6 +1453,51 @@ candle[i] = columns[floor(i*dX) .. floor((i+1)*dX))
 - **Phase B 완료**: 마우스 호버 → 툴팁 OCR → Y축 재캘리브레이션 (TooltipCalibrator)
 - **Volume 추출 완료**: 볼륨 패널 바 높이 + tooltip 거래량으로 절대값 캘리브레이션
 - **volume 패널 tooltip**: 캔들이 volume 패널 경계에 있으면 거래량 tooltip이 뜸 (maxY 클램핑으로 대부분 회피)
+
+## Feature Requests (from HTS GridChe automation work, 2026-02-26)
+
+### 1. Login Dialog Auto-Handler ✅
+- **Trigger**: Window title matching `"투혼 고객용 로그인"` (class `#32770`)
+- **Action**: PostMessage `BM_CLICK` to `확인` button (cid=1256)
+- **Context**: NXT session reconnection pops this dialog; blocks all MDI interaction until dismissed
+- **Implementation**: Standard Win32 Button — `PostMessage(hwnd, BM_CLICK, 0, 0)` is fully focusless
+- **Priority**: High — blocks automated test scenarios
+
+### 2. Alert Dialog Auto-Dismiss for `input` Command ✅
+- **Problem**: `wkappbot input` doesn't handle `알림!!` popups that appear after input
+- **Example**: Typing invalid screen number in toolbar Edit → `알림!!` dialog blocks further input
+- **Desired**: After `input` completes, check for `#32770` child dialogs matching `알림` keyword → auto-dismiss
+- **Fallback**: Return error code + dismiss info so caller can decide retry logic
+- **Note**: `wkappbot dismiss` already handles `알림` keyword — just needs integration into `input` error path
+
+### 3. Toolbar Screen Number Input (Non-MDI Target)
+- **Problem**: `wkappbot input <title> <form-id> <text>` requires MDI form-id, but the toolbar Edit (cid=2000) is in the main frame, not an MDI child
+- **Desired**: Support `form-id=0` or `--toolbar` flag to target main frame controls
+- **Use case**: Open new MDI screen by typing screen number + Enter in toolbar Edit
+- **Challenge**: MFC `PreTranslateMessage` chain — PostMessage WM_KEYDOWN(VK_RETURN) doesn't trigger screen navigation. Only `SendInput` (focus-stealing) works currently
+- **Ideal**: Focusless method that triggers MFC accelerator processing (may require injecting into message pump)
+
+### 4. ETK_CHILDFRAME Title Bar Button Access ✅
+- **Problem**: Title bar buttons (중복실행, minimize, close, etc.) are custom-drawn in non-client area — no HWND, no UIA, no class name
+- **Discovery**: `WM_NCHITTEST` returns `HTCLIENT` (1) for button positions; `WM_LBUTTONDOWN/UP` with negative client-y coordinates works via PostMessage (focusless!)
+- **Button mapping**: 11 buttons detected via 2px-step hittest probe. Consistent layout across instances
+- **Implemented**: `wkappbot titlebar <title> <form-id> [button-index] [--ocr] [--save]`
+- **Button identification**: 3x upscaled titlebar screenshot with green markers + OCR labels
+- **Verified**: Close button (index 10) successfully closed MDI child via focusless PostMessage
+
+### 5. Focusless Building Blocks Summary (verified working)
+For reference, these focusless patterns were validated during this session:
+
+| Pattern | Method | Works |
+|---------|--------|:-----:|
+| Read control text | SendMessage WM_GETTEXT | Yes |
+| Set edit text | SendMessage WM_SETTEXT | Yes |
+| Click standard Button | PostMessage BM_CLICK | Yes |
+| Click title bar button | PostMessage WM_LBUTTONDOWN (neg client-y) | Yes |
+| Stock code input | wkappbot input --method focusless | Yes |
+| Dismiss popups | wkappbot dismiss | Yes |
+| Toolbar Enter (screen open) | PostMessage WM_KEYDOWN(VK_RETURN) | **No** |
+| Toolbar Enter (screen open) | ForceFocus + SendInput | Yes (steals focus) |
 
 ## Important Notes
 - Windows 전용 (.NET 8.0 `net8.0-windows10.0.22621.0`)

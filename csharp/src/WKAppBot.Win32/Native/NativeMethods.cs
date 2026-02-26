@@ -271,6 +271,15 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
 
+    // ── SendMessageTimeout (responsive check: SMTO_ABORTIFHUNG) ──
+    public const uint WM_NULL = 0x0000;
+    public const uint SMTO_ABORTIFHUNG = 0x0002;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SendMessageTimeoutW(
+        IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam,
+        uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
     // ── MDI ──────────────────────────────────────────────────────
     public const uint WM_CLOSE = 0x0010;
     public const uint WM_COPYDATA = 0x004A;
@@ -284,9 +293,21 @@ public static partial class NativeMethods
     public const uint WM_MOUSEMOVE = 0x0200;
     public const uint WM_LBUTTONDOWN = 0x0201;
     public const uint WM_LBUTTONUP = 0x0202;
+    public const uint WM_NCHITTEST = 0x0084;
+
+    // WM_NCHITTEST return values
+    public const int HTCLIENT = 1;
+    public const int HTCAPTION = 2;
+    public const int HTSYSMENU = 3;
+    public const int HTMINBUTTON = 8;
+    public const int HTMAXBUTTON = 9;
+    public const int HTCLOSE = 20;
 
     /// <summary>Pack (x, y) client coords into lParam for mouse messages.</summary>
     public static IntPtr MakeLParam(int x, int y) => (IntPtr)((y << 16) | (x & 0xFFFF));
+
+    /// <summary>Pack (x, y) screen coords into lParam for WM_NCHITTEST.</summary>
+    public static IntPtr MakeScreenLParam(int x, int y) => (IntPtr)((y << 16) | (x & 0xFFFF));
 
     // ── Process ──────────────────────────────────────────────────
     [DllImport("user32.dll")]
