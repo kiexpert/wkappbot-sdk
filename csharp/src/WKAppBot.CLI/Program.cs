@@ -83,10 +83,11 @@ internal partial class Program
 
             // Auto-launch AppBotEye for ALL commands except help only
             // 앱봇이 뭔가 하면 눈은 항상 떠있어야! (도움말만 제외)
+            // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
             var isHelp = command is "help" or "--help" or "-h";
             if (!isHelp)
             {
-                try { LaunchAppBotEyeIfNeeded(); } catch { /* best-effort */ }
+                ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
             }
 
             try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
