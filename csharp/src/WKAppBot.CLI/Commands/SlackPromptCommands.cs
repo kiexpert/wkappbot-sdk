@@ -423,12 +423,14 @@ internal partial class Program
 
     /// <summary>Fetch channel history via conversations.history API.</summary>
     static async Task<List<JsonNode>> SlackFetchHistoryAsync(string botToken, string channel,
-        string? oldest = null, int limit = 20)
+        string? oldest = null, int limit = 20, bool inclusive = false)
     {
         using var http = new HttpClient();
         var url = $"https://slack.com/api/conversations.history?channel={channel}&limit={limit}";
         if (!string.IsNullOrEmpty(oldest))
             url += $"&oldest={oldest}";
+        if (inclusive)
+            url += "&inclusive=true";
 
         using var req = new HttpRequestMessage(HttpMethod.Get, url);
         req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);

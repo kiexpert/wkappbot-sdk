@@ -31,11 +31,13 @@
     - `[KRO_PLAN_END]`
   - EyeTick은 위 블록을 우선 추출하며, 최신 플랜 블록이 나오면 이전 플랜과 혼합하지 않고 교체
 
-- **EyeTick 슬랙 인박스 전달 (MUST!)**
-  - `wkappbot eye tick` 실행 시 `slack_inbox.jsonl` 자동 체크 → Claude 프롬프트에 전달
-  - 인박스 비어있으면: `[EYE_TICK] slack_inbox=empty`
-  - 메시지 있으면: FindPrompt → TypeAndSubmit → 인박스 클리어
-  - 프롬프트 못찾으면: 인박스 보존 (다음 tick에서 재시도)
+- **EyeTick 슬랙 메시지 전달 (MUST!)**
+  - `wkappbot eye tick` 실행 시 Slack conversations.history API로 새 메시지 직접 조회 → Claude 프롬프트에 전달
+  - `slack_last_ts.txt`로 마지막 처리 위치 추적 (채널별 타임스탬프)
+  - 새 메시지 없으면: `[EYE_TICK] slack=no_new_messages`
+  - 새 메시지 있으면: 직전 대화(맥락) + 새 메시지를 FindPrompt → TypeAndSubmit
+  - 맥락 포함: `[직전 대화] @user: text` 형태로 첫 번째 새 메시지 앞에 붙여 대화 흐름 파악 가능
+  - 프롬프트 못찾으면: 다음 tick에서 재시도 (lastTs 미갱신)
   - **슬랙 메시지를 받았으면 반드시 슬랙으로 응답할 것!** (`wkappbot slack send` 또는 `wkappbot slack reply`)
 
 - logcat 명령 (실시간 로그 추적)
