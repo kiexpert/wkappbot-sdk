@@ -348,11 +348,14 @@ internal partial class Program
 
             // Get last processed timestamp
             var lastTs = LoadLastTs(channel);
+            var lastTsDouble = 0.0;
+            if (!string.IsNullOrEmpty(lastTs))
+                double.TryParse(lastTs, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out lastTsDouble);
 
-            // Fetch recent messages via conversations.history (inclusive=true to get context msg at lastTs)
-            var hasLastTs = !string.IsNullOrEmpty(lastTs);
-            var messages = SlackFetchHistoryAsync(botToken, channel, oldest: lastTs,
-                limit: hasLastTs ? 6 : 5, inclusive: hasLastTs)
+            // Fetch latest 20 messages (no oldest param — Slack API oldest returns ascending order,
+            // causing limit to clip old messages instead of new ones. Filter by ts in code instead.)
+            var messages = SlackFetchHistoryAsync(botToken, channel, limit: 20)
                 .GetAwaiter().GetResult();
 
             if (messages.Count == 0)
@@ -361,7 +364,7 @@ internal partial class Program
                 return;
             }
 
-            // Separate context message (at lastTs) from new messages
+            // Separate: context message (last processed) vs new messages (after lastTs)
             string? contextLine = null; // last processed message for conversation context
             var newMsgs = new List<(string user, string text, string ts)>();
             foreach (var msg in messages)
@@ -375,6 +378,10 @@ internal partial class Program
                 if (!string.IsNullOrEmpty(subtype)) continue;
                 if (string.IsNullOrWhiteSpace(text)) continue;
 
+                // Parse ts for comparison
+                double.TryParse(ts, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var tsDouble);
+
                 // Message at lastTs = context (already processed, include for conversation flow)
                 if (ts == lastTs)
                 {
@@ -383,6 +390,9 @@ internal partial class Program
                     contextLine = $"[직전 대화] {who}: {ctxClean}";
                     continue;
                 }
+
+                // Skip messages older than or equal to lastTs (already processed)
+                if (lastTsDouble > 0 && tsDouble <= lastTsDouble) continue;
 
                 // Skip bot's own messages (for new messages only)
                 if (user == botUserId) continue;
