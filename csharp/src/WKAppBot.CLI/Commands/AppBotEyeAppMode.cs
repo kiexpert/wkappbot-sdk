@@ -61,7 +61,6 @@ internal partial class Program
         // Slack status streaming — edit same message instead of spamming new ones
         string? slackStatusTs = null;       // current status message timestamp
         string? lastSlackStatusText = null;  // cached text for change detection
-        DateTime lastRelocateCheck = DateTime.MinValue; // throttle: check channel position max once per 5s
 
         // Restore previous status message ts from file (so restart can clean up old message)
         var statusTsFile = Path.Combine(DataDir, "runtime", "status_streaming_ts.txt");
@@ -685,51 +684,17 @@ internal partial class Program
 
                                         bool textChanged = slackText != lastSlackStatusText;
 
-                                        if (slackStatusTs != null)
+                                        // Reuse existing status message via chat.update (no relocate spam!)
+                                        // Thread reply detection (resetStatusStreaming) handles new message creation
+                                        if (slackStatusTs != null && textChanged)
                                         {
-                                            // Check if our status message is still the latest in channel
-                                            // Throttled to max once per 5 seconds (avoid Slack API rate limit)
-                                            bool shouldRelocate = false;
-                                            var now = DateTime.Now;
-                                            if ((now - lastRelocateCheck).TotalSeconds >= 5.0)
-                                            {
-                                                lastRelocateCheck = now;
-                                                try
-                                                {
-                                                    var latestTs = Task.Run(async () =>
-                                                        await GetChannelLatestMessageTs(slackBotToken!, slackChannel!))
-                                                        .GetAwaiter().GetResult();
-                                                    if (latestTs != null && latestTs != slackStatusTs)
-                                                        shouldRelocate = true;
-                                                }
-                                                catch { }
-                                            }
-
-                                            if (shouldRelocate)
-                                            {
-                                                // Don't delete — old message may be thread parent!
-                                                // Update old message to dim text, then send new one
-                                                var oldTs = slackStatusTs;
-                                                Task.Run(async () => await SlackUpdateMessageAsync(
-                                                    slackBotToken!, slackChannel!, oldTs, "_(상태 이동됨)_")).Wait(3000);
-                                                var (ok2, ts2) = Task.Run(async () =>
-                                                    await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
-                                                    .GetAwaiter().GetResult();
-                                                if (ok2 && ts2 != null) slackStatusTs = ts2;
-                                                lastSlackStatusText = slackText;
-                                            }
-                                            else if (textChanged)
-                                            {
-                                                // Still at bottom — just edit in place (streaming)
-                                                var localTs = slackStatusTs;
-                                                Task.Run(async () => await SlackUpdateMessageAsync(
-                                                    slackBotToken!, slackChannel!, localTs, slackText))
-                                                    .Wait(3000);
-                                                lastSlackStatusText = slackText;
-                                            }
-                                            // else: same text + still at bottom → no-op
+                                            var localTs = slackStatusTs;
+                                            Task.Run(async () => await SlackUpdateMessageAsync(
+                                                slackBotToken!, slackChannel!, localTs, slackText))
+                                                .Wait(3000);
+                                            lastSlackStatusText = slackText;
                                         }
-                                        else if (textChanged)
+                                        else if (slackStatusTs == null && textChanged)
                                         {
                                             // First message — create new
                                             var (ok, ts) = Task.Run(async () =>
