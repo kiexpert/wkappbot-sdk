@@ -99,6 +99,7 @@ internal partial class Program
         bool planApprovalSentToSlack = false;
         string? pendingPlanApprovalSlackTs = null;
         bool permissionPromptSentToSlack = false;
+        string? pendingPermissionSlackTs = null;
 
         // ── Slack status streaming ──
         string? slackStatusTs = null;
@@ -149,9 +150,10 @@ internal partial class Program
                             startupTs = sTs;
                     }
 
-                    // Set up event handlers (Slack → Claude prompt forwarding)
+                    // Set up event handlers (Slack → Claude prompt forwarding, plan/permission approval)
                     SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
-                        claudeHwnd, () => pendingPlanApprovalSlackTs, startupTs, botUsername);
+                        claudeHwnd, () => pendingPlanApprovalSlackTs,
+                        () => pendingPermissionSlackTs, startupTs, botUsername);
 
                     // Block Kit button handler (plan approve/reject, permission buttons)
                     slackClient.OnBlockAction += (action) =>
@@ -487,6 +489,7 @@ internal partial class Program
                                                 .GetAwaiter().GetResult();
                                             if (sendOk)
                                             {
+                                                pendingPermissionSlackTs = sendTs;
                                                 permissionPromptSentToSlack = true;
                                                 Console.ForegroundColor = ConsoleColor.Cyan;
                                                 Console.WriteLine($"[EYE] Permission buttons sent to Slack: [{btnList}] (ts={sendTs})");
@@ -500,7 +503,10 @@ internal partial class Program
                                     }
                                 }
                                 if (claudeStatus.Item1 != "permission_prompt" && permissionPromptSentToSlack)
+                                {
                                     permissionPromptSentToSlack = false;
+                                    pendingPermissionSlackTs = null;
+                                }
                             }
                         }
                         else
