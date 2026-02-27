@@ -16,155 +16,89 @@ Your testing, coding, and ideas are appreciated. Let's build together.
 Usage:
   wkappbot <command> [options]
 
-Scenario Commands:
-  run <scenario.yaml> [-v] [--no-watch] [--watch-interval N]
-      Run a test scenario with passive [WATCH] background tracker.
-  validate <scenario.yaml>
-      Validate a YAML scenario file (syntax + structure check).
+═══ Public Commands ═══════════════════════════════════════════
 
-Search Commands:
-  find <keyword> [--deep] [--limit N] [--process <name>] [--class <name>]
+  find <keyword> [--deep] [--limit N] [--process <name>]
       Unified search: window titles + UIA accessibility elements.
-      --deep: Thorough UIA tree search (depth 12, slower but finds more).
-
-Inspection Commands:
-  inspect <window-title> [--depth N] [--win32] [--filter <pattern>]
-      Dump UI Automation tree of a window (by title substring match).
-      --filter: Search A11Y tree for matching elements (supports A11Y: prefix).
-  windows [filter] [--uia] [--deep] [--process <name>] [--class <name>] [--limit N]
-      List visible windows in Z-order (front to back). ★=foreground.
-      --uia: Unified search — also find UIA elements inside windows.
-      --deep: Include MDI child windows. --limit N: Stop after N matches.
-  win-click <window-title> <x> <y> [--uia]
-      Click a coordinate inside a window + detect UIA element at point.
-      --uia: Show UIA element details with zoom overlay.
-  focus [--title <text>] [--delay N] [--depth N] [--win32] [-b]
-      Inspect the currently focused window (countdown + UIA/Win32 dump).
-  watch [--duration N] [--live] [--win32] [--interval N] [--save file]
-      Real-time element tracking under mouse cursor (Ctrl+C to stop).
+      --deep: Thorough search (depth 12, slower but finds more).
+  run <scenario.yaml> [-v] [--no-watch]
+      Run a YAML test scenario with background element tracking.
+  do <window-title> <form-id> <button-text> [--confirm]
+      Full automation: combo select + button click + dialog handling.
+  scan <window-title> [--save] [--ocr] [--detail]
+      Scan app structure, learn controls, build Experience DB.
+  ocr <window-title|image.png> [--save] [-o file]
+      Extract text from window/image using Windows.Media.Ocr.
   capture <window-title> [-o output.png] [--form <id>]
-      Capture a screenshot of a window or specific MDI child form.
+      Capture a screenshot of a window or MDI child form.
+  dismiss <window-title> [keywords...]
+      Auto-dismiss notice/popup windows (OCR importance check).
+  input <window-title> <text>
+      Type text into a window (focusless PostMessage preferred).
+  web <subcommand> [options]
+      Chrome DevTools Protocol web automation (open/click/type/eval).
+      Type 'wkappbot web help' for all subcommands.
+  eye [--interval N] [--size WxH] [--pos X,Y]
+      WK AppBot Eye — live overlay + Slack daemon (always on).
+  slack send|reply|upload|screenshot|listen|catch-up
+      Slack messaging (Socket Mode, always-on prompt forwarding).
 
-App Scanning Commands:
-  scan <window-title> [--save] [--ocr] [--detail] [--depth N]
-      Scan window structure: auto-classify zones, MDI forms, Experience DB.
-      --save: Save profile + experience data. --ocr: OCR learning.
-      --detail: Per-control screenshots + text history (opt-in).
+═══ Detail Commands ═══════════════════════════════════════════
+
+Inspection:
+  windows [filter] [--uia] [--deep] [--process <name>] [--limit N]
+      List visible windows in Z-order. --uia: also search UIA elements.
+  inspect <window-title> [--depth N] [--win32] [--filter <pattern>]
+      Dump UIA tree of a window. --filter: search A11Y elements.
+  win-click <window-title> <x> <y> [--uia]
+      Click a coordinate inside a window + detect UIA element.
+  focus [--title <text>] [--delay N] [--depth N] [--win32] [-b]
+      Inspect the currently focused window (countdown + dump).
+  watch [--duration N] [--live] [--win32] [--interval N]
+      Real-time element tracking under mouse cursor.
+
+Automation:
+  click <window-title> <form-id> [button-text] [--combo N INDEX]
+      Click a button in MDI form (lower-level than 'do').
+  dialog-click <dialog-title> [button-index]
+      Click a button in a top-level dialog (physical click).
+  toolbar-ocr <window-title> [--click ""text""] [--save]
+      OCR-scan MFC toolbar panes + click by text match.
+  titlebar <window-title> <form-id> [button-index] [--ocr]
+      Access custom title bar buttons (focusless PostMessage).
   form-dump <window-title> <form-id> [--depth N]
       Recursively dump all controls in an MDI child form.
 
-Automation Commands:
-  click <window-title> <form-id> [button-text] [--combo N INDEX] [options]
-      Find an MDI form and click a button (with MFC combo selection).
-  do <window-title> <form-id> <button-text> [--delay N] [--confirm] [--no-dismiss]
-      Full automation: combos + button click + dialog handling + notice dismiss.
-      Integrates Experience DB for smart click strategy ordering.
-  dismiss <window-title> [--force] [keyword1] [keyword2] ...
-      Auto-dismiss MDI child notice/popup windows matching keywords.
-      Default keywords: 怨듭?, ?몄궗, ?덈궡, ?뚮┝, POP-UP.
-      Reads content via OCR and classifies importance (critical = no close).
-
-Dialog & Toolbar Commands:
-  dialog-click <dialog-title> [button-index]
-      Click a button in a top-level dialog using physical mouse click.
-  toolbar-ocr <window-title> [--click ""text""] [--save]
-      OCR-scan MFC toolbar panes and show recognized button text.
-      --click: Click the region matching text. --save: Save toolbar screenshots.
-  titlebar <window-title> <form-id> [button-index] [--ocr] [--save]
-      Access custom title bar buttons (ETK_CHILDFRAME, focusless PostMessage).
-      --ocr: Show OCR labels for button identification.
-
-UIA Testing Commands:
+Testing & Analysis:
+  validate <scenario.yaml>
+      Validate a YAML scenario file (syntax + structure check).
   uia-test <window-title> [--invoke <name>]
       Systematic 7-phase MFC UIA pattern test with zoom overlay.
-      --invoke: Quick invoke a single button by name (focusless).
-
-Chart Analysis Commands:
-  chart-analyze <window-title|image.png> [--form <id>] [--candles N] [options]
-      Extract OHLC + volume candlestick data from chart screenshots.
-      3 strategies: body-first, column-scan, hts_style (auto-selected).
-      --tooltip: Y-axis recalibration via mouse hover (Phase B).
-      --debug: Save debug overlay image with detection visualization.
+  chart-analyze <window-title|image.png> [--form <id>] [--candles N]
+      Extract OHLC+volume from chart screenshots (3 strategies).
+      --tooltip: Y-axis recalibration. --debug: overlay image.
   tooltip-probe <process-name> [--capture]
-      Enumerate tooltip windows for a process (diagnostic tool).
+      Enumerate tooltip windows for a process.
+  hts-stress <form.xmf> [-n 20] [--pattern repeat|memory|ctx-only]
+      HTS MDI stress test with memory tracking.
 
-WebBot Commands (Chrome DevTools Protocol):
-  web open [url] [--port N] [--headless] [--no-launch]
-      Launch Chrome and connect via CDP. Auto-finds chrome.exe.
-  web navigate <url>           Navigate to URL.
-  web click <css-selector>     Click an element.
-  web type <selector> <text>   Type text into an input.
-  web eval <expression>        Evaluate JavaScript.
-  web text <css-selector>      Get element text content.
-  web screenshot [-o file]     Capture page screenshot.
-  web status [--port N]        Check Chrome CDP status and list tabs.
-  web run <steps-file.txt>     Run batch of web commands from file.
-  web help                     Show all web subcommands.
-
-HTS Stress Test Commands:
-  hts-stress <form.xmf> [-n 20] [--pattern repeat|memory|ctx-only] [options]
-      HTS MDI stress test with memory tracking (3 patterns).
-      --process <name>: Target process (default: HTSRun).
-
-Run Options:
-  --no-watch          Disable passive background element watcher
-  --watch-interval N  Watcher polling interval in ms (default: 200)
-
-Focus Options:
-  --title <text>  Find window by title (skip countdown)
-  --delay N       Seconds to wait before capturing focus (default: 3)
-  --depth N       UIA tree depth (default: 6)
-  --win32         Show Win32 child windows list
-  -b, --buttons   Show all clickable buttons with AutomationId
-
-Watch Options:
-  --duration N    Stop after N seconds (default: unlimited)
-  --live          Single-line overwrite mode (instead of scroll history)
-  --win32         Also show Win32 hwnd/class under cursor
-  --interval N    Polling interval in ms (default: 150)
-  --save <file>   Save log to specific file
-
-AppBotEye + Slack Commands:
-  eye [--interval N] [--size WxH] [--pos X,Y]
-      WK AppBot Eye (GlobalMode) ??live text overlay on Claude Desktop.
-      Slack + Prompt forwarding + keyword monitoring: ALWAYS ON.
-  eye tick
-      Run one immediate info-acquire tick and print Kro card snapshot.
-  slack listen [--bg] [--ai] [--claude|--webbot] [--name N]
-      Slack Socket Mode: listen for @mentions and forward to Claude.
-      Prompt + keyword monitoring always enabled.
-  slack send ""message""             Send message to configured channel.
-  slack reply ""text""               Reply to latest thread.
-  slack upload <file>              Upload file to Slack.
-  slack screenshot [title]         Capture + upload screenshot.
-  slack catch-up [--limit N]       Fetch missed messages (auto-forward).
-
-Utility Commands:
-  ocr <window-title|image.png> [--save] [-o file]
-      Extract text from window/image using Windows.Media.Ocr.
-  knowhow write|read|web|web-read  Record/read per-control automation notes.
-  schedule add|list|remove|clear   Manage scheduled prompts for auto-recovery.
-  snapshot <window-title> [--tag N] [--depth N] [--cid N]
-      One-shot diagnostic capture: UIA tree + screenshot + OCR (+experience blend).
-  screen off [--no-check]          Turn off monitor immediately; optional skip health check.
-  win-move <window-title> [--right-top] [--x N --y N] [--margin N]
-      Move a window (default: right-top on the right-most monitor).
+Utility:
+  snapshot <window-title> [--tag N] [--depth N]
+      One-shot diagnostic: UIA tree + screenshot + OCR.
+  knowhow write|read|web|web-read
+      Record/read per-control automation notes.
+  schedule add|list|remove|clear
+      Manage scheduled prompts for auto-recovery.
   logcat <fileFilter> <messageFilter>
-      Stream changed logs until Ctrl+C (fileFilter supports ';' wildcards).
-      Example: wkappbot logcat ""*.txt;*.jsonl"" ""A11Y|ACT|FALLBACK|EYE_PLAN""
-  input <window-title> <text>      Type text into a window.
-  kro-trial-YYYYMMDD [args...]     Special: run real AppBot input trial (default: 투혼 1101 005930).
-
-COM Commands (session per current folder):
-  com ls                           List available COM profiles/adapters.
-  com use <name>                   Select profile for this folder (.wkcom/session.json).
-  com current                      Show current profile.
-  com methods                      Show methods for current profile.
-  com call <method> [params...]    Call method through selected adapter.
-
-Telegram Commands:
-  telegram send ""text"" [--window WkQuant] [--no-fallback-enter]
-                                   Accessibility-first send, Enter fallback.
+      Stream logs in real-time (Ctrl+C to stop).
+  win-move <window-title> [--right-top] [--x N --y N]
+      Move a window to a specific position.
+  screen off [--no-check]
+      Turn off monitor immediately.
+  com ls|use|current|methods|call
+      COM adapter commands (session per folder).
+  telegram send ""text""
+      Send message via Telegram (A11Y-first).
 
 General Options:
   -v, --verbose   Verbose output
