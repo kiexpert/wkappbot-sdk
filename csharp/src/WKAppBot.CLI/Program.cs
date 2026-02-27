@@ -137,6 +137,7 @@ internal partial class Program
                 "tick" => TickCommand(restArgs),
                 "prompt-test" => PromptTestCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
+                "--version" or "version" => PrintVersion(),
                 _ when command.StartsWith("kro-trial-", StringComparison.OrdinalIgnoreCase) => KroTrialSpecialCommand(command, restArgs),
                 _ => Error($"Unknown command: {command}")
             };
