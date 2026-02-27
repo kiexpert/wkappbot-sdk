@@ -844,6 +844,7 @@ internal partial class Program
         string? filterClass = GetArgValue(args, "--class");
         bool showAll = args.Contains("--all"); // include zero-size/invisible
         bool deep = args.Contains("--deep");   // include child windows (EnumChildWindows)
+        bool uiaSearch = args.Contains("--uia"); // also search UIA elements
         int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 0; // 0=unlimited
         bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null;
 
@@ -934,68 +935,183 @@ internal partial class Program
 
         IntPtr fgWnd = NativeMethods.GetForegroundWindow();
         int totalCount = 0;
+        int uiaMatchWindows = 0;
 
         // EnumWindows enumerates in Z-order (front to back) — no re-sort needed!
-        string mode = deep ? "windows (deep, Z-order ★=foreground)" : "windows (Z-order ★=foreground)";
+        string mode = uiaSearch ? "windows+uia (Z-order ★=foreground)"
+            : deep ? "windows (deep, Z-order ★=foreground)"
+            : "windows (Z-order ★=foreground)";
         Console.WriteLine($"── {mode} ──");
         Console.WriteLine();
 
+        // Helper: get raw window info WITHOUT title filter (for --uia mode)
+        (string title, string className, string process, uint pid, int w, int h, bool visible)?
+            GetRawWindowInfo(IntPtr hWnd)
+        {
+            var titleBuf = new StringBuilder(512);
+            NativeMethods.GetWindowTextW(hWnd, titleBuf, titleBuf.Capacity);
+            string title = titleBuf.ToString();
+
+            var classBuf = new StringBuilder(256);
+            NativeMethods.GetClassNameW(hWnd, classBuf, classBuf.Capacity);
+            string className = classBuf.ToString();
+
+            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+            string processName = GetProcessName(pid);
+
+            NativeMethods.GetWindowRect(hWnd, out var rect);
+            int w = rect.Right - rect.Left;
+            int h = rect.Bottom - rect.Top;
+            bool visible = NativeMethods.IsWindowVisible(hWnd);
+
+            if (!showAll && string.IsNullOrEmpty(title) && !visible) return null;
+            if (!showAll && w == 0 && h == 0) return null;
+
+            // Process/class filters still apply (not title!)
+            if (filterProcess != null)
+            {
+                bool match = PatternMatcher.IsPattern(filterProcess)
+                    ? PatternMatcher.Create(filterProcess).IsMatch(processName)
+                    : processName.Contains(filterProcess, StringComparison.OrdinalIgnoreCase);
+                if (!match) return null;
+            }
+            if (filterClass != null)
+            {
+                bool match = PatternMatcher.IsPattern(filterClass)
+                    ? PatternMatcher.Create(filterClass).IsMatch(className)
+                    : className.Contains(filterClass, StringComparison.OrdinalIgnoreCase);
+                if (!match) return null;
+            }
+
+            return (title, className, processName, pid, w, h, visible);
+        }
+
+        // Helper: print UIA matches inline under a window
+        void PrintUiaMatches(List<UiaQuickMatch> matches)
+        {
+            foreach (var m in matches)
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Write($"    → [{m.ControlType}] ");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write($"\"{m.Name}\"");
+                if (!string.IsNullOrEmpty(m.AutomationId))
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($" aid=\"{m.AutomationId}\"");
+                }
+                Console.ResetColor();
+                Console.WriteLine();
+            }
+        }
+
         NativeMethods.EnumWindows((hWnd, _) =>
         {
-            if (IsPipeBroken()) return false; // stop enumeration, file log already captured
+            if (IsPipeBroken()) return false;
             bool isFg = hWnd == fgWnd;
-            var info = GetWindowInfo(hWnd);
             bool parentPrinted = false;
 
-            if (info != null)
+            if (uiaSearch && filterTitle != null)
             {
-                var v = info.Value;
-                PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
+                // ── Unified search: title OR UIA elements ──
+                var raw = GetRawWindowInfo(hWnd);
+                if (raw == null) return true; // noise or process/class mismatch
+
+                var r = raw.Value;
+                if (!r.visible || r.w < 50 || r.h < 50) return true; // skip tiny/hidden
+
+                // Check title match
+                bool titleMatch = PatternMatcher.IsPattern(filterTitle)
+                    ? PatternMatcher.Create(filterTitle).IsMatch(r.title)
+                    : r.title.Contains(filterTitle, StringComparison.OrdinalIgnoreCase);
+
+                // UIA search (regardless of title match — show bonus elements if title matches too)
+                var uiaMatches = UiaLocator.QuickSearch(hWnd, filterTitle);
+
+                if (!titleMatch && uiaMatches.Count == 0) return true; // no match at all
+
+                // Print window (Cyan if UIA-only match, normal if title match)
+                if (!titleMatch)
+                {
+                    // UIA-only match: dim window header, highlight elements
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    string dt = r.title.Length > 60 ? r.title[..57] + "..." : r.title;
+                    if (string.IsNullOrEmpty(dt)) dt = "(no title)";
+                    Console.Write($"  [{hWnd:X8}] \"{dt}\"  ({r.className})  [{r.process}]");
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"  ({uiaMatches.Count} UIA match)");
+                    Console.ResetColor();
+                }
+                else
+                {
+                    PrintWindow(hWnd, r.title, r.className, r.process, r.pid, r.w, r.h, r.visible, false, isFg);
+                }
+
+                if (uiaMatches.Count > 0)
+                {
+                    PrintUiaMatches(uiaMatches);
+                    uiaMatchWindows++;
+                }
+
                 totalCount++;
                 parentPrinted = true;
-                if (limit > 0 && totalCount >= limit) { Console.Out.Flush(); return false; }
+                Console.Out.Flush();
+                if (limit > 0 && totalCount >= limit) return false;
             }
-
-            // Child windows (if --deep)
-            if (deep)
+            else
             {
-                NativeMethods.EnumChildWindows(hWnd, (childHwnd, _) =>
+                // ── Original mode: title/process/class filter only ──
+                var info = GetWindowInfo(hWnd);
+
+                if (info != null)
                 {
-                    if (IsPipeBroken() || (limit > 0 && totalCount >= limit)) return false; // early exit
-                    var childInfo = GetWindowInfo(childHwnd);
-                    if (childInfo != null)
+                    var v = info.Value;
+                    PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
+                    totalCount++;
+                    parentPrinted = true;
+                    if (limit > 0 && totalCount >= limit) { Console.Out.Flush(); return false; }
+                }
+
+                // Child windows (if --deep)
+                if (deep)
+                {
+                    NativeMethods.EnumChildWindows(hWnd, (childHwnd, _) =>
                     {
-                        // Show parent as context header if it wasn't printed (filter miss) but children match
-                        if (!parentPrinted)
+                        if (IsPipeBroken() || (limit > 0 && totalCount >= limit)) return false;
+                        var childInfo = GetWindowInfo(childHwnd);
+                        if (childInfo != null)
                         {
-                            var titleBuf = new StringBuilder(512);
-                            NativeMethods.GetWindowTextW(hWnd, titleBuf, titleBuf.Capacity);
-                            var classBuf = new StringBuilder(256);
-                            NativeMethods.GetClassNameW(hWnd, classBuf, classBuf.Capacity);
-                            NativeMethods.GetWindowThreadProcessId(hWnd, out uint ppid);
-                            NativeMethods.GetWindowRect(hWnd, out var prect);
-                            Console.ForegroundColor = ConsoleColor.DarkCyan;
-                            Console.WriteLine($"  [{hWnd:X8}] \"{titleBuf}\"  ({classBuf}) {prect.Right - prect.Left}x{prect.Bottom - prect.Top}  [{GetProcessName(ppid)} pid={ppid}]  (parent)");
-                            Console.ResetColor();
-                            parentPrinted = true;
+                            if (!parentPrinted)
+                            {
+                                var titleBuf = new StringBuilder(512);
+                                NativeMethods.GetWindowTextW(hWnd, titleBuf, titleBuf.Capacity);
+                                var classBuf = new StringBuilder(256);
+                                NativeMethods.GetClassNameW(hWnd, classBuf, classBuf.Capacity);
+                                NativeMethods.GetWindowThreadProcessId(hWnd, out uint ppid);
+                                NativeMethods.GetWindowRect(hWnd, out var prect);
+                                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                                Console.WriteLine($"  [{hWnd:X8}] \"{titleBuf}\"  ({classBuf}) {prect.Right - prect.Left}x{prect.Bottom - prect.Top}  [{GetProcessName(ppid)} pid={ppid}]  (parent)");
+                                Console.ResetColor();
+                                parentPrinted = true;
+                            }
+                            var c = childInfo.Value;
+                            PrintWindow(childHwnd, c.title, c.className, c.process, c.pid, c.w, c.h, c.visible, true, false);
+                            totalCount++;
                         }
-                        var c = childInfo.Value;
-                        PrintWindow(childHwnd, c.title, c.className, c.process, c.pid, c.w, c.h, c.visible, true, false);
-                        totalCount++;
-                    }
-                    return true;
-                }, IntPtr.Zero);
+                        return true;
+                    }, IntPtr.Zero);
+                }
+
+                if (parentPrinted) Console.Out.Flush();
             }
 
-            // Flush after each main window group — results appear immediately!
-            if (parentPrinted) Console.Out.Flush();
-
-            return !(limit > 0 && totalCount >= limit); // false = stop EnumWindows
+            return !(limit > 0 && totalCount >= limit);
         }, IntPtr.Zero);
 
-        string limitNote = limit > 0 ? $", --limit {limit}" : "";
         Console.WriteLine();
-        Console.WriteLine($"Total: {totalCount} (--deep: child windows, --all: hidden/zero-size, --filter/--process/--class{limitNote})");
+        string uiaNote = uiaSearch ? $", UIA matched in {uiaMatchWindows} window(s)" : "";
+        string limitNote = limit > 0 ? $", --limit {limit}" : "";
+        Console.WriteLine($"Total: {totalCount}{uiaNote} (--uia: accessibility search, --deep: child windows{limitNote})");
         return 0;
     }
 }

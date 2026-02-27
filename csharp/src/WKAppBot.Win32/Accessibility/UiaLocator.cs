@@ -1099,7 +1099,80 @@ public sealed class UiaLocator : IDisposable
     {
         _automation.Dispose();
     }
+
+    // ── Quick UIA search (static, self-contained) ──────────────────
+
+    /// <summary>
+    /// Lightweight BFS search of a window's UIA tree for keyword matches.
+    /// Self-contained: creates and disposes its own UIA3Automation.
+    /// Used by "windows --uia" for unified title+element search.
+    /// </summary>
+    /// <param name="hWnd">Target window handle</param>
+    /// <param name="keyword">Search text (substring, case-insensitive)</param>
+    /// <param name="maxDepth">BFS depth limit (default: 4, keeps it fast)</param>
+    /// <param name="maxResults">Stop after N matches</param>
+    /// <param name="maxVisited">Safety limit on total elements visited</param>
+    /// <param name="timeoutMs">Abort if search takes longer than this</param>
+    /// <returns>List of matching elements (empty on error/timeout)</returns>
+    public static List<UiaQuickMatch> QuickSearch(
+        IntPtr hWnd, string keyword,
+        int maxDepth = 4, int maxResults = 5, int maxVisited = 300, int timeoutMs = 3000)
+    {
+        var results = new List<UiaQuickMatch>();
+        try
+        {
+            using var automation = new UIA3Automation();
+            var root = automation.FromHandle(hWnd);
+            if (root == null) return results;
+
+            var deadline = Environment.TickCount64 + timeoutMs;
+            int visited = 0;
+            var queue = new Queue<(AutomationElement el, int depth)>();
+            queue.Enqueue((root, 0));
+
+            while (queue.Count > 0 && results.Count < maxResults)
+            {
+                if (++visited > maxVisited || Environment.TickCount64 > deadline) break;
+
+                var (el, depth) = queue.Dequeue();
+
+                string name, aid, ct;
+                try { name = el.Properties.Name.ValueOrDefault ?? ""; } catch { continue; }
+                try { aid = el.Properties.AutomationId.ValueOrDefault ?? ""; } catch { aid = ""; }
+                try { ct = el.Properties.ControlType.ValueOrDefault.ToString(); }
+                catch { ct = "?"; }
+
+                // Match on Name or AutomationId (skip root element)
+                if (depth > 0)
+                {
+                    bool nameMatch = !string.IsNullOrEmpty(name) && name.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+                    bool aidMatch = !string.IsNullOrEmpty(aid) && aid.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+                    if (nameMatch || aidMatch)
+                        results.Add(new UiaQuickMatch(ct, name, aid));
+                }
+
+                // Enqueue children (BFS)
+                if (depth < maxDepth)
+                {
+                    try
+                    {
+                        var children = el.FindAllChildren();
+                        foreach (var child in children)
+                            queue.Enqueue((child, depth + 1));
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
+        return results;
+    }
 }
+
+/// <summary>
+/// Lightweight search result from QuickSearch (no COM references, safe to hold).
+/// </summary>
+public record UiaQuickMatch(string ControlType, string Name, string AutomationId);
 
 /// <summary>
 /// Info about a UI element found at a screen point.

@@ -26,8 +26,9 @@ Inspection Commands:
   inspect <window-title> [--depth N] [--win32] [--filter <pattern>]
       Dump UI Automation tree of a window (by title substring match).
       --filter: Search A11Y tree for matching elements (supports A11Y: prefix).
-  windows [filter] [--deep] [--process <name>] [--class <name>] [--limit N] [--all]
+  windows [filter] [--uia] [--deep] [--process <name>] [--class <name>] [--limit N]
       List visible windows in Z-order (front to back). ★=foreground.
+      --uia: Unified search — also find UIA elements inside windows.
       --deep: Include MDI child windows. --limit N: Stop after N matches.
   win-click <window-title> <x> <y> [--uia]
       Click a coordinate inside a window + detect UIA element at point.
