@@ -25,12 +25,22 @@ internal sealed class ClickZoomHelper : IDisposable
     private InputZoomHost? _host;
     private readonly IntPtr _formHandle;
     private readonly IntPtr _controlHandle;
+    private readonly Rectangle? _captureRect; // fixed sub-rect for "too large" elements
 
-    private ClickZoomHelper(InputZoomHost host, IntPtr formHandle, IntPtr controlHandle)
+    // Too-large threshold: elements bigger than this get fixed-size magnifier
+    // instead of giant HL/Relay overlay (webview, large panels, etc.)
+    private const int TooLargeW = 300;
+    private const int TooLargeH = 200;
+    private const int FixedCapW = 100; // fixed capture area
+    private const int FixedCapH = 60;
+
+    private ClickZoomHelper(InputZoomHost host, IntPtr formHandle, IntPtr controlHandle,
+        Rectangle? captureRect = null)
     {
         _host = host;
         _formHandle = formHandle;
         _controlHandle = controlHandle;
+        _captureRect = captureRect;
     }
 
     /// <summary>
@@ -49,9 +59,11 @@ internal sealed class ClickZoomHelper : IDisposable
             if (ctlRect.Width <= 0 || ctlRect.Height <= 0) return null;
 
             bool isSmall = ctlRect.Width < 200 && ctlRect.Height < 60;
+            bool isTooLarge = ctlRect.Width > TooLargeW || ctlRect.Height > TooLargeH;
 
             ZoomMode mode;
             int zW, zH, zX, zY;
+            Rectangle? captureRect = null;
 
             if (isSmall)
             {
@@ -60,6 +72,19 @@ internal sealed class ClickZoomHelper : IDisposable
                 zH = ctlRect.Height * 3 + 50; // exact 3x + header + status + padding
                 zX = ctlRect.Left + (ctlRect.Width / 2) - (zW / 2);
                 zY = ctlRect.Top + (ctlRect.Height / 2) - (zH / 2);
+            }
+            else if (isTooLarge)
+            {
+                // Fixed-size magnifier centered on control
+                // Avoids giant HL/Relay overlay for webview/large panel elements
+                mode = ZoomMode.Magnifier;
+                zW = FixedCapW * 3 + 16;
+                zH = FixedCapH * 3 + 50;
+                int cx = ctlRect.Left + ctlRect.Width / 2;
+                int cy = ctlRect.Top + ctlRect.Height / 2;
+                zX = cx - zW / 2;
+                zY = cy - zH / 2;
+                captureRect = new Rectangle(cx - FixedCapW / 2, cy - FixedCapH / 2, FixedCapW, FixedCapH);
             }
             else
             {
@@ -107,12 +132,14 @@ internal sealed class ClickZoomHelper : IDisposable
             // Initial capture (Magnifier/Relay only)
             if (mode != ZoomMode.HighlightBox)
             {
-                var initPng = CaptureControlPng(hFormOrParent, hControl);
+                var initPng = captureRect.HasValue
+                    ? CaptureRectPng(hFormOrParent, captureRect.Value)
+                    : CaptureControlPng(hFormOrParent, hControl);
                 if (initPng != null) host.UpdateImage(initPng);
             }
             host.UpdateStatus($"Ready: {actionLabel}");
 
-            return new ClickZoomHelper(host, hFormOrParent, hControl);
+            return new ClickZoomHelper(host, hFormOrParent, hControl, captureRect);
         }
         catch (Exception ex)
         {
@@ -136,9 +163,11 @@ internal sealed class ClickZoomHelper : IDisposable
             if (screenRect.Width <= 0 || screenRect.Height <= 0) return null;
 
             bool isSmall = screenRect.Width < 200 && screenRect.Height < 60;
+            bool isTooLarge = screenRect.Width > TooLargeW || screenRect.Height > TooLargeH;
 
             ZoomMode mode;
             int zW, zH, zX, zY;
+            Rectangle? captureRect = null;
 
             if (isSmall)
             {
@@ -147,6 +176,17 @@ internal sealed class ClickZoomHelper : IDisposable
                 zH = screenRect.Height * 3 + 50; // exact 3x + header + status + padding
                 zX = screenRect.Left + (screenRect.Width / 2) - (zW / 2);
                 zY = screenRect.Top + (screenRect.Height / 2) - (zH / 2);
+            }
+            else if (isTooLarge)
+            {
+                mode = ZoomMode.Magnifier;
+                zW = FixedCapW * 3 + 16;
+                zH = FixedCapH * 3 + 50;
+                int cx = screenRect.Left + screenRect.Width / 2;
+                int cy = screenRect.Top + screenRect.Height / 2;
+                zX = cx - zW / 2;
+                zY = cy - zH / 2;
+                captureRect = new Rectangle(cx - FixedCapW / 2, cy - FixedCapH / 2, FixedCapW, FixedCapH);
             }
             else
             {
@@ -193,12 +233,13 @@ internal sealed class ClickZoomHelper : IDisposable
             // Initial capture via form PrintWindow + crop
             if (mode != ZoomMode.HighlightBox && hFormOrParent != IntPtr.Zero)
             {
-                var png = CaptureRectPng(hFormOrParent, screenRect);
+                var rect = captureRect ?? screenRect;
+                var png = CaptureRectPng(hFormOrParent, rect);
                 if (png != null) host.UpdateImage(png);
             }
             host.UpdateStatus($"Ready: {actionLabel}");
 
-            return new ClickZoomHelper(host, hFormOrParent, IntPtr.Zero);
+            return new ClickZoomHelper(host, hFormOrParent, IntPtr.Zero, captureRect);
         }
         catch (Exception ex)
         {
@@ -218,11 +259,8 @@ internal sealed class ClickZoomHelper : IDisposable
     public void UpdateImage()
     {
         if (_host?.IsAlive != true) return;
-        if (_controlHandle != IntPtr.Zero)
-        {
-            var png = CaptureControlPng(_formHandle, _controlHandle);
-            if (png != null) _host.UpdateImage(png);
-        }
+        var png = CaptureCurrentPng();
+        if (png != null) _host.UpdateImage(png);
     }
 
     /// <summary>Show success result and auto-fade.</summary>
@@ -230,14 +268,10 @@ internal sealed class ClickZoomHelper : IDisposable
     {
         if (_host?.IsAlive != true) return;
         _host.ShowResult(true, $"✓ {detail}");
-        // Final capture to show post-action state
-        if (_controlHandle != IntPtr.Zero)
-        {
-            var png = CaptureControlPng(_formHandle, _controlHandle);
-            if (png != null) _host.UpdateImage(png);
-        }
-        _host.BeginFadeOut(1500, 400); // faster cleanup
-        _host = null; // release — STA thread cleans up
+        var png = CaptureCurrentPng();
+        if (png != null) _host.UpdateImage(png);
+        _host.BeginFadeOut(1500, 400);
+        _host = null;
     }
 
     /// <summary>Show failure result and auto-fade.</summary>
@@ -245,13 +279,20 @@ internal sealed class ClickZoomHelper : IDisposable
     {
         if (_host?.IsAlive != true) return;
         _host.ShowResult(false, $"✗ {detail}");
-        if (_controlHandle != IntPtr.Zero)
-        {
-            var png = CaptureControlPng(_formHandle, _controlHandle);
-            if (png != null) _host.UpdateImage(png);
-        }
-        _host.BeginFadeOut(2000, 500); // faster cleanup
+        var png = CaptureCurrentPng();
+        if (png != null) _host.UpdateImage(png);
+        _host.BeginFadeOut(2000, 500);
         _host = null;
+    }
+
+    /// <summary>Capture helper: fixed sub-rect > full control > null.</summary>
+    private byte[]? CaptureCurrentPng()
+    {
+        if (_captureRect.HasValue)
+            return CaptureRectPng(_formHandle, _captureRect.Value);
+        if (_controlHandle != IntPtr.Zero)
+            return CaptureControlPng(_formHandle, _controlHandle);
+        return null;
     }
 
     public void Dispose()

@@ -806,6 +806,65 @@ public sealed class UiaLocator : IDisposable
     }
 
     /// <summary>
+    /// Focusless click at a screen point within a window's UIA tree.
+    /// Finds the deepest element → tries Invoke/Toggle/Select/ExpandCollapse patterns.
+    /// Returns (success, elementInfo) — no foreground or physical click needed!
+    /// </summary>
+    public (bool ok, string detail) TryFocuslessClickAtPoint(int screenX, int screenY, IntPtr hWnd)
+    {
+        try
+        {
+            var root = _automation.FromHandle(hWnd);
+            if (root == null) return (false, "UIA root not found");
+
+            var pt = new System.Drawing.Point(screenX, screenY);
+            var found = FindDeepestAtPoint(root, pt);
+            if (found == null) return (false, "no element at point");
+
+            string name = "", aid = "", ct = "";
+            try { name = found.Name ?? ""; } catch { }
+            try { aid = found.AutomationId ?? ""; } catch { }
+            try { ct = found.ControlType.ToString(); } catch { ct = "?"; }
+
+            string desc = $"[{ct}]";
+            if (!string.IsNullOrEmpty(name)) desc += $" \"{(name.Length > 30 ? name[..30] : name)}\"";
+            if (!string.IsNullOrEmpty(aid)) desc += $" aid={aid}";
+
+            // Try focusless patterns in priority order
+            if (TryInvoke(found))
+                return (true, $"{desc} (Invoke, focusless)");
+            if (TryToggle(found))
+                return (true, $"{desc} (Toggle, focusless)");
+            if (TrySelect(found))
+                return (true, $"{desc} (Select, focusless)");
+
+            // Try ExpandCollapse
+            try
+            {
+                var ec = found.Patterns.ExpandCollapse;
+                if (ec.IsSupported)
+                {
+                    var state = ec.Pattern.ExpandCollapseState.Value;
+                    if (state == FlaUI.Core.Definitions.ExpandCollapseState.Collapsed)
+                        ec.Pattern.Expand();
+                    else
+                        ec.Pattern.Collapse();
+                    return (true, $"{desc} (ExpandCollapse, focusless)");
+                }
+            }
+            catch { }
+
+            var patterns = GetSupportedPatterns(found);
+            string patStr = patterns.Count > 0 ? string.Join(",", patterns) : "none";
+            return (false, $"{desc} patterns=[{patStr}] — no focusless action available");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"UIA error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Get combined hierarchy path for an element at a point.
     /// Format: "[ClassPath/.../ClassName] 앱이름/부모이름/.../현재요소이름"
     /// Win32 class path in brackets, UIA name path after it.
