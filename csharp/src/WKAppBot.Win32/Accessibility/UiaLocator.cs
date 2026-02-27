@@ -1135,14 +1135,14 @@ public sealed class UiaLocator : IDisposable
 
             var deadline = Environment.TickCount64 + timeoutMs;
             int visited = 0;
-            var queue = new Queue<(AutomationElement el, int depth)>();
-            queue.Enqueue((root, 0));
+            var queue = new Queue<(AutomationElement el, int depth, string path)>();
+            queue.Enqueue((root, 0, ""));
 
             while (queue.Count > 0 && results.Count < maxResults)
             {
                 if (++visited > maxVisited || Environment.TickCount64 > deadline) break;
 
-                var (el, depth) = queue.Dequeue();
+                var (el, depth, parentPath) = queue.Dequeue();
 
                 string name, aid, ct;
                 try { name = el.Properties.Name.ValueOrDefault ?? ""; } catch { continue; }
@@ -1150,23 +1150,37 @@ public sealed class UiaLocator : IDisposable
                 try { ct = el.Properties.ControlType.ValueOrDefault.ToString(); }
                 catch { ct = "?"; }
 
+                // Build name path: use Name if available, else AutomationId, else ControlType
+                string segName = !string.IsNullOrEmpty(name) ? name
+                    : !string.IsNullOrEmpty(aid) ? aid : ct;
+                string currentPath = depth == 0 ? "" : string.IsNullOrEmpty(parentPath) ? segName : $"{parentPath}/{segName}";
+
                 // Match on Name or AutomationId (skip root element)
+                // Empty keyword → return all elements (for path search mode)
                 // Supports: substring (default), glob (*/?) and regex: prefix
                 if (depth > 0)
                 {
-                    bool nameMatch, aidMatch;
-                    if (matcher != null)
+                    if (string.IsNullOrEmpty(keyword))
                     {
-                        nameMatch = !string.IsNullOrEmpty(name) && matcher.IsMatch(name);
-                        aidMatch = !string.IsNullOrEmpty(aid) && matcher.IsMatch(aid);
+                        // Path search mode: collect all elements with their paths
+                        results.Add(new UiaQuickMatch(ct, name, aid, currentPath));
                     }
                     else
                     {
-                        nameMatch = !string.IsNullOrEmpty(name) && name.Contains(keyword, StringComparison.OrdinalIgnoreCase);
-                        aidMatch = !string.IsNullOrEmpty(aid) && aid.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+                        bool nameMatch, aidMatch;
+                        if (matcher != null)
+                        {
+                            nameMatch = !string.IsNullOrEmpty(name) && matcher.IsMatch(name);
+                            aidMatch = !string.IsNullOrEmpty(aid) && matcher.IsMatch(aid);
+                        }
+                        else
+                        {
+                            nameMatch = !string.IsNullOrEmpty(name) && name.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+                            aidMatch = !string.IsNullOrEmpty(aid) && aid.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+                        }
+                        if (nameMatch || aidMatch)
+                            results.Add(new UiaQuickMatch(ct, name, aid, currentPath));
                     }
-                    if (nameMatch || aidMatch)
-                        results.Add(new UiaQuickMatch(ct, name, aid));
                 }
 
                 // Enqueue children (BFS)
@@ -1176,7 +1190,7 @@ public sealed class UiaLocator : IDisposable
                     {
                         var children = el.FindAllChildren();
                         foreach (var child in children)
-                            queue.Enqueue((child, depth + 1));
+                            queue.Enqueue((child, depth + 1, currentPath));
                     }
                     catch { }
                 }
@@ -1190,7 +1204,7 @@ public sealed class UiaLocator : IDisposable
 /// <summary>
 /// Lightweight search result from QuickSearch (no COM references, safe to hold).
 /// </summary>
-public record UiaQuickMatch(string ControlType, string Name, string AutomationId);
+public record UiaQuickMatch(string ControlType, string Name, string AutomationId, string NamePath = "");
 
 /// <summary>
 /// Info about a UI element found at a screen point.
