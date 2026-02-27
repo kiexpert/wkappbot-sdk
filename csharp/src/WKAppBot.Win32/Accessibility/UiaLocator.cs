@@ -1121,6 +1121,10 @@ public sealed class UiaLocator : IDisposable
         var results = new List<UiaQuickMatch>();
         try
         {
+            // Auto-enable screen reader mode for Chromium/Electron apps
+            // (their A11Y tree is empty unless a screen reader is announced)
+            Native.ScreenReaderMode.EnableForWindow(hWnd);
+
             using var automation = new UIA3Automation();
             var root = automation.FromHandle(hWnd);
             if (root == null) return results;
