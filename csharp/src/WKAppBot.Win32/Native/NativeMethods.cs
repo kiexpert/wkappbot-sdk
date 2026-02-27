@@ -411,6 +411,17 @@ public static partial class NativeMethods
     public const uint PW_CLIENTONLY = 0x01;
     public const uint PW_RENDERFULLCONTENT = 0x02;
 
+    // ── GDI clip region + viewport (PrintWindow sub-region optimization) ──
+
+    [DllImport("gdi32.dll")]
+    public static extern bool SetViewportOrgEx(IntPtr hdc, int x, int y, out POINT lppt);
+
+    [DllImport("gdi32.dll")]
+    public static extern IntPtr CreateRectRgn(int x1, int y1, int x2, int y2);
+
+    [DllImport("gdi32.dll")]
+    public static extern int SelectClipRgn(IntPtr hdc, IntPtr hrgn);
+
     // ── Window Z-order positioning ─────────────────────────────
     [DllImport("user32.dll")]
     public static extern bool SetWindowPos(

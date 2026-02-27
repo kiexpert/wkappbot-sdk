@@ -17,6 +17,12 @@ public sealed class ScenarioRunner
     private readonly int _watchIntervalMs;
     private object? _consoleLock;
 
+    /// <summary>
+    /// [ZOOM] Optional zoom overlay factory. Set by CLI layer.
+    /// Passed through to ActionExecutor.CreateZoom for per-step visual feedback.
+    /// </summary>
+    public Func<System.Drawing.Rectangle, IntPtr, string, string, IActionZoom?>? ZoomFactory { get; set; }
+
     public ScenarioRunner(bool verbose = false, bool watch = true, int watchIntervalMs = 200)
     {
         _verbose = verbose;
@@ -145,6 +151,7 @@ public sealed class ScenarioRunner
 
             // 4. Run steps
             using var executor = new ActionExecutor(ctx, _verbose, visionCache, visionAnalyzer, simpleOcr);
+            executor.CreateZoom = ZoomFactory; // [ZOOM] Pass through CLI layer factory
 
             for (int i = 0; i < doc.Steps.Count; i++)
             {

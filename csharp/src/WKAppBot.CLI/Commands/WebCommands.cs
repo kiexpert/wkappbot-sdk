@@ -1,8 +1,11 @@
 using System.Diagnostics;
+using System.Drawing;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using WKAppBot.Core.Runner;
 using WKAppBot.WebBot;
 using WKAppBot.Win32.Window;
+using WKAppBot.Win32.Native;
 using NativeMethods = WKAppBot.Win32.Native.NativeMethods;
 
 namespace WKAppBot.CLI;
@@ -35,6 +38,7 @@ internal partial class Program
             "open" => WebOpenCommand(restArgs),
             "eval" => WebEvalCommand(restArgs),
             "click" => WebClickCommand(restArgs),
+            "dblclick" or "double-click" => WebDblClickCommand(restArgs),
             "type" => WebTypeCommand(restArgs),
             "text" => WebGetTextCommand(restArgs),
             "screenshot" => WebScreenshotCommand(restArgs),
@@ -150,6 +154,106 @@ Options:
         }
 
         return cdp;
+    }
+
+    // ── Helper: get web element screen rect for zoom overlay ────
+
+    /// <summary>
+    /// Get a web element's bounding rectangle in physical screen coordinates.
+    /// Strategy: CDP getBoundingClientRect (CSS px) + Win32 ClientToScreen on
+    /// Chrome_RenderWidgetHostHWND (the actual viewport window) + devicePixelRatio.
+    /// Returns null if element not found or not visible. Non-critical — never throws.
+    /// </summary>
+    static Rectangle? GetWebElementScreenRect(CdpClient cdp, string selector)
+    {
+        try
+        {
+            var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+
+            // Step 1: Get element's viewport-relative rect + DPI via CDP
+            var json = cdp.EvalAsync($$"""
+                (() => {
+                    const el = document.querySelector('{{escaped}}');
+                    if (!el) return null;
+                    el.scrollIntoView({ block:'center', inline:'center' });
+                    const r = el.getBoundingClientRect();
+                    if (!r || r.width <= 0 || r.height <= 0) return null;
+                    return JSON.stringify({
+                        left: r.left, top: r.top, width: r.width, height: r.height,
+                        dpr: window.devicePixelRatio || 1
+                    });
+                })()
+                """).GetAwaiter().GetResult();
+
+            if (string.IsNullOrEmpty(json)) return null;
+            var node = JsonNode.Parse(json);
+            if (node == null) return null;
+
+            double cssLeft = node["left"]!.GetValue<double>();
+            double cssTop = node["top"]!.GetValue<double>();
+            double cssWidth = node["width"]!.GetValue<double>();
+            double cssHeight = node["height"]!.GetValue<double>();
+            double dpr = node["dpr"]!.GetValue<double>();
+
+            // Step 2: Find Chrome_RenderWidgetHostHWND — the actual web viewport window
+            var chromeHwnd = cdp.GetChromeWindowHandle();
+            if (chromeHwnd == IntPtr.Zero) return null;
+
+            IntPtr renderHwnd = IntPtr.Zero;
+            NativeMethods.EnumChildWindows(chromeHwnd, (hwnd, _) =>
+            {
+                var sb = new System.Text.StringBuilder(256);
+                NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
+                if (sb.ToString() == "Chrome_RenderWidgetHostHWND")
+                {
+                    renderHwnd = hwnd;
+                    return false; // stop
+                }
+                return true; // continue
+            }, IntPtr.Zero);
+
+            // Fallback: use main Chrome window if render widget not found
+            var targetHwnd = renderHwnd != IntPtr.Zero ? renderHwnd : chromeHwnd;
+
+            // Step 3: ClientToScreen on the viewport window → physical pixel origin
+            var origin = new POINT(0, 0);
+            NativeMethods.ClientToScreen(targetHwnd, ref origin);
+
+            // Step 4: Convert CSS pixels to physical pixels and add viewport origin
+            int screenX = origin.X + (int)Math.Round(cssLeft * dpr);
+            int screenY = origin.Y + (int)Math.Round(cssTop * dpr);
+            int width = (int)Math.Round(cssWidth * dpr);
+            int height = (int)Math.Round(cssHeight * dpr);
+
+            // Sanity check — element must be within visible screen area
+            if (width <= 0 || height <= 0 || screenX < -100 || screenY < -100) return null;
+
+            return new Rectangle(screenX, screenY, width, height);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Begin zoom overlay for a web element. Returns disposable zoom helper (or null).
+    /// Chrome window handle used as formHandle for PrintWindow clip region capture.
+    /// </summary>
+    static ClickZoomHelper? BeginWebZoom(CdpClient cdp, string selector, string action, string label)
+    {
+        try
+        {
+            var rect = GetWebElementScreenRect(cdp, selector);
+            if (rect == null) return null;
+
+            var chromeHwnd = cdp.GetChromeWindowHandle();
+            if (chromeHwnd == IntPtr.Zero) return null;
+
+            // 3-mode auto-selection handles it:
+            // - Foreground + large → HighlightBox (border only, user can see directly)
+            // - Foreground + small → 3x Magnifier
+            // - Obscured → 1:1 Relay
+            return ClickZoomHelper.BeginFromRect(rect.Value, chromeHwnd, action, label);
+        }
+        catch { return null; }
     }
 
     // ── open ─────────────────────────────────────────────────────
@@ -420,15 +524,68 @@ Options:
 
         Console.Write($"[WEB] Click '{selector}'... ");
         cdp.SetStatusRunningAsync($"Click: {selector}").GetAwaiter().GetResult();
+
+        // ── Zoom overlay ──
+        using var zoom = BeginWebZoom(cdp, selector, "web_click", selector);
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        cdp.ClickAsync(selector).GetAwaiter().GetResult();
-        cdp.UpdateStatusAsync($"Click: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("OK");
-        Console.ResetColor();
+        try
+        {
+            cdp.ClickAsync(selector).GetAwaiter().GetResult();
+            cdp.UpdateStatusAsync($"Click: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("OK");
+            Console.ResetColor();
+            zoom?.ShowPass($"Click OK ({sw.ElapsedMilliseconds}ms)");
+        }
+        catch (Exception ex)
+        {
+            zoom?.ShowFail(ex.Message);
+            throw;
+        }
 
         // ── ActionState IPC ──
         try { ActionState.Write(new ActionState { Source = "web", ElementName = selector, ActionName = "click", ActionDetail = $"Click: {selector}", Status = "pass" }); } catch { }
+
+        return 0;
+    }
+
+    // ── dblclick ────────────────────────────────────────────────
+
+    static int WebDblClickCommand(string[] args)
+    {
+        if (args.Length < 1)
+            return Error("Usage: wkappbot web dblclick <css-selector> [--port N]");
+
+        int port = GetPort(args);
+        string selector = args[0];
+
+        using var cdp = ConnectCdp(port);
+
+        Console.Write($"[WEB] Double-click '{selector}'... ");
+        cdp.SetStatusRunningAsync($"DblClick: {selector}").GetAwaiter().GetResult();
+
+        // ── Zoom overlay ──
+        using var zoom = BeginWebZoom(cdp, selector, "web_dblclick", selector);
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            cdp.DoubleClickAsync(selector).GetAwaiter().GetResult();
+            cdp.UpdateStatusAsync($"DblClick: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("OK");
+            Console.ResetColor();
+            zoom?.ShowPass($"DblClick OK ({sw.ElapsedMilliseconds}ms)");
+        }
+        catch (Exception ex)
+        {
+            zoom?.ShowFail(ex.Message);
+            throw;
+        }
+
+        // ── ActionState IPC ──
+        try { ActionState.Write(new ActionState { Source = "web", ElementName = selector, ActionName = "dblclick", ActionDetail = $"DblClick: {selector}", Status = "pass" }); } catch { }
 
         return 0;
     }
@@ -450,12 +607,25 @@ Options:
 
         Console.Write($"[WEB] Type '{text}' into '{selector}'... ");
         cdp.SetStatusRunningAsync($"Type: '{text}' -> {selector}").GetAwaiter().GetResult();
+
+        // ── Zoom overlay ──
+        using var zoom = BeginWebZoom(cdp, selector, "web_type", selector);
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
-        cdp.UpdateStatusAsync($"Type: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("OK");
-        Console.ResetColor();
+        try
+        {
+            cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
+            cdp.UpdateStatusAsync($"Type: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("OK");
+            Console.ResetColor();
+            zoom?.ShowPass($"Type OK ({sw.ElapsedMilliseconds}ms)");
+        }
+        catch (Exception ex)
+        {
+            zoom?.ShowFail(ex.Message);
+            throw;
+        }
 
         // ── ActionState IPC ──
         try { ActionState.Write(new ActionState { Source = "web", ElementName = selector, ActionName = "type_text", ActionDetail = $"Type: \"{text}\" → {selector}", Status = "pass" }); } catch { }
@@ -599,10 +769,23 @@ Options:
         using var cdp = ConnectCdp(port);
 
         Console.Write($"[WEB] SetChecked '{selector}' = {check}... ");
-        cdp.SetCheckedAsync(selector, check).GetAwaiter().GetResult();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("OK");
-        Console.ResetColor();
+
+        // ── Zoom overlay ──
+        using var zoom = BeginWebZoom(cdp, selector, "web_check", selector);
+
+        try
+        {
+            cdp.SetCheckedAsync(selector, check).GetAwaiter().GetResult();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("OK");
+            Console.ResetColor();
+            zoom?.ShowPass($"Check={check} OK");
+        }
+        catch (Exception ex)
+        {
+            zoom?.ShowFail(ex.Message);
+            throw;
+        }
 
         return 0;
     }
@@ -621,10 +804,23 @@ Options:
         using var cdp = ConnectCdp(port);
 
         Console.Write($"[WEB] Select '{selector}' = '{value}'... ");
-        cdp.SelectAsync(selector, value).GetAwaiter().GetResult();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("OK");
-        Console.ResetColor();
+
+        // ── Zoom overlay ──
+        using var zoom = BeginWebZoom(cdp, selector, "web_select", selector);
+
+        try
+        {
+            cdp.SelectAsync(selector, value).GetAwaiter().GetResult();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("OK");
+            Console.ResetColor();
+            zoom?.ShowPass($"Select='{value}' OK");
+        }
+        catch (Exception ex)
+        {
+            zoom?.ShowFail(ex.Message);
+            throw;
+        }
 
         return 0;
     }
@@ -935,6 +1131,7 @@ Options:
                     "open" => WebOpenCommand(subRest),
                     "eval" => WebEvalCommand(subRest),
                     "click" => WebClickCommand(subRest),
+                    "dblclick" or "double-click" => WebDblClickCommand(subRest),
                     "type" => WebTypeCommand(subRest),
                     "text" => WebGetTextCommand(subRest),
                     "screenshot" => WebScreenshotCommand(subRest),

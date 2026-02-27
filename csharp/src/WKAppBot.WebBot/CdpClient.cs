@@ -545,6 +545,57 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
+    /// Double-click an element by CSS selector. Selects the word under cursor in text.
+    /// Uses CDP Input.dispatchMouseEvent with clickCount=2.
+    /// </summary>
+    public async Task DoubleClickAsync(string selector)
+    {
+        var escapedSelector = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+
+        var pointJson = await EvalAsync($$"""
+            (() => {
+                const el = document.querySelector('{{escapedSelector}}');
+                if (!el) return JSON.stringify({ ok:false, reason:'NOT_FOUND' });
+                el.scrollIntoView({ block:'center', inline:'center' });
+                const r = el.getBoundingClientRect();
+                if (!r || r.width <= 0 || r.height <= 0)
+                    return JSON.stringify({ ok:false, reason:'NO_RECT' });
+                const x = r.left + Math.min(r.width / 2, Math.max(1, r.width - 1));
+                const y = r.top + Math.min(r.height / 2, Math.max(1, r.height - 1));
+                return JSON.stringify({ ok:true, x, y });
+            })()
+            """);
+
+        if (string.IsNullOrWhiteSpace(pointJson))
+            throw new InvalidOperationException($"Failed to resolve click point: {selector}");
+
+        var point = JsonNode.Parse(pointJson);
+        var ok = point?["ok"]?.GetValue<bool>() ?? false;
+        if (!ok)
+        {
+            var reason = point?["reason"]?.GetValue<string>();
+            throw new InvalidOperationException(reason == "NOT_FOUND"
+                ? $"Element not found: {selector}"
+                : $"Element not clickable: {selector} ({reason})");
+        }
+
+        var x = point?["x"]?.GetValue<double>() ?? 0;
+        var y = point?["y"]?.GetValue<double>() ?? 0;
+
+        // Double-click = two rapid click sequences with clickCount=2
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mouseMoved", ["x"] = x, ["y"] = y, ["button"] = "none" });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mousePressed", ["x"] = x, ["y"] = y, ["button"] = "left", ["clickCount"] = 1 });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mouseReleased", ["x"] = x, ["y"] = y, ["button"] = "left", ["clickCount"] = 1 });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mousePressed", ["x"] = x, ["y"] = y, ["button"] = "left", ["clickCount"] = 2 });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mouseReleased", ["x"] = x, ["y"] = y, ["button"] = "left", ["clickCount"] = 2 });
+    }
+
+    /// <summary>
     /// Type text into an element by CSS selector.
     /// Supports both input/textarea and contentEditable editors (e.g., Quill).
     /// </summary>

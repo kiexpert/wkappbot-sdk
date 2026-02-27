@@ -86,7 +86,7 @@ internal partial class Program
             // eye tick은 one-shot이라 Eye를 띄워도 cascade 안 됨 → 자동 실행 대상!
             // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
             var isEyeGlobal = command == "eye" && (restArgs.Length == 0 || restArgs[0] != "tick");
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" || isEyeGlobal;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" || isEyeGlobal;
             if (!isExcluded)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
@@ -131,6 +131,9 @@ internal partial class Program
                 "com" => ComCommand(restArgs),
                 "telegram" => TelegramCommand(restArgs),
                 "zoom-demo" => ZoomDemoCommand(restArgs),
+                "win-click" => WinClickCommand(restArgs),
+                "windows" => WindowsCommand(restArgs),
+                "uia-test" => UiaTestCommand(restArgs),
                 "tick" => TickCommand(restArgs),
                 "prompt-test" => PromptTestCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
@@ -570,6 +573,14 @@ internal partial class Program
 
         // Run with passive background watcher (default: on)
         var runner = new ScenarioRunner(verbose, watch: !noWatch, watchIntervalMs: watchMs);
+
+        // [ZOOM] Wire up zoom overlay factory for per-step visual feedback
+        runner.ZoomFactory = (screenRect, formHandle, action, label) =>
+        {
+            var helper = ClickZoomHelper.BeginFromRect(screenRect, formHandle, action, label);
+            return helper != null ? new ClickZoomAdapter(helper) : null;
+        };
+
         var result = runner.Run(doc);
 
         // TODO: Generate HTML report if reportDir specified

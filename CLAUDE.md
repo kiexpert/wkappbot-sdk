@@ -145,6 +145,7 @@ W:/GitHub/WKAppBot/
 │       ├── WKAppBot.CLI/              # CLI 진입점 (run/validate/inspect/focus/watch/capture/hts-stress)
 │       │   ├── Program.cs
 │       │   ├── InputZoomOverlay.cs    # [ZOOM] 돋보기 중계방송 — 3모드 적응형 오버레이 (Magnifier/HighlightBox/Relay)
+│       │   ├── ClickZoomHelper.cs    # [ZOOM] click/invoke/select용 돋보기 래퍼 (SmartClickButton/UiaTest 공용)
 │       │   └── TooltipProbe.cs        # tooltip 윈도우 진단 (EnumWindows + PrintWindow + OCR)
 │       ├── WKAppBot.Core/             # 핵심 로직
 │       │   ├── Runner/
@@ -230,7 +231,7 @@ wkappbot run 'W:\GitHub\WKAppBot\scenarios\calc_four_ops.yaml' -v
 ```
 wkappbot run <scenario.yaml> [-v] [--no-watch] [--watch-interval N]
 wkappbot validate <scenario.yaml>
-wkappbot inspect <window-title> [--depth N]
+wkappbot inspect <window-title> [--depth N] [--win32] [--filter <pattern>]  # UIA/Win32 트리 (--filter: A11Y 경로 탐색)
 wkappbot focus [--title <text>] [--delay N] [--depth N] [--win32] [-b]
 wkappbot watch [--duration N] [--live] [--win32] [--interval N] [--save file]
 wkappbot capture <window-title> [-o output.png]
@@ -252,6 +253,9 @@ wkappbot input <window-title> <form-id> <text> [--cid N] [--enter] [--method N] 
 wkappbot zoom-demo <window-title> [text]   # 돋보기 데모 — 아무 앱에서 적응형 줌 테스트
 wkappbot schedule <subcommand>       # 스케줄 관리 (자동 복구, 예약 프롬프트)
 wkappbot snapshot <window-title> [--tag <name>] [--depth N]  # UIA+스크린샷+OCR 원샷 캡처
+wkappbot uia-test <window-title> [--invoke <name>]  # MFC UIA 패턴 체계적 테스트 (7 Phase + ZOOM)
+wkappbot windows [filter] [--deep] [--process <name>] [--class <name>] [--all]  # 윈도우 목록 (Z-order, ★=전경)
+wkappbot win-click <window-title> <x> <y> [--uia]  # 윈도우 내 좌표 클릭 + UIA 요소 감지
 ```
 
 ### knowhow 명령 (컨트롤별 자동화 노하우)
@@ -829,7 +833,11 @@ teardown:
   - 3모드 자동 선택: Magnifier(3x, 소형 컨트롤) / HighlightBox(테두리만, 대형+전경) / Relay(1:1, 대형+가림)
   - WPF STA 스레드 독립 실행 (IsBackground=true, fire-and-forget 페이드아웃)
   - WS_EX_NOACTIVATE(포커스 안뺏음) + WS_EX_TRANSPARENT(HighlightBox 클릭관통)
-  - PrintWindow 기반 실시간 캡처 (Z-order 안전, 오버레이 자기캡처 방지)
+  - 라이브 캡처: CopyFromScreen 기반 (~15-25ms/프레임, 200ms 간격 DispatcherTimer + ThreadPool)
+  - **MFC PrintWindow 병목 발견+해결**: PrintWindow가 MFC WM_PRINT 블로킹으로 1000ms+, CopyFromScreen은 ~15ms
+  - 초기 캡처만 PrintWindow(Z-order 안전), 라이브 프리뷰는 CopyFromScreen(가려지면 가려진 대로 표시)
+  - Opacity=0 시작 → 첫 프레임 수신 시 0.50 페이드인 (눈에 부드러운 로딩)
+  - TOPMOST 강제: Win32 SetWindowPos(HWND_TOPMOST) 주기적 호출 (MFC 드롭다운 위로)
   - 기본 ON (`--no-zoom`으로 끔), 경험DB에 zoom_input.png 자동 저장
   - `[ZOOM]` 태그: `[ZOOM:3x]`/`[ZOOM:HL]`/`[ZOOM:1:1]` 모드별 출력
   - `zoom-demo` 커맨드: 아무 앱에서 적응형 줌 데모 (SendInput 타이핑)
@@ -855,6 +863,32 @@ teardown:
   - FlaUI LegacyIAccessible.SetValue → E_NOTIMPL (UIA→MSAA 브릿지가 거부)
   - IAccessibleEditableText.insertText → E_NOINTERFACE (ROLE_GROUPING이라 미지원)
   - `wkappbot prompt-test "text" [--dry-run]` CLI로 검증 가능
+- **ClickZoomHelper 완료**: click/invoke/select 시 돋보기 중계방송 — SmartClickButton/UiaTest 통합
+  - ClickZoomHelper.Begin(hWnd) + BeginFromRect(rect) 두 진입점
+  - SmartClickButton: showZoom 파라미터로 전략 루프 전체 줌 오버레이
+  - UiaTestCommand: Phase 2(Button Invoke) + Phase 3(Tab Select) + QuickInvoke 줌 통합
+- **uia-test 커맨드 완료**: `wkappbot uia-test <title> [--invoke <name>]` — MFC UIA 패턴 체계적 테스트
+  - Phase 1: 요소 카운트 (안전)
+  - Phase 2: Button Invoke — Focusless (투혼 3/3 PASS)
+  - Phase 3: Tab SelectionItem — Focusless (투혼 7/12 PASS)
+  - Phase 4: Scroll — SKIPPED (COM 0x80040201 → 영구 행)
+  - Phase 5: Win32 WM_GETTEXT (투혼 136개 텍스트)
+  - Phase 6: LegacyIAccessible (투혼 timeout)
+  - Phase 7: MDI Info
+  - `--invoke <name>`: 단일 버튼 focusless invoke (스크립트오류 팝업 닫기에 활용)
+- **투혼 MFC UIA 테스트 결과 (VS Exception 언체크)**: PASS 13 / FAIL 5 / Total 18
+  - Button Invoke: 3/3 PASS — MFC 버튼도 UIA Invoke 작동!
+  - Tab[3800] 시간대별/일별: 2/2 PASS
+  - Tab[3805] 시세~차트: 5/7 PASS (일정/뉴스 TrySelect=false)
+  - Tab[3810] 체결~예상: 0/3 FAIL (TrySelect=false + 0x80131505 timeout)
+  - **핵심 발견**: VS "발생시 멈춤" 언체크 → COM 0x80040201이 0x80131505(timeout)으로 변환 → COM 세션 생존!
+- **스크립트오류 핸들러 완료**: 투혼 VBScript 오류 팝업 (Calendar2.Format 등) 자동 닫기
+- **A11Y 경험 자동 기록**: action-failed 시 snapshot + experience 자동 저장
+- **windows 명령 완료**: `wkappbot windows [filter] [--deep] [--limit N]` — Z-order(앞→뒤) 순서, ★전경 마크, 메인윈도 단위 즉시 플러시, 자식 윈도우 탐색(EnumChildWindows), 부모 컨텍스트 헤더
+- **win-click 명령 완료**: `wkappbot win-click <title> <x> <y> [--uia]` — 윈도우 내 좌표 클릭 + UIA 요소 감지 + 줌 오버레이
+- **inspect --filter 완료**: `A11Y:` 경로 접두사 + 매칭 경로 한 줄 + 서브트리 덤프 패턴
+- **FindDeepestAtPoint 수정**: Electron/Chrome 모든 형제 Pane 탐색 → 최소 면적(가장 정확한) 요소 반환
+- **TeeTextWriter 전역 broken pipe 처리**: stdout IOException → 콘솔 쓰기만 중단, 파일 로깅 계속 + ~1초 주기 자동 플러시 (모든 명령 공통)
 - **미구현**: 아래 로드맵 참조
 
 ## 구현 로드맵 (Implementation Roadmap)

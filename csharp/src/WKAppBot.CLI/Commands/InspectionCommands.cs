@@ -14,11 +14,12 @@ internal partial class Program
     static int InspectCommand(string[] args)
     {
         if (args.Length == 0)
-            return Error("Usage: appbot inspect <window-title> [--depth N] [--win32]");
+            return Error("Usage: appbot inspect <window-title> [--depth N] [--win32] [--filter <pattern>]\n  --filter: Search entire UIA tree for matching elements (Name/AutomationId/ControlType)\n            Supports wildcards (*/?), regex: prefix, or plain substring");
 
         string title = args[0];
         int depth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 5;
         bool win32Mode = args.Contains("--win32");
+        string? filter = GetArgValue(args, "--filter");
 
         var windows = WindowFinder.FindByTitle(title);
         if (windows.Count == 0)
@@ -39,6 +40,16 @@ internal partial class Program
             Console.ResetColor();
             var win32Tree = WindowFinder.DumpWin32Tree(win.Handle, depth);
             Console.Write(win32Tree);
+        }
+        else if (filter != null)
+        {
+            // Filtered UIA tree — search entire tree, dump matching subtrees
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"── UIA Tree Filtered: \"{filter}\" (subtree depth={depth}) ──");
+            Console.ResetColor();
+            using var uia = new UiaLocator();
+            var tree = uia.DumpTreeFiltered(win.Handle, filter, depth);
+            Console.Write(tree);
         }
         else
         {
@@ -820,5 +831,171 @@ internal partial class Program
         Console.Write(lineText);
         Console.ResetColor();
         Console.WriteLine($"  ({words.Count} words, x={firstWord.X}..{words.Last().X + words.Last().Width})");
+    }
+
+    // ── windows — list all top-level windows ────────────────────
+    // Usage: wkappbot windows [--filter <pattern>] [--process <name>] [--class <name>]
+
+    static int WindowsCommand(string[] args)
+    {
+        // First positional arg = title filter (like inspect <title>)
+        string? filterTitle = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : GetArgValue(args, "--filter");
+        string? filterProcess = GetArgValue(args, "--process");
+        string? filterClass = GetArgValue(args, "--class");
+        bool showAll = args.Contains("--all"); // include zero-size/invisible
+        bool deep = args.Contains("--deep");   // include child windows (EnumChildWindows)
+        int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 0; // 0=unlimited
+        bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null;
+
+        // Process cache to avoid repeated Process.GetProcessById
+        var processCache = new Dictionary<uint, string>();
+        string GetProcessName(uint pid)
+        {
+            if (processCache.TryGetValue(pid, out var cached)) return cached;
+            string name = "";
+            try { name = Process.GetProcessById((int)pid).ProcessName; } catch { }
+            processCache[pid] = name;
+            return name;
+        }
+
+        // Get window info, apply filters. Returns null if filtered out or noise.
+        (string title, string className, string process, uint pid, int w, int h, bool visible)?
+            GetWindowInfo(IntPtr hWnd)
+        {
+            var titleBuf = new StringBuilder(512);
+            NativeMethods.GetWindowTextW(hWnd, titleBuf, titleBuf.Capacity);
+            string title = titleBuf.ToString();
+
+            var classBuf = new StringBuilder(256);
+            NativeMethods.GetClassNameW(hWnd, classBuf, classBuf.Capacity);
+            string className = classBuf.ToString();
+
+            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+            string processName = GetProcessName(pid);
+
+            NativeMethods.GetWindowRect(hWnd, out var rect);
+            int w = rect.Right - rect.Left;
+            int h = rect.Bottom - rect.Top;
+            bool visible = NativeMethods.IsWindowVisible(hWnd);
+
+            // Skip noise unless --all
+            if (!showAll && string.IsNullOrEmpty(title) && !visible) return null;
+            if (!showAll && w == 0 && h == 0) return null;
+
+            // Apply filters
+            if (filterTitle != null)
+            {
+                bool match = PatternMatcher.IsPattern(filterTitle)
+                    ? PatternMatcher.Create(filterTitle).IsMatch(title)
+                    : title.Contains(filterTitle, StringComparison.OrdinalIgnoreCase);
+                if (!match) return null;
+            }
+            if (filterProcess != null)
+            {
+                bool match = PatternMatcher.IsPattern(filterProcess)
+                    ? PatternMatcher.Create(filterProcess).IsMatch(processName)
+                    : processName.Contains(filterProcess, StringComparison.OrdinalIgnoreCase);
+                if (!match) return null;
+            }
+            if (filterClass != null)
+            {
+                bool match = PatternMatcher.IsPattern(filterClass)
+                    ? PatternMatcher.Create(filterClass).IsMatch(className)
+                    : className.Contains(filterClass, StringComparison.OrdinalIgnoreCase);
+                if (!match) return null;
+            }
+
+            return (title, className, processName, pid, w, h, visible);
+        }
+
+        // Broken pipe detection — TeeTextWriter handles IOException globally,
+        // but we check IsPipeBroken to stop expensive EnumWindows/EnumChildWindows early
+        bool IsPipeBroken() => Console.Out is TeeTextWriter tee && tee.IsPipeBroken;
+
+        void PrintWindow(IntPtr hWnd, string title, string className, string process,
+            uint pid, int w, int h, bool visible, bool isChild, bool isForeground)
+        {
+            string vis = visible ? "" : " [hidden]";
+            string prefix = isChild ? "  └ " : "";
+            string displayTitle = title.Length > 60 ? title[..57] + "..." : title;
+            if (string.IsNullOrEmpty(displayTitle)) displayTitle = "(no title)";
+
+            Console.ForegroundColor = isForeground ? ConsoleColor.Green
+                : (visible && !string.IsNullOrEmpty(title)) ? ConsoleColor.White
+                : ConsoleColor.DarkGray;
+            Console.Write($"  {prefix}[{hWnd:X8}] ");
+            Console.ForegroundColor = isForeground ? ConsoleColor.Green : ConsoleColor.Yellow;
+            Console.Write($"\"{displayTitle}\"");
+            Console.ResetColor();
+            Console.Write($"  ({className}) {w}x{h}{vis}  [{process} pid={pid}]");
+            if (isForeground) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" ★"); Console.ResetColor(); }
+            Console.WriteLine();
+        }
+
+        IntPtr fgWnd = NativeMethods.GetForegroundWindow();
+        int totalCount = 0;
+
+        // EnumWindows enumerates in Z-order (front to back) — no re-sort needed!
+        string mode = deep ? "windows (deep, Z-order ★=foreground)" : "windows (Z-order ★=foreground)";
+        Console.WriteLine($"── {mode} ──");
+        Console.WriteLine();
+
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (IsPipeBroken()) return false; // stop enumeration, file log already captured
+            bool isFg = hWnd == fgWnd;
+            var info = GetWindowInfo(hWnd);
+            bool parentPrinted = false;
+
+            if (info != null)
+            {
+                var v = info.Value;
+                PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
+                totalCount++;
+                parentPrinted = true;
+                if (limit > 0 && totalCount >= limit) { Console.Out.Flush(); return false; }
+            }
+
+            // Child windows (if --deep)
+            if (deep)
+            {
+                NativeMethods.EnumChildWindows(hWnd, (childHwnd, _) =>
+                {
+                    if (IsPipeBroken() || (limit > 0 && totalCount >= limit)) return false; // early exit
+                    var childInfo = GetWindowInfo(childHwnd);
+                    if (childInfo != null)
+                    {
+                        // Show parent as context header if it wasn't printed (filter miss) but children match
+                        if (!parentPrinted)
+                        {
+                            var titleBuf = new StringBuilder(512);
+                            NativeMethods.GetWindowTextW(hWnd, titleBuf, titleBuf.Capacity);
+                            var classBuf = new StringBuilder(256);
+                            NativeMethods.GetClassNameW(hWnd, classBuf, classBuf.Capacity);
+                            NativeMethods.GetWindowThreadProcessId(hWnd, out uint ppid);
+                            NativeMethods.GetWindowRect(hWnd, out var prect);
+                            Console.ForegroundColor = ConsoleColor.DarkCyan;
+                            Console.WriteLine($"  [{hWnd:X8}] \"{titleBuf}\"  ({classBuf}) {prect.Right - prect.Left}x{prect.Bottom - prect.Top}  [{GetProcessName(ppid)} pid={ppid}]  (parent)");
+                            Console.ResetColor();
+                            parentPrinted = true;
+                        }
+                        var c = childInfo.Value;
+                        PrintWindow(childHwnd, c.title, c.className, c.process, c.pid, c.w, c.h, c.visible, true, false);
+                        totalCount++;
+                    }
+                    return true;
+                }, IntPtr.Zero);
+            }
+
+            // Flush after each main window group — results appear immediately!
+            if (parentPrinted) Console.Out.Flush();
+
+            return !(limit > 0 && totalCount >= limit); // false = stop EnumWindows
+        }, IntPtr.Zero);
+
+        string limitNote = limit > 0 ? $", --limit {limit}" : "";
+        Console.WriteLine();
+        Console.WriteLine($"Total: {totalCount} (--deep: child windows, --all: hidden/zero-size, --filter/--process/--class{limitNote})");
+        return 0;
     }
 }

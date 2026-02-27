@@ -33,6 +33,16 @@ public sealed class ActionExecutor : IDisposable
     private VisionAnalyzer? _visionAnalyzer;
     private SimpleOcrAnalyzer? _simpleOcr;
 
+    // [ZOOM] Overlay factory — set by CLI layer (ClickZoomAdapter)
+    // Parameters: (screenRect, formHandle, actionName, label) → IActionZoom?
+    private IActionZoom? _currentZoom;
+
+    /// <summary>
+    /// Optional zoom overlay factory. Set by CLI layer to enable visual feedback.
+    /// Parameters: (System.Drawing.Rectangle screenRect, IntPtr formHandle, string action, string label)
+    /// </summary>
+    public Func<System.Drawing.Rectangle, IntPtr, string, string, IActionZoom?>? CreateZoom { get; set; }
+
     public ActionExecutor(RuntimeContext ctx, bool verbose = false,
                           VisionCache? visionCache = null, VisionAnalyzer? visionAnalyzer = null,
                           SimpleOcrAnalyzer? simpleOcr = null)
@@ -43,6 +53,33 @@ public sealed class ActionExecutor : IDisposable
         _visionCache = visionCache;
         _visionAnalyzer = visionAnalyzer;
         _simpleOcr = simpleOcr;
+    }
+
+    // ── [ZOOM] Overlay helper ───────────────────────────────
+
+    /// <summary>
+    /// Start zoom overlay for the located element (if factory is set).
+    /// Sets _currentZoom field — Execute() manages ShowPass/ShowFail/Dispose.
+    /// </summary>
+    private void BeginZoomForElement(FlaUI.Core.AutomationElements.AutomationElement? element, StepDefinition step)
+    {
+        if (CreateZoom == null || element == null) return;
+        try
+        {
+            var rect = element.Properties.BoundingRectangle.ValueOrDefault;
+            if (rect.Width <= 0 || rect.Height <= 0) return;
+
+            var hwnd = IntPtr.Zero;
+            try { hwnd = element.Properties.NativeWindowHandle.ValueOrDefault; } catch { }
+
+            var screenRect = new System.Drawing.Rectangle(
+                (int)rect.X, (int)rect.Y, (int)rect.Width, (int)rect.Height);
+            var formHandle = hwnd != IntPtr.Zero ? hwnd : _ctx.MainWindowHandle;
+            var label = step.Target?.AutomationId ?? step.Target?.Name ?? step.Name;
+
+            _currentZoom = CreateZoom(screenRect, formHandle, step.Action, label);
+        }
+        catch { /* zoom is non-critical — never block automation */ }
     }
 
     // ── Smart Focus ("위치확보") ─────────────────────────────
@@ -94,6 +131,7 @@ public sealed class ActionExecutor : IDisposable
             Action = step.Action
         };
 
+        _currentZoom = null;
         try
         {
             switch (step.Action)
@@ -177,11 +215,22 @@ public sealed class ActionExecutor : IDisposable
 
             if (result.Status == StepStatus.Pass || result.Status == 0)
                 result.Status = StepStatus.Pass;
+
+            // [ZOOM] Show success result
+            _currentZoom?.ShowPass(result.ActionDetail ?? "done");
         }
         catch (Exception ex)
         {
             result.Status = StepStatus.Fail;
             result.Message = ex.Message;
+
+            // [ZOOM] Show failure result
+            _currentZoom?.ShowFail(ex.Message);
+        }
+        finally
+        {
+            _currentZoom?.Dispose();
+            _currentZoom = null;
         }
 
         sw.Stop();
@@ -194,6 +243,7 @@ public sealed class ActionExecutor : IDisposable
     private string DoClick(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        BeginZoomForElement(element, step);
         if (element != null)
         {
             var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
@@ -239,6 +289,7 @@ public sealed class ActionExecutor : IDisposable
     private string DoDoubleClick(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        BeginZoomForElement(element, step);
         if (element != null)
         {
             var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
@@ -269,6 +320,7 @@ public sealed class ActionExecutor : IDisposable
     private string DoRightClick(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        BeginZoomForElement(element, step);
         if (element != null)
         {
             var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
@@ -311,6 +363,7 @@ public sealed class ActionExecutor : IDisposable
             try
             {
                 (element, _) = LocateElement(step);
+                BeginZoomForElement(element, step);
                 if (element?.Patterns.Value.IsSupported == true)
                 {
                     element.Patterns.Value.Pattern.SetValue(text);
@@ -519,6 +572,7 @@ public sealed class ActionExecutor : IDisposable
             try
             {
                 var (element, method) = LocateElement(step);
+                BeginZoomForElement(element, step);
                 if (element != null)
                 {
                     var hAmount = FlaUI.Core.Definitions.ScrollAmount.NoAmount;
@@ -573,6 +627,7 @@ public sealed class ActionExecutor : IDisposable
     private void DoToggle(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        BeginZoomForElement(element, step);
         if (element == null)
             throw new InvalidOperationException($"Cannot locate element for toggle: {step.Target?.AutomationId ?? step.Target?.Name ?? "(no target)"}");
 
@@ -627,6 +682,7 @@ public sealed class ActionExecutor : IDisposable
     private void DoExpandCollapse(StepDefinition step, StepResult result, bool expand)
     {
         var (element, method) = LocateElement(step);
+        BeginZoomForElement(element, step);
         if (element == null)
             throw new InvalidOperationException($"Cannot locate element for {(expand ? "expand" : "collapse")}");
 
@@ -669,6 +725,7 @@ public sealed class ActionExecutor : IDisposable
     private void DoSelect(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        BeginZoomForElement(element, step);
         if (element == null)
             throw new InvalidOperationException("Cannot locate element for select");
 
@@ -738,6 +795,7 @@ public sealed class ActionExecutor : IDisposable
     private void DoSetRange(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        BeginZoomForElement(element, step);
         if (element == null)
             throw new InvalidOperationException("Cannot locate element for set_range");
 

@@ -721,26 +721,43 @@ public sealed class UiaLocator : IDisposable
         FlaUI.Core.AutomationElements.AutomationElement parent,
         System.Drawing.Point pt, int depth = 0)
     {
-        if (depth > 8) return parent; // safety limit
+        if (depth > 15) return parent; // safety limit (Chrome/Electron web content can be 12+ deep)
 
         try
         {
             var children = parent.FindAllChildren();
             if (children == null || children.Length == 0) return parent;
 
+            // Explore ALL matching children (not just first) — critical for Electron/Chrome
+            // where multiple Pane siblings share the same BoundingRectangle.
+            // Pick the result with the smallest area (most specific element).
+            FlaUI.Core.AutomationElements.AutomationElement? bestResult = null;
+            double bestArea = double.MaxValue;
+            int bestDepth = depth;
+
             foreach (var child in children)
             {
                 try
                 {
                     var rect = child.BoundingRectangle;
-                    if (rect.Contains(pt))
+                    if (!rect.Contains(pt)) continue;
+
+                    var candidate = FindDeepestAtPoint(child, pt, depth + 1);
+                    if (candidate == null) continue;
+
+                    // Score: prefer smallest area (most specific), then deepest
+                    var cRect = candidate.BoundingRectangle;
+                    double cArea = (double)cRect.Width * cRect.Height;
+                    if (bestResult == null || cArea < bestArea)
                     {
-                        // Go deeper
-                        return FindDeepestAtPoint(child, pt, depth + 1);
+                        bestResult = candidate;
+                        bestArea = cArea;
                     }
                 }
                 catch { /* skip inaccessible children */ }
             }
+
+            if (bestResult != null) return bestResult;
         }
         catch { }
 
@@ -902,6 +919,139 @@ public sealed class UiaLocator : IDisposable
         var sb = new System.Text.StringBuilder();
         DumpElement(root, sb, 0, maxDepth);
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Dump the UI tree filtered by a pattern.
+    /// Searches the ENTIRE tree (ignoring depth limit for the search phase).
+    /// When a matching element is found, dumps its ancestry path + subtree up to subtreeDepth.
+    /// Pattern matches against Name, AutomationId, or ControlType (case-insensitive).
+    /// Supports wildcards (*/?), regex: prefix, and plain substring matching.
+    /// </summary>
+    public string DumpTreeFiltered(IntPtr hWnd, string filterPattern, int subtreeDepth = 5)
+    {
+        var root = _automation.FromHandle(hWnd);
+        var sb = new System.Text.StringBuilder();
+        var matches = new List<(AutomationElement element, List<string> ancestorLines)>();
+
+        // Phase 1: Search entire tree for matching elements (max 20 depth, 15s timeout)
+        var matcher = PatternMatcher.IsPattern(filterPattern)
+            ? PatternMatcher.Create(filterPattern)
+            : null; // plain substring
+
+        var searchTimeout = DateTime.UtcNow.AddSeconds(15);
+        SearchForMatches(root, filterPattern, matcher, new List<string>(), matches, 0, 20, searchTimeout);
+
+        if (matches.Count == 0)
+        {
+            sb.AppendLine($"(no elements matching \"{filterPattern}\")");
+            return sb.ToString();
+        }
+
+        sb.AppendLine($"── {matches.Count} match(es) for \"{filterPattern}\" ──");
+        sb.AppendLine();
+
+        // Phase 2: For each match, show path one-liner + subtree dump
+        for (int i = 0; i < matches.Count; i++)
+        {
+            var (elem, ancestors) = matches[i];
+
+            // Build path one-liner: /Window:Claude/Pane/Document/Group/Button:Menu
+            string elemName, elemAid, elemCt;
+            try { elemName = elem.Name ?? ""; } catch { elemName = ""; }
+            try { elemAid = elem.AutomationId ?? ""; } catch { elemAid = ""; }
+            try { elemCt = elem.ControlType.ToString(); } catch { elemCt = "?"; }
+            var pathParts = ancestors.Select(a =>
+            {
+                var typeStart = a.IndexOf('[');
+                var typeEnd = a.IndexOf(']', typeStart + 1);
+                var nameStart = a.IndexOf('"', typeEnd) + 1;
+                var nameEnd = a.IndexOf('"', nameStart);
+                var type = typeStart >= 0 && typeEnd > typeStart ? a[(typeStart + 1)..typeEnd] : "?";
+                var name = nameStart > 0 && nameEnd > nameStart ? a[nameStart..nameEnd] : "";
+                return string.IsNullOrEmpty(name) || name == "(null)" ? type : $"{type}:{name}";
+            }).ToList();
+            // Element itself: include aid if available
+            string elemPart = string.IsNullOrEmpty(elemName) ? elemCt : $"{elemCt}:{elemName}";
+            if (!string.IsNullOrEmpty(elemAid)) elemPart += $"(aid={elemAid})";
+            pathParts.Add(elemPart);
+
+            // Path line with index — A11Y: prefix to distinguish from Win32 tree paths
+            sb.AppendLine($"[{i + 1}] A11Y:/{string.Join("/", pathParts)}");
+
+            // Subtree dump starting at depth 0 (flat, easy to read)
+            DumpElement(elem, sb, 1, 1 + subtreeDepth);
+            sb.AppendLine();
+
+            if (i >= 49) // safety limit
+            {
+                sb.AppendLine($"... +{matches.Count - 50} more matches (truncated)");
+                break;
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Recursively search the UIA tree for elements matching the filter.
+    /// Collects matching elements with their ancestry path for context.
+    /// </summary>
+    private void SearchForMatches(
+        AutomationElement element, string filterText, PatternMatcher? matcher,
+        List<string> ancestorLines, List<(AutomationElement, List<string>)> matches,
+        int depth, int maxSearchDepth, DateTime timeout)
+    {
+        if (depth > maxSearchDepth || matches.Count >= 50) return;
+        if (DateTime.UtcNow > timeout) return; // safety timeout
+
+        // Extract properties safely
+        string name, aid, ctStr, rectStr;
+        try { name = element.Name ?? ""; } catch { name = ""; }
+        try { aid = element.AutomationId ?? ""; } catch { aid = ""; }
+        try { ctStr = element.ControlType.ToString(); } catch { ctStr = "?"; }
+        try
+        {
+            var rect = element.BoundingRectangle;
+            rectStr = $"({rect.X},{rect.Y} {rect.Width}x{rect.Height})";
+        }
+        catch { rectStr = "(?)"; }
+
+        // Check if this element matches the filter
+        bool isMatch;
+        if (matcher != null)
+        {
+            isMatch = matcher.IsMatch(name) || matcher.IsMatch(aid) || matcher.IsMatch(ctStr);
+        }
+        else
+        {
+            // Plain substring search (case-insensitive)
+            isMatch = name.Contains(filterText, StringComparison.OrdinalIgnoreCase)
+                || aid.Contains(filterText, StringComparison.OrdinalIgnoreCase)
+                || ctStr.Contains(filterText, StringComparison.OrdinalIgnoreCase);
+        }
+
+        string lineForAncestry = $"[{ctStr}] \"{(name.Length > 40 ? name[..40] + "..." : name)}\" aid=\"{aid}\" {rectStr}";
+
+        if (isMatch)
+        {
+            matches.Add((element, new List<string>(ancestorLines)));
+        }
+        else
+        {
+            // Not a match — recurse into children
+            try
+            {
+                var children = element.FindAllChildren();
+                var newAncestors = new List<string>(ancestorLines) { lineForAncestry };
+                foreach (var child in children)
+                {
+                    SearchForMatches(child, filterText, matcher, newAncestors, matches, depth + 1, maxSearchDepth, timeout);
+                    if (matches.Count >= 50 || DateTime.UtcNow > timeout) break;
+                }
+            }
+            catch { }
+        }
     }
 
     private void DumpElement(AutomationElement element, System.Text.StringBuilder sb, int depth, int maxDepth)
