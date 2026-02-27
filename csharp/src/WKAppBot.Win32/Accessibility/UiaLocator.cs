@@ -1129,6 +1129,10 @@ public sealed class UiaLocator : IDisposable
             var root = automation.FromHandle(hWnd);
             if (root == null) return results;
 
+            // Pattern support: glob (*/?) and regex: prefix via PatternMatcher
+            bool isPattern = PatternMatcher.IsPattern(keyword);
+            PatternMatcher? matcher = isPattern ? PatternMatcher.Create(keyword) : null;
+
             var deadline = Environment.TickCount64 + timeoutMs;
             int visited = 0;
             var queue = new Queue<(AutomationElement el, int depth)>();
@@ -1147,10 +1151,20 @@ public sealed class UiaLocator : IDisposable
                 catch { ct = "?"; }
 
                 // Match on Name or AutomationId (skip root element)
+                // Supports: substring (default), glob (*/?) and regex: prefix
                 if (depth > 0)
                 {
-                    bool nameMatch = !string.IsNullOrEmpty(name) && name.Contains(keyword, StringComparison.OrdinalIgnoreCase);
-                    bool aidMatch = !string.IsNullOrEmpty(aid) && aid.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+                    bool nameMatch, aidMatch;
+                    if (matcher != null)
+                    {
+                        nameMatch = !string.IsNullOrEmpty(name) && matcher.IsMatch(name);
+                        aidMatch = !string.IsNullOrEmpty(aid) && matcher.IsMatch(aid);
+                    }
+                    else
+                    {
+                        nameMatch = !string.IsNullOrEmpty(name) && name.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+                        aidMatch = !string.IsNullOrEmpty(aid) && aid.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+                    }
                     if (nameMatch || aidMatch)
                         results.Add(new UiaQuickMatch(ct, name, aid));
                 }

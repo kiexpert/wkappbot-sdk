@@ -12,13 +12,13 @@ namespace WKAppBot.Win32.Native;
 ///   If it's Chromium/Electron → enable screen reader flag → A11Y tree appears.
 ///   If it's native Win32/MFC → skip (UIA already works).
 ///
-/// Once enabled, stays on for the lifetime of the process.
-/// Restored on exit if WE enabled it (doesn't clobber real screen readers).
+/// Once enabled, stays on PERMANENTLY (survives process exit).
+/// Next run: already ON → zero broadcast delay → instant A11Y access.
+/// Reboot clears it, but next wkappbot run re-enables automatically.
 /// </summary>
 public static class ScreenReaderMode
 {
     private static bool _weEnabled;
-    private static bool _checked;
 
     /// <summary>
     /// Check if the target window is a modern app (Chromium/Electron) that
@@ -58,19 +58,20 @@ public static class ScreenReaderMode
     /// <summary>
     /// Force enable screen reader mode (system-wide announcement).
     /// Broadcasts WM_SETTINGCHANGE so Chromium picks it up immediately.
+    /// Stays on permanently — no restore on exit.
     /// </summary>
     public static void Enable()
     {
         if (_weEnabled) return;
 
-        // Check current state — don't clobber a real screen reader (NVDA/JAWS/Narrator)
+        // Check current state — already on? (previous run or real screen reader)
         NativeMethods.SystemParametersInfoW(
             NativeMethods.SPI_GETSCREENREADER, 0, out int current, 0);
 
         if (current != 0)
         {
-            // Real screen reader already running — A11Y trees are already active
-            _weEnabled = true; // mark so we don't check again
+            // Already enabled (previous wkappbot run or real AT) — skip broadcast
+            _weEnabled = true;
             return;
         }
 
@@ -82,28 +83,12 @@ public static class ScreenReaderMode
         if (ok)
         {
             _weEnabled = true;
-            _checked = false; // we actually changed the flag
             Console.WriteLine("[A11Y] Screen reader mode enabled — Chromium/Electron A11Y trees activated");
         }
     }
 
     /// <summary>
-    /// Restore previous state on exit. Only disables if WE enabled it.
-    /// Safe: if a real screen reader was already running, we didn't change anything.
-    /// </summary>
-    public static void Restore()
-    {
-        if (!_weEnabled || _checked) return; // we didn't change the system flag
-
-        NativeMethods.SystemParametersInfoW(
-            NativeMethods.SPI_SETSCREENREADER, 0, IntPtr.Zero,
-            NativeMethods.SPIF_SENDCHANGE);
-
-        _weEnabled = false;
-    }
-
-    /// <summary>
-    /// Whether screen reader mode is currently active (by us or by a real AT).
+    /// Whether screen reader mode is currently active (by us or already was).
     /// </summary>
     public static bool IsEnabled => _weEnabled;
 }
