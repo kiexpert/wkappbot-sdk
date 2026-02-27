@@ -41,11 +41,8 @@ internal partial class Program
         // Enable DPI awareness
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
 
-        // Restore screen reader flag on exit (if we enabled it for Chromium/Electron)
-        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-        {
-            try { WKAppBot.Win32.Native.ScreenReaderMode.Restore(); } catch { }
-        };
+        // Screen reader mode: once enabled for Chromium/Electron, stays ON permanently.
+        // No restore on exit — next run starts instantly (no broadcast delay).
 
         // Auto-log: tee all console output to file
         var exePath = Environment.ProcessPath ?? "wkappbot.exe";

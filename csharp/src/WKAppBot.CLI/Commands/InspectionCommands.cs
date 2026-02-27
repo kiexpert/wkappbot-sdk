@@ -14,13 +14,26 @@ internal partial class Program
     static int FindCommand(string[] args)
     {
         if (args.Length == 0 || (args.Length == 1 && args[0].StartsWith("--")))
-            return Error("Usage: wkappbot find <keyword> [--deep] [--limit N] [--process <name>] [--class <name>]\n" +
-                         "  Unified search: finds windows by title AND UIA elements by Name/AutomationId.\n" +
-                         "  --deep: Deeper UIA tree search (depth 12, slower but thorough)");
+            return Error("Usage: wkappbot find <keyword> [--deep] [--limit N] [--process <name>]\n" +
+                         "  Unified search: window titles + UIA accessibility elements.\n" +
+                         "  Supports path search: find \"윈도우**UIA요소\" (GitHub-style glob)\n" +
+                         "    ** separates window title filter from UIA element filter.\n" +
+                         "    Each part supports: substring, wildcard (*/?) or regex: prefix.\n" +
+                         "  --deep: Deeper UIA tree search (depth 12, slower but thorough).\n" +
+                         "  Examples:\n" +
+                         "    find \"Claude\"              Search everywhere for 'Claude'\n" +
+                         "    find \"투혼**현재가\"        투혼 windows → 현재가 UIA elements\n" +
+                         "    find \"*Editor***Button*\"   Editor windows → Button elements");
 
         // Preprocess: inject --uia (or --uia-deep for --deep) and forward to WindowsCommand
         var forwarded = new List<string>(args);
         bool hasDeep = forwarded.Remove("--deep");
+
+        // Path search: "윈도우**UIA요소" → auto deep (hierarchy needs thorough search)
+        string keyword = forwarded.FirstOrDefault(a => !a.StartsWith("--")) ?? "";
+        if (keyword.Contains("**"))
+            hasDeep = true;
+
         forwarded.Add(hasDeep ? "--uia-deep" : "--uia");
         return WindowsCommand(forwarded.ToArray());
     }
@@ -900,6 +913,9 @@ internal partial class Program
             if (!showAll && string.IsNullOrEmpty(title) && !visible) return null;
             if (!showAll && w == 0 && h == 0) return null;
 
+            // Skip wkappbot windows (Eye/Zoom overlays) — don't search ourselves
+            if (processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
+
             // Apply filters
             if (filterTitle != null)
             {
@@ -955,7 +971,9 @@ internal partial class Program
         int uiaMatchWindows = 0;
 
         // EnumWindows enumerates in Z-order (front to back) — no re-sort needed!
-        string mode = uiaDeep ? "find --deep (Z-order ★=foreground)"
+        bool hasPathSearch = filterTitle != null && filterTitle.Contains("**");
+        string mode = hasPathSearch ? "find path (Z-order ★=foreground)"
+            : uiaDeep ? "find --deep (Z-order ★=foreground)"
             : uiaSearch ? "find (Z-order ★=foreground)"
             : deep ? "windows (deep, Z-order ★=foreground)"
             : "windows (Z-order ★=foreground)";
@@ -984,6 +1002,9 @@ internal partial class Program
 
             if (!showAll && string.IsNullOrEmpty(title) && !visible) return null;
             if (!showAll && w == 0 && h == 0) return null;
+
+            // Skip wkappbot windows (Eye/Zoom overlays) — don't search ourselves
+            if (processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
 
             // Process/class filters still apply (not title!)
             if (filterProcess != null)
@@ -1032,28 +1053,65 @@ internal partial class Program
             if (uiaSearch && filterTitle != null)
             {
                 // ── Unified search: title OR UIA elements ──
+                // Path search: "윈도우**UIA요소" splits into window filter + UIA filter
+                // Regular search: same keyword for both title and UIA (OR logic)
+                bool isPathSearch = filterTitle.Contains("**");
+                string windowFilter, uiaKeyword;
+                if (isPathSearch)
+                {
+                    var parts = filterTitle.Split(new[] { "**" }, 2, StringSplitOptions.None);
+                    windowFilter = parts[0].TrimEnd('/', '*');
+                    uiaKeyword = parts.Length > 1 ? parts[1].TrimStart('/', '*') : "";
+                    if (string.IsNullOrEmpty(windowFilter)) windowFilter = ""; // match all
+                    if (string.IsNullOrEmpty(uiaKeyword)) uiaKeyword = ""; // match all
+                }
+                else
+                {
+                    windowFilter = filterTitle;
+                    uiaKeyword = filterTitle;
+                }
+
                 var raw = GetRawWindowInfo(hWnd);
                 if (raw == null) return true; // noise or process/class mismatch
 
                 var r = raw.Value;
                 if (!r.visible || r.w < 50 || r.h < 50) return true; // skip tiny/hidden
 
-                // Check title match
-                bool titleMatch = PatternMatcher.IsPattern(filterTitle)
-                    ? PatternMatcher.Create(filterTitle).IsMatch(r.title)
-                    : r.title.Contains(filterTitle, StringComparison.OrdinalIgnoreCase);
+                // Check title match (window filter part)
+                bool titleMatch;
+                if (string.IsNullOrEmpty(windowFilter))
+                    titleMatch = true; // path search with empty window part → match all
+                else if (PatternMatcher.IsPattern(windowFilter))
+                    titleMatch = PatternMatcher.Create(windowFilter).IsMatch(r.title);
+                else
+                    titleMatch = r.title.Contains(windowFilter, StringComparison.OrdinalIgnoreCase);
 
-                // UIA search (regardless of title match — show bonus elements if title matches too)
-                var uiaMatches = uiaDeep
-                    ? UiaLocator.QuickSearch(hWnd, filterTitle, maxDepth: 12, maxResults: 10, maxVisited: 1500, timeoutMs: 8000)
-                    : UiaLocator.QuickSearch(hWnd, filterTitle);
+                // Path search: window MUST match (AND logic). Regular: try both (OR logic).
+                if (isPathSearch && !titleMatch) return true;
 
-                if (!titleMatch && uiaMatches.Count == 0) return true; // no match at all
+                // UIA search (UIA filter part — supports glob/regex via PatternMatcher)
+                List<UiaQuickMatch> uiaMatches;
+                bool hasUiaFilter = !string.IsNullOrEmpty(uiaKeyword);
+                if (hasUiaFilter)
+                {
+                    uiaMatches = uiaDeep
+                        ? UiaLocator.QuickSearch(hWnd, uiaKeyword, maxDepth: 12, maxResults: 10, maxVisited: 1500, timeoutMs: 8000)
+                        : UiaLocator.QuickSearch(hWnd, uiaKeyword);
+                }
+                else
+                {
+                    uiaMatches = new List<UiaQuickMatch>();
+                }
+
+                // Path search with UIA filter: both parts must match (AND).
+                // Path search without UIA filter ("Claude**"): window match is enough.
+                // Regular search: title OR UIA (either one is enough).
+                if (isPathSearch && hasUiaFilter && uiaMatches.Count == 0) return true;
+                if (!isPathSearch && !titleMatch && uiaMatches.Count == 0) return true;
 
                 // Print window (Cyan if UIA-only match, normal if title match)
                 if (!titleMatch)
                 {
-                    // UIA-only match: dim window header, highlight elements
                     Console.ForegroundColor = ConsoleColor.DarkCyan;
                     string dt = r.title.Length > 60 ? r.title[..57] + "..." : r.title;
                     if (string.IsNullOrEmpty(dt)) dt = "(no title)";
