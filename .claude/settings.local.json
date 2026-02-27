@@ -59,7 +59,8 @@
       "Write(*.yml)",
       "Write(**/*.yml)",
       "WebSearch(*)",
-      "WebFetch(*)"
+      "WebFetch(*)",
+      "mcp__Desktop_Commander__list_directory"
     ]
   }
 }

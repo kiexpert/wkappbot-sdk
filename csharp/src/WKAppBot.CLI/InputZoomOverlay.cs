@@ -42,6 +42,7 @@ internal sealed class InputZoomWindow : Window
     private readonly TextBlock _headerText;
     private readonly TextBlock _statusText;
     private readonly Border _outerBorder;
+    private bool _firstFrameReceived;
 
     public InputZoomWindow(int width, int height)
     {
@@ -56,7 +57,7 @@ internal sealed class InputZoomWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false; // CRITICAL: never steal focus from target app
         ResizeMode = ResizeMode.NoResize;
-        Opacity = 0.98; // nearly opaque — input text must be clearly visible
+        Opacity = 0; // Start fully transparent — reveal on first frame load
 
         // Build visual tree programmatically (no XAML)
         _outerBorder = new Border
@@ -125,7 +126,7 @@ internal sealed class InputZoomWindow : Window
             new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE));
     }
 
-    /// <summary>Update the magnified control image from PNG data.</summary>
+    /// <summary>Update the magnified control image from PNG data. Reveals overlay on first frame.</summary>
     public void UpdateImage(byte[] pngData)
     {
         try
@@ -138,6 +139,13 @@ internal sealed class InputZoomWindow : Window
             bi.EndInit();
             bi.Freeze(); // thread-safe
             _controlImage.Source = bi;
+
+            // Reveal on first frame — was fully transparent until now
+            if (!_firstFrameReceived)
+            {
+                _firstFrameReceived = true;
+                Opacity = 0.50;
+            }
         }
         catch { /* best effort */ }
     }
@@ -184,15 +192,36 @@ internal sealed class InputZoomWindow : Window
         timer.Start();
     }
 
+    /// <summary>Force Win32 HWND_TOPMOST to stay above dropdowns and other popups.</summary>
+    public void EnsureTopmost()
+    {
+        try
+        {
+            var helper = new WindowInteropHelper(this);
+            if (helper.Handle != IntPtr.Zero)
+                SetWindowPos(helper.Handle, HWND_TOPMOST, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+        catch { /* best effort */ }
+    }
+
     // ── Win32 P/Invoke ──
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_NOACTIVATE = 0x08000000;
+    private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOACTIVATE = 0x0010;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int X, int Y, int cx, int cy, uint uFlags);
 }
 
 /// <summary>
@@ -219,7 +248,7 @@ internal sealed class InputHighlightWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false; // CRITICAL: never steal focus from target app
         ResizeMode = ResizeMode.NoResize;
-        Opacity = 0.95;
+        Opacity = 0.50; // 50% transparent
 
         // Just a border — transparent interior, no image/header
         var grid = new Grid();
@@ -299,16 +328,37 @@ internal sealed class InputHighlightWindow : Window
         timer.Start();
     }
 
+    /// <summary>Force Win32 HWND_TOPMOST to stay above dropdowns and other popups.</summary>
+    public void EnsureTopmost()
+    {
+        try
+        {
+            var helper = new WindowInteropHelper(this);
+            if (helper.Handle != IntPtr.Zero)
+                SetWindowPos(helper.Handle, HWND_TOPMOST, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+        catch { /* best effort */ }
+    }
+
     // ── Win32 P/Invoke ──
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_NOACTIVATE = 0x08000000;
     private const int WS_EX_TRANSPARENT = 0x00000020;
+    private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOACTIVATE = 0x0010;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int X, int Y, int cx, int cy, uint uFlags);
 }
 
 /// <summary>
@@ -328,6 +378,8 @@ internal sealed class InputZoomHost : IDisposable
     private InputHighlightWindow? _highlightWindow; // HighlightBox mode
     private Dispatcher? _dispatcher;
     private readonly ManualResetEventSlim _ready = new();
+    private DispatcherTimer? _refreshTimer;
+    private Func<byte[]?>? _captureFunc;
 
     public ZoomMode Mode { get; private set; }
     public bool IsAlive => _uiThread?.IsAlive == true;
@@ -397,6 +449,74 @@ internal sealed class InputZoomHost : IDisposable
             _dispatcher?.BeginInvoke(() => _zoomWindow?.ShowResult(pass, text));
     }
 
+    /// <summary>
+    /// Start periodic live capture (Magnifier/Relay: image refresh + TOPMOST,
+    /// HighlightBox: TOPMOST only). Interval default 500ms.
+    /// </summary>
+    private int _tickCount;
+    public void StartLiveCapture(Func<byte[]?>? captureFunc = null, int intervalMs = 200)
+    {
+        _captureFunc = captureFunc;
+        _tickCount = 0;
+        bool _capturing = false;
+        _dispatcher?.BeginInvoke(() =>
+        {
+            _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(intervalMs) };
+            _refreshTimer.Tick += (_, _) =>
+            {
+                _tickCount++;
+                try
+                {
+                    if (Mode != ZoomMode.HighlightBox && _captureFunc != null)
+                    {
+                        if (_capturing) return; // skip if previous capture still running
+                        _capturing = true;
+                        var func = _captureFunc; // local copy for closure safety
+                        // Capture on ThreadPool (off UI thread!) → push result to WPF
+                        System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                        {
+                            try
+                            {
+                                var png = func?.Invoke();
+                                if (png != null)
+                                    _dispatcher?.BeginInvoke(() =>
+                                    {
+                                        _zoomWindow?.UpdateImage(png);
+                                        _zoomWindow?.EnsureTopmost();
+                                    });
+                            }
+                            catch { /* best effort */ }
+                            finally { _capturing = false; }
+                        });
+                    }
+                    else
+                    {
+                        _highlightWindow?.EnsureTopmost();
+                    }
+                }
+                catch { /* best effort */ }
+            };
+            _refreshTimer.Start();
+        });
+    }
+    /// <summary>Number of timer ticks fired (for diagnostics).</summary>
+    public int TickCount => _tickCount;
+
+    /// <summary>Stop the periodic live capture timer.</summary>
+    public void StopLiveCapture()
+    {
+        _dispatcher?.BeginInvoke(() => { _refreshTimer?.Stop(); _refreshTimer = null; });
+    }
+
+    /// <summary>Force Win32 TOPMOST on the overlay window.</summary>
+    public void EnsureTopmost()
+    {
+        if (Mode == ZoomMode.HighlightBox)
+            _dispatcher?.BeginInvoke(() => _highlightWindow?.EnsureTopmost());
+        else
+            _dispatcher?.BeginInvoke(() => _zoomWindow?.EnsureTopmost());
+    }
+
     /// <summary>Begin fade-out animation, then auto-close.</summary>
     public void BeginFadeOut(int delayMs = 3000, int fadeDurationMs = 800)
     {
@@ -411,6 +531,7 @@ internal sealed class InputZoomHost : IDisposable
     {
         try
         {
+            _dispatcher?.BeginInvoke(() => { _refreshTimer?.Stop(); _refreshTimer = null; });
             _dispatcher?.InvokeShutdown();
             _uiThread?.Join(3000);
         }

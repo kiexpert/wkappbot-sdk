@@ -41,6 +41,33 @@ public static class ScreenCapture
     }
 
     /// <summary>
+    /// PrintWindow-only capture — NO BringToFront fallback.
+    /// Returns null if PrintWindow fails (blank bitmap).
+    /// Designed for live preview where skipping a frame is acceptable (~200ms until next attempt).
+    /// Cost: ~5-15ms vs ~200ms+ with BringToFront fallback.
+    /// </summary>
+    public static Bitmap? TryPrintWindowOnly(IntPtr hWnd)
+    {
+        NativeMethods.GetWindowRect(hWnd, out var rect);
+        int w = rect.Width;
+        int h = rect.Height;
+        if (w <= 0 || h <= 0) return null;
+
+        var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            IntPtr hdc = g.GetHdc();
+            bool ok = NativeMethods.PrintWindow(hWnd, hdc, NativeMethods.PW_RENDERFULLCONTENT);
+            g.ReleaseHdc(hdc);
+
+            if (ok && !IsBlankBitmap(bmp))
+                return bmp;
+        }
+        bmp.Dispose();
+        return null; // Skip this frame — caller will retry in ~200ms
+    }
+
+    /// <summary>
     /// Capture window by temporarily bringing it to Z-order top.
     /// Uses SWP_NOACTIVATE to avoid stealing focus from the user.
     /// Used when PrintWindow fails (common with HTS MFC apps).
@@ -104,6 +131,68 @@ public static class ScreenCapture
             }
         }
         return true; // All 9 sample points are black → blank capture
+    }
+
+    /// <summary>
+    /// Capture a sub-region of a window via PrintWindow + GDI viewport offset.
+    /// Creates only a regionWidth×regionHeight bitmap instead of the full window.
+    /// Falls back to full PrintWindow + CropRegion if viewport trick fails.
+    ///
+    /// Performance: Allocates only the needed bitmap size. On non-MFC apps this can be
+    /// significantly faster. On MFC apps the bottleneck is WM_PRINT message processing
+    /// (1000ms+) regardless of bitmap size, so savings are in GDI rendering + allocation only.
+    ///
+    /// Parameters: regionX/Y are relative to the window's top-left corner (not screen coordinates).
+    /// </summary>
+    public static Bitmap? CaptureWindowRegion(IntPtr hWnd, int regionX, int regionY,
+        int regionWidth, int regionHeight)
+    {
+        NativeMethods.GetWindowRect(hWnd, out var rect);
+        if (rect.Width <= 0 || rect.Height <= 0) return null;
+
+        // Clamp region to window bounds
+        if (regionX < 0) { regionWidth += regionX; regionX = 0; }
+        if (regionY < 0) { regionHeight += regionY; regionY = 0; }
+        if (regionX + regionWidth > rect.Width) regionWidth = rect.Width - regionX;
+        if (regionY + regionHeight > rect.Height) regionHeight = rect.Height - regionY;
+        if (regionWidth <= 0 || regionHeight <= 0) return null;
+
+        // Strategy 1: Small bitmap + viewport offset (GDI renders only needed region)
+        var bmp = new Bitmap(regionWidth, regionHeight, PixelFormat.Format32bppArgb);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            IntPtr hdc = g.GetHdc();
+
+            // Shift viewport so window's (regionX, regionY) maps to bitmap's (0, 0)
+            NativeMethods.SetViewportOrgEx(hdc, -regionX, -regionY, out _);
+
+            // Set clip region to ensure only our target area is rendered
+            IntPtr hRgn = NativeMethods.CreateRectRgn(regionX, regionY,
+                regionX + regionWidth, regionY + regionHeight);
+            NativeMethods.SelectClipRgn(hdc, hRgn);
+            NativeMethods.DeleteObject(hRgn);
+
+            bool ok = NativeMethods.PrintWindow(hWnd, hdc, NativeMethods.PW_RENDERFULLCONTENT);
+
+            // Reset viewport origin before releasing HDC
+            NativeMethods.SetViewportOrgEx(hdc, 0, 0, out _);
+            g.ReleaseHdc(hdc);
+
+            if (ok && !IsBlankBitmap(bmp))
+                return bmp;
+        }
+        bmp.Dispose();
+
+        // Strategy 2: Full PrintWindow + CropRegion (fallback if viewport trick fails)
+        try
+        {
+            using var fullBmp = TryPrintWindowOnly(hWnd);
+            if (fullBmp != null)
+                return CropRegion(fullBmp, regionX, regionY, regionWidth, regionHeight);
+        }
+        catch { }
+
+        return null;
     }
 
     /// <summary>

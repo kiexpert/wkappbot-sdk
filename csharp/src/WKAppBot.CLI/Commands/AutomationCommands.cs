@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using FlaUI.UIA3;
+using FlaUI.Core.Definitions;
 using WKAppBot.Core.Runner;
 using WKAppBot.Core.Scenario;
 using WKAppBot.Win32.Input;
@@ -355,7 +357,119 @@ Examples:
             return 0;
         }
 
-        // Click the matched button
+        // Click the matched button — if no button found, try UIA TabItem fallback
+        if (matchedButton == null && buttonText != null)
+        {
+            // UIA TabItem fallback: search ALL matching forms for tab items
+            var matchingForms = scanResult.Forms.Where(f => f.FormId == targetFormId).ToList();
+            int tabsSelected = 0;
+
+            try
+            {
+                using var automation = new UIA3Automation();
+                var mainElement = automation.FromHandle(win.Handle);
+                // Find ALL TabItem elements matching the text
+                var allTabItems = mainElement.FindAllDescendants(cf =>
+                    cf.ByControlType(ControlType.TabItem));
+
+                foreach (var ti in allTabItems)
+                {
+                    if (ti.Name == null || !ti.Name.Contains(buttonText))
+                        continue;
+
+                    // Check if already selected
+                    var selPattern = ti.Patterns.SelectionItem;
+                    if (selPattern != null && selPattern.IsSupported && selPattern.Pattern.IsSelected)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"  [TAB] \"{ti.Name}\" already selected — skipping");
+                        Console.ResetColor();
+                        continue;
+                    }
+
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.Write($"  [TAB] Selecting \"{ti.Name}\"");
+                    Console.ResetColor();
+
+                    bool selected = false;
+                    // Try UIA SelectionItem.Select first (focusless!)
+                    if (selPattern != null && selPattern.IsSupported)
+                    {
+                        try
+                        {
+                            selPattern.Pattern.Select();
+                            selected = true;
+                        }
+                        catch { /* UIA Select failed — try click fallback */ }
+                    }
+
+                    // Fallback: PostMessage click on tab item coordinates
+                    if (!selected)
+                    {
+                        try
+                        {
+                            var rect = ti.BoundingRectangle;
+                            int tcx = (int)(rect.X + rect.Width / 2);
+                            int tcy = (int)(rect.Y + rect.Height / 2);
+                            // Find the parent Tab control handle
+                            var parentTab = ti.Parent;
+                            if (parentTab != null)
+                            {
+                                var ph = parentTab.Properties.NativeWindowHandle.ValueOrDefault;
+                                if (ph != IntPtr.Zero)
+                                {
+                                    var parentRect = parentTab.BoundingRectangle;
+                                    int localX = tcx - (int)parentRect.X;
+                                    int localY = tcy - (int)parentRect.Y;
+                                    IntPtr lParam = (IntPtr)((localY << 16) | (localX & 0xFFFF));
+                                    NativeMethods.PostMessageW(ph, 0x0201 /*WM_LBUTTONDOWN*/, (IntPtr)0x0001, lParam);
+                                    Thread.Sleep(50);
+                                    NativeMethods.PostMessageW(ph, 0x0202 /*WM_LBUTTONUP*/, IntPtr.Zero, lParam);
+                                    selected = true;
+                                }
+                            }
+                        }
+                        catch { /* click fallback also failed */ }
+                    }
+
+                    if (selected)
+                    {
+                        tabsSelected++;
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($" ✓ (focusless!)");
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($" ✗ FAIL");
+                    }
+                    Console.ResetColor();
+                    Thread.Sleep(200);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"  [TAB] UIA error: {ex.Message}");
+                Console.ResetColor();
+            }
+
+            if (tabsSelected > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"\n  ✓ {tabsSelected} tab(s) \"{buttonText}\" selected across all forms");
+                Console.ResetColor();
+                return 0;
+            }
+
+            // No button AND no tab found
+            Console.ForegroundColor = ConsoleColor.Red;
+            var searchDesc = targetCid.HasValue ? $"cid={targetCid}" : $"\"{buttonText}\"";
+            Console.WriteLine($"\n  Button/TabItem {searchDesc} not found in [{targetFormId}]");
+            Console.ResetColor();
+            return 1;
+        }
+
         if (matchedButton == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
@@ -575,13 +689,23 @@ Examples:
     /// </summary>
     private static bool SmartClickButton(
         IntPtr hButton, IntPtr hDialogOrParent,
-        ExperienceDb? expDb = null, string? formId = null, int? controlId = null)
+        ExperienceDb? expDb = null, string? formId = null, int? controlId = null,
+        bool showZoom = true)
     {
         NativeMethods.GetWindowRect(hButton, out var btnRect);
         int cx = (btnRect.Left + btnRect.Right) / 2;
         int cy = (btnRect.Top + btnRect.Bottom) / 2;
         int localX = (btnRect.Right - btnRect.Left) / 2;
         int localY = (btnRect.Bottom - btnRect.Top) / 2;
+
+        // [ZOOM] Start adaptive overlay for the button
+        var buttonLabel = WindowFinder.GetWindowText(hButton);
+        ClickZoomHelper? zoom = null;
+        if (showZoom)
+        {
+            zoom = ClickZoomHelper.Begin(hButton, hDialogOrParent,
+                "click", string.IsNullOrEmpty(buttonLabel) ? $"cid={controlId}" : buttonLabel);
+        }
 
         // Strategy implementations keyed by name
         var strategyActions = new Dictionary<string, Action>
@@ -683,6 +807,8 @@ Examples:
         var failedStrategies = new List<string>();
         var buttonText = WindowFinder.GetWindowText(hButton);
 
+        zoom?.UpdateStatus($"Clicking: \"{buttonText}\"");
+
         foreach (var strategyName in order)
         {
             if (!strategyActions.TryGetValue(strategyName, out var action))
@@ -693,6 +819,8 @@ Examples:
             Console.ResetColor();
             isFirst = false;
 
+            zoom?.UpdateStatus($"Try: {strategyName}");
+
             action();
             bool success = CheckDialogGone(hDialogOrParent, fgBefore, strategyName);
 
@@ -702,6 +830,9 @@ Examples:
 
             if (success)
             {
+                // [ZOOM] Show success
+                zoom?.ShowPass($"{strategyName}: dialog closed");
+
                 // Auto-record knowhow when earlier strategies failed (fallback occurred)
                 if (hasExpData && failedStrategies.Count > 0)
                 {
@@ -718,6 +849,9 @@ Examples:
 
             failedStrategies.Add(strategyName);
         }
+
+        // [ZOOM] Show failure
+        zoom?.ShowFail("all strategies failed");
 
         // Record overall failure + knowhow
         Console.ForegroundColor = ConsoleColor.Red;

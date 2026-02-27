@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using FlaUI.UIA3;
 using WKAppBot.Core.Runner;
@@ -128,6 +129,9 @@ Examples:
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("  ✓ Elevated — input enabled");
         Console.ResetColor();
+
+        // ── Pre-input: auto-dismiss "알림!!" / alert popups that block MDI access ──
+        TryDismissAlertPopups(win.Handle, mdiClient);
 
         // First check: is there a specific MDI child the user wants?
         // For now, find the FIRST visible form matching the ID (Z-order top = first)
@@ -351,6 +355,7 @@ Examples:
         }
 
         // [ZOOM] Capture a control as PNG bytes (PrintWindow + CropRegion, Z-order safe)
+        // Used for: initial capture, post-type, OCR target, final result (quality matters)
         byte[]? CaptureControlPng(IntPtr formHandle, IntPtr controlHandle)
         {
             try
@@ -367,6 +372,28 @@ Examples:
 
                 using var crop = ScreenCapture.CropRegion(formBmp, rx, ry, rw, rh);
                 return ScreenCapture.ToPngBytes(crop);
+            }
+            catch { return null; }
+        }
+
+        // [ZOOM] Fast capture for live preview — CopyFromScreen (~15-25ms, no blocking!)
+        // PrintWindow is too slow on MFC apps (1000ms+ due to WM_PRINT message blocking).
+        // CopyFromScreen captures whatever is visible — if control is covered by another window,
+        // the preview shows the covering window, which is acceptable for live preview.
+        // BMP format (no PNG compression) saves ~10-30ms per frame.
+        byte[]? CaptureControlFast(IntPtr formHandle, IntPtr controlHandle)
+        {
+            try
+            {
+                NativeMethods.GetWindowRect(controlHandle, out var cr);
+                if (cr.Width <= 0 || cr.Height <= 0) return null;
+
+                using var bmp = ScreenCapture.CaptureScreenRegion(cr.Left, cr.Top, cr.Width, cr.Height);
+                if (ScreenCapture.IsBlankBitmap(bmp)) return null;
+
+                using var ms = new System.IO.MemoryStream();
+                bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Bmp);
+                return ms.ToArray();
             }
             catch { return null; }
         }
@@ -487,9 +514,11 @@ Examples:
                     return (IntPtr)lp;
                 }
 
+                var perfTotal = Stopwatch.StartNew();
+
                 // NO foreground/focus change — just MDI activate (sendmessage, not focus)
                 NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
-                Thread.Sleep(200);
+                Thread.Sleep(50); // reduced from 200ms
 
                 // [ZOOM] Hook 1: Create adaptive overlay centered on control
                 // Adaptive mode selection:
@@ -508,10 +537,10 @@ Examples:
 
                         if (isSmall)
                         {
-                            // Magnifier: 3x + generous padding for header/status/border
+                            // Magnifier: 3x control size + chrome (header 16px + status 18px + border/padding ~16px)
                             zoomMode = ZoomMode.Magnifier;
-                            zW = Math.Max(zCtl.Width * 3 + 40, 400);
-                            zH = Math.Max(zCtl.Height * 3 + 80, 180);
+                            zW = zCtl.Width * 3 + 16;  // exact 3x width + border padding
+                            zH = zCtl.Height * 3 + 50; // exact 3x height + header + status + padding
                             zX = zCtl.Left + (zCtl.Width / 2) - (zW / 2);
                             zY = zCtl.Top + (zCtl.Height / 2) - (zH / 2);
                         }
@@ -567,7 +596,13 @@ Examples:
                             var initPng = CaptureControlPng(targetForm.Handle, targetHwnd);
                             if (initPng != null) zoomHost.UpdateImage(initPng);
                         }
-                        zoomHost.UpdateStatus($"Ready: \"{text}\" ({text.Length} chars)");
+                        zoomHost.UpdateStatus($"Before → \"{text}\" ({text.Length} chars)");
+
+                        // Start periodic live capture (fast refresh) + TOPMOST enforcement
+                        var formH = targetForm.Handle;
+                        var ctlH = targetHwnd;
+                        zoomHost.StartLiveCapture(
+                            zoomMode != ZoomMode.HighlightBox ? () => CaptureControlFast(formH, ctlH) : null);
                     }
                     catch (Exception zex)
                     {
@@ -576,15 +611,21 @@ Examples:
                     }
                 }
 
+                // Step 0b: Dismiss any VBScript popups right before typing (from previous Enter)
+                TryDismissAlertPopups(win.Handle, mdiClient);
+
                 // Step 1: Home via PostMessage (cursor to pos 0)
+                var perfHome = Stopwatch.StartNew();
                 NativeMethods.PostMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x24 /*VK_HOME*/,
                     MkLParam10(0x24, extended: true));
-                Thread.Sleep(10);
+                Thread.Sleep(5);
                 NativeMethods.PostMessageW(targetHwnd, 0x0101 /*WM_KEYUP*/, (IntPtr)0x24,
                     MkLParam10(0x24, keyUp: true, extended: true));
-                Thread.Sleep(50);
+                Thread.Sleep(15); // reduced from 50ms
+                perfHome.Stop();
 
                 // Step 2: WM_CHAR only per digit (no WM_KEYDOWN/UP — avoids TranslateMessage doubling)
+                var perfType = Stopwatch.StartNew();
                 int charIdx10 = 0;
                 foreach (char ch in text)
                 {
@@ -593,28 +634,28 @@ Examples:
                     IntPtr lp = MkLParam10(vk);
                     NativeMethods.PostMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, lp);
                     charIdx10++;
-                    Thread.Sleep(30);
+                    Thread.Sleep(10); // reduced from 30ms — PostMessage is async, 10ms is safe
 
-                    // [ZOOM] Hook 2: Update magnifier after each character
+                    // [ZOOM] Hook 2: Update status text only (NO capture per character — major perf win!)
                     if (zoomHost?.IsAlive == true)
                     {
-                        try
-                        {
-                            var png = CaptureControlPng(targetForm.Handle, targetHwnd);
-                            if (png != null) zoomHost.UpdateImage(png);
-                            zoomHost.UpdateStatus($"Typing: {charIdx10}/{text.Length}  \"{text[..charIdx10]}\"");
-                        }
-                        catch { /* best-effort */ }
+                        zoomHost.UpdateStatus($"Typing: {charIdx10}/{text.Length}  \"{text[..charIdx10]}\"");
                     }
                 }
-                Thread.Sleep(200);
+                perfType.Stop();
+                Thread.Sleep(100); // allow message pump to process WM_CHAR + repaint before OCR
 
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($"[typed {text.Length} chars, NO focus] ");
+                Console.Write($"[typed {text.Length} chars, NO focus, home={perfHome.ElapsedMilliseconds}ms type={perfType.ElapsedMilliseconds}ms] ");
                 Console.ResetColor();
 
-                // [ZOOM] Hook 2b: After typing — PrintWindow capture (Z-order safe, ignores overlay)
-                // Desktop capture would show the overlay itself → use PrintWindow for display
+                // Stop live capture before manual captures (OCR verification etc.)
+                var ticks = zoomHost?.TickCount ?? 0;
+                zoomHost?.StopLiveCapture();
+                Console.Write($"[live-ticks={ticks}] ");
+
+                // [ZOOM] Hook 2b: Single capture after all typing complete (not per-char!)
+                var perfZoomPost = Stopwatch.StartNew();
                 if (zoomHost?.IsAlive == true)
                 {
                     try
@@ -628,6 +669,7 @@ Examples:
                     }
                     catch { /* best-effort */ }
                 }
+                perfZoomPost.Stop();
 
                 // Step 2b: OCR verify BEFORE Enter
                 string? preOcr10 = null;
@@ -671,16 +713,22 @@ Examples:
                 Console.ResetColor();
 
                 // Step 3: Enter via PostMessage (m_bKeyDown flag needed for OnKeyUp query trigger)
+                var perfEnter = Stopwatch.StartNew();
                 if (sendEnter)
                 {
                     NativeMethods.PostMessageW(targetHwnd, 0x0100, (IntPtr)0x0D, MkLParam10(0x0D));
-                    Thread.Sleep(50);
+                    Thread.Sleep(20); // reduced from 50ms
                     NativeMethods.PostMessageW(targetHwnd, 0x0101, (IntPtr)0x0D, MkLParam10(0x0D, keyUp: true));
-                    Thread.Sleep(1500);
+                    Thread.Sleep(800); // reduced from 1500ms — data query needs time but not this much
                 }
+                perfEnter.Stop();
+
+                // Step 3b: Dismiss any VBScript popups that appeared during data load
+                TryDismissAlertPopups(win.Handle, mdiClient);
 
                 // Step 4: Verify
-                Thread.Sleep(300);
+                var perfVerify = Stopwatch.StartNew();
+                Thread.Sleep(200); // reduced from 300ms
                 bool ocrOk10 = ConfirmByOcrContains("m10");
 
                 var vSb10 = new StringBuilder(256);
@@ -727,7 +775,14 @@ Examples:
                     Console.ResetColor();
                 }
 
-                // [ZOOM] Hook 4: Show pass/fail result + desktop screenshot + slow fade
+                perfVerify.Stop();
+
+                // [PERF] Performance summary
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[PERF] total={perfTotal.ElapsedMilliseconds}ms home={perfHome.ElapsedMilliseconds}ms type={perfType.ElapsedMilliseconds}ms zoom-post={perfZoomPost.ElapsedMilliseconds}ms enter={perfEnter.ElapsedMilliseconds}ms verify={perfVerify.ElapsedMilliseconds}ms ");
+                Console.ResetColor();
+
+                // [ZOOM] Hook 4: Show pass/fail result + desktop screenshot + quick fade
                 if (zoomHost?.IsAlive == true)
                 {
                     try
@@ -754,7 +809,7 @@ Examples:
                             int zShotY = zShotRect.Top + (zShotRect.Height / 2) - (zShotH / 2);
                             if (zShotX < 0) zShotX = 0;
                             if (zShotY < 0) zShotY = 0;
-                            Thread.Sleep(300); // brief wait for WPF to render result state
+                            Thread.Sleep(100); // brief wait for WPF to render result state (reduced from 300ms)
                             using var zShotBmp = ScreenCapture.CaptureScreenRegion(zShotX, zShotY, zShotW, zShotH);
                             // Save to logs
                             var zShotPath = Path.Combine(DataDir, "logs", $"zoom_result_{DateTime.Now:HHmmss}.png");
@@ -779,7 +834,7 @@ Examples:
 
                         // Fire-and-forget: overlay fades on its own STA thread
                         // No Thread.Sleep — main thread proceeds immediately for fast successive inputs
-                        zoomHost.BeginFadeOut(3000, 800); // 3s hold + 0.8s fade → auto InvokeShutdown
+                        zoomHost.BeginFadeOut(1500, 400); // 1.5s hold + 0.4s fade → faster cleanup
                         zoomHost = null; // hand off lifecycle to STA thread (IsBackground=true)
                     }
                     catch { zoomHost?.Dispose(); zoomHost = null; }
@@ -2086,6 +2141,128 @@ Examples:
         catch { /* best-effort */ }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Auto-dismiss alert/error dialogs that block MDI form access.
+    /// Checks both title AND message text (Static controls) for alert keywords.
+    /// Uses BM_CLICK on "확인" button — fully focusless.
+    /// Handles: 알림!!, VBScript 오류, 스크립트 오류, 접속 끊김 알림 등
+    /// </summary>
+    /// <summary>
+    /// Dismiss VBScript/alert popups in a loop until no more appear.
+    /// Returns total number of popups dismissed.
+    /// </summary>
+    static int TryDismissAlertPopups(IntPtr mainWindow, IntPtr mdiClient, int maxRounds = 10)
+    {
+        int totalDismissed = 0;
+        try
+        {
+            var titleKeywords = new[] { "알림", "안내", "경고", "alert" };
+            var msgKeywords = new[] { "오류", "에러", "error", "스크립트", "script" };
+
+            for (int round = 0; round < maxRounds; round++)
+            {
+                var dismissed = new List<string>();
+
+                // Collect all #32770 dialogs: children + same-process top-level
+                NativeMethods.GetWindowThreadProcessId(mainWindow, out uint targetPid);
+                var dialogsToCheck = new List<IntPtr>();
+
+                NativeMethods.EnumChildWindows(mainWindow, (hWnd, _) =>
+                {
+                    if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+                    var sb = new StringBuilder(64);
+                    NativeMethods.GetClassNameW(hWnd, sb, 64);
+                    if (sb.ToString() == "#32770") dialogsToCheck.Add(hWnd);
+                    return true;
+                }, IntPtr.Zero);
+
+                NativeMethods.EnumWindows((hWnd, _) =>
+                {
+                    if (hWnd == mainWindow) return true;
+                    if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+                    NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                    if (pid != targetPid) return true;
+                    var sb = new StringBuilder(64);
+                    NativeMethods.GetClassNameW(hWnd, sb, 64);
+                    if (sb.ToString() == "#32770") dialogsToCheck.Add(hWnd);
+                    return true;
+                }, IntPtr.Zero);
+
+                foreach (var hDlg in dialogsToCheck)
+                {
+                    var sb = new StringBuilder(256);
+                    NativeMethods.GetWindowTextW(hDlg, sb, 256);
+                    string dlgTitle = sb.ToString();
+
+                    // Read Static control text (dialog message body)
+                    var msgParts = new List<string>();
+                    NativeMethods.EnumChildWindows(hDlg, (hChild, _) =>
+                    {
+                        var csb = new StringBuilder(64);
+                        NativeMethods.GetClassNameW(hChild, csb, 64);
+                        string cc = csb.ToString();
+                        if (cc == "Static" || cc.Contains("STATIC"))
+                        {
+                            var tsb = new StringBuilder(512);
+                            NativeMethods.GetWindowTextW(hChild, tsb, 512);
+                            string t = tsb.ToString();
+                            if (!string.IsNullOrWhiteSpace(t)) msgParts.Add(t);
+                        }
+                        return true;
+                    }, IntPtr.Zero);
+                    string dlgMessage = string.Join(" ", msgParts);
+
+                    bool titleMatch = titleKeywords.Any(k =>
+                        dlgTitle.Contains(k, StringComparison.OrdinalIgnoreCase));
+                    bool msgMatch = msgKeywords.Any(k =>
+                        dlgMessage.Contains(k, StringComparison.OrdinalIgnoreCase));
+                    if (!titleMatch && !msgMatch) continue;
+
+                    // Find "확인" or "OK" button
+                    IntPtr hBtn = IntPtr.Zero;
+                    NativeMethods.EnumChildWindows(hDlg, (hChild, _) =>
+                    {
+                        var csb = new StringBuilder(64);
+                        NativeMethods.GetClassNameW(hChild, csb, 64);
+                        if (!csb.ToString().Contains("Button")) return true;
+                        csb.Clear();
+                        NativeMethods.GetWindowTextW(hChild, csb, 64);
+                        string btnText = csb.ToString();
+                        if (btnText == "확인" || btnText == "OK" || btnText == "예" || btnText == "Yes")
+                        { hBtn = hChild; return false; }
+                        return true;
+                    }, IntPtr.Zero);
+
+                    if (hBtn != IntPtr.Zero)
+                    {
+                        NativeMethods.PostMessageW(hBtn, 0x00F5 /*BM_CLICK*/, IntPtr.Zero, IntPtr.Zero);
+                        dismissed.Add("click");
+                    }
+                    else
+                    {
+                        NativeMethods.PostMessageW(hDlg, 0x0010 /*WM_CLOSE*/, IntPtr.Zero, IntPtr.Zero);
+                        dismissed.Add("close");
+                    }
+                }
+
+                totalDismissed += dismissed.Count;
+
+                if (dismissed.Count == 0) break; // no more popups — done!
+                Thread.Sleep(200); // wait for dialog close + check for more
+            }
+
+            if (totalDismissed > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write("  [BLOCK] ");
+                Console.ResetColor();
+                Console.WriteLine($"Auto-dismissed {totalDismissed} popup(s) before input");
+            }
+        }
+        catch { /* best-effort */ }
+        return totalDismissed;
     }
 }
 
