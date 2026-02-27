@@ -22,6 +22,11 @@ Scenario Commands:
   validate <scenario.yaml>
       Validate a YAML scenario file (syntax + structure check).
 
+Search Commands:
+  find <keyword> [--deep] [--limit N] [--process <name>] [--class <name>]
+      Unified search: window titles + UIA accessibility elements.
+      --deep: Thorough UIA tree search (depth 12, slower but finds more).
+
 Inspection Commands:
   inspect <window-title> [--depth N] [--win32] [--filter <pattern>]
       Dump UI Automation tree of a window (by title substring match).

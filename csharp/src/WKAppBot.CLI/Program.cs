@@ -132,6 +132,7 @@ internal partial class Program
                 "telegram" => TelegramCommand(restArgs),
                 "zoom-demo" => ZoomDemoCommand(restArgs),
                 "win-click" => WinClickCommand(restArgs),
+                "find" => FindCommand(restArgs),
                 "windows" => WindowsCommand(restArgs),
                 "uia-test" => UiaTestCommand(restArgs),
                 "tick" => TickCommand(restArgs),

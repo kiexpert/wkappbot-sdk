@@ -9,6 +9,22 @@ namespace WKAppBot.CLI;
 // partial class: inspect, focus, watch, capture commands + watch helpers
 internal partial class Program
 {
+    // ── find (unified search — absorbs windows --uia + inspect --filter) ──
+
+    static int FindCommand(string[] args)
+    {
+        if (args.Length == 0 || (args.Length == 1 && args[0].StartsWith("--")))
+            return Error("Usage: wkappbot find <keyword> [--deep] [--limit N] [--process <name>] [--class <name>]\n" +
+                         "  Unified search: finds windows by title AND UIA elements by Name/AutomationId.\n" +
+                         "  --deep: Deeper UIA tree search (depth 12, slower but thorough)");
+
+        // Preprocess: inject --uia (or --uia-deep for --deep) and forward to WindowsCommand
+        var forwarded = new List<string>(args);
+        bool hasDeep = forwarded.Remove("--deep");
+        forwarded.Add(hasDeep ? "--uia-deep" : "--uia");
+        return WindowsCommand(forwarded.ToArray());
+    }
+
     // ── inspect ────────────────────────────────────────────────
 
     static int InspectCommand(string[] args)
@@ -844,7 +860,8 @@ internal partial class Program
         string? filterClass = GetArgValue(args, "--class");
         bool showAll = args.Contains("--all"); // include zero-size/invisible
         bool deep = args.Contains("--deep");   // include child windows (EnumChildWindows)
-        bool uiaSearch = args.Contains("--uia"); // also search UIA elements
+        bool uiaDeep = args.Contains("--uia-deep"); // deep UIA search (find --deep)
+        bool uiaSearch = uiaDeep || args.Contains("--uia"); // also search UIA elements
         int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 0; // 0=unlimited
         bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null;
 
@@ -938,7 +955,8 @@ internal partial class Program
         int uiaMatchWindows = 0;
 
         // EnumWindows enumerates in Z-order (front to back) — no re-sort needed!
-        string mode = uiaSearch ? "windows+uia (Z-order ★=foreground)"
+        string mode = uiaDeep ? "find --deep (Z-order ★=foreground)"
+            : uiaSearch ? "find (Z-order ★=foreground)"
             : deep ? "windows (deep, Z-order ★=foreground)"
             : "windows (Z-order ★=foreground)";
         Console.WriteLine($"── {mode} ──");
@@ -1026,7 +1044,9 @@ internal partial class Program
                     : r.title.Contains(filterTitle, StringComparison.OrdinalIgnoreCase);
 
                 // UIA search (regardless of title match — show bonus elements if title matches too)
-                var uiaMatches = UiaLocator.QuickSearch(hWnd, filterTitle);
+                var uiaMatches = uiaDeep
+                    ? UiaLocator.QuickSearch(hWnd, filterTitle, maxDepth: 12, maxResults: 10, maxVisited: 1500, timeoutMs: 8000)
+                    : UiaLocator.QuickSearch(hWnd, filterTitle);
 
                 if (!titleMatch && uiaMatches.Count == 0) return true; // no match at all
 
@@ -1111,7 +1131,8 @@ internal partial class Program
         Console.WriteLine();
         string uiaNote = uiaSearch ? $", UIA matched in {uiaMatchWindows} window(s)" : "";
         string limitNote = limit > 0 ? $", --limit {limit}" : "";
-        Console.WriteLine($"Total: {totalCount}{uiaNote} (--uia: accessibility search, --deep: child windows{limitNote})");
+        string hint = uiaSearch ? "(--deep: thorough search)" : "(--uia: accessibility search, --deep: child windows)";
+        Console.WriteLine($"Total: {totalCount}{uiaNote} {hint}{limitNote}");
         return 0;
     }
 }
