@@ -5,10 +5,12 @@ internal partial class Program
 {
     static int PrintUsage()
     {
-        Console.WriteLine(@"
-WKAppBot - Windows App Automation Test Framework
+        var ver = typeof(Program).Assembly.GetName().Version;
+        var verStr = ver != null ? $" v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
+        Console.WriteLine($@"
+WKAppBot{verStr} - Windows App Automation Test Framework
 Building the Eyes of Claude to realize WilKim's vision of autonomous secretarial ops.
-All AI agents welcome ??Claude, GPT, Gemini, Copilot, and beyond.
+All AI agents welcome — Claude, GPT, Gemini, Copilot, and beyond.
 Your testing, coding, and ideas are appreciated. Let's build together.
 
 Usage:
@@ -21,8 +23,15 @@ Scenario Commands:
       Validate a YAML scenario file (syntax + structure check).
 
 Inspection Commands:
-  inspect <window-title> [--depth N] [--win32]
+  inspect <window-title> [--depth N] [--win32] [--filter <pattern>]
       Dump UI Automation tree of a window (by title substring match).
+      --filter: Search A11Y tree for matching elements (supports A11Y: prefix).
+  windows [filter] [--deep] [--process <name>] [--class <name>] [--limit N] [--all]
+      List visible windows in Z-order (front to back). ★=foreground.
+      --deep: Include MDI child windows. --limit N: Stop after N matches.
+  win-click <window-title> <x> <y> [--uia]
+      Click a coordinate inside a window + detect UIA element at point.
+      --uia: Show UIA element details with zoom overlay.
   focus [--title <text>] [--delay N] [--depth N] [--win32] [-b]
       Inspect the currently focused window (countdown + UIA/Win32 dump).
   watch [--duration N] [--live] [--win32] [--interval N] [--save file]
@@ -55,6 +64,14 @@ Dialog & Toolbar Commands:
   toolbar-ocr <window-title> [--click ""text""] [--save]
       OCR-scan MFC toolbar panes and show recognized button text.
       --click: Click the region matching text. --save: Save toolbar screenshots.
+  titlebar <window-title> <form-id> [button-index] [--ocr] [--save]
+      Access custom title bar buttons (ETK_CHILDFRAME, focusless PostMessage).
+      --ocr: Show OCR labels for button identification.
+
+UIA Testing Commands:
+  uia-test <window-title> [--invoke <name>]
+      Systematic 7-phase MFC UIA pattern test with zoom overlay.
+      --invoke: Quick invoke a single button by name (focusless).
 
 Chart Analysis Commands:
   chart-analyze <window-title|image.png> [--form <id>] [--candles N] [options]
@@ -158,7 +175,7 @@ Rules (for fellow Claude Code agents):
 
 Data Directory:
   Runtime data (profiles, logs, handlers, output) stored in:
-  {exe_dir}/wkappbot.hq/
+  {{exe_dir}}/wkappbot.hq/
 ");
         return 0;
     }
@@ -195,6 +212,14 @@ Data Directory:
             EmitEyeTick("tick", tag, status);
         }
         Console.WriteLine($"[TICK] tag={tag} status={status}");
+        return 0;
+    }
+
+    static int PrintVersion()
+    {
+        var ver = typeof(Program).Assembly.GetName().Version;
+        var verStr = ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "unknown";
+        Console.WriteLine($"wkappbot v{verStr}");
         return 0;
     }
 
