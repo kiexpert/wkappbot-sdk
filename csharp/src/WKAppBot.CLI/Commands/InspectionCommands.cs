@@ -1063,11 +1063,29 @@ internal partial class Program
                 if (!string.IsNullOrEmpty(m.NamePath))
                 {
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.Write($"  path={m.NamePath}");
+                    Console.Write($"  path={CollapsePath(m.NamePath)}");
                 }
                 Console.ResetColor();
                 Console.WriteLine();
             }
+        }
+
+        // Collapse consecutive same-name segments for display (VS Code style)
+        // Pane/Pane/Pane/Pane → Pane/...   (3+ repeats → keep first + ...)
+        string CollapsePath(string path)
+        {
+            var segs = path.Split('/');
+            var result = new List<string>();
+            int i = 0;
+            while (i < segs.Length)
+            {
+                result.Add(segs[i]);
+                int run = 1;
+                while (i + run < segs.Length && segs[i + run] == segs[i]) run++;
+                if (run >= 3) result.Add("...");
+                i += run;
+            }
+            return string.Join("/", result);
         }
 
         // Build regex from path pattern for partial matching against full UIA name paths.
@@ -1122,10 +1140,12 @@ internal partial class Program
                         ? UiaLocator.QuickSearch(hWnd, "", maxDepth: 12, maxResults: 5000, maxVisited: 3000, timeoutMs: 10000)
                         : UiaLocator.QuickSearch(hWnd, "", maxDepth: 4, maxResults: 2000, maxVisited: 1000, timeoutMs: 5000);
 
-                    // Match full path: windowTitle/element/name/path (partial match!)
+                    // Match full path: windowTitle/[Type]Name/... (partial match!)
+                    // Skip [Text] elements — conversation content noise (self-referencing echo)
                     var uiaMatches = new List<UiaQuickMatch>();
                     foreach (var el in allElements)
                     {
+                        if (el.ControlType == "Text") continue;
                         string fullPath = string.IsNullOrEmpty(el.NamePath)
                             ? r.title : $"{r.title}/{el.NamePath}";
                         if (pathRx.IsMatch(fullPath))
