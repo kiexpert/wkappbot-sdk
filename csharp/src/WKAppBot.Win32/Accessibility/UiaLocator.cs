@@ -1150,9 +1150,9 @@ public sealed class UiaLocator : IDisposable
                 try { ct = el.Properties.ControlType.ValueOrDefault.ToString(); }
                 catch { ct = "?"; }
 
-                // Build name path: use Name if available, else AutomationId, else ControlType
-                string segName = !string.IsNullOrEmpty(name) ? name
-                    : !string.IsNullOrEmpty(aid) ? aid : ct;
+                // Build name path segment: [Type:aid]Name — type+id+name as one "folder"
+                // [Button:radix-_r_42_]사이드바, [Pane]Claude, [Pane] (unnamed, no aid)
+                string segName = !string.IsNullOrEmpty(aid) ? $"[{ct}:{aid}]{name}" : $"[{ct}]{name}";
                 string currentPath = depth == 0 ? "" : string.IsNullOrEmpty(parentPath) ? segName : $"{parentPath}/{segName}";
 
                 // Match on Name or AutomationId (skip root element)
