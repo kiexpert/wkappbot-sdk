@@ -34,6 +34,18 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool IsIconic(IntPtr hWnd);
 
+    // ── Screen Reader announcement (SPI_SETSCREENREADER) ──
+    // Tells all apps "a screen reader is running" → Chromium/Electron auto-enable A11Y tree
+    public const uint SPI_GETSCREENREADER = 0x0046;
+    public const uint SPI_SETSCREENREADER = 0x0047;
+    public const uint SPIF_SENDCHANGE = 0x0002;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SystemParametersInfoW(uint uiAction, uint uiParam, out int pvParam, uint fWinIni);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SystemParametersInfoW(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
+
     [DllImport("user32.dll")]
     public static extern bool IsWindowEnabled(IntPtr hWnd);
 
