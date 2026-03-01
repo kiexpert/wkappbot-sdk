@@ -90,7 +90,7 @@ internal partial class Program
             // eye tick은 one-shot이라 Eye를 띄워도 cascade 안 됨 → 자동 실행 대상!
             // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
             var isEyeGlobal = command == "eye" && (restArgs.Length == 0 || restArgs[0] != "tick");
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" || isEyeGlobal;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" || isEyeGlobal;
             if (!isExcluded)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
@@ -143,6 +143,7 @@ internal partial class Program
                 "tab-select" => TabSelectCommand(restArgs),
                 "cond-add" => CondAddCommand(restArgs),
                 "tick" => TickCommand(restArgs),
+                "newchat" => NewChatCommand(restArgs),
                 "prompt-test" => PromptTestCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),
