@@ -666,6 +666,107 @@ public static class AppScanner
         return "control";
     }
 
+    // ── Quick Touch Controls (lightweight ExperienceDb accumulation) ──
+
+    /// <summary>
+    /// Quick per-control experience accumulation WITHOUT OCR.
+    /// Uses PrintWindow bitmap + WM_GETTEXT only — much lighter than LearnFormsWithOcr.
+    /// Called from snapshot/capture commands to accumulate experience on every encounter.
+    /// </summary>
+    /// <param name="scanResult">AppScanResult from Scan()</param>
+    /// <param name="expDb">Experience DB to store learned controls</param>
+    /// <param name="maxDepth">Max tree depth for control collection (default: 4)</param>
+    /// <returns>(forms touched, controls touched, screenshots captured)</returns>
+    public static (int forms, int controls, int screenshots) QuickTouchControls(
+        AppScanResult scanResult, ExperienceDb expDb, int maxDepth = 4)
+    {
+        int formCount = 0, controlCount = 0, screenshotCount = 0;
+
+        var formGroups = scanResult.Forms
+            .Where(f => f.FormId != null && f.IsVisible && f.Rect.Width > 50 && f.Rect.Height > 50)
+            .GroupBy(f => f.FormId!)
+            .ToList();
+
+        foreach (var group in formGroups)
+        {
+            var formId = group.Key;
+            var form = group.First();
+
+            try
+            {
+                // Skip minimized forms
+                if (NativeMethods.IsIconic(form.Handle)) continue;
+
+                // Capture form bitmap via PrintWindow (Z-order safe)
+                using var formBmp = ScreenCapture.CaptureWindow(form.Handle);
+                if (formBmp == null || ScreenCapture.IsBlankBitmap(formBmp)) continue;
+
+                var formRect = form.Rect;
+                formCount++;
+
+                // Collect leaf + parent controls
+                var (leafControls, parentControls) = CollectAllControls(form.Handle, formRect, maxDepth);
+
+                // Touch each control (screenshot on first encounter + WM_GETTEXT text history)
+                foreach (var ctrl in leafControls)
+                {
+                    try
+                    {
+                        var ctrlRect = new System.Drawing.Rectangle(
+                            ctrl.Info.Rect.Left, ctrl.Info.Rect.Top,
+                            ctrl.Info.Rect.Width, ctrl.Info.Rect.Height);
+                        var fRect = new System.Drawing.Rectangle(
+                            formRect.Left, formRect.Top,
+                            formRect.Right - formRect.Left, formRect.Bottom - formRect.Top);
+
+                        // WM_GETTEXT for text history (best-effort)
+                        string? wmText = null;
+                        try { wmText = NativeMethods.GetWindowTextW(ctrl.Info.Handle); }
+                        catch { }
+
+                        bool captured = expDb.TouchControl(
+                            formId, ctrl.Info.ControlId,
+                            formBmp, fRect, ctrlRect,
+                            ocrText: null, wmText: wmText,
+                            treePath: ctrl.TreePath);
+
+                        controlCount++;
+                        if (captured) screenshotCount++;
+                    }
+                    catch { /* best-effort per control */ }
+                }
+
+                // Parent controls (containers) — screenshot only, no text
+                foreach (var parent in parentControls)
+                {
+                    try
+                    {
+                        var ctrlRect = new System.Drawing.Rectangle(
+                            parent.Info.Rect.Left, parent.Info.Rect.Top,
+                            parent.Info.Rect.Width, parent.Info.Rect.Height);
+                        var fRect = new System.Drawing.Rectangle(
+                            formRect.Left, formRect.Top,
+                            formRect.Right - formRect.Left, formRect.Bottom - formRect.Top);
+
+                        expDb.TouchControl(
+                            formId, parent.Info.ControlId,
+                            formBmp, fRect, ctrlRect,
+                            treePath: parent.TreePath);
+
+                        controlCount++;
+                    }
+                    catch { /* best-effort per control */ }
+                }
+            }
+            catch { /* best-effort per form */ }
+        }
+
+        // Save all accumulated experience
+        try { expDb.SaveAll(); } catch { }
+
+        return (formCount, controlCount, screenshotCount);
+    }
+
     // ── Form-level Text Snapshot (WM_GETTEXT) ─────────────────
 
     /// <summary>

@@ -112,9 +112,15 @@ internal sealed class ClickZoomHelper : IDisposable
                 }
             }
 
-            // Clamp to screen bounds
-            if (zX < 0) zX = 0;
-            if (zY < 0) zY = 0;
+            // Clamp to virtual screen bounds (supports multi-monitor with negative coordinates)
+            int vsX = NativeMethods.GetSystemMetrics(76 /*SM_XVIRTUALSCREEN*/);
+            int vsY = NativeMethods.GetSystemMetrics(77 /*SM_YVIRTUALSCREEN*/);
+            int vsW = NativeMethods.GetSystemMetrics(78 /*SM_CXVIRTUALSCREEN*/);
+            int vsH = NativeMethods.GetSystemMetrics(79 /*SM_CYVIRTUALSCREEN*/);
+            if (zX < vsX) zX = vsX;
+            if (zY < vsY) zY = vsY;
+            if (zX + zW > vsX + vsW) zX = vsX + vsW - zW;
+            if (zY + zH > vsY + vsH) zY = vsY + vsH - zH;
 
             string modeName = mode switch
             {

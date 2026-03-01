@@ -18,6 +18,7 @@ using WKAppBot.WebBot;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Native;
+using WKAppBot.Vision;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
@@ -542,6 +543,16 @@ internal partial class Program
                         catch { continue; }
                     }
                 }
+
+                // ★ 2b. OCR fallback — Claude Desktop sometimes exposes NO UIA Text elements
+                // When the UIA tree is sparse (no Text children under RootWebArea),
+                // fall back to OCR screenshot analysis to detect rate limit text.
+                // This handles Claude Desktop updates that change accessibility structure.
+                if (allTexts == null || allTexts.Length == 0)
+                {
+                    var ocrResult = TryDetectRateLimitViaOcr(claudeHwnd);
+                    if (ocrResult != null) return ocrResult;
+                }
             }
             catch { }
 
@@ -704,6 +715,65 @@ internal partial class Program
             return latestText;
         }
         catch { return null; }
+    }
+
+    // ── OCR-based rate limit detection ──────────────────────────────────────
+    // Throttle: max once per 5 seconds to avoid performance overhead in the polling loop.
+    private static DateTime _lastOcrRateLimitCheck = DateTime.MinValue;
+    private static readonly TimeSpan OcrRateLimitInterval = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// OCR fallback for rate limit detection when UIA tree has no Text elements.
+    /// Captures the Claude Desktop window via PrintWindow and runs OCR to find
+    /// "hit your limit" / "resets Xam/pm" text.
+    /// Throttled to max once per 5 seconds to avoid performance overhead.
+    /// </summary>
+    static Tuple<string, string>? TryDetectRateLimitViaOcr(IntPtr claudeHwnd)
+    {
+        // Throttle: skip if checked recently
+        if (DateTime.UtcNow - _lastOcrRateLimitCheck < OcrRateLimitInterval)
+            return null;
+        _lastOcrRateLimitCheck = DateTime.UtcNow;
+
+        try
+        {
+            // Capture window via PrintWindow (Z-order safe, focusless)
+            using var bitmap = ScreenCapture.CaptureWindow(claudeHwnd);
+            if (bitmap == null || ScreenCapture.IsBlankBitmap(bitmap))
+                return null;
+
+            // Run OCR — crop upper portion only (rate limit banner is at top)
+            // Cropping to top 40% reduces OCR time significantly
+            var cropHeight = Math.Min(bitmap.Height * 2 / 5, bitmap.Height);
+            using var topCrop = bitmap.Clone(
+                new Rectangle(0, 0, bitmap.Width, cropHeight),
+                bitmap.PixelFormat);
+
+            var ocr = new SimpleOcrAnalyzer();
+            var ocrResult = ocr.RecognizeAll(topCrop).GetAwaiter().GetResult();
+            if (ocrResult == null || string.IsNullOrEmpty(ocrResult.FullText))
+                return null;
+
+            var fullText = ocrResult.FullText;
+
+            // Check for rate limit phrases in OCR text
+            if (fullText.Contains("hit your limit", StringComparison.OrdinalIgnoreCase) ||
+                fullText.Contains("hit your usage limit", StringComparison.OrdinalIgnoreCase) ||
+                fullText.Contains("한도를 초과", StringComparison.OrdinalIgnoreCase) ||
+                fullText.Contains("사용 한도", StringComparison.OrdinalIgnoreCase))
+            {
+                // Extract reset time from OCR text
+                var resetTime = ParseResetTime(fullText);
+                var displayText = resetTime != null
+                    ? $"한도 초과 — {resetTime.Value:HH:mm}에 리셋"
+                    : "한도 초과";
+
+                return Tuple.Create("rate_limit", displayText);
+            }
+        }
+        catch { /* OCR is best-effort fallback */ }
+
+        return null;
     }
 
     /// <summary>

@@ -130,6 +130,23 @@ Examples:
         Console.WriteLine("  ✓ Elevated — input enabled");
         Console.ResetColor();
 
+        // Load ExperienceDb from matching profile (best-effort)
+        ExperienceDb? expDb = null;
+        try
+        {
+            var profileStore = new ProfileStore();
+            string procName = "";
+            try { procName = System.Diagnostics.Process.GetProcessById((int)targetPid).ProcessName; } catch { }
+            var profileMatch = profileStore.FindByMatch(win.ClassName, "")
+                ?? (!string.IsNullOrEmpty(procName) ? profileStore.FindByMatch("", procName) : null);
+            if (profileMatch != null)
+            {
+                var expDir = Path.Combine(profileStore.ProfileDir, $"{profileMatch.Value.name}_exp");
+                expDb = new ExperienceDb(expDir);
+            }
+        }
+        catch { /* best-effort — proceed without experience DB */ }
+
         // ── Pre-input: auto-dismiss "알림!!" / alert popups that block MDI access ──
         TryDismissAlertPopups(win.Handle, mdiClient);
 
@@ -194,6 +211,12 @@ Examples:
             Console.ResetColor();
         }
         Console.WriteLine($"Form: {targetForm.Title} @({targetForm.Rect.Left},{targetForm.Rect.Top} {targetForm.Rect.Width}x{targetForm.Rect.Height})");
+
+        // Show past failure history + knowhow for this form (if any)
+        if (expDb != null)
+        {
+            ShowFormExperienceHints(expDb, targetFormId, actionName: "input");
+        }
 
         // === INPUT READINESS CHECK ===
         // Verify the target form is in a state where input can succeed
@@ -314,6 +337,12 @@ Examples:
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine($" → \"{text}\"");
         Console.ResetColor();
+
+        // Show control-level experience hints (past failures + knowhow for this cid)
+        if (expDb != null)
+        {
+            ShowControlExperienceHints(expDb, targetFormId, targetCid, actionName: "input");
+        }
 
         bool success = false;
         const bool RequireOcrForNonA11y = true;

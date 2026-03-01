@@ -12,9 +12,11 @@ public static class KeyboardInput
     /// <summary>
     /// Type a text string using Unicode input events.
     /// Works with any language (Korean, etc.) without VK mapping.
+    /// BLOCKED by FocuslessGuard (SendInput).
     /// </summary>
     public static void TypeText(string text)
     {
+        FocuslessGuard.AssertAllowed("SendInput(keyboard TypeText)");
         foreach (char ch in text)
         {
             var inputs = new INPUT[2];
@@ -92,9 +94,11 @@ public static class KeyboardInput
 
     /// <summary>
     /// Press and release a single key by name.
+    /// BLOCKED by FocuslessGuard (SendInput).
     /// </summary>
     public static void PressKey(string keyName)
     {
+        FocuslessGuard.AssertAllowed("SendInput(keyboard PressKey)");
         ushort vk = NameToVk(keyName);
         KeyDown(vk);
         Thread.Sleep(30);
@@ -103,9 +107,11 @@ public static class KeyboardInput
 
     /// <summary>
     /// Press a hotkey combination (e.g., ["ctrl", "s"]).
+    /// BLOCKED by FocuslessGuard (SendInput).
     /// </summary>
     public static void Hotkey(IReadOnlyList<string> keys)
     {
+        FocuslessGuard.AssertAllowed("SendInput(keyboard Hotkey)");
         // Press modifiers first, then the final key
         var vks = keys.Select(NameToVk).ToList();
 
@@ -127,9 +133,11 @@ public static class KeyboardInput
 
     /// <summary>
     /// Press a key down (no release).
+    /// BLOCKED by FocuslessGuard (SendInput).
     /// </summary>
     public static void KeyDown(ushort vk)
     {
+        FocuslessGuard.AssertAllowed("SendInput(keyboard KeyDown)");
         var inputs = new INPUT[1];
         inputs[0].type = INPUT.INPUT_KEYBOARD;
         inputs[0].u.ki.wVk = vk;
@@ -140,9 +148,11 @@ public static class KeyboardInput
 
     /// <summary>
     /// Release a key.
+    /// BLOCKED by FocuslessGuard (SendInput).
     /// </summary>
     public static void KeyUp(ushort vk)
     {
+        FocuslessGuard.AssertAllowed("SendInput(keyboard KeyUp)");
         var inputs = new INPUT[1];
         inputs[0].type = INPUT.INPUT_KEYBOARD;
         inputs[0].u.ki.wVk = vk;

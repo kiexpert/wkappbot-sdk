@@ -68,6 +68,12 @@ internal partial class Program
     static long _dirtyPromptLength = -1;
     static DateTime _dirtyPromptWriteUtc = DateTime.MinValue;
 
+    // ── FSW hybrid: event-driven dirty flags (set by FileSystemWatcher callbacks) ──
+    static volatile bool _fswTickDirty;
+    static volatile bool _fswPromptDirty;
+    static FileSystemWatcher? _fswTick;
+    static FileSystemWatcher? _fswPrompt;
+
     static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs)
     {
         if (posX < 0 || posY < 0)
@@ -284,12 +290,22 @@ internal partial class Program
             WKAppBot.Win32.Native.NativeMethods.ES_DISPLAY_REQUIRED);
         _lastKeepAwakeUtc = DateTime.UtcNow;
 
+        // ── FSW hybrid: event-driven file change detection ──
+        InitFileWatchers();
+
+        // ── Context usage monitor + auto-relay ──
+        bool contextWarning90Sent = false, contextWarning95Sent = false;
+        bool contextRelayPromptSent = false;   // 90%: "준비해!" prompt delivered
+        bool contextRelayExecuted = false;     // 95%: new chat opened + handoff pasted
+        string? lastContextJsonlPath = null;
+        const double ContextLimitMB = 40.0; // empirical: sessions hit limit ~40MB JSONL
+
         int frameCount = 0;
         while (host.IsAlive && !cts.IsCancellationRequested)
         {
             // ── Core tick: read ticks + sessions ──
             var forceFull = ShouldForceFullLoad();
-            var (tickDirty, promptDirty) = CheckGlobalDirtyFlags();
+            var (tickDirty, promptDirty) = CheckGlobalDirtyFlags(forceFull);
             if (!TryRunOneGlobalTick(host, timeoutMs: 3000, forceFull, tickDirty, promptDirty))
             {
                 Console.WriteLine("[EYE] tick timeout (>3s) - self terminate");
@@ -342,18 +358,21 @@ internal partial class Program
                             }
                             else if (wasRateLimited)
                             {
+                                // ★ 다른 상태(executing/prompt_ready/permission 등) 감지 = 리밋 해제!
+                                // 시간 조건 없이 즉시 해제 (유저 요청: "다른 상태가 감지되면 리밋이 풀린 것")
+                                bool stateChanged = true; // claudeStatus is NOT rate_limit → 상태 변화
                                 var now = DateTime.Now;
                                 bool cooldownPassed = rateLimitDetectedAt != null &&
                                     (now - rateLimitDetectedAt.Value).TotalMinutes >= RateLimitCooldownMinutes;
                                 bool resetTimePassed = rateLimitResetTime != null && now >= rateLimitResetTime.Value;
 
-                                if (cooldownPassed || resetTimePassed)
+                                if (stateChanged || cooldownPassed || resetTimePassed)
                                 {
                                     wasRateLimited = false;
                                     rateLimitDetectedAt = null;
                                     rateLimitResetTime = null;
                                     Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.WriteLine($"[EYE] Rate limit cleared (cooldown={cooldownPassed}, resetTime={resetTimePassed})");
+                                    Console.WriteLine($"[EYE] Rate limit cleared (stateChanged={stateChanged}, newState={claudeStatus.Item1}, cooldown={cooldownPassed}, resetTime={resetTimePassed})");
                                     Console.ResetColor();
 
                                     // Execute on_limit_reset schedules
@@ -393,6 +412,193 @@ internal partial class Program
                                 }
                                 catch { }
                             }
+
+                            // ── Context usage monitor (~every 5s, same as Claude status) ──
+                            try
+                            {
+                                var claudeProjectsDir = Path.Combine(
+                                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                                    ".claude", "projects");
+                                if (Directory.Exists(claudeProjectsDir))
+                                {
+                                    // Find most recently modified .jsonl (= active session)
+                                    // Refresh() forces OS-level re-read (no .NET FileInfo attr cache)
+                                    var latest = Directory.EnumerateFiles(claudeProjectsDir, "*.jsonl", SearchOption.AllDirectories)
+                                        .Select(f => { try { var fi = new FileInfo(f); fi.Refresh(); return fi; } catch { return null; } })
+                                        .Where(fi => fi != null && fi.Length > 0)
+                                        .OrderByDescending(fi => fi!.LastWriteTimeUtc)
+                                        .FirstOrDefault();
+                                    if (latest != null)
+                                    {
+                                        // Staleness check: if JSONL hasn't been written in 2+ min,
+                                        // it's an old/abandoned session — skip context monitor.
+                                        // Prevents: eye restart → detects old 95% JSONL → false relay
+                                        var staleMinutes = (DateTime.UtcNow - latest.LastWriteTimeUtc).TotalMinutes;
+                                        if (staleMinutes > 2.0)
+                                        {
+                                            // Stale JSONL — likely old session, new chat has no history yet
+                                            // Reset all flags so we don't carry stale state
+                                            if (contextWarning90Sent || contextWarning95Sent)
+                                            {
+                                                Console.WriteLine($"[EYE] JSONL stale ({staleMinutes:F0}min) — skipping context monitor (new chat?)");
+                                                contextWarning90Sent = false;
+                                                contextWarning95Sent = false;
+                                                contextRelayPromptSent = false;
+                                                contextRelayExecuted = false;
+                                                lastContextJsonlPath = null;
+                                            }
+                                            goto skipContextMonitor;
+                                        }
+
+                                        var sizeMB = latest.Length / (1024.0 * 1024.0);
+                                        var pct = (int)(sizeMB / ContextLimitMB * 100);
+                                        // Reset warnings if session changed
+                                        if (lastContextJsonlPath != latest.FullName)
+                                        {
+                                            lastContextJsonlPath = latest.FullName;
+                                            contextWarning90Sent = false;
+                                            contextWarning95Sent = false;
+                                            contextRelayPromptSent = false;
+                                            contextRelayExecuted = false;
+                                        }
+                                        if (pct >= 95 && !contextRelayExecuted && !string.IsNullOrEmpty(slackBotToken))
+                                        {
+                                            // Send 95% Slack warning once
+                                            if (!contextWarning95Sent)
+                                            {
+                                                contextWarning95Sent = true;
+                                                Console.ForegroundColor = ConsoleColor.Red;
+                                                Console.WriteLine($"[EYE] 🚨 Context 95%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — auto-relay 대기 중...");
+                                                Console.ResetColor();
+                                                Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                                    $":rotating_light: *컨텍스트 95%!* ({sizeMB:F1}/{ContextLimitMB}MB) 릴레이 대기 중 (클롣 대기상태 + 인수인계 섹션 필요)",
+                                                    username: botUsername)).Wait(3000);
+                                            }
+
+                                            // ── Auto-relay preconditions ──
+                                            // 1. Claude must be idle (prompt_ready) — not executing/planning
+                                            // 2. CLAUDE.md must have handoff section (written by current Claude)
+                                            bool claudeIsIdle = claudeStatus?.Item1 == "prompt_ready";
+                                            bool handoffExists = HasHandoffSectionInClaudeMd();
+
+                                            if (!claudeIsIdle || !handoffExists)
+                                            {
+                                                // Not ready yet — retry next cycle (every 5s)
+                                                if (frameCount % 250 == 0) // log every ~25s to avoid spam
+                                                    Console.WriteLine($"[EYE] Auto-relay waiting: idle={claudeIsIdle}, handoff={handoffExists}");
+                                            }
+                                            else
+                                            {
+                                                contextRelayExecuted = true;
+                                                try
+                                                {
+                                                    // 1. Build handoff prompt from current session's JSONL
+                                                    var handoffPrompt = BuildHandoffPrompt(latest.FullName);
+                                                    Console.WriteLine($"[EYE] Handoff prompt built ({handoffPrompt.Length} chars)");
+
+                                                    // 2. Open new chat (Ctrl+N) + verify JSONL change
+                                                    using var relayHelper = new ClaudePromptHelper();
+                                                    var newChatOk = relayHelper.OpenNewChat();
+
+                                                    // 3. Always write handoff to MEMORY.md as durable backup
+                                                    //    → even if schedule fails, next session reads MEMORY.md
+                                                    var handoffSection = BuildHandoffSection(latest.FullName, handoffPrompt);
+                                                    WriteHandoffToClaudeMd(handoffSection);
+
+                                                    if (newChatOk)
+                                                    {
+                                                        // 4. Schedule handoff prompt for 1 minute later
+                                                        //    → Eye tick will execute it after new chat fully initializes
+                                                        var scheduleId = ScheduleManager.Add(new ScheduleItem
+                                                        {
+                                                            Type = "once",
+                                                            ExecuteAt = DateTime.Now.AddMinutes(1).ToString("O"),
+                                                            Prompt = handoffPrompt,
+                                                            Status = "pending",
+                                                            CreatedBy = "auto-relay",
+                                                            NotifySlack = true
+                                                        });
+                                                        Console.ForegroundColor = ConsoleColor.Green;
+                                                        Console.WriteLine($"[EYE] ✅ New chat opened! Handoff scheduled (id={scheduleId}, +1min) + CLAUDE.md written");
+                                                        Console.ResetColor();
+                                                        Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                                            $":sparkles: *새 채팅 열림!* 핸드오프 프롬프트 1분 후 자동 입력 예약됨 (id={scheduleId})\nCLAUDE.md에도 인수인계 섹션 작성됨 :memo:",
+                                                            username: botUsername)).Wait(3000);
+                                                    }
+                                                    else
+                                                    {
+                                                        Console.ForegroundColor = ConsoleColor.Red;
+                                                        Console.WriteLine("[EYE] ❌ Failed to open new chat! Handoff written to CLAUDE.md");
+                                                        Console.ResetColor();
+                                                        Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                                            $":x: 새 채팅 열기 실패! 수동으로 새 채팅을 열어주세요.\n:memo: CLAUDE.md에 인수인계 섹션이 작성되어 있으니, 새 세션이 자동으로 읽습니다.",
+                                                            username: botUsername)).Wait(3000);
+                                                    }
+                                                }
+                                                catch (Exception relayEx)
+                                                {
+                                                    Console.WriteLine($"[EYE] Auto-relay error: {relayEx.Message}");
+                                                    Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                                        $":x: 자동 릴레이 에러: {relayEx.Message}",
+                                                        username: botUsername)).Wait(3000);
+                                                }
+                                            }
+                                        }
+                                        else if (pct >= 90 && !contextWarning90Sent && !string.IsNullOrEmpty(slackBotToken))
+                                        {
+                                            contextWarning90Sent = true;
+                                            Console.ForegroundColor = ConsoleColor.Yellow;
+                                            Console.WriteLine($"[EYE] ⚠️ Context 90%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 핸드오프 준비 프롬프트 전달!");
+                                            Console.ResetColor();
+                                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                                $":warning: *컨텍스트 90% 소진!* ({sizeMB:F1}/{ContextLimitMB}MB) 핸드오프 프롬프트 전달 중...",
+                                                username: botUsername)).Wait(3000);
+
+                                            // ── Deliver "prepare handoff" prompt to current Claude session ──
+                                            if (!contextRelayPromptSent)
+                                            {
+                                                contextRelayPromptSent = true;
+                                                try
+                                                {
+                                                    using var prepHelper = new ClaudePromptHelper();
+                                                    var prompt = prepHelper.FindPrompt();
+                                                    if (prompt == null)
+                                                    {
+                                                        Thread.Sleep(2000);
+                                                        prompt = prepHelper.FindPrompt();
+                                                    }
+                                                    if (prompt != null)
+                                                    {
+                                                        var prepText = @"[CONTEXT_90%] 컨텍스트 90% 소진! 핸드오프를 준비해주세요.
+
+지금까지 이 세션에서 한 작업을 요약하고, 다음 세션에서 이어갈 수 있는 핸드오프 프롬프트를 작성해주세요.
+작업 요약 + 미완성 작업 + 핵심 파일 목록을 포함해주세요.
+
+⚠️ 95%에 도달하면 앱봇의 눈이 자동으로 새 채팅을 열고 핸드오프 프롬프트를 입력합니다!
+빠르게 현재 작업을 마무리하고 슬랙으로도 현황을 알려주세요.
+
+(auto-relay by AppBotEye context monitor)";
+                                                        prepHelper.TypeAndSubmit(prompt, prepText);
+                                                        Console.ForegroundColor = ConsoleColor.Green;
+                                                        Console.WriteLine("[EYE] ✅ Handoff preparation prompt delivered!");
+                                                        Console.ResetColor();
+                                                    }
+                                                    else
+                                                    {
+                                                        Console.WriteLine("[EYE] WARNING: Could not find Claude prompt for handoff prep");
+                                                    }
+                                                }
+                                                catch (Exception prepEx)
+                                                {
+                                                    Console.WriteLine($"[EYE] Handoff prep error: {prepEx.Message}");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch { /* best-effort */ }
+                            skipContextMonitor:;
 
                             // Slack status streaming (edit same message)
                             if (slackClient != null && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
@@ -555,41 +761,72 @@ internal partial class Program
                         }
                         else
                         {
-                            // Claude status null (idle) — update to "XX 후 프롬프트 대기"
-                            // Use lastExecutingText (real work), skip transient states (permission, plan approval)
-                            if (slackStatusTs != null && lastExecutingText != null
-                                && !lastSlackStatusText?.Contains("프롬프트 대기") == true)
+                            // Claude status null (idle) — update Slack to show idle
+                            // ★ Guard: both idle text variants MUST contain "프롬프트 대기" to prevent re-fire
+                            if (slackStatusTs != null
+                                && lastSlackStatusText != null
+                                && !lastSlackStatusText.Contains("프롬프트 대기"))
                             {
                                 try
                                 {
-                                    var prev = lastExecutingText.Length > 30
-                                        ? lastExecutingText.Substring(0, 30) + "..."
-                                        : lastExecutingText;
-                                    var idleText = $":speech_balloon: {prev} 후 프롬프트 대기";
-                                    Task.Run(async () => await SlackUpdateMessageAsync(
-                                        slackBotToken!, slackChannel!, slackStatusTs, idleText))
-                                        .Wait(3000);
+                                    string idleText;
+                                    if (lastExecutingText != null)
+                                    {
+                                        var prev = lastExecutingText.Length > 30
+                                            ? lastExecutingText.Substring(0, 30) + "..."
+                                            : lastExecutingText;
+                                        idleText = $":speech_balloon: {prev} 후 프롬프트 대기";
+                                    }
+                                    else
+                                    {
+                                        // ★ FIX: "프롬프트 입력 대기" didn't contain guard "프롬프트 대기"!
+                                        idleText = ":speech_balloon: 프롬프트 대기";
+                                    }
+
+                                    // ★ FIX: Relocate to bottom if buried (same as active status)
+                                    var latestTs = Task.Run(async () =>
+                                        await GetChannelLatestMessageTs(slackBotToken!, slackChannel!))
+                                        .GetAwaiter().GetResult();
+
+                                    if (latestTs == slackStatusTs)
+                                    {
+                                        Task.Run(async () => await SlackUpdateMessageAsync(
+                                            slackBotToken!, slackChannel!, slackStatusTs, idleText))
+                                            .Wait(3000);
+                                    }
+                                    else
+                                    {
+                                        // Buried → delete old + create new at bottom
+                                        var oldTs = slackStatusTs;
+                                        Task.Run(async () => await SlackDeleteMessageAsync(
+                                            slackBotToken!, slackChannel!, oldTs)).Wait(3000);
+                                        var (ok, ts) = Task.Run(async () =>
+                                            await SlackSendViaApi(slackBotToken!, slackChannel!, idleText, username: botUsername))
+                                            .GetAwaiter().GetResult();
+                                        if (ok && ts != null)
+                                        {
+                                            slackStatusTs = ts;
+                                            try { File.WriteAllText(statusTsFile, ts); } catch { }
+                                        }
+                                    }
                                     lastSlackStatusText = idleText;
+                                    Console.WriteLine($"[EYE] Status → idle: {idleText}");
                                 }
-                                catch { }
+                                catch (Exception ex) { Console.WriteLine($"[EYE] Idle status error: {ex.Message}"); }
                             }
                             cachedClaudeStatusText = null;
 
-                            // Claude status null — auto-clear stale rate limit
+                            // Claude status null (idle) — ★ 리밋 중에 idle 감지 = 리밋 해제!
                             if (wasRateLimited)
                             {
-                                var now = DateTime.Now;
-                                bool cooldownPassed = rateLimitDetectedAt != null &&
-                                    (now - rateLimitDetectedAt.Value).TotalMinutes >= RateLimitCooldownMinutes;
-                                bool resetTimePassed = rateLimitResetTime != null && now >= rateLimitResetTime.Value;
-                                if (cooldownPassed || resetTimePassed)
+                                // idle 상태 = Claude가 정상 동작 중 → 리밋 즉시 해제
                                 {
                                     wasRateLimited = false;
                                     rateLimitDetectedAt = null;
                                     rateLimitResetTime = null;
                                     cachedClaudeStatusText = null;
                                     Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.WriteLine($"[EYE] Rate limit auto-cleared (null status)");
+                                    Console.WriteLine($"[EYE] Rate limit cleared (idle status detected — limit lifted)");
                                     Console.ResetColor();
 
                                     try
@@ -611,6 +848,25 @@ internal partial class Program
                         }
                     }
                     catch { /* best-effort */ }
+                }
+                // ★ FIX: claudeHwnd lost — still update Slack to idle if needed
+                else if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel)
+                    && slackStatusTs != null
+                    && lastSlackStatusText != null
+                    && !lastSlackStatusText.Contains("프롬프트 대기")
+                    && !lastSlackStatusText.Contains("창 없음"))
+                {
+                    try
+                    {
+                        var idleText = ":zzz: Claude 창 없음 — 프롬프트 대기";
+                        Task.Run(async () => await SlackUpdateMessageAsync(
+                            slackBotToken!, slackChannel!, slackStatusTs, idleText))
+                            .Wait(3000);
+                        lastSlackStatusText = idleText;
+                        cachedClaudeStatusText = null;
+                        Console.WriteLine($"[EYE] Claude window lost → Slack idle");
+                    }
+                    catch { }
                 }
             }
 
@@ -702,11 +958,46 @@ internal partial class Program
                 catch { }
             }
 
+            // ── Slack socket health check (~every 10 min = 6000 frames @ 100ms) ──
+            if (frameCount % 6000 == 0 && frameCount > 0 && slackClient != null)
+            {
+                try
+                {
+                    var connAge = (DateTime.UtcNow - slackClient.LastConnectedUtc).TotalMinutes;
+                    if (!slackClient.IsConnected || connAge >= 10)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"[EYE][SLACK] Health check: connected={slackClient.IsConnected} age={connAge:F0}m → force reconnect");
+                        Console.ResetColor();
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await slackClient.ReconnectAsync();
+                                Console.WriteLine("[EYE][SLACK] Periodic reconnect OK");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[EYE][SLACK] Periodic reconnect failed: {ex.Message}");
+                            }
+                        }).Wait(10000);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[EYE][SLACK] Health OK: connected={slackClient.IsConnected} age={connAge:F0}m msgs={slackClient.MessageCount} reconnects={slackClient.ReconnectCount}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[EYE][SLACK] Health check error: {ex.Message}");
+                }
+            }
+
             // ── Stats logging ──
             if (frameCount % 100 == 0 && frameCount > 0)
             {
                 var slackInfo = slackClient != null
-                    ? $", Slack={slackClient.IsConnected}, msgs={slackClient.MessageCount}"
+                    ? $", Slack={slackClient.IsConnected}, msgs={slackClient.MessageCount}, reconn={slackClient.ReconnectCount}"
                     : "";
                 Console.WriteLine($"[EYE] frame #{frameCount} ({(slackClient != null ? "Socket+API" : "API-only")}{slackInfo})");
             }
@@ -718,6 +1009,9 @@ internal partial class Program
         // ── Cleanup ──
         WKAppBot.Win32.Native.NativeMethods.SetThreadExecutionState(
             WKAppBot.Win32.Native.NativeMethods.ES_CONTINUOUS);
+
+        // ── Cleanup FSW watchers ──
+        DisposeFileWatchers();
 
         if (slackClient != null)
         {
@@ -825,52 +1119,132 @@ internal partial class Program
         return false;
     }
 
-    static (bool tickDirty, bool promptDirty) CheckGlobalDirtyFlags()
+    /// <summary>
+    /// FSW hybrid dirty check:
+    /// - Fast path: consume volatile FSW flags (set by FileSystemWatcher callbacks, ~0ms)
+    /// - Slow path: FileInfo triple-check (only on forceFull=true, every 1s safety net)
+    /// This eliminates 100ms polling overhead while keeping reliability.
+    /// </summary>
+    static (bool tickDirty, bool promptDirty) CheckGlobalDirtyFlags(bool forceFull = false)
     {
-        bool tickDirty = false;
-        bool promptDirty = false;
+        // ── Fast path: FSW event-driven flags (instant, no I/O) ──
+        bool tickDirty = _fswTickDirty;
+        bool promptDirty = _fswPromptDirty;
+        if (tickDirty) _fswTickDirty = false;    // consume flag
+        if (promptDirty) _fswPromptDirty = false; // consume flag
 
-        try
+        // ── Slow path: FileInfo poll (only on 1s safety-net intervals) ──
+        // Catches edge cases: FSW buffer overflow, network drives, watcher init failure
+        if (forceFull)
         {
-            var tickPath = EyeTicksPath;
-            if (File.Exists(tickPath))
+            try
             {
-                var fi = new FileInfo(tickPath);
-                if (_dirtyTickFile != tickPath || _dirtyTickLength != fi.Length || _dirtyTickWriteUtc != fi.LastWriteTimeUtc)
+                var tickPath = EyeTicksPath;
+                if (File.Exists(tickPath))
                 {
-                    tickDirty = true;
-                    _dirtyTickFile = tickPath;
-                    _dirtyTickLength = fi.Length;
-                    _dirtyTickWriteUtc = fi.LastWriteTimeUtc;
-                }
-            }
-        }
-        catch { }
-
-        try
-        {
-            var sessionsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "agents", "main", "sessions");
-            if (Directory.Exists(sessionsDir))
-            {
-                var latestFile = Directory.GetFiles(sessionsDir, "*.jsonl")
-                    .OrderByDescending(p => File.GetLastWriteTimeUtc(p))
-                    .FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(latestFile) && File.Exists(latestFile))
-                {
-                    var fi = new FileInfo(latestFile);
-                    if (_dirtyPromptFile != latestFile || _dirtyPromptLength != fi.Length || _dirtyPromptWriteUtc != fi.LastWriteTimeUtc)
+                    var fi = new FileInfo(tickPath);
+                    if (_dirtyTickFile != tickPath || _dirtyTickLength != fi.Length || _dirtyTickWriteUtc != fi.LastWriteTimeUtc)
                     {
-                        promptDirty = true;
-                        _dirtyPromptFile = latestFile;
-                        _dirtyPromptLength = fi.Length;
-                        _dirtyPromptWriteUtc = fi.LastWriteTimeUtc;
+                        tickDirty = true;
+                        _dirtyTickFile = tickPath;
+                        _dirtyTickLength = fi.Length;
+                        _dirtyTickWriteUtc = fi.LastWriteTimeUtc;
                     }
                 }
             }
+            catch { }
+
+            try
+            {
+                var sessionsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "agents", "main", "sessions");
+                if (Directory.Exists(sessionsDir))
+                {
+                    var latestFile = Directory.GetFiles(sessionsDir, "*.jsonl")
+                        .OrderByDescending(p => File.GetLastWriteTimeUtc(p))
+                        .FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(latestFile) && File.Exists(latestFile))
+                    {
+                        var fi = new FileInfo(latestFile);
+                        if (_dirtyPromptFile != latestFile || _dirtyPromptLength != fi.Length || _dirtyPromptWriteUtc != fi.LastWriteTimeUtc)
+                        {
+                            promptDirty = true;
+                            _dirtyPromptFile = latestFile;
+                            _dirtyPromptLength = fi.Length;
+                            _dirtyPromptWriteUtc = fi.LastWriteTimeUtc;
+                        }
+                    }
+                }
+            }
+            catch { }
         }
-        catch { }
 
         return (tickDirty, promptDirty);
+    }
+
+    /// <summary>
+    /// FSW hybrid: create FileSystemWatchers for tick file + OpenClaw sessions dir.
+    /// Events set volatile dirty flags → 100ms loop picks them up instantly (no FileInfo poll).
+    /// 1s full-load safety net unchanged.
+    /// </summary>
+    static void InitFileWatchers()
+    {
+        // ── 1. Tick file watcher (eye_ticks.jsonl) ──
+        try
+        {
+            var tickPath = EyeTicksPath;
+            var tickDir = Path.GetDirectoryName(tickPath);
+            var tickFile = Path.GetFileName(tickPath);
+            if (tickDir != null && Directory.Exists(tickDir))
+            {
+                _fswTick = new FileSystemWatcher(tickDir)
+                {
+                    Filter = tickFile,
+                    IncludeSubdirectories = false,
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
+                    EnableRaisingEvents = true
+                };
+                _fswTick.Changed += (_, _) => _fswTickDirty = true;
+                _fswTick.Created += (_, _) => _fswTickDirty = true;
+                Console.WriteLine($"[EYE][FSW] Tick watcher: {tickDir}/{tickFile}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE][FSW] Tick watcher init failed: {ex.Message}");
+        }
+
+        // ── 2. OpenClaw sessions watcher (*.jsonl) ──
+        try
+        {
+            var sessionsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".openclaw", "agents", "main", "sessions");
+            if (Directory.Exists(sessionsDir))
+            {
+                _fswPrompt = new FileSystemWatcher(sessionsDir)
+                {
+                    Filter = "*.jsonl",
+                    IncludeSubdirectories = false,
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
+                    EnableRaisingEvents = true
+                };
+                _fswPrompt.Changed += (_, _) => _fswPromptDirty = true;
+                _fswPrompt.Created += (_, _) => _fswPromptDirty = true;
+                _fswPrompt.Renamed += (_, _) => _fswPromptDirty = true;
+                Console.WriteLine($"[EYE][FSW] Prompt watcher: {sessionsDir}/*.jsonl");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE][FSW] Prompt watcher init failed: {ex.Message}");
+        }
+    }
+
+    static void DisposeFileWatchers()
+    {
+        try { if (_fswTick != null) { _fswTick.EnableRaisingEvents = false; _fswTick.Dispose(); _fswTick = null; } } catch { }
+        try { if (_fswPrompt != null) { _fswPrompt.EnableRaisingEvents = false; _fswPrompt.Dispose(); _fswPrompt = null; } } catch { }
+        Console.WriteLine("[EYE][FSW] Watchers disposed");
     }
 
     static int EyeTickCommand(string[] args)
@@ -1049,10 +1423,9 @@ internal partial class Program
                 var cleanText = System.Text.RegularExpressions.Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
                 if (string.IsNullOrWhiteSpace(cleanText)) continue;
 
-                var replyCmd = $"wkappbot slack reply \"response\" --channel {channel} --thread {ts}";
                 // Include context from last processed message for conversation flow
                 var contextPrefix = (contextLine != null && forwarded == 0) ? $"{contextLine}\n\n" : "";
-                var promptText = $"{contextPrefix}{cleanText}\n\n(Slack @{user} — reply: {replyCmd})";
+                var promptText = $"{contextPrefix}{cleanText}\n\n(Slack @{user} thread={ts} — MUST reply to this thread: wkappbot slack reply \"응답\" --thread {ts})";
 
                 // Re-find prompt each time (window may shift)
                 var fresh = helper.FindPrompt();
@@ -1063,13 +1436,24 @@ internal partial class Program
                 }
 
                 Console.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → Claude prompt");
-                Console.WriteLine($"[EYE_TICK] [GUIDELINE] When replying via Slack, AI MUST also print the reply content to console for the user watching the app screen.");
                 var ok = helper.TypeAndSubmit(fresh, promptText);
                 if (ok)
                 {
                     forwarded++;
                     latestTs = ts;
                     Console.WriteLine($"[EYE_TICK] [DELIVERED] Slack @{user}: {cleanText}");
+
+                    // Send "전달했습니다" ack — deleted when slack reply is sent
+                    try
+                    {
+                        var ackText = $"Claude에 전달했습니다! (thread={ts})";
+                        var (ackOk, ackTs) = SlackSendViaApi(botToken, channel, ackText, ts, username: BotUsername)
+                            .GetAwaiter().GetResult();
+                        if (ackOk && ackTs != null)
+                            SavePendingAck(ts, channel, ackTs);
+                    }
+                    catch { }
+
                     if (newMsgs.Count > 1)
                         Thread.Sleep(2000);
                 }
@@ -1180,8 +1564,7 @@ internal partial class Program
                     var cleanParent = System.Text.RegularExpressions.Regex.Replace(parentText, @"<@[A-Z0-9]+>\s*", "").Trim();
                     if (cleanParent.Length > 80) cleanParent = cleanParent[..80] + "…";
 
-                    var replyCmd = $"wkappbot slack reply \"response\" --channel {channel} --thread {threadTs}";
-                    var promptText = $"[쓰레드 시작] 클롣: {cleanParent}\n\n@{rUser}: {cleanReply}\n\n(Slack thread reply — {replyCmd})";
+                    var promptText = $"[쓰레드 시작] {cleanParent}\n\n{cleanReply}\n\n(Slack thread reply @{rUser} thread={threadTs} — MUST reply to this thread: wkappbot slack reply \"응답\" --thread {threadTs})";
 
                     var fresh = helper.FindPrompt();
                     if (fresh == null)
@@ -1191,13 +1574,24 @@ internal partial class Program
                     }
 
                     Console.WriteLine($"[EYE_TICK] [FORWARD] Thread @{rUser} → Claude prompt");
-                    Console.WriteLine($"[EYE_TICK] [GUIDELINE] When replying via Slack, AI MUST also print the reply content to console for the user watching the app screen.");
                     var ok = helper.TypeAndSubmit(fresh, promptText);
                     if (ok)
                     {
                         threadReplies++;
                         latestReplyTs = rTs;
                         Console.WriteLine($"[EYE_TICK] [DELIVERED] Thread @{rUser}: {cleanReply}");
+
+                        // Send "전달했습니다" ack — deleted when slack reply is sent
+                        try
+                        {
+                            var ackText = $"Claude에 전달했습니다! (thread={threadTs})";
+                            var (ackOk, ackTs) = SlackSendViaApi(botToken, channel, ackText, threadTs, username: BotUsername)
+                                .GetAwaiter().GetResult();
+                            if (ackOk && ackTs != null)
+                                SavePendingAck(threadTs, channel, ackTs);
+                        }
+                        catch { }
+
                         Thread.Sleep(2000);
                     }
                 }
@@ -1943,5 +2337,238 @@ internal partial class Program
         }
 
         return cards.Values.Where(c => (now - c.LastTsUtc).TotalSeconds <= staleSeconds).ToList();
+    }
+
+    /// <summary>
+    /// Build a handoff prompt for a new chat session.
+    /// Reads the tail of the current JSONL session to extract recent context,
+    /// then constructs a continuation prompt in English (token-efficient) with Korean response instruction.
+    /// </summary>
+    static string BuildHandoffPrompt(string jsonlPath)
+    {
+        // Extract last few user/assistant messages from JSONL for context
+        var recentMessages = new List<string>();
+        try
+        {
+            // Read last ~50KB of the file (tail) to find recent conversation
+            using var fs = new FileStream(jsonlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var tailSize = Math.Min(fs.Length, 50 * 1024);
+            fs.Seek(-tailSize, SeekOrigin.End);
+            using var sr = new StreamReader(fs, Encoding.UTF8);
+
+            // Skip partial first line
+            if (fs.Position > 0) sr.ReadLine();
+
+            string? line;
+            while ((line = sr.ReadLine()) != null)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                try
+                {
+                    var node = JsonNode.Parse(line);
+                    if (node == null) continue;
+                    var role = node["role"]?.GetValue<string>();
+                    var type = node["type"]?.GetValue<string>();
+
+                    // Capture human/assistant summary messages
+                    if (role == "human" || role == "user")
+                    {
+                        var content = node["content"]?.ToString() ?? "";
+                        if (content.Length > 200) content = content[..200] + "...";
+                        if (!string.IsNullOrWhiteSpace(content))
+                            recentMessages.Add($"[USER] {content}");
+                    }
+                    else if (role == "assistant")
+                    {
+                        var content = node["content"]?.ToString() ?? "";
+                        if (content.Length > 300) content = content[..300] + "...";
+                        if (!string.IsNullOrWhiteSpace(content))
+                            recentMessages.Add($"[ASSISTANT] {content}");
+                    }
+                }
+                catch { /* skip unparseable lines */ }
+            }
+        }
+        catch (Exception ex)
+        {
+            recentMessages.Add($"(Failed to read session: {ex.Message})");
+        }
+
+        // Keep only the last ~10 messages for context
+        if (recentMessages.Count > 10)
+            recentMessages = recentMessages.Skip(recentMessages.Count - 10).ToList();
+
+        var contextBlock = recentMessages.Count > 0
+            ? string.Join("\n", recentMessages)
+            : "(no recent messages extracted)";
+
+        // Build handoff prompt (English for token efficiency, Korean response requested)
+        var handoffPrompt = $@"This is an AUTO-RELAY from AppBotEye. The previous session hit 95% context limit and was automatically handed off.
+
+## Instructions
+1. Read CLAUDE.md and MEMORY.md first to understand the project
+2. Continue the work from where the previous session left off
+3. Reply in Korean (한국어로 답변해주세요)
+4. Send a Slack message to let the user know you're continuing: `wkappbot slack send ""새 채팅에서 이어갑니다! (auto-relay) 🔄""`
+5. Check recent Slack messages for any user instructions: look at eye tick data
+
+## Recent conversation context from previous session:
+```
+{contextBlock}
+```
+
+## Session info
+- Previous JSONL: {Path.GetFileName(jsonlPath)}
+- Relay timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+- Relay reason: context 95% limit reached
+
+Please start by reading CLAUDE.md, then summarize what you understand about the pending work and continue.
+
+(auto-relay by AppBotEye context monitor)";
+
+        return handoffPrompt;
+    }
+
+    /// <summary>
+    /// Build a handoff section to write into CLAUDE.md.
+    /// Written in Korean so the user can also read it ("나도 보게 ㅋ").
+    /// The next Claude session reads CLAUDE.md on startup and sees this section.
+    /// </summary>
+    static string BuildHandoffSection(string jsonlPath, string handoffPrompt)
+    {
+        // Extract recent context summary from JSONL
+        var recentLines = new List<string>();
+        try
+        {
+            using var fs = new FileStream(jsonlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var tailSize = Math.Min(fs.Length, 30 * 1024);
+            fs.Seek(-tailSize, SeekOrigin.End);
+            using var sr = new StreamReader(fs, Encoding.UTF8);
+            if (fs.Position > 0) sr.ReadLine(); // skip partial
+
+            string? line;
+            while ((line = sr.ReadLine()) != null)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                try
+                {
+                    var node = JsonNode.Parse(line);
+                    if (node == null) continue;
+                    var role = node["role"]?.GetValue<string>();
+                    if (role == "human" || role == "user")
+                    {
+                        var c = node["content"]?.ToString() ?? "";
+                        if (c.Length > 150) c = c[..150] + "...";
+                        if (!string.IsNullOrWhiteSpace(c)) recentLines.Add($"  - **User**: {c}");
+                    }
+                    else if (role == "assistant")
+                    {
+                        var c = node["content"]?.ToString() ?? "";
+                        if (c.Length > 150) c = c[..150] + "...";
+                        if (!string.IsNullOrWhiteSpace(c)) recentLines.Add($"  - **Claude**: {c}");
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { recentLines.Add("  - (failed to read session)"); }
+
+        // Keep last 8 messages
+        if (recentLines.Count > 8)
+            recentLines = recentLines.Skip(recentLines.Count - 8).ToList();
+
+        var contextSummary = recentLines.Count > 0
+            ? string.Join("\n", recentLines)
+            : "  - (no recent messages)";
+
+        return $@"
+## 🔄 Handoff — {DateTime.Now:yyyy-MM-dd HH:mm}
+
+> **Previous session hit 95% context limit and was auto-relayed by AppBotEye.**
+> Read this section, continue the work, then DELETE this section when done.
+
+### Previous Session
+- **JSONL**: `{Path.GetFileName(jsonlPath)}`
+- **Relay time**: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+- **Reason**: context 95% limit (auto-relay by AppBotEye)
+
+### Recent Conversation
+{contextSummary}
+
+### TODO for new session
+1. Read CLAUDE.md + MEMORY.md to understand project state
+2. Run `wkappbot slack send ""New chat continuing! (auto-relay) 🔄""` to notify user
+3. Check recent Slack messages for user instructions
+4. Continue work from where previous session left off
+5. **DELETE this handoff section** after processing
+
+";
+    }
+
+    /// <summary>
+    /// Check if CLAUDE.md contains a handoff section (auto-relay precondition).
+    /// </summary>
+    static bool HasHandoffSectionInClaudeMd()
+    {
+        const string claudeMdPath = @"W:\GitHub\WKAppBot\CLAUDE.md";
+        const string handoffMarker = "## \U0001f504 Handoff";
+        try
+        {
+            if (!File.Exists(claudeMdPath)) return false;
+            var content = File.ReadAllText(claudeMdPath, Encoding.UTF8);
+            return content.Contains(handoffMarker, StringComparison.Ordinal);
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Write handoff section to CLAUDE.md (at the end, before roadmap section).
+    /// If a previous handoff section exists, replace it.
+    /// CLAUDE.md path: W:/GitHub/WKAppBot/CLAUDE.md
+    /// </summary>
+    static void WriteHandoffToClaudeMd(string handoffSection)
+    {
+        const string claudeMdPath = @"W:\GitHub\WKAppBot\CLAUDE.md";
+        const string handoffMarker = "## 🔄 Handoff";
+        const string handoffEndMarker = "## "; // next section starts
+
+        try
+        {
+            if (!File.Exists(claudeMdPath))
+            {
+                Console.WriteLine("[EYE] CLAUDE.md not found! Cannot write handoff.");
+                return;
+            }
+
+            var content = File.ReadAllText(claudeMdPath, Encoding.UTF8);
+
+            // Remove existing handoff section if present
+            var handoffIdx = content.IndexOf(handoffMarker, StringComparison.Ordinal);
+            if (handoffIdx >= 0)
+            {
+                // Find end of handoff section (next ## heading or end of file)
+                var afterHandoff = content.IndexOf("\n" + handoffEndMarker, handoffIdx + handoffMarker.Length, StringComparison.Ordinal);
+                if (afterHandoff >= 0)
+                    content = content[..handoffIdx] + content[(afterHandoff + 1)..];
+                else
+                    content = content[..handoffIdx]; // handoff was at end
+            }
+
+            // Append handoff section at the end
+            content = content.TrimEnd() + "\n" + handoffSection;
+
+            // Atomic write
+            var tmpPath = claudeMdPath + ".tmp";
+            File.WriteAllText(tmpPath, content, Encoding.UTF8);
+            File.Move(tmpPath, claudeMdPath, overwrite: true);
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"[EYE] ✅ CLAUDE.md 인수인계 섹션 작성 완료 ({handoffSection.Length} chars)");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE] CLAUDE.md 인수인계 작성 실패: {ex.Message}");
+        }
     }
 }

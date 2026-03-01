@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using WKAppBot.Core.Scenario;
 using WKAppBot.Core.Runner;
+using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
@@ -138,6 +139,9 @@ internal partial class Program
                 "find" => FindCommand(restArgs),
                 "windows" => WindowsCommand(restArgs),
                 "uia-test" => UiaTestCommand(restArgs),
+                "tree-select" => TreeSelectCommand(restArgs),
+                "tab-select" => TabSelectCommand(restArgs),
+                "cond-add" => CondAddCommand(restArgs),
                 "tick" => TickCommand(restArgs),
                 "prompt-test" => PromptTestCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
@@ -153,7 +157,7 @@ internal partial class Program
             }
             catch { }
 
-            // Auto snapshot+blend on A11Y action failure (experience DB accumulation)
+            // Auto snapshot + profile-based experience DB recording on A11Y action failure
             try
             {
                 if (exitCode != 0)
@@ -167,7 +171,7 @@ internal partial class Program
                         var winTitle = restArgs[0];
                         if (!string.IsNullOrWhiteSpace(winTitle))
                         {
-                            Console.WriteLine($"[FALLBACK] auto snapshot+blend trigger (cmd={command})");
+                            Console.WriteLine($"[FALLBACK] auto snapshot+experience trigger (cmd={command})");
                             Console.WriteLine($"[A11Y] unavailable (cmd={command}, reason=action-failed, text=(none), role=(none), action=(none))");
                             var cidArg = "";
                             for (int i = 0; i < restArgs.Length - 1; i++)
@@ -178,12 +182,18 @@ internal partial class Program
                                     break;
                                 }
                             }
+
+                            // 1. Snapshot (UIA tree + screenshot + OCR + per-control learning)
                             if (!string.IsNullOrWhiteSpace(cidArg))
                                 SnapshotCommand(new[] { winTitle, "--tag", $"a11y_fail_{command}", "--depth", "2", "--cid", cidArg });
                             else
                                 SnapshotCommand(new[] { winTitle, "--tag", $"a11y_fail_{command}", "--depth", "2" });
 
+                            // 2. Profile-based action log (screenshot ring buffer + JSONL in control/form folder)
                             var stdAction = ResolveStandardAction(command, restArgs);
+                            WriteA11yFailToProfileDb(winTitle, command, stdAction, cidArg, "action-failed");
+
+                            // 3. Legacy flat file record (backward compat, will be phased out)
                             WriteA11yFailExperienceRecord(winTitle, command, stdAction, cidArg, "action-failed", "(none)", "(none)", "(none)");
                         }
                     }
@@ -511,6 +521,308 @@ internal partial class Program
             "scan" => "Scan",
             _ => "General"
         };
+    }
+
+    /// <summary>
+    /// Write A11Y failure to profile-based ExperienceDb.
+    /// Screenshot → ring buffer (log_0..log_8.png) + metadata → action_log.jsonl
+    /// Stored under profiles/{name}_exp/form_{id}/logs/ or form_{id}/tree/.../logs/
+    /// </summary>
+    static void WriteA11yFailToProfileDb(string windowTitle, string command, string stdAction, string cidArg, string reason)
+    {
+        try
+        {
+            var windows = WKAppBot.Win32.Window.WindowFinder.FindByTitle(windowTitle);
+            if (windows.Count == 0) return;
+            var win = windows[0];
+
+            WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(win.Handle, out uint pid);
+            string procName = "unknown";
+            try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+
+            // Find matching profile
+            var profileStore = new WKAppBot.Win32.Window.ProfileStore();
+            var profileMatch = profileStore.FindByMatch(win.ClassName, "")
+                ?? (!string.IsNullOrEmpty(procName) ? profileStore.FindByMatch("", procName) : null);
+
+            if (profileMatch == null)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine("[A11Y] 프로파일 없음 — 경험DB 기록 건너뜀 (wkappbot scan --save 필요)");
+                Console.ResetColor();
+                return;
+            }
+
+            var expDir = Path.Combine(profileStore.ProfileDir, $"{profileMatch.Value.name}_exp");
+            var expDb = new WKAppBot.Win32.Window.ExperienceDb(expDir);
+
+            // Capture window screenshot for ring buffer
+            System.Drawing.Bitmap? screenshot = null;
+            try
+            {
+                screenshot = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(win.Handle);
+                if (screenshot != null && WKAppBot.Win32.Input.ScreenCapture.IsBlankBitmap(screenshot))
+                {
+                    screenshot.Dispose();
+                    screenshot = null;
+                }
+            }
+            catch { }
+
+            // Build metadata JSON
+            int? cid = int.TryParse(cidArg, out var c) ? c : null;
+            var metadata = JsonSerializer.Serialize(new
+            {
+                ts = DateTime.Now.ToString("O"),
+                cmd = command,
+                action = stdAction,
+                reason,
+                window = win.Title,
+                @class = win.ClassName,
+                pid = (int)pid,
+                cid,
+                profile = profileMatch.Value.name
+            });
+
+            // Scan for active forms to find the right form to log under
+            var scanResult = WKAppBot.Win32.Window.AppScanner.Scan(win.Handle);
+            bool saved = false;
+
+            if (cid.HasValue)
+            {
+                // Try to find which form contains this control
+                foreach (var form in scanResult.Forms.Where(f => f.FormId != null && f.IsVisible))
+                {
+                    // Save to form-level log under action-name subfolder
+                    expDb.SaveFormActionLog(form.FormId!, screenshot, metadata, actionName: stdAction);
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"[A11Y] 프로파일 경험DB 기록: profile={profileMatch.Value.name}, form={form.FormId}, action={stdAction}, cid={cid}");
+                    Console.ResetColor();
+                    saved = true;
+                    break;
+                }
+            }
+
+            if (!saved)
+            {
+                // Save to the first visible form, or a generic "unknown" form
+                var targetForm = scanResult.Forms.FirstOrDefault(f => f.FormId != null && f.IsVisible);
+                var formId = targetForm?.FormId ?? "unknown";
+                expDb.SaveFormActionLog(formId, screenshot, metadata, actionName: stdAction);
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"[A11Y] 프로파일 경험DB 기록: profile={profileMatch.Value.name}, form={formId}, action={stdAction}");
+                Console.ResetColor();
+            }
+
+            screenshot?.Dispose();
+
+            // Also run QuickTouchControls to accumulate per-control experience
+            try
+            {
+                var (forms, controls, screenshots2) = WKAppBot.Win32.Window.AppScanner.QuickTouchControls(scanResult, expDb);
+                if (controls > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"[A11Y] 추가 경험 학습: {forms} forms, {controls} controls, {screenshots2} new screenshots");
+                    Console.ResetColor();
+                }
+            }
+            catch { }
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[A11Y] 프로파일 경험DB 기록 실패: {ex.Message}");
+            Console.ResetColor();
+        }
+    }
+
+    /// <summary>
+    /// Show past failure history and knowhow hints for a form.
+    /// Called when accessing a form that has previous action log entries in ExperienceDb.
+    /// Shared across do/input/click commands.
+    /// </summary>
+    /// <summary>
+    /// Show form-level experience hints.
+    /// actionName이 있으면 knowhow-{action}.md 우선 방송, 없으면 knowhow.md 방송.
+    /// </summary>
+    static void ShowFormExperienceHints(ExperienceDb expDb, string formId, string? actionName = null)
+    {
+        try
+        {
+            var summary = expDb.GetFormActionLogSummary(formId);
+            if (summary != null && summary.TotalEntries > 0)
+            {
+                var breakdown = summary.ActionBreakdown.Count > 0
+                    ? string.Join(", ", summary.ActionBreakdown.Select(kv => $"{kv.Key}:{kv.Value}"))
+                    : "";
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($"  [EXP] ⚠ 이전 기록 {summary.TotalEntries}건");
+                if (!string.IsNullOrEmpty(breakdown))
+                    Console.Write($" ({breakdown})");
+                Console.WriteLine($", 스크린샷 {summary.ScreenshotCount}장");
+                Console.ResetColor();
+            }
+
+            // 액션 노하우 우선, 없으면 일반 노하우 방송
+            string? knowhowPath = null;
+            if (!string.IsNullOrEmpty(actionName))
+                knowhowPath = expDb.GetFormActionKnowhowPath(formId, actionName);
+            knowhowPath ??= expDb.GetFormKnowhowPath(formId);
+
+            if (knowhowPath != null)
+                ShowKnowhowBroadcast(knowhowPath);
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Show control-level experience hints.
+    /// actionName이 있으면 knowhow-{action}.md 우선 방송, 없으면 knowhow.md 방송.
+    /// 노하우 없으면 "여기에 노하우를 남겨주세요" 절대경로 안내.
+    /// </summary>
+    static void ShowControlExperienceHints(ExperienceDb expDb, string formId, int cid,
+        string? actionName = null)
+    {
+        try
+        {
+            // Control-level log history
+            var summary = expDb.GetControlActionLogSummary(formId, cid);
+            if (summary != null && summary.TotalEntries > 0)
+            {
+                var breakdown = summary.ActionBreakdown.Count > 0
+                    ? string.Join(", ", summary.ActionBreakdown.Select(kv => $"{kv.Key}:{kv.Value}"))
+                    : "";
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($"  [EXP] cid={cid}: 이전 기록 {summary.TotalEntries}건");
+                if (!string.IsNullOrEmpty(breakdown))
+                    Console.Write($" ({breakdown})");
+                Console.WriteLine($", 스크린샷 {summary.ScreenshotCount}장");
+                Console.ResetColor();
+            }
+
+            // 액션별 노하우 우선 → 일반 노하우 폴백
+            bool found = false;
+            if (!string.IsNullOrEmpty(actionName))
+            {
+                var (actFormPath, actCtrlPath) = expDb.GetActionKnowhowPaths(formId, cid, actionName);
+                if (actCtrlPath != null) { ShowKnowhowBroadcast(actCtrlPath); found = true; }
+                else if (actFormPath != null) { ShowKnowhowBroadcast(actFormPath); found = true; }
+            }
+            if (!found)
+            {
+                var (formPath, ctrlPath) = expDb.GetKnowhowPaths(formId, cid);
+                if (ctrlPath != null) { ShowKnowhowBroadcast(ctrlPath); found = true; }
+                else if (formPath != null) { ShowKnowhowBroadcast(formPath); found = true; }
+            }
+
+            // 노하우 없을 때: 노하우 파일 경로 안내 (미래 클롣이 발견하면 여기에 기록)
+            if (!found && summary != null && summary.TotalEntries > 0)
+            {
+                var ctrlDir = expDb.GetControlDir(formId, cid, create: false);
+                var suggestedFile = !string.IsNullOrEmpty(actionName)
+                    ? $"knowhow-{actionName.ToLowerInvariant()}.md"
+                    : "knowhow.md";
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"  [KNOWHOW] 노하우 발견 시 기록 → {Path.Combine(ctrlDir, suggestedFile)}");
+                Console.ResetColor();
+            }
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Knowhow 방송: 파일의 첫 문단(개요/목차)을 출력.
+    /// 첫 문단 = 파일 시작부터 첫 번째 빈 줄(\n\n) 전까지의 비어있지 않은 줄들.
+    /// ## 헤더가 있으면 첫 헤더를 타이틀로, 그 아래 첫 문단을 내용으로 표시.
+    /// 섹션 수도 함께 표시 → 미래 클롣이 "더 있다"는 것을 인지.
+    /// </summary>
+    static void ShowKnowhowBroadcast(string knowhowPath)
+    {
+        try
+        {
+            var allLines = File.ReadAllLines(knowhowPath, System.Text.Encoding.UTF8);
+            if (allLines.Length == 0) return;
+
+            // ## 헤더 수 카운트 (섹션 수 표시용)
+            int sectionCount = 0;
+            for (int i = 0; i < allLines.Length; i++)
+            {
+                if (allLines[i].TrimStart().StartsWith("## "))
+                    sectionCount++;
+            }
+
+            // 첫 헤더 찾기 (타이틀)
+            string title = "";
+            int contentStart = 0;
+            for (int i = 0; i < allLines.Length; i++)
+            {
+                var trimmed = allLines[i].TrimStart();
+                if (trimmed.StartsWith("## "))
+                {
+                    title = trimmed.TrimStart('#').Trim();
+                    contentStart = i + 1;
+                    break;
+                }
+                // 헤더 없이 바로 내용 시작하는 경우
+                if (!string.IsNullOrWhiteSpace(allLines[i]))
+                {
+                    contentStart = i;
+                    break;
+                }
+            }
+
+            // 첫 문단 추출: contentStart부터 빈 줄(\n\n) 또는 다음 ## 헤더까지
+            var paragraph = new List<string>();
+            bool started = false;
+            for (int i = contentStart; i < allLines.Length; i++)
+            {
+                var line = allLines[i].TrimEnd();
+                // 다음 ## 섹션이면 끝
+                if (line.TrimStart().StartsWith("## "))
+                    break;
+                // 빈 줄이면 문단 끝 (내용 시작 후에만)
+                if (started && string.IsNullOrWhiteSpace(line))
+                    break;
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    started = true;
+                    paragraph.Add(line);
+                }
+            }
+
+            if (paragraph.Count == 0 && string.IsNullOrEmpty(title)) return;
+
+            // 출력: [KNOWHOW] (N sections) [title] paragraph...
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            var countInfo = sectionCount > 1 ? $" ({sectionCount}§)" : "";
+            Console.Write($"  [KNOWHOW]{countInfo} ");
+            Console.ResetColor();
+
+            if (!string.IsNullOrEmpty(title))
+            {
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write($"{title}: ");
+                Console.ResetColor();
+            }
+
+            if (paragraph.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                // 줄 합치되 너무 길면 잘라내기 (토큰 절약)
+                var text = string.Join(" ", paragraph);
+                if (text.Length > 200) text = text[..197] + "...";
+                Console.WriteLine(text);
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.WriteLine();
+            }
+        }
+        catch { /* best-effort */ }
     }
 
     static void WriteA11yFailExperienceRecord(string windowTitle, string command, string stdAction, string cidArg, string reason, string text, string role, string action)

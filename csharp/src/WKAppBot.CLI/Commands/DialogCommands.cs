@@ -889,8 +889,13 @@ internal partial class Program
 
         string title = filteredArgs[0];
         var keywords = filteredArgs.Length > 1
-            ? filteredArgs.Skip(1).ToArray()
+            ? filteredArgs.Skip(1).Where(k => !string.IsNullOrWhiteSpace(k) && k.Length >= 2).ToArray()
             : new[] { "공지", "인사", "안내", "알림", "POP-UP", "POPUP", "notice", "popup" };
+
+        // Safety: empty keywords match EVERYTHING (String.Contains("") == true)
+        if (keywords.Length == 0)
+            return Error("No valid keywords provided. Keywords must be at least 2 characters. " +
+                "Empty/whitespace keywords would match all windows — this is a safety check to prevent accidental mass-close.");
 
         var windows = WindowFinder.FindByTitle(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");

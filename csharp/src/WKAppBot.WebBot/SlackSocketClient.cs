@@ -37,9 +37,14 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     private string? _appToken;
     private string? _botUserId;  // our bot's user ID (to ignore own messages)
     private int _messageCount;   // total WebSocket messages received (for diagnostics)
+    private volatile bool _autoReconnect;  // enables auto-reconnect on disconnect/error
+    private DateTime _lastConnectedUtc = DateTime.MinValue;  // for periodic health check
+    private int _reconnectCount;  // total reconnections (for diagnostics)
 
     public bool IsConnected => _ws?.State == WebSocketState.Open;
     public int MessageCount => _messageCount;
+    public int ReconnectCount => _reconnectCount;
+    public DateTime LastConnectedUtc => _lastConnectedUtc;
 
     /// <summary>Fired when a message is posted in a subscribed channel.</summary>
     public event Action<SlackMessage>? OnMessage;
@@ -81,6 +86,8 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         // Step 3: Start receive loop
         _receiveCts = new CancellationTokenSource();
         _receiveTask = Task.Run(() => ReceiveLoopAsync(_receiveCts.Token));
+        _autoReconnect = true;
+        _lastConnectedUtc = DateTime.UtcNow;
 
         Console.WriteLine($"[SLACK] Connected (Socket Mode)");
     }
@@ -208,6 +215,37 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         }
 
         Console.WriteLine($"[SLACK] Receive loop ended (ws.State={_ws?.State}, msgCount={_messageCount})");
+
+        // ── Auto-reconnect: if loop ended unexpectedly, try to reconnect ──
+        if (_autoReconnect && !ct.IsCancellationRequested)
+        {
+            _ = Task.Run(async () =>
+            {
+                for (int attempt = 1; attempt <= 5; attempt++)
+                {
+                    var delay = Math.Min(attempt * 3, 15);  // 3s, 6s, 9s, 12s, 15s
+                    Console.WriteLine($"[SLACK] Auto-reconnect attempt {attempt}/5 in {delay}s...");
+                    await Task.Delay(delay * 1000);
+                    if (!_autoReconnect) break;
+                    try
+                    {
+                        await ReconnectAsync();
+                        Interlocked.Increment(ref _reconnectCount);
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"[SLACK] Auto-reconnected OK (attempt {attempt}, total reconnects={_reconnectCount})");
+                        Console.ResetColor();
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[SLACK] Auto-reconnect attempt {attempt} failed: {ex.Message}");
+                    }
+                }
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("[SLACK] Auto-reconnect exhausted — Slack offline until periodic health check");
+                Console.ResetColor();
+            });
+        }
     }
 
     /// <summary>Process a received WebSocket message.</summary>
@@ -234,7 +272,27 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
                     break;
 
                 case "disconnect":
-                    Console.WriteLine($"[SLACK] Disconnect requested: {json["reason"]}");
+                    Console.WriteLine($"[SLACK] Disconnect requested: {json["reason"]} — will auto-reconnect");
+                    // Slack sends "disconnect" with reason "refresh_requested" periodically
+                    // Must reconnect to maintain event delivery
+                    if (_autoReconnect)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await Task.Delay(1000);  // brief delay before reconnect
+                                await ReconnectAsync();
+                                Interlocked.Increment(ref _reconnectCount);
+                                Console.WriteLine($"[SLACK] Reconnected after disconnect (total={_reconnectCount})");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[SLACK] Reconnect after disconnect failed: {ex.Message}");
+                                // auto-reconnect in ReceiveLoopAsync will retry
+                            }
+                        });
+                    }
                     break;
 
                 case "events_api":
@@ -400,6 +458,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         var wsUrl = await OpenConnectionAsync();
         _ws = new ClientWebSocket();
         await _ws.ConnectAsync(new Uri(wsUrl), CancellationToken.None);
+        _lastConnectedUtc = DateTime.UtcNow;
         Console.WriteLine($"[SLACK] Reconnected (ws.State={_ws.State})");
 
         // Restart receive loop
@@ -411,6 +470,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     /// <summary>Disconnect and clean up.</summary>
     public async Task DisconnectAsync()
     {
+        _autoReconnect = false;  // prevent auto-reconnect on intentional disconnect
         _receiveCts?.Cancel();
 
         if (_ws?.State == WebSocketState.Open)

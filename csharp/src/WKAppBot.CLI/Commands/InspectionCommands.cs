@@ -45,54 +45,101 @@ internal partial class Program
     static int InspectCommand(string[] args)
     {
         if (args.Length == 0)
-            return Error("Usage: appbot inspect <window-title> [--depth N] [--win32] [--filter <pattern>]\n  --filter: Search entire UIA tree for matching elements (Name/AutomationId/ControlType)\n            Supports wildcards (*/?), regex: prefix, or plain substring");
+            return Error("Usage: appbot inspect <window-title>[/<child-pattern>] [--depth N] [--win32] [--filter <pattern>]\n" +
+                "  <child-pattern>: MDI/자식 윈도우 glob 매칭 (예: 투혼/**현재가, 투혼/[0600]*)\n" +
+                "  --filter: Search entire UIA tree for matching elements (Name/AutomationId/ControlType)\n" +
+                "            Supports wildcards (*/?), regex: prefix, or plain substring");
 
-        string title = args[0];
+        string rawTitle = args[0];
         int depth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 5;
         bool win32Mode = args.Contains("--win32");
         string? filter = GetArgValue(args, "--filter");
 
-        var windows = WindowFinder.FindByTitle(title);
+        // "투혼/**현재가" → mainTitle="투혼", childPattern="**현재가"
+        string mainTitle;
+        string? childPattern = null;
+        var slashIdx = rawTitle.IndexOf('/');
+        if (slashIdx > 0)
+        {
+            mainTitle = rawTitle[..slashIdx];
+            childPattern = rawTitle[(slashIdx + 1)..];
+        }
+        else
+        {
+            mainTitle = rawTitle;
+        }
+
+        var windows = WindowFinder.FindByTitle(mainTitle);
         if (windows.Count == 0)
         {
-            Console.WriteLine($"No window found matching: \"{title}\"");
+            Console.WriteLine($"No window found matching: \"{mainTitle}\"");
             return 1;
         }
 
-        var win = windows[0];
-        Console.WriteLine($"Window: {win}");
+        var mainWin = windows[0];
+
+        // 자식 패턴 있으면 → MDI/자식 윈도우 매칭
+        IntPtr inspectHandle = mainWin.Handle;
+        string? matchedFormId = null;
+        string? matchedFormTitle = null;
+
+        if (!string.IsNullOrEmpty(childPattern))
+        {
+            var childMatch = FindChildWindowByPattern(mainWin.Handle, childPattern);
+            if (childMatch == null)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"No child window matching \"{childPattern}\" under \"{mainWin.Title}\"");
+                Console.ResetColor();
+                // 사용 가능한 자식 윈도우 목록 표시
+                ShowAvailableChildren(mainWin.Handle);
+                return 1;
+            }
+            inspectHandle = childMatch.Value.handle;
+            matchedFormId = childMatch.Value.formId;
+            matchedFormTitle = childMatch.Value.title;
+            Console.WriteLine($"Window: {mainWin}");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write($"  └ Child: ");
+            Console.ResetColor();
+            Console.WriteLine($"\"{matchedFormTitle}\" (hWnd=0x{inspectHandle:X})");
+        }
+        else
+        {
+            Console.WriteLine($"Window: {mainWin}");
+        }
+
+        // 노하우 방송: 프로파일 매칭 → 해당 폼 폴더의 knowhow.md
+        BroadcastInspectKnowhow(mainWin.Handle, mainWin.ClassName, matchedFormId, matchedFormTitle);
+
         Console.WriteLine();
 
         if (win32Mode)
         {
-            // Win32 recursive child window tree (for MFC/native apps where UIA is empty)
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine($"── Win32 Window Tree (depth={depth}) ──");
             Console.ResetColor();
-            var win32Tree = WindowFinder.DumpWin32Tree(win.Handle, depth);
+            var win32Tree = WindowFinder.DumpWin32Tree(inspectHandle, depth);
             Console.Write(win32Tree);
         }
         else if (filter != null)
         {
-            // Filtered UIA tree — search entire tree, dump matching subtrees
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine($"── UIA Tree Filtered: \"{filter}\" (subtree depth={depth}) ──");
             Console.ResetColor();
             using var uia = new UiaLocator();
-            var tree = uia.DumpTreeFiltered(win.Handle, filter, depth);
+            var tree = uia.DumpTreeFiltered(inspectHandle, filter, depth);
             Console.Write(tree);
         }
         else
         {
-            // UIA tree (default — works for UWP/WPF/WinForms)
             using var uia = new UiaLocator();
-            var tree = uia.DumpTree(win.Handle, depth);
+            var tree = uia.DumpTree(inspectHandle, depth);
             Console.Write(tree);
 
-            // Also show Win32 child count hint
-            var children = WindowFinder.GetChildren(win.Handle);
+            var children = WindowFinder.GetChildren(inspectHandle);
             Console.WriteLine($"\n--- Win32 children: {children.Count} ---");
-            if (children.Count > 0 && string.IsNullOrWhiteSpace(tree.Replace($"[Window] \"{win.Title}\"", "").Trim()))
+            if (children.Count > 0 && string.IsNullOrWhiteSpace(tree.Replace($"[Window] \"{matchedFormTitle ?? mainWin.Title}\"", "").Trim()))
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("Hint: UIA tree is empty. Try --win32 for Win32 native child windows.");
@@ -101,6 +148,302 @@ internal partial class Program
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Find a child window (MDI children + direct children) matching a grap pattern.
+    /// ★ Search key: "[ClassName] Title (cid=N hwnd=XX WxH)" — class name 절대 우선.
+    ///   Empty-title children도 클래스명/cid로 매칭 가능.
+    ///   Examples: "#32770" → class match, "cid=4015" → control ID match, "*현재가*" → title match.
+    /// </summary>
+    static (IntPtr handle, string? formId, string title)? FindChildWindowByPattern(IntPtr hParent, string pattern)
+    {
+        // MDI 자식 먼저 탐색 (MDIClient 찾기)
+        var topChildren = WindowFinder.GetChildrenZOrder(hParent);
+        IntPtr hMdiClient = IntPtr.Zero;
+        foreach (var ch in topChildren)
+        {
+            if (ch.ClassName == "MDIClient")
+            {
+                hMdiClient = ch.Handle;
+                break;
+            }
+        }
+
+        // MDI 자식 검색
+        if (hMdiClient != IntPtr.Zero)
+        {
+            var mdiChildren = WindowFinder.GetChildrenZOrder(hMdiClient);
+            foreach (var mc in mdiChildren)
+            {
+                var searchKey = BuildChildSearchKey(mc);
+                // ★ Try title first (backward compat), then full searchKey
+                if (GlobMatch(mc.Title, pattern) || GlobMatch(searchKey, pattern))
+                {
+                    var (formId, _) = ZoneClassifier.ParseFormTitle(mc.Title);
+                    return (mc.Handle, formId, mc.Title);
+                }
+            }
+        }
+
+        // 직접 자식도 검색 (non-MDI 앱)
+        foreach (var ch in topChildren)
+        {
+            var searchKey = BuildChildSearchKey(ch);
+            if (GlobMatch(ch.Title, pattern) || GlobMatch(searchKey, pattern))
+            {
+                var (formId, _) = ZoneClassifier.ParseFormTitle(ch.Title);
+                return (ch.Handle, formId, ch.Title);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Build enriched search key for child window: "[ClassName] Title (cid=N hwnd=XX WxH)"
+    /// </summary>
+    static string BuildChildSearchKey(WindowInfo wi)
+    {
+        var r = wi.Rect;
+        return $"[{wi.ClassName}] {wi.Title} (cid={wi.ControlId} hwnd={wi.Handle:X8} {r.Width}x{r.Height})";
+    }
+
+    /// <summary>
+    /// Simple glob match: * = any chars, ? = one char, ** = same as * for title matching.
+    /// Pattern can be substring if no wildcards.
+    /// </summary>
+    static bool GlobMatch(string text, string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern)) return false;
+        // Contains wildcard? → glob full match
+        if (pattern.Contains('*') || pattern.Contains('?'))
+        {
+            var regexPattern = "^" + Regex.Escape(pattern)
+                .Replace("\\*\\*", ".*")
+                .Replace("\\*", ".*")
+                .Replace("\\?", ".") + "$";
+            return Regex.IsMatch(text, regexPattern, RegexOptions.IgnoreCase);
+        }
+        // No wildcards → substring match (기존 동작 호환)
+        return text.Contains(pattern, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Show available child windows when pattern match fails.
+    /// </summary>
+    static void ShowAvailableChildren(IntPtr hParent)
+    {
+        var topChildren = WindowFinder.GetChildrenZOrder(hParent);
+        IntPtr hMdiClient = IntPtr.Zero;
+        foreach (var ch in topChildren)
+        {
+            if (ch.ClassName == "MDIClient") { hMdiClient = ch.Handle; break; }
+        }
+
+        var candidates = new List<string>();
+        if (hMdiClient != IntPtr.Zero)
+        {
+            var mdiChildren = WindowFinder.GetChildrenZOrder(hMdiClient);
+            foreach (var mc in mdiChildren)
+            {
+                // ★ Show enriched search key (empty-title children visible too)
+                candidates.Add(BuildChildSearchKey(mc));
+            }
+        }
+        else
+        {
+            // Non-MDI: show direct children
+            foreach (var ch in topChildren)
+            {
+                if (ch.ClassName == "IME" || ch.Rect.Width <= 0) continue;
+                candidates.Add(BuildChildSearchKey(ch));
+            }
+        }
+        if (candidates.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"\n사용 가능한 자식 ({candidates.Count}개):");
+            foreach (var c in candidates.Take(20))
+                Console.WriteLine($"  · {c}");
+            if (candidates.Count > 20)
+                Console.WriteLine($"  ... +{candidates.Count - 20}개");
+            Console.ResetColor();
+        }
+    }
+
+    /// <summary>
+    /// Broadcast knowhow for the inspect target.
+    /// matchedFormId != null → 해당 폼 폴더의 knowhow.md만 방송
+    /// matchedFormId == null → 프로파일의 모든 폼 knowhow.md 방송 (최대 5개)
+    /// </summary>
+    static void BroadcastInspectKnowhow(IntPtr mainHandle, string mainClassName, string? matchedFormId, string? matchedFormTitle = null)
+    {
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(mainHandle, out uint inspPid);
+            var procName = "";
+            try { procName = System.Diagnostics.Process.GetProcessById((int)inspPid).ProcessName; } catch { }
+
+            var profileStore = new ProfileStore();
+            var profileMatch = profileStore.FindByMatch(mainClassName, "")
+                ?? (!string.IsNullOrEmpty(procName) ? profileStore.FindByMatch("", procName) : null);
+            if (profileMatch == null) return;
+
+            var expDir = Path.Combine(profileStore.ProfileDir, $"{profileMatch.Value.name}_exp");
+            if (!Directory.Exists(expDir)) return;
+
+            if (!string.IsNullOrEmpty(matchedFormId))
+            {
+                // 특정 폼 폴더의 노하우만 방송
+                var formDir = Path.Combine(expDir, $"form_{matchedFormId}");
+                if (Directory.Exists(formDir))
+                {
+                    var kh = Path.Combine(formDir, "knowhow.md");
+                    if (File.Exists(kh))
+                    {
+                        ShowKnowhowBroadcast(kh);
+                    }
+                    else
+                    {
+                        // 노하우 없으면 기본 템플릿 자동 생성
+                        TryGenerateKnowhowTemplate(formDir, matchedFormId, expDir, matchedFormTitle);
+                        if (File.Exists(kh)) ShowKnowhowBroadcast(kh);
+                    }
+
+                    // 해당 폼 트리 하위의 노하우도 탐색
+                    var treeDir = Path.Combine(formDir, "tree");
+                    if (Directory.Exists(treeDir))
+                    {
+                        foreach (var khFile in Directory.GetFiles(treeDir, "knowhow*.md", SearchOption.AllDirectories).Take(5))
+                        {
+                            ShowKnowhowBroadcast(khFile);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // 전체 폼 폴더 스캔 (메인윈도 inspect)
+                foreach (var formDir in Directory.GetDirectories(expDir, "form_*").Take(5))
+                {
+                    var kh = Path.Combine(formDir, "knowhow.md");
+                    if (File.Exists(kh)) ShowKnowhowBroadcast(kh);
+                }
+            }
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// 노하우 없는 폼 폴더에 기본 템플릿 자동 생성.
+    /// 첫 문단: 개요 (폼 이름 + form.json 요약)
+    /// 둘째 문단: UIA 접근 가능/불가 컨트롤 분류
+    /// ExperienceDb form_{id}.json에서 컨트롤 목록 추출.
+    /// </summary>
+    static void TryGenerateKnowhowTemplate(string formDir, string formId, string expDir, string? mdiTitle = null)
+    {
+        try
+        {
+            var khPath = Path.Combine(formDir, "knowhow.md");
+            if (File.Exists(khPath)) return; // already exists
+
+            // formTitle: MDI child 타이틀에서 추출 (예: "[0600] 키움종합차트" → "키움종합차트")
+            var formJson = Path.Combine(expDir, $"form_{formId}.json");
+            string formTitle = "";
+            if (!string.IsNullOrEmpty(mdiTitle))
+            {
+                // "[0600] 키움종합차트" → "키움종합차트", "[0150] 조건검색" → "조건검색"
+                formTitle = System.Text.RegularExpressions.Regex.Replace(mdiTitle, @"^\[\d+\]\s*", "").Trim();
+                // 뒤에 부가정보 제거: "키움현재가 (통합)" → 그대로 유지 (정보성)
+            }
+            var uiaAccessible = new List<string>();
+            var ownerDrawn = new List<string>();
+
+            if (File.Exists(formJson))
+            {
+                try
+                {
+                    var json = File.ReadAllText(formJson);
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+
+                    // FormTitle 추출 (mdiTitle이 없을 때만)
+                    if (string.IsNullOrEmpty(formTitle) && doc.RootElement.TryGetProperty("FormTitle", out var titleEl))
+                    {
+                        var t = titleEl.GetString();
+                        if (!string.IsNullOrEmpty(t))
+                            formTitle = System.Text.RegularExpressions.Regex.Replace(t, @"^\[\d+\]\s*", "").Trim();
+                    }
+
+                    // Controls 맵에서 UIA 패턴 분류
+                    if (doc.RootElement.TryGetProperty("Controls", out var controls))
+                    {
+                        foreach (var ctrl in controls.EnumerateObject())
+                        {
+                            var cid = ctrl.Name;
+                            var c = ctrl.Value;
+                            var name = "";
+                            var role = "";
+                            var patterns = "";
+
+                            if (c.TryGetProperty("Name", out var nameEl)) name = nameEl.GetString() ?? "";
+                            if (c.TryGetProperty("Role", out var roleEl)) role = roleEl.GetString() ?? "";
+                            if (c.TryGetProperty("Patterns", out var patEl)) patterns = patEl.GetString() ?? "";
+
+                            // Invoke/Value/Toggle/SelectionItem = UIA 접근 가능
+                            bool hasUiaAction = patterns.Contains("Invoke") || patterns.Contains("Value")
+                                || patterns.Contains("Toggle") || patterns.Contains("SelectionItem")
+                                || patterns.Contains("ExpandCollapse");
+
+                            var desc = !string.IsNullOrEmpty(name) ? $"{role} \"{name}\" (cid={cid})" : $"{role} (cid={cid})";
+                            if (!string.IsNullOrEmpty(patterns)) desc += $" [{patterns}]";
+
+                            if (hasUiaAction)
+                                uiaAccessible.Add($"- {desc}");
+                            else if (role == "Pane" || role == "Custom" || role == "List")
+                                ownerDrawn.Add($"- {desc}");
+                        }
+                    }
+                }
+                catch { /* parse error, still generate minimal template */ }
+            }
+
+            // 템플릿 생성 — 첫 문단은 ShowKnowhowBroadcast에서 방송됨!
+            var sb = new System.Text.StringBuilder();
+            var headerTitle = !string.IsNullOrEmpty(formTitle) ? $"{formTitle} [{formId}]" : $"[{formId}]";
+            sb.AppendLine($"## {headerTitle} 자동화 노하우");
+            sb.AppendLine($"이 폼의 자동화 노하우를 여기에 기록해주세요! 첫 문단(이 줄)이 inspect 시 [KNOWHOW]로 방송됩니다. 폼의 핵심 특성, Focusless 가능 여부, 주의사항 등을 한 줄 개요로 정리하면 미래의 클롣이 감사합니다.");
+            sb.AppendLine();
+
+            if (uiaAccessible.Count > 0 || ownerDrawn.Count > 0)
+            {
+                if (uiaAccessible.Count > 0)
+                {
+                    sb.AppendLine($"### UIA 접근 가능 (Focusless) — {uiaAccessible.Count}개");
+                    foreach (var item in uiaAccessible.Take(15))
+                        sb.AppendLine(item);
+                    if (uiaAccessible.Count > 15)
+                        sb.AppendLine($"- ... +{uiaAccessible.Count - 15}개");
+                    sb.AppendLine();
+                }
+
+                if (ownerDrawn.Count > 0)
+                {
+                    sb.AppendLine($"### UIA 접근 불가 (Owner-drawn) — {ownerDrawn.Count}개");
+                    foreach (var item in ownerDrawn.Take(10))
+                        sb.AppendLine(item);
+                    if (ownerDrawn.Count > 10)
+                        sb.AppendLine($"- ... +{ownerDrawn.Count - 10}개");
+                    sb.AppendLine();
+                }
+            }
+
+            File.WriteAllText(khPath, sb.ToString(), System.Text.Encoding.UTF8);
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
+            Console.WriteLine($"  [KNOWHOW] 기본 템플릿 자동 생성: {khPath}");
+            Console.ResetColor();
+        }
+        catch { /* best-effort */ }
     }
 
     // ── focus ─────────────────────────────────────────────────
@@ -686,12 +1029,14 @@ internal partial class Program
     static int CaptureCommand(string[] args)
     {
         if (args.Length == 0)
-            return Error(@"Usage: appbot capture <window-title> [-o output.png] [--form <form-id>]
-  --form <id>: Capture a specific MDI child form (brings it to front first).");
+            return Error(@"Usage: appbot capture <window-title> [-o output.png] [--form <form-id>] [--no-learn]
+  --form <id>: Capture a specific MDI child form (brings it to front first).
+  --no-learn:  Skip per-control experience DB learning.");
 
         string title = args[0];
         string output = GetArgValue(args, "-o") ?? $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
         string? formId = GetArgValue(args, "--form");
+        bool skipLearn = args.Any(a => a.Equals("--no-learn", StringComparison.OrdinalIgnoreCase));
 
         var windows = WindowFinder.FindByTitle(title);
         if (windows.Count == 0)
@@ -701,11 +1046,12 @@ internal partial class Program
         }
 
         var win = windows[0];
+        AppScanResult? scanResult = null;
 
         if (formId != null)
         {
             // Find MDI child form and bring to front before capture
-            var scanResult = AppScanner.Scan(win.Handle);
+            scanResult = AppScanner.Scan(win.Handle);
             var form = scanResult.Forms.FirstOrDefault(f =>
                 f.FormId != null && f.FormId.Contains(formId, StringComparison.OrdinalIgnoreCase));
             if (form == null)
@@ -738,6 +1084,37 @@ internal partial class Program
             using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(win.Handle);
             WKAppBot.Win32.Input.ScreenCapture.SaveToFile(bmp, output);
             Console.WriteLine($"Saved: {output} ({bmp.Width}x{bmp.Height})");
+        }
+
+        // Per-control experience learning (auto when profile exists)
+        if (!skipLearn)
+        {
+            try
+            {
+                NativeMethods.GetWindowThreadProcessId(win.Handle, out uint capPid);
+                string? capProcName = null;
+                try { capProcName = System.Diagnostics.Process.GetProcessById((int)capPid).ProcessName; } catch { }
+
+                var profileStore = new ProfileStore();
+                var profileMatch = profileStore.FindByMatch(win.ClassName, "")
+                    ?? (!string.IsNullOrEmpty(capProcName) ? profileStore.FindByMatch("", capProcName) : null);
+
+                if (profileMatch != null)
+                {
+                    var expDir = Path.Combine(profileStore.ProfileDir, $"{profileMatch.Value.name}_exp");
+                    var expDb = new ExperienceDb(expDir);
+                    scanResult ??= AppScanner.Scan(win.Handle);
+                    var (forms, controls, screenshots) = AppScanner.QuickTouchControls(scanResult, expDb);
+
+                    if (controls > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"[CAPTURE] 경험DB 학습: {forms} forms, {controls} controls, {screenshots} new screenshots (profile={profileMatch.Value.name})");
+                        Console.ResetColor();
+                    }
+                }
+            }
+            catch { /* best-effort */ }
         }
 
         return 0;
@@ -918,12 +1295,22 @@ internal partial class Program
             // Skip wkappbot windows (Eye/Zoom overlays) — don't search ourselves
             if (processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
 
-            // Apply filters
+            // Apply filters — ★ enriched search key: "[ClassName] Title (process hwnd=XX WxH)"
             if (filterTitle != null)
             {
-                bool match = PatternMatcher.IsPattern(filterTitle)
-                    ? PatternMatcher.Create(filterTitle).IsMatch(title)
-                    : title.Contains(filterTitle, StringComparison.OrdinalIgnoreCase);
+                var searchKey = $"[{className}] {title} ({processName} hwnd={hWnd:X8} {w}x{h})";
+                bool match;
+                if (PatternMatcher.IsPattern(filterTitle))
+                {
+                    // Pattern: try title first (backward compat), then full searchKey
+                    var m = PatternMatcher.Create(filterTitle);
+                    match = m.IsMatch(title) || m.IsMatch(searchKey);
+                }
+                else
+                {
+                    // Literal: Contains on full searchKey
+                    match = searchKey.Contains(filterTitle, StringComparison.OrdinalIgnoreCase);
+                }
                 if (!match) return null;
             }
             if (filterProcess != null)
