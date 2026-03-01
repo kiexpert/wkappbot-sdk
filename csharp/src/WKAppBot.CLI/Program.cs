@@ -739,7 +739,7 @@ internal partial class Program
     /// ## 헤더가 있으면 첫 헤더를 타이틀로, 그 아래 첫 문단을 내용으로 표시.
     /// 섹션 수도 함께 표시 → 미래 클롣이 "더 있다"는 것을 인지.
     /// </summary>
-    static void ShowKnowhowBroadcast(string knowhowPath)
+    static void ShowKnowhowBroadcast(string knowhowPath, string tag = "KNOWHOW")
     {
         try
         {
@@ -798,7 +798,7 @@ internal partial class Program
             // 출력: [KNOWHOW] (N sections) [title] paragraph...
             Console.ForegroundColor = ConsoleColor.Magenta;
             var countInfo = sectionCount > 1 ? $" ({sectionCount}§)" : "";
-            Console.Write($"  [KNOWHOW]{countInfo} ");
+            Console.Write($"  [{tag}]{countInfo} ");
             Console.ResetColor();
 
             if (!string.IsNullOrEmpty(title))

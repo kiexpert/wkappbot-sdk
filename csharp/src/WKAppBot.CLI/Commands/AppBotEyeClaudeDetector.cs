@@ -834,4 +834,112 @@ internal partial class Program
         }
         return null;
     }
+
+    // ── Spinner pixel detection (idle via animation absence) ──────────────────
+    // ★ Uses PrintWindow on Chrome_RenderWidgetHostHWND sub-window
+    //   → works even when Claude Desktop is covered by other windows or unfocused!
+    //   CopyFromScreen fails when covered. PrintWindow on Electron main window captures
+    //   only native chrome (title bar). But the render sub-window captures GPU web content!
+
+    static uint _lastSpinnerHash;
+    static int _consecutiveNoChange;
+    static IntPtr _cachedRenderHwnd;  // cached Chrome_RenderWidgetHostHWND
+
+    /// <summary>
+    /// Detect Claude Desktop spinner/animation above the prompt area.
+    /// Uses PrintWindow on Chrome_RenderWidgetHostHWND for focusless, Z-order-safe capture.
+    /// Samples a strip of 100 pixels above turn-form. If pixels are unchanged
+    /// for 2+ consecutive calls (1s apart) → spinner stopped → Claude idle.
+    /// Returns: true = idle detected, false = still animating or can't detect.
+    /// </summary>
+    static bool DetectSpinnerIdle(IntPtr claudeHwnd)
+    {
+        if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd)) return false;
+
+        try
+        {
+            // Find render sub-window (cached for performance)
+            if (_cachedRenderHwnd == IntPtr.Zero || !IsWindow(_cachedRenderHwnd))
+            {
+                _cachedRenderHwnd = NativeMethods.FindWindowExW(
+                    claudeHwnd, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
+                if (_cachedRenderHwnd == IntPtr.Zero) return false;
+            }
+
+            // Get render widget screen position (for coordinate conversion)
+            if (!NativeMethods.GetWindowRect(_cachedRenderHwnd, out var renderRect))
+                return false;
+            int renderW = renderRect.Right - renderRect.Left;
+            int renderH = renderRect.Bottom - renderRect.Top;
+            if (renderW <= 0 || renderH <= 0) return false;
+
+            // Find turn-form to anchor the spinner area (UIA — works even when covered)
+            using var automation = new UIA3Automation();
+            var window = automation.FromHandle(claudeHwnd);
+            if (window == null) return false;
+
+            var cf = new ConditionFactory(new UIA3PropertyLibrary());
+            var turnForm = window.FindFirstDescendant(cf.ByAutomationId("turn-form"));
+            if (turnForm == null) return false;
+
+            var tfRect = turnForm.BoundingRectangle;
+            if (tfRect.Height < 10) return false;
+
+            // Convert screen coordinates to render-widget-local coordinates
+            int sampleW = 100;
+            int screenX = (int)(tfRect.Left + (tfRect.Width / 2)) - (sampleW / 2);
+            int screenY = (int)tfRect.Top - 60;
+            int localX = screenX - renderRect.Left;
+            int localY = screenY - renderRect.Top;
+
+            // Bounds check
+            if (localX < 0 || localY < 0 || localX + sampleW > renderW || localY >= renderH)
+                return false;
+
+            // PrintWindow the full render widget → extract spinner strip
+            uint hash;
+            using (var fullBmp = new Bitmap(renderW, renderH, PixelFormat.Format32bppArgb))
+            {
+                using (var g = Graphics.FromImage(fullBmp))
+                {
+                    IntPtr hdc = g.GetHdc();
+                    bool ok = NativeMethods.PrintWindow(
+                        _cachedRenderHwnd, hdc, NativeMethods.PW_RENDERFULLCONTENT);
+                    g.ReleaseHdc(hdc);
+                    if (!ok) return false;
+                }
+
+                // FNV-1a hash of 100 pixels at spinner line
+                hash = 2166136261u;
+                for (int px = 0; px < sampleW; px++)
+                    hash = (hash ^ (uint)fullBmp.GetPixel(localX + px, localY).ToArgb()) * 16777619u;
+            }
+
+            if (hash == _lastSpinnerHash)
+            {
+                _consecutiveNoChange++;
+                if (_consecutiveNoChange >= 2)
+                    return true; // 2+ consecutive same → no animation → idle
+            }
+            else
+            {
+                _consecutiveNoChange = 0;
+                _lastSpinnerHash = hash;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Reset spinner detection state (e.g., on active recovery).</summary>
+    static void ResetSpinnerDetection()
+    {
+        _lastSpinnerHash = 0;
+        _consecutiveNoChange = 0;
+        _cachedRenderHwnd = IntPtr.Zero;
+    }
 }

@@ -276,6 +276,8 @@ internal partial class Program
     /// Broadcast knowhow for the inspect target.
     /// matchedFormId != null → 해당 폼 폴더의 knowhow.md만 방송
     /// matchedFormId == null → 프로파일의 모든 폼 knowhow.md 방송 (최대 5개)
+    /// 엑빌경로(A11Y) = profiles/{name}_exp/ — 플랫폼 무관, 프로필 기반
+    /// 운영경로(OS)  = experience/{process}/{class}/ — OS 종속 (Win32 class)
     /// </summary>
     static void BroadcastInspectKnowhow(IntPtr mainHandle, string mainClassName, string? matchedFormId, string? matchedFormTitle = null)
     {
@@ -285,55 +287,101 @@ internal partial class Program
             var procName = "";
             try { procName = System.Diagnostics.Process.GetProcessById((int)inspPid).ProcessName; } catch { }
 
+            // ── 경로 해석 ──
             var profileStore = new ProfileStore();
-            var profileMatch = profileStore.FindByMatch(mainClassName, "")
-                ?? (!string.IsNullOrEmpty(procName) ? profileStore.FindByMatch("", procName) : null);
-            if (profileMatch == null) return;
+            var profileMatch = profileStore.FindByMatch(mainClassName, procName);
 
-            var expDir = Path.Combine(profileStore.ProfileDir, $"{profileMatch.Value.name}_exp");
-            if (!Directory.Exists(expDir)) return;
-
-            if (!string.IsNullOrEmpty(matchedFormId))
+            // A11Y 경로 (프로필 기반)
+            string? a11yDir = null;
+            if (profileMatch != null)
             {
-                // 특정 폼 폴더의 노하우만 방송
-                var formDir = Path.Combine(expDir, $"form_{matchedFormId}");
-                if (Directory.Exists(formDir))
-                {
-                    var kh = Path.Combine(formDir, "knowhow.md");
-                    if (File.Exists(kh))
-                    {
-                        ShowKnowhowBroadcast(kh);
-                    }
-                    else
-                    {
-                        // 노하우 없으면 기본 템플릿 자동 생성
-                        TryGenerateKnowhowTemplate(formDir, matchedFormId, expDir, matchedFormTitle);
-                        if (File.Exists(kh)) ShowKnowhowBroadcast(kh);
-                    }
+                a11yDir = Path.Combine(profileStore.ProfileDir, $"{profileMatch.Value.name}_exp");
+                if (!Directory.Exists(a11yDir)) a11yDir = null;
+            }
 
-                    // 해당 폼 트리 하위의 노하우도 탐색
-                    var treeDir = Path.Combine(formDir, "tree");
-                    if (Directory.Exists(treeDir))
+            // OS 경로 (process/class 기반)
+            string? osDir = null;
+            if (!string.IsNullOrEmpty(procName))
+            {
+                var safeProc = SanitizePathToken(procName);
+                var safeClass = SanitizePathToken(mainClassName);
+                osDir = Path.Combine(DataDir, "experience", safeProc, safeClass);
+                if (!Directory.Exists(osDir)) osDir = null;
+            }
+
+            // 경로 표시
+            if (a11yDir != null || osDir != null)
+            {
+                if (a11yDir != null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.Write("  [A11Y] ");
+                    Console.ResetColor();
+                    Console.WriteLine(Path.GetRelativePath(Path.GetDirectoryName(profileStore.ProfileDir)!, a11yDir));
+                }
+                if (osDir != null)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.Write("  [OS]   ");
+                    Console.ResetColor();
+                    Console.WriteLine(Path.GetRelativePath(DataDir, osDir));
+                }
+            }
+
+            if (a11yDir == null && osDir == null) return;
+
+            // ── A11Y 노하우 방송 ──
+            if (a11yDir != null)
+            {
+                // Profile-level knowhow
+                var profileKh = Path.Combine(a11yDir, "knowhow.md");
+                if (File.Exists(profileKh)) ShowKnowhowBroadcast(profileKh, "KNOWHOW:A11Y");
+
+                if (!string.IsNullOrEmpty(matchedFormId))
+                {
+                    var formDir = Path.Combine(a11yDir, $"form_{matchedFormId}");
+                    if (Directory.Exists(formDir))
                     {
-                        foreach (var khFile in Directory.GetFiles(treeDir, "knowhow*.md", SearchOption.AllDirectories).Take(5))
+                        var kh = Path.Combine(formDir, "knowhow.md");
+                        if (File.Exists(kh))
                         {
-                            ShowKnowhowBroadcast(khFile);
+                            ShowKnowhowBroadcast(kh, "KNOWHOW:A11Y");
+                        }
+                        else
+                        {
+                            TryGenerateKnowhowTemplate(formDir, matchedFormId, a11yDir, matchedFormTitle);
+                            if (File.Exists(kh)) ShowKnowhowBroadcast(kh, "KNOWHOW:A11Y");
+                        }
+
+                        var treeDir = Path.Combine(formDir, "tree");
+                        if (Directory.Exists(treeDir))
+                        {
+                            foreach (var khFile in Directory.GetFiles(treeDir, "knowhow*.md", SearchOption.AllDirectories).Take(5))
+                                ShowKnowhowBroadcast(khFile, "KNOWHOW:A11Y");
                         }
                     }
                 }
-            }
-            else
-            {
-                // 전체 폼 폴더 스캔 (메인윈도 inspect)
-                foreach (var formDir in Directory.GetDirectories(expDir, "form_*").Take(5))
+                else
                 {
-                    var kh = Path.Combine(formDir, "knowhow.md");
-                    if (File.Exists(kh)) ShowKnowhowBroadcast(kh);
+                    foreach (var formDir in Directory.GetDirectories(a11yDir, "form_*").Take(5))
+                    {
+                        var kh = Path.Combine(formDir, "knowhow.md");
+                        if (File.Exists(kh)) ShowKnowhowBroadcast(kh, "KNOWHOW:A11Y");
+                    }
                 }
+            }
+
+            // ── OS 노하우 방송 ──
+            if (osDir != null)
+            {
+                var osKh = Path.Combine(osDir, "knowhow.md");
+                if (File.Exists(osKh)) ShowKnowhowBroadcast(osKh, "KNOWHOW:OS");
             }
         }
         catch { /* best-effort */ }
     }
+
+    // SanitizePathToken is defined in SnapshotCommand.cs (same partial class)
 
     /// <summary>
     /// 노하우 없는 폼 폴더에 기본 템플릿 자동 생성.

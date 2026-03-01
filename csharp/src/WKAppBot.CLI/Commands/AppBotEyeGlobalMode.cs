@@ -94,6 +94,10 @@ internal partial class Program
 
         Console.WriteLine("[EYE] Global monitor active — press Ctrl+C to stop");
 
+        // ★ Force focusless: Eye should NEVER steal foreground focus
+        ClaudePromptHelper.ForceFocusless = true;
+        Console.WriteLine("[EYE] ForceFocusless=ON (prompt delivery will not steal focus)");
+
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
@@ -120,6 +124,8 @@ internal partial class Program
         string? slackStatusTs = null;
         string? lastSlackStatusText = null;
         string? lastExecutingText = null; // remember last "executing" status for prompt_ready transition
+        string? idleAfterText = null; // persisted: what was the last task before going idle
+        bool idleMessageSent = false; // whether idle status message has been posted to Slack
         var statusTsFile = Path.Combine(DataDir, "runtime", "status_streaming_ts.txt");
 
         // Restore previous status message ts (reuse on restart instead of creating new)
@@ -331,20 +337,9 @@ internal partial class Program
 
                         if (claudeStatus != null)
                         {
-                            // Remember last executing text for "XX 후 프롬프트 입력 대기" transition
+                            // Remember last executing text for idle display
                             if (claudeStatus.Item1 == "executing")
                                 lastExecutingText = claudeStatus.Item2;
-
-                            // Enrich prompt_ready with previous task context
-                            if (claudeStatus.Item1 == "prompt_ready" && lastExecutingText != null)
-                            {
-                                // Shorten: "Updated WKAppBot.CLI project file configuration" → first 30 chars
-                                var prev = lastExecutingText.Length > 30
-                                    ? lastExecutingText.Substring(0, 30) + "..."
-                                    : lastExecutingText;
-                                claudeStatus = Tuple.Create("prompt_ready", $"{prev} 후 입력 대기");
-                                lastExecutingText = null; // consume
-                            }
 
                             cachedClaudeStatusText = $"Claude: {claudeStatus.Item2}";
 
@@ -609,57 +604,54 @@ internal partial class Program
                             {
                                 try
                                 {
-                                    // Never show permission_prompt in status stream — handled by Block Kit buttons separately.
-                                    // When permission clears, idle handler uses lastExecutingText → "XX 후 프롬프트 대기"
+                                    // Never show permission_prompt in status stream
                                     if (claudeStatus.Item1 == "permission_prompt")
                                         goto skipStatusStreaming;
 
-                                    var statusEmoji = claudeStatus.Item1 switch
+                                    // ── Build status text ──
+                                    // Note: idle detection is handled by spinner pixel check below, NOT by prompt_ready.
+                                    // prompt_ready from Claude Desktop is unreliable (KRO keeps "executing" active).
+                                    string slackText;
+                                    if (claudeStatus.Item1 == "prompt_ready")
                                     {
-                                        "executing" => ":gear:",
-                                        "plan_approval_pending" => ":clipboard:",
-                                        "plan_mode" => ":memo:",
-                                        "permission_prompt" => ":lock:",
-                                        "prompt_ready" => ":speech_balloon:",
-                                        "rate_limit" => ":warning:",
-                                        _ => ":robot_face:"
-                                    };
-                                    var slackText = $"{statusEmoji} Claude: {claudeStatus.Item2}";
-                                    bool textChanged = slackText != lastSlackStatusText;
-
-                                    if (slackStatusTs != null && textChanged)
-                                    {
-                                        // Check if our status message is still the latest in channel
-                                        var latestTs = Task.Run(async () =>
-                                            await GetChannelLatestMessageTs(slackBotToken!, slackChannel!))
-                                            .GetAwaiter().GetResult();
-
-                                        if (latestTs == slackStatusTs)
-                                        {
-                                            // Still latest → chat.update (reuse)
-                                            var localTs = slackStatusTs;
-                                            Task.Run(async () => await SlackUpdateMessageAsync(
-                                                slackBotToken!, slackChannel!, localTs, slackText))
-                                                .Wait(3000);
-                                        }
-                                        else
-                                        {
-                                            // Not latest → delete old + create new (relocate to bottom)
-                                            var oldTs = slackStatusTs;
-                                            Task.Run(async () => await SlackDeleteMessageAsync(
-                                                slackBotToken!, slackChannel!, oldTs)).Wait(3000);
-                                            var (ok, ts) = Task.Run(async () =>
-                                                await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
-                                                .GetAwaiter().GetResult();
-                                            if (ok && ts != null)
-                                            {
-                                                slackStatusTs = ts;
-                                                try { File.WriteAllText(statusTsFile, ts); } catch { }
-                                            }
-                                        }
-                                        lastSlackStatusText = slackText;
+                                        // Skip — spinner detection handles idle below
+                                        goto skipStatusStreaming;
                                     }
-                                    else if (slackStatusTs == null && textChanged)
+                                    else
+                                    {
+                                        // Active: reset idle ONLY if spinner is animating again (proves something is working)
+                                        // Without this check: KRO keeps claudeStatus="executing" → ping-pong idle↔active
+                                        if (idleMessageSent)
+                                        {
+                                            // DetectSpinnerIdle returns true=idle. If still idle → skip active status.
+                                            // If spinner started again (not idle) → allow active status to proceed.
+                                            if (DetectSpinnerIdle(claudeHwnd)) goto skipStatusStreaming;
+                                            // Spinner is animating again → activity resumed!
+                                            ResetSpinnerDetection();
+                                            idleAfterText = null; // clear for next idle cycle
+                                        }
+                                        idleMessageSent = false;
+                                        var statusEmoji = claudeStatus.Item1 switch
+                                        {
+                                            "executing" => ":gear:",
+                                            "plan_approval_pending" => ":clipboard:",
+                                            "plan_mode" => ":memo:",
+                                            "rate_limit" => ":warning:",
+                                            _ => ":robot_face:"
+                                        };
+                                        slackText = $"{statusEmoji} Claude: {claudeStatus.Item2}";
+                                    }
+
+                                    if (slackText == lastSlackStatusText) goto skipStatusStreaming;
+
+                                    // ── Always: delete old → post new (fresh timestamp) ──
+                                    if (slackStatusTs != null)
+                                    {
+                                        var oldTs = slackStatusTs;
+                                        Task.Run(async () => await SlackDeleteMessageAsync(
+                                            slackBotToken!, slackChannel!, oldTs)).Wait(3000);
+                                        slackStatusTs = null;
+                                    }
                                     {
                                         var (ok, ts) = Task.Run(async () =>
                                             await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
@@ -674,6 +666,49 @@ internal partial class Program
                                 }
                                 catch { /* best-effort */ }
                                 skipStatusStreaming:
+
+                                // ── Spinner pixel idle: if Claude Desktop prompt area stops animating → idle ──
+                                // Samples pixels above turn-form every tick (~1s).
+                                // 2 consecutive identical hashes = no animation = idle.
+                                if (!idleMessageSent
+                                    && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                                {
+                                    try
+                                    {
+                                        if (DetectSpinnerIdle(claudeHwnd))
+                                        {
+                                            // Spinner stopped → Claude idle!
+                                            if (idleAfterText == null)
+                                            {
+                                                if (lastExecutingText != null)
+                                                    idleAfterText = lastExecutingText;
+                                                lastExecutingText = null;
+                                            }
+                                            var idleSuffix = idleAfterText != null ? $" after: {idleAfterText}" : "";
+                                            var idleMsg = $":zzz: Idle{idleSuffix}";
+                                            // Delete old status → post new idle message
+                                            if (slackStatusTs != null)
+                                            {
+                                                var oldTs = slackStatusTs;
+                                                Task.Run(async () => await SlackDeleteMessageAsync(
+                                                    slackBotToken!, slackChannel!, oldTs)).Wait(3000);
+                                                slackStatusTs = null;
+                                            }
+                                            var (idleOk, idleTs) = Task.Run(async () =>
+                                                await SlackSendViaApi(slackBotToken!, slackChannel!, idleMsg, username: botUsername))
+                                                .GetAwaiter().GetResult();
+                                            if (idleOk && idleTs != null)
+                                            {
+                                                slackStatusTs = idleTs;
+                                                try { File.WriteAllText(statusTsFile, idleTs); } catch { }
+                                            }
+                                            lastSlackStatusText = idleMsg;
+                                            idleMessageSent = true;
+                                            Console.WriteLine($"[EYE] Spinner idle: {idleMsg}");
+                                        }
+                                    }
+                                    catch { }
+                                }
 
                                 // Plan approval → Slack
                                 if (claudeStatus.Item1 == "plan_approval_pending" && !planApprovalSentToSlack)
@@ -765,59 +800,7 @@ internal partial class Program
                         }
                         else
                         {
-                            // Claude status null (idle) — update Slack to show idle
-                            // ★ Guard: both idle text variants MUST contain "프롬프트 대기" to prevent re-fire
-                            if (slackStatusTs != null
-                                && lastSlackStatusText != null
-                                && !lastSlackStatusText.Contains("프롬프트 대기"))
-                            {
-                                try
-                                {
-                                    string idleText;
-                                    if (lastExecutingText != null)
-                                    {
-                                        var prev = lastExecutingText.Length > 30
-                                            ? lastExecutingText.Substring(0, 30) + "..."
-                                            : lastExecutingText;
-                                        idleText = $":speech_balloon: {prev} 후 프롬프트 대기";
-                                    }
-                                    else
-                                    {
-                                        // ★ FIX: "프롬프트 입력 대기" didn't contain guard "프롬프트 대기"!
-                                        idleText = ":speech_balloon: 프롬프트 대기";
-                                    }
-
-                                    // ★ FIX: Relocate to bottom if buried (same as active status)
-                                    var latestTs = Task.Run(async () =>
-                                        await GetChannelLatestMessageTs(slackBotToken!, slackChannel!))
-                                        .GetAwaiter().GetResult();
-
-                                    if (latestTs == slackStatusTs)
-                                    {
-                                        Task.Run(async () => await SlackUpdateMessageAsync(
-                                            slackBotToken!, slackChannel!, slackStatusTs, idleText))
-                                            .Wait(3000);
-                                    }
-                                    else
-                                    {
-                                        // Buried → delete old + create new at bottom
-                                        var oldTs = slackStatusTs;
-                                        Task.Run(async () => await SlackDeleteMessageAsync(
-                                            slackBotToken!, slackChannel!, oldTs)).Wait(3000);
-                                        var (ok, ts) = Task.Run(async () =>
-                                            await SlackSendViaApi(slackBotToken!, slackChannel!, idleText, username: botUsername))
-                                            .GetAwaiter().GetResult();
-                                        if (ok && ts != null)
-                                        {
-                                            slackStatusTs = ts;
-                                            try { File.WriteAllText(statusTsFile, ts); } catch { }
-                                        }
-                                    }
-                                    lastSlackStatusText = idleText;
-                                    Console.WriteLine($"[EYE] Status → idle: {idleText}");
-                                }
-                                catch (Exception ex) { Console.WriteLine($"[EYE] Idle status error: {ex.Message}"); }
-                            }
+                            // Claude status null — tick-file idle will handle Slack status
                             cachedClaudeStatusText = null;
 
                             // Claude status null (idle) — ★ 리밋 중에 idle 감지 = 리밋 해제!
@@ -1064,7 +1047,7 @@ internal partial class Program
         {
             latest = ReadLatestTick(out tickRead, out tickParse);
             _cachedLatestTick = latest;
-            _cachedCards = ReadEyeCards(staleSeconds: 180);
+            _cachedCards = ReadEyeCards(staleSeconds: 86400); // 24 hours
         }
         swTick.Stop();
 
@@ -1283,7 +1266,7 @@ internal partial class Program
             var latest = ReadLatestTick(out tickRead, out tickParse);
             var promptDiag = new PromptDiag();
             var prompt = ReadLatestOpenClawPromptPreview(promptDiag);
-            var cards = ReadEyeCards(staleSeconds: 180);
+            var cards = ReadEyeCards(staleSeconds: 86400); // 24 hours
             _lastPromptSource = promptDiag.Source;
 
             Console.WriteLine("[EYE] one-shot tick");
@@ -1527,6 +1510,21 @@ internal partial class Program
 
                 if (replyCount <= 0) continue;
 
+                // Skip threads older than 1 hour — prevents old message flood on Eye restart
+                if (!string.IsNullOrEmpty(ts))
+                {
+                    if (double.TryParse(ts, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var tsEpoch))
+                    {
+                        var ageSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - tsEpoch;
+                        if (ageSeconds > 3600)
+                        {
+                            // Silently skip — old thread, no need to scan replies
+                            continue;
+                        }
+                    }
+                }
+
                 // Is this a bot message? (either user==botUserId or has bot_id or subtype==bot_message)
                 bool isBotMsg = user == botUserId
                     || !string.IsNullOrEmpty(botId)
@@ -1750,8 +1748,16 @@ internal partial class Program
                         ? (string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : c.ParentTitle)
                         : cwdTag;
                     sb.AppendLine($"[{header}] {c.ParentName}:{c.ParentPid}");
-                    sb.AppendLine($"클롣 작업: {c.LastTag}");
-                    sb.AppendLine($"클롣 상태: {c.LastStatus} ({ageText})");
+                    // If last tick is older than 30s, show idle state instead of stale command info
+                    if (age > 30)
+                    {
+                        sb.AppendLine($"클롣 상태: 대기중 ({ageText})");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"클롣 작업: {c.LastTag}");
+                        sb.AppendLine($"클롣 상태: {c.LastStatus} ({ageText})");
+                    }
                     sb.AppendLine("----");
                 }
                 else
@@ -2260,6 +2266,76 @@ internal partial class Program
         catch { return Array.Empty<string>(); }
     }
 
+    // Commands to skip when building idle-after text (meta + communication noise)
+    static readonly HashSet<string> _idleSkipCommands = new(StringComparer.OrdinalIgnoreCase)
+    { "eye", "slack", "tick" };
+
+    /// <summary>
+    /// Get age (seconds since last modification) of the most recent Claude Code session JSONL.
+    /// Claude Code writes to ~/.claude/projects/{project}/*.jsonl during ALL activity
+    /// (file reads, edits, builds, tool calls) — not just wkappbot commands.
+    /// Returns 9999 if no session file found.
+    /// </summary>
+    static double GetClaudeCodeSessionAge()
+    {
+        try
+        {
+            var claudeDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects");
+            if (!Directory.Exists(claudeDir)) return 9999;
+
+            // Find most recently modified .jsonl across all projects
+            DateTime latestUtc = DateTime.MinValue;
+            foreach (var projDir in Directory.GetDirectories(claudeDir))
+            {
+                try
+                {
+                    foreach (var jsonl in Directory.GetFiles(projDir, "*.jsonl"))
+                    {
+                        var mtime = File.GetLastWriteTimeUtc(jsonl);
+                        if (mtime > latestUtc) latestUtc = mtime;
+                    }
+                }
+                catch { }
+            }
+
+            if (latestUtc == DateTime.MinValue) return 9999;
+            return (DateTime.UtcNow - latestUtc).TotalSeconds;
+        }
+        catch { return 9999; }
+    }
+
+    /// <summary>
+    /// Read the last meaningful tick's tag from eye_ticks.jsonl.
+    /// Skips meta tags AND communication commands (slack, eye) to find actual work.
+    /// Returns like "publish/build" or "inspect" — shown as idle-after text.
+    /// </summary>
+    static string? GetLastTickTag()
+    {
+        try
+        {
+            if (!File.Exists(EyeTicksPath)) return null;
+            var lines = ReadTailLinesShared(EyeTicksPath, 8192); // ~last 30 ticks (may need deeper scan)
+            for (int i = lines.Length - 1; i >= 0; i--)
+            {
+                if (string.IsNullOrWhiteSpace(lines[i])) continue;
+                var t = System.Text.Json.JsonSerializer.Deserialize<EyeTick>(lines[i]);
+                if (t == null) continue;
+                // Skip meta tags (eye, snapshot, validate, help)
+                if (IsMetaTag(t.Tag)) continue;
+                // Skip communication commands (slack send/reply, eye tick)
+                if (_idleSkipCommands.Contains(t.Command ?? "")) continue;
+                var tag = t.Tag ?? "";
+                // Include command for context: "publish/build" or "run/click"
+                if (!string.IsNullOrEmpty(t.Command) && !tag.StartsWith(t.Command))
+                    return $"{t.Command}/{tag}";
+                return tag;
+            }
+        }
+        catch { }
+        return null;
+    }
+
     static (string progress, string done, string next, string block) BuildKroStatus3(EyeTick t)
     {
         var report = $"{t.Command}/{t.Tag}";
@@ -2302,13 +2378,14 @@ internal partial class Program
     static bool IsMetaTag(string? tag) =>
         !string.IsNullOrWhiteSpace(tag) && _metaTags.Contains(tag!);
 
-    static List<EyeParentCard> ReadEyeCards(int staleSeconds = 25)
+    static List<EyeParentCard> ReadEyeCards(int staleSeconds = 86400)
     {
         // KEY = normalized CWD (folder-based grouping: same folder = one card, survives PID restart)
         var cards = new Dictionary<string, EyeParentCard>(StringComparer.OrdinalIgnoreCase);
         var path = EyeTicksPath;
         if (!File.Exists(path)) return cards.Values.ToList();
 
+        // 2MB tail: enough for ~24h of ticks (each tick ~200 bytes, tick every ~10s = ~1.7MB/day)
         var lines = ReadTailLinesShared(path, 64 * 1024);
         var now = DateTime.UtcNow;
 

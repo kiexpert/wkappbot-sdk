@@ -318,17 +318,44 @@ internal partial class Program
         a.ConnectionTimeout = TimeSpan.FromSeconds(10);
         a.TransactionTimeout = TimeSpan.FromSeconds(10);
         var root = a.FromHandle(hwnd);
-        var btns = root.FindAllDescendants(x => x.ByControlType(ControlType.Button));
+        // Recursive walk (like inspect) to find element by name — FindAllDescendants misses Electron subtrees
         AutomationElement? btn = null;
-        foreach (var b in btns)
+        var candidates = new List<(string type, string name)>();
+        void Walk(AutomationElement el, int depth)
         {
-            try { if ((b.Properties.Name.ValueOrDefault ?? "").Contains(target, StringComparison.OrdinalIgnoreCase)) { btn = b; break; } }
+            if (depth > 15 || btn != null) return;
+            try
+            {
+                var name = el.Properties.Name.ValueOrDefault ?? "";
+                if (name.Equals(target, StringComparison.OrdinalIgnoreCase)
+                    || (name.Length < 200 && name.Contains(target, StringComparison.OrdinalIgnoreCase)))
+                {
+                    bool hasInvoke = false;
+                    try { hasInvoke = el.Patterns.Invoke.IsSupported; } catch { }
+                    string ct = "?";
+                    try { ct = el.ControlType.ToString(); } catch { }
+                    if (hasInvoke)
+                    {
+                        btn = el;
+                        return;
+                    }
+                    // Also check LegacyIAccessible default action as fallback (Electron Hyperlinks)
+                    if (!hasInvoke && ct.Contains("Hyperlink", StringComparison.OrdinalIgnoreCase))
+                    {
+                        btn = el; // Hyperlinks are invokable via LegacyIA
+                        return;
+                    }
+                    candidates.Add((ct, name.Length > 80 ? name[..80] + "..." : name));
+                }
+            }
             catch { }
+            try { foreach (var child in el.FindAllChildren()) Walk(child, depth + 1); } catch { }
         }
+        Walk(root, 0);
         if (btn == null)
         {
-            Console.WriteLine($"Button '{target}' not found. Available:");
-            foreach (var b in btns.Take(20)) try { Console.WriteLine($"  [{b.Properties.Name.ValueOrDefault}]"); } catch { }
+            Console.WriteLine($"Invokable '{target}' not found. Matches without Invoke pattern:");
+            foreach (var (t, n) in candidates.Take(10)) Console.WriteLine($"  [{t}] \"{n}\"");
             return 1;
         }
         // [ZOOM] Quick invoke with zoom overlay

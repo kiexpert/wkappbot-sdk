@@ -149,6 +149,11 @@ public sealed class ProfileStore
     {
         if (!Directory.Exists(_profileDir)) return null;
 
+        // Two-pass: first prefer process match (most specific), then fallback to window class
+        // classOnly fallback is only used when exactly ONE profile has that window class (not ambiguous)
+        (string name, AppProfile profile)? classOnlyMatch = null;
+        int classMatchCount = 0;
+
         foreach (var file in Directory.GetFiles(_profileDir, "*.json"))
         {
             try
@@ -157,24 +162,32 @@ public sealed class ProfileStore
                 var profile = JsonSerializer.Deserialize<AppProfile>(json, JsonOpts);
                 if (profile == null) continue;
 
-                // Match by window class (exact)
-                if (!string.IsNullOrEmpty(profile.App.WindowClass) &&
-                    string.Equals(profile.App.WindowClass, windowClass, StringComparison.OrdinalIgnoreCase))
-                {
-                    return (Path.GetFileNameWithoutExtension(file), profile);
-                }
+                var matchesClass = !string.IsNullOrEmpty(profile.App.WindowClass) &&
+                    string.Equals(profile.App.WindowClass, windowClass, StringComparison.OrdinalIgnoreCase);
+                var matchesProc = !string.IsNullOrEmpty(profile.App.Process) &&
+                    string.Equals(profile.App.Process, processName, StringComparison.OrdinalIgnoreCase);
 
-                // Match by process name
-                if (!string.IsNullOrEmpty(profile.App.Process) &&
-                    string.Equals(profile.App.Process, processName, StringComparison.OrdinalIgnoreCase))
-                {
+                // Best: both match
+                if (matchesClass && matchesProc)
                     return (Path.GetFileNameWithoutExtension(file), profile);
+
+                // Process-only match (high priority)
+                if (matchesProc)
+                    return (Path.GetFileNameWithoutExtension(file), profile);
+
+                // Track window class matches for ambiguity check
+                if (matchesClass)
+                {
+                    classMatchCount++;
+                    if (classOnlyMatch == null)
+                        classOnlyMatch = (Path.GetFileNameWithoutExtension(file), profile);
                 }
             }
             catch { /* skip corrupt profiles */ }
         }
 
-        return null;
+        // Only return classOnly match if unambiguous (e.g. Chrome_WidgetWin_1 shared by many apps)
+        return classMatchCount == 1 ? classOnlyMatch : null;
     }
 
     /// <summary>
