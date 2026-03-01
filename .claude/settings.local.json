@@ -60,7 +60,8 @@
       "Write(**/*.yml)",
       "WebSearch(*)",
       "WebFetch(*)",
-      "mcp__Desktop_Commander__list_directory"
+      "mcp__Desktop_Commander__list_directory",
+      "mcp__Desktop_Commander__get_file_info"
     ]
   }
 }

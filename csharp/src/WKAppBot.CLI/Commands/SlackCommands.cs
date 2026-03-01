@@ -813,13 +813,12 @@ internal partial class Program
         Console.WriteLine("  status              Check if background listener is running");
         Console.WriteLine("  stop                Stop background listener");
         Console.WriteLine("  inbox               Show unread @mention messages");
-        Console.WriteLine("  reply \"text\" [--channel ID] [--thread TS]");
+        Console.WriteLine("  reply \"text\" [--channel ID] [--msg TS]");
         Console.WriteLine("                        Reply to Slack and clear inbox");
-        Console.WriteLine("                        --channel: target channel (default: from inbox/config)");
-        Console.WriteLine("                        --thread: reply in-thread (Slack message timestamp)");
-        Console.WriteLine("  upload <file> [--channel ID] [--thread TS] [--title \"name\"]");
+        Console.WriteLine("                        --msg: reply in-thread (request message timestamp)");
+        Console.WriteLine("  upload <file> [--channel ID] [--msg TS] [--title \"name\"]");
         Console.WriteLine("                        Upload a file to Slack channel");
-        Console.WriteLine("  screenshot [window-title] [--channel ID] [--thread TS]");
+        Console.WriteLine("  screenshot [window-title] [--channel ID] [--msg TS]");
         Console.WriteLine("                        Capture screenshot and upload to Slack");
         Console.WriteLine("                        (no title = full screen capture)");
         Console.WriteLine("  catch-up [--channel ID] [--limit N]");

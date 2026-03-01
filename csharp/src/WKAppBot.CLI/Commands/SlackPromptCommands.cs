@@ -49,19 +49,19 @@ internal partial class Program
 
     /// <summary>
     /// Reply to a Slack message (and clear inbox).
-    /// Usage: wkappbot slack reply "response text" [--channel C0AFXJBMB2N] [--thread 1234567890.123456]
+    /// Usage: wkappbot slack reply "response text" [--channel C0AFXJBMB2N] [--msg 1234567890.123456]
     ///   --channel: target channel ID (default: from latest inbox message or config)
-    ///   --thread: reply in-thread to the original message (Slack thread_ts)
+    ///   --msg: reply in-thread to the request message (Slack message timestamp)
     /// </summary>
     static int SlackReplyCommand(string[] args)
     {
         if (args.Length < 2)
         {
-            Console.WriteLine("Usage: wkappbot slack reply \"response text\" [--channel ID] [--thread TS]");
+            Console.WriteLine("Usage: wkappbot slack reply \"response text\" [--channel ID] [--msg TS]");
             return 1;
         }
 
-        // Parse --channel and --thread flags
+        // Parse --channel and --msg flags (--thread accepted as legacy alias)
         string? explicitChannel = null;
         string? threadTs = null;
         var textParts = new List<string>();
@@ -71,7 +71,7 @@ internal partial class Program
             {
                 explicitChannel = args[++i];
             }
-            else if (args[i] == "--thread" && i + 1 < args.Length)
+            else if ((args[i] == "--msg" || args[i] == "--thread") && i + 1 < args.Length)
             {
                 threadTs = args[++i];
             }
@@ -248,8 +248,8 @@ internal partial class Program
 
                 // Format: message first, then source attribution + reply hint (with thread_ts)
                 var ts = msg?["ts"]?.GetValue<string>() ?? "";
-                var replyCmd = $"wkappbot slack reply \"your response\" --channel {channel} --thread {ts}";
-                var promptText = $"{text}\n\n(Slack @{user} #{channel} — reply: {replyCmd})";
+                var replyCmd = $"wkappbot slack reply \"MUST reply here\" --channel {channel} --msg {ts}";
+                var promptText = $"{text}\n\n(Slack @{user} #{channel} — {replyCmd})";
 
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.WriteLine($"[SLACK] >> Typing into prompt: {promptText}");
@@ -384,8 +384,8 @@ internal partial class Program
                 var replyThread = threadTs ?? ts;
                 if (toPrompt && promptHelper != null)
                 {
-                    var replyHint = $"wkappbot slack reply \"your response\" --channel {channel} --thread {replyThread}";
-                    var promptText = $"{cleanText}\n\n(Slack @{user} #{channel} — reply: {replyHint})";
+                    var replyHint = $"wkappbot slack reply \"MUST reply here\" --channel {channel} --msg {replyThread}";
+                    var promptText = $"{cleanText}\n\n(Slack @{user} #{channel} — {replyHint})";
 
                     var fresh = promptHelper.FindPrompt();
                     if (fresh != null)
