@@ -129,17 +129,15 @@ internal partial class Program
         bool idleMessageSent = false; // whether idle status message has been posted to Slack
         var statusTsFile = Path.Combine(DataDir, "runtime", "status_streaming_ts.txt");
 
-        // Restore previous status message ts (reuse on restart instead of creating new)
+        // Previous status message ts — will be deleted after Slack connects
+        string? previousStatusTs = null;
         try
         {
             if (File.Exists(statusTsFile))
             {
                 var savedTs = File.ReadAllText(statusTsFile).Trim();
                 if (!string.IsNullOrEmpty(savedTs))
-                {
-                    slackStatusTs = savedTs;
-                    Console.WriteLine($"[EYE] Restored previous status message (ts={savedTs})");
-                }
+                    previousStatusTs = savedTs;
             }
         }
         catch { }
@@ -177,7 +175,15 @@ internal partial class Program
                     Console.WriteLine("[EYE] Slack Socket Mode connected (GlobalMode)");
                     Console.ResetColor();
 
-                    // Startup — no Slack announcement (reduces channel spam on hot-reload restarts)
+                    // Startup: delete previous status message (stale idle/status from last Eye session)
+                    if (previousStatusTs != null)
+                    {
+                        Console.WriteLine($"[EYE] Deleting previous status message (ts={previousStatusTs})");
+                        Task.Run(async () => await SlackDeleteMessageAsync(
+                            slackBotToken!, slackChannel!, previousStatusTs)).Wait(3000);
+                        try { File.WriteAllText(statusTsFile, ""); } catch { }
+                        previousStatusTs = null;
+                    }
                     string? startupTs = null;
 
                     // Set up event handlers (Slack → Claude prompt forwarding, plan/permission approval, status streaming)
