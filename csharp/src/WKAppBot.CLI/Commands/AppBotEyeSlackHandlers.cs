@@ -196,22 +196,60 @@ internal partial class Program
             else
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("[EYE][SLACK] Prompt not found! Claude 상태 확인 중...");
+                Console.WriteLine("[EYE][SLACK] Prompt not found! 새 채팅 폴백 시도...");
                 Console.ResetColor();
 
                 var ackThread = msg.ThreadTs ?? msg.Timestamp;
+
+                // ★ New-chat fallback: if Claude Desktop window exists, try click+paste
+                if (claudeHwnd != IntPtr.Zero)
+                {
+                    var replyThread = msg.ThreadTs ?? msg.Timestamp;
+                    var threadContext = "";
+                    if (msg.ThreadTs != null)
+                    {
+                        var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
+                        if (!string.IsNullOrEmpty(ctx)) threadContext = $"\n{ctx}\n";
+                    }
+                    var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, replyThread)}";
+
+                    if (promptHelper.TryNewChatInput(claudeHwnd, promptText))
+                    {
+                        Console.WriteLine("[EYE][SLACK] >> New-chat fallback SUCCESS!");
+                        handledByMention.Add(msg.Timestamp);
+                        DeletePendingAck(ackThread);
+                        SendAndTrackAck(msg.Channel, ackThread);
+                        return; // skip diagnosis
+                    }
+                    Console.WriteLine("[EYE][SLACK] New-chat fallback FAILED, running diagnosis...");
+                }
+
                 try
                 {
-                    // Check Claude Desktop status for better diagnosis
+                    // Comprehensive diagnosis
                     var claudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
                     var statusInfo = claudeStatus != null
                         ? $"Claude 상태: {claudeStatus.Item2}"
                         : "Claude 상태: 감지 불가";
 
-                    var diagMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
+                    string diagDetail;
+                    try { diagDetail = promptHelper.DiagnosePromptSearch(); }
+                    catch (Exception dex) { diagDetail = $"(진단 실패: {dex.Message})"; }
+
+                    Console.WriteLine(diagDetail);
+                    try
+                    {
+                        var diagPath = Path.Combine(DataDir, "logs", $"prompt_diag_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                        File.WriteAllText(diagPath, $"{statusInfo}\n{diagDetail}\n받은 메시지: {cleanText}");
+                        Console.WriteLine($"[EYE] Diagnosis saved: {diagPath}");
+                    }
+                    catch { }
+
+                    var slackMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
                         $"{statusInfo}\n" +
-                        $"받은 메시지: {cleanText}";
-                    Task.Run(async () => await Send(msg.Channel, diagMsg, ackThread)).Wait(5000);
+                        $"받은 메시지: {cleanText}\n" +
+                        $"```\n{(diagDetail.Length > 800 ? diagDetail.Substring(0, 800) + "\n...(truncated)" : diagDetail)}\n```";
+                    Task.Run(async () => await Send(msg.Channel, slackMsg, ackThread)).Wait(5000);
                 }
                 catch
                 {
@@ -385,8 +423,28 @@ internal partial class Program
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("[EYE][SLACK] >> Thread reply: Prompt not found!");
+                    Console.WriteLine("[EYE][SLACK] >> Thread reply: Prompt not found! 새 채팅 폴백 시도...");
                     Console.ResetColor();
+
+                    // ★ New-chat fallback
+                    if (claudeHwnd != IntPtr.Zero)
+                    {
+                        var threadContext = "";
+                        if (msg.ThreadTs != null)
+                        {
+                            var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
+                            if (!string.IsNullOrEmpty(ctx)) threadContext = $"\n{ctx}\n";
+                        }
+                        var fallbackText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, msg.ThreadTs!, "thread reply")}";
+                        if (trPromptHelper.TryNewChatInput(claudeHwnd, fallbackText))
+                        {
+                            Console.WriteLine("[EYE][SLACK] >> Thread reply: New-chat fallback SUCCESS!");
+                            DeletePendingAck(msg.ThreadTs!);
+                            SendAndTrackAck(msg.Channel, msg.ThreadTs!);
+                            return;
+                        }
+                        Console.WriteLine("[EYE][SLACK] New-chat fallback FAILED, running diagnosis...");
+                    }
 
                     try
                     {
@@ -394,9 +452,24 @@ internal partial class Program
                         var trStatusInfo = trClaudeStatus != null
                             ? $"Claude 상태: {trClaudeStatus.Item2}"
                             : "Claude 상태: 감지 불가";
+
+                        string trDiagDetail;
+                        try { trDiagDetail = trPromptHelper.DiagnosePromptSearch(); }
+                        catch (Exception dex) { trDiagDetail = $"(진단 실패: {dex.Message})"; }
+
+                        Console.WriteLine(trDiagDetail);
+                        try
+                        {
+                            var diagPath = Path.Combine(DataDir, "logs", $"prompt_diag_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                            File.WriteAllText(diagPath, $"{trStatusInfo}\n{trDiagDetail}\n스레드 답장: {cleanText}");
+                            Console.WriteLine($"[EYE] Diagnosis saved: {diagPath}");
+                        }
+                        catch { }
+
                         var diagMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
                             $"{trStatusInfo}\n" +
-                            $"스레드 답장: {cleanText}";
+                            $"스레드 답장: {cleanText}\n" +
+                            $"```\n{(trDiagDetail.Length > 800 ? trDiagDetail.Substring(0, 800) + "\n...(truncated)" : trDiagDetail)}\n```";
                         Task.Run(async () => await Send(msg.Channel, diagMsg, msg.ThreadTs)).Wait(5000);
                     }
                     catch
@@ -449,8 +522,29 @@ internal partial class Program
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("[EYE][SLACK] >> Keyword match: Prompt not found!");
+                    Console.WriteLine("[EYE][SLACK] >> Keyword match: Prompt not found! 새 채팅 폴백 시도...");
                     Console.ResetColor();
+
+                    // ★ New-chat fallback
+                    if (claudeHwnd != IntPtr.Zero)
+                    {
+                        var kwFbThread = msg.ThreadTs ?? msg.Timestamp;
+                        var kwFbContext = "";
+                        if (msg.ThreadTs != null)
+                        {
+                            var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
+                            if (!string.IsNullOrEmpty(ctx)) kwFbContext = $"\n{ctx}\n";
+                        }
+                        var kwFallbackText = $"{cleanKwText}{kwFbContext}\n{SlackReplySuffix(msg.User, kwFbThread, $"keyword:\"{matchedKw}\"")}";
+                        if (kwPromptHelper.TryNewChatInput(claudeHwnd, kwFallbackText))
+                        {
+                            Console.WriteLine("[EYE][SLACK] >> Keyword match: New-chat fallback SUCCESS!");
+                            DeletePendingAck(kwThreadKey);
+                            SendAndTrackAck(msg.Channel, kwThreadKey);
+                            return;
+                        }
+                        Console.WriteLine("[EYE][SLACK] New-chat fallback FAILED, running diagnosis...");
+                    }
 
                     try
                     {
@@ -458,9 +552,24 @@ internal partial class Program
                         var kwStatusInfo = kwClaudeStatus != null
                             ? $"Claude 상태: {kwClaudeStatus.Item2}"
                             : "Claude 상태: 감지 불가";
+
+                        string kwDiagDetail;
+                        try { kwDiagDetail = kwPromptHelper.DiagnosePromptSearch(); }
+                        catch (Exception dex) { kwDiagDetail = $"(진단 실패: {dex.Message})"; }
+
+                        Console.WriteLine(kwDiagDetail);
+                        try
+                        {
+                            var diagPath = Path.Combine(DataDir, "logs", $"prompt_diag_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                            File.WriteAllText(diagPath, $"{kwStatusInfo}\n{kwDiagDetail}\n키워드 \"{matchedKw}\" 감지: {cleanKwText}");
+                            Console.WriteLine($"[EYE] Diagnosis saved: {diagPath}");
+                        }
+                        catch { }
+
                         var diagMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
                             $"{kwStatusInfo}\n" +
-                            $"키워드 \"{matchedKw}\" 감지: {cleanKwText}";
+                            $"키워드 \"{matchedKw}\" 감지: {cleanKwText}\n" +
+                            $"```\n{(kwDiagDetail.Length > 800 ? kwDiagDetail.Substring(0, 800) + "\n...(truncated)" : kwDiagDetail)}\n```";
                         Task.Run(async () => await Send(msg.Channel, diagMsg, kwThreadKey)).Wait(5000);
                     }
                     catch

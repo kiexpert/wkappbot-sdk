@@ -35,6 +35,14 @@ public sealed class ClaudePromptHelper : IDisposable
 {
     private readonly UIA3Automation _automation;
 
+    /// <summary>
+    /// Global toggle: when true, only focusless strategies are allowed.
+    /// Focus-stealing fallbacks are blocked and return false instead.
+    /// Toggle at runtime to guarantee no foreground window disruption
+    /// (e.g., during AppBotEye monitoring). Static = affects ALL instances.
+    /// </summary>
+    public static bool ForceFocusless { get; set; }
+
     public ClaudePromptHelper()
     {
         _automation = new UIA3Automation();
@@ -80,21 +88,307 @@ public sealed class ClaudePromptHelper : IDisposable
 
         // Strategy 2: Enumerate all visible windows from claude.exe processes
         Console.WriteLine("  [PROMPT] Ancestor walk failed, scanning all claude.exe windows...");
-        foreach (var proc in Process.GetProcessesByName("claude"))
+        var claudeProcs = Process.GetProcessesByName("claude");
+        Console.WriteLine($"  [PROMPT] Process.GetProcessesByName(\"claude\"): {claudeProcs.Length} process(es)");
+        foreach (var proc in claudeProcs)
         {
+            Console.WriteLine($"  [PROMPT]   claude PID={proc.Id}");
             var result = FindClaudeDesktopPrompt(proc.Id);
             if (result != null) return result;
         }
 
         // Strategy 3: Enumerate all VS Code windows
         Console.WriteLine("  [PROMPT] Scanning VS Code windows...");
-        foreach (var proc in Process.GetProcessesByName("Code"))
+        var codeProcs = Process.GetProcessesByName("Code");
+        Console.WriteLine($"  [PROMPT] Process.GetProcessesByName(\"Code\"): {codeProcs.Length} process(es)");
+        foreach (var proc in codeProcs)
         {
             var result = FindVSCodePrompt(proc.Id);
             if (result != null) return result;
         }
 
+        // Strategy 4: Brute-force — scan ALL Chrome_WidgetWin_1 windows for turn-form
+        Console.WriteLine("  [PROMPT] Brute-force: scanning all Chrome_WidgetWin_1 windows...");
+        var allElectronWindows = new List<IntPtr>();
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            var cls = WindowFinder.GetClassName(hWnd);
+            if (cls == "Chrome_WidgetWin_1")
+            {
+                var title = WindowFinder.GetWindowText(hWnd);
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                string procName = "?";
+                try { procName = Process.GetProcessById((int)pid).ProcessName; } catch { }
+                Console.WriteLine($"  [PROMPT]   Chrome_WidgetWin_1: 0x{hWnd:X} \"{title}\" proc={procName} pid={pid}");
+                allElectronWindows.Add(hWnd);
+            }
+            return true;
+        }, IntPtr.Zero);
+
+        // Try each Chrome_WidgetWin_1 window for turn-form
+        foreach (var hWnd in allElectronWindows)
+        {
+            try
+            {
+                var root = _automation.FromHandle(hWnd);
+                if (root == null) continue;
+                var turnForm = root.FindFirstDescendant(
+                    new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+                if (turnForm == null) continue;
+
+                var inputGroup = turnForm.FindFirstChild(
+                    new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Group));
+                if (inputGroup == null)
+                {
+                    var children = turnForm.FindAllChildren();
+                    inputGroup = children.FirstOrDefault(c =>
+                        c.ControlType == ControlType.Group && c.BoundingRectangle.Width > 100);
+                }
+                if (inputGroup == null) continue;
+
+                var rect = inputGroup.BoundingRectangle;
+                var title = WindowFinder.GetWindowText(hWnd);
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                string pName = "?";
+                try { pName = Process.GetProcessById((int)pid).ProcessName; } catch { }
+                Console.WriteLine($"  [PROMPT] BRUTE-FORCE FOUND: turn-form in \"{title}\" proc={pName} pid={pid}");
+                return new PromptInfo(hWnd, title, pName, new Rectangle(rect.X, rect.Y, rect.Width, rect.Height),
+                    pName.Equals("claude", StringComparison.OrdinalIgnoreCase) ? "claude-desktop" : "unknown");
+            }
+            catch { }
+        }
+
+        Console.WriteLine("  [PROMPT] ALL strategies exhausted — no prompt found");
         return null;
+    }
+
+    /// <summary>
+    /// Comprehensive diagnostic for prompt search failure.
+    /// Returns a multi-line string with all relevant details for debugging.
+    /// Call this AFTER FindPrompt() returns null to capture the full picture.
+    /// </summary>
+    public string DiagnosePromptSearch()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("=== Prompt Search Diagnosis ===");
+
+        // 1. Process ancestry
+        try
+        {
+            var ancestors = GetAncestorProcesses();
+            sb.AppendLine($"Process ancestry ({ancestors.Count}):");
+            foreach (var (pid, name) in ancestors)
+                sb.AppendLine($"  {name} (PID={pid})");
+        }
+        catch (Exception ex) { sb.AppendLine($"Ancestry error: {ex.Message}"); }
+
+        // 2. All claude.exe processes and their windows
+        try
+        {
+            var claudeProcs = Process.GetProcessesByName("claude");
+            sb.AppendLine($"claude.exe processes: {claudeProcs.Length}");
+            foreach (var proc in claudeProcs)
+            {
+                var windows = FindWindowsByProcessId(proc.Id);
+                sb.AppendLine($"  PID={proc.Id}: {windows.Count} visible window(s)");
+                foreach (var hWnd in windows)
+                {
+                    var title = WindowFinder.GetWindowText(hWnd);
+                    var cls = WindowFinder.GetClassName(hWnd);
+                    NativeMethods.GetWindowRect(hWnd, out var r);
+                    sb.AppendLine($"    0x{hWnd:X} \"{title}\" class={cls} {r.Right - r.Left}x{r.Bottom - r.Top}");
+
+                    // Check UIA for turn-form
+                    try
+                    {
+                        var root = _automation.FromHandle(hWnd);
+                        if (root == null) { sb.AppendLine("      UIA: null"); continue; }
+
+                        var tf = root.FindFirstDescendant(
+                            new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+                        if (tf != null)
+                        {
+                            sb.AppendLine($"      turn-form: FOUND at {tf.BoundingRectangle}");
+                            // Check children
+                            var children = tf.FindAllChildren();
+                            sb.AppendLine($"      turn-form children ({children.Length}):");
+                            foreach (var c in children)
+                            {
+                                try { sb.AppendLine($"        {c.ControlType} \"{c.Name}\" {c.BoundingRectangle.Width}x{c.BoundingRectangle.Height} enabled={c.IsEnabled}"); }
+                                catch { sb.AppendLine($"        (read error)"); }
+                            }
+                        }
+                        else
+                        {
+                            sb.AppendLine("      turn-form: NOT FOUND");
+                            // Deep UIA dump → saved to file for analysis
+                            try
+                            {
+                                var deepSb = new System.Text.StringBuilder();
+                                deepSb.AppendLine($"=== Deep UIA Dump: 0x{hWnd:X} \"{title}\" ===");
+                                DumpUiaTree(root, deepSb, 0, maxDepth: 10);
+                                var dumpPath = Path.Combine(
+                                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                                    ".claude", "projects", "prompt_uia_dump_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".txt");
+                                try { Directory.CreateDirectory(Path.GetDirectoryName(dumpPath)!); } catch { }
+                                File.WriteAllText(dumpPath, deepSb.ToString());
+                                sb.AppendLine($"      UIA deep dump saved: {dumpPath}");
+                                // Also include top 20 lines in the summary
+                                var lines = deepSb.ToString().Split('\n');
+                                foreach (var line in lines.Take(20))
+                                    sb.AppendLine($"      {line.TrimEnd()}");
+                                if (lines.Length > 20) sb.AppendLine($"      ...(+{lines.Length - 20} more lines in dump file)");
+                            }
+                            catch (Exception dumpEx) { sb.AppendLine($"      (UIA dump error: {dumpEx.Message})"); }
+                        }
+                    }
+                    catch (Exception uiaEx) { sb.AppendLine($"      UIA error: {uiaEx.Message}"); }
+                }
+            }
+        }
+        catch (Exception ex) { sb.AppendLine($"Claude process scan error: {ex.Message}"); }
+
+        // 3. Foreground window info
+        try
+        {
+            var fg = NativeMethods.GetForegroundWindow();
+            if (fg != IntPtr.Zero)
+            {
+                var fgTitle = WindowFinder.GetWindowText(fg);
+                var fgClass = WindowFinder.GetClassName(fg);
+                NativeMethods.GetWindowThreadProcessId(fg, out uint fgPid);
+                sb.AppendLine($"Foreground: 0x{fg:X} \"{fgTitle}\" class={fgClass} pid={fgPid}");
+            }
+            else sb.AppendLine("Foreground: none");
+        }
+        catch { }
+
+        return sb.ToString();
+    }
+
+    /// <summary>Recursive UIA tree dump for diagnostics.</summary>
+    private static void DumpUiaTree(AutomationElement el, System.Text.StringBuilder sb, int depth, int maxDepth)
+    {
+        if (depth > maxDepth) return;
+        var indent = new string(' ', depth * 2);
+        // Read element properties individually (each can fail independently)
+        string name = "?", aid = "?", ct = "?", rect = "?";
+        try { name = (el.Name ?? "").Replace("\n", " ").Replace("\r", ""); if (name.Length > 60) name = name.Substring(0, 60) + "..."; } catch { }
+        try { aid = el.AutomationId ?? ""; } catch { }
+        try { ct = el.ControlType.ToString(); } catch { }
+        try { var r = el.BoundingRectangle; rect = $"{r.Width}x{r.Height} at {r.X},{r.Y}"; } catch { }
+        sb.AppendLine($"{indent}[{ct}] aid=\"{aid}\" name=\"{name}\" ({rect})");
+
+        // Always try to enumerate children even if parent properties failed
+        try
+        {
+            foreach (var child in el.FindAllChildren())
+                DumpUiaTree(child, sb, depth + 1, maxDepth);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Fallback for new-chat landing page: when turn-form doesn't exist,
+    /// activate Claude Desktop, click the input area, paste text, and submit.
+    /// This starts a new conversation, after which turn-form becomes available.
+    /// Returns true if text was submitted.
+    /// </summary>
+    public bool TryNewChatInput(IntPtr claudeHwnd, string text)
+    {
+        if (claudeHwnd == IntPtr.Zero || !NativeMethods.IsWindow(claudeHwnd)) return false;
+
+        Console.WriteLine("  [PROMPT] NEW-CHAT FALLBACK: attempting paste on Claude Desktop...");
+
+        // ★ Dump UIA tree at this point for analysis (always, even if fallback succeeds)
+        try
+        {
+            var root = _automation.FromHandle(claudeHwnd);
+            if (root != null)
+            {
+                var dumpSb = new System.Text.StringBuilder();
+                var title = WindowFinder.GetWindowText(claudeHwnd);
+                dumpSb.AppendLine($"=== New-Chat UIA Dump: 0x{claudeHwnd:X} \"{title}\" @ {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
+                DumpUiaTree(root, dumpSb, 0, maxDepth: 10);
+                var dumpDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".claude", "projects");
+                try { Directory.CreateDirectory(dumpDir); } catch { }
+                var dumpPath = Path.Combine(dumpDir, $"newchat_uia_dump_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                File.WriteAllText(dumpPath, dumpSb.ToString());
+                Console.WriteLine($"  [PROMPT] UIA dump saved: {dumpPath}");
+            }
+        }
+        catch (Exception dumpEx) { Console.WriteLine($"  [PROMPT] UIA dump failed: {dumpEx.Message}"); }
+
+        // First, try to find turn-form with retries (page might still be loading)
+        for (int retry = 0; retry < 3; retry++)
+        {
+            if (retry > 0)
+            {
+                Console.WriteLine($"  [PROMPT] Retry {retry}/3: waiting 1s for turn-form...");
+                Thread.Sleep(1000);
+            }
+            try
+            {
+                var root = _automation.FromHandle(claudeHwnd);
+                if (root != null)
+                {
+                    var turnForm = root.FindFirstDescendant(
+                        new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+                    if (turnForm != null)
+                    {
+                        Console.WriteLine($"  [PROMPT] turn-form appeared after retry {retry}!");
+                        var inputGroup = turnForm.FindFirstChild(
+                            new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Group));
+                        if (inputGroup == null)
+                        {
+                            var children = turnForm.FindAllChildren();
+                            inputGroup = children.FirstOrDefault(c =>
+                                c.ControlType == ControlType.Group && c.BoundingRectangle.Width > 100);
+                        }
+                        if (inputGroup != null)
+                        {
+                            var rect = inputGroup.BoundingRectangle;
+                            var title = WindowFinder.GetWindowText(claudeHwnd);
+                            var prompt = new PromptInfo(claudeHwnd, title, "claude",
+                                new Rectangle(rect.X, rect.Y, rect.Width, rect.Height), "claude-desktop");
+                            return TypeAndSubmit(prompt, text);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // turn-form still not found after retries → brute-force paste (no click!)
+        // ★ New-chat landing page already has cursor focused in input — clicking risks UNFOCUSING it!
+        Console.WriteLine("  [PROMPT] turn-form not found after 3 retries. Brute-force paste (no click)...");
+
+        var prevFg = NativeMethods.GetForegroundWindow();
+        NativeMethods.SmartSetForegroundWindow(claudeHwnd);
+        Thread.Sleep(300);
+
+        // Paste text directly — cursor is already in the input field
+        SetClipboardText(text);
+        Thread.Sleep(100);
+        KeyboardInput.Hotkey(new[] { "ctrl", "v" });
+        Thread.Sleep(300);
+
+        // Submit with Enter
+        KeyboardInput.PressKey("enter");
+        Thread.Sleep(200);
+        Console.WriteLine("  [PROMPT] NEW-CHAT: text pasted + Enter pressed (brute-force)");
+
+        // Restore focus
+        if (prevFg != IntPtr.Zero && prevFg != claudeHwnd)
+        {
+            Thread.Sleep(500);
+            NativeMethods.SmartSetForegroundWindow(prevFg);
+            Console.WriteLine("  [PROMPT] Focus restored after new-chat input");
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -110,6 +404,11 @@ public sealed class ClaudePromptHelper : IDisposable
             return true;
 
         // === Strategy 2: Focus-stealing with auto-restore (minimal disruption) ===
+        if (ForceFocusless)
+        {
+            Console.WriteLine("  [PROMPT] ForceFocusless: focusless input failed, refusing to steal focus");
+            return false;
+        }
         var prevForeground = NativeMethods.GetForegroundWindow();
         Console.WriteLine($"  [PROMPT] Activating: {prompt.WindowTitle} (will restore focus)");
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
@@ -255,103 +554,219 @@ public sealed class ClaudePromptHelper : IDisposable
     ///   3. PostMessage VK_RETURN to Chrome renderer hwnd
     ///   4. Fallback: brief focus steal for Enter key
     /// </summary>
+    /// <summary>
+    /// Unified submit logic: find "제출" button → check state → invoke → verify → retry.
+    /// Returns true only if submit is VERIFIED (button disappeared or "중단" appeared).
+    /// </summary>
     private bool TryFocuslessSubmit(PromptInfo prompt, AutomationElement turnForm)
     {
-        Thread.Sleep(200); // Wait a bit for UI to settle after text insertion
+        Thread.Sleep(500); // Wait for UI to settle + React to detect DOM change from put_accValue
 
-        // === Strategy 1: UIA Invoke on Submit/Send button (best — fully focusless!) ===
-        // Retry up to 3 times with increasing delay (button may not appear immediately)
-        for (int attempt = 0; attempt < 3; attempt++)
+        // === Strategy 1: UIA Invoke with verify (fully focusless) ===
+        if (TrySubmitWithVerify(turnForm, "UIA"))
+            return true;
+
+        // === Strategy 2: MSAA accDoDefaultAction ===
+        if (TryMsaaSubmit(prompt))
         {
-            if (attempt > 0) Thread.Sleep(300 * attempt);
+            Console.WriteLine("  [PROMPT] MSAA submit fired, verifying...");
+            if (VerifySubmitSuccess(turnForm))
+            {
+                Console.WriteLine("  [PROMPT] Submitted via MSAA (verified, focusless!)");
+                return true;
+            }
+            Console.WriteLine("  [PROMPT] MSAA submit fired but NOT verified");
+        }
+
+        // === Strategy 3: PostMessage VK_RETURN ===
+        if (TryPostMessageEnter(prompt))
+        {
+            Console.WriteLine("  [PROMPT] PostMessage VK_RETURN fired, verifying...");
+            if (VerifySubmitSuccess(turnForm))
+            {
+                Console.WriteLine("  [PROMPT] Submitted via PostMessage VK_RETURN (verified, focusless!)");
+                return true;
+            }
+            Console.WriteLine("  [PROMPT] PostMessage submit fired but NOT verified");
+        }
+
+        // === Strategy 4: brief focus + nudge React + Enter ===
+        // put_accValue sets DOM text but React may not see it (no input event fired).
+        // Brief focus + Space+Backspace triggers React's onChange, then Enter submits.
+        if (ForceFocusless)
+        {
+            Console.WriteLine("  [PROMPT] ForceFocusless: focusless submit failed, refusing to steal focus");
+            return false;
+        }
+        Console.WriteLine("  [PROMPT] Focusless strategies exhausted, trying brief focus + React nudge...");
+        var prevFg = NativeMethods.GetForegroundWindow();
+        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+        Thread.Sleep(200);
+
+        // Nudge React: End → Space → Backspace (triggers input event without changing text)
+        KeyboardInput.PressKey("end");
+        Thread.Sleep(50);
+        KeyboardInput.PressKey("space");
+        Thread.Sleep(50);
+        KeyboardInput.PressKey("backspace");
+        Thread.Sleep(200); // Let React process the input event
+
+        // Now submit with Enter (retry 3 times)
+        for (int retry = 0; retry < 3; retry++)
+        {
+            KeyboardInput.PressKey("enter");
+            Thread.Sleep(500);
+
+            // After each Enter, check if submit succeeded
             try
             {
-                var allElements = turnForm.FindAllDescendants();
-                foreach (var el in allElements)
+                var checkResult = CheckSubmitButton(turnForm);
+                if (checkResult == SubmitButtonState.Gone || checkResult == SubmitButtonState.StopAppeared)
                 {
-                    if (el.ControlType != ControlType.Button) continue;
-                    var name = (el.Name ?? "").ToLowerInvariant();
-                    var aid = (el.AutomationId ?? "").ToLowerInvariant();
-                    // Skip stop/cancel/중단 buttons
-                    if (name.Contains("중단") || name.Contains("stop") || name.Contains("cancel")) continue;
-                    // Match submit/send buttons (Claude Desktop uses "제출" = Korean for "submit")
-                    if (name.Contains("send") || name.Contains("submit") || name.Contains("전송") ||
-                        name.Contains("제출") ||
-                        aid.Contains("send") || aid.Contains("submit"))
-                    {
-                        if (el.Patterns.Invoke.IsSupported)
-                        {
-                            el.Patterns.Invoke.Pattern.Invoke();
-                            Console.WriteLine($"  [PROMPT] Submitted via UIA Invoke on \"{el.Name}\" (attempt {attempt + 1}, fully focusless!)");
-
-                            // Retry 2 more times at 1s intervals (user: "가끔 실패하는데 두번 더 누르면")
-                            // Safe: if first Invoke worked, button disappears → retry no-ops silently
-                            for (int extra = 1; extra <= 2; extra++)
-                            {
-                                Thread.Sleep(1000);
-                                try
-                                {
-                                    // Re-find button (UIA element may become stale)
-                                    var freshElements = turnForm.FindAllDescendants();
-                                    bool found = false;
-                                    foreach (var fe in freshElements)
-                                    {
-                                        if (fe.ControlType != ControlType.Button) continue;
-                                        var fn = (fe.Name ?? "").ToLowerInvariant();
-                                        if (fn.Contains("중단") || fn.Contains("stop")) break; // Submit already worked → "중단" appeared
-                                        if ((fn.Contains("send") || fn.Contains("submit") || fn.Contains("전송") || fn.Contains("제출")) &&
-                                            fe.Patterns.Invoke.IsSupported)
-                                        {
-                                            fe.Patterns.Invoke.Pattern.Invoke();
-                                            Console.WriteLine($"  [PROMPT] Submit re-pressed ({extra}/2, button still visible)");
-                                            found = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!found) break; // Button gone or "중단" appeared → submit succeeded
-                                }
-                                catch { break; } // Element stale → submit likely succeeded
-                            }
-                            return true;
-                        }
-                    }
+                    Console.WriteLine($"  [PROMPT] Submitted via focus+Enter (retry {retry + 1}, verified!)");
+                    RestoreFocus(prevFg, prompt.WindowHandle);
+                    return true;
                 }
-                if (attempt < 2) Console.WriteLine($"  [PROMPT] Submit button not found (attempt {attempt + 1}/3), retrying...");
             }
             catch { }
         }
 
-        // === Strategy 2: MSAA accDoDefaultAction on Send button ===
-        if (TryMsaaSubmit(prompt))
+        RestoreFocus(prevFg, prompt.WindowHandle);
+        Console.WriteLine("  [PROMPT] Submitted (focus+Enter, 3x retry, unverified)");
+        return true; // Best-effort: text was set + Enter pressed 3 times
+    }
+
+    /// <summary>
+    /// Find submit button, check its enabled state, invoke, verify, retry up to 3 times.
+    /// Returns true only if submit is VERIFIED (button gone or "중단" appeared).
+    /// </summary>
+    private bool TrySubmitWithVerify(AutomationElement turnForm, string tag)
+    {
+        for (int attempt = 0; attempt < 3; attempt++)
         {
-            Console.WriteLine("  [PROMPT] Submitted via MSAA (fully focusless!)");
-            return true;
+            if (attempt > 0) Thread.Sleep(500 * attempt);
+            try
+            {
+                var btn = FindSubmitButton(turnForm);
+                if (btn == null)
+                {
+                    if (attempt < 2) Console.WriteLine($"  [PROMPT] [{tag}] Submit button not found (attempt {attempt + 1}/3)");
+                    continue;
+                }
+
+                // Check if button is enabled/invokable
+                if (!btn.Patterns.Invoke.IsSupported)
+                {
+                    Console.WriteLine($"  [PROMPT] [{tag}] Button \"{btn.Name}\" found but Invoke not supported");
+                    continue;
+                }
+                if (!btn.IsEnabled)
+                {
+                    Console.WriteLine($"  [PROMPT] [{tag}] Button \"{btn.Name}\" found but DISABLED (React may not see text yet)");
+                    Thread.Sleep(300); // Extra wait for React
+                    continue;
+                }
+
+                // Invoke the button
+                btn.Patterns.Invoke.Pattern.Invoke();
+                Console.WriteLine($"  [PROMPT] [{tag}] Invoked \"{btn.Name}\" (attempt {attempt + 1})");
+
+                // Verify: wait up to 2 seconds for submit to take effect
+                for (int check = 0; check < 4; check++)
+                {
+                    Thread.Sleep(500);
+                    var state = CheckSubmitButton(turnForm);
+                    if (state == SubmitButtonState.Gone || state == SubmitButtonState.StopAppeared)
+                    {
+                        Console.WriteLine($"  [PROMPT] [{tag}] Submit VERIFIED ({state}, attempt {attempt + 1}, fully focusless!)");
+                        return true;
+                    }
+                }
+
+                // Button still visible after 2s — submit likely failed, re-press
+                Console.WriteLine($"  [PROMPT] [{tag}] Submit NOT verified after invoke (attempt {attempt + 1}), retrying...");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [PROMPT] [{tag}] Error (attempt {attempt + 1}): {ex.Message}");
+            }
         }
 
-        // === Strategy 3: PostMessage VK_RETURN to Chrome renderer hwnd ===
-        if (TryPostMessageEnter(prompt))
-        {
-            Console.WriteLine("  [PROMPT] Submitted via PostMessage VK_RETURN (focusless!)");
-            return true;
-        }
+        Console.WriteLine($"  [PROMPT] [{tag}] All 3 attempts exhausted without verification");
+        return false;
+    }
 
-        // === Strategy 4: brief focus steal for Enter key only (retry 3 times) ===
-        Console.WriteLine("  [PROMPT] Text set focuslessly! Brief focus for Enter key (3x)...");
-        var prevFg = NativeMethods.GetForegroundWindow();
-        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
-        Thread.Sleep(200);
-        for (int retry = 0; retry < 3; retry++)
+    private enum SubmitButtonState { Visible, Gone, StopAppeared }
+
+    /// <summary>
+    /// Check if submit succeeded by examining button state.
+    /// Gone = button disappeared (submit consumed), StopAppeared = Claude is processing.
+    /// </summary>
+    private SubmitButtonState CheckSubmitButton(AutomationElement turnForm)
+    {
+        try
         {
-            KeyboardInput.PressKey("enter");
-            Thread.Sleep(300);
+            var elements = turnForm.FindAllDescendants();
+            bool submitVisible = false;
+            foreach (var el in elements)
+            {
+                if (el.ControlType != ControlType.Button) continue;
+                var name = (el.Name ?? "").ToLowerInvariant();
+                if (name.Contains("중단") || name.Contains("stop"))
+                    return SubmitButtonState.StopAppeared;
+                if (name.Contains("제출") || name.Contains("submit") || name.Contains("send") || name.Contains("전송"))
+                    submitVisible = true;
+            }
+            return submitVisible ? SubmitButtonState.Visible : SubmitButtonState.Gone;
         }
-        if (prevFg != IntPtr.Zero && prevFg != prompt.WindowHandle)
+        catch { return SubmitButtonState.Gone; } // Element stale → likely submitted
+    }
+
+    /// <summary>
+    /// Find the submit/send button in turn-form descendants.
+    /// </summary>
+    private AutomationElement? FindSubmitButton(AutomationElement turnForm)
+    {
+        try
         {
+            foreach (var el in turnForm.FindAllDescendants())
+            {
+                if (el.ControlType != ControlType.Button) continue;
+                var name = (el.Name ?? "").ToLowerInvariant();
+                var aid = (el.AutomationId ?? "").ToLowerInvariant();
+                if (name.Contains("중단") || name.Contains("stop") || name.Contains("cancel")) continue;
+                if (name.Contains("send") || name.Contains("submit") || name.Contains("전송") ||
+                    name.Contains("제출") || aid.Contains("send") || aid.Contains("submit"))
+                    return el;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// Verify submit success: wait up to 2s for button to disappear or "중단" to appear.
+    /// </summary>
+    private bool VerifySubmitSuccess(AutomationElement turnForm)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            Thread.Sleep(500);
+            var state = CheckSubmitButton(turnForm);
+            if (state == SubmitButtonState.Gone || state == SubmitButtonState.StopAppeared)
+                return true;
+        }
+        return false;
+    }
+
+    private void RestoreFocus(IntPtr prevFg, IntPtr promptHwnd)
+    {
+        if (prevFg != IntPtr.Zero && prevFg != promptHwnd)
+        {
+            Thread.Sleep(200);
             NativeMethods.SmartSetForegroundWindow(prevFg);
-            Console.WriteLine("  [PROMPT] Focus restored after Enter");
+            Console.WriteLine("  [PROMPT] Focus restored");
         }
-        Console.WriteLine("  [PROMPT] Submitted (text=focusless, Enter=brief focus, 3x retry)");
-        return true;
     }
 
     /// <summary>
@@ -667,12 +1082,22 @@ public sealed class ClaudePromptHelper : IDisposable
     {
         // Find all visible top-level windows from this PID
         var windows = FindWindowsByProcessId(processId);
+        Console.WriteLine($"  [PROMPT] PID={processId}: {windows.Count} visible window(s)");
         foreach (var hWnd in windows)
         {
+            var wTitle = WindowFinder.GetWindowText(hWnd);
+            var wClass = WindowFinder.GetClassName(hWnd);
+            NativeMethods.GetWindowRect(hWnd, out var wRect);
+            var wSize = $"{wRect.Right - wRect.Left}x{wRect.Bottom - wRect.Top}";
+            Console.WriteLine($"  [PROMPT]   hwnd=0x{hWnd:X} \"{wTitle}\" class={wClass} {wSize}");
             try
             {
                 var root = _automation.FromHandle(hWnd);
-                if (root == null) continue;
+                if (root == null)
+                {
+                    Console.WriteLine($"  [PROMPT]     UIA.FromHandle=null (no UIA tree)");
+                    continue;
+                }
 
                 // Look for the turn-form group (the prompt container)
                 var turnForm = root.FindFirstDescendant(
@@ -680,7 +1105,45 @@ public sealed class ClaudePromptHelper : IDisposable
                         _automation.PropertyLibrary.Element.AutomationId,
                         "turn-form"));
 
-                if (turnForm == null) continue;
+                if (turnForm == null)
+                {
+                    // Log what we DID find at the top level (for diagnosis)
+                    try
+                    {
+                        var topAids = new List<string>();
+                        var topChildren = root.FindAllChildren();
+                        foreach (var child in topChildren)
+                        {
+                            try
+                            {
+                                var aid = child.AutomationId;
+                                var ct = child.ControlType;
+                                topAids.Add($"{ct}(aid={aid})");
+                                // Check one level deeper for RootWebArea or named elements
+                                foreach (var gc in child.FindAllChildren())
+                                {
+                                    try
+                                    {
+                                        var gcAid = gc.AutomationId;
+                                        if (!string.IsNullOrEmpty(gcAid))
+                                            topAids.Add($"  {gc.ControlType}(aid={gcAid})");
+                                    }
+                                    catch { }
+                                }
+                            }
+                            catch { }
+                            if (topAids.Count > 20) { topAids.Add("...(truncated)"); break; }
+                        }
+                        Console.WriteLine($"  [PROMPT]     turn-form NOT found. UIA tree: {string.Join(", ", topAids)}");
+                    }
+                    catch (Exception diagEx)
+                    {
+                        Console.WriteLine($"  [PROMPT]     turn-form NOT found (UIA tree read error: {diagEx.Message})");
+                    }
+                    continue;
+                }
+
+                Console.WriteLine($"  [PROMPT]     turn-form FOUND at ({turnForm.BoundingRectangle})");
 
                 // Found the prompt container! Get the input group
                 // It's a child Group with name "입력하세요" or similar placeholder
@@ -698,16 +1161,27 @@ public sealed class ClaudePromptHelper : IDisposable
                         c.BoundingRectangle.Width > 100);
                 }
 
-                if (inputGroup == null) continue;
+                if (inputGroup == null)
+                {
+                    // Log turn-form children for diagnosis
+                    try
+                    {
+                        var tfChildren = turnForm.FindAllChildren();
+                        var tfInfo = string.Join(", ", tfChildren.Select(c =>
+                            $"{c.ControlType}(\"{c.Name}\",{c.BoundingRectangle.Width}x{c.BoundingRectangle.Height})"));
+                        Console.WriteLine($"  [PROMPT]     inputGroup NOT found! turn-form children: {tfInfo}");
+                    }
+                    catch { Console.WriteLine($"  [PROMPT]     inputGroup NOT found (children read error)"); }
+                    continue;
+                }
 
                 var rect = inputGroup.BoundingRectangle;
-                var title = WindowFinder.GetWindowText(hWnd);
 
                 Console.WriteLine($"  [PROMPT] Found Claude Desktop prompt: aid=turn-form at ({rect.X},{rect.Y} {rect.Width}x{rect.Height})");
 
                 return new PromptInfo(
                     hWnd,
-                    title,
+                    wTitle,
                     "claude",
                     new Rectangle(rect.X, rect.Y, rect.Width, rect.Height),
                     "claude-desktop"
@@ -715,7 +1189,7 @@ public sealed class ClaudePromptHelper : IDisposable
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"  [PROMPT] Error checking hWnd {hWnd}: {ex.Message}");
+                Console.WriteLine($"  [PROMPT]     Error: {ex.Message}");
             }
         }
         return null;
