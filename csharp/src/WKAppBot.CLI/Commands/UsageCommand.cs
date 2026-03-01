@@ -40,6 +40,10 @@ Usage:
       Type 'wkappbot web help' for all subcommands.
   eye [--interval N] [--size WxH] [--pos X,Y]
       WK AppBot Eye — live overlay + Slack daemon (always on).
+      ctx=N% in tick output, auto-deletes stale idle messages on restart.
+  newchat ""prompt"" [--file prompt.txt]
+      Open new Claude Desktop chat + submit prompt (all focusless UIA).
+      Use for session handoff when context reaches 90%+.
   slack send|reply|upload|screenshot|listen|catch-up
       Slack messaging (Socket Mode, always-on prompt forwarding).
 
