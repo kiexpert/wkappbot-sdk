@@ -29,8 +29,11 @@
   - `slack_last_ts.txt`로 위치 추적, 쓰레드 댓글 자동 조회
   - **슬랙 메시지를 받았으면 반드시 해당 쓰레드에 슬랙으로 응답할 것!**
   - "전달했습니다" ack → `slack reply` 시 자동 삭제
-- 경험 DB 노하우 방송: `knowhow.md`(일반) + `knowhow-{action}.md`(액션별) — 콘솔 방송
+- 경험 DB 노하우 방송: `[KNOWHOW:A11Y]` (프로필 경험) + `[KNOWHOW:OS]` (OS 경험) 분리 출력
 - A11Y 액션 실패 시 자동: snapshot + experience 저장 (0~9 ring)
+- **컨텍스트 모니터**: eye tick에 `ctx=N%` 표시. 90%→경고+Slack, 95%→긴급경고+Slack
+- **인수인계**: `wkappbot newchat "프롬프트"` 명령으로 새채팅 열고 프롬프트 전달 (focusless)
+- **Eye 재시작 시 이전 idle 상태 메시지 자동 삭제** (Slack 채널 스팸 방지)
 
 ### Slack + 프롬프트 전달
 - Slack 수신 메시지는 **항상** Claude 프롬프트에 전달 (옵션 없음)
@@ -139,6 +142,7 @@ wkappbot web <subcommand> [options]           # CDP 웹 자동화 (open/navigate
 wkappbot slack <subcommand>                   # send/reply/upload/screenshot/test/listen/catch-up
 wkappbot knowhow <subcommand>                # write/read (Win32+Web 노하우)
 wkappbot eye [--port N] [--interval N]        # AppBotEye (Slack+Prompt 항상 ON)
+wkappbot newchat "prompt" [--file f.txt]      # Claude Desktop 새채팅 열고 프롬프트 입력 (focusless)
 wkappbot schedule <subcommand>                # add/list/remove/clear (예약 프롬프트)
 wkappbot logcat <fileFilter> <messageFilter>  # 실시간 로그 추적
 ```
@@ -187,8 +191,10 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
 - Dialog Handlers, dismiss, toolbar-ocr, titlebar, ChartAnalyzer v11+B+V
 - WebBot CDP (Phase 11A), Slack Socket Mode (Phase 12), AppBotEye
 - Focusless PostMessage, InputFocusGuard, InputZoom, GlobalMode Socket Mode
-- Context Monitor + Auto-Relay, tab-select, cond-add, FocuslessGuard
+- Context Monitor (ctx% 표시 + newchat 안내), tab-select, cond-add, FocuslessGuard
 - Claude 프롬프트 Focusless 입력 (MSAA put_accValue)
+- newchat 명령 (사이드바 토글 + 새 대화 invoke + 프롬프트 입력, 전부 focusless)
+- A11Y/OS 듀얼경로 노하우 방송 (프로필 경험 vs OS 경험 분리)
 - 키움 프록시봇 Phase A (32비트 COM + Named Pipe)
 
 ### Phase 8: puppet 패턴 매칭 — 미구현
