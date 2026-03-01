@@ -1425,7 +1425,7 @@ internal partial class Program
 
                 // Include context from last processed message for conversation flow
                 var contextPrefix = (contextLine != null && forwarded == 0) ? $"{contextLine}\n\n" : "";
-                var promptText = $"{contextPrefix}{cleanText}\n\n(Slack @{user} thread={ts} — MUST reply to this thread: wkappbot slack reply \"응답\" --thread {ts})";
+                var promptText = $"{contextPrefix}{cleanText}\n\n(Slack @{user} — MUST: wkappbot slack reply \"your reply here\" --thread {ts})";
 
                 // Re-find prompt each time (window may shift)
                 var fresh = helper.FindPrompt();
@@ -1564,7 +1564,7 @@ internal partial class Program
                     var cleanParent = System.Text.RegularExpressions.Regex.Replace(parentText, @"<@[A-Z0-9]+>\s*", "").Trim();
                     if (cleanParent.Length > 80) cleanParent = cleanParent[..80] + "…";
 
-                    var promptText = $"[쓰레드 시작] {cleanParent}\n\n{cleanReply}\n\n(Slack thread reply @{rUser} thread={threadTs} — MUST reply to this thread: wkappbot slack reply \"응답\" --thread {threadTs})";
+                    var promptText = $"[쓰레드 시작] {cleanParent}\n\n{cleanReply}\n\n(Slack thread reply @{rUser} — MUST: wkappbot slack reply \"your reply here\" --thread {threadTs})";
 
                     var fresh = helper.FindPrompt();
                     if (fresh == null)
