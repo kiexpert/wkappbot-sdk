@@ -448,6 +448,27 @@ public sealed class UiaLocator : IDisposable
         return null;
     }
 
+    // ── ScrollItem Pattern (scroll element into view — focusless!) ──
+
+    /// <summary>
+    /// Scroll a TreeItem/ListItem into the visible area. Focusless!
+    /// Works with virtualized containers (TreeView, ListView).
+    /// </summary>
+    public static bool TryScrollIntoView(AutomationElement element)
+    {
+        try
+        {
+            var pattern = element.Patterns.ScrollItem;
+            if (pattern.IsSupported)
+            {
+                pattern.Pattern.ScrollIntoView();
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
     // ── Window Pattern (Window close/minimize/maximize — focusless!) ──
 
     /// <summary>

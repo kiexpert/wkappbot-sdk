@@ -725,6 +725,285 @@ public sealed class ExperienceDb
     }
 
     /// <summary>
+    /// Save an A11Y failure/action log screenshot to the control's folder as a ring buffer.
+    /// Files: log_0.png .. log_8.png (max 9, oldest overwritten).
+    /// Also appends a JSONL record with metadata.
+    /// </summary>
+    /// <param name="formId">Form type ID</param>
+    /// <param name="cid">Control ID (0 for form-level)</param>
+    /// <param name="screenshot">Screenshot bitmap to save</param>
+    /// <param name="metadata">JSONL record (command, reason, timestamp, etc.)</param>
+    /// <param name="treePath">Optional tree path for folder structure</param>
+    public void SaveActionLog(string formId, int cid,
+        System.Drawing.Bitmap? screenshot, string? metadataJson,
+        string? treePath = null, string? actionName = null)
+    {
+        try
+        {
+            treePath ??= GetTreePath(formId, cid);
+            var dir = GetControlDir(formId, cid, treePath: treePath);
+            // No logs/ subfolder — folder names reserved for class-name tree.
+            // Files use "log-{action}" prefix to distinguish from control data.
+            var actionToken = SanitizeToken(actionName ?? "general");
+
+            SaveRingBufferScreenshot(dir, screenshot, $"log-{actionToken}");
+
+            if (!string.IsNullOrWhiteSpace(metadataJson))
+            {
+                var logPath = Path.Combine(dir, $"log-{actionToken}.jsonl");
+                File.AppendAllText(logPath, metadataJson + Environment.NewLine, System.Text.Encoding.UTF8);
+            }
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Save a form-level action log (when specific control is unknown).
+    /// Saves directly in form_{id}/ with "log-{action}" prefix:
+    ///   log-{action}_0.png .. log-{action}_9.png (ring buffer screenshots)
+    ///   log-{action}.jsonl (metadata)
+    /// No logs/ subfolder — folder names reserved for class-name tree.
+    /// </summary>
+    public void SaveFormActionLog(string formId,
+        System.Drawing.Bitmap? screenshot, string? metadataJson,
+        string? actionName = null)
+    {
+        try
+        {
+            var actionToken = SanitizeToken(actionName ?? "general");
+            var dir = Path.Combine(ExpDir, $"form_{formId}");
+            Directory.CreateDirectory(dir);
+
+            SaveRingBufferScreenshot(dir, screenshot, $"log-{actionToken}");
+
+            if (!string.IsNullOrWhiteSpace(metadataJson))
+            {
+                var logPath = Path.Combine(dir, $"log-{actionToken}.jsonl");
+                File.AppendAllText(logPath, metadataJson + Environment.NewLine, System.Text.Encoding.UTF8);
+            }
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Save ring buffer screenshot ({prefix}_0.png .. {prefix}_8.png, max 9 slots, oldest overwritten).
+    /// Shared by both per-control and form-level action logs.
+    /// </summary>
+    private static void SaveRingBufferScreenshot(string dir, System.Drawing.Bitmap? screenshot, string prefix)
+    {
+        if (screenshot == null) return;
+        const int maxSlots = 10;
+        var slots = Enumerable.Range(0, maxSlots)
+            .Select(i => Path.Combine(dir, $"{prefix}_{i}.png"))
+            .ToArray();
+
+        string targetPath;
+        var emptySlot = slots.FirstOrDefault(s => !File.Exists(s));
+        if (emptySlot != null) targetPath = emptySlot;
+        else targetPath = slots.OrderBy(s => File.GetLastWriteTimeUtc(s)).First();
+
+        Input.ScreenCapture.SaveToFile(screenshot, targetPath);
+    }
+
+    /// <summary>
+    /// Sanitize a token for use in file/folder names (remove invalid chars, lowercase).
+    /// </summary>
+    private static string SanitizeToken(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "general";
+        var invalid = Path.GetInvalidFileNameChars();
+        var chars = s.ToLowerInvariant().Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray();
+        return new string(chars);
+    }
+
+    /// <summary>
+    /// Get action log summary for a form, scanning log-{action}.jsonl files in form_{id}/.
+    /// File naming: log-{action}.jsonl, log-{action}_0.png .. log-{action}_9.png
+    /// No logs/ subfolder — folder names reserved for class-name tree.
+    /// Returns null if no action logs exist.
+    /// </summary>
+    public ActionLogSummary? GetFormActionLogSummary(string formId)
+    {
+        try
+        {
+            var formDir = Path.Combine(ExpDir, $"form_{formId}");
+            if (!Directory.Exists(formDir)) return null;
+
+            int totalEntries = 0;
+            int totalScreenshots = 0;
+            var allRecentEntries = new List<(DateTime ts, string text)>();
+            var actionBreakdown = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            // Scan all log-{action}.jsonl files directly in form folder
+            foreach (var logFile in Directory.GetFiles(formDir, "log-*.jsonl"))
+            {
+                var fileName = Path.GetFileNameWithoutExtension(logFile); // e.g., "log-click"
+                var actionName = fileName.StartsWith("log-") ? fileName[4..] : fileName;
+
+                var lines = File.ReadAllLines(logFile, System.Text.Encoding.UTF8)
+                    .Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+                if (lines.Length == 0) continue;
+
+                totalEntries += lines.Length;
+                actionBreakdown[actionName] = lines.Length;
+
+                // Count ring buffer screenshots: log-{action}_0.png .. log-{action}_9.png
+                totalScreenshots += Enumerable.Range(0, 10)
+                    .Count(i => File.Exists(Path.Combine(formDir, $"log-{actionName}_{i}.png")));
+
+                // Parse last 2 entries from each action for recent summary
+                for (int i = Math.Max(0, lines.Length - 2); i < lines.Length; i++)
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(lines[i]);
+                        var root = doc.RootElement;
+                        var tsStr = root.TryGetProperty("ts", out var tsEl) ? tsEl.GetString() : null;
+                        var cmd = root.TryGetProperty("cmd", out var cmdEl) ? cmdEl.GetString() : "?";
+                        var reason = root.TryGetProperty("reason", out var rEl) ? rEl.GetString() : "?";
+                        var act = root.TryGetProperty("action", out var aEl) ? aEl.GetString() : actionName;
+                        var dt = DateTime.TryParse(tsStr, out var parsed) ? parsed : DateTime.MinValue;
+                        allRecentEntries.Add((dt, $"{tsStr}: {cmd}/{act} ({reason})"));
+                    }
+                    catch { allRecentEntries.Add((DateTime.MinValue, lines[i])); }
+                }
+            }
+
+            // Also check legacy patterns (backward compat)
+            // Legacy 1: form_{id}/logs/action_log.jsonl (old subfolder pattern)
+            var legacyLogsDir = Path.Combine(formDir, "logs");
+            if (Directory.Exists(legacyLogsDir))
+            {
+                foreach (var logFile in Directory.GetFiles(legacyLogsDir, "*.jsonl"))
+                {
+                    var lines = File.ReadAllLines(logFile, System.Text.Encoding.UTF8)
+                        .Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+                    if (lines.Length == 0) continue;
+                    totalEntries += lines.Length;
+                    actionBreakdown["(legacy)"] = (actionBreakdown.GetValueOrDefault("(legacy)") + lines.Length);
+                    for (int i = Math.Max(0, lines.Length - 2); i < lines.Length; i++)
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(lines[i]);
+                            var root = doc.RootElement;
+                            var tsStr = root.TryGetProperty("ts", out var tsEl) ? tsEl.GetString() : null;
+                            var cmd = root.TryGetProperty("cmd", out var cmdEl) ? cmdEl.GetString() : "?";
+                            var reason = root.TryGetProperty("reason", out var rEl) ? rEl.GetString() : "?";
+                            var act = root.TryGetProperty("action", out var aEl) ? aEl.GetString() : "?";
+                            var dt = DateTime.TryParse(tsStr, out var parsed) ? parsed : DateTime.MinValue;
+                            allRecentEntries.Add((dt, $"{tsStr}: {cmd}/{act} ({reason})"));
+                        }
+                        catch { allRecentEntries.Add((DateTime.MinValue, lines[i])); }
+                    }
+                }
+            }
+
+            if (totalEntries == 0) return null;
+
+            // Sort by timestamp, take latest 3
+            var recentEntries = allRecentEntries
+                .OrderByDescending(e => e.ts)
+                .Take(3)
+                .Select(e => e.text)
+                .ToList();
+
+            return new ActionLogSummary
+            {
+                TotalEntries = totalEntries,
+                ScreenshotCount = totalScreenshots,
+                RecentEntries = recentEntries,
+                ActionBreakdown = actionBreakdown,
+                LogPath = formDir
+            };
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Get action log summary for a specific control, scanning log-{action}.jsonl in control dir.
+    /// Returns null if no action logs exist.
+    /// </summary>
+    public ActionLogSummary? GetControlActionLogSummary(string formId, int cid, string? treePath = null)
+    {
+        try
+        {
+            treePath ??= GetTreePath(formId, cid);
+            var ctrlDir = GetControlDir(formId, cid, create: false, treePath: treePath);
+            if (!Directory.Exists(ctrlDir)) return null;
+
+            int totalEntries = 0;
+            int totalScreenshots = 0;
+            var allRecentEntries = new List<(DateTime ts, string text)>();
+            var actionBreakdown = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            // Scan log-{action}.jsonl files directly in control folder
+            foreach (var logFile in Directory.GetFiles(ctrlDir, "log-*.jsonl"))
+            {
+                var fileName = Path.GetFileNameWithoutExtension(logFile);
+                var actionName = fileName.StartsWith("log-") ? fileName[4..] : fileName;
+
+                var lines = File.ReadAllLines(logFile, System.Text.Encoding.UTF8)
+                    .Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+                if (lines.Length == 0) continue;
+
+                totalEntries += lines.Length;
+                actionBreakdown[actionName] = lines.Length;
+
+                totalScreenshots += Enumerable.Range(0, 10)
+                    .Count(i => File.Exists(Path.Combine(ctrlDir, $"log-{actionName}_{i}.png")));
+
+                for (int i = Math.Max(0, lines.Length - 2); i < lines.Length; i++)
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(lines[i]);
+                        var root = doc.RootElement;
+                        var tsStr = root.TryGetProperty("ts", out var tsEl) ? tsEl.GetString() : null;
+                        var cmd = root.TryGetProperty("cmd", out var cmdEl) ? cmdEl.GetString() : "?";
+                        var reason = root.TryGetProperty("reason", out var rEl) ? rEl.GetString() : "?";
+                        var act = root.TryGetProperty("action", out var aEl) ? aEl.GetString() : actionName;
+                        var dt = DateTime.TryParse(tsStr, out var parsed) ? parsed : DateTime.MinValue;
+                        allRecentEntries.Add((dt, $"{tsStr}: {cmd}/{act} ({reason})"));
+                    }
+                    catch { allRecentEntries.Add((DateTime.MinValue, lines[i])); }
+                }
+            }
+
+            if (totalEntries == 0) return null;
+
+            var recentEntries = allRecentEntries
+                .OrderByDescending(e => e.ts)
+                .Take(3)
+                .Select(e => e.text)
+                .ToList();
+
+            return new ActionLogSummary
+            {
+                TotalEntries = totalEntries,
+                ScreenshotCount = totalScreenshots,
+                RecentEntries = recentEntries,
+                ActionBreakdown = actionBreakdown,
+                LogPath = ctrlDir
+            };
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Get knowhow text for a form (if knowhow.md exists in form folder).
+    /// </summary>
+    public string? GetFormKnowhow(string formId)
+    {
+        try
+        {
+            var path = Path.Combine(ExpDir, $"form_{formId}", "knowhow.md");
+            return File.Exists(path) ? File.ReadAllText(path, System.Text.Encoding.UTF8).Trim() : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
     /// Append a text history entry to a control's text_history.jsonl.
     /// Only appends if text actually changed from the last entry (dedup).
     /// Format: {"ts":"...","ocr":"...","wm":"..."}\n
@@ -833,6 +1112,109 @@ public sealed class ExperienceDb
     {
         var path = Path.Combine(_expDir, $"form_{formId}", "knowhow.md");
         return File.Exists(path) ? File.ReadAllText(path) : null;
+    }
+
+    /// <summary>
+    /// Get existing knowhow.md file paths for form + control level.
+    /// Returns (formKnowhowPath, controlKnowhowPath) — null if file doesn't exist.
+    /// For console hint: "절대경로: 첫 문단" 간결 출력용.
+    /// </summary>
+    public (string? formPath, string? controlPath) GetKnowhowPaths(string formId, int cid, string? treePath = null)
+    {
+        string? formPath = null;
+        string? ctrlPath = null;
+
+        var fp = Path.Combine(_expDir, $"form_{formId}", "knowhow.md");
+        if (File.Exists(fp)) formPath = fp;
+
+        treePath ??= GetTreePath(formId, cid);
+        var ctrlDir = GetControlDir(formId, cid, create: false, treePath: treePath);
+        var cp = Path.Combine(ctrlDir, "knowhow.md");
+        if (File.Exists(cp)) ctrlPath = cp;
+
+        return (formPath, ctrlPath);
+    }
+
+    /// <summary>
+    /// Get form-level knowhow.md path (null if doesn't exist).
+    /// </summary>
+    public string? GetFormKnowhowPath(string formId)
+    {
+        var path = Path.Combine(_expDir, $"form_{formId}", "knowhow.md");
+        return File.Exists(path) ? path : null;
+    }
+
+    /// <summary>
+    /// Get action-specific knowhow file path: knowhow-{action}.md
+    /// inspect 시 → knowhow.md, 액션(input/click/do) 시 → knowhow-{action}.md
+    /// Returns (formActionPath, controlActionPath) — null if file doesn't exist.
+    /// </summary>
+    public (string? formPath, string? controlPath) GetActionKnowhowPaths(
+        string formId, int cid, string actionName, string? treePath = null)
+    {
+        string? formPath = null;
+        string? ctrlPath = null;
+        var actionToken = SanitizeToken(actionName);
+
+        var fp = Path.Combine(_expDir, $"form_{formId}", $"knowhow-{actionToken}.md");
+        if (File.Exists(fp)) formPath = fp;
+
+        treePath ??= GetTreePath(formId, cid);
+        var ctrlDir = GetControlDir(formId, cid, create: false, treePath: treePath);
+        var cp = Path.Combine(ctrlDir, $"knowhow-{actionToken}.md");
+        if (File.Exists(cp)) ctrlPath = cp;
+
+        return (formPath, ctrlPath);
+    }
+
+    /// <summary>
+    /// Get form-level action knowhow path (null if doesn't exist).
+    /// </summary>
+    public string? GetFormActionKnowhowPath(string formId, string actionName)
+    {
+        var actionToken = SanitizeToken(actionName);
+        var path = Path.Combine(_expDir, $"form_{formId}", $"knowhow-{actionToken}.md");
+        return File.Exists(path) ? path : null;
+    }
+
+    /// <summary>
+    /// Append a knowhow entry to an action-specific knowhow-{action}.md file (control level).
+    /// </summary>
+    public bool AppendActionKnowhow(string formId, int cid, string actionName,
+        string category, string lesson, string? treePath = null)
+    {
+        try
+        {
+            treePath ??= GetTreePath(formId, cid);
+            var dir = GetControlDir(formId, cid, create: true, treePath: treePath);
+            var actionToken = SanitizeToken(actionName);
+            var path = Path.Combine(dir, $"knowhow-{actionToken}.md");
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var entry = $"\n## [{timestamp}] {category}\n{lesson}\n";
+            File.AppendAllText(path, entry);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Append a knowhow entry to form-level action-specific knowhow-{action}.md.
+    /// </summary>
+    public bool AppendFormActionKnowhow(string formId, string actionName,
+        string category, string lesson)
+    {
+        try
+        {
+            var dir = Path.Combine(_expDir, $"form_{formId}");
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            var actionToken = SanitizeToken(actionName);
+            var path = Path.Combine(dir, $"knowhow-{actionToken}.md");
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var entry = $"\n## [{timestamp}] {category}\n{lesson}\n";
+            File.AppendAllText(path, entry);
+            return true;
+        }
+        catch { return false; }
     }
 
     /// <summary>
@@ -1096,4 +1478,17 @@ public sealed class TextHistoryEntry
 
     [JsonPropertyName("wm")]
     public string? Wm { get; set; }
+}
+
+/// <summary>
+/// Summary of action logs for a form or control — used for console hints when re-accessing.
+/// </summary>
+public sealed class ActionLogSummary
+{
+    public int TotalEntries { get; set; }
+    public int ScreenshotCount { get; set; }
+    public List<string> RecentEntries { get; set; } = new();
+    /// <summary>Per-action entry counts: e.g. {"click": 5, "input": 3, "invoke": 2}</summary>
+    public Dictionary<string, int> ActionBreakdown { get; set; } = new();
+    public string LogPath { get; set; } = "";
 }

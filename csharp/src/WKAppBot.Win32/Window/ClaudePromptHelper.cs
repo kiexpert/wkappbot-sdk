@@ -257,34 +257,69 @@ public sealed class ClaudePromptHelper : IDisposable
     /// </summary>
     private bool TryFocuslessSubmit(PromptInfo prompt, AutomationElement turnForm)
     {
-        Thread.Sleep(100);
+        Thread.Sleep(200); // Wait a bit for UI to settle after text insertion
 
         // === Strategy 1: UIA Invoke on Submit/Send button (best — fully focusless!) ===
-        try
+        // Retry up to 3 times with increasing delay (button may not appear immediately)
+        for (int attempt = 0; attempt < 3; attempt++)
         {
-            var allElements = turnForm.FindAllDescendants();
-            foreach (var el in allElements)
+            if (attempt > 0) Thread.Sleep(300 * attempt);
+            try
             {
-                if (el.ControlType != ControlType.Button) continue;
-                var name = (el.Name ?? "").ToLowerInvariant();
-                var aid = (el.AutomationId ?? "").ToLowerInvariant();
-                // Skip stop/cancel/중단 buttons
-                if (name.Contains("중단") || name.Contains("stop") || name.Contains("cancel")) continue;
-                // Match submit/send buttons (Claude Desktop uses "제출" = Korean for "submit")
-                if (name.Contains("send") || name.Contains("submit") || name.Contains("전송") ||
-                    name.Contains("제출") ||
-                    aid.Contains("send") || aid.Contains("submit"))
+                var allElements = turnForm.FindAllDescendants();
+                foreach (var el in allElements)
                 {
-                    if (el.Patterns.Invoke.IsSupported)
+                    if (el.ControlType != ControlType.Button) continue;
+                    var name = (el.Name ?? "").ToLowerInvariant();
+                    var aid = (el.AutomationId ?? "").ToLowerInvariant();
+                    // Skip stop/cancel/중단 buttons
+                    if (name.Contains("중단") || name.Contains("stop") || name.Contains("cancel")) continue;
+                    // Match submit/send buttons (Claude Desktop uses "제출" = Korean for "submit")
+                    if (name.Contains("send") || name.Contains("submit") || name.Contains("전송") ||
+                        name.Contains("제출") ||
+                        aid.Contains("send") || aid.Contains("submit"))
                     {
-                        el.Patterns.Invoke.Pattern.Invoke();
-                        Console.WriteLine($"  [PROMPT] Submitted via UIA Invoke on \"{el.Name}\" (fully focusless!)");
-                        return true;
+                        if (el.Patterns.Invoke.IsSupported)
+                        {
+                            el.Patterns.Invoke.Pattern.Invoke();
+                            Console.WriteLine($"  [PROMPT] Submitted via UIA Invoke on \"{el.Name}\" (attempt {attempt + 1}, fully focusless!)");
+
+                            // Retry 2 more times at 1s intervals (user: "가끔 실패하는데 두번 더 누르면")
+                            // Safe: if first Invoke worked, button disappears → retry no-ops silently
+                            for (int extra = 1; extra <= 2; extra++)
+                            {
+                                Thread.Sleep(1000);
+                                try
+                                {
+                                    // Re-find button (UIA element may become stale)
+                                    var freshElements = turnForm.FindAllDescendants();
+                                    bool found = false;
+                                    foreach (var fe in freshElements)
+                                    {
+                                        if (fe.ControlType != ControlType.Button) continue;
+                                        var fn = (fe.Name ?? "").ToLowerInvariant();
+                                        if (fn.Contains("중단") || fn.Contains("stop")) break; // Submit already worked → "중단" appeared
+                                        if ((fn.Contains("send") || fn.Contains("submit") || fn.Contains("전송") || fn.Contains("제출")) &&
+                                            fe.Patterns.Invoke.IsSupported)
+                                        {
+                                            fe.Patterns.Invoke.Pattern.Invoke();
+                                            Console.WriteLine($"  [PROMPT] Submit re-pressed ({extra}/2, button still visible)");
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!found) break; // Button gone or "중단" appeared → submit succeeded
+                                }
+                                catch { break; } // Element stale → submit likely succeeded
+                            }
+                            return true;
+                        }
                     }
                 }
+                if (attempt < 2) Console.WriteLine($"  [PROMPT] Submit button not found (attempt {attempt + 1}/3), retrying...");
             }
+            catch { }
         }
-        catch { }
 
         // === Strategy 2: MSAA accDoDefaultAction on Send button ===
         if (TryMsaaSubmit(prompt))
@@ -300,19 +335,22 @@ public sealed class ClaudePromptHelper : IDisposable
             return true;
         }
 
-        // === Strategy 4: brief focus steal for Enter key only ===
-        Console.WriteLine("  [PROMPT] Text set focuslessly! Brief focus for Enter key...");
+        // === Strategy 4: brief focus steal for Enter key only (retry 3 times) ===
+        Console.WriteLine("  [PROMPT] Text set focuslessly! Brief focus for Enter key (3x)...");
         var prevFg = NativeMethods.GetForegroundWindow();
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
-        Thread.Sleep(100);
-        KeyboardInput.PressKey("enter");
-        Thread.Sleep(100);
+        Thread.Sleep(200);
+        for (int retry = 0; retry < 3; retry++)
+        {
+            KeyboardInput.PressKey("enter");
+            Thread.Sleep(300);
+        }
         if (prevFg != IntPtr.Zero && prevFg != prompt.WindowHandle)
         {
             NativeMethods.SmartSetForegroundWindow(prevFg);
             Console.WriteLine("  [PROMPT] Focus restored after Enter");
         }
-        Console.WriteLine("  [PROMPT] Submitted (text=focusless, Enter=brief focus)");
+        Console.WriteLine("  [PROMPT] Submitted (text=focusless, Enter=brief focus, 3x retry)");
         return true;
     }
 
@@ -1302,6 +1340,263 @@ public sealed class ClaudePromptHelper : IDisposable
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Open a new chat in Claude Desktop via UIA sidebar "새 대화" button (fully Focusless!).
+    /// Flow: Toggle sidebar open → Invoke "새 대화" Hyperlink → verify new JSONL → Toggle sidebar closed.
+    /// Falls back to Ctrl+N (focus steal) if UIA approach fails.
+    /// Verification: checks that a new JSONL session file was created (= new chat confirmed).
+    /// </summary>
+    public bool OpenNewChat(PromptInfo? currentPrompt = null)
+    {
+        try
+        {
+            // Find Claude Desktop window
+            IntPtr claudeHwnd;
+            AutomationElement? claudeRoot = null;
+            if (currentPrompt != null)
+            {
+                claudeHwnd = currentPrompt.WindowHandle;
+            }
+            else
+            {
+                var found = FindPrompt();
+                if (found == null)
+                {
+                    Console.WriteLine("  [PROMPT] OpenNewChat: Claude Desktop window not found");
+                    return false;
+                }
+                claudeHwnd = found.WindowHandle;
+            }
+
+            // Snapshot current JSONL for change detection
+            var (beforePath, beforeCreation) = GetLatestJsonlInfo();
+            Console.WriteLine($"  [PROMPT] OpenNewChat: Before JSONL = {Path.GetFileName(beforePath ?? "(none)")} created={beforeCreation:HH:mm:ss}");
+
+            // === Strategy 1: UIA Focusless — sidebar toggle + "새 대화" button ===
+            bool uiaTriggered = false;
+            try
+            {
+                using var automation = new FlaUI.UIA3.UIA3Automation();
+                claudeRoot = automation.FromHandle(claudeHwnd);
+                if (claudeRoot != null)
+                {
+                    // Step 1: Find and click "사이드바 열기" toggle button
+                    var sidebarBtn = claudeRoot.FindAllDescendants()
+                        .FirstOrDefault(e => e.ControlType == ControlType.Button &&
+                                            (e.Name ?? "").Contains("사이드바"));
+                    if (sidebarBtn != null && sidebarBtn.Patterns.Toggle.IsSupported)
+                    {
+                        var toggleState = sidebarBtn.Patterns.Toggle.Pattern.ToggleState;
+                        Console.WriteLine($"  [PROMPT] OpenNewChat: Sidebar toggle found (state={toggleState})");
+
+                        // Open sidebar if closed
+                        if (toggleState == FlaUI.Core.Definitions.ToggleState.Off)
+                        {
+                            sidebarBtn.Patterns.Toggle.Pattern.Toggle();
+                            Console.WriteLine("  [PROMPT] OpenNewChat: Sidebar opened (focusless!)");
+                            Thread.Sleep(500); // Wait for sidebar animation
+                        }
+
+                        // Step 2: Find "새 대화" hyperlink in sidebar and Invoke
+                        var newChatLink = claudeRoot.FindAllDescendants()
+                            .FirstOrDefault(e => e.ControlType == ControlType.Hyperlink &&
+                                                (e.Name ?? "").Contains("새 대화"));
+                        if (newChatLink != null && newChatLink.Patterns.Invoke.IsSupported)
+                        {
+                            newChatLink.Patterns.Invoke.Pattern.Invoke();
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine("  [PROMPT] OpenNewChat: '새 대화' clicked (fully focusless!)");
+                            Console.ResetColor();
+                            uiaTriggered = true;
+                        }
+                        else
+                        {
+                            Console.WriteLine("  [PROMPT] OpenNewChat: '새 대화' hyperlink not found in sidebar");
+                        }
+
+                        // Step 3: Close sidebar back (cleanup)
+                        Thread.Sleep(300);
+                        // Re-find sidebar button (DOM may have changed)
+                        sidebarBtn = claudeRoot.FindAllDescendants()
+                            .FirstOrDefault(e => e.ControlType == ControlType.Button &&
+                                                (e.Name ?? "").Contains("사이드바"));
+                        if (sidebarBtn?.Patterns.Toggle.IsSupported == true)
+                        {
+                            var newState = sidebarBtn.Patterns.Toggle.Pattern.ToggleState;
+                            if (newState == FlaUI.Core.Definitions.ToggleState.On)
+                            {
+                                sidebarBtn.Patterns.Toggle.Pattern.Toggle();
+                                Console.WriteLine("  [PROMPT] OpenNewChat: Sidebar closed back (focusless!)");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [PROMPT] OpenNewChat: UIA strategy failed: {ex.Message}");
+            }
+
+            // === Strategy 2: Ctrl+N fallback (requires focus steal) ===
+            if (!uiaTriggered)
+            {
+                Console.WriteLine("  [PROMPT] OpenNewChat: Falling back to Ctrl+N (focus steal)...");
+                var prevForeground = NativeMethods.GetForegroundWindow();
+                NativeMethods.SmartSetForegroundWindow(claudeHwnd);
+                Thread.Sleep(300);
+                KeyboardInput.Hotkey(new[] { "ctrl", "n" });
+                Console.WriteLine("  [PROMPT] OpenNewChat: Sent Ctrl+N");
+                Thread.Sleep(300);
+                if (prevForeground != IntPtr.Zero && prevForeground != claudeHwnd)
+                    NativeMethods.SmartSetForegroundWindow(prevForeground);
+            }
+
+            // Wait and verify: new JSONL file should appear (= new session)
+            // Detection: new file path OR same path but newer CreationTime
+            // Minimum size: new JSONL should have some initial content (>100 bytes)
+            const long MinNewJsonlBytes = 100;
+            bool newChatConfirmed = false;
+            for (int retry = 0; retry < 15; retry++)  // 15 retries × 500ms = 7.5s max
+            {
+                Thread.Sleep(500);
+                var (afterPath, afterCreation) = GetLatestJsonlInfo();
+                if (afterPath == null) continue;
+
+                // Check 1: different file path = definitely new chat
+                // Check 2: same path but newer creation time = recycled name (unlikely but safe)
+                bool isNewFile = afterPath != beforePath ||
+                                 (afterCreation > beforeCreation && (afterCreation - beforeCreation).TotalSeconds > 2);
+
+                if (isNewFile)
+                {
+                    var afterSize = 0L;
+                    try { afterSize = new FileInfo(afterPath).Length; } catch { }
+
+                    if (afterSize >= MinNewJsonlBytes)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"  [PROMPT] OpenNewChat: New JSONL confirmed! {Path.GetFileName(afterPath)} ({afterSize}B, created={afterCreation:HH:mm:ss})");
+                        Console.ResetColor();
+                        newChatConfirmed = true;
+                        break;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"  [PROMPT] OpenNewChat: New JSONL found but too small ({afterSize}B < {MinNewJsonlBytes}B), waiting...");
+                    }
+                }
+            }
+
+            if (!newChatConfirmed)
+            {
+                // Fallback: check if prompt exists (less reliable but better than nothing)
+                var newPrompt = FindPrompt();
+                if (newPrompt != null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("  [PROMPT] OpenNewChat: No new JSONL confirmed, but prompt found (assuming OK)");
+                    Console.ResetColor();
+                    return true;
+                }
+                Console.WriteLine("  [PROMPT] OpenNewChat: FAILED — no new JSONL and no prompt found");
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] OpenNewChat error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Get the most recently created JSONL file in ~/.claude/projects/
+    /// Returns (path, creationTime) for new chat detection.
+    /// Uses CreationTimeUtc to distinguish genuinely new files from merely updated ones.
+    /// </summary>
+    internal static (string? path, DateTime creationUtc) GetLatestJsonlInfo()
+    {
+        try
+        {
+            var claudeProjectsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".claude", "projects");
+            if (!Directory.Exists(claudeProjectsDir)) return (null, DateTime.MinValue);
+
+            var latest = Directory.EnumerateFiles(claudeProjectsDir, "*.jsonl", SearchOption.AllDirectories)
+                .Select(f => { try { return new FileInfo(f); } catch { return null; } })
+                .Where(fi => fi != null)
+                .OrderByDescending(fi => fi!.CreationTimeUtc)
+                .FirstOrDefault();
+
+            if (latest == null) return (null, DateTime.MinValue);
+            return (latest.FullName, latest.CreationTimeUtc);
+        }
+        catch { return (null, DateTime.MinValue); }
+    }
+
+    /// <summary>Backward compat wrapper — returns just the path.</summary>
+    private static string? GetLatestJsonlPath()
+        => GetLatestJsonlInfo().path;
+
+    /// <summary>
+    /// Complete auto-relay: open new chat and type handoff prompt immediately.
+    /// NOTE: Prefer Schedule-based relay (OpenNewChat + ScheduleManager.Add) for reliability.
+    /// This method is kept as a manual/fallback option.
+    /// </summary>
+    public bool AutoRelay(string handoffPrompt)
+    {
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("[RELAY] Starting auto-relay to new chat...");
+        Console.ResetColor();
+
+        // 1. Open new chat
+        if (!OpenNewChat())
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[RELAY] Failed to open new chat!");
+            Console.ResetColor();
+            return false;
+        }
+
+        // 2. Wait a bit for new chat to stabilize
+        Thread.Sleep(1000);
+
+        // 3. Find prompt in the new chat
+        var newPrompt = FindPrompt();
+        if (newPrompt == null)
+        {
+            // Retry
+            Thread.Sleep(2000);
+            newPrompt = FindPrompt();
+        }
+        if (newPrompt == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[RELAY] Failed to find prompt in new chat!");
+            Console.ResetColor();
+            return false;
+        }
+
+        // 4. Type handoff prompt
+        var ok = TypeAndSubmit(newPrompt, handoffPrompt);
+        if (ok)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("[RELAY] ✅ Auto-relay complete! New chat started with handoff prompt.");
+            Console.ResetColor();
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[RELAY] Failed to type handoff prompt!");
+            Console.ResetColor();
+        }
+        return ok;
     }
 
     public void Dispose()

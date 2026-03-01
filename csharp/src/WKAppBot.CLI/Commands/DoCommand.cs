@@ -10,23 +10,25 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
-    /// Multi-step action: click MFC custom combos (AfxWnd+Edit) to open dropdown,
-    /// select first item, then click a button. Designed for HTS trading forms.
-    /// Usage: appbot do &lt;window-title&gt; &lt;form-id&gt; &lt;button-text&gt; [--delay N]
+    /// Multi-step action: activate MDI child, optionally click MFC custom combos + button.
+    /// Usage: appbot do &lt;window-title&gt; &lt;form-id&gt; [button-text] [--delay N]
+    /// If button-text is omitted, just brings MDI child to front (focusless MDI activate).
     /// </summary>
     static int DoCommand(string[] args)
     {
-        if (args.Length < 3)
-            return Error(@"Usage: appbot do <window-title> <form-id> <button-text> [--delay N]
-  Selects first item in all MFC custom combos, then clicks a button.
+        if (args.Length < 2)
+            return Error(@"Usage: appbot do <window-title> <form-id> [button-text] [--delay N]
+  Activates MDI child form (focusless). If button-text given, also clicks it.
 
 Examples:
+  appbot do ""영웅문Global"" 2220                    # just bring MDI child to front (focusless!)
   appbot do ""영웅문"" 4051 ""매매시작""          # select combos + click 매매시작
   appbot do ""영웅문"" 4051 ""매매시작"" --delay 500  # custom delay between steps");
 
         string title = args[0];
         string targetFormId = args[1];
-        string buttonText = args[2];
+        // buttonText is now optional — if missing, just MDI-activate
+        string? buttonText = args.Length >= 3 && !args[2].StartsWith("--") ? args[2] : null;
         int stepDelay = int.TryParse(GetArgValue(args, "--delay"), out var sd) ? sd : 300;
 
         // Load dialog handlers from handlers/ directory
@@ -45,20 +47,23 @@ Examples:
         var win = windows[0];
         Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
 
-        // Elevation check
+        // Elevation check (only needed when button click is required)
         NativeMethods.GetWindowThreadProcessId(win.Handle, out uint targetPid);
-        bool weAreElevated = NativeMethods.IsCurrentProcessElevated();
-        if (!weAreElevated)
+        if (buttonText != null)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("  ✗ Not elevated — physical mouse click requires admin. Re-run as admin.");
+            bool weAreElevated = NativeMethods.IsCurrentProcessElevated();
+            if (!weAreElevated)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("  ✗ Not elevated — physical mouse click requires admin. Re-run as admin.");
+                Console.ResetColor();
+                return 1;
+            }
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write("  ✓ Elevated");
             Console.ResetColor();
-            return 1;
+            Console.WriteLine(" — physical mouse enabled");
         }
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.Write("  ✓ Elevated");
-        Console.ResetColor();
-        Console.WriteLine(" — physical mouse enabled");
 
         // Load ExperienceDb from matching profile (best-effort)
         ExperienceDb? expDb = null;
@@ -130,6 +135,46 @@ Examples:
         }
         Console.WriteLine($"Form: [{targetForm.FormId}] {targetForm.FormName}");
         Console.WriteLine($"[A11Y] form={targetForm.FormId} name='{targetForm.FormName}' role=MDIForm");
+
+        // Show past failure history + knowhow for this form (if any)
+        if (expDb != null)
+        {
+            ShowFormExperienceHints(expDb, targetFormId, actionName: "click");
+        }
+
+        // ── Focusless MDI Activate: bring child to front without stealing focus ──
+        if (scanResult.MdiHandle != IntPtr.Zero)
+        {
+            NativeMethods.SendMessageW(scanResult.MdiHandle, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"  [MDI] Activated form [{targetFormId}] (focusless WM_MDIACTIVATE)");
+            Console.ResetColor();
+            Thread.Sleep(100);
+        }
+
+        // If no button text specified, just MDI-activate and return
+        if (buttonText == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"\n  ✓ MDI child [{targetFormId}] brought to front (focusless)");
+            Console.ResetColor();
+
+            // ActionState IPC
+            try
+            {
+                ActionState.Write(new ActionState
+                {
+                    Source = "do",
+                    WindowTitle = win.Title,
+                    ElementName = targetForm.FormName ?? targetFormId,
+                    ActionName = "mdi_activate",
+                    ActionDetail = $"MDI activate [{targetFormId}] \"{targetForm.FormName}\" (focusless)",
+                    Status = "pass",
+                });
+            }
+            catch { /* best-effort */ }
+            return 0;
+        }
         Console.WriteLine();
 
         // Find the target button (with blocker retry loop)
@@ -368,6 +413,13 @@ Examples:
 
         // ── Final: Click the button (SmartClickButton with experience DB) ──
         Console.WriteLine();
+
+        // Show control-level experience hints for the button being clicked
+        if (expDb != null)
+        {
+            ShowControlExperienceHints(expDb, targetFormId, targetButton.ControlId, actionName: "click");
+        }
+
         Console.ForegroundColor = ConsoleColor.Green;
         Console.Write($"  ▶ Clicking: \"{targetButton.Title}\" ");
         Console.ResetColor();
@@ -466,4 +518,5 @@ Examples:
 
         return 0;
     }
+
 }

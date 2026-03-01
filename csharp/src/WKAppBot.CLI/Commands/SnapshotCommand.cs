@@ -14,23 +14,25 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
-    /// wkappbot snapshot <window-title> [--tag <name>] [--depth N] [--cid N]
+    /// wkappbot snapshot <window-title> [--tag <name>] [--depth N] [--cid N] [--no-learn]
     /// Captures UIA tree, screenshot, and OCR text for a window in one shot.
     /// Saves to wkappbot.hq/output/snapshots/{tag}_{datetime}/
+    /// Auto-learns per-control experience when a matching profile exists.
     /// </summary>
     static int SnapshotCommand(string[] args)
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot snapshot <window-title> [--tag <name>] [--depth N] [--cid N]");
+            Console.WriteLine("Usage: wkappbot snapshot <window-title> [--tag <name>] [--depth N] [--cid N] [--no-learn]");
             Console.WriteLine();
             Console.WriteLine("Options:");
             Console.WriteLine("  --tag <name>   Tag for output folder (default: snap)");
             Console.WriteLine("  --depth N      UIA tree depth (default: 8)");
             Console.WriteLine("  --cid N        Optional control-id hint (for experience file naming)");
+            Console.WriteLine("  --no-learn     Skip per-control experience DB learning");
             Console.WriteLine();
             Console.WriteLine("Captures UIA tree + screenshot + OCR in one shot.");
-            Console.WriteLine("Use during rate limit to record Claude Desktop's UIA structure.");
+            Console.WriteLine("Auto-learns per-control experience when a matching app profile exists.");
             return 1;
         }
 
@@ -38,6 +40,7 @@ internal partial class Program
         string tag = GetArgValue(args, "--tag") ?? "snap";
         int depth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 8;
         int? cid = int.TryParse(GetArgValue(args, "--cid"), out var cidVal) ? cidVal : null;
+        bool skipLearn = args.Any(a => a.Equals("--no-learn", StringComparison.OrdinalIgnoreCase));
 
         // Find window
         var windows = WindowFinder.FindByTitle(title);
@@ -180,6 +183,45 @@ internal partial class Program
             savedCount++;
         }
         catch { }
+
+        // 5. Per-control experience learning (auto when profile exists)
+        if (!skipLearn)
+        {
+            try
+            {
+                var profileStore = new ProfileStore();
+                var profileMatch = profileStore.FindByMatch(win.ClassName, "")
+                    ?? (!string.IsNullOrEmpty(winProcessName) ? profileStore.FindByMatch("", winProcessName) : null);
+
+                if (profileMatch != null)
+                {
+                    var expDir = Path.Combine(profileStore.ProfileDir, $"{profileMatch.Value.name}_exp");
+                    var expDb = new ExperienceDb(expDir);
+                    var scanResult = AppScanner.Scan(win.Handle);
+                    var (forms, controls, screenshots) = AppScanner.QuickTouchControls(scanResult, expDb);
+
+                    if (controls > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"[SNAPSHOT] 경험DB 학습: {forms} forms, {controls} controls touched, {screenshots} new screenshots (profile={profileMatch.Value.name})");
+                        Console.ResetColor();
+                        savedCount++;
+                    }
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine("[SNAPSHOT] 경험DB: 매칭 프로파일 없음 (wkappbot scan --save로 프로파일 생성 필요)");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[SNAPSHOT] 경험DB 학습 실패: {ex.Message}");
+                Console.ResetColor();
+            }
+        }
 
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"[SNAPSHOT] Done! {savedCount} files saved to {outDir}");

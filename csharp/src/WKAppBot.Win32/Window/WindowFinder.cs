@@ -13,15 +13,34 @@ namespace WKAppBot.Win32.Window;
 public static class WindowFinder
 {
     /// <summary>
-    /// Find all visible top-level windows matching a title pattern.
-    /// Supports: literal substring, glob (* ? **), regex: prefix.
-    /// Literal = Contains check (backward compatible).
-    /// Glob/regex = full match.
+    /// Find all visible top-level windows matching a grap pattern.
+    /// Supports: literal substring, glob (* ? **), regex: prefix, hwnd: prefix.
+    /// ★ Search key: "[ClassName] Title (processName hwnd=XXXXXXXX WxH)"
+    ///   Class name 절대 우선! 제목, 프로세스명, hwnd, 크기 전부 포함.
+    ///   Examples: "#32770" → finds [#32770] dialogs with empty titles
+    ///             "nkrunlite" → finds all windows from that process
+    ///             "영웅문" → finds [_NKHeroMainClass] 영웅문4
+    ///             "hwnd:0054188E" → direct handle lookup
     /// </summary>
     public static List<WindowInfo> FindByTitle(string titlePattern)
     {
+        // ★ hwnd: prefix — direct handle lookup (no enumeration needed)
+        if (titlePattern.StartsWith("hwnd:", StringComparison.OrdinalIgnoreCase))
+        {
+            var hexStr = titlePattern.Substring(5).Trim().TrimStart('0', 'x', 'X');
+            if (IntPtr.TryParse(hexStr, System.Globalization.NumberStyles.HexNumber, null, out var hwndVal)
+                && hwndVal != IntPtr.Zero && NativeMethods.IsWindow(hwndVal))
+            {
+                return new List<WindowInfo> { WindowInfo.FromHwnd(hwndVal) };
+            }
+            return new List<WindowInfo>();
+        }
+
         var isPattern = PatternMatcher.IsPattern(titlePattern);
         var matcher = isPattern ? PatternMatcher.Create(titlePattern) : null;
+
+        // Cache process names by PID (avoid repeated lookups)
+        var procNameCache = new Dictionary<uint, string>();
 
         var results = new List<WindowInfo>();
         NativeMethods.EnumWindows((hWnd, _) =>
@@ -29,13 +48,40 @@ public static class WindowFinder
             if (!NativeMethods.IsWindowVisible(hWnd)) return true;
 
             var title = GetWindowText(hWnd);
-            bool match = isPattern
-                ? matcher!.IsMatch(title)
-                : title.Contains(titlePattern, StringComparison.OrdinalIgnoreCase);
-            if (match)
+            var cls = GetClassName(hWnd);
+
+            // Get process name (cached)
+            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+            if (!procNameCache.TryGetValue(pid, out var procName))
             {
-                results.Add(WindowInfo.FromHwnd(hWnd));
+                try { procName = Process.GetProcessById((int)pid).ProcessName; }
+                catch { procName = $"pid={pid}"; }
+                procNameCache[pid] = procName;
             }
+
+            // Get window size
+            NativeMethods.GetWindowRect(hWnd, out var rect);
+            var w = rect.Right - rect.Left;
+            var h = rect.Bottom - rect.Top;
+
+            // ★ Combined search key: "[ClassName] Title (processName hwnd=XX WxH)"
+            var searchKey = $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h})";
+
+            bool match;
+            if (isPattern)
+            {
+                // Pattern (glob/regex): try title first (backward compat), then full searchKey
+                match = matcher!.IsMatch(title) || matcher!.IsMatch(searchKey);
+            }
+            else
+            {
+                // Literal: Contains on full searchKey (matches any prop naturally)
+                match = searchKey.Contains(titlePattern, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (match)
+                results.Add(WindowInfo.FromHwnd(hWnd));
+
             return true;
         }, IntPtr.Zero);
         return results;

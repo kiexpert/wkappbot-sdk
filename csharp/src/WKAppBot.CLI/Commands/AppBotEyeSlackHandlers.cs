@@ -49,8 +49,8 @@ internal partial class Program
             DeletePendingAckFromFile(botToken, threadKey);
         }
 
-        // Local helper: send ack "전달했습니다" and track it for later deletion (memory + file)
-        // Auto-deletes after 15 seconds — ack purpose is instant receipt confirmation only
+        // Local helper: send ack "전달했습니다" and track it for later deletion
+        // Deleted when slack reply is sent (not auto-deleted — stays visible until response)
         void SendAndTrackAck(string ch, string threadKey)
         {
             var ackText = $"Claude에 전달했습니다! (thread={threadKey})";
@@ -62,14 +62,6 @@ internal partial class Program
                 activeThreads.Add(ackTs);
                 // Persist to file for cross-process access (CLI can delete when replying)
                 SavePendingAck(threadKey, ch, ackTs);
-
-                // Auto-cleanup after 15s — Claude response may go to channel, not thread
-                var capturedKey = threadKey;
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(15_000);
-                    DeletePendingAck(capturedKey);
-                });
             }
         }
 

@@ -27,13 +27,13 @@ internal partial class Program
     }
 
     /// <summary>
-    /// wkappbot knowhow write &lt;form-id&gt; "lesson" [--cid N] [--category "..."]
+    /// wkappbot knowhow write &lt;form-id&gt; "lesson" [--cid N] [--category "..."] [--profile name]
     /// </summary>
     static int KnowhowWriteCommand(string[] args)
     {
         if (args.Length < 2)
         {
-            Console.WriteLine("Usage: wkappbot knowhow write <form-id> \"lesson\" [--cid N] [--category \"...\"]");
+            Console.WriteLine("Usage: wkappbot knowhow write <form-id> \"lesson\" [--cid N] [--category \"...\"] [--profile name]");
             return 1;
         }
 
@@ -41,6 +41,7 @@ internal partial class Program
         string? lesson = null;
         int? cid = null;
         string category = "Manual Note";
+        string? profileName = null;
 
         for (int i = 1; i < args.Length; i++)
         {
@@ -51,6 +52,10 @@ internal partial class Program
             else if (args[i] == "--category" && i + 1 < args.Length)
             {
                 category = args[++i];
+            }
+            else if (args[i] == "--profile" && i + 1 < args.Length)
+            {
+                profileName = args[++i];
             }
             else if (lesson == null)
             {
@@ -64,8 +69,8 @@ internal partial class Program
             return 1;
         }
 
-        // Find profile directory
-        var profileDir = FindProfileExpDir();
+        // Find profile directory — --profile 지정 시 직접 매칭, 없으면 스마트 매칭
+        var profileDir = FindProfileExpDir(profileName, formId);
         if (profileDir == null)
         {
             // No profile — use a default location
@@ -255,16 +260,60 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Find the first matching profile _exp directory.
-    /// Returns null if no profiles exist.
+    /// Find the matching profile _exp directory.
+    /// --profile name: 이름 직접 매칭 (예: --profile nkrunlite → nkrunlite_exp)
+    /// formId 있으면: 해당 form 폴더가 존재하는 프로파일 우선
+    /// 그래도 모호하면: ActionState에서 마지막 프로세스명 → 프로파일 매칭
+    /// 최종 폴백: 첫 번째 *_exp 디렉토리
     /// </summary>
-    static string? FindProfileExpDir()
+    static string? FindProfileExpDir(string? profileName = null, string? formId = null)
     {
         var profilesDir = Path.Combine(DataDir, "profiles");
         if (!Directory.Exists(profilesDir)) return null;
 
         var expDirs = Directory.GetDirectories(profilesDir, "*_exp");
-        return expDirs.Length > 0 ? expDirs[0] : null;
+        if (expDirs.Length == 0) return null;
+        if (expDirs.Length == 1) return expDirs[0];
+
+        // --profile 직접 지정
+        if (!string.IsNullOrEmpty(profileName))
+        {
+            var match = expDirs.FirstOrDefault(d =>
+                Path.GetFileName(d).StartsWith(profileName, StringComparison.OrdinalIgnoreCase));
+            if (match != null) return match;
+        }
+
+        // ActionState에서 마지막 프로세스명 → 프로파일 매칭
+        try
+        {
+            var actionStatePath = Path.Combine(DataDir, "runtime", "action_state.json");
+            if (File.Exists(actionStatePath))
+            {
+                var json = File.ReadAllText(actionStatePath);
+                // 간단 파싱: "ProcessName":"nkrunlite" 패턴
+                var procMatch = System.Text.RegularExpressions.Regex.Match(json,
+                    "\"ProcessName\"\\s*:\\s*\"([^\"]+)\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (procMatch.Success)
+                {
+                    var proc = procMatch.Groups[1].Value.ToLowerInvariant();
+                    var byProc = expDirs.FirstOrDefault(d =>
+                        Path.GetFileName(d).StartsWith(proc, StringComparison.OrdinalIgnoreCase));
+                    if (byProc != null) return byProc;
+                }
+            }
+        }
+        catch { /* best-effort */ }
+
+        // formId로 form 폴더 존재하는 프로파일 우선
+        if (!string.IsNullOrEmpty(formId))
+        {
+            var withForm = expDirs.Where(d =>
+                Directory.Exists(Path.Combine(d, $"form_{formId}"))).ToArray();
+            if (withForm.Length == 1) return withForm[0];
+        }
+
+        // 최종 폴백: 첫 번째
+        return expDirs[0];
     }
 
     static int KnowhowUsage()

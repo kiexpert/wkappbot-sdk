@@ -48,6 +48,8 @@ public static partial class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool IsWindowEnabled(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
+    [DllImport("user32.dll")] public static extern bool UpdateWindow(IntPtr hWnd);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr FindWindowW(string? lpClassName, string? lpWindowName);
@@ -263,6 +265,49 @@ public static partial class NativeMethods
     // ── DPI ──────────────────────────────────────────────────────
     [DllImport("shcore.dll")]
     public static extern int SetProcessDpiAwareness(int awareness);
+
+    /// <summary>Returns the DPI for a window (e.g. 96=100%, 144=150%, 192=200%). Win10 1607+.</summary>
+    [DllImport("user32.dll")]
+    public static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    /// <summary>Thread DPI awareness context switch. Win10 1607+. Returns previous context.</summary>
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
+
+    // DPI awareness contexts
+    public static readonly IntPtr DPI_AWARENESS_CONTEXT_UNAWARE = new IntPtr(-1);
+    public static readonly IntPtr DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = new IntPtr(-2);
+    public static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new IntPtr(-4);
+
+    /// <summary>
+    /// Get DPI scale factor by comparing physical vs logical client rect.
+    /// Temporarily switches to DPI-unaware to get the MFC app's logical coords.
+    /// Returns (dpiScale, logicalClientW, logicalClientH).
+    /// </summary>
+    public static (double scale, int logicalW, int logicalH) GetDpiScaleForMfc(IntPtr hwnd)
+    {
+        // Physical client (DPI-aware)
+        GetClientRect(hwnd, out var physRect);
+        int physW = physRect.Right - physRect.Left;
+        int physH = physRect.Bottom - physRect.Top;
+
+        // Logical client (temporarily DPI-unaware)
+        int logW, logH;
+        var prev = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE);
+        try
+        {
+            GetClientRect(hwnd, out var logRect);
+            logW = logRect.Right - logRect.Left;
+            logH = logRect.Bottom - logRect.Top;
+        }
+        finally
+        {
+            SetThreadDpiAwarenessContext(prev);
+        }
+
+        double scale = logW > 0 ? (double)physW / logW : 1.0;
+        return (scale, logW, logH);
+    }
 
     [DllImport("user32.dll")]
     public static extern int GetSystemMetrics(int nIndex);
@@ -482,11 +527,15 @@ public static partial class NativeMethods
     /// Smart SetForegroundWindow using AttachThreadInput trick.
     /// Windows normally blocks SetForegroundWindow from non-foreground threads.
     /// By attaching our input queue to the foreground thread, we gain permission.
+    /// BLOCKED by FocuslessGuard (steals foreground focus).
     /// </summary>
     public static bool SmartSetForegroundWindow(IntPtr hWnd)
     {
-        // Already foreground?
+        // Already foreground? → no focus-stealing needed
         if (IsWindowForeground(hWnd)) return true;
+
+        // FocuslessGuard: block if enabled (only when we actually NEED to steal focus)
+        Input.FocuslessGuard.AssertAllowed("SetForegroundWindow");
 
         // Simple attempt first
         SetForegroundWindow(hWnd);
