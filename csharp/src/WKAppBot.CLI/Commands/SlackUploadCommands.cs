@@ -108,13 +108,13 @@ internal partial class Program
 
     /// <summary>
     /// Upload a file to Slack.
-    /// Usage: wkappbot slack upload &lt;file-path&gt; [--channel ID] [--thread TS] [--title "name"]
+    /// Usage: wkappbot slack upload &lt;file-path&gt; [--channel ID] [--msg TS] [--title "name"]
     /// </summary>
     static int SlackUploadCommand(string[] args)
     {
         if (args.Length < 2)
         {
-            Console.WriteLine("Usage: wkappbot slack upload <file-path> [--channel ID] [--thread TS] [--title \"name\"]");
+            Console.WriteLine("Usage: wkappbot slack upload <file-path> [--channel ID] [--msg TS] [--title \"name\"]");
             return 1;
         }
 
@@ -128,7 +128,7 @@ internal partial class Program
         {
             if (args[i] == "--channel" && i + 1 < args.Length)
                 explicitChannel = args[++i];
-            else if (args[i] == "--thread" && i + 1 < args.Length)
+            else if ((args[i] == "--msg" || args[i] == "--thread") && i + 1 < args.Length)
                 threadTs = args[++i];
             else if (args[i] == "--title" && i + 1 < args.Length)
                 title = args[++i];
@@ -164,7 +164,7 @@ internal partial class Program
 
     /// <summary>
     /// Capture a screenshot and upload to Slack.
-    /// Usage: wkappbot slack screenshot [window-title] [--channel ID] [--thread TS]
+    /// Usage: wkappbot slack screenshot [window-title] [--channel ID] [--msg TS]
     /// </summary>
     static int SlackScreenshotCommand(string[] args)
     {
@@ -176,7 +176,7 @@ internal partial class Program
         {
             if (args[i] == "--channel" && i + 1 < args.Length)
                 explicitChannel = args[++i];
-            else if (args[i] == "--thread" && i + 1 < args.Length)
+            else if ((args[i] == "--msg" || args[i] == "--thread") && i + 1 < args.Length)
                 threadTs = args[++i];
             else if (windowTitle == null)
                 windowTitle = args[i];
