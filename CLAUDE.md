@@ -38,6 +38,18 @@
 - `--prompt`, `--keywords`, `--no-slack` 같은 옵션은 **존재하지 않음**
 - 프롬프트 입력 실패 시: 전경 윈도우 진단 + Slack에 상황 공유
 
+### 슬랙 답장 규칙 (MUST!)
+- **슬랙에서 온 메시지엔 반드시 슬랙 쓰레드로 답장!** 여기(프롬프트)에만 답하면 안 됨
+- 전달된 메시지 끝에 `thread=XXXXXXXXXX` 가 있으면 그 쓰레드에 답장:
+  ```
+  wkappbot slack reply "답변 내용" --thread 1772339328.052469
+  ```
+- 쓰레드 없는 채널 메시지에 답장:
+  ```
+  wkappbot slack send "답변 내용"
+  ```
+- 답장하면 "전달했습니다" ack 메시지가 자동 삭제됨
+
 ### 빌드 & 배포
 - 코드 변경 후 **반드시** `dotnet publish` + AppBotEye 재시작까지 완료할 것
 - 빌드 명령: `"$DOTNET_ROOT/dotnet" publish ... --verbosity quiet` (MEMORY.md 참조)
