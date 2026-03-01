@@ -68,6 +68,9 @@ internal partial class Program
         }
         Console.WriteLine();
 
+        // Knowhow broadcast: show existing knowhow for this window/profile
+        BroadcastInspectKnowhow(win.Handle, win.ClassName, null, win.Title);
+
         // Run scan
         var scanResult = AppScanner.Scan(win.Handle);
 

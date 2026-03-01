@@ -46,6 +46,9 @@ internal partial class Program
         var mainHwnd = matches[0].Handle;
         Console.WriteLine($"Window: [{mainHwnd:X8}] \"{matches[0].Title}\"");
 
+        // Knowhow broadcast: show existing knowhow for this window/profile
+        BroadcastInspectKnowhow(mainHwnd, matches[0].ClassName, null, matches[0].Title);
+
         // Initialize UIA
         UIA3Automation automation;
         AutomationElement root;

@@ -54,6 +54,9 @@ internal partial class Program
         try { winProcessName = System.Diagnostics.Process.GetProcessById((int)winPid).ProcessName; } catch { }
         Console.WriteLine($"[SNAPSHOT] Window: \"{win.Title}\" (class={win.ClassName}, pid={winPid})");
 
+        // Knowhow broadcast: show existing knowhow for this window/profile
+        BroadcastInspectKnowhow(win.Handle, win.ClassName, null, win.Title);
+
         // Create output directory
         var snapshotsRoot = Path.Combine(DataDir, "output", "snapshots");
         Directory.CreateDirectory(snapshotsRoot);

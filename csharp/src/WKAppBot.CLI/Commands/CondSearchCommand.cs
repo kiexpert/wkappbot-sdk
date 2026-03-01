@@ -99,6 +99,9 @@ internal partial class Program
         if (form == null) return Error("[0150] 조건검색 form not found. Open it first.");
         Console.WriteLine($"Form: \"{form.Name}\"");
 
+        // Knowhow broadcast: show knowhow for [0150] form
+        BroadcastInspectKnowhow(mainHwnd, matches[0].ClassName, "0150", form.Name);
+
         // --new: create new condition
         if (newName != null)
             return CondNew(form, automation, newName);
