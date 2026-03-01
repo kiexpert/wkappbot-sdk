@@ -42,6 +42,9 @@ internal partial class Program
         var winInfo = found[0];
         var hWnd = winInfo.Handle;
 
+        // Knowhow broadcast: show existing knowhow for this window/profile
+        BroadcastInspectKnowhow(hWnd, winInfo.ClassName, null, winInfo.Title);
+
         // Get window rect + compute screen coordinates
         NativeMethods.GetWindowRect(hWnd, out var wRect);
         int screenX = wRect.Left + relX;

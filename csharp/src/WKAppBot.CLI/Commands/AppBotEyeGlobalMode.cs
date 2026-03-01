@@ -74,6 +74,10 @@ internal partial class Program
     static FileSystemWatcher? _fswTick;
     static FileSystemWatcher? _fswPrompt;
 
+    // ── Memory tracking ──
+    static long _prevWorkingSetMB;
+    static long _peakWorkingSetMB;
+
     static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs)
     {
         if (posX < 0 || posY < 0)
@@ -993,6 +997,19 @@ internal partial class Program
                 }
             }
 
+            // ── Periodic GC (~every 5 min = 3000 frames @ 100ms) ──
+            if (frameCount % 3000 == 0 && frameCount > 0)
+            {
+                var beforeMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+                GC.Collect(2, GCCollectionMode.Optimized);
+                GC.WaitForPendingFinalizers();
+                GC.Collect(2, GCCollectionMode.Optimized);
+                var afterMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"[EYE][GC] Gen2 collect: {beforeMB}MB → {afterMB}MB (freed {beforeMB - afterMB}MB)");
+                Console.ResetColor();
+            }
+
             // ── Stats logging ──
             if (frameCount % 100 == 0 && frameCount > 0)
             {
@@ -1090,9 +1107,17 @@ internal partial class Program
         swTotal.Stop();
 
         var mode = forceFull ? "full-1s" : (tickDirty || promptDirty ? "dirty" : "idle");
+        // Memory delta tracking
+        var proc = Process.GetCurrentProcess();
+        var wsMB = proc.WorkingSet64 / (1024 * 1024);
+        var deltaMB = wsMB - _prevWorkingSetMB;
+        if (wsMB > _peakWorkingSetMB) _peakWorkingSetMB = wsMB;
+        _prevWorkingSetMB = wsMB;
+        var memSuffix = deltaMB != 0 ? $" mem={wsMB}MB({(deltaMB >= 0 ? "+" : "")}{deltaMB}) peak={_peakWorkingSetMB}MB" : "";
+
         Console.WriteLine($"[EYE_TICK] mode={mode} tick={swTick.ElapsedMilliseconds}ms(read={tickRead}ms,parse={tickParse}ms,activity=0ms) " +
                           $"prompt={swPrompt.ElapsedMilliseconds}ms(stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms) " +
-                          $"schedule={swSchedule.ElapsedMilliseconds}ms total={swTotal.ElapsedMilliseconds}ms");
+                          $"schedule={swSchedule.ElapsedMilliseconds}ms total={swTotal.ElapsedMilliseconds}ms{memSuffix}");
         Console.WriteLine($"[EYE_TICK] hint promptLine={_lastPromptLineIndex} tickLine={_lastEyeTickLineIndex}");
 
         var execIdle = (DateTime.UtcNow - _lastTickActivityUtc).TotalSeconds;
@@ -1425,7 +1450,7 @@ internal partial class Program
 
                 // Include context from last processed message for conversation flow
                 var contextPrefix = (contextLine != null && forwarded == 0) ? $"{contextLine}\n\n" : "";
-                var promptText = $"{contextPrefix}{cleanText}\n\n(Slack @{user} — wkappbot slack reply \"MUST reply here\" --msg {ts})";
+                var promptText = $"{contextPrefix}{cleanText}\n\n{SlackReplySuffix(user, ts)}";
 
                 // Re-find prompt each time (window may shift)
                 var fresh = helper.FindPrompt();
@@ -1564,7 +1589,7 @@ internal partial class Program
                     var cleanParent = System.Text.RegularExpressions.Regex.Replace(parentText, @"<@[A-Z0-9]+>\s*", "").Trim();
                     if (cleanParent.Length > 80) cleanParent = cleanParent[..80] + "…";
 
-                    var promptText = $"[쓰레드 시작] {cleanParent}\n\n{cleanReply}\n\n(Slack thread reply @{rUser} — wkappbot slack reply \"MUST reply here\" --msg {threadTs})";
+                    var promptText = $"[쓰레드 시작] {cleanParent}\n\n{cleanReply}\n\n{SlackReplySuffix(rUser, threadTs, "thread reply")}";
 
                     var fresh = helper.FindPrompt();
                     if (fresh == null)
@@ -1666,7 +1691,8 @@ internal partial class Program
         foreach (var c in cards)
         {
             var clotContent = $"{c.LastTag}|{c.LastStatus}";
-            var clotKey = $"clot_{c.ParentPid}";
+            var cwdAbbrev = AbbreviateCwd(c.Cwd);
+            var clotKey = !string.IsNullOrEmpty(cwdAbbrev) ? $"clot_{cwdAbbrev}" : $"clot_pid{c.ParentPid}";
             var cachedTs = CardCacheGetTimestamp(clotKey, clotContent);
             if (cachedTs == DateTime.MinValue)
             {
@@ -2278,7 +2304,8 @@ internal partial class Program
 
     static List<EyeParentCard> ReadEyeCards(int staleSeconds = 25)
     {
-        var cards = new Dictionary<int, EyeParentCard>();
+        // KEY = normalized CWD (folder-based grouping: same folder = one card, survives PID restart)
+        var cards = new Dictionary<string, EyeParentCard>(StringComparer.OrdinalIgnoreCase);
         var path = EyeTicksPath;
         if (!File.Exists(path)) return cards.Values.ToList();
 
@@ -2299,12 +2326,16 @@ internal partial class Program
                 var pname = !string.IsNullOrWhiteSpace(t.HostName) ? t.HostName : (string.IsNullOrWhiteSpace(t.ParentName) ? "unknown" : t.ParentName);
                 var ptitle = t.HostTitle ?? "";
 
+                // CWD-based key: normalize to lowercase forward-slash, trimmed
+                var cwdRaw = (t.Cwd ?? "").Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
+                var cardKey = string.IsNullOrEmpty(cwdRaw) ? $"pid_{ppid}" : cwdRaw;
+
                 // Always update timestamp with latest tick
                 // But for tag/status: meta tags (eye, snapshot) don't overwrite meaningful work tags
-                if (!cards.TryGetValue(ppid, out var c))
+                if (!cards.TryGetValue(cardKey, out var c))
                 {
-                    // First tick for this PID — always accept
-                    cards[ppid] = new EyeParentCard
+                    // First tick for this CWD — always accept
+                    cards[cardKey] = new EyeParentCard
                     {
                         ParentPid = ppid,
                         ParentName = pname,
@@ -2319,6 +2350,7 @@ internal partial class Program
                 {
                     // Newer tick — always update timestamp and process info
                     c.LastTsUtc = tsUtc;
+                    c.ParentPid = ppid; // latest PID for this CWD
                     c.ParentName = pname;
                     c.ParentTitle = ptitle;
                     if (!string.IsNullOrWhiteSpace(t.Cwd)) c.Cwd = t.Cwd;

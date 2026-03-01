@@ -399,7 +399,7 @@ internal partial class Program
 
                 var candidateText = messages[i]?["text"]?.GetValue<string>();
                 // Skip ack messages (not useful context for Claude)
-                if (candidateText == "Claude에 전달했습니다!") continue;
+                if (candidateText != null && candidateText.StartsWith("Claude에 전달했습니다!")) continue;
 
                 prevText = candidateText;
                 prevIsBot = messages[i]?["bot_id"] != null;
@@ -409,7 +409,7 @@ internal partial class Program
             // Build context
             var sb = new System.Text.StringBuilder();
 
-            if (!string.IsNullOrEmpty(parentText) && parentText != "Claude에 전달했습니다!")
+            if (!string.IsNullOrEmpty(parentText) && !parentText.StartsWith("Claude에 전달했습니다!"))
             {
                 if (parentText.Length > 300) parentText = parentText[..297] + "...";
                 sb.AppendLine("[쓰레드 시작]");

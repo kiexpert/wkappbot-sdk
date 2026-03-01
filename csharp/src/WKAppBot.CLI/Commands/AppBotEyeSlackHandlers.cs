@@ -12,6 +12,16 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
+    /// Build the "(Slack ... — wkappbot slack reply ...)" suffix appended to every forwarded prompt.
+    /// ONE place to change the format — never duplicate this string elsewhere!
+    /// </summary>
+    static string SlackReplySuffix(string user, string replyTs, string? label = null)
+    {
+        var tag = string.IsNullOrEmpty(label) ? $"Slack @{user}" : $"Slack {label} @{user}";
+        return $"({tag} — wkappbot slack reply \"MUST reply here\" --msg {replyTs})";
+    }
+
+    /// <summary>
     /// Set up Slack event handlers for AppBotEye-integrated Slack daemon.
     /// Handles @mentions, keyword monitoring, thread reply forwarding, and plan approval responses.
     /// RULE: User replies to bot messages are ALWAYS forwarded to Claude prompt.
@@ -25,8 +35,17 @@ internal partial class Program
         // Track threads where bot is engaged (for thread reply forwarding)
         // RULE: User replies to bot messages are ALWAYS forwarded to Claude prompt.
         var activeThreads = new HashSet<string>();
+        // Dedup: messages already forwarded by OnMention → skip in OnMessage thread handler
+        var handledByMention = new HashSet<string>();
         if (!string.IsNullOrEmpty(startupTs))
             activeThreads.Add(startupTs);
+
+        // Restore active threads from pending_acks.json (survives Eye restart)
+        var savedAcks = LoadPendingAcks();
+        foreach (var threadTs in savedAcks.Keys)
+            activeThreads.Add(threadTs);
+        if (savedAcks.Count > 0)
+            Console.WriteLine($"[EYE][SLACK] Restored {savedAcks.Count} active thread(s) from pending_acks.json");
 
         // Track "전달했습니다" ack messages per thread → delete when Claude responds via this bot
         // Key: threadTs, Value: (channel, ackMessageTs)
@@ -166,8 +185,9 @@ internal partial class Program
                 }
 
                 var replyThread = msg.ThreadTs ?? msg.Timestamp;
-                var promptText = $"{cleanText}{threadContext}\n(Slack @{msg.User} thread={replyThread} — via AppBotEye)";
+                var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, replyThread)}";
                 promptHelper.TypeAndSubmit(promptInfo, promptText);
+                handledByMention.Add(msg.Timestamp); // dedup: OnMessage won't re-forward
                 Console.WriteLine("[EYE][SLACK] >> Sent to Claude prompt (with thread context)");
 
                 DeletePendingAck(ackThread);
@@ -318,6 +338,9 @@ internal partial class Program
             // ── Thread reply to bot's message → ALWAYS forward to Claude prompt ──
             if (msg.ThreadTs != null && activeThreads.Contains(msg.ThreadTs))
             {
+                // Dedup: already forwarded by OnMention handler → skip
+                if (handledByMention.Remove(msg.Timestamp)) return;
+
                 var cleanText = System.Text.RegularExpressions.Regex.Replace(
                     msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
                 if (string.IsNullOrEmpty(cleanText)) return;
@@ -352,7 +375,7 @@ internal partial class Program
                             threadContext = $"\n{ctx}\n";
                     }
 
-                    var promptText = $"{cleanText}{threadContext}\n(Slack thread reply @{msg.User} thread={msg.ThreadTs} — via AppBotEye)";
+                    var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, msg.ThreadTs!, "thread reply")}";
                     trPromptHelper.TypeAndSubmit(trPromptInfo, promptText);
                     Console.WriteLine("[EYE][SLACK] >> Thread reply sent to Claude prompt (with context)");
 
@@ -416,7 +439,7 @@ internal partial class Program
                     }
 
                     var kwReplyThread = msg.ThreadTs ?? msg.Timestamp;
-                    var promptText = $"{cleanKwText}{threadContext}\n(Slack keyword:\"{matchedKw}\" @{msg.User} thread={kwReplyThread} — via AppBotEye)";
+                    var promptText = $"{cleanKwText}{threadContext}\n{SlackReplySuffix(msg.User, kwReplyThread, $"keyword:\"{matchedKw}\"")}";
                     kwPromptHelper.TypeAndSubmit(kwPromptInfo, promptText);
                     Console.WriteLine("[EYE][SLACK] >> Keyword match sent to Claude prompt (with context)");
 
