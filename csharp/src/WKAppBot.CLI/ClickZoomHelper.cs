@@ -133,7 +133,13 @@ internal sealed class ClickZoomHelper : IDisposable
             var host = new InputZoomHost();
             host.Start(zX, zY, zW, zH, mode);
             host.UpdateHeader($"[ZOOM:{modeName}] {source} \"{actionLabel}\"");
-            Console.Write($"[ZOOM:{modeName}] ");
+
+            // Debug: overlay position vs control center
+            int ctlCX = ctlRect.Left + ctlRect.Width / 2;
+            int ctlCY = ctlRect.Top + ctlRect.Height / 2;
+            int ovCX = zX + zW / 2;
+            int ovCY = zY + zH / 2;
+            Console.Write($"[ZOOM:{modeName} ov@({zX},{zY} {zW}x{zH}) center=({ovCX},{ovCY}) ctl=({ctlCX},{ctlCY}) Δ=({ovCX - ctlCX},{ovCY - ctlCY})] ");
 
             // Initial capture (Magnifier/Relay only)
             if (mode != ZoomMode.HighlightBox)
@@ -241,7 +247,13 @@ internal sealed class ClickZoomHelper : IDisposable
             var host = new InputZoomHost();
             host.Start(zX, zY, zW, zH, mode);
             host.UpdateHeader($"[ZOOM:{modeName}] {source} \"{actionLabel}\"");
-            Console.Write($"[ZOOM:{modeName}] ");
+
+            // Debug: overlay position vs source rect center
+            int srcCX = screenRect.Left + screenRect.Width / 2;
+            int srcCY = screenRect.Top + screenRect.Height / 2;
+            int ovCX = zX + zW / 2;
+            int ovCY = zY + zH / 2;
+            Console.Write($"[ZOOM:{modeName} ov@({zX},{zY} {zW}x{zH}) center=({ovCX},{ovCY}) src=({srcCX},{srcCY}) Δ=({ovCX - srcCX},{ovCY - srcCY})] ");
 
             // Initial capture via form PrintWindow + crop
             if (mode != ZoomMode.HighlightBox && hFormOrParent != IntPtr.Zero)
