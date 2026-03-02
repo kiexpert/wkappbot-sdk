@@ -406,7 +406,7 @@ internal partial class Program
     /// <summary>
     /// Broadcast knowhow for the inspect target.
     /// matchedFormId != null → 해당 폼 폴더의 knowhow.md만 방송
-    /// matchedFormId == null → 프로파일의 모든 폼 knowhow.md 방송 (최대 5개)
+    /// matchedFormId == null → 프로필 레벨 knowhow.md만 방송 (form 노하우는 생략)
     /// 엑빌경로(A11Y) = profiles/{name}_exp/ — 플랫폼 무관, 프로필 기반
     /// 운영경로(OS)  = experience/{process}/{class}/ — OS 종속 (Win32 class)
     /// </summary>
@@ -502,11 +502,9 @@ internal partial class Program
                 }
                 else
                 {
-                    foreach (var formDir in Directory.GetDirectories(a11yDir, "form_*").Take(5))
-                    {
-                        var kh = Path.Combine(formDir, "knowhow.md");
-                        if (File.Exists(kh)) ShowKnowhowBroadcast(kh, "KNOWHOW:A11Y");
-                    }
+                    // matchedFormId == null → 프로필 레벨 knowhow.md는 이미 위에서 방송됨
+                    // form_* 폴더 무차별 방송은 노이즈 유발 → 생략
+                    // (특정 폼 작업 시 inspect/cond-add 등에서 formId 명시하면 해당 폼만 방송)
                 }
             }
 

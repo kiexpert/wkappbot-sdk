@@ -34,6 +34,27 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool IsIconic(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WINDOWPLACEMENT
+    {
+        public int length;
+        public int flags;
+        public int showCmd;
+        public POINT ptMinPosition;
+        public POINT ptMaxPosition;
+        public RECT rcNormalPosition;
+    }
+
+    public const int SW_SHOWNOACTIVATE = 4;
+    public const int SW_SHOWMINNOACTIVE = 7;
+    public const int SW_RESTORE = 9;
+
     // ── Screen Reader announcement (SPI_SETSCREENREADER) ──
     // Tells all apps "a screen reader is running" → Chromium/Electron auto-enable A11Y tree
     public const uint SPI_GETSCREENREADER = 0x0046;
@@ -63,6 +84,12 @@ public static partial class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetParent(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+    public const uint GA_PARENT = 1;
+    public const uint GA_ROOT = 2;
+    public const uint GA_ROOTOWNER = 3;
 
     [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -182,6 +209,7 @@ public static partial class NativeMethods
     public static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
 
     public const uint GW_HWNDFIRST = 0; // topmost child in Z-order
+    public const uint GW_HWNDPREV = 3;  // prev in Z-order (in front of)
     public const uint GW_HWNDNEXT = 2;  // next in Z-order (behind)
     public const uint GW_CHILD = 5;     // first child window
 
@@ -424,6 +452,29 @@ public static partial class NativeMethods
         using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
         var principal = new System.Security.Principal.WindowsPrincipal(identity);
         return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+    }
+
+    // ── User idle detection ────────────────────────────────────
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LASTINPUTINFO
+    {
+        public uint cbSize;
+        public uint dwTime;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+    /// <summary>
+    /// Milliseconds since the last user keyboard/mouse input event.
+    /// Uses GetLastInputInfo + Environment.TickCount delta.
+    /// </summary>
+    public static uint GetUserIdleMs()
+    {
+        var lii = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        if (!GetLastInputInfo(ref lii)) return uint.MaxValue;
+        return (uint)((Environment.TickCount & 0x7FFFFFFF) - (lii.dwTime & 0x7FFFFFFF));
     }
 
     // ── Sleep / Display prevention ─────────────────────────────

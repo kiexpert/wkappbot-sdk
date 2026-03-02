@@ -1817,6 +1817,139 @@ public sealed class ClaudePromptHelper : IDisposable
     }
 
     /// <summary>
+    /// Write text to MSAA elements at point. Tries put_accValue on hit + ancestors (L0..L3),
+    /// waits 5s so user can visually check if text appeared, then clears.
+    /// </summary>
+    public static void ProbeMsaaWrite(int absX, int absY, string text)
+    {
+        var pt = new Native.POINT(absX, absY);
+        int hr = AccessibleObjectFromPoint(pt, out object? acc, out object? _);
+        if (hr != 0 || acc == null)
+        {
+            Console.WriteLine($"  [MSAA-WRITE] AccessibleObjectFromPoint failed hr=0x{hr:X8}");
+            return;
+        }
+        try
+        {
+            object? current = acc;
+            for (int level = 0; level <= 4 && current != null; level++)
+            {
+                if (current is not IAccessibleVtbl v) break;
+                object? role = null; try { v.get_accRole(0, out role); } catch { }
+                string? name = null; try { v.get_accName(0, out name); } catch { }
+                int ri = role is int r ? r : -1;
+                Console.Write($"    L{level}: role={ri}(0x{ri:X2}) name=\"{name ?? "(null)"}\" → put_accValue...");
+                try
+                {
+                    int pvHr = v.put_accValue(0, text);
+                    Console.WriteLine($" hr=0x{pvHr:X8} {(pvHr == 0 ? "★ WRITTEN!" : "failed")}");
+                    if (pvHr == 0)
+                    {
+                        Console.WriteLine($"  [MSAA-WRITE] Text written at L{level}! Waiting 5s for visual check...");
+                        Thread.Sleep(5000);
+                        // Read back
+                        string? readBack = null;
+                        try { v.get_accValue(0, out readBack); } catch { }
+                        Console.WriteLine($"  [MSAA-WRITE] Read back: \"{readBack ?? "(null)"}\"");
+                        // Clean up
+                        v.put_accValue(0, "");
+                        Console.WriteLine($"  [MSAA-WRITE] Cleaned up.");
+                        return;
+                    }
+                }
+                catch (Exception ex) { Console.WriteLine($" {ex.GetType().Name}"); }
+                try { v.get_accParent(out current); } catch { current = null; }
+            }
+            Console.WriteLine("  [MSAA-WRITE] No writable element found in L0..L4");
+        }
+        finally { try { Marshal.ReleaseComObject(acc); } catch { } }
+    }
+
+    /// <summary>
+    /// Probe MSAA tree at absolute screen coordinates. Dumps role/name/children up to parent.
+    /// Used to investigate VS Code webview accessibility for Claude Code input.
+    /// Returns the MSAA role of the hit element, or -1 on failure.
+    /// </summary>
+    public static int ProbeMsaaAtPoint(int absX, int absY, int walkDepth = 6)
+    {
+        var pt = new Native.POINT(absX, absY);
+        int hr = AccessibleObjectFromPoint(pt, out object? acc, out object? childId);
+        if (hr != 0 || acc == null)
+        {
+            Console.WriteLine($"  [MSAA-PROBE] AccessibleObjectFromPoint({absX},{absY}) failed hr=0x{hr:X8}");
+            return -1;
+        }
+
+        var childIdStr = childId switch { int id => id == 0 ? "SELF" : $"child={id}", _ => $"type={childId?.GetType().Name}" };
+        Console.WriteLine($"  [MSAA-PROBE] Hit at ({absX},{absY}) childId={childIdStr}");
+
+        try
+        {
+            // Walk up from hit element, dumping role/name/value
+            object? current = acc;
+            for (int level = 0; level <= walkDepth && current != null; level++)
+            {
+                if (current is not IAccessibleVtbl v) { Console.WriteLine($"    L{level}: not IAccessibleVtbl"); break; }
+
+                int childCount = 0; try { v.get_accChildCount(out childCount); } catch { }
+                object? role = null; try { v.get_accRole(0, out role); } catch { }
+                string? name = null; try { v.get_accName(0, out name); } catch { }
+                string? value = null; try { v.get_accValue(0, out value); } catch { }
+                string? defAction = null; try { v.get_accDefaultAction(0, out defAction); } catch { }
+
+                int roleInt = role is int r ? r : -1;
+                var nameStr = string.IsNullOrEmpty(name) ? "(null)" : (name.Length > 80 ? name[..77] + "..." : name);
+                var valStr = string.IsNullOrEmpty(value) ? "" : $" val=\"{(value.Length > 40 ? value[..37] + "..." : value)}\"";
+                var actStr = string.IsNullOrEmpty(defAction) ? "" : $" action=\"{defAction}\"";
+                Console.WriteLine($"    L{level}: role={roleInt}(0x{roleInt:X2}) name=\"{nameStr}\" children={childCount}{valStr}{actStr}");
+
+                // Try put_accValue to test writability
+                if (level <= 2)
+                {
+                    try
+                    {
+                        int pvHr = v.put_accValue(0, "__PROBE_TEST__");
+                        Console.WriteLine($"    L{level}: put_accValue → hr=0x{pvHr:X8} {(pvHr == 0 ? "★ WRITABLE!" : "")}");
+                        if (pvHr == 0) // clean up test value
+                            v.put_accValue(0, "");
+                    }
+                    catch (Exception ex) { Console.WriteLine($"    L{level}: put_accValue → {ex.GetType().Name}"); }
+                }
+
+                // Move to parent
+                try { v.get_accParent(out current); } catch { current = null; }
+            }
+
+            // Also dump children of the hit element
+            if (acc is IAccessibleVtbl hitV)
+            {
+                hitV.get_accChildCount(out int cc);
+                Console.WriteLine($"  [MSAA-PROBE] Children of hit ({cc}):");
+                for (int i = 1; i <= Math.Min(cc, 15); i++)
+                {
+                    try
+                    {
+                        hitV.get_accChild(i, out object? child);
+                        if (child is IAccessibleVtbl cv)
+                        {
+                            object? cr = null; try { cv.get_accRole(0, out cr); } catch { }
+                            string? cn = null; try { cv.get_accName(0, out cn); } catch { }
+                            int cri = cr is int crint ? crint : -1;
+                            Console.WriteLine($"    child[{i}]: role={cri}(0x{cri:X2}) name=\"{cn ?? "(null)"}\"");
+                        }
+                    }
+                    catch { }
+                }
+            }
+            return acc is IAccessibleVtbl av ? (av.get_accRole(0, out object? ro) == 0 && ro is int ri ? ri : -1) : -1;
+        }
+        finally
+        {
+            try { Marshal.ReleaseComObject(acc); } catch { }
+        }
+    }
+
+    /// <summary>
     /// Open a new chat in Claude Desktop via UIA sidebar "새 대화" button (fully Focusless!).
     /// Flow: Toggle sidebar open → Invoke "새 대화" Hyperlink → verify new JSONL → Toggle sidebar closed.
     /// Falls back to Ctrl+N (focus steal) if UIA approach fails.

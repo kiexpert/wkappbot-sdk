@@ -48,7 +48,6 @@ Options:
                     Numbers: 1..10
                     Keywords: replacesel|settext-notify|settext|atomic|postpipe|focusless|postmsg|click-post|focus-char|click-type
   --click-x N       Override click X offset from control left edge (default: 30)
-  --no-zoom         Hide the adaptive zoom overlay (shown by default)
 
 Examples:
   wkappbot input ""투혼"" 1101 ""000660"" --enter
@@ -62,7 +61,7 @@ Examples:
         bool sendEnter = args.Contains("--enter");
         int? methodOnly = ParseMethodOption(GetArgValue(args, "--method"));
         int clickXOffset = int.TryParse(GetArgValue(args, "--click-x"), out var cx2) ? cx2 : 30;
-        bool showZoom = !args.Contains("--no-zoom");
+        // 돋보기 항상 표시 (입력확보 과정 시각화)
 
         var methodRaw = GetArgValue(args, "--method");
         if (!string.IsNullOrWhiteSpace(methodRaw) && methodOnly == null)
@@ -115,20 +114,41 @@ Examples:
         }
         Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
 
-        // Check elevation
+        // [READINESS] 입력위치확보: 전수조사 + 노하우 + 방해꾼 + 유저 간섭 분석
+        var readiness = CreateInputReadiness();
+        var readinessReport = readiness.Probe(new InputReadinessRequest
+        {
+            TargetHwnd = win.Handle,
+            IntendedAction = "input",
+            MainHwnd = win.Handle,
+            FormId = targetFormId,
+            ControlId = targetCid,
+            SkipZoom = false, // 돋보기 항상 표시
+        });
+        InputReadiness.PrintReport(readinessReport);
+
+        // Check elevation (use readiness report)
         NativeMethods.GetWindowThreadProcessId(win.Handle, out uint targetPid);
-        bool weAreElevated = NativeMethods.IsCurrentProcessElevated();
-        bool targetElevated = NativeMethods.IsProcessElevated(targetPid) ?? true;
-        if (targetElevated && !weAreElevated)
+        if (readinessReport.ElevationMismatch)
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("  ✗ Target is elevated but wkappbot is not. Run as admin.");
             Console.ResetColor();
+            readinessReport.Zoom?.ShowFail("Elevation mismatch");
             return 1;
         }
+        bool weAreElevated = readinessReport.WeAreElevated;
+        bool targetElevated = readinessReport.TargetElevated;
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("  ✓ Elevated — input enabled");
         Console.ResetColor();
+
+        // Auto-dismiss blocker if detected by readiness
+        if (readinessReport.ActiveBlocker != null)
+        {
+            readiness.TryDismissBlocker(win.Handle, readinessReport.ActiveBlocker);
+            Thread.Sleep(300);
+        }
 
         // Load ExperienceDb from matching profile (best-effort)
         ExperienceDb? expDb = null;
@@ -554,7 +574,7 @@ Examples:
                 //   Small control (w<200 && h<60): 3x magnifier overlay
                 //   Large control + foreground:     highlight box (cyan 3px border only)
                 //   Large control + obscured:       1:1 relay overlay (no magnification)
-                if (showZoom)
+                if (true) // 돋보기 항상 표시
                 {
                     try
                     {

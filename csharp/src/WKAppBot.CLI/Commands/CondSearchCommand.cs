@@ -289,6 +289,23 @@ internal partial class Program
     {
         Console.WriteLine($"\n=== Adding indicator: \"{keyword}\" ===\n");
 
+        // [READINESS] 입력위치확보: 전수조사 + 노하우 + 돋보기 + 방해꾼 체크
+        var readiness = CreateInputReadiness();
+        var readinessReport = readiness.Probe(new InputReadinessRequest
+        {
+            TargetHwnd = mainHwnd,
+            IntendedAction = "cond-add",
+            MainHwnd = mainHwnd,
+            FormId = "0150",
+            SkipZoom = false, // 돋보기 항상 표시
+        });
+        InputReadiness.PrintReport(readinessReport);
+        if (readinessReport.ActiveBlocker != null)
+        {
+            readiness.TryDismissBlocker(mainHwnd, readinessReport.ActiveBlocker);
+            Thread.Sleep(500);
+        }
+
         // Step 1: Switch to 조건식 tab (Tab1, index 0)
         Console.Write("[1/5] Switching to 조건식 tab... ");
         var tab = FindByAid(form, "3019");
@@ -436,6 +453,16 @@ internal partial class Program
         }
 
         // === Try Approach 0A: Keyboard select + UIA add button (fully focusless!) ===
+        // [READINESS] 방해꾼 체크 (approach 전)
+        var blocker = readiness.DetectBlocker(mainHwnd);
+        if (blocker != null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [READINESS] Blocker: [{blocker.ClassPath}] \"{blocker.Title}\"");
+            Console.ResetColor();
+            readiness.TryDismissBlocker(mainHwnd, blocker);
+            Thread.Sleep(500);
+        }
         // User insight: tree selection (no dblclk) shows params → click + button to add
         Console.WriteLine("  [Approach 0A] Keyboard select → UIA + button (aid=4009)...");
         TryKeyboardSelect(treeHwnd);
@@ -469,6 +496,15 @@ internal partial class Program
         else Console.WriteLine("  + button (aid=4009) not found.");
 
         // === Try Approach 0B: Keyboard VK_RETURN (double-click equivalent, fully focusless!) ===
+        blocker = readiness.DetectBlocker(mainHwnd);
+        if (blocker != null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [READINESS] Blocker: [{blocker.ClassPath}] \"{blocker.Title}\"");
+            Console.ResetColor();
+            readiness.TryDismissBlocker(mainHwnd, blocker);
+            Thread.Sleep(500);
+        }
         Console.WriteLine("  [Approach 0B] Keyboard VK_RETURN (dblclk equivalent)...");
         PostKey(treeHwnd, 0x0D); // VK_RETURN
         Thread.Sleep(200);
@@ -484,6 +520,15 @@ internal partial class Program
         Console.WriteLine("  Approach 0B (keyboard RETURN) didn't work.");
 
         // === Try Approach 1: PostMessage-based double-click ===
+        blocker = readiness.DetectBlocker(mainHwnd);
+        if (blocker != null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [READINESS] Blocker: [{blocker.ClassPath}] \"{blocker.Title}\"");
+            Console.ResetColor();
+            readiness.TryDismissBlocker(mainHwnd, blocker);
+            Thread.Sleep(500);
+        }
         TryDoubleClickTreeItem(treeHwnd, clickX, clickY);
         Thread.Sleep(800);
 
@@ -497,6 +542,15 @@ internal partial class Program
         Console.WriteLine("  Approach 1 didn't add the indicator.");
 
         // === Try Approach 2: VK_RETURN to tree (keyboard activation) ===
+        blocker = readiness.DetectBlocker(mainHwnd);
+        if (blocker != null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [READINESS] Blocker: [{blocker.ClassPath}] \"{blocker.Title}\"");
+            Console.ResetColor();
+            readiness.TryDismissBlocker(mainHwnd, blocker);
+            Thread.Sleep(500);
+        }
         Console.WriteLine("  [Approach 2] Sending VK_RETURN to tree...");
         {
             const int VK_RETURN = 0x0D;
@@ -518,6 +572,15 @@ internal partial class Program
         Console.WriteLine("  Approach 2 didn't add the indicator.");
 
         // === Try Approach 3: SendInput actual double-click (steals focus!) ===
+        blocker = readiness.DetectBlocker(mainHwnd);
+        if (blocker != null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [READINESS] Blocker: [{blocker.ClassPath}] \"{blocker.Title}\"");
+            Console.ResetColor();
+            readiness.TryDismissBlocker(mainHwnd, blocker);
+            Thread.Sleep(500);
+        }
         Console.WriteLine("  Falling back to SendInput (will briefly steal focus)...");
         TryDoubleClickSendInput(treeHwnd, clickX, clickY);
         Thread.Sleep(800);
