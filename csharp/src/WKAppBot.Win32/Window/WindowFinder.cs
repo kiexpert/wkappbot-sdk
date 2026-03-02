@@ -148,6 +148,44 @@ public static class WindowFinder
     }
 
     /// <summary>
+    /// Find a child window (MDI children first, then direct children) matching a pattern.
+    /// Uses PatternMatcher.Create (substring matching) against title and enriched searchKey.
+    /// Returns null if no match found.
+    /// </summary>
+    public static WindowInfo? FindChildByPattern(IntPtr hParent, string pattern)
+    {
+        var matcher = PatternMatcher.Create(pattern);
+
+        // Build search key for matching
+        static string SearchKey(WindowInfo wi) =>
+            $"[{wi.ClassName}] {wi.Title} (cid={wi.ControlId} hwnd={wi.Handle:X8} {wi.Rect.Width}x{wi.Rect.Height})";
+
+        // MDI children first
+        var topChildren = GetChildrenZOrder(hParent);
+        IntPtr hMdiClient = IntPtr.Zero;
+        foreach (var ch in topChildren)
+            if (ch.ClassName == "MDIClient") { hMdiClient = ch.Handle; break; }
+
+        if (hMdiClient != IntPtr.Zero)
+        {
+            foreach (var mc in GetChildrenZOrder(hMdiClient))
+            {
+                if (matcher.IsMatch(mc.Title) || matcher.IsMatch(SearchKey(mc)))
+                    return mc;
+            }
+        }
+
+        // Direct children fallback
+        foreach (var ch in topChildren)
+        {
+            if (matcher.IsMatch(ch.Title) || matcher.IsMatch(SearchKey(ch)))
+                return ch;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Count MDI children (direct children of MDIClient).
     /// </summary>
     public static int CountMDIChildren(IntPtr hMainWnd)

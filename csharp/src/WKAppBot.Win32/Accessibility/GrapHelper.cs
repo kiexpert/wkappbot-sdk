@@ -5,17 +5,20 @@ using FlaUI.UIA3;
 namespace WKAppBot.Win32.Accessibility;
 
 /// <summary>
-/// Grap pattern helper: parses "windowGrap#uiaPath" syntax for UIA scope narrowing.
+/// Grap pattern helper: unified '/' and '#' separator for hierarchical scope narrowing.
 ///
-/// The '#' separator splits window finding (Win32) from UIA element scoping:
-///   *영웅문*#*잔고확인*        → find window → narrow UIA root to "잔고확인"
-///   *영웅문*#*잔고확인*/*Tab*  → find window → narrow to "잔고확인" → then "Tab" inside it
+/// Both '/' and '#' are equivalent separators that split grap into segments:
+///   "영웅문/잔고확인"    → find window → narrow to "잔고확인" (Win32 child or UIA scope)
+///   "영웅문#잔고확인"    → same as above — '#' and '/' are interchangeable
+///   "영웅문/실현손익/당일" → window → child → UIA scope
 ///
-/// After '#', both '/' and '#' separate UIA hierarchy levels (multi-level path).
-/// Each segment supports PatternMatcher syntax: wildcards (*/?), regex: prefix, or literal.
+/// Resolution order per segment (after the first = window title):
+///   1. Try Win32 child window match (MDIClient → direct children)
+///   2. If no Win32 child found → switch to UIA scope (container-first search)
+///   3. Once in UIA mode, remaining segments stay in UIA mode
 ///
-/// Container-first: prefers Window/Pane/Group elements over leaf elements (TabItem/Button)
-/// when matching by name. This ensures #scope finds forms/containers, not their leaf children.
+/// Each segment supports PatternMatcher syntax: substring (default), wildcards (*/?), regex: prefix.
+/// Container-first: prefers Window/Pane/Group elements over leaf elements (TabItem/Button).
 /// </summary>
 public static class GrapHelper
 {
@@ -25,29 +28,6 @@ public static class GrapHelper
         ControlType.Window, ControlType.Pane, ControlType.Group,
         ControlType.Tab, ControlType.Document, ControlType.Custom
     };
-
-    /// <summary>
-    /// Split "windowGrap#uiaPath" into components.
-    /// Returns (windowGrap, null) if no '#' present (backward compatible).
-    /// </summary>
-    public static (string windowGrap, string? uiaPath) SplitHash(string grap)
-    {
-        if (string.IsNullOrEmpty(grap))
-            return (grap, null);
-
-        var hashIdx = grap.IndexOf('#');
-        if (hashIdx < 0)
-            return (grap, null);
-
-        var windowPart = grap[..hashIdx];
-        var uiaPart = hashIdx + 1 < grap.Length ? grap[(hashIdx + 1)..] : null;
-
-        // Empty window part → use original (shouldn't happen, but safety)
-        if (string.IsNullOrEmpty(windowPart))
-            return (grap, null);
-
-        return (windowPart, string.IsNullOrEmpty(uiaPart) ? null : uiaPart);
-    }
 
     /// <summary>
     /// Find UIA element by name path within a root element.
@@ -81,17 +61,70 @@ public static class GrapHelper
     }
 
     /// <summary>
-    /// Convenience: resolve full grap with optional '#' scope.
-    /// Returns narrowed UIA root element, or original root if no '#'.
+    /// Parse full grap pattern and resolve to (hwnd, uiaRoot).
+    /// '/' and '#' are equivalent separators — segments resolve as:
+    ///   1st segment → FindByTitle (main window)
+    ///   subsequent  → Win32 child first, UIA scope fallback (auto-switch)
+    /// Once switched to UIA mode, remaining segments stay in UIA.
+    /// Examples:
+    ///   "영웅문"                → main window only
+    ///   "영웅문/잔고확인"       → window → Win32 child (MDI)
+    ///   "영웅문#실시간계좌"     → window → (no child) → UIA scope
+    ///   "영웅문/실현손익/당일"  → window → child → UIA scope "당일"
     /// </summary>
-    public static AutomationElement? ResolveScope(
-        UIA3Automation automation, IntPtr windowHwnd, string? uiaPath)
+    public static (IntPtr hwnd, AutomationElement root, string? error)? ResolveFullGrap(
+        string grap, UIA3Automation automation)
     {
-        var root = automation.FromHandle(windowHwnd);
-        if (string.IsNullOrEmpty(uiaPath))
-            return root;
+        if (string.IsNullOrEmpty(grap))
+            return (IntPtr.Zero, null!, "Empty grap pattern");
 
-        return FindUiaScope(root, uiaPath);
+        // Split by / or # — both are equivalent separators
+        var segments = grap.Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+            return (IntPtr.Zero, null!, "Empty grap pattern");
+
+        // First segment = main window title
+        var windows = Window.WindowFinder.FindByTitle(segments[0]);
+        if (windows.Count == 0)
+            return (IntPtr.Zero, null!, $"Window not found: \"{segments[0]}\"");
+
+        var targetHwnd = windows[0].Handle;
+        AutomationElement? root = null;
+        bool inUiaMode = false;
+
+        // Subsequent segments: Win32 child → UIA scope (auto-switch)
+        for (int i = 1; i < segments.Length; i++)
+        {
+            var seg = segments[i];
+
+            // Once in UIA mode, stay in UIA mode
+            if (!inUiaMode)
+            {
+                var child = Window.WindowFinder.FindChildByPattern(targetHwnd, seg);
+                if (child != null)
+                {
+                    targetHwnd = child.Handle;
+                    continue; // Stay in Win32 mode
+                }
+                // No Win32 child found — switch to UIA mode
+                inUiaMode = true;
+            }
+
+            // UIA scope narrowing
+            if (root == null)
+                root = automation.FromHandle(targetHwnd);
+
+            var scoped = FindUiaScope(root, seg);
+            if (scoped == null)
+                return (targetHwnd, null!, $"Scope not found: \"{seg}\"");
+            root = scoped;
+        }
+
+        // Ensure root is initialized
+        if (root == null)
+            root = automation.FromHandle(targetHwnd);
+
+        return (targetHwnd, root, null);
     }
 
     /// <summary>

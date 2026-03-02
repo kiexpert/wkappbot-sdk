@@ -36,7 +36,6 @@ internal partial class Program
             return 1;
         }
 
-        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         var treeAid = GetArgValue(args, "--aid") ?? "";
         var selectTarget = GetArgValue(args, "--select") ?? "";
         var expandTarget = GetArgValue(args, "--expand") ?? "";
@@ -48,30 +47,23 @@ internal partial class Program
         if (string.IsNullOrEmpty(treeAid))
             return Error("--aid is required. Use inspect to find the Tree control's AutomationId.");
 
-        // Find window
-        var matches = WindowFinder.FindByTitle(title);
-        if (matches.Count == 0) return Error($"Window not found: {title}");
-        var mainHwnd = matches[0].Handle;
-        Console.WriteLine($"Window: [{mainHwnd:X8}] \"{matches[0].Title}\"");
-
-        // Initialize UIA
+        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
         UIA3Automation automation;
         AutomationElement root;
+        IntPtr mainHwnd;
         try
         {
             automation = new UIA3Automation();
             automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
             automation.TransactionTimeout = TimeSpan.FromSeconds(5);
-            root = automation.FromHandle(mainHwnd);
 
-            // '#' scope narrowing
-            if (!string.IsNullOrEmpty(uiaScope))
-            {
-                var scoped = GrapHelper.FindUiaScope(root, uiaScope);
-                if (scoped == null) return Error($"UIA scope not found: \"{uiaScope}\"");
-                root = scoped;
-                Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
-            }
+            var resolved = GrapHelper.ResolveFullGrap(args[0], automation);
+            if (resolved == null) return Error("Failed to resolve grap pattern.");
+            if (resolved.Value.error != null) return Error(resolved.Value.error);
+
+            mainHwnd = resolved.Value.hwnd;
+            root = resolved.Value.root;
+            Console.WriteLine($"Window: [{mainHwnd:X8}] \"{WindowFinder.GetWindowText(mainHwnd)}\"");
         }
         catch (Exception ex)
         {

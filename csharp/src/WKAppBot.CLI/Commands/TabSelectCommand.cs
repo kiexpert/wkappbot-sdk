@@ -32,8 +32,6 @@ internal partial class Program
             return 1;
         }
 
-        // Parse "windowGrap#uiaPath" — '#' narrows UIA search scope
-        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         var tabAid = GetArgValue(args, "--aid") ?? "";
         var selectTarget = GetArgValue(args, "--select") ?? "";
         var doList = args.Contains("--list");
@@ -42,39 +40,37 @@ internal partial class Program
         if (string.IsNullOrEmpty(tabAid))
             return Error("--aid is required. Use inspect to find the Tab control's AutomationId.");
 
-        // Find window
-        var matches = WindowFinder.FindByTitle(title);
-        if (matches.Count == 0) return Error($"Window not found: {title}");
-        var mainHwnd = matches[0].Handle;
-        Console.WriteLine($"Window: [{mainHwnd:X8}] \"{matches[0].Title}\"");
-
-        // Knowhow broadcast: show existing knowhow for this window/profile
-        BroadcastInspectKnowhow(mainHwnd, matches[0].ClassName, null, matches[0].Title);
-
-        // Initialize UIA
+        // Resolve full grap: "window/child#uiaScope"
         UIA3Automation automation;
         AutomationElement root;
+        IntPtr mainHwnd;
         try
         {
             automation = new UIA3Automation();
             automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
             automation.TransactionTimeout = TimeSpan.FromSeconds(5);
-            root = automation.FromHandle(mainHwnd);
 
-            // '#' scope narrowing: find UIA element by name path, use as root
-            if (!string.IsNullOrEmpty(uiaScope))
-            {
-                var scoped = GrapHelper.FindUiaScope(root, uiaScope);
-                if (scoped == null)
-                    return Error($"UIA scope not found: \"{uiaScope}\" under \"{matches[0].Title}\"");
-                root = scoped;
-                Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
-            }
+            var resolved = GrapHelper.ResolveFullGrap(args[0], automation);
+            if (resolved == null)
+                return Error("Failed to resolve grap pattern.");
+            if (resolved.Value.error != null)
+                return Error(resolved.Value.error);
+
+            mainHwnd = resolved.Value.hwnd;
+            root = resolved.Value.root;
+
+            // Print resolved window info
+            var winTitle = WindowFinder.GetWindowText(mainHwnd);
+            Console.WriteLine($"Window: [{mainHwnd:X8}] \"{winTitle}\"");
         }
         catch (Exception ex)
         {
             return Error($"UIA init failed: {ex.Message}");
         }
+
+        // Knowhow broadcast
+        var cls = WindowFinder.GetClassName(mainHwnd);
+        BroadcastInspectKnowhow(mainHwnd, cls, null, WindowFinder.GetWindowText(mainHwnd));
 
         // Find Tab control — search for Tab and TabItem control types
         AutomationElement? tab = null;

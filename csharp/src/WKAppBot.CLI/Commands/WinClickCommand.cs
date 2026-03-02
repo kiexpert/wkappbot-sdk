@@ -26,7 +26,6 @@ internal partial class Program
                 "  --dbl: Double-click (physical only)\n" +
                 "  --right: Right-click (physical only)");
 
-        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         bool isDouble = args.Any(a => a == "--dbl" || a == "--double");
         bool isRight = args.Any(a => a == "--right");
         bool forceFocusless = args.Any(a => a == "--fl" || a == "--focusless");
@@ -34,13 +33,24 @@ internal partial class Program
         if (!int.TryParse(args[1], out int relX) || !int.TryParse(args[2], out int relY))
             return Error("Invalid coordinates. Usage: wkappbot win-click <title> <x> <y>");
 
-        // Find window
-        var found = WindowFinder.FindByTitle(title);
-        if (found.Count == 0)
-            return Error($"Window not found: \"{title}\"");
+        // Resolve grap: "window/child" — '/' and '#' resolve to target window
+        // Note: win-click doesn't use UIA scope, just window resolution
+        var segments = args[0].Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0) return Error("Empty grap pattern");
 
-        var winInfo = found[0];
-        var hWnd = winInfo.Handle;
+        var found = WindowFinder.FindByTitle(segments[0]);
+        if (found.Count == 0)
+            return Error($"Window not found: \"{segments[0]}\"");
+
+        var hWnd = found[0].Handle;
+        // Resolve child window segments (Win32 only, no UIA needed for click)
+        for (int si = 1; si < segments.Length; si++)
+        {
+            var child = WindowFinder.FindChildByPattern(hWnd, segments[si]);
+            if (child != null) { hWnd = child.Handle; continue; }
+            break; // Remaining segments ignored for win-click (coordinate-based)
+        }
+        var winInfo = WindowInfo.FromHwnd(hWnd);
 
         // Knowhow broadcast: show existing knowhow for this window/profile
         BroadcastInspectKnowhow(hWnd, winInfo.ClassName, null, winInfo.Title);

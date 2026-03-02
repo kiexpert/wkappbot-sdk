@@ -36,18 +36,40 @@ internal partial class Program
             return 1;
         }
 
-        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         string tag = GetArgValue(args, "--tag") ?? "snap";
         int depth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 8;
         int? cid = int.TryParse(GetArgValue(args, "--cid"), out var cidVal) ? cidVal : null;
         bool skipLearn = args.Any(a => a.Equals("--no-learn", StringComparison.OrdinalIgnoreCase));
 
-        // Find window
-        var windows = WindowFinder.FindByTitle(title);
+        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
+        // Note: we need window info before UIA init, so resolve manually
+        var segments = args[0].Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0) return Error("Empty grap pattern");
+
+        var windows = WindowFinder.FindByTitle(segments[0]);
         if (windows.Count == 0)
-            return Error($"No window found matching: \"{title}\"");
+            return Error($"No window found matching: \"{segments[0]}\"");
 
         var win = windows[0];
+        var targetHwnd = win.Handle;
+
+        // Resolve remaining segments: Win32 child → UIA scope
+        bool hasUiaScope = false;
+        string? uiaScopePath = null;
+        for (int si = 1; si < segments.Length; si++)
+        {
+            var child = WindowFinder.FindChildByPattern(targetHwnd, segments[si]);
+            if (child != null)
+            {
+                targetHwnd = child.Handle;
+                continue;
+            }
+            // Remaining segments are UIA scope
+            uiaScopePath = string.Join("/", segments[si..]);
+            hasUiaScope = true;
+            break;
+        }
+
         // Get process info from window handle
         NativeMethods.GetWindowThreadProcessId(win.Handle, out uint winPid);
         string? winProcessName = null;
@@ -70,16 +92,17 @@ internal partial class Program
         {
             using var uia = new UiaLocator();
             string tree;
-            if (!string.IsNullOrEmpty(uiaScope))
+            if (hasUiaScope && !string.IsNullOrEmpty(uiaScopePath))
             {
-                var scopedRoot = GrapHelper.ResolveScope(uia.Automation, win.Handle, uiaScope);
-                if (scopedRoot == null) return Error($"UIA scope not found: \"{uiaScope}\"");
+                var uiaRoot = uia.Automation.FromHandle(targetHwnd);
+                var scopedRoot = GrapHelper.FindUiaScope(uiaRoot, uiaScopePath);
+                if (scopedRoot == null) return Error($"UIA scope not found: \"{uiaScopePath}\"");
                 Console.WriteLine($"  UIA scope: \"{scopedRoot.Properties.Name.ValueOrDefault}\"");
                 tree = uia.DumpTree(scopedRoot, depth);
             }
             else
             {
-                tree = uia.DumpTree(win.Handle, depth);
+                tree = uia.DumpTree(targetHwnd, depth);
             }
             var uiaPath = Path.Combine(outDir, "uia_tree.txt");
             File.WriteAllText(uiaPath, tree, Encoding.UTF8);
