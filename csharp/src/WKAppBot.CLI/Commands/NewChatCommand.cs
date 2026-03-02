@@ -20,6 +20,9 @@ internal partial class Program
     ///   5. Wait for new chat page to load
     ///   6. Insert text via MSAA put_accValue + submit (ClaudePromptHelper)
     /// </summary>
+    /// <summary>Max retries per step. Electron can lag heavily at 90%+ context.</summary>
+    const int NewChatMaxRetries = 3;
+
     static int NewChatCommand(string[] args)
     {
         // ── Parse args ──
@@ -58,54 +61,80 @@ internal partial class Program
         }
         Console.WriteLine($"[NEWCHAT] Found Claude: hwnd=0x{claudeHwnd:X}");
 
-        // ── Step 2: Open sidebar (focusless Toggle) ──
-        Console.WriteLine("[NEWCHAT] Opening sidebar...");
-        if (!ToggleSidebar(claudeHwnd, open: true))
+        // ── Step 2: Open sidebar (retry with backoff — Electron lag at 90%+ context) ──
+        bool sidebarOpened = false;
+        for (int attempt = 1; attempt <= NewChatMaxRetries; attempt++)
         {
-            Console.WriteLine("[ERROR] Failed to toggle sidebar");
+            Console.WriteLine($"[NEWCHAT] Opening sidebar... (attempt {attempt}/{NewChatMaxRetries})");
+            if (ToggleSidebar(claudeHwnd, open: true))
+            {
+                sidebarOpened = true;
+                break;
+            }
+            Console.WriteLine($"  [SIDEBAR] Failed, waiting {attempt}s before retry...");
+            Thread.Sleep(attempt * 1000);
+        }
+        if (!sidebarOpened)
+        {
+            Console.WriteLine("[ERROR] Failed to toggle sidebar after retries");
             return 1;
         }
-        Thread.Sleep(500);
+        Thread.Sleep(1000); // extra wait for sidebar animation under lag
 
-        // ── Step 3: Invoke "새 대화" (focusless Hyperlink) ──
-        Console.WriteLine("[NEWCHAT] Invoking '새 대화'...");
-        var invokeResult = QuickInvoke(claudeHwnd, "새 대화");
-        if (invokeResult != 0)
+        // ── Step 3: Invoke "새 대화" (retry — UIA walk can timeout under heavy load) ──
+        bool invoked = false;
+        for (int attempt = 1; attempt <= NewChatMaxRetries; attempt++)
         {
-            Console.WriteLine("[ERROR] Failed to invoke '새 대화'");
-            // Try to close sidebar before returning
+            Console.WriteLine($"[NEWCHAT] Invoking '새 대화'... (attempt {attempt}/{NewChatMaxRetries})");
+            if (QuickInvoke(claudeHwnd, "새 대화") == 0)
+            {
+                invoked = true;
+                break;
+            }
+            Console.WriteLine($"  [INVOKE] Failed, waiting {attempt * 2}s before retry...");
+            Thread.Sleep(attempt * 2000);
+        }
+        if (!invoked)
+        {
+            Console.WriteLine("[ERROR] Failed to invoke '새 대화' after retries");
             ToggleSidebar(claudeHwnd, open: false);
             return 1;
         }
-        Thread.Sleep(500);
+        Thread.Sleep(1000);
 
         // ── Step 4: Close sidebar (focusless Toggle) ──
         ToggleSidebar(claudeHwnd, open: false);
 
-        // ── Step 5: Wait for new chat page to load ──
+        // ── Step 5: Wait for new chat page to load (longer for laggy Electron) ──
         Console.WriteLine("[NEWCHAT] Waiting for new chat page...");
-        Thread.Sleep(2000);
+        Thread.Sleep(3000);
 
-        // ── Step 6: Submit prompt via ClaudePromptHelper ──
-        Console.WriteLine("[NEWCHAT] Submitting prompt...");
-        using var helper = new ClaudePromptHelper();
-        ClaudePromptHelper.ForceFocusless = true;
+        // ── Step 6: Submit prompt via ClaudePromptHelper (retry) ──
+        for (int attempt = 1; attempt <= NewChatMaxRetries; attempt++)
+        {
+            Console.WriteLine($"[NEWCHAT] Submitting prompt... (attempt {attempt}/{NewChatMaxRetries})");
+            using var helper = new ClaudePromptHelper();
+            ClaudePromptHelper.ForceFocusless = true;
 
-        var result = helper.TryNewChatInput(claudeHwnd, text);
-        if (result)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("[NEWCHAT] SUCCESS — prompt submitted to new chat!");
-            Console.ResetColor();
-            return 0;
+            if (helper.TryNewChatInput(claudeHwnd, text))
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("[NEWCHAT] SUCCESS — prompt submitted to new chat!");
+                Console.ResetColor();
+                return 0;
+            }
+
+            if (attempt < NewChatMaxRetries)
+            {
+                Console.WriteLine($"  [PROMPT] Failed, waiting {attempt * 2}s before retry...");
+                Thread.Sleep(attempt * 2000);
+            }
         }
-        else
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("[NEWCHAT] FAILED — could not submit prompt");
-            Console.ResetColor();
-            return 1;
-        }
+
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine("[NEWCHAT] FAILED — could not submit prompt after retries");
+        Console.ResetColor();
+        return 1;
     }
 
     // FindClaudeDesktopWindow is defined in AppBotEyeClaudeDetector.cs (same partial class)
