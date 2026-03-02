@@ -1,4 +1,4 @@
-using WKAppBot.Core.Runner;
+using WKAppBot.Win32.Input;
 
 namespace WKAppBot.CLI;
 

@@ -1,6 +1,4 @@
 using System.Drawing;
-using System.Drawing.Imaging;
-using WKAppBot.Vision;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Native;
@@ -8,11 +6,11 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: win-click — UIA focusless click (main) + physical click (fallback)
+// partial class: win-click — ProbeAtPoint 입력확보 → UIA focusless (main) → physical click (fallback)
 // Usage: wkappbot win-click <window-title> <x> <y> [--dbl] [--right] [--fl]
 //
-// Flow: FindWindow → UIA Focusless Click → (fallback) Foreground + Physical Click
-// UIA Invoke/Toggle/Select = focusless! No foreground steal.
+// Flow: FindWindow → ProbeAtPoint (Z-order 전수조사 + 포커스리스 시도) → (fallback) Physical Click
+// ProbeAtPoint: 좌표에 겹쳐있는 창들을 앞에서부터 포커스리스 시도, 방해꾼 dismiss, 타겟을 앞으로.
 // --fl: Force focusless only (no fallback to physical click)
 // --dbl/--right: Skip focusless attempt (UIA has no double-click/right-click concept)
 internal partial class Program
@@ -21,7 +19,7 @@ internal partial class Program
     {
         if (args.Length < 3)
             return Error("Usage: wkappbot win-click <window-title> <x> <y> [--dbl] [--right] [--fl]\n" +
-                "  UIA focusless click (main) + physical click (fallback).\n" +
+                "  ProbeAtPoint 입력확보 + UIA focusless click (main) + physical click (fallback).\n" +
                 "  --fl: Force focusless only (fail if UIA pattern not available)\n" +
                 "  --dbl: Double-click (physical only)\n" +
                 "  --right: Right-click (physical only)");
@@ -60,97 +58,7 @@ internal partial class Program
         int screenY = wRect.Top + relY;
         string clickType = isDouble ? "DblClick" : isRight ? "RightClick" : "Click";
 
-        // ── Main path: UIA Focusless Click ──
-        // Single left-click only (UIA has no double-click/right-click concept)
-        if (!isDouble && !isRight)
-        {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            try
-            {
-                using var uia = new UiaLocator();
-                var (ok, detail) = uia.TryFocuslessClickAtPoint(screenX, screenY, hWnd);
-
-                if (ok)
-                {
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Write("[WIN] ");
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.Write("FocuslessClick ");
-                    Console.ResetColor();
-                    Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) → {detail} ({sw.ElapsedMilliseconds}ms)");
-                    return 0;
-                }
-
-                // Focusless not available
-                if (forceFocusless)
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Write("[WIN] ");
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Write("FocuslessFail ");
-                    Console.ResetColor();
-                    Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) → {detail}");
-                    return 1;
-                }
-
-                // Fall through to physical click
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"[WIN] UIA focusless unavailable ({detail}) → fallback to physical click");
-                Console.ResetColor();
-            }
-            catch (Exception ex)
-            {
-                if (forceFocusless)
-                    return Error($"Focusless click failed: {ex.Message}");
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"[WIN] UIA error ({ex.GetType().Name}) → fallback to physical click");
-                Console.ResetColor();
-            }
-        }
-
-        // ── Fallback: Foreground + OCR + Physical Click ──
-
-        // Bring to foreground (required for CopyFromScreen on GPU-composited content)
-        NativeMethods.SmartSetForegroundWindow(hWnd);
-        Thread.Sleep(150);
-
-        // Re-read rect after foreground (window position may have changed)
-        NativeMethods.GetWindowRect(hWnd, out wRect);
-        screenX = wRect.Left + relX;
-        screenY = wRect.Top + relY;
-
-        // OCR verification (best-effort)
-        string ocrSnippet = "";
-        string ocrInfo = "";
-        try
-        {
-            int ocrW = 120, ocrH = 40;
-            using var ocrBmp = ScreenCapture.CaptureScreenRegion(
-                screenX - ocrW / 2, screenY - ocrH / 2, ocrW, ocrH);
-            if (ocrBmp != null)
-            {
-                try
-                {
-                    string dbgDir = Path.Combine(Program.DataDir, "output", "win-click");
-                    Directory.CreateDirectory(dbgDir);
-                    ocrBmp.Save(Path.Combine(dbgDir,
-                        $"ocr_{DateTime.Now:yyyyMMdd_HHmmss}_{relX}_{relY}.png"), ImageFormat.Png);
-                }
-                catch { }
-
-                if (!ScreenCapture.IsBlankBitmap(ocrBmp))
-                {
-                    using var ocr = new SimpleOcrAnalyzer();
-                    var ocrResult = ocr.RecognizeAll(ocrBmp).GetAwaiter().GetResult();
-                    string ocrText = ocrResult?.FullText?.Trim() ?? "";
-                    ocrSnippet = ocrText.Length > 20 ? ocrText[..20] : ocrText;
-                    if (!string.IsNullOrEmpty(ocrSnippet)) ocrInfo = $" OCR=\"{ocrSnippet}\"";
-                }
-            }
-        }
-        catch { }
-
-        // UIA element detection → zoom rect (centered on click point)
+        // ── 돋보기 최우선: 입력확보 전에 무조건 띄움 ──
         Rectangle zoomRect;
         string uiaLabel = "";
         string uiaInfo = "";
@@ -163,20 +71,8 @@ internal partial class Program
                 var br = new Rectangle(elem.BoundsX, elem.BoundsY, elem.BoundsW, elem.BoundsH);
                 string name = elem.Name ?? "";
                 if (name.Length > 30) name = name[..30];
-
-                // Use element rect only if small enough for zoom; otherwise center on click point
                 bool elemFitsZoom = br.Width <= 300 && br.Height <= 200;
-
-                if (elemFitsZoom)
-                {
-                    zoomRect = br;
-                }
-                else
-                {
-                    // Large element (Tree, Pane, etc.) — zoom on click point, not element center
-                    zoomRect = new Rectangle(screenX - 60, screenY - 20, 120, 40);
-                }
-
+                zoomRect = elemFitsZoom ? br : new Rectangle(screenX - 60, screenY - 20, 120, 40);
                 uiaLabel = string.IsNullOrEmpty(name) ? elem.ControlType : name;
                 uiaInfo = $" [{elem.ControlType}] {br.Width}x{br.Height}";
                 if (!elemFitsZoom) uiaInfo += $"(→click@{screenX},{screenY})";
@@ -193,16 +89,111 @@ internal partial class Program
             zoomRect = new Rectangle(screenX - 60, screenY - 20, 120, 40);
         }
 
-        Console.Write($"[WIN] {clickType} \"{winInfo.Title}\" at ({relX},{relY}) → screen ({screenX},{screenY}){ocrInfo}{uiaInfo}... ");
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.Write($"[zoom@({zoomRect.X},{zoomRect.Y} {zoomRect.Width}x{zoomRect.Height})] ");
-        Console.ResetColor();
-
-        string actionLabel = !string.IsNullOrEmpty(uiaLabel) ? uiaLabel
-            : !string.IsNullOrEmpty(ocrSnippet) ? ocrSnippet
-            : $"({relX},{relY})";
-
+        string actionLabel = !string.IsNullOrEmpty(uiaLabel) ? uiaLabel : $"({relX},{relY})";
         using var zoom = ClickZoomHelper.BeginFromRect(zoomRect, hWnd, $"win_{clickType.ToLower()}", actionLabel);
+        zoom?.UpdateStatus("입력확보 중...");
+
+        // ── Main path: ProbeAtPoint 좌표 기반 입력확보 ──
+        // Single left-click: 포커스리스 시도 (Z-order 전수조사 + 방해꾼 dismiss + 경로 정리)
+        if (!isDouble && !isRight)
+        {
+            try
+            {
+                var readiness = CreateInputReadiness();
+                var pointReport = readiness.ProbeAtPoint(new PointReadinessRequest
+                {
+                    ScreenX = screenX,
+                    ScreenY = screenY,
+                    TargetHwnd = hWnd,
+                    IntendedAction = "click",
+                    FocuslessOnly = forceFocusless,
+                });
+
+                // 이미 포커스리스 클릭 성공?
+                if (pointReport.FocuslessClicked)
+                {
+                    // 전경 도둑질 감지 → 알림 팝업 (타겟 소유, 다시알림 체크박스)
+                    if (pointReport.ForegroundStolen)
+                    {
+                        zoom?.ShowFail($"⚠fg {pointReport.ResolvedDetail}");
+
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.Write("[WIN] ");
+                        Console.Write("FocuslessClick ⚠fg ");
+                        Console.ResetColor();
+
+                        string? procName = null;
+                        try
+                        {
+                            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                            procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName;
+                        }
+                        catch { }
+
+                        FocuslessWarningOverlay.Show(
+                            NativeMethods.GetAncestor(hWnd, NativeMethods.GA_ROOT),
+                            pointReport.ResolvedDetail,
+                            procName);
+                    }
+                    else
+                    {
+                        zoom?.ShowPass($"Focusless {pointReport.ResolvedDetail}");
+
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.Write("[WIN] ");
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write("FocuslessClick ");
+                        Console.ResetColor();
+                    }
+                    Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) → {pointReport.ResolvedDetail}");
+                    return 0;
+                }
+
+                // 포커스리스 전용 모드인데 실패?
+                if (forceFocusless)
+                {
+                    zoom?.ShowFail($"No focusless: {pointReport.ResolvedDetail}");
+
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write("[WIN] ");
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Write("FocuslessFail ");
+                    Console.ResetColor();
+                    Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) → {pointReport.ResolvedDetail}");
+                    return 1;
+                }
+
+                // Fall through to physical click
+                zoom?.UpdateStatus("포커스리스 불가 → 물리클릭...");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"[WIN] Focusless unavailable ({pointReport.ResolvedDetail}) → fallback to physical click");
+                Console.ResetColor();
+            }
+            catch (Exception ex)
+            {
+                if (forceFocusless)
+                {
+                    zoom?.ShowFail(ex.Message);
+                    return Error($"ProbeAtPoint failed: {ex.Message}");
+                }
+                zoom?.UpdateStatus($"ProbeAtPoint 오류 → 물리클릭...");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"[WIN] ProbeAtPoint error ({ex.GetType().Name}) → fallback to physical click");
+                Console.ResetColor();
+            }
+        }
+
+        // ── Fallback: Foreground + Physical Click ──
+        zoom?.UpdateStatus($"{clickType} 물리클릭...");
+        NativeMethods.SmartSetForegroundWindow(hWnd);
+        Thread.Sleep(150);
+
+        // Re-read rect after foreground (window position may have changed)
+        NativeMethods.GetWindowRect(hWnd, out wRect);
+        screenX = wRect.Left + relX;
+        screenY = wRect.Top + relY;
+
+        Console.Write($"[WIN] {clickType} \"{winInfo.Title}\" at ({relX},{relY}) → screen ({screenX},{screenY}){uiaInfo}... ");
 
         // Physical click
         var swPhys = System.Diagnostics.Stopwatch.StartNew();
@@ -219,27 +210,6 @@ internal partial class Program
             Console.WriteLine($"OK ({swPhys.ElapsedMilliseconds}ms)");
             Console.ResetColor();
             zoom?.ShowPass($"{clickType} OK ({swPhys.ElapsedMilliseconds}ms)");
-
-            // Desktop screenshot for diagnostics
-            Thread.Sleep(300);
-            try
-            {
-                int diagW = 600, diagH = 400;
-                using var desktop = ScreenCapture.CaptureScreenRegion(
-                    screenX - diagW / 2, screenY - diagH / 2, diagW, diagH);
-                string diagDir = Path.Combine(Program.DataDir, "output", "win-click");
-                Directory.CreateDirectory(diagDir);
-                string diagPath = Path.Combine(diagDir,
-                    $"diag_{DateTime.Now:yyyyMMdd_HHmmss}_{relX}_{relY}.png");
-                desktop.Save(diagPath, ImageFormat.Png);
-                Console.WriteLine($"[DIAG] Desktop screenshot: {diagPath}");
-            }
-            catch (Exception diagEx)
-            {
-                Console.WriteLine($"[DIAG] Desktop capture failed: {diagEx.Message}");
-            }
-
-            Thread.Sleep(1200);
         }
         catch (Exception ex)
         {

@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.UIA3;
+using WKAppBot.Win32.Native;
 
 namespace WKAppBot.Win32.Accessibility;
 
@@ -904,6 +905,123 @@ public sealed class UiaLocator : IDisposable
             return (false, $"UIA error: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// 미니마이즈 윈도우용: 자식 트리에서 Invoke/Toggle 가능 요소 수집.
+    /// rcNormalPosition 기준 상대좌표로 거리 계산하여 가까운 순으로 정렬.
+    /// BoundingRectangle이 비어있는 요소도 포함 (미니마이즈 상태에서 rect=0,0,0,0).
+    /// 미니마이즈에서 BoundingRect이 없으면 트리 순서(DFS)로 수집 → 첫 번째 = 가장 위/왼쪽.
+    /// </summary>
+    public List<InvocableCandidate> FindInvocableDescendants(
+        IntPtr hWnd, int targetX, int targetY, RECT normalRect)
+    {
+        var result = new List<InvocableCandidate>();
+        try
+        {
+            var root = _automation.FromHandle(hWnd);
+            if (root == null) return result;
+
+            CollectInvocable(root, targetX, targetY, normalRect, result, 0);
+
+            // 거리순 정렬 (BoundingRect이 있는 요소 우선, 없으면 트리 순서)
+            result.Sort((a, b) =>
+            {
+                // BoundingRect 있는 쪽 우선
+                if (a.HasBounds && !b.HasBounds) return -1;
+                if (!a.HasBounds && b.HasBounds) return 1;
+                // 둘 다 있으면 거리순
+                if (a.HasBounds && b.HasBounds) return a.Distance.CompareTo(b.Distance);
+                // 둘 다 없으면 트리 순서 유지
+                return a.TreeOrder.CompareTo(b.TreeOrder);
+            });
+        }
+        catch { }
+        return result;
+    }
+
+    /// <summary>재귀적으로 Invoke/Toggle 가능 요소 수집.</summary>
+    private void CollectInvocable(AutomationElement parent, int targetX, int targetY,
+        RECT normalRect, List<InvocableCandidate> result, int depth)
+    {
+        if (depth > 8) return; // 미니마이즈 탐색은 깊이 제한 (MFC는 보통 3-4단)
+
+        try
+        {
+            var children = parent.FindAllChildren();
+            if (children == null) return;
+
+            foreach (var child in children)
+            {
+                try
+                {
+                    // Invoke 또는 Toggle 지원?
+                    bool hasInvoke = false, hasToggle = false;
+                    try { hasInvoke = child.Patterns.Invoke.IsSupported; } catch { }
+                    try { hasToggle = child.Patterns.Toggle.IsSupported; } catch { }
+
+                    if (hasInvoke || hasToggle)
+                    {
+                        string name = "", aid = "", ct = "";
+                        try { name = child.Name ?? ""; } catch { }
+                        try { aid = child.AutomationId ?? ""; } catch { }
+                        try { ct = child.ControlType.ToString(); } catch { ct = "?"; }
+
+                        // BoundingRectangle 거리 계산 (미니마이즈면 0,0,0,0 → HasBounds=false)
+                        var rect = System.Drawing.Rectangle.Empty;
+                        bool hasBounds = false;
+                        double dist = double.MaxValue;
+                        try
+                        {
+                            rect = child.BoundingRectangle;
+                            hasBounds = !rect.IsEmpty && rect.Width > 0 && rect.Height > 0;
+                            if (hasBounds)
+                            {
+                                // 요소 중심까지 거리
+                                double cx = rect.Left + rect.Width / 2.0;
+                                double cy = rect.Top + rect.Height / 2.0;
+                                dist = Math.Sqrt((cx - targetX) * (cx - targetX) + (cy - targetY) * (cy - targetY));
+                            }
+                        }
+                        catch { }
+
+                        result.Add(new InvocableCandidate(
+                            Element: child,
+                            ControlType: ct,
+                            Name: name,
+                            AutomationId: aid,
+                            HasBounds: hasBounds,
+                            Distance: dist,
+                            TreeOrder: result.Count
+                        ));
+                    }
+
+                    // 재귀: 자식의 자식도 탐색
+                    CollectInvocable(child, targetX, targetY, normalRect, result, depth + 1);
+                }
+                catch { }
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>요소에 Invoke 실행. Toggle은 Invoke 없을 때 폴백.</summary>
+    public bool TryInvokeElement(AutomationElement element)
+    {
+        try { element.Patterns.Invoke.Pattern.Invoke(); return true; } catch { }
+        try { element.Patterns.Toggle.Pattern.Toggle(); return true; } catch { }
+        return false;
+    }
+
+    /// <summary>미니마이즈 UIA 탐색 후보.</summary>
+    public record InvocableCandidate(
+        AutomationElement Element,
+        string ControlType,
+        string Name,
+        string AutomationId,
+        bool HasBounds,
+        double Distance,
+        int TreeOrder
+    );
 
     /// <summary>
     /// Get combined hierarchy path for an element at a point.

@@ -152,6 +152,7 @@ internal partial class Program
                 "tick" => TickCommand(restArgs),
                 "newchat" => NewChatCommand(restArgs),
                 "prompt-test" => PromptTestCommand(restArgs),
+                "msaa-probe" => MsaaProbeCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),
                 _ when command.StartsWith("kro-trial-", StringComparison.OrdinalIgnoreCase) => KroTrialSpecialCommand(command, restArgs),
