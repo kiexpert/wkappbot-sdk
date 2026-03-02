@@ -398,6 +398,9 @@ internal sealed class InputZoomHost : IDisposable
                 _dispatcher = Dispatcher.CurrentDispatcher;
                 _ready.Set();
                 _highlightWindow.Show();
+                // Fix DPI mismatch: WPF Left/Top = DIPs, but we have physical pixels.
+                // Use Win32 SetWindowPos to force exact physical pixel position.
+                ForceWindowPosition(_highlightWindow, screenX, screenY, width, height);
             }
             else
             {
@@ -407,6 +410,8 @@ internal sealed class InputZoomHost : IDisposable
                 _dispatcher = Dispatcher.CurrentDispatcher;
                 _ready.Set();
                 _zoomWindow.Show();
+                // Fix DPI mismatch: force exact physical pixel position via Win32
+                ForceWindowPosition(_zoomWindow, screenX, screenY, width, height);
             }
             Dispatcher.Run(); // message loop — blocks until InvokeShutdown()
         });
@@ -416,6 +421,31 @@ internal sealed class InputZoomHost : IDisposable
         _uiThread.Start();
         _ready.Wait(3000);
     }
+
+    /// <summary>
+    /// Force exact physical pixel position via Win32 SetWindowPos.
+    /// WPF Window.Left/Top use device-independent pixels (DIPs) which differ from
+    /// physical pixels on high-DPI monitors, causing zoom overlays to appear offset.
+    /// This bypasses WPF's DPI conversion and positions at exact screen coordinates.
+    /// </summary>
+    private static void ForceWindowPosition(Window window, int x, int y, int w, int h)
+    {
+        try
+        {
+            var helper = new System.Windows.Interop.WindowInteropHelper(window);
+            if (helper.Handle != IntPtr.Zero)
+            {
+                SetWindowPos(helper.Handle, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE);
+            }
+        }
+        catch { /* best effort — WPF Left/Top is fallback */ }
+    }
+
+    private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+    private const uint SWP_NOACTIVATE = 0x0010;
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int X, int Y, int cx, int cy, uint uFlags);
 
     /// <summary>Push a new control capture frame (Magnifier/Relay only).</summary>
     public void UpdateImage(byte[] pngData)
