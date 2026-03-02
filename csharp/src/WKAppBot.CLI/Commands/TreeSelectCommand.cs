@@ -1,3 +1,4 @@
+using System.Drawing;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
@@ -35,7 +36,7 @@ internal partial class Program
             return 1;
         }
 
-        var title = args[0];
+        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         var treeAid = GetArgValue(args, "--aid") ?? "";
         var selectTarget = GetArgValue(args, "--select") ?? "";
         var expandTarget = GetArgValue(args, "--expand") ?? "";
@@ -62,6 +63,15 @@ internal partial class Program
             automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
             automation.TransactionTimeout = TimeSpan.FromSeconds(5);
             root = automation.FromHandle(mainHwnd);
+
+            // '#' scope narrowing
+            if (!string.IsNullOrEmpty(uiaScope))
+            {
+                var scoped = GrapHelper.FindUiaScope(root, uiaScope);
+                if (scoped == null) return Error($"UIA scope not found: \"{uiaScope}\"");
+                root = scoped;
+                Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
+            }
         }
         catch (Exception ex)
         {
@@ -102,19 +112,19 @@ internal partial class Program
         // --expand <text>: expand matching TreeItem
         if (!string.IsNullOrEmpty(expandTarget))
         {
-            return ExpandMatchingItem(tree, expandTarget);
+            return ExpandMatchingItem(tree, expandTarget, mainHwnd);
         }
 
         // --collapse <text>: collapse matching TreeItem
         if (!string.IsNullOrEmpty(collapseTarget))
         {
-            return CollapseMatchingItem(tree, collapseTarget);
+            return CollapseMatchingItem(tree, collapseTarget, mainHwnd);
         }
 
         // --select <text>: select matching TreeItem
         if (!string.IsNullOrEmpty(selectTarget))
         {
-            return SelectMatchingItem(tree, selectTarget);
+            return SelectMatchingItem(tree, selectTarget, mainHwnd);
         }
 
         // --list: list all TreeItems
@@ -150,7 +160,7 @@ internal partial class Program
         return 0;
     }
 
-    static int ExpandMatchingItem(AutomationElement tree, string target)
+    static int ExpandMatchingItem(AutomationElement tree, string target, IntPtr mainHwnd)
     {
         var items = tree.FindAllDescendants(x => x.ByControlType(ControlType.TreeItem));
         foreach (var item in items)
@@ -159,6 +169,11 @@ internal partial class Program
             if (name.Contains(target, StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"\nFound: \"{name}\"");
+
+                var br = item.BoundingRectangle;
+                var zoomRect = new Rectangle((int)br.X, (int)br.Y, (int)br.Width, (int)br.Height);
+                using var zoom = ClickZoomHelper.BeginFromRect(zoomRect, mainHwnd, "tree_expand", name);
+
                 var scrolled = UiaLocator.TryScrollIntoView(item);
                 Console.WriteLine($"  ScrollIntoView: {scrolled}");
                 var state = UiaLocator.GetExpandCollapseState(item);
@@ -175,13 +190,16 @@ internal partial class Program
                     foreach (var c in children)
                         Console.WriteLine($"    [{c.Name}]");
                 }
+
+                if (expanded) zoom?.ShowPass($"Expand \"{name}\" OK");
+                else zoom?.ShowFail($"Expand \"{name}\" failed");
                 return 0;
             }
         }
         return Error($"No TreeItem matching \"{target}\" found.");
     }
 
-    static int CollapseMatchingItem(AutomationElement tree, string target)
+    static int CollapseMatchingItem(AutomationElement tree, string target, IntPtr mainHwnd)
     {
         var items = tree.FindAllDescendants(x => x.ByControlType(ControlType.TreeItem));
         foreach (var item in items)
@@ -190,15 +208,23 @@ internal partial class Program
             if (name.Contains(target, StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"\nFound: \"{name}\"");
+
+                var br = item.BoundingRectangle;
+                var zoomRect = new Rectangle((int)br.X, (int)br.Y, (int)br.Width, (int)br.Height);
+                using var zoom = ClickZoomHelper.BeginFromRect(zoomRect, mainHwnd, "tree_collapse", name);
+
                 var collapsed = UiaLocator.TryCollapse(item);
                 Console.WriteLine($"  Collapse: {collapsed} (focusless!)");
+
+                if (collapsed) zoom?.ShowPass($"Collapse \"{name}\" OK");
+                else zoom?.ShowFail($"Collapse \"{name}\" failed");
                 return 0;
             }
         }
         return Error($"No TreeItem matching \"{target}\" found.");
     }
 
-    static int SelectMatchingItem(AutomationElement tree, string target)
+    static int SelectMatchingItem(AutomationElement tree, string target, IntPtr mainHwnd)
     {
         var items = tree.FindAllDescendants(x => x.ByControlType(ControlType.TreeItem));
         Console.WriteLine($"\nSearching {items.Length} items for \"{target}\"...");
@@ -209,6 +235,10 @@ internal partial class Program
             if (name.Contains(target, StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"  Match: \"{name}\"");
+
+                var br = item.BoundingRectangle;
+                var zoomRect = new Rectangle((int)br.X, (int)br.Y, (int)br.Width, (int)br.Height);
+                using var zoom = ClickZoomHelper.BeginFromRect(zoomRect, mainHwnd, "tree_select", name);
 
                 // Scroll into view first
                 var scrolled = UiaLocator.TryScrollIntoView(item);
@@ -225,6 +255,9 @@ internal partial class Program
                 var rect = item.BoundingRectangle;
                 Console.WriteLine($"  IsSelected: {isSelected}");
                 Console.WriteLine($"  Rect: ({rect.Left},{rect.Top} {rect.Width}x{rect.Height})");
+
+                if (selected) zoom?.ShowPass($"Select \"{name}\" OK");
+                else zoom?.ShowFail($"Select \"{name}\" failed");
 
                 return selected ? 0 : 1;
             }

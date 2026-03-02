@@ -16,6 +16,7 @@ internal partial class Program
     ///   wkappbot tab-select "영웅문4" --aid 3019 --select "조건식"
     ///   wkappbot tab-select "영웅문4" --aid 3019 --list
     ///   wkappbot tab-select "영웅문4" --aid 3019 --index 0
+    ///   wkappbot tab-select "*영웅문*#*잔고확인*" --aid 1000 --list   (# = UIA scope)
     /// </summary>
     static int TabSelectCommand(string[] args)
     {
@@ -31,7 +32,8 @@ internal partial class Program
             return 1;
         }
 
-        var title = args[0];
+        // Parse "windowGrap#uiaPath" — '#' narrows UIA search scope
+        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         var tabAid = GetArgValue(args, "--aid") ?? "";
         var selectTarget = GetArgValue(args, "--select") ?? "";
         var doList = args.Contains("--list");
@@ -58,6 +60,16 @@ internal partial class Program
             automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
             automation.TransactionTimeout = TimeSpan.FromSeconds(5);
             root = automation.FromHandle(mainHwnd);
+
+            // '#' scope narrowing: find UIA element by name path, use as root
+            if (!string.IsNullOrEmpty(uiaScope))
+            {
+                var scoped = GrapHelper.FindUiaScope(root, uiaScope);
+                if (scoped == null)
+                    return Error($"UIA scope not found: \"{uiaScope}\" under \"{matches[0].Title}\"");
+                root = scoped;
+                Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
+            }
         }
         catch (Exception ex)
         {
@@ -158,7 +170,7 @@ internal partial class Program
         {
             if (idx < 0 || idx >= tabItems.Length)
                 return Error($"Index {idx} out of range (0..{tabItems.Length - 1})");
-            return DoTabSelect(tabItems[idx], idx);
+            return DoTabSelect(tabItems[idx], idx, mainHwnd, tabRect);
         }
 
         // --select <text>: select by name
@@ -169,7 +181,7 @@ internal partial class Program
                 var name = tabItems[i].Name ?? "";
                 if (name.Contains(selectTarget, StringComparison.OrdinalIgnoreCase))
                 {
-                    return DoTabSelect(tabItems[i], i);
+                    return DoTabSelect(tabItems[i], i, mainHwnd, tabRect);
                 }
             }
             return Error($"No TabItem matching \"{selectTarget}\" found.");
@@ -179,7 +191,8 @@ internal partial class Program
         return 1;
     }
 
-    static int DoTabSelect(AutomationElement tabItem, int index)
+    static int DoTabSelect(AutomationElement tabItem, int index,
+        IntPtr mainHwnd, System.Drawing.Rectangle tabCtrlRect)
     {
         var name = tabItem.Name ?? "(no name)";
         Console.WriteLine($"\nSelecting tab [{index}] \"{name}\"...");
@@ -204,14 +217,34 @@ internal partial class Program
         var nowSel = UiaLocator.IsSelected(tabItem);
         Console.WriteLine($"  After: IsSelected={nowSel}");
 
+        // Zoom overlay: show TabItem AFTER selection (MFC tabs may have 0x0 bounds before selection)
+        ClickZoomHelper? zoom = null;
+        try
+        {
+            var itemRect = tabItem.BoundingRectangle;
+            var zoomRect = (itemRect.Width > 0 && itemRect.Height > 0)
+                ? new System.Drawing.Rectangle(itemRect.X, itemRect.Y, itemRect.Width, itemRect.Height)
+                : tabCtrlRect; // fallback to tab control rect
+            zoom = ClickZoomHelper.BeginFromRect(zoomRect, mainHwnd,
+                "tab_select", $"[{index}] {name}");
+        }
+        catch { }
+
         if (nowSel == true)
         {
             Console.WriteLine($"  ✓ Tab \"{name}\" selected successfully!");
+            zoom?.ShowPass($"Tab \"{name}\" OK");
+            zoom?.Dispose();
             return 0;
         }
         else
         {
             Console.WriteLine($"  ✗ Tab selection may have failed (IsSelected={nowSel})");
+            if (selected)
+                zoom?.ShowPass($"Select() OK (verify={nowSel})");
+            else
+                zoom?.ShowFail($"Select failed");
+            zoom?.Dispose();
             return selected ? 0 : 1; // return success if Select() succeeded even if IsSelected is unclear
         }
     }

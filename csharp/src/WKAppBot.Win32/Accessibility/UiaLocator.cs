@@ -13,6 +13,9 @@ public sealed class UiaLocator : IDisposable
 {
     private readonly UIA3Automation _automation;
 
+    /// <summary>Expose automation instance for GrapHelper scope resolution.</summary>
+    public UIA3Automation Automation => _automation;
+
     public UiaLocator()
     {
         _automation = new UIA3Automation();
@@ -1001,6 +1004,14 @@ public sealed class UiaLocator : IDisposable
         return sb.ToString();
     }
 
+    /// <summary>DumpTree from a pre-resolved UIA element (for # scope narrowing).</summary>
+    public string DumpTree(AutomationElement root, int maxDepth = 5)
+    {
+        var sb = new System.Text.StringBuilder();
+        DumpElement(root, sb, 0, maxDepth);
+        return sb.ToString();
+    }
+
     /// <summary>
     /// Dump the UI tree filtered by a pattern.
     /// Searches the ENTIRE tree (ignoring depth limit for the search phase).
@@ -1009,8 +1020,11 @@ public sealed class UiaLocator : IDisposable
     /// Supports wildcards (*/?), regex: prefix, and plain substring matching.
     /// </summary>
     public string DumpTreeFiltered(IntPtr hWnd, string filterPattern, int subtreeDepth = 5)
+        => DumpTreeFiltered(_automation.FromHandle(hWnd), filterPattern, subtreeDepth);
+
+    /// <summary>DumpTreeFiltered from a pre-resolved UIA element (for # scope narrowing).</summary>
+    public string DumpTreeFiltered(AutomationElement root, string filterPattern, int subtreeDepth = 5)
     {
-        var root = _automation.FromHandle(hWnd);
         var sb = new System.Text.StringBuilder();
         var matches = new List<(AutomationElement element, List<string> ancestorLines)>();
 
@@ -1208,6 +1222,30 @@ public sealed class UiaLocator : IDisposable
             using var automation = new UIA3Automation();
             var root = automation.FromHandle(hWnd);
             if (root == null) return results;
+
+            return QuickSearchCore(root, keyword, maxDepth, maxResults, maxVisited, timeoutMs);
+        }
+        catch { }
+        return results;
+    }
+
+    /// <summary>
+    /// QuickSearch from an existing AutomationElement root (for #scope narrowing).
+    /// </summary>
+    public static List<UiaQuickMatch> QuickSearch(
+        AutomationElement root, string keyword,
+        int maxDepth = 4, int maxResults = 5, int maxVisited = 300, int timeoutMs = 3000)
+    {
+        return QuickSearchCore(root, keyword, maxDepth, maxResults, maxVisited, timeoutMs);
+    }
+
+    private static List<UiaQuickMatch> QuickSearchCore(
+        AutomationElement root, string keyword,
+        int maxDepth, int maxResults, int maxVisited, int timeoutMs)
+    {
+        var results = new List<UiaQuickMatch>();
+        try
+        {
 
             // Pattern support: glob (*/?) and regex: prefix via PatternMatcher
             bool isPattern = PatternMatcher.IsPattern(keyword);
@@ -1411,6 +1449,26 @@ public sealed class PatternMatcher
     public static bool IsPattern(string text) =>
         text.StartsWith("regex:", StringComparison.OrdinalIgnoreCase) ||
         text.Contains('*') || text.Contains('?');
+
+    /// <summary>
+    /// Ensure a pattern does substring matching by wrapping with <c>*...*</c>.
+    /// Handles all cases gracefully:
+    ///   "실현손익"  → "*실현손익*"  (plain literal)
+    ///   "*실현손익" → "*실현손익*"  (missing trailing *)
+    ///   "실현손익*" → "*실현손익*"  (missing leading *)
+    ///   "*실현*"    → "*실현*"     (already wrapped)
+    ///   "regex:..."  → "regex:..."   (explicit regex, unchanged)
+    /// Use this for contexts where substring matching is the expected default
+    /// (e.g., window finding, UIA scope narrowing, child window matching).
+    /// </summary>
+    public static string EnsureSubstring(string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern)) return pattern;
+        if (pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase)) return pattern;
+        if (!pattern.StartsWith('*')) pattern = "*" + pattern;
+        if (!pattern.EndsWith('*')) pattern += "*";
+        return pattern;
+    }
 
     /// <summary>
     /// Does the pattern use path-aware glob syntax?

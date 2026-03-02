@@ -24,19 +24,20 @@ internal partial class Program
     {
         if (args.Length == 0) { Console.WriteLine("Usage: wkappbot uia-test <title> [--form id] [--invoke name]"); return 1; }
 
-        var title = args[0];
+        // Parse "windowGrap#uiaPath" — '#' narrows UIA search scope
+        var (windowTitle, uiaScope) = GrapHelper.SplitHash(args[0]);
         var formId = GetArgValue(args, "--form") ?? "";
         var invokeTarget = GetArgValue(args, "--invoke") ?? "";
 
-        var matches = WindowFinder.FindByTitle(title);
-        if (matches.Count == 0) { Console.WriteLine($"Window not found: {title}"); return 1; }
+        var matches = WindowFinder.FindByTitle(windowTitle);
+        if (matches.Count == 0) { Console.WriteLine($"Window not found: {windowTitle}"); return 1; }
 
         var mainHwnd = matches[0].Handle;
         Console.WriteLine($"Target: {matches[0].Title} (0x{mainHwnd:X})");
 
-        // Quick invoke mode
+        // Quick invoke mode — pass uiaScope for narrowing
         if (!string.IsNullOrEmpty(invokeTarget))
-            return QuickInvoke(mainHwnd, invokeTarget);
+            return QuickInvoke(mainHwnd, invokeTarget, uiaScope);
 
         // Find MDI child if form-id specified
         var targetHwnd = FindFormHwnd(mainHwnd, formId);
@@ -49,6 +50,15 @@ internal partial class Program
             automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
             automation.TransactionTimeout = TimeSpan.FromSeconds(5);
             root = automation.FromHandle(targetHwnd);
+
+            // '#' scope narrowing for full test mode
+            if (!string.IsNullOrEmpty(uiaScope))
+            {
+                var scoped = GrapHelper.FindUiaScope(root, uiaScope);
+                if (scoped == null) { Console.WriteLine($"UIA scope not found: \"{uiaScope}\""); return 1; }
+                root = scoped;
+                Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
+            }
         }
         catch (Exception ex)
         {
@@ -312,12 +322,25 @@ internal partial class Program
         return 0;
     }
 
-    static int QuickInvoke(IntPtr hwnd, string target)
+    static int QuickInvoke(IntPtr hwnd, string target, string? uiaScope = null)
     {
         using var a = new UIA3Automation();
         a.ConnectionTimeout = TimeSpan.FromSeconds(10);
         a.TransactionTimeout = TimeSpan.FromSeconds(10);
         var root = a.FromHandle(hwnd);
+
+        // '#' scope narrowing: narrow UIA root before searching
+        if (!string.IsNullOrEmpty(uiaScope))
+        {
+            var scoped = GrapHelper.FindUiaScope(root, uiaScope);
+            if (scoped == null)
+            {
+                Console.WriteLine($"UIA scope not found: \"{uiaScope}\"");
+                return 1;
+            }
+            root = scoped;
+            Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
+        }
         // Recursive walk (like inspect) to find element by name — FindAllDescendants misses Electron subtrees
         AutomationElement? btn = null;
         var candidates = new List<(string type, string name)>();

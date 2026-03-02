@@ -20,12 +20,20 @@ internal partial class Program
                          "  Path search: find \"윈도우/UIA요소\" — / separates hierarchy levels.\n" +
                          "    * = any chars within one level, ** = any number of levels.\n" +
                          "    Each segment is implicitly *segment* (contains match).\n" +
+                         "  Scoped search: find \"윈도우#UIA스코프\" — # narrows UIA search root.\n" +
+                         "    Combine: find \"영웅문/*실현*#*잔고*\" + keyword after #\n" +
                          "  --deep: Deeper UIA tree search (depth 12, slower but thorough).\n" +
                          "  Examples:\n" +
-                         "    find \"Claude\"              Search everywhere for 'Claude'\n" +
-                         "    find \"투혼/현재가\"         투혼 windows → ... → 현재가 element\n" +
-                         "    find \"투혼/**/현재가\"      투혼 → any depth → 현재가\n" +
-                         "    find \"Claude/**/Radio*\"    Claude → any depth → Radio* elements");
+                         "    find \"Claude\"                       Search everywhere for 'Claude'\n" +
+                         "    find \"투혼/현재가\"                  투혼 windows → ... → 현재가 element\n" +
+                         "    find \"투혼/**/현재가\"               투혼 → any depth → 현재가\n" +
+                         "    find \"*영웅문*#*잔고확인*\"          영웅문 → UIA scope 잔고확인 → list elements\n" +
+                         "    find \"*영웅문*/*실현*#*잔고*\" 예수금  영웅문/실현* child → #잔고 scope → 예수금 검색");
+
+        // Check for '#' scope — if present, do scoped search directly
+        string firstArg = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "";
+        if (firstArg.Contains('#'))
+            return FindScopedCommand(args);
 
         // Preprocess: inject --uia (or --uia-deep for --deep) and forward to WindowsCommand
         var forwarded = new List<string>(args);
@@ -40,13 +48,139 @@ internal partial class Program
         return WindowsCommand(forwarded.ToArray());
     }
 
+    /// <summary>
+    /// Scoped find: "window#uiaScope" [keyword] — narrow UIA root, then search within.
+    /// Without keyword: lists all elements under scope (like inspect).
+    /// With keyword: searches for matching elements within scope.
+    /// </summary>
+    static int FindScopedCommand(string[] args)
+    {
+        bool hasDeep = args.Contains("--deep");
+        int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 50;
+
+        // First positional arg = grap#scope, second = keyword (optional)
+        var positional = args.Where(a => !a.StartsWith("--")).ToList();
+        string grapArg = positional[0];
+        string? searchKeyword = positional.Count > 1 ? positional[1] : null;
+
+        // Parse "window/child#uiaScope"
+        var (windowPart, uiaScope) = GrapHelper.SplitHash(grapArg);
+
+        // Parse '/' for child window matching
+        string mainTitle;
+        string? childPattern = null;
+        var slashIdx = windowPart.IndexOf('/');
+        if (slashIdx > 0)
+        {
+            mainTitle = windowPart[..slashIdx];
+            childPattern = windowPart[(slashIdx + 1)..];
+        }
+        else
+        {
+            mainTitle = windowPart;
+        }
+
+        // Find window
+        var windows = WindowFinder.FindByTitle(mainTitle);
+        if (windows.Count == 0) return Error($"Window not found: \"{mainTitle}\"");
+        var mainWin = windows[0];
+        Console.WriteLine($"Window: [{mainWin.Handle:X8}] \"{mainWin.Title}\"");
+
+        // Child window matching
+        IntPtr targetHwnd = mainWin.Handle;
+        if (!string.IsNullOrEmpty(childPattern))
+        {
+            var childMatch = FindChildWindowByPattern(mainWin.Handle, childPattern);
+            if (childMatch == null)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  No child window matching \"{childPattern}\"");
+                Console.ResetColor();
+                ShowAvailableChildren(mainWin.Handle);
+                return 1;
+            }
+            targetHwnd = childMatch.Value.handle;
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write($"  └ Child: ");
+            Console.ResetColor();
+            Console.WriteLine($"\"{childMatch.Value.title}\" (hWnd=0x{targetHwnd:X})");
+        }
+
+        // UIA scope narrowing
+        if (string.IsNullOrEmpty(uiaScope))
+            return Error("# scope is empty. Use: find \"window#uiaScope\" [keyword]");
+
+        using var uia = new FlaUI.UIA3.UIA3Automation();
+        uia.ConnectionTimeout = TimeSpan.FromSeconds(5);
+        uia.TransactionTimeout = TimeSpan.FromSeconds(5);
+        var uiaRoot = uia.FromHandle(targetHwnd);
+        if (uiaRoot == null) return Error("UIA root not available for this window.");
+
+        var scoped = GrapHelper.FindUiaScope(uiaRoot, uiaScope);
+        if (scoped == null)
+            return Error($"UIA scope not found: \"{uiaScope}\" under \"{mainWin.Title}\"");
+
+        var scopeName = scoped.Properties.Name.ValueOrDefault ?? "(unnamed)";
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write($"  # Scope: ");
+        Console.ResetColor();
+        Console.WriteLine($"\"{scopeName}\"");
+
+        // Search within scope
+        int maxDepth = hasDeep ? 12 : 6;
+        int maxResults = limit;
+        int maxVisited = hasDeep ? 3000 : 1000;
+        int timeoutMs = hasDeep ? 10000 : 5000;
+
+        var matches = UiaLocator.QuickSearch(scoped, searchKeyword ?? "",
+            maxDepth: maxDepth, maxResults: maxResults, maxVisited: maxVisited, timeoutMs: timeoutMs);
+
+        Console.WriteLine();
+        if (matches.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine(searchKeyword != null
+                ? $"  No elements matching \"{searchKeyword}\" within scope \"{scopeName}\""
+                : $"  No elements found within scope \"{scopeName}\"");
+            Console.ResetColor();
+            return 0;
+        }
+
+        string mode = searchKeyword != null ? $"find \"{searchKeyword}\"" : "list all";
+        Console.WriteLine($"── {mode} under #{uiaScope} ({matches.Count} results) ──");
+        foreach (var m in matches)
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write($"  [{m.ControlType}] ");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write($"\"{m.Name}\"");
+            if (!string.IsNullOrEmpty(m.AutomationId))
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($" aid=\"{m.AutomationId}\"");
+            }
+            if (!string.IsNullOrEmpty(m.NamePath))
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Write($"  path={m.NamePath}");
+            }
+            Console.ResetColor();
+            Console.WriteLine();
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Total: {matches.Count} (scope=\"{scopeName}\", depth={maxDepth})");
+        return 0;
+    }
+
     // ── inspect ────────────────────────────────────────────────
 
     static int InspectCommand(string[] args)
     {
         if (args.Length == 0)
-            return Error("Usage: appbot inspect <window-title>[/<child-pattern>] [--depth N] [--win32] [--filter <pattern>]\n" +
+            return Error("Usage: appbot inspect <window-title>[/<child-pattern>][#<uia-scope>] [--depth N] [--win32] [--filter <pattern>]\n" +
                 "  <child-pattern>: MDI/자식 윈도우 glob 매칭 (예: 투혼/**현재가, 투혼/[0600]*)\n" +
+                "  #<uia-scope>: UIA 요소 Name 매칭으로 검색 루트 축소 (예: *영웅문*#*잔고확인*)\n" +
                 "  --filter: Search entire UIA tree for matching elements (Name/AutomationId/ControlType)\n" +
                 "            Supports wildcards (*/?), regex: prefix, or plain substring");
 
@@ -55,18 +189,21 @@ internal partial class Program
         bool win32Mode = args.Contains("--win32");
         string? filter = GetArgValue(args, "--filter");
 
-        // "투혼/**현재가" → mainTitle="투혼", childPattern="**현재가"
+        // Parse '#' first: "window/child#uiaScope" → split at first '#'
+        var (windowPart, uiaScope) = GrapHelper.SplitHash(rawTitle);
+
+        // Then parse '/' in window part: "투혼/**현재가" → mainTitle="투혼", childPattern="**현재가"
         string mainTitle;
         string? childPattern = null;
-        var slashIdx = rawTitle.IndexOf('/');
+        var slashIdx = windowPart.IndexOf('/');
         if (slashIdx > 0)
         {
-            mainTitle = rawTitle[..slashIdx];
-            childPattern = rawTitle[(slashIdx + 1)..];
+            mainTitle = windowPart[..slashIdx];
+            childPattern = windowPart[(slashIdx + 1)..];
         }
         else
         {
-            mainTitle = rawTitle;
+            mainTitle = windowPart;
         }
 
         var windows = WindowFinder.FindByTitle(mainTitle);
@@ -128,13 +265,37 @@ internal partial class Program
             Console.WriteLine($"── UIA Tree Filtered: \"{filter}\" (subtree depth={depth}) ──");
             Console.ResetColor();
             using var uia = new UiaLocator();
-            var tree = uia.DumpTreeFiltered(inspectHandle, filter, depth);
-            Console.Write(tree);
+            // '#' scope narrowing: use scoped UIA element as root
+            if (!string.IsNullOrEmpty(uiaScope))
+            {
+                var scopedRoot = GrapHelper.ResolveScope(uia.Automation, inspectHandle, uiaScope);
+                if (scopedRoot == null) return Error($"UIA scope not found: \"{uiaScope}\"");
+                Console.WriteLine($"  UIA scope: \"{scopedRoot.Properties.Name.ValueOrDefault}\"");
+                var tree = uia.DumpTreeFiltered(scopedRoot, filter, depth);
+                Console.Write(tree);
+            }
+            else
+            {
+                var tree = uia.DumpTreeFiltered(inspectHandle, filter, depth);
+                Console.Write(tree);
+            }
         }
         else
         {
             using var uia = new UiaLocator();
-            var tree = uia.DumpTree(inspectHandle, depth);
+            string tree;
+            // '#' scope narrowing
+            if (!string.IsNullOrEmpty(uiaScope))
+            {
+                var scopedRoot = GrapHelper.ResolveScope(uia.Automation, inspectHandle, uiaScope);
+                if (scopedRoot == null) return Error($"UIA scope not found: \"{uiaScope}\"");
+                Console.WriteLine($"  UIA scope: \"{scopedRoot.Properties.Name.ValueOrDefault}\"");
+                tree = uia.DumpTree(scopedRoot, depth);
+            }
+            else
+            {
+                tree = uia.DumpTree(inspectHandle, depth);
+            }
             Console.Write(tree);
 
             var children = WindowFinder.GetChildren(inspectHandle);
@@ -216,10 +377,11 @@ internal partial class Program
     static bool GlobMatch(string text, string pattern)
     {
         if (string.IsNullOrEmpty(pattern)) return false;
-        // Contains wildcard? → glob full match
+        // Contains wildcard? → glob full match (with smart substring wrapping)
         if (pattern.Contains('*') || pattern.Contains('?'))
         {
-            var regexPattern = "^" + Regex.Escape(pattern)
+            var wrapped = PatternMatcher.EnsureSubstring(pattern);
+            var regexPattern = "^" + Regex.Escape(wrapped)
                 .Replace("\\*\\*", ".*")
                 .Replace("\\*", ".*")
                 .Replace("\\?", ".") + "$";
@@ -1351,7 +1513,7 @@ internal partial class Program
                 if (PatternMatcher.IsPattern(filterTitle))
                 {
                     // Pattern: try title first (backward compat), then full searchKey
-                    var m = PatternMatcher.Create(filterTitle);
+                    var m = PatternMatcher.Create(PatternMatcher.EnsureSubstring(filterTitle));
                     match = m.IsMatch(title) || m.IsMatch(searchKey);
                 }
                 else
@@ -1603,7 +1765,7 @@ internal partial class Program
                     // ── Regular search: keyword matches title OR UIA elements (OR logic) ──
                     bool titleMatch;
                     if (PatternMatcher.IsPattern(filterTitle))
-                        titleMatch = PatternMatcher.Create(filterTitle).IsMatch(r.title);
+                        titleMatch = PatternMatcher.Create(PatternMatcher.EnsureSubstring(filterTitle)).IsMatch(r.title);
                     else
                         titleMatch = r.title.Contains(filterTitle, StringComparison.OrdinalIgnoreCase);
 

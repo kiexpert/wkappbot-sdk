@@ -37,7 +37,9 @@ public static class WindowFinder
         }
 
         var isPattern = PatternMatcher.IsPattern(titlePattern);
-        var matcher = isPattern ? PatternMatcher.Create(titlePattern) : null;
+        // Smart substring: *text → *text*, text* → *text* (casual wildcard OK)
+        var matchPattern = isPattern ? PatternMatcher.EnsureSubstring(titlePattern) : titlePattern;
+        var matcher = isPattern ? PatternMatcher.Create(matchPattern) : null;
 
         // Cache process names by PID (avoid repeated lookups)
         var procNameCache = new Dictionary<uint, string>();

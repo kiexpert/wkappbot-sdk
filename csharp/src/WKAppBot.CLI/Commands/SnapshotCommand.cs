@@ -36,7 +36,7 @@ internal partial class Program
             return 1;
         }
 
-        string title = args[0];
+        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         string tag = GetArgValue(args, "--tag") ?? "snap";
         int depth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 8;
         int? cid = int.TryParse(GetArgValue(args, "--cid"), out var cidVal) ? cidVal : null;
@@ -69,7 +69,18 @@ internal partial class Program
         try
         {
             using var uia = new UiaLocator();
-            var tree = uia.DumpTree(win.Handle, depth);
+            string tree;
+            if (!string.IsNullOrEmpty(uiaScope))
+            {
+                var scopedRoot = GrapHelper.ResolveScope(uia.Automation, win.Handle, uiaScope);
+                if (scopedRoot == null) return Error($"UIA scope not found: \"{uiaScope}\"");
+                Console.WriteLine($"  UIA scope: \"{scopedRoot.Properties.Name.ValueOrDefault}\"");
+                tree = uia.DumpTree(scopedRoot, depth);
+            }
+            else
+            {
+                tree = uia.DumpTree(win.Handle, depth);
+            }
             var uiaPath = Path.Combine(outDir, "uia_tree.txt");
             File.WriteAllText(uiaPath, tree, Encoding.UTF8);
             Console.WriteLine($"[SNAPSHOT] UIA tree: {uiaPath} ({tree.Length} chars)");
