@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Runtime.InteropServices;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
@@ -52,7 +53,7 @@ internal partial class Program
             return 1;
         }
 
-        var title = args[0];
+        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         var newName = GetArgValue(args, "--new");
         var formula = GetArgValue(args, "--formula");
         var saveName = GetArgValue(args, "--save");
@@ -84,6 +85,15 @@ internal partial class Program
         automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
         automation.TransactionTimeout = TimeSpan.FromSeconds(5);
         var root = automation.FromHandle(mainHwnd);
+
+        // '#' scope narrowing
+        if (!string.IsNullOrEmpty(uiaScope))
+        {
+            var scoped = GrapHelper.FindUiaScope(root, uiaScope);
+            if (scoped == null) return Error($"UIA scope not found: \"{uiaScope}\"");
+            root = scoped;
+            Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
+        }
 
         // Find [0150] form
         AutomationElement? form = null;
@@ -150,7 +160,7 @@ internal partial class Program
         if (btn == null) return Error("Button 조건식 새로작성 (aid=4026) not found");
 
         Console.WriteLine("Clicking '조건식 새로작성'...");
-        var invoked = UiaLocator.TryInvoke(btn);
+        var invoked = InvokeWithZoom(btn, form, "조건식 새로작성");
         Console.WriteLine($"  Invoke: {invoked} (focusless!)");
         if (!invoked) return Error("Failed to invoke 조건식 새로작성");
         Thread.Sleep(500);
@@ -228,7 +238,7 @@ internal partial class Program
         if (btn == null) return Error("Button 검색 (aid=4035) not found");
 
         Console.WriteLine("Clicking '검색'...");
-        var invoked = UiaLocator.TryInvoke(btn);
+        var invoked = InvokeWithZoom(btn, form, "검색");
         Console.WriteLine($"  Invoke: {invoked} (focusless!)");
         return invoked ? 0 : 1;
     }
@@ -264,7 +274,7 @@ internal partial class Program
         if (btn == null) return Error("Button 내조건식 저장 (aid=4030) not found");
 
         Console.WriteLine("Clicking '내조건식 저장'...");
-        var invoked = UiaLocator.TryInvoke(btn);
+        var invoked = InvokeWithZoom(btn, form, "내조건식 저장");
         Console.WriteLine($"  Invoke: {invoked} (focusless!)");
         return invoked ? 0 : 1;
     }
@@ -352,7 +362,7 @@ internal partial class Program
             // Fallback: click search button (aid=3001)
             Console.Write("(no hWnd, clicking button) ");
             var searchBtn = FindByAid(form, "3001");
-            if (searchBtn != null) UiaLocator.TryInvoke(searchBtn);
+            if (searchBtn != null) InvokeWithZoom(searchBtn, form, "검색");
             Console.WriteLine("OK (button fallback)");
         }
         else
@@ -1018,7 +1028,7 @@ internal partial class Program
         if (btn == null) return Error("Button 수정 (aid=4046) not found");
 
         Console.WriteLine("Clicking '수정'...");
-        var invoked = UiaLocator.TryInvoke(btn);
+        var invoked = InvokeWithZoom(btn, form, "수정");
         Console.ForegroundColor = invoked ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine($"  Invoke: {invoked} (focusless!)");
         Console.ResetColor();
@@ -1113,7 +1123,7 @@ internal partial class Program
         if (saveBtn != null)
         {
             Console.Write("  Saving... ");
-            bool saved = UiaLocator.TryInvoke(saveBtn);
+            bool saved = InvokeWithZoom(saveBtn, form, "저장");
             Thread.Sleep(500);
             DismissAnyPopup(); // dismiss any save confirmation
 
@@ -1137,6 +1147,32 @@ internal partial class Program
         }
 
         return 0;
+    }
+
+    /// <summary>Invoke a button with zoom overlay (best-effort zoom, non-critical).</summary>
+    static bool InvokeWithZoom(AutomationElement btn, AutomationElement form, string label)
+    {
+        ClickZoomHelper? zoom = null;
+        try
+        {
+            var br = btn.BoundingRectangle;
+            if (br.Width > 0 && br.Height > 0)
+            {
+                var formHwnd = IntPtr.Zero;
+                try { var h = form.Properties.NativeWindowHandle.ValueOrDefault; if (h != 0) formHwnd = new IntPtr((long)h); } catch { }
+                zoom = ClickZoomHelper.BeginFromRect(
+                    new Rectangle(br.X, br.Y, br.Width, br.Height), formHwnd, "cond", label);
+            }
+        }
+        catch { }
+
+        var invoked = UiaLocator.TryInvoke(btn);
+
+        if (invoked) zoom?.ShowPass($"{label} OK");
+        else zoom?.ShowFail($"{label} failed");
+        zoom?.Dispose();
+
+        return invoked;
     }
 
     static string GetFormulaText(IntPtr formulaHwnd)

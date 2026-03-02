@@ -114,11 +114,11 @@ wkappbot run 'W:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml' -v
 ```
 
 ## CLI 명령어
-> **`<grap>`** = **gr**ab **a**ccessibility **p**attern — 와일드카드/정규식/경로glob 지원
+> **`<grap>`** = **gr**ab **a**ccessibility **p**attern — 와일드카드/정규식/경로glob/#UIA스코프 지원
 ```
 wkappbot run <scenario.yaml> [-v] [--no-watch]
 wkappbot validate <scenario.yaml>
-wkappbot inspect <grap>[/<child-grap>] [--depth N] [--win32] [--filter <pattern>]
+wkappbot inspect <grap>[/<child-grap>][#<uia-scope>] [--depth N] [--win32] [--filter <pattern>]
 wkappbot focus [--title <grap>] [--delay N] [--depth N] [--win32] [-b]
 wkappbot watch [--duration N] [--live] [--win32] [--interval N]
 wkappbot capture <grap> [-o output.png]
@@ -169,6 +169,14 @@ Phase 0: Already Focused? → Phase 1: Alert+Wait(3초) → Phase 2: Force Recov
 | 와일드카드 | `"*Button*"` | glob 스타일 |
 | 정규식 | `"regex:btn_\\d+"` | 정규식 |
 | 경로 glob | `"**/#32770"` | GitHub-style (classPath 매칭) |
+| Win32 자식 | `"투혼/[0600]*"` | `/` 뒤 = MDI 자식 윈도우 매칭 |
+| **#UIA 스코프** | `"*영웅문*#*실시간계좌*"` | `#` 뒤 = UIA Name 매칭으로 루트 축소 |
+| UIA 다단 경로 | `"*영웅문*#*폼*#*Tab*"` | `#`/`/` 모두 UIA 계층 구분자 |
+
+> **`#` 스코프 = URL fragment 스타일**: `window/child#a11y-bookmark`
+> - `#` 앞: Win32 윈도우 탐색 (기존 grap)
+> - `#` 뒤: UIA 트리에서 Name 매칭 요소로 검색 루트 축소 (container-first)
+> - 적용 명령: `inspect`, `tab-select`, `uia-test` (나머지 점진 확대)
 
 ## YAML Scenario Format (요약)
 ```yaml

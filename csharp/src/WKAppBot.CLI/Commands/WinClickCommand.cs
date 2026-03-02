@@ -26,7 +26,7 @@ internal partial class Program
                 "  --dbl: Double-click (physical only)\n" +
                 "  --right: Right-click (physical only)");
 
-        string title = args[0];
+        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         bool isDouble = args.Any(a => a == "--dbl" || a == "--double");
         bool isRight = args.Any(a => a == "--right");
         bool forceFocusless = args.Any(a => a == "--fl" || a == "--focusless");

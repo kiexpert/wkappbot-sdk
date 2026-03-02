@@ -52,14 +52,19 @@ Usage:
 Inspection:
   windows [filter] [--uia] [--deep] [--process <name>] [--limit N]
       List visible windows in Z-order. --uia: also search UIA elements.
-  inspect <window-title> [--depth N] [--win32] [--filter <pattern>]
-      Dump UIA tree of a window. --filter: search A11Y elements.
+  inspect <grap>[#<uia-scope>] [--depth N] [--win32] [--filter <pattern>]
+      Dump UIA tree of a window. # narrows to UIA element by name.
+      --filter: search A11Y elements. Ex: *영웅문*#*실시간계좌*
   win-click <window-title> <x> <y> [--uia]
       Click a coordinate inside a window + detect UIA element.
   focus [--title <text>] [--delay N] [--depth N] [--win32] [-b]
       Inspect the currently focused window (countdown + dump).
   watch [--duration N] [--live] [--win32] [--interval N]
       Real-time element tracking under mouse cursor.
+
+  tab-select <grap>[#<uia-scope>] --aid <id> [--list|--select <text>|--index N]
+      Focusless tab switching via UIA SelectionItem pattern.
+      # scopes to specific form. Ex: *영웅문*#*실시간계좌* --aid 1000
 
 Automation:
   click <window-title> <form-id> [button-text] [--combo N INDEX]
@@ -76,8 +81,9 @@ Automation:
 Testing & Analysis:
   validate <scenario.yaml>
       Validate a YAML scenario file (syntax + structure check).
-  uia-test <window-title> [--invoke <name>]
+  uia-test <grap>[#<uia-scope>] [--invoke <name>]
       Systematic 7-phase MFC UIA pattern test with zoom overlay.
+      # narrows UIA root. Ex: *영웅문*#*실시간계좌* --invoke 예수금
   chart-analyze <window-title|image.png> [--form <id>] [--candles N]
       Extract OHLC+volume from chart screenshots (3 strategies).
       --tooltip: Y-axis recalibration. --debug: overlay image.

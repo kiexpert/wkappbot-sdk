@@ -1,3 +1,4 @@
+using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
@@ -14,7 +15,7 @@ internal partial class Program
         if (args.Length < 1)
             return Error("Usage: wkappbot zoom-demo <window-title> [text]\n  Demo: types text with adaptive zoom overlay on any window.");
 
-        string title = args[0];
+        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         string text = args.Length >= 2 ? args[1] : "Hello World!";
 
         // Find window
@@ -40,9 +41,19 @@ internal partial class Program
             var uiaWin = automation.FromHandle(hWnd);
             if (uiaWin != null)
             {
+                // '#' scope narrowing
+                FlaUI.Core.AutomationElements.AutomationElement uiaRoot = uiaWin;
+                if (!string.IsNullOrEmpty(uiaScope))
+                {
+                    var scoped = GrapHelper.FindUiaScope(uiaWin, uiaScope);
+                    if (scoped == null) return Error($"UIA scope not found: \"{uiaScope}\"");
+                    uiaRoot = scoped;
+                    Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
+                }
+
                 // Look for Document or Edit control type
-                var doc = uiaWin.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Document));
-                var edit = doc ?? uiaWin.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Edit));
+                var doc = uiaRoot.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Document));
+                var edit = doc ?? uiaRoot.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Edit));
                 if (edit != null)
                 {
                     editElement = edit;
