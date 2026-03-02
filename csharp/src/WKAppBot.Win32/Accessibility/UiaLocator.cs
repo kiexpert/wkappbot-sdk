@@ -1384,26 +1384,28 @@ public sealed class PatternMatcher
     /// <summary>
     /// Create a matcher from a pattern string.
     /// Auto-detects pattern type: regex: prefix, wildcard (*/?), or literal.
+    /// All modes do SUBSTRING matching by default (no anchoring).
+    /// Use <see cref="CreatePathGlob"/> for anchored path-segment matching.
     /// </summary>
     public static PatternMatcher Create(string pattern)
     {
-        // regex: prefix → explicit regex
+        // regex: prefix → explicit regex (user controls anchoring)
         if (pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase))
         {
             var regexStr = pattern[6..];
             return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
         }
 
-        // Contains wildcard chars → convert glob to regex
+        // Contains wildcard chars → convert glob to regex (NO anchoring = substring)
         if (pattern.Contains('*') || pattern.Contains('?'))
         {
-            var regexStr = "^" + Regex.Escape(pattern)
+            var regexStr = Regex.Escape(pattern)
                 .Replace("\\*", ".*")
-                .Replace("\\?", ".") + "$";
+                .Replace("\\?", ".");
             return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
         }
 
-        // Plain literal → exact match
+        // Plain literal → substring match (Contains)
         return new PatternMatcher(pattern);
     }
 
@@ -1485,7 +1487,8 @@ public sealed class PatternMatcher
     {
         if (_regex != null)
             return _regex.IsMatch(value);
-        return string.Equals(_literal, value, StringComparison.OrdinalIgnoreCase);
+        // Literal → substring match (Contains), not exact match
+        return value.Contains(_literal!, StringComparison.OrdinalIgnoreCase);
     }
 
     public override string ToString() =>

@@ -377,18 +377,8 @@ internal partial class Program
     static bool GlobMatch(string text, string pattern)
     {
         if (string.IsNullOrEmpty(pattern)) return false;
-        // Contains wildcard? → glob full match (with smart substring wrapping)
-        if (pattern.Contains('*') || pattern.Contains('?'))
-        {
-            var wrapped = PatternMatcher.EnsureSubstring(pattern);
-            var regexPattern = "^" + Regex.Escape(wrapped)
-                .Replace("\\*\\*", ".*")
-                .Replace("\\*", ".*")
-                .Replace("\\?", ".") + "$";
-            return Regex.IsMatch(text, regexPattern, RegexOptions.IgnoreCase);
-        }
-        // No wildcards → substring match (기존 동작 호환)
-        return text.Contains(pattern, StringComparison.OrdinalIgnoreCase);
+        // PatternMatcher.Create does substring matching for all modes
+        return PatternMatcher.Create(pattern).IsMatch(text);
     }
 
     /// <summary>
@@ -1509,19 +1499,9 @@ internal partial class Program
             if (filterTitle != null)
             {
                 var searchKey = $"[{className}] {title} ({processName} hwnd={hWnd:X8} {w}x{h})";
-                bool match;
-                if (PatternMatcher.IsPattern(filterTitle))
-                {
-                    // Pattern: try title first (backward compat), then full searchKey
-                    var m = PatternMatcher.Create(PatternMatcher.EnsureSubstring(filterTitle));
-                    match = m.IsMatch(title) || m.IsMatch(searchKey);
-                }
-                else
-                {
-                    // Literal: Contains on full searchKey
-                    match = searchKey.Contains(filterTitle, StringComparison.OrdinalIgnoreCase);
-                }
-                if (!match) return null;
+                // Create() does substring matching for all modes (literal/glob/regex)
+                var m = PatternMatcher.Create(filterTitle);
+                if (!m.IsMatch(title) && !m.IsMatch(searchKey)) return null;
             }
             if (filterProcess != null)
             {
@@ -1763,11 +1743,7 @@ internal partial class Program
                 else
                 {
                     // ── Regular search: keyword matches title OR UIA elements (OR logic) ──
-                    bool titleMatch;
-                    if (PatternMatcher.IsPattern(filterTitle))
-                        titleMatch = PatternMatcher.Create(PatternMatcher.EnsureSubstring(filterTitle)).IsMatch(r.title);
-                    else
-                        titleMatch = r.title.Contains(filterTitle, StringComparison.OrdinalIgnoreCase);
+                    var titleMatch = PatternMatcher.Create(filterTitle).IsMatch(r.title);
 
                     var uiaMatches = uiaDeep
                         ? UiaLocator.QuickSearch(hWnd, filterTitle, maxDepth: 12, maxResults: 10, maxVisited: 1500, timeoutMs: 8000)

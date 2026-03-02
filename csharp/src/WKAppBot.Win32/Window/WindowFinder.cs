@@ -36,10 +36,8 @@ public static class WindowFinder
             return new List<WindowInfo>();
         }
 
-        var isPattern = PatternMatcher.IsPattern(titlePattern);
-        // Smart substring: *text → *text*, text* → *text* (casual wildcard OK)
-        var matchPattern = isPattern ? PatternMatcher.EnsureSubstring(titlePattern) : titlePattern;
-        var matcher = isPattern ? PatternMatcher.Create(matchPattern) : null;
+        // Create() does substring matching for all modes (literal/glob/regex)
+        var matcher = PatternMatcher.Create(titlePattern);
 
         // Cache process names by PID (avoid repeated lookups)
         var procNameCache = new Dictionary<uint, string>();
@@ -69,19 +67,8 @@ public static class WindowFinder
             // ★ Combined search key: "[ClassName] Title (processName hwnd=XX WxH)"
             var searchKey = $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h})";
 
-            bool match;
-            if (isPattern)
-            {
-                // Pattern (glob/regex): try title first (backward compat), then full searchKey
-                match = matcher!.IsMatch(title) || matcher!.IsMatch(searchKey);
-            }
-            else
-            {
-                // Literal: Contains on full searchKey (matches any prop naturally)
-                match = searchKey.Contains(titlePattern, StringComparison.OrdinalIgnoreCase);
-            }
-
-            if (match)
+            // Substring match: try title first, then full searchKey
+            if (matcher.IsMatch(title) || matcher.IsMatch(searchKey))
                 results.Add(WindowInfo.FromHwnd(hWnd));
 
             return true;
