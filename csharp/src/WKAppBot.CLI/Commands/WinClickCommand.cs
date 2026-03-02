@@ -150,7 +150,7 @@ internal partial class Program
         }
         catch { }
 
-        // UIA element detection → zoom rect
+        // UIA element detection → zoom rect (centered on click point)
         Rectangle zoomRect;
         string uiaLabel = "";
         string uiaInfo = "";
@@ -164,23 +164,24 @@ internal partial class Program
                 string name = elem.Name ?? "";
                 if (name.Length > 30) name = name[..30];
 
-                double elemArea = (double)br.Width * br.Height;
-                double winArea = (double)wRect.Width * wRect.Height;
-                bool tooCoarse = winArea > 0 && elemArea > winArea * 0.5;
+                // Use element rect only if small enough for zoom; otherwise center on click point
+                bool elemFitsZoom = br.Width <= 300 && br.Height <= 200;
 
-                if (!tooCoarse)
+                if (elemFitsZoom)
                 {
                     zoomRect = br;
-                    uiaLabel = string.IsNullOrEmpty(name) ? elem.ControlType : name;
-                    uiaInfo = $" [{elem.ControlType}] {br.Width}x{br.Height}";
-                    if (!string.IsNullOrEmpty(name)) uiaInfo += $" \"{name}\"";
-                    if (!string.IsNullOrEmpty(elem.AutomationId)) uiaInfo += $" aid={elem.AutomationId}";
                 }
                 else
                 {
+                    // Large element (Tree, Pane, etc.) — zoom on click point, not element center
                     zoomRect = new Rectangle(screenX - 60, screenY - 20, 120, 40);
-                    uiaInfo = $" [{elem.ControlType}] {br.Width}x{br.Height}(coarse→120x40)";
                 }
+
+                uiaLabel = string.IsNullOrEmpty(name) ? elem.ControlType : name;
+                uiaInfo = $" [{elem.ControlType}] {br.Width}x{br.Height}";
+                if (!elemFitsZoom) uiaInfo += $"(→click@{screenX},{screenY})";
+                if (!string.IsNullOrEmpty(name)) uiaInfo += $" \"{name}\"";
+                if (!string.IsNullOrEmpty(elem.AutomationId)) uiaInfo += $" aid={elem.AutomationId}";
             }
             else
             {
@@ -193,6 +194,9 @@ internal partial class Program
         }
 
         Console.Write($"[WIN] {clickType} \"{winInfo.Title}\" at ({relX},{relY}) → screen ({screenX},{screenY}){ocrInfo}{uiaInfo}... ");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.Write($"[zoom@({zoomRect.X},{zoomRect.Y} {zoomRect.Width}x{zoomRect.Height})] ");
+        Console.ResetColor();
 
         string actionLabel = !string.IsNullOrEmpty(uiaLabel) ? uiaLabel
             : !string.IsNullOrEmpty(ocrSnippet) ? ocrSnippet
