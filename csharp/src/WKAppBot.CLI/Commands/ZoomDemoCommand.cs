@@ -15,17 +15,20 @@ internal partial class Program
         if (args.Length < 1)
             return Error("Usage: wkappbot zoom-demo <window-title> [text]\n  Demo: types text with adaptive zoom overlay on any window.");
 
-        var (title, uiaScope) = GrapHelper.SplitHash(args[0]);
         string text = args.Length >= 2 ? args[1] : "Hello World!";
 
-        // Find window
-        var found = WindowFinder.FindByTitle(title);
-        if (found.Count == 0)
-            return Error($"Window not found: \"{title}\"");
+        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
+        using var automation = new FlaUI.UIA3.UIA3Automation();
+        automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
+        automation.TransactionTimeout = TimeSpan.FromSeconds(5);
 
-        var winInfo = found[0];
-        var hWnd = winInfo.Handle;
-        Console.WriteLine($"Target: [{hWnd:X8}] \"{winInfo.Title}\"");
+        var resolved = GrapHelper.ResolveFullGrap(args[0], automation);
+        if (resolved == null) return Error("Failed to resolve grap pattern.");
+        if (resolved.Value.error != null) return Error(resolved.Value.error);
+
+        var hWnd = resolved.Value.hwnd;
+        var uiaRoot = resolved.Value.root;
+        Console.WriteLine($"Target: [{hWnd:X8}] \"{WindowFinder.GetWindowText(hWnd)}\"");
 
         // Get window rect for zoom mode detection
         NativeMethods.GetWindowRect(hWnd, out var wRect);
@@ -37,31 +40,16 @@ internal partial class Program
         System.Drawing.Rectangle editBounds = default;
         try
         {
-            using var automation = new FlaUI.UIA3.UIA3Automation();
-            var uiaWin = automation.FromHandle(hWnd);
-            if (uiaWin != null)
+            // Look for Document or Edit control type within resolved scope
+            var doc = uiaRoot.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Document));
+            var edit = doc ?? uiaRoot.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Edit));
+            if (edit != null)
             {
-                // '#' scope narrowing
-                FlaUI.Core.AutomationElements.AutomationElement uiaRoot = uiaWin;
-                if (!string.IsNullOrEmpty(uiaScope))
-                {
-                    var scoped = GrapHelper.FindUiaScope(uiaWin, uiaScope);
-                    if (scoped == null) return Error($"UIA scope not found: \"{uiaScope}\"");
-                    uiaRoot = scoped;
-                    Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
-                }
-
-                // Look for Document or Edit control type
-                var doc = uiaRoot.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Document));
-                var edit = doc ?? uiaRoot.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Edit));
-                if (edit != null)
-                {
-                    editElement = edit;
-                    var nH = edit.Properties.NativeWindowHandle.ValueOrDefault;
-                    if (nH != IntPtr.Zero) editHwnd = nH;
-                    editBounds = edit.BoundingRectangle;
-                    Console.WriteLine($"  Edit: [{edit.ControlType}] \"{edit.Name}\" {(int)editBounds.Width}x{(int)editBounds.Height} @({(int)editBounds.X},{(int)editBounds.Y})");
-                }
+                editElement = edit;
+                var nH = edit.Properties.NativeWindowHandle.ValueOrDefault;
+                if (nH != IntPtr.Zero) editHwnd = nH;
+                editBounds = edit.BoundingRectangle;
+                Console.WriteLine($"  Edit: [{edit.ControlType}] \"{edit.Name}\" {(int)editBounds.Width}x{(int)editBounds.Height} @({(int)editBounds.X},{(int)editBounds.Y})");
             }
         }
         catch (Exception ex)

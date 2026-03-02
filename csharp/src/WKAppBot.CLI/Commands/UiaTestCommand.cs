@@ -24,40 +24,40 @@ internal partial class Program
     {
         if (args.Length == 0) { Console.WriteLine("Usage: wkappbot uia-test <title> [--form id] [--invoke name]"); return 1; }
 
-        // Parse "windowGrap#uiaPath" — '#' narrows UIA search scope
-        var (windowTitle, uiaScope) = GrapHelper.SplitHash(args[0]);
         var formId = GetArgValue(args, "--form") ?? "";
         var invokeTarget = GetArgValue(args, "--invoke") ?? "";
 
-        var matches = WindowFinder.FindByTitle(windowTitle);
-        if (matches.Count == 0) { Console.WriteLine($"Window not found: {windowTitle}"); return 1; }
-
-        var mainHwnd = matches[0].Handle;
-        Console.WriteLine($"Target: {matches[0].Title} (0x{mainHwnd:X})");
-
-        // Quick invoke mode — pass uiaScope for narrowing
-        if (!string.IsNullOrEmpty(invokeTarget))
-            return QuickInvoke(mainHwnd, invokeTarget, uiaScope);
-
-        // Find MDI child if form-id specified
-        var targetHwnd = FindFormHwnd(mainHwnd, formId);
-
+        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
         UIA3Automation automation;
         AutomationElement root;
+        IntPtr mainHwnd;
         try
         {
             automation = new UIA3Automation();
-            automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
-            automation.TransactionTimeout = TimeSpan.FromSeconds(5);
-            root = automation.FromHandle(targetHwnd);
+            automation.ConnectionTimeout = TimeSpan.FromSeconds(10);
+            automation.TransactionTimeout = TimeSpan.FromSeconds(10);
 
-            // '#' scope narrowing for full test mode
-            if (!string.IsNullOrEmpty(uiaScope))
+            var resolved = GrapHelper.ResolveFullGrap(args[0], automation);
+            if (resolved == null) { Console.WriteLine("Failed to resolve grap pattern."); return 1; }
+            if (resolved.Value.error != null) { Console.WriteLine(resolved.Value.error); return 1; }
+
+            mainHwnd = resolved.Value.hwnd;
+            root = resolved.Value.root;
+            Console.WriteLine($"Target: \"{WindowFinder.GetWindowText(mainHwnd)}\" (0x{mainHwnd:X})");
+
+            // Quick invoke mode — use resolved root (already scope-narrowed)
+            if (!string.IsNullOrEmpty(invokeTarget))
+                return QuickInvoke(mainHwnd, invokeTarget, root);
+
+            // Find MDI child if form-id specified (additional narrowing)
+            if (!string.IsNullOrEmpty(formId))
             {
-                var scoped = GrapHelper.FindUiaScope(root, uiaScope);
-                if (scoped == null) { Console.WriteLine($"UIA scope not found: \"{uiaScope}\""); return 1; }
-                root = scoped;
-                Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
+                var formHwnd = FindFormHwnd(mainHwnd, formId);
+                if (formHwnd != mainHwnd)
+                {
+                    root = automation.FromHandle(formHwnd);
+                    mainHwnd = formHwnd;
+                }
             }
         }
         catch (Exception ex)
@@ -139,7 +139,7 @@ internal partial class Program
                     var btnRect = btn.BoundingRectangle;
                     var drawRect = new System.Drawing.Rectangle(
                         (int)btnRect.X, (int)btnRect.Y, (int)btnRect.Width, (int)btnRect.Height);
-                    using var zoom = ClickZoomHelper.BeginFromRect(drawRect, targetHwnd,
+                    using var zoom = ClickZoomHelper.BeginFromRect(drawRect, mainHwnd,
                         "invoke", $"btn[{aid}]");
                     Test($"Invoke btn[{aid}]", () =>
                     {
@@ -193,7 +193,7 @@ internal partial class Program
                         var tiRect = ti.BoundingRectangle;
                         var drawRect = new System.Drawing.Rectangle(
                             (int)tiRect.X, (int)tiRect.Y, (int)tiRect.Width, (int)tiRect.Height);
-                        tabZoom = ClickZoomHelper.BeginFromRect(drawRect, targetHwnd,
+                        tabZoom = ClickZoomHelper.BeginFromRect(drawRect, mainHwnd,
                             "select", $"Tab '{ti.Name}'");
                     }
                     catch { /* zoom is non-critical */ }
@@ -235,7 +235,7 @@ internal partial class Program
         try
         {
             var childHwnds = new List<IntPtr>();
-            NativeMethods.EnumChildWindows(targetHwnd, (hwnd, _) => { childHwnds.Add(hwnd); return true; }, IntPtr.Zero);
+            NativeMethods.EnumChildWindows(mainHwnd, (hwnd, _) => { childHwnds.Add(hwnd); return true; }, IntPtr.Zero);
             Console.WriteLine($"  Win32 children: {childHwnds.Count}");
 
             var textFound = 0;
@@ -322,25 +322,12 @@ internal partial class Program
         return 0;
     }
 
-    static int QuickInvoke(IntPtr hwnd, string target, string? uiaScope = null)
+    static int QuickInvoke(IntPtr hwnd, string target, AutomationElement? preResolvedRoot = null)
     {
         using var a = new UIA3Automation();
         a.ConnectionTimeout = TimeSpan.FromSeconds(10);
         a.TransactionTimeout = TimeSpan.FromSeconds(10);
-        var root = a.FromHandle(hwnd);
-
-        // '#' scope narrowing: narrow UIA root before searching
-        if (!string.IsNullOrEmpty(uiaScope))
-        {
-            var scoped = GrapHelper.FindUiaScope(root, uiaScope);
-            if (scoped == null)
-            {
-                Console.WriteLine($"UIA scope not found: \"{uiaScope}\"");
-                return 1;
-            }
-            root = scoped;
-            Console.WriteLine($"  UIA scope: \"{scoped.Properties.Name.ValueOrDefault}\"");
-        }
+        var root = preResolvedRoot ?? a.FromHandle(hwnd);
         // Recursive walk (like inspect) to find element by name — FindAllDescendants misses Electron subtrees
         AutomationElement? btn = null;
         var candidates = new List<(string type, string name)>();
