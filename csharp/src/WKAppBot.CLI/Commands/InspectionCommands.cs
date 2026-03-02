@@ -31,11 +31,10 @@ internal partial class Program
                          "    find \"*영웅문*#*잔고확인*\"          영웅문 → UIA scope 잔고확인 → list elements\n" +
                          "    find \"*영웅문*/*실현*#*잔고*\" 예수금  영웅문/실현* child → #잔고 scope → 예수금 검색");
 
-        // Check for scope separators — '/' or '#' with multiple segments → scoped search
+        // Check for scope separators — '#' = UIA scope, '/' with 2+ segments = Win32 child hierarchy
         string firstArg = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "";
-        var hasSeparator = firstArg.Contains('#') || firstArg.Contains('/');
-        var segmentCount = firstArg.Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries).Length;
-        if (hasSeparator && segmentCount >= 2)
+        var (w32segs, uiaP) = GrapHelper.SplitGrap(firstArg);
+        if (uiaP != null || w32segs.Length >= 2)
             return FindScopedCommand(args);
 
         // Preprocess: inject --uia (or --uia-deep for --deep) and forward to WindowsCommand
@@ -66,66 +65,48 @@ internal partial class Program
         string grapArg = positional[0];
         string? searchKeyword = positional.Count > 1 ? positional[1] : null;
 
-        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
-        // find command requires at least one scope segment after the window title
-        var segments = grapArg.Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length < 2)
-            return Error("find requires scope: find \"window/scope\" [keyword] or find \"window#scope\" [keyword]");
+        // Split at first '#': before = Win32 path (/), after = UIA scope (/ and # equivalent)
+        var (win32Segments, uiaPath) = GrapHelper.SplitGrap(grapArg);
+        if (win32Segments.Length == 0)
+            return Error("find requires window title: find \"window/child\" or find \"window#scope\"");
 
-        var windows = WindowFinder.FindByTitle(segments[0]);
-        if (windows.Count == 0) return Error($"Window not found: \"{segments[0]}\"");
+        var windows = WindowFinder.FindByTitle(win32Segments[0]);
+        if (windows.Count == 0) return Error($"Window not found: \"{win32Segments[0]}\"");
         var mainWin = windows[0];
         Console.WriteLine($"Window: [{mainWin.Handle:X8}] \"{mainWin.Title}\"");
 
-        // Walk segments: Win32 child → UIA scope (auto-switch)
+        // Walk Win32 children (segments before '#')
         IntPtr targetHwnd = mainWin.Handle;
-        bool inUiaMode = false;
-        AutomationElement? scoped = null;
+        for (int si = 1; si < win32Segments.Length; si++)
+        {
+            var childMatch = FindChildWindowByPattern(mainWin.Handle, win32Segments[si]);
+            if (childMatch != null)
+            {
+                targetHwnd = childMatch.Value.handle;
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write($"  └ Child: ");
+                Console.ResetColor();
+                Console.WriteLine($"\"{childMatch.Value.title}\" (hWnd=0x{targetHwnd:X})");
+            }
+            else
+            {
+                return Error($"Win32 child not found: \"{win32Segments[si]}\"");
+            }
+        }
 
+        // UIA scope (after '#')
         using var uia = new FlaUI.UIA3.UIA3Automation();
         uia.ConnectionTimeout = TimeSpan.FromSeconds(5);
         uia.TransactionTimeout = TimeSpan.FromSeconds(5);
 
-        for (int si = 1; si < segments.Length; si++)
+        AutomationElement? scoped = uia.FromHandle(targetHwnd);
+        if (scoped is null) return Error("UIA root not available.");
+
+        if (!string.IsNullOrEmpty(uiaPath))
         {
-            var seg = segments[si];
-
-            if (!inUiaMode)
-            {
-                var childMatch = FindChildWindowByPattern(mainWin.Handle, seg);
-                if (childMatch != null)
-                {
-                    targetHwnd = childMatch.Value.handle;
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.Write($"  └ Child: ");
-                    Console.ResetColor();
-                    Console.WriteLine($"\"{childMatch.Value.title}\" (hWnd=0x{targetHwnd:X})");
-                    continue;
-                }
-                inUiaMode = true;
-            }
-
-            // UIA scope narrowing
+            scoped = GrapHelper.FindUiaScope(scoped!, uiaPath);
             if (scoped is null)
-            {
-                var uiaRoot = uia.FromHandle(targetHwnd);
-                if (uiaRoot is null) return Error("UIA root not available for this window.");
-                scoped = GrapHelper.FindUiaScope(uiaRoot, seg);
-            }
-            else
-            {
-                scoped = GrapHelper.FindUiaScope(scoped!, seg);
-            }
-
-            if (scoped is null)
-                return Error($"Scope not found: \"{seg}\"");
-        }
-
-        // If no UIA scope but we have a resolved Win32 child, use that as root
-        if (scoped is null)
-        {
-            scoped = uia.FromHandle(targetHwnd);
-            if (scoped is null) return Error("UIA root not available.");
+                return Error($"UIA scope not found: \"{uiaPath}\"");
         }
 
         var scopeName = scoped!.Properties.Name.ValueOrDefault ?? "(unnamed)";
@@ -197,46 +178,37 @@ internal partial class Program
         bool win32Mode = args.Contains("--win32");
         string? filter = GetArgValue(args, "--filter");
 
-        // Split by / or # — all separators are equivalent
-        var segments = rawTitle.Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0) return Error("Empty grap pattern");
+        // Split at first '#': before = Win32 path (/), after = UIA scope (/ and # equivalent)
+        var (win32Segments, uiaScopePath) = GrapHelper.SplitGrap(rawTitle);
+        if (win32Segments.Length == 0) return Error("Empty grap pattern");
 
-        var windows = WindowFinder.FindByTitle(segments[0]);
+        var windows = WindowFinder.FindByTitle(win32Segments[0]);
         if (windows.Count == 0)
         {
-            Console.WriteLine($"No window found matching: \"{segments[0]}\"");
+            Console.WriteLine($"No window found matching: \"{win32Segments[0]}\"");
             return 1;
         }
 
         var mainWin = windows[0];
 
-        // Walk segments: Win32 child → UIA scope (auto-switch)
+        // Walk Win32 children (segments before '#')
         IntPtr inspectHandle = mainWin.Handle;
         string? matchedFormId = null;
         string? matchedFormTitle = null;
-        bool inUiaMode = false;
-        string? uiaScopePath = null; // remaining segments for UIA scope
 
-        for (int si = 1; si < segments.Length; si++)
+        for (int si = 1; si < win32Segments.Length; si++)
         {
-            var seg = segments[si];
-
-            if (!inUiaMode)
+            var childMatch = FindChildWindowByPattern(mainWin.Handle, win32Segments[si]);
+            if (childMatch != null)
             {
-                var childMatch = FindChildWindowByPattern(mainWin.Handle, seg);
-                if (childMatch != null)
-                {
-                    inspectHandle = childMatch.Value.handle;
-                    matchedFormId = childMatch.Value.formId;
-                    matchedFormTitle = childMatch.Value.title;
-                    continue;
-                }
-                inUiaMode = true;
+                inspectHandle = childMatch.Value.handle;
+                matchedFormId = childMatch.Value.formId;
+                matchedFormTitle = childMatch.Value.title;
             }
-
-            // Collect remaining segments as UIA scope path
-            uiaScopePath = string.Join("/", segments[si..]);
-            break;
+            else
+            {
+                return Error($"Win32 child not found: \"{win32Segments[si]}\"");
+            }
         }
 
         // Display window info

@@ -33,22 +33,21 @@ internal partial class Program
         if (!int.TryParse(args[1], out int relX) || !int.TryParse(args[2], out int relY))
             return Error("Invalid coordinates. Usage: wkappbot win-click <title> <x> <y>");
 
-        // Resolve grap: "window/child" — '/' and '#' resolve to target window
-        // Note: win-click doesn't use UIA scope, just window resolution
-        var segments = args[0].Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0) return Error("Empty grap pattern");
+        // Resolve grap: "window/child" — '/' = Win32 child, '#' part ignored (coordinate-based click)
+        var (win32Segments, _) = GrapHelper.SplitGrap(args[0]);
+        if (win32Segments.Length == 0) return Error("Empty grap pattern");
 
-        var found = WindowFinder.FindByTitle(segments[0]);
+        var found = WindowFinder.FindByTitle(win32Segments[0]);
         if (found.Count == 0)
-            return Error($"Window not found: \"{segments[0]}\"");
+            return Error($"Window not found: \"{win32Segments[0]}\"");
 
         var hWnd = found[0].Handle;
-        // Resolve child window segments (Win32 only, no UIA needed for click)
-        for (int si = 1; si < segments.Length; si++)
+        // Walk Win32 children (segments before '#')
+        for (int si = 1; si < win32Segments.Length; si++)
         {
-            var child = WindowFinder.FindChildByPattern(hWnd, segments[si]);
-            if (child != null) { hWnd = child.Handle; continue; }
-            break; // Remaining segments ignored for win-click (coordinate-based)
+            var child = WindowFinder.FindChildByPattern(hWnd, win32Segments[si]);
+            if (child == null) return Error($"Win32 child not found: \"{win32Segments[si]}\"");
+            hWnd = child.Handle;
         }
         var winInfo = WindowInfo.FromHwnd(hWnd);
 

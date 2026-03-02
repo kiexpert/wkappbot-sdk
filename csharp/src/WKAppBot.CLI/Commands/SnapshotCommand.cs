@@ -41,34 +41,26 @@ internal partial class Program
         int? cid = int.TryParse(GetArgValue(args, "--cid"), out var cidVal) ? cidVal : null;
         bool skipLearn = args.Any(a => a.Equals("--no-learn", StringComparison.OrdinalIgnoreCase));
 
-        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
-        // Note: we need window info before UIA init, so resolve manually
-        var segments = args[0].Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0) return Error("Empty grap pattern");
+        // Split at first '#': before = Win32 path (/), after = UIA scope (/ and # equivalent)
+        var (win32Segments, uiaScopePath) = GrapHelper.SplitGrap(args[0]);
+        if (win32Segments.Length == 0) return Error("Empty grap pattern");
 
-        var windows = WindowFinder.FindByTitle(segments[0]);
+        var windows = WindowFinder.FindByTitle(win32Segments[0]);
         if (windows.Count == 0)
-            return Error($"No window found matching: \"{segments[0]}\"");
+            return Error($"No window found matching: \"{win32Segments[0]}\"");
 
         var win = windows[0];
         var targetHwnd = win.Handle;
 
-        // Resolve remaining segments: Win32 child → UIA scope
-        bool hasUiaScope = false;
-        string? uiaScopePath = null;
-        for (int si = 1; si < segments.Length; si++)
+        // Walk Win32 children (segments before '#')
+        for (int si = 1; si < win32Segments.Length; si++)
         {
-            var child = WindowFinder.FindChildByPattern(targetHwnd, segments[si]);
-            if (child != null)
-            {
-                targetHwnd = child.Handle;
-                continue;
-            }
-            // Remaining segments are UIA scope
-            uiaScopePath = string.Join("/", segments[si..]);
-            hasUiaScope = true;
-            break;
+            var child = WindowFinder.FindChildByPattern(targetHwnd, win32Segments[si]);
+            if (child == null)
+                return Error($"Win32 child not found: \"{win32Segments[si]}\"");
+            targetHwnd = child.Handle;
         }
+        bool hasUiaScope = !string.IsNullOrEmpty(uiaScopePath);
 
         // Get process info from window handle
         NativeMethods.GetWindowThreadProcessId(win.Handle, out uint winPid);
