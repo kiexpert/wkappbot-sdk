@@ -502,7 +502,11 @@ internal partial class Program
                                                 var pi = ctxHelper.FindPrompt();
                                                 if (pi != null)
                                                 {
-                                                    var nudge = $"⚠️ 컨텍스트 90% 도달! ({sizeMB:F1}/{ContextLimitMB}MB) 아래 명령을 실행해서 인수인계하세요:\n\nwkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
+                                                    var nudge = $"⚠️ 컨텍스트 90% 도달! ({sizeMB:F1}/{ContextLimitMB}MB)\n"
+                                                        + "Electron이 무거워서 새 대화 열기가 실패할 수 있습니다.\n"
+                                                        + "인수인계 전에 부하가 심한 잔여 프로세스를 정리하세요 (불필요한 탭 닫기, 빌드 프로세스 종료 등).\n"
+                                                        + "준비되면 아래 명령을 실행:\n\n"
+                                                        + $"wkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
                                                     ctxHelper.TypeAndSubmit(pi, nudge);
                                                     Console.WriteLine("[EYE] ✅ Handoff nudge sent to Claude prompt");
                                                 }
