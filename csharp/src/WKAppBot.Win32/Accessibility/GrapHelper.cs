@@ -69,9 +69,8 @@ public static class GrapHelper
         var current = root;
         foreach (var segment in segments)
         {
-            // Smart substring matching: ensure *...* for # scope
-            var pattern = PatternMatcher.EnsureSubstring(segment);
-            var matcher = PatternMatcher.Create(pattern);
+            // Create() does substring matching — no wrapping needed
+            var matcher = PatternMatcher.Create(segment);
             var found = WalkFindContainerFirst(current, matcher, maxDepth);
             if (found == null)
                 return null;
