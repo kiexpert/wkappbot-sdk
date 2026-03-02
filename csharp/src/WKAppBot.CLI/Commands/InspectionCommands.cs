@@ -484,6 +484,14 @@ internal partial class Program
                             if (File.Exists(kh)) ShowKnowhowBroadcast(kh, "KNOWHOW:A11Y");
                         }
 
+                        // Form-level action knowhow files (knowhow-*.md) — filename only
+                        foreach (var khExtra in Directory.GetFiles(formDir, "knowhow-*.md").Take(5))
+                        {
+                            Console.ForegroundColor = ConsoleColor.Magenta;
+                            Console.WriteLine($"  [KNOWHOW:A11Y] + {Path.GetFileName(khExtra)}");
+                            Console.ResetColor();
+                        }
+
                         var treeDir = Path.Combine(formDir, "tree");
                         if (Directory.Exists(treeDir))
                         {
