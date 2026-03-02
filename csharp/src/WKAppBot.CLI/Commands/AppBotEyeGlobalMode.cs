@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using WKAppBot.Core.Runner;
 using WKAppBot.WebBot;
@@ -31,6 +32,7 @@ internal partial class Program
         public long NormMs { get; set; }
         public long CacheMs { get; set; }
         public string Source { get; set; } = "none";
+        public DateTime FileWriteUtc { get; set; } = DateTime.MinValue; // session file mtime
     }
 
     static DateTime _lastTickActivityUtc = DateTime.MinValue;
@@ -57,6 +59,7 @@ internal partial class Program
 
     static EyeTick? _cachedLatestTick;
     static string _cachedPromptPreview = "";
+    static DateTime _cachedPromptFileWriteUtc = DateTime.MinValue;
     static List<EyeParentCard> _cachedCards = new();
     static DateTime _lastForceFullLoadUtc = DateTime.MinValue;
     // Card cache: content + changedUtc per card, persisted to disk
@@ -72,6 +75,7 @@ internal partial class Program
     // ── FSW hybrid: event-driven dirty flags (set by FileSystemWatcher callbacks) ──
     static volatile bool _fswTickDirty;
     static volatile bool _fswPromptDirty;
+    static volatile string? _fswPromptChangedFile; // last changed file name for filtering
     static FileSystemWatcher? _fswTick;
     static FileSystemWatcher? _fswPrompt;
 
@@ -478,12 +482,39 @@ internal partial class Program
                                         {
                                             contextWarning90Sent = true;
                                             Console.ForegroundColor = ConsoleColor.Yellow;
-                                            Console.WriteLine($"[EYE] ⚠️ Context 90%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 인수인계 준비하세요!");
-                                            Console.WriteLine($"[EYE] 인수인계 명령: wkappbot newchat \"인수인계 프롬프트\"");
+                                            Console.WriteLine($"[EYE] ⚠️ Context 90%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 인수인계 프롬프트 생성 중...");
                                             Console.ResetColor();
+
+                                            // Build handoff prompt from session + cards
+                                            var handoff = BuildHandoffPrompt(latest.FullName, _cachedCards, sizeMB, ContextLimitMB);
+                                            Console.WriteLine($"[EYE] Handoff prompt ({handoff.Length} chars):");
+                                            Console.WriteLine(handoff);
+
+                                            // ① Slack 알림
                                             Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                                $":warning: *컨텍스트 90%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 `wkappbot newchat` 명령으로 인수인계하라고 안내했습니다.",
+                                                $":warning: *컨텍스트 90%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 인수인계 프롬프트를 전달합니다.",
                                                 username: botUsername)).Wait(3000);
+
+                                            // ② Claude 프롬프트에 직접 입력 — 클롣이 newchat 실행하도록 유도
+                                            try
+                                            {
+                                                using var ctxHelper = new ClaudePromptHelper();
+                                                var pi = ctxHelper.FindPrompt();
+                                                if (pi != null)
+                                                {
+                                                    var nudge = $"⚠️ 컨텍스트 90% 도달! ({sizeMB:F1}/{ContextLimitMB}MB) 아래 명령을 실행해서 인수인계하세요:\n\nwkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
+                                                    ctxHelper.TypeAndSubmit(pi, nudge);
+                                                    Console.WriteLine("[EYE] ✅ Handoff nudge sent to Claude prompt");
+                                                }
+                                                else
+                                                {
+                                                    Console.WriteLine("[EYE] ⚠️ Claude prompt not found — nudge skipped, check Slack");
+                                                }
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                Console.WriteLine($"[EYE] ⚠️ Handoff nudge failed: {ex.Message}");
+                                            }
                                         }
                                     }
                                 }
@@ -950,11 +981,13 @@ internal partial class Program
         {
             promptPreview = ReadLatestOpenClawPromptPreview(promptDiag);
             _cachedPromptPreview = promptPreview;
+            _cachedPromptFileWriteUtc = promptDiag.FileWriteUtc; // cache mtime for kro sort
         }
         else
         {
             promptDiag.Source = "sessions-cache";
             promptDiag.CacheMs = 1;
+            promptDiag.FileWriteUtc = _cachedPromptFileWriteUtc; // restore cached mtime
         }
         swPrompt.Stop();
 
@@ -977,7 +1010,7 @@ internal partial class Program
         var cards = _cachedCards;
 
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
-        host.UpdateAccessibilityText(BuildEyeSummary(cards, latest, promptPreview));
+        host.UpdateAccessibilityText(BuildEyeSummary(cards, latest, promptPreview, promptDiag.FileWriteUtc));
 
         swTotal.Stop();
 
@@ -1031,8 +1064,19 @@ internal partial class Program
         // ── Fast path: FSW event-driven flags (instant, no I/O) ──
         bool tickDirty = _fswTickDirty;
         bool promptDirty = _fswPromptDirty;
+        var promptChangedFile = _fswPromptChangedFile;
         if (tickDirty) _fswTickDirty = false;    // consume flag
         if (promptDirty) _fswPromptDirty = false; // consume flag
+
+        // Filter: skip prompt dirty if the changed file isn't the one we're tracking
+        if (promptDirty && !string.IsNullOrEmpty(promptChangedFile) && !string.IsNullOrEmpty(_dirtyPromptFile))
+        {
+            var trackedName = Path.GetFileName(_dirtyPromptFile);
+            if (!string.Equals(promptChangedFile, trackedName, StringComparison.OrdinalIgnoreCase))
+            {
+                promptDirty = false; // irrelevant file change — skip
+            }
+        }
 
         // ── Slow path: FileInfo poll (only on 1s safety-net intervals) ──
         // Catches edge cases: FSW buffer overflow, network drives, watcher init failure
@@ -1129,9 +1173,9 @@ internal partial class Program
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
                     EnableRaisingEvents = true
                 };
-                _fswPrompt.Changed += (_, _) => _fswPromptDirty = true;
-                _fswPrompt.Created += (_, _) => _fswPromptDirty = true;
-                _fswPrompt.Renamed += (_, _) => _fswPromptDirty = true;
+                _fswPrompt.Changed += (_, e) => { _fswPromptChangedFile = e.Name; _fswPromptDirty = true; };
+                _fswPrompt.Created += (_, e) => { _fswPromptChangedFile = e.Name; _fswPromptDirty = true; };
+                _fswPrompt.Renamed += (_, e) => { _fswPromptChangedFile = e.Name; _fswPromptDirty = true; };
                 Console.WriteLine($"[EYE][FSW] Prompt watcher: {sessionsDir}/*.jsonl");
             }
         }
@@ -1213,7 +1257,7 @@ internal partial class Program
             Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
 
             // ── Build final card display (same as eye overlay) and print ──
-            var summary = BuildEyeSummary(cards, latest, prompt);
+            var summary = BuildEyeSummary(cards, latest, prompt, promptDiag.FileWriteUtc);
             Console.WriteLine($"[EYE_TICK] ── card display ──");
             foreach (var line in summary.Split('\n'))
                 Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
@@ -1547,7 +1591,7 @@ internal partial class Program
         }
     }
 
-    static string BuildEyeSummary(List<EyeParentCard> cards, EyeTick? latest, string prompt)
+    static string BuildEyeSummary(List<EyeParentCard> cards, EyeTick? latest, string prompt, DateTime kroFileWriteUtc = default)
     {
         var sb = new StringBuilder();
 
@@ -1557,23 +1601,17 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(act)) sb.AppendLine($"액션: {act}");
         if (!string.IsNullOrWhiteSpace(fallback)) sb.AppendLine($"폴백: {fallback}");
 
-        if (!string.IsNullOrWhiteSpace(prompt))
-        {
-            // Truncate to ~60 chars to keep overlay compact — cards must stay visible
-            var truncated = prompt.Length > 60 ? prompt[..60] + "..." : prompt;
-            sb.AppendLine($"최근 생각: {truncated}");
-        }
-
         // ── Build KRO section text (rendered inline with cards by recency) ──
-        // KRO timestamp = time when prompt CONTENT last changed (not file mtime, not eye tick time)
-        // File mtime can update without content change; eye tick is CLI's time, not KRO's.
+        // KRO sort time = session file mtime (= when kro last wrote to its session JSONL)
+        // CardCacheGetTimestamp had a bug: content varied due to whitespace → always UtcNow
+        // Now uses file mtime directly — more accurate indicator of kro activity
         string kroBlock = "";
         DateTime kroTsUtc = DateTime.MinValue;
         if (latest != null)
         {
-            // KRO timestamp from file-based card cache (content-change detection)
-            var kroContent = prompt ?? "";
-            kroTsUtc = CardCacheGetTimestamp("kro", kroContent);
+            // Use session file mtime — reflects actual kro write activity
+            kroTsUtc = kroFileWriteUtc != default ? kroFileWriteUtc
+                : CardCacheGetTimestamp("kro", prompt ?? ""); // fallback if mtime not passed
 
             var kroSb = new StringBuilder();
             // KRO's home is ~/.openclaw/, not the CLI command's CWD
@@ -1595,6 +1633,13 @@ internal partial class Program
 
             if (!string.IsNullOrWhiteSpace(block))
                 kroSb.AppendLine($"크로 이슈: {block}");
+
+            // 크로 생각: OpenClaw session의 최신 assistant/user 텍스트
+            if (!string.IsNullOrWhiteSpace(prompt))
+            {
+                var kroThought = prompt.Length > 120 ? prompt[..120] + "..." : prompt;
+                kroSb.AppendLine($"크로 생각: {kroThought}");
+            }
             kroBlock = kroSb.ToString().TrimEnd();
         }
 
@@ -1672,6 +1717,14 @@ internal partial class Program
                         sb.AppendLine($"클롣 작업: {c.LastTag}");
                         sb.AppendLine($"클롣 상태: {c.LastStatus} ({ageText})");
                     }
+                    // 클롣 생각: CWD별 Claude Code 세션에서 최신 assistant 텍스트
+                    var clotThought = ReadClotThoughtForCwd(c.Cwd);
+                    if (!string.IsNullOrWhiteSpace(clotThought))
+                    {
+                        var truncClot = clotThought.Length > 120 ? clotThought[..120] + "..." : clotThought;
+                        sb.AppendLine($"클롣 생각: {truncClot}");
+                    }
+                    // No else — skip "클롣 생각:" if no text found
                     sb.AppendLine("----");
                 }
                 else
@@ -1858,6 +1911,7 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(latestFile)) return "";
 
         var fi = new FileInfo(latestFile);
+        diag.FileWriteUtc = fi.LastWriteTimeUtc; // expose session file mtime for kro sort
         if (latestFile == _lastPromptSessionFile && fi.Length == _lastPromptSessionLength && fi.LastWriteTimeUtc == _lastPromptSessionWriteUtc)
         {
             diag.CacheMs = 1;
@@ -1937,6 +1991,80 @@ internal partial class Program
         return selected;
     }
 
+    /// <summary>
+    /// Read "클롣 생각" from Claude Code session JSONL for a specific CWD.
+    /// CWD → project dir name mapping: "W:\GitHub\WKAppBot" → "W--GitHub-WKAppBot"
+    /// Uses ReadTailLinesShared (FileShare.ReadWrite, no file lock) — reads only last 64KB.
+    /// Session files can be 35MB+ so tail-only reading is critical.
+    /// Per-CWD cache to avoid re-reading unchanged files.
+    /// </summary>
+    static readonly Dictionary<string, (string file, string preview, long len, DateTime mtime)> _clotThoughtCache = new();
+
+    static string ReadClotThoughtForCwd(string? cwd)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return "";
+        try
+        {
+            // CWD → project dir name: "W:\HTS_Project\..." → "w--HTS-Project-..."
+            // Claude Code mapping: ':' → '-', '\' → '-', '/' → '-', '_' → '-'
+            // Drive letter case varies (w-- or W--), Windows FS is case-insensitive so OK
+            var projName = cwd.Replace(':', '-').Replace('\\', '-').Replace('/', '-').Replace('_', '-');
+            var projDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects", projName);
+            if (!Directory.Exists(projDir)) return "";
+
+            // Find most recently modified .jsonl in this project
+            string? latestFile = null;
+            DateTime latestMtime = DateTime.MinValue;
+            foreach (var jsonl in Directory.GetFiles(projDir, "*.jsonl"))
+            {
+                var mtime = File.GetLastWriteTimeUtc(jsonl);
+                if (mtime > latestMtime) { latestMtime = mtime; latestFile = jsonl; }
+            }
+            if (latestFile == null) return "";
+
+            // Cache check per CWD
+            var fi = new FileInfo(latestFile);
+            if (_clotThoughtCache.TryGetValue(cwd, out var cached) &&
+                cached.file == latestFile && cached.len == fi.Length && cached.mtime == fi.LastWriteTimeUtc)
+                return cached.preview;
+
+            // Lightweight: 8KB first, 32KB fallback if needed
+            string selected = "";
+            foreach (var tailSize in new[] { 8 * 1024, 32 * 1024 })
+            {
+                var lines = ReadTailLinesShared(latestFile, tailSize);
+                string bestAssistant = "";
+                string bestUser = "";
+                for (int i = lines.Length - 1; i >= 0; i--)
+                {
+                    var line = lines[i];
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    if (!line.Contains("\"role\"", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    if (TryExtractRoleAndText(line, out var role, out var text))
+                    {
+                        text = NormalizePrompt(text);
+                        if (string.IsNullOrWhiteSpace(text)) continue;
+
+                        if (role == "assistant" && string.IsNullOrWhiteSpace(bestAssistant))
+                        {
+                            bestAssistant = text;
+                            break;
+                        }
+                        if (role == "user" && string.IsNullOrWhiteSpace(bestUser))
+                            bestUser = $"유저> {text}";
+                    }
+                }
+                selected = !string.IsNullOrWhiteSpace(bestAssistant) ? bestAssistant : bestUser;
+                if (!string.IsNullOrWhiteSpace(selected)) break;
+            }
+            _clotThoughtCache[cwd] = (latestFile, selected, fi.Length, fi.LastWriteTimeUtc);
+            return selected;
+        }
+        catch { return ""; }
+    }
+
     static bool TryExtractRoleAndText(string jsonLine, out string role, out string text)
     {
         role = "";
@@ -1950,6 +2078,7 @@ internal partial class Program
             role = roleEl.GetString() ?? "";
             if (!msg.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array) return false;
 
+            string? toolSummary = null; // fallback: tool_use abbreviated
             foreach (var c in content.EnumerateArray())
             {
                 if (c.TryGetProperty("type", out var typeEl))
@@ -1962,6 +2091,27 @@ internal partial class Program
                             text = txtEl.GetString() ?? "";
                             if (!string.IsNullOrWhiteSpace(text)) return true;
                         }
+                    }
+                    // tool_use → abbreviated summary: "Bash: wkappbot ..." / "Read: file.cs"
+                    if (type == "tool_use" && toolSummary == null && c.TryGetProperty("name", out var nameEl))
+                    {
+                        var toolName = nameEl.GetString() ?? "";
+                        var brief = "";
+                        if (c.TryGetProperty("input", out var inp) && inp.ValueKind == JsonValueKind.Object)
+                        {
+                            // Extract first useful field: command, file_path, pattern, etc.
+                            foreach (var prop in inp.EnumerateObject())
+                            {
+                                if (prop.Value.ValueKind == JsonValueKind.String)
+                                {
+                                    var v = prop.Value.GetString() ?? "";
+                                    if (v.Length > 60) v = v[..60] + "...";
+                                    brief = v;
+                                    break;
+                                }
+                            }
+                        }
+                        toolSummary = string.IsNullOrWhiteSpace(brief) ? $"🔧{toolName}" : $"🔧{toolName}: {brief}";
                     }
                 }
 
@@ -1983,20 +2133,29 @@ internal partial class Program
                     }
                 }
             }
+            // No text found — use tool_use summary as fallback
+            if (toolSummary != null) { text = toolSummary; return true; }
             return false;
         }
         catch { return false; }
     }
 
+    static readonly Regex _multiSpaceRx = new(@"\s{2,}", RegexOptions.Compiled);
+
     static string NormalizePrompt(string s)
     {
         if (string.IsNullOrWhiteSpace(s)) return "";
-        var t = s.Replace("\r", " ").Replace("\n", " ").Trim();
+        // Collapse all whitespace (newlines, tabs, consecutive spaces) → single space
+        var t = _multiSpaceRx.Replace(s, " ").Trim();
         if (t.Equals("NO_REPLY", StringComparison.OrdinalIgnoreCase)) return "";
         if (t.Contains("send ㄱㄱ", StringComparison.OrdinalIgnoreCase)) return "";
         if (t.Contains("telegram send ㄱㄱ", StringComparison.OrdinalIgnoreCase)) return "";
         if (t.Equals("ㄱㄱ", StringComparison.OrdinalIgnoreCase)) return "";
-        if (t.Length > 160) t = t[..160] + "...";
+        // Filter eye tick profiling / diagnostic noise from "생각" display
+        if (t.Contains("tick=") && t.Contains("ms(")) return "";
+        if (t.StartsWith("[EYE_TICK]", StringComparison.Ordinal)) return "";
+        if (t.StartsWith("[ACT]", StringComparison.Ordinal)) return "";
+        if (t.Length > 200) t = t[..200] + "...";
         return t;
     }
 
@@ -2450,6 +2609,57 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
 (auto-relay by AppBotEye context monitor)";
 
         return handoffPrompt;
+    }
+
+    /// <summary>Overload: includes active card data + plan files for richer handoff.</summary>
+    static string BuildHandoffPrompt(string jsonlPath, List<EyeParentCard> cards, double sizeMB, double limitMB)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("이전 세션이 컨텍스트 90%에 도달하여 자동 인수인계합니다.");
+        sb.AppendLine("CLAUDE.md와 MEMORY.md를 먼저 읽고 이어서 작업해주세요.");
+        sb.AppendLine();
+
+        // Active cards = what clots were working on
+        if (cards.Count > 0)
+        {
+            sb.AppendLine("## 활성 클롣 카드:");
+            foreach (var c in cards.Take(5))
+            {
+                var cwd = AbbreviateCwd(c.Cwd);
+                var info = !string.IsNullOrWhiteSpace(cwd) ? cwd : c.ParentName;
+                sb.AppendLine($"- [{info}] {c.LastTag}: {c.LastStatus}");
+            }
+            sb.AppendLine();
+        }
+
+        // Plan files
+        try
+        {
+            var plansDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".claude", "plans");
+            if (Directory.Exists(plansDir))
+            {
+                var recentPlan = Directory.GetFiles(plansDir, "*.md")
+                    .OrderByDescending(f => File.GetLastWriteTimeUtc(f))
+                    .FirstOrDefault();
+                if (recentPlan != null)
+                {
+                    var age = (DateTime.UtcNow - File.GetLastWriteTimeUtc(recentPlan)).TotalHours;
+                    if (age < 24)
+                        sb.AppendLine($"## 미완료 플랜: {Path.GetFileName(recentPlan)} ({age:F0}시간 전)");
+                }
+            }
+        }
+        catch { }
+
+        sb.AppendLine();
+        sb.AppendLine($"세션: {Path.GetFileName(jsonlPath)} ({sizeMB:F1}/{limitMB}MB)");
+        sb.AppendLine($"시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine();
+        sb.AppendLine("⚡ 중요: 채팅방 제목을 참신하고 재밌게 지어주세요! 매번 '인수인계'같은 뻔한 제목 금지!");
+        sb.AppendLine("슬랙으로 인수인계 완료 알림 보내주세요: wkappbot slack send '새 세션에서 이어갑니다 🔄'");
+
+        return sb.ToString().Trim();
     }
 
     /// <summary>

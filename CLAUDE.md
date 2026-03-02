@@ -19,21 +19,27 @@
 - **클롣 카드만 개선 가능**: 클롣(wkappbot CLI)의 카드 표시/포맷은 자유롭게 개선 OK
 - **CWD 약식 표시**: `W:\GitHub\WKAppBot` → `WG-WKAppBot`
 
-### EyeTick 운영 메모
-- `wkappbot eye tick`은 반드시 **one-shot 진단 명령** (글로벌 루프 진입 금지)
-- Eye 루프: FSW 하이브리드 (이벤트 기반 dirty-check + 1초 full-load 안전망)
-- 최근 생각 source: OpenClaw sessions jsonl (assistant 우선, user fallback)
-- 노이즈 필터: `NO_REPLY`, `send ㄱㄱ`, `telegram send ㄱㄱ`, `ㄱㄱ`
-- 계획 출력: `[KRO_PLAN_BEGIN]` ~ `[KRO_PLAN_END]` 블록
-- **EyeTick 슬랙 메시지 전달 (MUST!)**: conversations.history API → 새 메시지 → FindPrompt → TypeAndSubmit
+### EyeTick 사용법 & 운영 메모
+- **`wkappbot eye tick`**: one-shot 진단 명령 — 모든 활성 클롣/크로 상태를 즉시 조회
+  - 출력: 액션 트리플릿 + 카드별 상태/생각 + 크로 진행/완료/예정 + 슬랙 신규메시지
+  - `ctx=N%` 표시: 현재 세션 컨텍스트 사용량 (90%→경고, 95%→긴급)
+- **`wkappbot eye`**: 글로벌 루프 모드 — FSW 하이브리드 (이벤트 기반 dirty-check + 1초 안전망)
+  - AppBotEye = Slack 데몬 통합 → 별도 `slack listen` 불필요
+  - Eye 재시작 시 이전 idle 상태 메시지 자동 삭제 (Slack 스팸 방지)
+- **카드 시스템**: 크로 카드 (OpenClaw 서비스) + 클롣 카드 (Claude Code CLI, CWD별)
+  - 클롣 카드: 상태(대기/실행중) + 생각(세션 JSONL tail 추출) + CWD 약식명
+  - 크로 카드: 진행/완료/예정 + 생각(OpenClaw sessions JSONL)
+  - **클롣 생각 추출**: CWD → `~/.claude/projects/{projDir}/*.jsonl` → 최신 파일 tail 8-32KB → assistant 텍스트
+- **슬랙 연동**:
+  - EyeTick 슬랙 메시지 전달 (MUST!): conversations.history API → 새 메시지 → FindPrompt → TypeAndSubmit
   - `slack_last_ts.txt`로 위치 추적, 쓰레드 댓글 자동 조회
   - **슬랙 메시지를 받았으면 반드시 해당 쓰레드에 슬랙으로 응답할 것!**
   - "전달했습니다" ack → `slack reply` 시 자동 삭제
 - 경험 DB 노하우 방송: `[KNOWHOW:A11Y]` (프로필 경험) + `[KNOWHOW:OS]` (OS 경험) 분리 출력
 - A11Y 액션 실패 시 자동: snapshot + experience 저장 (0~9 ring)
-- **컨텍스트 모니터**: eye tick에 `ctx=N%` 표시. 90%→경고+Slack, 95%→긴급경고+Slack
+- 노이즈 필터: `NO_REPLY`, `send ㄱㄱ`, `telegram send ㄱㄱ`, `ㄱㄱ`
+- 계획 출력: `[KRO_PLAN_BEGIN]` ~ `[KRO_PLAN_END]` 블록
 - **인수인계**: `wkappbot newchat "프롬프트"` 명령으로 새채팅 열고 프롬프트 전달 (focusless)
-- **Eye 재시작 시 이전 idle 상태 메시지 자동 삭제** (Slack 채널 스팸 방지)
 
 ### Slack + 프롬프트 전달
 - Slack 수신 메시지는 **항상** Claude 프롬프트에 전달 (옵션 없음)
@@ -141,7 +147,8 @@ wkappbot zoom-demo <grap> [text]
 wkappbot web <subcommand> [options]           # CDP 웹 자동화 (open/navigate/click/type/eval/screenshot/...)
 wkappbot slack <subcommand>                   # send/reply/upload/screenshot/test/listen/catch-up
 wkappbot knowhow <subcommand>                # write/read (Win32+Web 노하우)
-wkappbot eye [--port N] [--interval N]        # AppBotEye (Slack+Prompt 항상 ON)
+wkappbot eye [--port N] [--interval N]        # AppBotEye 글로벌 루프 (Slack+Prompt 항상 ON)
+wkappbot eye tick                             # one-shot: 모든 클롣/크로 카드 상태+생각 즉시 조회
 wkappbot newchat "prompt" [--file f.txt]      # Claude Desktop 새채팅 열고 프롬프트 입력 (focusless)
 wkappbot schedule <subcommand>                # add/list/remove/clear (예약 프롬프트)
 wkappbot logcat <fileFilter> <messageFilter>  # 실시간 로그 추적
@@ -220,6 +227,23 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
 ### Phase 13: 키움 OpenAPI+ — Phase A 완료, Phase B/C 미구현
 - 아키텍처: `[앱봇 64비트] ←Named Pipe→ [프록시봇 32비트] ←COM→ [키움 OpenAPI+]`
 - 키움 COM: 58 methods + 9 events (TypeLib 분석 완료 → `C:\OpenAPI\khopenapi_typelib.md`)
+
+### 완료: EyeTick 크로/클롣 생각 분리 (2026-03-02)
+- "최근 생각" → "크로 생각:" 크로 카드 내부로 이동
+- "클롣 생각:" 추가: CWD별 Claude Code JSONL → 점진적 tail 읽기 (8KB→32KB) → 최신 assistant 텍스트
+- CWD→projDir 매핑: `Replace(':','-').Replace('\\','-').Replace('_','-')`
+
+### 실패 액션 기록 정책 (knowhow-failed-actions.md)
+- **A11Y 실패** → A11Y 경로에 기록 (`profiles/{name}_exp/form_{id}/knowhow-failed-actions.md`)
+- **OS 실패** → OS 경로에 기록 (`experience/{process}/{class}/knowhow-failed-actions.md`)
+- 각 경로에서 inspect 시 `[KNOWHOW:A11Y]` / `[KNOWHOW:OS]` 태그로 파일명만 방송
+- 폴더 경로는 이미 `[A11Y]` / `[OS]` 줄로 공유되므로 파일명만 표시하면 충분
+
+### TODO: 방해꾼(DialogHandler) 감지 누락 이슈
+- **문제**: 포커스 입력(SendInput) 시도 중 팝업("#32770 선택영역을 확인하십시요")이 떴는데 방해꾼으로 자동 감지되지 않음
+- **원인 추정**: cond-add 명령의 입력 루프에서 PatrolWaitLoop/DialogHandlerManager 체크가 빠져있거나, EnsureFocus 단계에서만 방해꾼 체크가 돌아가고 PostMessage/UIA Invoke 경로에는 체크가 없음
+- **해야 할 것**: 포커스 입력을 시도할 때 방해꾼 체크가 입력확보 단계에서 돌아가도록 구조 개선. 특히 UIA Invoke 실패 후 팝업 감지 → 자동 dismiss → 재시도 패턴 필요
+- **우선순위**: 나중에 볼 것 (2026-03-02 기록)
 
 ## 배포 구조
 ```

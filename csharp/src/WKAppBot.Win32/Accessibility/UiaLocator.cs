@@ -227,6 +227,23 @@ public sealed class UiaLocator : IDisposable
             }
         }
         catch { /* not supported */ }
+
+        // Fallback: LegacyIAccessible DoDefaultAction — needed for Electron Hyperlinks
+        // where Patterns.Invoke.IsSupported throws COM exception.
+        try
+        {
+            var legacy = element.Patterns.LegacyIAccessible;
+            if (legacy.IsSupported)
+            {
+                var defAction = legacy.Pattern.DefaultAction.ValueOrDefault;
+                if (!string.IsNullOrEmpty(defAction))
+                {
+                    legacy.Pattern.DoDefaultAction();
+                    return true;
+                }
+            }
+        }
+        catch { /* LegacyIA also not available */ }
         return false;
     }
 

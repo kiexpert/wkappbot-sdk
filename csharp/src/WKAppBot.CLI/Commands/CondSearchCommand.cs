@@ -46,7 +46,8 @@ internal partial class Program
             Console.WriteLine("  --save <name>     Save condition with name");
             Console.WriteLine("  --select <A-Z>    Select condition row (PostMessage click)");
             Console.WriteLine("  --modify          Click 수정 button (UIA Invoke, focusless)");
-            Console.WriteLine("  --delete          Delete selected condition row (X button, focusless)");
+            Console.WriteLine("  --delete          Delete last letter from formula (focusless)");
+            Console.WriteLine("  --del-row <A-Z>   Delete condition row by clicking 삭제 X button");
             Console.WriteLine("  --list            Show current condition items via OCR");
             Console.WriteLine("  --dry-run         Just search, don't double-click");
             Console.WriteLine("  --force-focusless Block all focus-stealing ops (error if needed)");
@@ -57,6 +58,7 @@ internal partial class Program
         var formula = GetArgValue(args, "--formula");
         var saveName = GetArgValue(args, "--save");
         var selectRow = GetArgValue(args, "--select");
+        var delRow = GetArgValue(args, "--del-row");
         var dryRun = args.Contains("--dry-run");
         var doRun = args.Contains("--run");
         var doModify = args.Contains("--modify");
@@ -119,11 +121,15 @@ internal partial class Program
         if (selectRow != null)
             return CondSelectRow(form, selectRow.ToUpper());
 
+        // --del-row: click 삭제 X button on specific row (physical click, needs foreground!)
+        if (delRow != null)
+            return CondDeleteRow(form, delRow.ToUpper(), mainHwnd);
+
         // --modify: click 수정 button
         if (doModify)
             return CondClickModify(form);
 
-        // --delete: click X button to delete selected condition
+        // --delete: delete last letter from formula text
         if (doDelete)
             return CondClickDelete(form);
 
@@ -1012,6 +1018,34 @@ internal partial class Program
         return 0;
     }
 
+    /// <summary>
+    /// Delete condition row from the owner-drawn table (aid=4015).
+    /// STATUS: UNSOLVED — see knowhow.md "[2026-03-02] 조건 행 삭제 (del-row)"
+    ///
+    /// All tested strategies failed:
+    ///   1. PostMessage WM_LBUTTONDOWN at 삭제 column (X=440~480) — row selects but X button doesn't trigger
+    ///   2. UIA Invoke aid=4022 (toolbar X) — requires formula text selection, not table row
+    ///   3. PostMessage VK_DELETE key — no effect
+    ///   4. SendInput ABSOLUTE + MOUSEEVENTF_MOVE — cursor lands correctly but X button doesn't respond
+    ///
+    /// Potential future approaches:
+    ///   A. Edit formula text directly via EM_SETSEL/EM_REPLACESEL (CondClickDelete pattern)
+    ///   B. Rebuild condition from scratch (새로작성 + re-add needed items)
+    ///   C. Spy++ reverse-engineering of actual X button click message sequence
+    /// </summary>
+    static int CondDeleteRow(AutomationElement form, string rowLabel, IntPtr mainHwnd)
+    {
+        if (rowLabel.Length != 1 || rowLabel[0] < 'A' || rowLabel[0] > 'Z')
+            return Error($"Invalid row label: {rowLabel}. Use A, B, C, ..., Z");
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[del-row] Not yet implemented — owner-drawn X button doesn't respond to PostMessage/SendInput.");
+        Console.WriteLine($"  See: knowhow.md \"[2026-03-02] 조건 행 삭제 (del-row)\"");
+        Console.WriteLine($"  Workaround: use formula text editing (EM_SETSEL + EM_REPLACESEL) or manual deletion.");
+        Console.ResetColor();
+        return 1;
+    }
+
     /// <summary>Click 수정 button (aid=4046) via UIA Invoke — focusless!</summary>
     static int CondClickModify(AutomationElement form)
     {
@@ -1222,6 +1256,11 @@ internal partial class Program
         if (bmp == null) return Error("PrintWindow capture failed");
 
         Console.WriteLine($"Captured: {bmp.Width}x{bmp.Height}");
+
+        // Save bitmap for visual inspection
+        var savePath = Path.Combine(Environment.GetEnvironmentVariable("USERPROFILE") ?? ".", "cond_table_raw.png");
+        bmp.Save(savePath, System.Drawing.Imaging.ImageFormat.Png);
+        Console.WriteLine($"Saved: {savePath}");
 
         // OCR
         var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
