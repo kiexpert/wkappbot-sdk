@@ -74,6 +74,13 @@ internal partial class Program
             var command = args[0].ToLowerInvariant();
             var restArgs = args.Skip(1).ToArray();
 
+            // Global option: disable zoom overlay — intentionally obnoxious name to discourage use
+            if (restArgs.Any(a => a == "--i-dont-want-to-see-the-magnifier-overlay"))
+            {
+                ActionApi.ZoomEnabled = false;
+                restArgs = restArgs.Where(a => a != "--i-dont-want-to-see-the-magnifier-overlay").ToArray();
+            }
+
             // Global Eye tick (for eye --global multi-parent monitor)
             try { EmitEyeTick(command, cmdTag, "start"); } catch { }
             try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }

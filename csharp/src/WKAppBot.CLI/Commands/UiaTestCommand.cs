@@ -136,16 +136,10 @@ internal partial class Program
                 {
                     if (comDead) break;
                     var aid = btn.Properties.AutomationId.ValueOrDefault ?? "?";
-                    var btnRect = btn.BoundingRectangle;
-                    var drawRect = new System.Drawing.Rectangle(
-                        (int)btnRect.X, (int)btnRect.Y, (int)btnRect.Width, (int)btnRect.Height);
-                    using var zoom = ClickZoomHelper.BeginFromRect(drawRect, mainHwnd,
-                        "invoke", $"btn[{aid}]");
                     Test($"Invoke btn[{aid}]", () =>
                     {
-                        var ok = UiaLocator.TryInvoke(btn);
+                        var ok = ActionApi.Invoke(btn, mainHwnd, $"btn[{aid}]");
                         if (!ok) throw new Exception("TryInvoke returned false");
-                        zoom?.ShowPass("focusless invoke");
                         return "focusless=true";
                     });
                     Thread.Sleep(400);
@@ -186,27 +180,13 @@ internal partial class Program
                     if (comDead) break;
                     if (ti.Name == origName) continue;
 
-                    // [ZOOM] Tab select zoom — show which tab is being switched
-                    ClickZoomHelper? tabZoom = null;
-                    try
-                    {
-                        var tiRect = ti.BoundingRectangle;
-                        var drawRect = new System.Drawing.Rectangle(
-                            (int)tiRect.X, (int)tiRect.Y, (int)tiRect.Width, (int)tiRect.Height);
-                        tabZoom = ClickZoomHelper.BeginFromRect(drawRect, mainHwnd,
-                            "select", $"Tab '{ti.Name}'");
-                    }
-                    catch { /* zoom is non-critical */ }
-
                     Test($"Tab[{tabAid}] '{ti.Name}'", () =>
                     {
-                        var ok = UiaLocator.TrySelect(ti);
+                        var ok = ActionApi.Select(ti, mainHwnd, $"Tab '{ti.Name}'");
                         if (!ok) throw new Exception("TrySelect returned false");
                         Thread.Sleep(300);
-                        tabZoom?.ShowPass($"Tab '{ti.Name}' selected");
                         return "focusless=true";
                     });
-                    tabZoom?.Dispose();
                 }
 
                 // Restore
@@ -368,24 +348,8 @@ internal partial class Program
             foreach (var (t, n) in candidates.Take(10)) Console.WriteLine($"  [{t}] \"{n}\"");
             return 1;
         }
-        // [ZOOM] Quick invoke with zoom overlay
-        ClickZoomHelper? zoom = null;
-        try
-        {
-            var btnRect = btn.BoundingRectangle;
-            var drawRect = new System.Drawing.Rectangle(
-                (int)btnRect.X, (int)btnRect.Y, (int)btnRect.Width, (int)btnRect.Height);
-            zoom = ClickZoomHelper.BeginFromRect(drawRect, hwnd, "invoke", target);
-        }
-        catch { /* zoom is non-critical */ }
-
-        var ok = UiaLocator.TryInvoke(btn);
-        if (ok)
-            zoom?.ShowPass($"Invoked '{btn.Properties.Name.ValueOrDefault}'");
-        else
-            zoom?.ShowFail("TryInvoke false");
-        zoom?.Dispose();
-
+        // Invoke with auto-zoom via ActionApi
+        var ok = ActionApi.Invoke(btn, hwnd, target);
         Console.WriteLine(ok ? $"[PASS] Invoked '{btn.Properties.Name.ValueOrDefault}' (focusless!)" : $"[FAIL] TryInvoke false");
         return ok ? 0 : 1;
     }

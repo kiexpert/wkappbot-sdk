@@ -197,14 +197,14 @@ internal partial class Program
         var wasSel = UiaLocator.IsSelected(tabItem);
         Console.WriteLine($"  Before: IsSelected={wasSel}");
 
-        // Try SelectionItem.Select() — focusless!
-        var selected = UiaLocator.TrySelect(tabItem);
+        // Try SelectionItem.Select() — focusless! (with auto-zoom via ActionApi)
+        var selected = ActionApi.Select(tabItem, mainHwnd, $"[{index}] {name}");
         Console.WriteLine($"  SelectionItem.Select(): {selected} (focusless!)");
 
         if (!selected)
         {
-            // Fallback: try Invoke if available
-            var invoked = UiaLocator.TryInvoke(tabItem);
+            // Fallback: try Invoke if available (also with zoom)
+            var invoked = ActionApi.Invoke(tabItem, mainHwnd, $"[{index}] {name}");
             Console.WriteLine($"  Invoke fallback: {invoked}");
         }
 
@@ -213,34 +213,14 @@ internal partial class Program
         var nowSel = UiaLocator.IsSelected(tabItem);
         Console.WriteLine($"  After: IsSelected={nowSel}");
 
-        // Zoom overlay: show TabItem AFTER selection (MFC tabs may have 0x0 bounds before selection)
-        ClickZoomHelper? zoom = null;
-        try
-        {
-            var itemRect = tabItem.BoundingRectangle;
-            var zoomRect = (itemRect.Width > 0 && itemRect.Height > 0)
-                ? new System.Drawing.Rectangle(itemRect.X, itemRect.Y, itemRect.Width, itemRect.Height)
-                : tabCtrlRect; // fallback to tab control rect
-            zoom = ClickZoomHelper.BeginFromRect(zoomRect, mainHwnd,
-                "tab_select", $"[{index}] {name}");
-        }
-        catch { }
-
         if (nowSel == true)
         {
             Console.WriteLine($"  ✓ Tab \"{name}\" selected successfully!");
-            zoom?.ShowPass($"Tab \"{name}\" OK");
-            zoom?.Dispose();
             return 0;
         }
         else
         {
             Console.WriteLine($"  ✗ Tab selection may have failed (IsSelected={nowSel})");
-            if (selected)
-                zoom?.ShowPass($"Select() OK (verify={nowSel})");
-            else
-                zoom?.ShowFail($"Select failed");
-            zoom?.Dispose();
             return selected ? 0 : 1; // return success if Select() succeeded even if IsSelected is unclear
         }
     }
