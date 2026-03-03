@@ -124,10 +124,21 @@ Options:
             Console.Out.Flush();
 
             InputReadiness.PrintReport(report);
+
+            swTotal.Stop();
+            Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
+            Console.Out.Flush();
+
+            // 돋보기에 결과 표시 — BeginFadeOut이 포그라운드 스레드로 승격하므로
+            // 메인 스레드 종료 후에도 돋보기가 자동 페이드아웃까지 살아남음 (유령 돋보기)
+            if (report.Zoom != null)
+            {
+                var verdict = report.Ready ? "READY" : "NOT READY";
+                var best = report.Methods.FirstOrDefault(m => m.Available);
+                report.Zoom.ShowPass($"{verdict}: {best?.Name ?? "none"}");
+            }
         }
 
-        Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
-        Console.Out.Flush();
         return 0;
     }
 }
