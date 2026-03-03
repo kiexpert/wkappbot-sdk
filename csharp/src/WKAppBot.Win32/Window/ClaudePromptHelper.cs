@@ -37,11 +37,12 @@ public sealed class ClaudePromptHelper : IDisposable
 
     /// <summary>
     /// Global toggle: when true, only focusless strategies are allowed.
-    /// Focus-stealing fallbacks are blocked and return false instead.
-    /// Toggle at runtime to guarantee no foreground window disruption
-    /// (e.g., during AppBotEye monitoring). Static = affects ALL instances.
+    /// When true, allows focus-stealing as a fallback after focusless input fails.
+    /// Default = false → pure focusless mode (all focus-stealing paths blocked).
+    /// Set true for critical actions like handoff nudges where delivery matters.
+    /// Focus-stealing goes through normal InputReadiness path (overlay + sound + zoom).
     /// </summary>
-    public static bool ForceFocusless { get; set; }
+    public static bool AllowFocusSteal { get; set; }
 
     public ClaudePromptHelper()
     {
@@ -161,6 +162,119 @@ public sealed class ClaudePromptHelper : IDisposable
 
         Console.WriteLine("  [PROMPT] ALL strategies exhausted — no prompt found");
         return null;
+    }
+
+    /// <summary>
+    /// Find the Claude Code prompt for a SPECIFIC project CWD.
+    /// Matches VS Code by window title, Claude Desktop by UIA text content.
+    /// Returns null if no matching prompt found (caller should fall back to Slack).
+    /// </summary>
+    public PromptInfo? FindPromptForCwd(string targetCwd)
+    {
+        var cwdFolder = Path.GetFileName(targetCwd); // e.g., "WKAppBot"
+        if (string.IsNullOrEmpty(cwdFolder)) return null;
+        Console.WriteLine($"  [PROMPT-CWD] Searching for prompt matching CWD: {targetCwd} (key: {cwdFolder})");
+
+        var allWindows = new List<(IntPtr hWnd, string title, string procName)>();
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            var cls = WindowFinder.GetClassName(hWnd);
+            if (cls == "Chrome_WidgetWin_1")
+            {
+                var title = WindowFinder.GetWindowText(hWnd);
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                string procName = "?";
+                try { procName = Process.GetProcessById((int)pid).ProcessName; } catch { }
+                allWindows.Add((hWnd, title, procName));
+            }
+            return true;
+        }, IntPtr.Zero);
+
+        // Priority 1: VS Code — match by window title containing folder name
+        foreach (var (hWnd, title, procName) in allWindows)
+        {
+            if (!procName.Equals("Code", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!title.Contains(cwdFolder, StringComparison.OrdinalIgnoreCase)) continue;
+            Console.WriteLine($"  [PROMPT-CWD] VS Code title match: \"{title}\"");
+            var pi = FindTurnFormInWindow(hWnd, title, procName);
+            if (pi != null) return pi;
+        }
+
+        // Priority 2: Claude Desktop — search UIA for CWD text at bottom bar
+        foreach (var (hWnd, title, procName) in allWindows)
+        {
+            if (!procName.Equals("claude", StringComparison.OrdinalIgnoreCase)) continue;
+            Console.WriteLine($"  [PROMPT-CWD] Checking Claude Desktop window: \"{title}\"");
+            try
+            {
+                var root = _automation.FromHandle(hWnd);
+                if (root == null) continue;
+                // Search for any element (Button/Text) whose Name matches the CWD path
+                // Claude Desktop Code tab shows CWD as a Button at the bottom bar
+                var allElements = root.FindAllDescendants();
+                bool cwdFound = false;
+                foreach (var el in allElements)
+                {
+                    try
+                    {
+                        var name = el.Name;
+                        if (string.IsNullOrEmpty(name) || name.Length > 500) continue;
+                        if (name.Equals(targetCwd, StringComparison.OrdinalIgnoreCase)
+                            || name.EndsWith("\\" + cwdFolder, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Console.WriteLine($"  [PROMPT-CWD] CWD element found in Claude Desktop: [{el.ControlType}] \"{name}\"");
+                            cwdFound = true;
+                            break;
+                        }
+                    }
+                    catch { }
+                }
+                if (!cwdFound) continue;
+                var pi = FindTurnFormInWindow(hWnd, title, procName);
+                if (pi != null) return pi;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [PROMPT-CWD] Claude Desktop UIA error: {ex.Message}");
+            }
+        }
+
+        Console.WriteLine($"  [PROMPT-CWD] No matching prompt found for CWD: {targetCwd}");
+        return null;
+    }
+
+    /// <summary>
+    /// Find turn-form prompt input in a specific window handle.
+    /// Shared helper for FindPrompt and FindPromptForCwd.
+    /// </summary>
+    private PromptInfo? FindTurnFormInWindow(IntPtr hWnd, string title, string procName)
+    {
+        try
+        {
+            var root = _automation.FromHandle(hWnd);
+            if (root == null) return null;
+            var turnForm = root.FindFirstDescendant(
+                new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+            if (turnForm == null) return null;
+
+            var inputGroup = turnForm.FindFirstChild(
+                new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Group));
+            if (inputGroup == null)
+            {
+                var children = turnForm.FindAllChildren();
+                inputGroup = children.FirstOrDefault(c =>
+                    c.ControlType == ControlType.Group && c.BoundingRectangle.Width > 100);
+            }
+            if (inputGroup == null) return null;
+
+            var rect = inputGroup.BoundingRectangle;
+            var hostType = procName.Equals("claude", StringComparison.OrdinalIgnoreCase) ? "claude-desktop" : "vscode";
+            Console.WriteLine($"  [PROMPT-CWD] turn-form found in \"{title}\" ({hostType})");
+            return new PromptInfo(hWnd, title, procName,
+                new Rectangle(rect.X, rect.Y, rect.Width, rect.Height), hostType);
+        }
+        catch { return null; }
     }
 
     /// <summary>
@@ -404,9 +518,9 @@ public sealed class ClaudePromptHelper : IDisposable
             return true;
 
         // === Strategy 2: Focus-stealing with auto-restore (minimal disruption) ===
-        if (ForceFocusless)
+        if (!AllowFocusSteal)
         {
-            Console.WriteLine("  [PROMPT] ForceFocusless: focusless input failed, refusing to steal focus");
+            Console.WriteLine("  [PROMPT] Focusless-only mode: focusless input failed, focus steal not allowed");
             return false;
         }
         var prevForeground = NativeMethods.GetForegroundWindow();
@@ -593,9 +707,9 @@ public sealed class ClaudePromptHelper : IDisposable
         // === Strategy 4: brief focus + nudge React + Enter ===
         // put_accValue sets DOM text but React may not see it (no input event fired).
         // Brief focus + Space+Backspace triggers React's onChange, then Enter submits.
-        if (ForceFocusless)
+        if (!AllowFocusSteal)
         {
-            Console.WriteLine("  [PROMPT] ForceFocusless: focusless submit failed, refusing to steal focus");
+            Console.WriteLine("  [PROMPT] Focusless-only mode: focusless submit failed, focus steal not allowed");
             return false;
         }
         Console.WriteLine("  [PROMPT] Focusless strategies exhausted, trying brief focus + React nudge...");
