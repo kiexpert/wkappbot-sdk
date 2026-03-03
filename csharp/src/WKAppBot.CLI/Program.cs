@@ -152,6 +152,7 @@ internal partial class Program
                 "tick" => TickCommand(restArgs),
                 "newchat" => NewChatCommand(restArgs),
                 "prompt-test" => PromptTestCommand(restArgs),
+                "readiness" => ReadinessCommand(restArgs),
                 "msaa-probe" => MsaaProbeCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),

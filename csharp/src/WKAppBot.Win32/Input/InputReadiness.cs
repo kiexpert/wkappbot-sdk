@@ -233,7 +233,12 @@ public sealed class InputReadiness
 
     public InputReadinessReport Probe(InputReadinessRequest req)
     {
+        var swProbe = Stopwatch.StartNew();
+        long msInit = 0, msElevation = 0, msZoom = 0, msUia = 0, msWin32 = 0, msSendInput = 0;
+        long msBlocker = 0, msKnowhow = 0, msYield = 0;
+
         // MainHwnd 자동 유도: GetAncestor(GA_ROOT) → 진짜 최상위 윈도우로 방해꾼 감지 스코프 확장
+        var swStep = Stopwatch.StartNew();
         var mainHwnd = req.MainHwnd != IntPtr.Zero
             ? req.MainHwnd
             : NativeMethods.GetAncestor(req.TargetHwnd, NativeMethods.GA_ROOT);
@@ -272,15 +277,16 @@ public sealed class InputReadiness
         bool weAreElevated = NativeMethods.IsCurrentProcessElevated();
         bool targetElevated = NativeMethods.IsProcessElevated(targetPid) ?? true;
         bool elevationMismatch = targetElevated && !weAreElevated;
+        swStep.Stop();
+        msInit = swStep.ElapsedMilliseconds;
 
         // ── 권한 상승 요청 (UIPI 차단 방지) ──
         if (elevationMismatch && ElevationRequester != null && !req.QuickMode)
         {
+            swStep.Restart();
             zoom?.UpdateStatus("관리자 권한 필요 — UAC 요청 중...");
             if (ElevationRequester.RequestElevation(procName, targetPid))
             {
-                // 재시작됨 — 여기 도달 안 함 (Environment.Exit)
-                // 방어적으로 빈 리포트 반환
                 return new InputReadinessReport
                 {
                     TargetHwnd = req.TargetHwnd, TargetClass = targetClass,
@@ -290,7 +296,8 @@ public sealed class InputReadiness
                     FormEnabled = formEnabled, FormIconic = formIconic,
                 };
             }
-            // UAC 거부됨 → 포커스리스 메서드만 사용, 계속 진행
+            swStep.Stop();
+            msElevation = swStep.ElapsedMilliseconds;
         }
 
         // ── 유저 입력 간섭 분석 ──
@@ -300,6 +307,7 @@ public sealed class InputReadiness
         // ── 돋보기 (QuickMode가 아닐 때만) ──
         if (!req.QuickMode && !req.SkipZoom && ZoomFactory != null)
         {
+            swStep.Restart();
             try
             {
                 var rect = GetTargetRect(req.TargetHwnd, req.UiaElement);
@@ -312,28 +320,45 @@ public sealed class InputReadiness
                 }
             }
             catch { }
+            swStep.Stop();
+            msZoom = swStep.ElapsedMilliseconds;
         }
 
         if (!req.QuickMode)
         {
             // ── 1. UIA 패턴 전수조사 (focusless) ──
+            swStep.Restart();
             if (req.UiaElement != null)
                 ProbeUiaPatterns(req.UiaElement, req.IntendedAction, methods);
+            swStep.Stop();
+            msUia = swStep.ElapsedMilliseconds;
 
             // ── 2. Win32 메시지 (focusless) ──
+            swStep.Restart();
             ProbeWin32Messages(targetClass, methods);
+            swStep.Stop();
+            msWin32 = swStep.ElapsedMilliseconds;
 
             // ── 3. SendInput (focus-needed) ──
+            swStep.Restart();
             ProbeSendInput(targetElevated, weAreElevated, methods);
+            swStep.Stop();
+            msSendInput = swStep.ElapsedMilliseconds;
         }
 
         // ── 방해꾼 감지 ──
+        swStep.Restart();
         if (!req.SkipBlockerCheck)
             blocker = DetectBlocker(mainHwnd);
+        swStep.Stop();
+        msBlocker = swStep.ElapsedMilliseconds;
 
         // ── 노하우 방송 ──
+        swStep.Restart();
         if (!req.SkipKnowhow && !req.QuickMode)
             KnowhowBroadcaster?.Broadcast(mainHwnd, req.FormId, req.ControlId, req.IntendedAction);
+        swStep.Stop();
+        msKnowhow = swStep.ElapsedMilliseconds;
 
         // ── 유저 입력 간섭 대기 ──
         bool yieldRequested = false;
@@ -372,9 +397,13 @@ public sealed class InputReadiness
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine($"  [READINESS] {reason} — showing yield overlay ({yieldTimeout}s)...");
                 Console.ResetColor();
+                Console.Out.Flush();
 
+                swStep.Restart();
                 var yieldResult = UserInputWait.WaitForUserYield(mainHwnd, idleMs, yieldTimeout,
                     positionHwnd: req.TargetHwnd);
+                swStep.Stop();
+                msYield = swStep.ElapsedMilliseconds;
                 yieldConfirmed = yieldResult.Approved;
                 yieldFocusAcquired = yieldResult.FocusAcquired;
 
@@ -394,6 +423,11 @@ public sealed class InputReadiness
                 }
             }
         }
+
+        // ── 프로파일링 출력 ──
+        swProbe.Stop();
+        Console.WriteLine($"  [PROF:PROBE] init={msInit}ms zoom={msZoom}ms uia={msUia}ms win32={msWin32}ms send={msSendInput}ms blocker={msBlocker}ms knowhow={msKnowhow}ms yield={msYield}ms TOTAL={swProbe.ElapsedMilliseconds}ms");
+        Console.Out.Flush();
 
         // ── 돋보기 상태 업데이트 ──
         if (zoom != null)

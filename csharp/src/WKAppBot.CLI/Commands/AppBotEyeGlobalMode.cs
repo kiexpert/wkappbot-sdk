@@ -1207,14 +1207,36 @@ internal partial class Program
             if (_lastTickActivityUtc == DateTime.MinValue) _lastTickActivityUtc = DateTime.UtcNow;
             if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
             var swTotal = Stopwatch.StartNew();
+
+            // ── Phase 1: ReadLatestTick ──
+            var swPhase = Stopwatch.StartNew();
             long tickRead = 0, tickParse = 0;
             var latest = ReadLatestTick(out tickRead, out tickParse);
+            swPhase.Stop();
+            var msReadTick = swPhase.ElapsedMilliseconds;
+            Console.WriteLine($"[PROF] ReadLatestTick={msReadTick}ms (read={tickRead}ms,parse={tickParse}ms)");
+            Console.Out.Flush();
+
+            // ── Phase 2: ReadLatestOpenClawPromptPreview ──
+            swPhase.Restart();
             var promptDiag = new PromptDiag();
             var prompt = ReadLatestOpenClawPromptPreview(promptDiag);
+            swPhase.Stop();
+            var msPrompt = swPhase.ElapsedMilliseconds;
+            Console.WriteLine($"[PROF] PromptPreview={msPrompt}ms (stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms)");
+            Console.Out.Flush();
+
+            // ── Phase 3: ReadEyeCards ──
+            swPhase.Restart();
             var cards = ReadEyeCards(staleSeconds: 86400); // 24 hours
+            swPhase.Stop();
+            var msCards = swPhase.ElapsedMilliseconds;
+            Console.WriteLine($"[PROF] ReadEyeCards={msCards}ms (count={cards.Count})");
+            Console.Out.Flush();
             _lastPromptSource = promptDiag.Source;
 
-            // Quick context % check for one-shot tick display
+            // ── Phase 4: Context % check ──
+            swPhase.Restart();
             try
             {
                 var cpDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects");
@@ -1233,17 +1255,37 @@ internal partial class Program
                 }
             }
             catch { }
+            swPhase.Stop();
+            var msCtx = swPhase.ElapsedMilliseconds;
+            Console.WriteLine($"[PROF] ContextPct={msCtx}ms (ctx={_lastContextPct}%)");
+            Console.Out.Flush();
 
+            // ── Phase 5: ExtractRecentPlanItems ──
+            swPhase.Restart();
+            var plans = ExtractRecentPlanItems(maxItems: 3);
+            swPhase.Stop();
+            var msPlans = swPhase.ElapsedMilliseconds;
+            Console.WriteLine($"[PROF] PlanItems={msPlans}ms (count={plans.Count})");
+            Console.Out.Flush();
+
+            // ── Phase 6: BuildEyeSummary ──
+            swPhase.Restart();
+            var summary = BuildEyeSummary(cards, latest, prompt, promptDiag.FileWriteUtc);
+            swPhase.Stop();
+            var msSummary = swPhase.ElapsedMilliseconds;
+            Console.WriteLine($"[PROF] BuildSummary={msSummary}ms");
+            Console.Out.Flush();
+
+            // ── Print results ──
             var ctxInfo = _lastContextPct >= 0 ? $" ctx={_lastContextPct}%" : "";
             Console.WriteLine("[EYE] one-shot tick");
-            Console.WriteLine($"[EYE_TICK] tick={tickRead + tickParse}ms(read={tickRead}ms,parse={tickParse}ms,activity=0ms) " +
-                              $"prompt={promptDiag.StatMs + promptDiag.ReadMs + promptDiag.ScanMs + promptDiag.ParseMs + promptDiag.NormMs + promptDiag.CacheMs}ms(stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms) schedule=0ms total={swTotal.ElapsedMilliseconds}ms{ctxInfo}");
+            Console.WriteLine($"[EYE_TICK] tick={msReadTick}ms prompt={msPrompt}ms cards={msCards}ms ctx={msCtx}ms plans={msPlans}ms summary={msSummary}ms total={swTotal.ElapsedMilliseconds}ms{ctxInfo}");
+            Console.Out.Flush();
             Console.WriteLine($"[EYE_TICK] hint promptLine={_lastPromptLineIndex} tickLine={_lastEyeTickLineIndex}");
             Console.WriteLine($"[EYE_TICK] cards={cards.Count} promptSource={promptDiag.Source}");
             if (!string.IsNullOrWhiteSpace(prompt))
                 Console.WriteLine($"[EYE_TICK] recent={prompt}");
 
-            var plans = ExtractRecentPlanItems(maxItems: 3);
             if (plans.Count > 0)
             {
                 for (int i = 0; i < plans.Count; i++)
@@ -1264,20 +1306,25 @@ internal partial class Program
             var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastKeepAwakeUtc).TotalSeconds;
             Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
 
-            // ── Build final card display (same as eye overlay) and print ──
-            var summary = BuildEyeSummary(cards, latest, prompt, promptDiag.FileWriteUtc);
             Console.WriteLine($"[EYE_TICK] ── card display ──");
             foreach (var line in summary.Split('\n'))
                 Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
+            Console.Out.Flush();
 
-            // ── Slack inbox check + forward to Claude prompt ──
+            // ── Phase 7: Slack inbox check + forward to Claude prompt ──
+            swPhase.Restart();
             EyeTickForwardSlackInbox();
+            swPhase.Stop();
+            Console.WriteLine($"[PROF] SlackInbox={swPhase.ElapsedMilliseconds}ms");
+            Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
+            Console.Out.Flush();
 
             return 0;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[EYE_TICK] error={ex.Message}");
+            Console.Out.Flush();
             return 1;
         }
     }
@@ -1291,11 +1338,15 @@ internal partial class Program
     {
         try
         {
-            // Load Slack config
+            var swSlack = Stopwatch.StartNew();
+
+            // ── Slack Step 1: Load config ──
+            var swStep = Stopwatch.StartNew();
             var configPath = Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
             if (!File.Exists(configPath))
             {
                 Console.WriteLine("[EYE_TICK] slack=no_config");
+                Console.Out.Flush();
                 return;
             }
 
@@ -1305,53 +1356,77 @@ internal partial class Program
             if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
             {
                 Console.WriteLine("[EYE_TICK] slack=missing_token_or_channel");
+                Console.Out.Flush();
                 return;
             }
+            swStep.Stop();
+            Console.WriteLine($"[PROF:SLACK] LoadConfig={swStep.ElapsedMilliseconds}ms");
+            Console.Out.Flush();
 
-            // Get bot user ID to filter self-messages
+            // ── Slack Step 2: auth.test (get bot user ID) — HTTP call ──
+            swStep.Restart();
             var botUserId = SlackGetBotUserId(botToken);
+            swStep.Stop();
+            Console.WriteLine($"[PROF:SLACK] auth.test={swStep.ElapsedMilliseconds}ms (botUserId={botUserId ?? "null"})");
+            Console.Out.Flush();
 
-            // Get last processed timestamp
+            // ── Slack Step 3: LoadLastTs ──
+            swStep.Restart();
             var lastTs = LoadLastTs(channel);
             var lastTsDouble = 0.0;
             if (!string.IsNullOrEmpty(lastTs))
                 double.TryParse(lastTs, System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out lastTsDouble);
+            swStep.Stop();
+            Console.WriteLine($"[PROF:SLACK] LoadLastTs={swStep.ElapsedMilliseconds}ms");
+            Console.Out.Flush();
 
-            // Fetch latest 20 messages (no oldest param — Slack API oldest returns ascending order,
-            // causing limit to clip old messages instead of new ones. Filter by ts in code instead.)
+            // ── Slack Step 4: conversations.history — HTTP call ──
+            swStep.Restart();
             var messages = SlackFetchHistoryAsync(botToken, channel, limit: 20)
                 .GetAwaiter().GetResult();
+            swStep.Stop();
+            Console.WriteLine($"[PROF:SLACK] conversations.history={swStep.ElapsedMilliseconds}ms (msgs={messages.Count})");
+            Console.Out.Flush();
 
             if (messages.Count == 0)
             {
                 Console.WriteLine("[EYE_TICK] slack=no_new_messages");
+                Console.Out.Flush();
                 return;
             }
 
-            // Thread reply check uses ClaudePromptHelper — create early for shared use
-            using var helper = new ClaudePromptHelper();
+            // ── Slack Step 5: Screen reader broadcast + UIA init ──
+            swStep.Restart();
+            WKAppBot.Win32.Native.ScreenReaderMode.Enable();
+            swStep.Stop();
+            Console.WriteLine($"[PROF:SLACK] ScreenReaderBroadcast={swStep.ElapsedMilliseconds}ms (enabled={WKAppBot.Win32.Native.ScreenReaderMode.IsEnabled})");
+            Console.Out.Flush();
 
-            // Separate: context message (last processed) vs new messages (after lastTs)
-            string? contextLine = null; // last processed message for conversation context
+            swStep.Restart();
+            using var helper = new ClaudePromptHelper();
+            swStep.Stop();
+            Console.WriteLine($"[PROF:SLACK] UIA3Automation_Init={swStep.ElapsedMilliseconds}ms");
+            Console.Out.Flush();
+
+            // ── Slack Step 6: Filter messages ──
+            swStep.Restart();
+            string? contextLine = null;
             var newMsgs = new List<(string user, string text, string ts)>();
             foreach (var msg in messages)
             {
                 var user = msg["user"]?.GetValue<string>() ?? "";
                 var text = msg["text"]?.GetValue<string>() ?? "";
-                var ts = msg["ts"]?.GetValue<string>() ?? "";
+                var msgTs = msg["ts"]?.GetValue<string>() ?? "";
                 var subtype = msg["subtype"]?.GetValue<string>();
 
-                // Skip subtypes (bot_message, channel_join, etc.)
                 if (!string.IsNullOrEmpty(subtype)) continue;
                 if (string.IsNullOrWhiteSpace(text)) continue;
 
-                // Parse ts for comparison
-                double.TryParse(ts, System.Globalization.NumberStyles.Float,
+                double.TryParse(msgTs, System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out var tsDouble);
 
-                // Message at lastTs = context (already processed, include for conversation flow)
-                if (ts == lastTs)
+                if (msgTs == lastTs)
                 {
                     var ctxClean = System.Text.RegularExpressions.Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
                     var who = user == botUserId ? "클롣" : $"@{user}";
@@ -1359,72 +1434,91 @@ internal partial class Program
                     continue;
                 }
 
-                // Skip messages older than or equal to lastTs (already processed)
                 if (lastTsDouble > 0 && tsDouble <= lastTsDouble) continue;
-
-                // Skip bot's own messages (for new messages only)
                 if (user == botUserId) continue;
 
-                newMsgs.Add((user, text, ts));
+                newMsgs.Add((user, text, msgTs));
             }
+            swStep.Stop();
+            Console.WriteLine($"[PROF:SLACK] FilterMessages={swStep.ElapsedMilliseconds}ms (new={newMsgs.Count})");
+            Console.Out.Flush();
 
             if (newMsgs.Count == 0)
             {
                 Console.WriteLine("[EYE_TICK] slack=no_new_messages");
                 // Still check thread replies even if no new channel messages
+                swStep.Restart();
                 EyeTickCheckThreadReplies(messages, botToken, channel, botUserId, helper);
+                swStep.Stop();
+                Console.WriteLine($"[PROF:SLACK] ThreadReplies={swStep.ElapsedMilliseconds}ms");
+                Console.Out.Flush();
                 return;
             }
 
-            // Reverse so oldest first (API returns newest first)
             newMsgs.Reverse();
-
             Console.WriteLine($"[EYE_TICK] slack={newMsgs.Count} new message(s) — forwarding to Claude prompt...");
+            Console.Out.Flush();
 
-            // Find Claude prompt
+            // ── Slack Step 7: FindPrompt (UIA tree walk) ──
+            swStep.Restart();
             var promptInfo = helper.FindPrompt();
+            swStep.Stop();
+            Console.WriteLine($"[PROF:SLACK] FindPrompt={swStep.ElapsedMilliseconds}ms (found={promptInfo != null}, host={promptInfo?.HostType ?? "n/a"})");
+            Console.Out.Flush();
             if (promptInfo == null)
             {
                 Console.WriteLine("[EYE_TICK] WARNING: Claude prompt not found — will retry next tick");
+                Console.Out.Flush();
                 return;
             }
 
+            // ── Slack Step 8: Forward messages ──
             int forwarded = 0;
             string? latestTs = null;
-            foreach (var (user, text, ts) in newMsgs)
+            foreach (var (user, text, msgTs) in newMsgs)
             {
-                // Clean @mention tags
                 var cleanText = System.Text.RegularExpressions.Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
                 if (string.IsNullOrWhiteSpace(cleanText)) continue;
 
-                // Include context from last processed message for conversation flow
                 var contextPrefix = (contextLine != null && forwarded == 0) ? $"{contextLine}\n\n" : "";
-                var promptText = $"{contextPrefix}{cleanText}\n\n{SlackReplySuffix(user, ts)}";
+                var promptText = $"{contextPrefix}{cleanText}\n\n{SlackReplySuffix(user, msgTs)}";
 
-                // Re-find prompt each time (window may shift)
+                swStep.Restart();
                 var fresh = helper.FindPrompt();
+                swStep.Stop();
+                Console.WriteLine($"[PROF:SLACK] Re-FindPrompt={swStep.ElapsedMilliseconds}ms");
+                Console.Out.Flush();
                 if (fresh == null)
                 {
                     Console.WriteLine("[EYE_TICK] WARNING: Lost prompt — stopping forward");
+                    Console.Out.Flush();
                     break;
                 }
 
-                Console.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → Claude prompt");
+                Console.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → Claude prompt ({fresh.HostType})");
+                Console.Out.Flush();
+                swStep.Restart();
                 var ok = helper.TypeAndSubmit(fresh, promptText);
+                swStep.Stop();
+                Console.WriteLine($"[PROF:SLACK] TypeAndSubmit={swStep.ElapsedMilliseconds}ms (ok={ok})");
+                Console.Out.Flush();
                 if (ok)
                 {
                     forwarded++;
-                    latestTs = ts;
+                    latestTs = msgTs;
                     Console.WriteLine($"[EYE_TICK] [DELIVERED] Slack @{user}: {cleanText}");
 
-                    // Send "전달했습니다" ack — deleted when slack reply is sent
                     try
                     {
-                        var ackText = $"Claude에 전달했습니다! (thread={ts})";
-                        var (ackOk, ackTs) = SlackSendViaApi(botToken, channel, ackText, ts, username: BotUsername)
+                        swStep.Restart();
+                        var ackText = $"Claude에 전달했습니다! (thread={msgTs})";
+                        var (ackOk, ackTs) = SlackSendViaApi(botToken, channel, ackText, msgTs, username: BotUsername)
                             .GetAwaiter().GetResult();
+                        swStep.Stop();
+                        Console.WriteLine($"[PROF:SLACK] AckSend={swStep.ElapsedMilliseconds}ms (ok={ackOk})");
+                        Console.Out.Flush();
                         if (ackOk && ackTs != null)
-                            SavePendingAck(ts, channel, ackTs);
+                            SavePendingAck(msgTs, channel, ackTs);
                     }
                     catch { }
 
@@ -1434,10 +1528,10 @@ internal partial class Program
                 else
                 {
                     Console.WriteLine($"[EYE_TICK] WARNING: TypeAndSubmit failed for @{user}");
+                    Console.Out.Flush();
                 }
             }
 
-            // Save last processed timestamp
             if (latestTs != null)
             {
                 SaveLastTs(channel, latestTs);
@@ -1445,12 +1539,17 @@ internal partial class Program
             }
 
             // ── Thread reply detection ──
-            // Check recent bot messages for user thread replies
+            swStep.Restart();
             EyeTickCheckThreadReplies(messages, botToken, channel, botUserId, helper);
+            swStep.Stop();
+            Console.WriteLine($"[PROF:SLACK] ThreadReplies={swStep.ElapsedMilliseconds}ms");
+            Console.WriteLine($"[PROF:SLACK] SlackTotal={swSlack.ElapsedMilliseconds}ms");
+            Console.Out.Flush();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[EYE_TICK] slack error: {ex.Message}");
+            Console.Out.Flush();
         }
     }
 
