@@ -150,6 +150,7 @@ wkappbot knowhow <subcommand>                # write/read (Win32+Web 노하우)
 wkappbot eye [--port N] [--interval N]        # AppBotEye 글로벌 루프 (Slack+Prompt 항상 ON)
 wkappbot eye tick                             # one-shot: 모든 클롣/크로 카드 상태+생각 즉시 조회
 wkappbot newchat "prompt" [--file f.txt]      # Claude Desktop 새채팅 열고 프롬프트 입력 (focusless)
+wkappbot readiness [grap] [--point X Y] [--yield] # InputReadiness 진단 (완전 포커스리스, 돋보기 강제)
 wkappbot schedule <subcommand>                # add/list/remove/clear (예약 프롬프트)
 wkappbot logcat <fileFilter> <messageFilter>  # 실시간 로그 추적
 ```
@@ -223,6 +224,9 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
 - 돋보기/승인창 가상화면 바운드 클램핑 (SM_XVIRTUALSCREEN 기반, 보조모니터 음수좌표 대응)
 - ElevationRequesterAdapter (UAC runas 관리자 재시작)
 - ExperienceDb InputMethods (컨트롤별 입력 메서드 성공/실패 기록)
+- readiness 명령: InputReadiness 진단 (완전 포커스리스, 돋보기 강제, 전수조사/좌표기반)
+- 유령 돋보기: BeginFadeOut 시 포그라운드 스레드 승격 → 프로세스 종료 후에도 페이드아웃 생존
+- 돋보기 불투명도 50% → 77% (럭키세븐), eye tick/Probe [PROF] 프로파일링 태그
 
 ### Phase 8: puppet 패턴 매칭 — 미구현
 - FormTypeIdentifier Level 4: OCR 텍스트 vs 패턴 매칭으로 폼 자동 식별

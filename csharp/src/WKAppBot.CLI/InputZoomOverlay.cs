@@ -144,7 +144,7 @@ internal sealed class InputZoomWindow : Window
             if (!_firstFrameReceived)
             {
                 _firstFrameReceived = true;
-                Opacity = 0.50;
+                Opacity = 0.77;
             }
         }
         catch { /* best effort */ }
@@ -248,7 +248,7 @@ internal sealed class InputHighlightWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false; // CRITICAL: never steal focus from target app
         ResizeMode = ResizeMode.NoResize;
-        Opacity = 0.50; // 50% transparent
+        Opacity = 0.77; // 77% opaque — lucky seven, clear enough to read
 
         // Just a border — transparent interior, no image/header
         var grid = new Grid();
@@ -547,9 +547,14 @@ internal sealed class InputZoomHost : IDisposable
             _dispatcher?.BeginInvoke(() => _zoomWindow?.EnsureTopmost());
     }
 
-    /// <summary>Begin fade-out animation, then auto-close.</summary>
+    /// <summary>Begin fade-out animation, then auto-close.
+    /// Promotes thread to foreground so the overlay survives after main thread exits.</summary>
     public void BeginFadeOut(int delayMs = 3000, int fadeDurationMs = 800)
     {
+        // Promote to foreground thread — keeps process alive until fade completes.
+        // Without this, IsBackground=true kills the overlay when main thread exits.
+        if (_uiThread != null) try { _uiThread.IsBackground = false; } catch { }
+
         if (Mode == ZoomMode.HighlightBox)
             _dispatcher?.BeginInvoke(() => _highlightWindow?.BeginFadeOut(
                 Math.Min(delayMs, 2000), Math.Min(fadeDurationMs, 600)));
