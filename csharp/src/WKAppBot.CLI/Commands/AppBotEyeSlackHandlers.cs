@@ -12,6 +12,9 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
+    /// <summary>현재 실행 중인 exe 경로 (설치 위치 무관).</summary>
+    static readonly string ExePath = Environment.ProcessPath ?? "wkappbot";
+
     /// <summary>
     /// Build the "(Slack ... — wkappbot slack reply ...)" suffix appended to every forwarded prompt.
     /// ONE place to change the format — never duplicate this string elsewhere!
@@ -19,13 +22,13 @@ internal partial class Program
     static string SlackReplySuffix(string user, string replyTs, string? label = null)
     {
         var tag = string.IsNullOrEmpty(label) ? $"Slack @{user}" : $"Slack {label} @{user}";
-        return $"({tag} → \"W:/SDK/bin/wkappbot.exe\" slack reply \"MUST reply your answer here\" --msg {replyTs})";
+        return $"({tag} → \"{ExePath}\" slack reply \"MUST reply your answer here\" --msg {replyTs})";
     }
 
     /// <summary>채널 브로드캐스트용 suffix — reply 대신 send (채널에 답장).</summary>
     static string SlackSendSuffix(string user)
     {
-        return $"(Slack @{user} → \"W:/SDK/bin/wkappbot.exe\" slack send \"퐁~! 지금 뭐뭐 완료하고 머머 하고있습니다~!\")";
+        return $"(Slack @{user} → \"{ExePath}\" slack send \"퐁~! 지금 뭐뭐 완료하고 머머 하고있습니다~!\")";
     }
 
     /// <summary>
