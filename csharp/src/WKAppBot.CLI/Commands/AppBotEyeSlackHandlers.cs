@@ -13,7 +13,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>현재 실행 중인 exe 경로 (설치 위치 무관).</summary>
-    static readonly string ExePath = Environment.ProcessPath ?? "wkappbot";
+    static readonly string ExePath = (Environment.ProcessPath ?? "wkappbot").Replace('\\', '/');
 
     /// <summary>
     /// Build the "(Slack ... — wkappbot slack reply ...)" suffix appended to every forwarded prompt.
