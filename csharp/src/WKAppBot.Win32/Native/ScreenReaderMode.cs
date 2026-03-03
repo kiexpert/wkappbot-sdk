@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 
 namespace WKAppBot.Win32.Native;
@@ -29,9 +30,18 @@ public static class ScreenReaderMode
     {
         if (_weEnabled) return; // already enabled this session
 
-        if (!IsModernApp(hWnd)) return; // native app, UIA works without this
+        var sw = Stopwatch.StartNew();
+        bool modern = IsModernApp(hWnd);
+        sw.Stop();
 
-        Enable();
+        if (!modern)
+        {
+            Console.WriteLine($"  [PROF:A11Y] ScreenReader skip (native) classCheck={sw.ElapsedMilliseconds}ms");
+            Console.Out.Flush();
+            return;
+        }
+
+        Enable(); // Enable() has its own profiling
     }
 
     /// <summary>
@@ -64,6 +74,8 @@ public static class ScreenReaderMode
     {
         if (_weEnabled) return;
 
+        var sw = Stopwatch.StartNew();
+
         // Check current state — already on? (previous run or real screen reader)
         NativeMethods.SystemParametersInfoW(
             NativeMethods.SPI_GETSCREENREADER, 0, out int current, 0);
@@ -72,6 +84,9 @@ public static class ScreenReaderMode
         {
             // Already enabled (previous wkappbot run or real AT) — skip broadcast
             _weEnabled = true;
+            sw.Stop();
+            Console.WriteLine($"  [PROF:A11Y] ScreenReader already_on={sw.ElapsedMilliseconds}ms");
+            Console.Out.Flush();
             return;
         }
 
@@ -79,12 +94,19 @@ public static class ScreenReaderMode
         bool ok = NativeMethods.SystemParametersInfoW(
             NativeMethods.SPI_SETSCREENREADER, 1, IntPtr.Zero,
             NativeMethods.SPIF_SENDCHANGE);
+        sw.Stop();
 
         if (ok)
         {
             _weEnabled = true;
-            Console.WriteLine("[A11Y] Screen reader mode enabled — Chromium/Electron A11Y trees activated");
+            Console.WriteLine($"[A11Y] Screen reader mode enabled — Chromium/Electron A11Y trees activated");
+            Console.WriteLine($"  [PROF:A11Y] ScreenReader broadcast={sw.ElapsedMilliseconds}ms (SPIF_SENDCHANGE)");
         }
+        else
+        {
+            Console.WriteLine($"  [PROF:A11Y] ScreenReader FAILED={sw.ElapsedMilliseconds}ms");
+        }
+        Console.Out.Flush();
     }
 
     /// <summary>
