@@ -513,6 +513,10 @@ public sealed class ClaudePromptHelper : IDisposable
     /// </summary>
     public bool TypeAndSubmit(PromptInfo prompt, string text)
     {
+        // === VS Code Claude Code (native extension): focus-steal + Escape + paste ===
+        if (prompt.HostType == "vscode-claudecode")
+            return TypeAndSubmitVSCodeClaudeCode(prompt, text);
+
         // === Strategy 1: Try fully focusless input ===
         if (TryFocuslessInput(prompt, text))
             return true;
@@ -557,6 +561,47 @@ public sealed class ClaudePromptHelper : IDisposable
             Thread.Sleep(300); // Brief pause to let Claude register the submit
             NativeMethods.SmartSetForegroundWindow(prevForeground);
             Console.WriteLine("  [PROMPT] Focus restored to previous window");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// VS Code Claude Code extension: focus-steal + Escape (focus input) + paste + Enter.
+    /// UIA turn-form 없음 → 키보드 단축키로 입력 영역 포커싱.
+    /// Escape: Claude Code 입력창 포커스 (VS Code 확장 기본 동작).
+    /// 입력위치확보(Probe) 승인 후 호출되므로 포커스 전환 허용됨.
+    /// </summary>
+    private bool TypeAndSubmitVSCodeClaudeCode(PromptInfo prompt, string text)
+    {
+        var prevForeground = NativeMethods.GetForegroundWindow();
+        Console.WriteLine($"  [PROMPT:VSCODE-CC] Activating: \"{prompt.WindowTitle}\"");
+
+        // Step 1: Bring VS Code to foreground
+        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+        Thread.Sleep(300);
+
+        // Step 2: Escape — focuses Claude Code input area
+        KeyboardInput.PressKey("escape");
+        Thread.Sleep(200);
+
+        // Step 3: Paste via clipboard (fast, supports multiline + unicode)
+        Console.WriteLine($"  [PROMPT:VSCODE-CC] Pasting ({text.Length} chars)");
+        SetClipboardText(text);
+        Thread.Sleep(50);
+        KeyboardInput.Hotkey(new[] { "ctrl", "v" });
+        Thread.Sleep(300);
+
+        // Step 4: Submit with Enter
+        KeyboardInput.PressKey("enter");
+        Console.WriteLine("  [PROMPT:VSCODE-CC] Submitted");
+
+        // Step 5: Restore previous foreground window
+        if (prevForeground != IntPtr.Zero && prevForeground != prompt.WindowHandle)
+        {
+            Thread.Sleep(500); // Brief pause for Claude to register
+            NativeMethods.SmartSetForegroundWindow(prevForeground);
+            Console.WriteLine("  [PROMPT:VSCODE-CC] Focus restored");
         }
 
         return true;
@@ -1355,6 +1400,24 @@ public sealed class ClaudePromptHelper : IDisposable
             }
             catch { }
         }
+
+        // Fallback: VS Code Claude Code extension (no turn-form, native panel)
+        // Detect by window title containing "Visual Studio Code"
+        foreach (var hWnd in windows)
+        {
+            if (!NativeMethods.IsWindowVisible(hWnd)) continue;
+            var title = WindowFinder.GetWindowText(hWnd);
+            if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)) continue;
+
+            // Use full window rect (will use keyboard shortcut to focus input)
+            NativeMethods.GetWindowRect(hWnd, out var wr);
+            var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
+
+            Console.WriteLine($"  [PROMPT] Found VS Code Claude Code (native ext): \"{title}\" at ({rect.X},{rect.Y} {rect.Width}x{rect.Height})");
+
+            return new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode");
+        }
+
         return null;
     }
 
