@@ -165,6 +165,76 @@ public sealed class ClaudePromptHelper : IDisposable
     }
 
     /// <summary>
+    /// Find ALL Claude Code prompt inputs across all windows.
+    /// Unlike FindPrompt (which returns first match), this returns every available prompt.
+    /// Used for broadcast messages (e.g., ping → all Claude instances respond).
+    /// </summary>
+    public List<PromptInfo> FindAllPrompts()
+    {
+        var results = new List<PromptInfo>();
+        var seen = new HashSet<IntPtr>();
+        var seenProcesses = new HashSet<uint>(); // dedupe vscode-claudecode per process
+
+        // Scan all Chrome_WidgetWin_1 windows (covers Electron + VS Code)
+        var allWindows = new List<(IntPtr hWnd, string title, string procName, uint pid)>();
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            var cls = WindowFinder.GetClassName(hWnd);
+            if (cls == "Chrome_WidgetWin_1")
+            {
+                var title = WindowFinder.GetWindowText(hWnd);
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                string procName = "?";
+                try { procName = Process.GetProcessById((int)pid).ProcessName; } catch { }
+                allWindows.Add((hWnd, title, procName, pid));
+            }
+            return true;
+        }, IntPtr.Zero);
+
+        foreach (var (hWnd, title, procName, pid) in allWindows)
+        {
+            if (seen.Contains(hWnd)) continue;
+
+            // Claude Desktop: look for turn-form (each window = separate instance)
+            if (procName.Equals("claude", StringComparison.OrdinalIgnoreCase))
+            {
+                var pi = FindTurnFormInWindow(hWnd, title, procName);
+                if (pi != null) { results.Add(pi); seen.Add(hWnd); }
+                continue;
+            }
+
+            // VS Code: try turn-form first, then native extension
+            if (procName.Equals("Code", StringComparison.OrdinalIgnoreCase))
+            {
+                var pi = FindTurnFormInWindow(hWnd, title, procName);
+                if (pi != null) { results.Add(pi); seen.Add(hWnd); continue; }
+
+                // Native Claude Code extension (no turn-form)
+                // DEDUP: keyboard-based input (Escape→paste→Enter) can't distinguish
+                // windows in the same process → one per process to avoid double-feeding
+                if (title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)
+                    && !seenProcesses.Contains(pid))
+                {
+                    NativeMethods.GetWindowRect(hWnd, out var wr);
+                    var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
+                    results.Add(new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode"));
+                    seen.Add(hWnd);
+                    seenProcesses.Add(pid);
+                }
+            }
+        }
+
+        Console.WriteLine($"  [PROMPT] FindAllPrompts: {results.Count} prompt(s) found");
+        foreach (var r in results)
+        {
+            var shortTitle = r.WindowTitle.Length > 60 ? r.WindowTitle[..57] + "..." : r.WindowTitle;
+            Console.WriteLine($"    [{r.HostType}] 0x{r.WindowHandle:X} \"{shortTitle}\"");
+        }
+        return results;
+    }
+
+    /// <summary>
     /// Find the Claude Code prompt for a SPECIFIC project CWD.
     /// Matches VS Code by window title, Claude Desktop by UIA text content.
     /// Returns null if no matching prompt found (caller should fall back to Slack).
@@ -1515,6 +1585,9 @@ public sealed class ClaudePromptHelper : IDisposable
     /// <summary>
     /// Set clipboard text using STA thread (Win32 clipboard requires STA).
     /// </summary>
+    /// <summary>Public wrapper for clipboard text setting (used by NewChatCommand).</summary>
+    public static void SetClipboardTextPublic(string text) => SetClipboardText(text);
+
     private static void SetClipboardText(string text)
     {
         // Clipboard operations require STA thread

@@ -1,26 +1,37 @@
 using WKAppBot.Win32.Window;
 using WKAppBot.Win32.Native;
+using WKAppBot.Win32.Input;
 using FlaUI.UIA3;
+using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 
 namespace WKAppBot.CLI;
 
-// partial class: newchat command — open new Claude Desktop chat and submit prompt (all focusless)
+// partial class: newchat command — open new chat in Claude Desktop OR VS Code Claude Code
 internal partial class Program
 {
     /// <summary>
     /// wkappbot newchat "prompt text"
     /// wkappbot newchat --file prompt.txt
+    /// wkappbot newchat --file prompt.txt --vscode   (force VS Code)
+    /// wkappbot newchat --file prompt.txt --desktop   (force Claude Desktop)
     ///
-    /// Flow (all focusless via UIA):
+    /// Auto-detection priority:
+    ///   1. VS Code with Claude Code extension (UIA Invoke "New Chat" — focusless!)
+    ///   2. Claude Desktop (sidebar toggle + "새 대화" — focusless!)
+    ///
+    /// VS Code flow:
+    ///   1. Find VS Code window (Chrome_WidgetWin_1, process=Code)
+    ///   2. UIA recursive walk → find "New Chat (Ctrl+N)" button → Invoke (focusless!)
+    ///   3. Wait for new chat to load
+    ///   4. Input prompt: Escape (focus input) → clipboard paste → Enter (needs focus)
+    ///
+    /// Claude Desktop flow:
     ///   1. Find Claude Desktop window (process=claude, class=Chrome_WidgetWin_1)
-    ///   2. Toggle sidebar open (Toggle pattern on sidebar button)
-    ///   3. Invoke "새 대화" (Hyperlink, recursive walk)
-    ///   4. Toggle sidebar closed
-    ///   5. Wait for new chat page to load
-    ///   6. Insert text via MSAA put_accValue + submit (ClaudePromptHelper)
+    ///   2. Toggle sidebar open → Invoke "새 대화" → Toggle sidebar closed (all focusless!)
+    ///   3. Wait for new chat page to load
+    ///   4. Insert text via MSAA put_accValue + submit (focusless!)
     /// </summary>
-    /// <summary>Max retries per step. Electron can lag heavily at 90%+ context.</summary>
     const int NewChatMaxRetries = 3;
 
     static int NewChatCommand(string[] args)
@@ -28,6 +39,8 @@ internal partial class Program
         // ── Parse args ──
         string? text = null;
         var filePath = GetArgValue(args, "--file");
+        bool forceVSCode = args.Contains("--vscode");
+        bool forceDesktop = args.Contains("--desktop");
 
         if (!string.IsNullOrEmpty(filePath))
         {
@@ -38,34 +51,176 @@ internal partial class Program
             }
             text = File.ReadAllText(filePath).Trim();
         }
-        else if (args.Length > 0 && !args[0].StartsWith("--"))
+        else
         {
-            text = args[0];
+            // First non-flag arg is the prompt text
+            text = args.FirstOrDefault(a => !a.StartsWith("--"));
         }
 
         if (string.IsNullOrWhiteSpace(text))
         {
             Console.WriteLine("Usage: wkappbot newchat \"prompt text\"");
             Console.WriteLine("       wkappbot newchat --file prompt.txt");
+            Console.WriteLine("       --vscode   Force VS Code target");
+            Console.WriteLine("       --desktop  Force Claude Desktop target");
             return 1;
         }
 
         Console.WriteLine($"[NEWCHAT] Prompt: {(text.Length > 80 ? text[..77] + "..." : text)} ({text.Length} chars)");
 
-        // ── Step 1: Find Claude Desktop window ──
-        var claudeHwnd = FindClaudeDesktopWindow();
-        if (claudeHwnd == IntPtr.Zero)
+        // ── Auto-detect target ──
+        if (!forceDesktop)
         {
-            Console.WriteLine("[ERROR] Claude Desktop window not found");
-            return 1;
+            // Try VS Code first
+            var vsHwnd = FindVSCodeWindowForNewChat();
+            if (vsHwnd != IntPtr.Zero)
+            {
+                Console.WriteLine($"[NEWCHAT] Target: VS Code hwnd=0x{vsHwnd:X}");
+                return NewChatVSCode(vsHwnd, text);
+            }
+            if (forceVSCode)
+            {
+                Console.WriteLine("[ERROR] VS Code window not found (--vscode forced)");
+                return 1;
+            }
         }
-        Console.WriteLine($"[NEWCHAT] Found Claude: hwnd=0x{claudeHwnd:X}");
 
+        if (!forceVSCode)
+        {
+            // Fall back to Claude Desktop
+            var claudeHwnd = FindClaudeDesktopWindow();
+            if (claudeHwnd != IntPtr.Zero)
+            {
+                Console.WriteLine($"[NEWCHAT] Target: Claude Desktop hwnd=0x{claudeHwnd:X}");
+                return NewChatClaudeDesktop(claudeHwnd, text);
+            }
+        }
+
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine("[ERROR] No VS Code or Claude Desktop window found");
+        Console.ResetColor();
+        return 1;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  VS Code Claude Code — New Chat via UIA Invoke (focusless!)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Find VS Code window suitable for new chat.
+    /// Priority: window with current CWD folder in title, then any VS Code.
+    /// </summary>
+    static IntPtr FindVSCodeWindowForNewChat()
+    {
+        var cwd = Environment.CurrentDirectory;
+        var cwdFolder = Path.GetFileName(cwd) ?? "";
+        var candidates = new List<(IntPtr hWnd, string title, bool cwdMatch)>();
+
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            var cls = WindowFinder.GetClassName(hWnd);
+            if (cls != "Chrome_WidgetWin_1") return true;
+            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+            string procName = "?";
+            try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+            if (!procName.Equals("Code", StringComparison.OrdinalIgnoreCase)) return true;
+
+            var title = WindowFinder.GetWindowText(hWnd);
+            if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)) return true;
+
+            bool cwdMatch = !string.IsNullOrEmpty(cwdFolder) &&
+                title.Contains(cwdFolder, StringComparison.OrdinalIgnoreCase);
+            candidates.Add((hWnd, title, cwdMatch));
+            return true;
+        }, IntPtr.Zero);
+
+        // Prefer CWD match
+        var match = candidates.FirstOrDefault(c => c.cwdMatch);
+        if (match.hWnd != IntPtr.Zero)
+        {
+            Console.WriteLine($"[NEWCHAT:VSCODE] CWD match: \"{match.title}\"");
+            return match.hWnd;
+        }
+
+        // Any VS Code
+        if (candidates.Count > 0)
+        {
+            Console.WriteLine($"[NEWCHAT:VSCODE] No CWD match, using: \"{candidates[0].title}\"");
+            return candidates[0].hWnd;
+        }
+
+        return IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Open new chat in VS Code Claude Code:
+    ///   1. SetForegroundWindow → bring VS Code to front
+    ///   2. Ctrl+Esc → focus Claude Code input area (extension keybinding)
+    ///   3. Ctrl+N → open new chat (extension keybinding when panel focused)
+    ///   4. Wait for new chat to load
+    ///   5. Paste prompt → Enter → restore focus
+    ///
+    /// Note: VS Code Claude Code UIA tree is too deep (10+ levels) for reliable
+    /// button discovery. Keyboard shortcuts are more reliable for all steps.
+    /// </summary>
+    static int NewChatVSCode(IntPtr hwnd, string text)
+    {
+        var prevFg = NativeMethods.GetForegroundWindow();
+
+        // ── Step 1: Bring VS Code to foreground ──
+        Console.WriteLine("[NEWCHAT:VSCODE] Activating VS Code...");
+        NativeMethods.SmartSetForegroundWindow(hwnd);
+        Thread.Sleep(300);
+
+        // ── Step 2: Focus Claude Code input (Ctrl+Esc) ──
+        Console.WriteLine("[NEWCHAT:VSCODE] Focusing Claude Code input (Ctrl+Esc)...");
+        KeyboardInput.Hotkey(new[] { "ctrl", "escape" });
+        Thread.Sleep(500);
+
+        // ── Step 3: New Chat (Ctrl+N) ──
+        Console.WriteLine("[NEWCHAT:VSCODE] Opening new chat (Ctrl+N)...");
+        KeyboardInput.Hotkey(new[] { "ctrl", "n" });
+        Thread.Sleep(1500); // Wait for new chat to initialize
+
+        // ── Step 4: Paste prompt + submit ──
+        Console.WriteLine($"[NEWCHAT:VSCODE] Pasting prompt ({text.Length} chars)...");
+        ClaudePromptHelper.SetClipboardTextPublic(text);
+        Thread.Sleep(50);
+        KeyboardInput.Hotkey(new[] { "ctrl", "v" });
+        Thread.Sleep(300);
+
+        KeyboardInput.PressKey("enter");
+        Console.WriteLine("[NEWCHAT:VSCODE] Submitted (Enter)");
+
+        // ── Step 5: Restore previous foreground ──
+        if (prevFg != IntPtr.Zero && prevFg != hwnd)
+        {
+            Thread.Sleep(500);
+            NativeMethods.SmartSetForegroundWindow(prevFg);
+            Console.WriteLine("[NEWCHAT:VSCODE] Focus restored");
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("[NEWCHAT:VSCODE] SUCCESS — prompt submitted to new chat!");
+        Console.ResetColor();
+        return 0;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Claude Desktop — New Chat via sidebar toggle + "새 대화" invoke
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Open new chat in Claude Desktop (existing flow, all focusless).
+    /// </summary>
+    static int NewChatClaudeDesktop(IntPtr claudeHwnd, string text)
+    {
         // ── Step 2: Open sidebar (retry with backoff — Electron lag at 90%+ context) ──
         bool sidebarOpened = false;
         for (int attempt = 1; attempt <= NewChatMaxRetries; attempt++)
         {
-            Console.WriteLine($"[NEWCHAT] Opening sidebar... (attempt {attempt}/{NewChatMaxRetries})");
+            Console.WriteLine($"[NEWCHAT:DESKTOP] Opening sidebar... (attempt {attempt}/{NewChatMaxRetries})");
             if (ToggleSidebar(claudeHwnd, open: true))
             {
                 sidebarOpened = true;
@@ -79,13 +234,13 @@ internal partial class Program
             Console.WriteLine("[ERROR] Failed to toggle sidebar after retries");
             return 1;
         }
-        Thread.Sleep(1000); // extra wait for sidebar animation under lag
+        Thread.Sleep(1000);
 
-        // ── Step 3: Invoke "새 대화" (retry — UIA walk can timeout under heavy load) ──
+        // ── Step 3: Invoke "새 대화" ──
         bool invoked = false;
         for (int attempt = 1; attempt <= NewChatMaxRetries; attempt++)
         {
-            Console.WriteLine($"[NEWCHAT] Invoking '새 대화'... (attempt {attempt}/{NewChatMaxRetries})");
+            Console.WriteLine($"[NEWCHAT:DESKTOP] Invoking '새 대화'... (attempt {attempt}/{NewChatMaxRetries})");
             if (QuickInvoke(claudeHwnd, "새 대화") == 0)
             {
                 invoked = true;
@@ -102,24 +257,24 @@ internal partial class Program
         }
         Thread.Sleep(1000);
 
-        // ── Step 4: Close sidebar (focusless Toggle) ──
+        // ── Step 4: Close sidebar ──
         ToggleSidebar(claudeHwnd, open: false);
 
-        // ── Step 5: Wait for new chat page to load (longer for laggy Electron) ──
-        Console.WriteLine("[NEWCHAT] Waiting for new chat page...");
+        // ── Step 5: Wait for new chat page ──
+        Console.WriteLine("[NEWCHAT:DESKTOP] Waiting for new chat page...");
         Thread.Sleep(3000);
 
-        // ── Step 6: Submit prompt via ClaudePromptHelper (retry) ──
+        // ── Step 6: Submit prompt ──
         for (int attempt = 1; attempt <= NewChatMaxRetries; attempt++)
         {
-            Console.WriteLine($"[NEWCHAT] Submitting prompt... (attempt {attempt}/{NewChatMaxRetries})");
+            Console.WriteLine($"[NEWCHAT:DESKTOP] Submitting prompt... (attempt {attempt}/{NewChatMaxRetries})");
             using var helper = new ClaudePromptHelper();
-            ClaudePromptHelper.AllowFocusSteal = false; // newchat = pure focusless
+            ClaudePromptHelper.AllowFocusSteal = false;
 
             if (helper.TryNewChatInput(claudeHwnd, text))
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("[NEWCHAT] SUCCESS — prompt submitted to new chat!");
+                Console.WriteLine("[NEWCHAT:DESKTOP] SUCCESS — prompt submitted to new chat!");
                 Console.ResetColor();
                 return 0;
             }
@@ -132,7 +287,7 @@ internal partial class Program
         }
 
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine("[NEWCHAT] FAILED — could not submit prompt after retries");
+        Console.WriteLine("[NEWCHAT:DESKTOP] FAILED — could not submit prompt after retries");
         Console.ResetColor();
         return 1;
     }
