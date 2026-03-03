@@ -166,6 +166,13 @@ wkappbot logcat <fileFilter> <messageFilter>  # 실시간 로그 추적
 ### 2. Smart Focus ("위치확보!") — EnsureFocus 4단계
 Phase 0: Already Focused? → Phase 1: Alert+Wait(3초) → Phase 2: Force Recovery → Phase 3: Timeout Fail
 
+### 2.5. 포커스 양보 승인 (UserInputWaitOverlay)
+- "input" 액션: focusless 메서드 유무와 관계없이 **항상** yield 로직 진입
+- 타겟 전경 + 유저 idle(30초) → 자동승인 (팝업 없음)
+- 타겟 비전경 or 유저 활동 → 승인 팝업 (30초 카운트다운)
+- 승인창 위치: positionHwnd(타겟 윈도우) 내부 상단 1/3 + 가상화면 바운드 클램핑
+- 소유자(GWL_HWNDPARENT): ownerHwnd(메인 윈도우) — 최소화 시 같이 숨김
+
 ### 3. 태그 규칙
 `[WATCH]` 요소추적 / `[RUN]` 실행 / `[FOCUS]` 포커스 / `[VERIFY]` 검증 / `[BLOCK]` 방해꾼 / `[GUARD]` 포커스간섭 / `[ZOOM]` 돋보기 / `[STRESS]` 스트레스 / `[TOOLTIP]` 캘리브레이션 / `[SLACK]` 슬랙 / `[EXP]` 경험DB / `[KNOWHOW]` 노하우
 
@@ -211,6 +218,11 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
 - newchat 명령 (사이드바 토글 + 새 대화 invoke + 프롬프트 입력, 전부 focusless)
 - A11Y/OS 듀얼경로 노하우 방송 (프로필 경험 vs OS 경험 분리)
 - 키움 프록시봇 Phase A (32비트 COM + Named Pipe)
+- 포커스 양보 승인창 (UserInputWaitOverlay) — 멀티모니터 타겟 윈도우 배치 + positionHwnd 분리
+- InputReadiness: "input" 액션 항상 yield 로직 진입 (focusless여도 승인창 표시)
+- 돋보기/승인창 가상화면 바운드 클램핑 (SM_XVIRTUALSCREEN 기반, 보조모니터 음수좌표 대응)
+- ElevationRequesterAdapter (UAC runas 관리자 재시작)
+- ExperienceDb InputMethods (컨트롤별 입력 메서드 성공/실패 기록)
 
 ### Phase 8: puppet 패턴 매칭 — 미구현
 - FormTypeIdentifier Level 4: OCR 텍스트 vs 패턴 매칭으로 폼 자동 식별

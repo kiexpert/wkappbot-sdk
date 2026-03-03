@@ -114,7 +114,7 @@ internal partial class Program
         {
             Console.WriteLine($"[NEWCHAT] Submitting prompt... (attempt {attempt}/{NewChatMaxRetries})");
             using var helper = new ClaudePromptHelper();
-            ClaudePromptHelper.ForceFocusless = true;
+            ClaudePromptHelper.AllowFocusSteal = false; // newchat = pure focusless
 
             if (helper.TryNewChatInput(claudeHwnd, text))
             {
