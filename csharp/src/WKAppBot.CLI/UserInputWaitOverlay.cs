@@ -13,28 +13,39 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// Non-focus-stealing WPF overlay that asks user to yield focus.
-/// Countdown timer on confirm button — timeout = fail.
+/// Countdown timer — auto-approves when user idle, resets on user activity.
 /// Owner set to target app's main window (stays above target, hides with it).
 ///
 /// Design: "사용자님의 포커스 양보가 필요합니다"
+/// - User clicks "확인" → immediate confirm (foreground right guaranteed)
+/// - User idle until timeout → auto-approve (try SetForegroundWindow)
+/// - User active (mouse/keyboard) → reset timer to 30s
 /// Tag: [READINESS] [ZOOM]
 /// </summary>
 internal sealed class UserInputWaitWindow : Window
 {
     private readonly TextBlock _buttonText;
     private readonly Border _buttonBorder;
+    private readonly TextBlock _idleText;
     private readonly DispatcherTimer _countdownTimer;
     private readonly IntPtr _ownerHwnd;
+    private readonly int _resetSeconds;
     private int _remainingSeconds;
+    private uint _lastInputTick;
     private bool _confirmed;
+    private bool _focusAcquired;
+
+    /// <summary>Focus was actually transferred to target (verified).</summary>
+    public bool FocusAcquired => _focusAcquired;
 
     public event Action? Confirmed;
-    public event Action? TimedOut;
 
-    public UserInputWaitWindow(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds)
+    public UserInputWaitWindow(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds, int resetSeconds = 30)
     {
         _ownerHwnd = ownerHwnd;
         _remainingSeconds = timeoutSeconds;
+        _resetSeconds = resetSeconds;
+        _lastInputTick = GetLastInputTick();
 
         Title = "UserInputWait";
         Width = 400;
@@ -83,7 +94,7 @@ internal sealed class UserInputWaitWindow : Window
         // Detail
         stack.Children.Add(new TextBlock
         {
-            Text = "자동화가 포커스를 확보해야 합니다.\n현재 작업을 잠시 멈추고 확인을 눌러주세요.",
+            Text = "자동화가 포커스를 확보해야 합니다.\n입력이 없으면 자동으로 진행합니다.",
             Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
             FontFamily = new FontFamily("맑은 고딕"),
             FontSize = 11,
@@ -91,8 +102,8 @@ internal sealed class UserInputWaitWindow : Window
             TextWrapping = TextWrapping.Wrap,
         });
 
-        // Idle info
-        stack.Children.Add(new TextBlock
+        // Idle info (dynamic — updates on user activity detection)
+        _idleText = new TextBlock
         {
             Text = $"마지막 입력: {userIdleMs / 1000.0:F1}초 전",
             Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xD5, 0x4F)),
@@ -100,7 +111,8 @@ internal sealed class UserInputWaitWindow : Window
             FontSize = 10,
             FontStyle = FontStyles.Italic,
             Margin = new Thickness(0, 0, 0, 12),
-        });
+        };
+        stack.Children.Add(_idleText);
 
         // Confirm button (Border + TextBlock for clean look, no ugly chrome)
         _buttonBorder = new Border
@@ -165,37 +177,71 @@ internal sealed class UserInputWaitWindow : Window
         // 핵심: 유저가 우리 창을 클릭했으므로 foreground right 보유 중!
         // 즉시 타겟 윈도우에 포커스 이전 → 호출자가 EnsureFocus 스킵 가능
         if (_ownerHwnd != IntPtr.Zero)
+        {
             SetForegroundWindow(_ownerHwnd);
-        Thread.Sleep(80); // Windows가 포커스 전환 처리할 시간
+            Thread.Sleep(80); // Windows가 포커스 전환 처리할 시간
+            _focusAcquired = true; // 클릭 = foreground right 보장
+        }
 
         Confirmed?.Invoke();
         Dispatcher.InvokeShutdown();
     }
 
+    private void OnAutoApprove()
+    {
+        if (_confirmed) return;
+        _confirmed = true;
+        _countdownTimer.Stop();
+
+        _buttonText.Text = "자동 진행!";
+        _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0x40, 0xC0, 0x40));
+
+        // User idle → safe to grab focus (no foreground right, but no contention)
+        if (_ownerHwnd != IntPtr.Zero)
+        {
+            SetForegroundWindow(_ownerHwnd);
+            Thread.Sleep(80);
+            _focusAcquired = GetForegroundWindow() == _ownerHwnd;
+        }
+
+        Confirmed?.Invoke();
+        // Brief green flash then close
+        var close = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+        close.Tick += (_, _) => { close.Stop(); Dispatcher.InvokeShutdown(); };
+        close.Start();
+    }
+
     private void OnCountdownTick(object? sender, EventArgs e)
     {
+        // ── Check user activity via GetLastInputInfo ──
+        uint currentTick = GetLastInputTick();
+        if (currentTick != _lastInputTick)
+        {
+            // User active → reset timer to _resetSeconds
+            _lastInputTick = currentTick;
+            _remainingSeconds = _resetSeconds;
+            _idleText.Text = "유저 활동 감지 — 대기 연장";
+            _buttonText.Text = $"확인 ({_remainingSeconds})";
+            _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xA0, 0x00));
+            return;
+        }
+
         _remainingSeconds--;
         if (_remainingSeconds <= 0)
         {
-            _countdownTimer.Stop();
-            _buttonText.Text = "시간 초과";
-            _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0x40, 0x40));
-            _buttonBorder.MouseEnter -= null; // disable hover
-            TimedOut?.Invoke();
-            // Brief delay then auto-close
-            var close = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
-            close.Tick += (_, _) => { close.Stop(); Dispatcher.InvokeShutdown(); };
-            close.Start();
+            OnAutoApprove();
+        }
+        else if (_remainingSeconds <= 5)
+        {
+            // Auto-approve approaching → amber→green transition
+            _buttonText.Text = $"자동 진행 ({_remainingSeconds})";
+            byte r = (byte)(0xFF - (0xFF - 0x40) * (5 - _remainingSeconds) / 5);
+            byte g = (byte)(0xA0 + (0xC0 - 0xA0) * (5 - _remainingSeconds) / 5);
+            _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(r, g, 0x00));
         }
         else
         {
             _buttonText.Text = $"확인 ({_remainingSeconds})";
-            // Gradually amber → red as time runs out (last 5 seconds)
-            if (_remainingSeconds <= 5)
-            {
-                byte g = (byte)(0xA0 * _remainingSeconds / 5);
-                _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0xFF, g, 0x00));
-            }
         }
     }
 
@@ -262,6 +308,25 @@ internal sealed class UserInputWaitWindow : Window
         });
     }
 
+    // ── GetLastInputInfo: user activity detection ──
+
+    private static uint GetLastInputTick()
+    {
+        var lii = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        GetLastInputInfo(ref lii);
+        return lii.dwTime;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LASTINPUTINFO
+    {
+        public uint cbSize;
+        public uint dwTime;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
     // ── Win32 P/Invoke ──
     private const int GWL_EXSTYLE = -20;
     private const int GWL_HWNDPARENT = -8;
@@ -275,35 +340,75 @@ internal sealed class UserInputWaitWindow : Window
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
 }
 
 /// <summary>
 /// STA thread host for UserInputWaitWindow.
-/// Blocks calling thread until user confirms or countdown expires.
+/// Blocks calling thread until user confirms or auto-approved on idle timeout.
 /// Tag: [READINESS]
 /// </summary>
 internal static class UserInputWaitOverlay
 {
     /// <summary>
     /// Show the yield dialog and block until resolved.
-    /// Returns true if user clicked confirm, false if timed out.
+    /// Returns (approved, focusAcquired):
+    /// - Manual click: approved=true, focusAcquired=true (foreground right from click)
+    /// - Auto-approve (idle): approved=true, focusAcquired=verified via GetForegroundWindow
+    /// - Safety timeout (5min hard cap): approved=false, focusAcquired=false
     /// </summary>
-    public static bool Show(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds)
+    public static (bool approved, bool focusAcquired) Show(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds,
+                                                            IntPtr positionHwnd = default)
     {
-        bool confirmed = false;
+        bool approved = false;
+        bool focusAcquired = false;
         var done = new ManualResetEventSlim(false);
+
+        // positionHwnd: 위치 기준 (타겟 컨트롤/폼), ownerHwnd: Win32 소유자 (메인 윈도우)
+        var posHwnd = positionHwnd != IntPtr.Zero ? positionHwnd : ownerHwnd;
 
         var thread = new Thread(() =>
         {
             var window = new UserInputWaitWindow(ownerHwnd, userIdleMs, timeoutSeconds);
 
-            // Position: top-center of primary screen (visible but non-intrusive)
-            var screenW = SystemParameters.PrimaryScreenWidth;
-            window.Left = (screenW - window.Width) / 2;
-            window.Top = 120;
+            // Position: centered inside target window (multi-monitor safe)
+            if (posHwnd != IntPtr.Zero && GetWindowRect(posHwnd, out var posRect)
+                && posRect.right - posRect.left > 0)
+            {
+                int posW = posRect.right - posRect.left;
+                int posH = posRect.bottom - posRect.top;
+                // Center overlay on target window (upper 1/3 for visibility)
+                window.Left = posRect.left + (posW - window.Width) / 2;
+                window.Top = posRect.top + (posH - window.Height) / 3;
 
-            window.Confirmed += () => { confirmed = true; done.Set(); };
-            window.TimedOut += () => { confirmed = false; done.Set(); };
+                // Clamp to virtual screen bounds
+                int vsLeft = GetSystemMetrics(76);  // SM_XVIRTUALSCREEN
+                int vsTop  = GetSystemMetrics(77);  // SM_YVIRTUALSCREEN
+                int vsW    = GetSystemMetrics(78);  // SM_CXVIRTUALSCREEN
+                int vsH    = GetSystemMetrics(79);  // SM_CYVIRTUALSCREEN
+                if (window.Left < vsLeft) window.Left = vsLeft;
+                if (window.Top  < vsTop)  window.Top  = vsTop;
+                if (window.Left + window.Width > vsLeft + vsW)
+                    window.Left = vsLeft + vsW - window.Width;
+                if (window.Top + window.Height > vsTop + vsH)
+                    window.Top = vsTop + vsH - window.Height;
+            }
+            else
+            {
+                // Fallback: primary screen center
+                var screenW = SystemParameters.PrimaryScreenWidth;
+                window.Left = (screenW - window.Width) / 2;
+                window.Top = 120;
+            }
+
+            window.Confirmed += () =>
+            {
+                approved = true;
+                focusAcquired = window.FocusAcquired;
+                done.Set();
+            };
 
             window.Show();
             Dispatcher.Run(); // blocks until InvokeShutdown()
@@ -313,10 +418,20 @@ internal static class UserInputWaitOverlay
         thread.Name = "UserInputWait-STA";
         thread.Start();
 
-        // Block caller until confirmed or timeout (+2s safety margin)
-        done.Wait((timeoutSeconds + 3) * 1000);
+        // Block caller — 5 minute hard cap (user activity resets can extend beyond initial timeout)
+        done.Wait(5 * 60 * 1000);
         done.Dispose();
 
-        return confirmed;
+        return (approved, focusAcquired);
     }
+
+    // P/Invoke for multi-monitor positioning
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int left, top, right, bottom; }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
 }
