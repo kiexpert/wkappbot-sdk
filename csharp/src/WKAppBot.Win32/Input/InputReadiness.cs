@@ -79,6 +79,11 @@ public record InputReadinessRequest
 
     /// <summary>포커스 양보 대기 타임아웃 (초). 기본 15.</summary>
     public int UserYieldTimeoutSeconds { get; init; } = 15;
+
+    /// <summary>true면 유저 양보 확인 오버레이 스킵 — 즉시 자동승인.
+    /// 슬랙 요청 등 유저가 명시적으로 요청한 액션에서 사용.
+    /// 돋보기/포커스확보는 정상 수행됨 — 승인만 자동.</summary>
+    public bool AutoApproveYield { get; init; }
 }
 
 // ── Report ────────────────────────────────────────────────────────
@@ -381,6 +386,20 @@ public sealed class InputReadiness
                 Console.WriteLine($"  [READINESS] Target foreground + user idle {idleMs / 1000}s — silent auto-approve");
                 Console.ResetColor();
             }
+            else if (req.AutoApproveYield)
+            {
+                // ── 자동승인 즉시 포커스 확보 (키보드+마우스) — 갭 없이! ──
+                yieldRequested = true;
+                yieldConfirmed = true;
+
+                if (mainHwnd != IntPtr.Zero)
+                {
+                    yieldFocusAcquired = NativeMethods.SmartSetForegroundWindow(mainHwnd);
+                    Console.ForegroundColor = yieldFocusAcquired ? ConsoleColor.Green : ConsoleColor.Red;
+                    Console.WriteLine($"  [READINESS] Auto-yield → focus={(yieldFocusAcquired ? "OK" : "FAIL")} (fg=0x{NativeMethods.GetForegroundWindow():X}, target=0x{mainHwnd:X})");
+                    Console.ResetColor();
+                }
+            }
             else if (UserInputWait != null)
             {
                 // ── 타겟이 비전경 → 무조건 팝업 (30초), 유저 활동 시에도 팝업 ──
@@ -475,13 +494,27 @@ public sealed class InputReadiness
         NativeMethods.GetWindowThreadProcessId(mainHwnd, out uint targetPid);
         uint myPid = (uint)Environment.ProcessId;
 
-        // Strategy 1: 전경 윈도우 체크
+        // Strategy 1: 전경 윈도우 체크 — 같은 프로세스의 팝업/다이얼로그만 blocker
+        // 같은 클래스의 최상위 윈도우(예: VS Code 다중창)는 blocker가 아님!
         var fg = NativeMethods.GetForegroundWindow();
         if (fg != mainHwnd && fg != IntPtr.Zero)
         {
             NativeMethods.GetWindowThreadProcessId(fg, out uint fgPid);
             if (fgPid != myPid && fgPid == targetPid)
-                blockerHwnd = fg;
+            {
+                var fgClsSb = new StringBuilder(256);
+                NativeMethods.GetClassNameW(fg, fgClsSb, 256);
+                var mainClsSb = new StringBuilder(256);
+                NativeMethods.GetClassNameW(mainHwnd, mainClsSb, 256);
+                var fgCls = fgClsSb.ToString();
+                var mainCls = mainClsSb.ToString();
+
+                // 같은 최상위 클래스(Chrome_WidgetWin_1 등) → 형제 윈도우, blocker 아님
+                bool isSiblingWindow = fgCls == mainCls
+                    && NativeMethods.GetAncestor(fg, NativeMethods.GA_ROOT) == fg;
+                if (!isSiblingWindow)
+                    blockerHwnd = fg;
+            }
         }
 
         // Strategy 2: EnumWindows — 같은 프로세스의 팝업/다이얼로그 탐색

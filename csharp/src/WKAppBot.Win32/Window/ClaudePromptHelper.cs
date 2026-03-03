@@ -173,7 +173,6 @@ public sealed class ClaudePromptHelper : IDisposable
     {
         var results = new List<PromptInfo>();
         var seen = new HashSet<IntPtr>();
-        var seenProcesses = new HashSet<uint>(); // dedupe vscode-claudecode per process
 
         // Scan all Chrome_WidgetWin_1 windows (covers Electron + VS Code)
         var allWindows = new List<(IntPtr hWnd, string title, string procName, uint pid)>();
@@ -211,16 +210,15 @@ public sealed class ClaudePromptHelper : IDisposable
                 if (pi != null) { results.Add(pi); seen.Add(hWnd); continue; }
 
                 // Native Claude Code extension (no turn-form)
-                // DEDUP: keyboard-based input (Escape→paste→Enter) can't distinguish
-                // windows in the same process → one per process to avoid double-feeding
-                if (title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)
-                    && !seenProcesses.Contains(pid))
+                // Each VS Code window gets its own entry — SmartSetForegroundWindow(hwnd) targets
+                // the specific window, and foreground verification in TypeAndSubmit prevents
+                // wrong-window delivery. No per-process dedup needed.
+                if (title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
                 {
                     NativeMethods.GetWindowRect(hWnd, out var wr);
                     var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
                     results.Add(new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode"));
                     seen.Add(hWnd);
-                    seenProcesses.Add(pid);
                 }
             }
         }
@@ -645,33 +643,35 @@ public sealed class ClaudePromptHelper : IDisposable
     private bool TypeAndSubmitVSCodeClaudeCode(PromptInfo prompt, string text)
     {
         var prevForeground = NativeMethods.GetForegroundWindow();
-        Console.WriteLine($"  [PROMPT:VSCODE-CC] Activating: \"{prompt.WindowTitle}\"");
 
-        // Step 1: Bring VS Code to foreground
+        // 항상 타이틀바 클릭으로 윈도우 활성화 — GetForegroundWindow 결과 무관
+        // 같은 프로세스(Electron) 다중 창은 API로 키보드 포커스 전환 불가 → 클릭 필수
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
-        Thread.Sleep(300);
+        NativeMethods.GetWindowRect(prompt.WindowHandle, out var wr);
+        var titleX = wr.Left + wr.Width / 2;
+        var titleY = wr.Top + 15; // 타이틀바 중앙
+        MouseInput.Click(titleX, titleY);
+        Thread.Sleep(150);
+        Console.WriteLine($"  [PROMPT:VSCODE-CC] Window activated via click ({titleX},{titleY})");
 
-        // Step 2: Escape — focuses Claude Code input area
+        // Escape → 입력창 포커스 → Paste → Enter (갭 최소화)
         KeyboardInput.PressKey("escape");
-        Thread.Sleep(200);
+        Thread.Sleep(100);
 
-        // Step 3: Paste via clipboard (fast, supports multiline + unicode)
         Console.WriteLine($"  [PROMPT:VSCODE-CC] Pasting ({text.Length} chars)");
         SetClipboardText(text);
-        Thread.Sleep(50);
+        Thread.Sleep(30);
         KeyboardInput.Hotkey(new[] { "ctrl", "v" });
-        Thread.Sleep(300);
+        Thread.Sleep(200);
 
-        // Step 4: Submit with Enter
         KeyboardInput.PressKey("enter");
         Console.WriteLine("  [PROMPT:VSCODE-CC] Submitted");
 
-        // Step 5: Restore previous foreground window
+        // Restore previous foreground
         if (prevForeground != IntPtr.Zero && prevForeground != prompt.WindowHandle)
         {
-            Thread.Sleep(500); // Brief pause for Claude to register
+            Thread.Sleep(300);
             NativeMethods.SmartSetForegroundWindow(prevForeground);
-            Console.WriteLine("  [PROMPT:VSCODE-CC] Focus restored");
         }
 
         return true;

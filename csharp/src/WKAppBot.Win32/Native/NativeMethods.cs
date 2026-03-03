@@ -582,17 +582,18 @@ public static partial class NativeMethods
     /// </summary>
     public static bool SmartSetForegroundWindow(IntPtr hWnd)
     {
-        // Already foreground? → no focus-stealing needed
-        if (IsWindowForeground(hWnd)) return true;
+        // 정확 핸들 비교 — 같은 프로세스의 다른 창은 "foreground"가 아님!
+        if (GetForegroundWindow() == hWnd) return true;
 
         // FocuslessGuard: block if enabled (only when we actually NEED to steal focus)
         Input.FocuslessGuard.AssertAllowed("SetForegroundWindow");
 
         // Simple attempt first
+        BringWindowToTop(hWnd);
         SetForegroundWindow(hWnd);
-        if (IsWindowForeground(hWnd)) return true;
+        if (GetForegroundWindow() == hWnd) return true;
 
-        // AttachThreadInput trick
+        // AttachThreadInput trick — Z-order + keyboard focus 동시 확보
         var fgHwnd = GetForegroundWindow();
         uint fgThread = GetWindowThreadProcessId(fgHwnd, out _);
         uint ourThread = GetCurrentThreadId();
@@ -602,6 +603,7 @@ public static partial class NativeMethods
             AttachThreadInput(ourThread, fgThread, true);
             try
             {
+                BringWindowToTop(hWnd);
                 SetForegroundWindow(hWnd);
             }
             finally
@@ -610,7 +612,7 @@ public static partial class NativeMethods
             }
         }
 
-        return IsWindowForeground(hWnd);
+        return GetForegroundWindow() == hWnd;
     }
 
     /// <summary>Get window text as string (convenience wrapper).</summary>
