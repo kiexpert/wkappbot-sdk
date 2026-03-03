@@ -578,6 +578,60 @@ internal partial class Program
                             $"(Claude 프롬프트 없음) 키워드 \"{matchedKw}\" 감지: {cleanKwText}", kwThreadKey)).Wait(5000);
                     }
                 }
+                return;
+            }
+
+            // ── Catch-all: ALL remaining messages → forward to Claude prompt ──
+            // CLAUDE.md: "Slack 수신 메시지는 항상 Claude 프롬프트에 전달 (옵션 없음)"
+            {
+                var cleanAll = System.Text.RegularExpressions.Regex.Replace(
+                    msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
+                if (string.IsNullOrEmpty(cleanAll)) return;
+
+                // Noise filter: very short noise tokens
+                var noise = new[] { "NO_REPLY", "ㄱㄱ" };
+                if (noise.Any(n => cleanAll.Equals(n, StringComparison.OrdinalIgnoreCase))) return;
+
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.WriteLine($"[EYE][SLACK] << catch-all from {msg.User}: {cleanAll}");
+                Console.ResetColor();
+
+                // Track thread for follow-up
+                var allThreadKey = msg.ThreadTs ?? msg.Timestamp;
+                activeThreads.Add(allThreadKey);
+
+                var allPromptHelper = new ClaudePromptHelper();
+                var allPromptInfo = allPromptHelper.FindPrompt();
+                if (allPromptInfo != null)
+                {
+                    var promptText = $"{cleanAll}\n{SlackReplySuffix(msg.User, allThreadKey, "channel msg")}";
+                    allPromptHelper.TypeAndSubmit(allPromptInfo, promptText);
+                    Console.WriteLine("[EYE][SLACK] >> Catch-all sent to Claude prompt");
+
+                    DeletePendingAck(allThreadKey);
+                    SendAndTrackAck(msg.Channel, allThreadKey);
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("[EYE][SLACK] >> Catch-all: Prompt not found!");
+                    Console.ResetColor();
+
+                    if (claudeHwnd != IntPtr.Zero)
+                    {
+                        var fallbackText = $"{cleanAll}\n{SlackReplySuffix(msg.User, allThreadKey, "channel msg")}";
+                        if (allPromptHelper.TryNewChatInput(claudeHwnd, fallbackText))
+                        {
+                            Console.WriteLine("[EYE][SLACK] >> Catch-all: New-chat fallback SUCCESS!");
+                            DeletePendingAck(allThreadKey);
+                            SendAndTrackAck(msg.Channel, allThreadKey);
+                            return;
+                        }
+                    }
+
+                    Task.Run(async () => await Send(msg.Channel,
+                        $":warning: Claude 프롬프트를 찾을 수 없습니다 (메시지: {cleanAll})", allThreadKey)).Wait(5000);
+                }
             }
         };
     }
