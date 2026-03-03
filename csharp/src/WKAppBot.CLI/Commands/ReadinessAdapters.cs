@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using WKAppBot.Core.Runner;
 using WKAppBot.Win32.Input;
@@ -57,9 +59,73 @@ internal sealed class KnowhowBroadcasterAdapter : IKnowhowBroadcaster
 /// </summary>
 internal sealed class UserInputWaitAdapter : IUserInputWait
 {
-    public bool WaitForUserYield(IntPtr targetMainHwnd, uint userIdleMs, int timeoutSeconds)
+    public UserYieldResult WaitForUserYield(IntPtr targetMainHwnd, uint userIdleMs, int timeoutSeconds,
+                                             IntPtr positionHwnd = default)
     {
-        return UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds);
+        var (approved, focusAcquired) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
+            positionHwnd: positionHwnd);
+        return new UserYieldResult(approved, focusAcquired);
+    }
+}
+
+// ── ElevationRequesterAdapter ────────────────────────────────────
+
+/// <summary>
+/// IElevationRequester 구현: UAC runas 로 관리자 재시작.
+/// 동일 커맨드라인 인자로 재시작, UAC 승인 시 원본 프로세스 종료.
+/// UAC 취소 시 false 반환 → 포커스리스 메서드로 계속.
+/// Tag: [READINESS]
+/// </summary>
+internal sealed class ElevationRequesterAdapter : IElevationRequester
+{
+    public bool RequestElevation(string targetProcessName, uint targetPid)
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"  [ELEVATION] {targetProcessName} (PID {targetPid}) is elevated — requesting admin rights...");
+        Console.ResetColor();
+
+        try
+        {
+            var exePath = Environment.ProcessPath ?? "wkappbot.exe";
+            // Reconstruct arguments: skip argv[0] (exe path), re-quote as needed
+            var rawArgs = Environment.GetCommandLineArgs();
+            var args = string.Join(" ", rawArgs.Skip(1).Select(a =>
+                a.Contains(' ') || a.Contains('"') ? $"\"{a.Replace("\"", "\\\"")}\"" : a));
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = exePath,
+                Arguments = args,
+                UseShellExecute = true,
+                Verb = "runas",
+            };
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"  [ELEVATION] Relaunching: {Path.GetFileName(exePath)} {args}");
+            Console.ResetColor();
+
+            var proc = Process.Start(psi);
+            if (proc != null)
+            {
+                proc.WaitForExit();
+                Environment.Exit(proc.ExitCode);
+                return true; // 방어적 — Environment.Exit 이후 도달 안 함
+            }
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) // ERROR_CANCELLED
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("  [ELEVATION] UAC denied — continuing with focusless methods only");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  [ELEVATION] Relaunch failed: {ex.Message}");
+            Console.ResetColor();
+        }
+
+        return false; // UAC 거부 or 실패 → 계속 진행
     }
 }
 

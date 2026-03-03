@@ -353,6 +353,71 @@ public sealed class ExperienceDb
             .ToList();
     }
 
+    // ── Input Method Stats (SmartInput — like SmartClickButton for input) ────
+
+    /// <summary>
+    /// Record an input method attempt result for a specific control.
+    /// InputCommand calls this after each method attempt.
+    /// </summary>
+    /// <param name="formId">Form type ID</param>
+    /// <param name="controlId">Control ID (cid)</param>
+    /// <param name="method">Method key: "a11y", "m10", "m6", "m7", "m3", "m8", "m9", "m4", "m5", "m1", "m2"</param>
+    /// <param name="success">Whether the method successfully input text</param>
+    public void RecordInputMethod(string formId, int controlId, string method, bool success)
+    {
+        var ctrl = GetControl(formId, controlId);
+        if (ctrl == null) return;
+
+        ctrl.InputMethods ??= new Dictionary<string, ClickStrategyStats>();
+        if (!ctrl.InputMethods.TryGetValue(method, out var stats))
+        {
+            stats = new ClickStrategyStats();
+            ctrl.InputMethods[method] = stats;
+        }
+
+        if (success) stats.Success++;
+        else stats.Fail++;
+    }
+
+    /// <summary>
+    /// Get the best input method order for a control based on recorded stats.
+    /// Returns method keys sorted by success rate (highest first).
+    /// Falls back to default order if no data available.
+    /// </summary>
+    public IReadOnlyList<string> GetBestInputMethodOrder(string formId, int controlId)
+    {
+        var defaultOrder = new[] { "a11y", "m10", "m6", "m7", "m3", "m8", "m9", "m4", "m5", "m1", "m2" };
+        var ctrl = GetControl(formId, controlId);
+        if (ctrl?.InputMethods == null || ctrl.InputMethods.Count == 0)
+            return defaultOrder;
+
+        return ctrl.InputMethods
+            .OrderByDescending(kv => kv.Value.SuccessRate)
+            .ThenByDescending(kv => kv.Value.Success + kv.Value.Fail) // prefer more data
+            .Select(kv => kv.Key)
+            .Union(defaultOrder) // append untried methods
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get the single best input method for a control (highest success, >0 attempts).
+    /// Returns null if no data available.
+    /// </summary>
+    public string? GetBestInputMethod(string formId, int controlId)
+    {
+        var ctrl = GetControl(formId, controlId);
+        if (ctrl?.InputMethods == null || ctrl.InputMethods.Count == 0)
+            return null;
+
+        var best = ctrl.InputMethods
+            .Where(kv => kv.Value.Success > 0)
+            .OrderByDescending(kv => kv.Value.SuccessRate)
+            .ThenByDescending(kv => kv.Value.Success)
+            .FirstOrDefault();
+
+        return best.Key; // null if no successful methods
+    }
+
     // ── Puppet Pattern (Phase 5) ────────────────────────
 
     /// <summary>
@@ -1407,6 +1472,17 @@ public sealed class ControlExperience
     /// </summary>
     [JsonPropertyName("click_strategies")]
     public Dictionary<string, ClickStrategyStats>? ClickStrategies { get; set; }
+
+    // ── Input Method Stats ──
+    // InputCommand가 각 입력 메서드의 성공/실패를 여기에 누적.
+    // 다음 입력 시 성공률 높은 메서드부터 시도하도록 순서 최적화.
+
+    /// <summary>
+    /// Per-method success/fail counts. Key: "a11y", "m10", "m6", "m7", "m3", "m8", "m9", "m4", "m5", "m1", "m2".
+    /// null until first input attempt recorded.
+    /// </summary>
+    [JsonPropertyName("input_methods")]
+    public Dictionary<string, ClickStrategyStats>? InputMethods { get; set; }
 
     /// <summary>
     /// Tree path mirroring Win32 hWnd class hierarchy.

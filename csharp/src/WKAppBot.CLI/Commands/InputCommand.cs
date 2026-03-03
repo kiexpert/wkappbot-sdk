@@ -622,9 +622,15 @@ Examples:
                             }
                         }
 
-                        // Clamp to screen bounds
-                        if (zX < 0) zX = 0;
-                        if (zY < 0) zY = 0;
+                        // Clamp to virtual screen bounds (multi-monitor safe)
+                        int vsLeft = NativeMethods.GetSystemMetrics(76);  // SM_XVIRTUALSCREEN
+                        int vsTop  = NativeMethods.GetSystemMetrics(77);  // SM_YVIRTUALSCREEN
+                        int vsW    = NativeMethods.GetSystemMetrics(78);  // SM_CXVIRTUALSCREEN
+                        int vsH    = NativeMethods.GetSystemMetrics(79);  // SM_CYVIRTUALSCREEN
+                        if (zX < vsLeft) zX = vsLeft;
+                        if (zY < vsTop)  zY = vsTop;
+                        if (zX + zW > vsLeft + vsW) zX = vsLeft + vsW - zW;
+                        if (zY + zH > vsTop + vsH)  zY = vsTop + vsH - zH;
 
                         string modeName = zoomMode switch
                         {

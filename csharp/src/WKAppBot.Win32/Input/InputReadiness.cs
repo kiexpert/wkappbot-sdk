@@ -70,8 +70,9 @@ public record InputReadinessRequest
     /// <summary>QuickMode: DetectBlocker만 (전수조사 생략, ~5ms).</summary>
     public bool QuickMode { get; init; }
 
-    /// <summary>유저 입력 간섭 판단 임계값 (ms). 기본 3000.</summary>
-    public uint UserIdleThresholdMs { get; init; } = 3000;
+    /// <summary>유저 입력 간섭 판단 임계값 (ms). 기본 30000 (30초).
+    /// 이 시간 이내 입력 있으면 승인창, 넘으면 무조건 자동승인.</summary>
+    public uint UserIdleThresholdMs { get; init; } = 30_000;
 
     /// <summary>UserInputRecent 시 포커스 양보 확인 대기창 표시. 기본 true.</summary>
     public bool WaitForUserIfBusy { get; init; } = true;
@@ -122,6 +123,7 @@ public record InputReadinessReport
     // 포커스 양보 대기 결과
     public bool UserYieldRequested { get; init; }
     public bool UserYieldConfirmed { get; init; }
+    public bool UserYieldFocusAcquired { get; init; }
 
     // 종합 판정
     public bool Ready => Available.Any() && ActiveBlocker == null && !ElevationMismatch;
@@ -129,10 +131,11 @@ public record InputReadinessReport
     public bool RequiresFocus => Available.FirstOrDefault()?.Focusless == false;
 
     /// <summary>
-    /// 포커스 사전 확보됨: yield 확인 시 SetForegroundWindow(타겟) 완료.
+    /// 포커스 사전 확보됨: yield 확인 + SetForegroundWindow 성공 검증 완료.
     /// true면 EnsureFocus 스킵하고 즉시 입력 디스패치 가능!
+    /// Manual click = always true, auto-approve = verified via GetForegroundWindow.
     /// </summary>
-    public bool FocusPreAcquired => UserYieldConfirmed;
+    public bool FocusPreAcquired => UserYieldConfirmed && UserYieldFocusAcquired;
 
     // 돋보기 세션 (호출자가 ShowPass/ShowFail 가능)
     public IActionZoom? Zoom { get; init; }
@@ -167,18 +170,42 @@ public interface IReadinessZoom
 }
 
 /// <summary>
+/// 유저 입력 간섭 대기 결과.
+/// Approved: 진행 허가됨 (수동 클릭 or 자동승인).
+/// FocusAcquired: SetForegroundWindow 성공 검증됨 (수동=보장, 자동=검증).
+/// </summary>
+public readonly record struct UserYieldResult(bool Approved, bool FocusAcquired);
+
+/// <summary>
+/// 권한 상승 요청 콜백. UIPI 차단 시 관리자 재시작 제안.
+/// Tag: [READINESS]
+/// </summary>
+public interface IElevationRequester
+{
+    /// <summary>
+    /// Target is elevated, wkappbot is not. Offer to relaunch as admin via UAC.
+    /// Returns true if relaunched (process will exit — caller should return).
+    /// Returns false if UAC denied or skipped (continue with focusless methods).
+    /// </summary>
+    bool RequestElevation(string targetProcessName, uint targetPid);
+}
+
+/// <summary>
 /// 유저 입력 간섭 대기 콜백. 포커스 확보 전 유저 확인 대기.
 /// 포커스 방해 안하는 알림창 + 카운트다운 확인 버튼.
+/// 타임아웃 시 자동승인 (유저 idle), 유저 활동 감지 시 30초 리셋.
 /// Tag: [READINESS]
 /// </summary>
 public interface IUserInputWait
 {
     /// <summary>
-    /// Show non-focus-stealing alert and wait for user confirmation.
+    /// Show non-focus-stealing alert and wait for user confirmation or auto-approve.
     /// Alert is owned by targetMainHwnd (stays above target app).
-    /// Returns true if user confirmed, false if timed out.
+    /// positionHwnd: overlay positioned near this window (control or form). Falls back to targetMainHwnd.
+    /// Auto-approves when user is idle; resets timer on mouse/keyboard activity.
     /// </summary>
-    bool WaitForUserYield(IntPtr targetMainHwnd, uint userIdleMs, int timeoutSeconds);
+    UserYieldResult WaitForUserYield(IntPtr targetMainHwnd, uint userIdleMs, int timeoutSeconds,
+                                     IntPtr positionHwnd = default);
 }
 
 // ── Main Class ────────────────────────────────────────────────────
@@ -200,6 +227,7 @@ public sealed class InputReadiness
     public IKnowhowBroadcaster? KnowhowBroadcaster { get; set; }
     public IReadinessZoom? ZoomFactory { get; set; }
     public IUserInputWait? UserInputWait { get; set; }
+    public IElevationRequester? ElevationRequester { get; set; }
 
     // ── Probe: 전수조사 ──────────────────────────────────────────
 
@@ -243,6 +271,27 @@ public sealed class InputReadiness
         // ── 권한 ──
         bool weAreElevated = NativeMethods.IsCurrentProcessElevated();
         bool targetElevated = NativeMethods.IsProcessElevated(targetPid) ?? true;
+        bool elevationMismatch = targetElevated && !weAreElevated;
+
+        // ── 권한 상승 요청 (UIPI 차단 방지) ──
+        if (elevationMismatch && ElevationRequester != null && !req.QuickMode)
+        {
+            zoom?.UpdateStatus("관리자 권한 필요 — UAC 요청 중...");
+            if (ElevationRequester.RequestElevation(procName, targetPid))
+            {
+                // 재시작됨 — 여기 도달 안 함 (Environment.Exit)
+                // 방어적으로 빈 리포트 반환
+                return new InputReadinessReport
+                {
+                    TargetHwnd = req.TargetHwnd, TargetClass = targetClass,
+                    TargetPid = targetPid, ProcessName = procName,
+                    Methods = methods, TargetElevated = targetElevated,
+                    WeAreElevated = weAreElevated, FormVisible = formVisible,
+                    FormEnabled = formEnabled, FormIconic = formIconic,
+                };
+            }
+            // UAC 거부됨 → 포커스리스 메서드만 사용, 계속 진행
+        }
 
         // ── 유저 입력 간섭 분석 ──
         uint idleMs = NativeMethods.GetUserIdleMs();
@@ -289,30 +338,60 @@ public sealed class InputReadiness
         // ── 유저 입력 간섭 대기 ──
         bool yieldRequested = false;
         bool yieldConfirmed = false;
+        bool yieldFocusAcquired = false;
 
-        if (req.WaitForUserIfBusy && userRecent && UserInputWait != null && !req.QuickMode
-            && NeedsFocusForAction(methods, req.IntendedAction))
+        if (!req.QuickMode && NeedsFocusForAction(methods, req.IntendedAction))
         {
-            yieldRequested = true;
-            zoom?.UpdateStatus("유저 입력 감지 — 확인 대기 중...");
+            bool targetIsForeground = mainHwnd != IntPtr.Zero
+                && NativeMethods.GetForegroundWindow() == mainHwnd;
 
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"  [READINESS] User input {idleMs}ms ago — waiting for focus yield...");
-            Console.ResetColor();
-
-            yieldConfirmed = UserInputWait.WaitForUserYield(mainHwnd, idleMs, req.UserYieldTimeoutSeconds);
-
-            if (yieldConfirmed)
+            if (targetIsForeground && !userRecent)
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("  [READINESS] User confirmed — proceeding");
+                // ── 타겟이 이미 전경 + 장기 idle → 승인창 없이 자동승인 ──
+                yieldRequested = true;
+                yieldConfirmed = true;
+                yieldFocusAcquired = true; // 이미 전경
+
+                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                Console.WriteLine($"  [READINESS] Target foreground + user idle {idleMs / 1000}s — silent auto-approve");
                 Console.ResetColor();
             }
-            else
+            else if (UserInputWait != null)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("  [READINESS] Yield timed out — focus acquisition aborted");
+                // ── 타겟이 비전경 → 무조건 팝업 (30초), 유저 활동 시에도 팝업 ──
+                yieldRequested = true;
+                int yieldTimeout = targetIsForeground
+                    ? req.UserYieldTimeoutSeconds  // 전경+유저활동: 기존 타임아웃
+                    : 30;                          // 비전경: 무조건 30초
+
+                var reason = targetIsForeground
+                    ? $"유저 입력 감지 ({idleMs}ms ago)"
+                    : "타겟이 전경이 아님";
+                zoom?.UpdateStatus($"{reason} — 확인 대기 중...");
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"  [READINESS] {reason} — showing yield overlay ({yieldTimeout}s)...");
                 Console.ResetColor();
+
+                var yieldResult = UserInputWait.WaitForUserYield(mainHwnd, idleMs, yieldTimeout,
+                    positionHwnd: req.TargetHwnd);
+                yieldConfirmed = yieldResult.Approved;
+                yieldFocusAcquired = yieldResult.FocusAcquired;
+
+                if (yieldConfirmed)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine(yieldFocusAcquired
+                        ? "  [READINESS] User confirmed — focus pre-acquired"
+                        : "  [READINESS] Auto-approved (user idle) — proceeding");
+                    Console.ResetColor();
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("  [READINESS] Yield safety timeout — proceeding anyway");
+                    Console.ResetColor();
+                }
             }
         }
 
@@ -320,7 +399,7 @@ public sealed class InputReadiness
         if (zoom != null)
         {
             if (yieldRequested && !yieldConfirmed)
-                zoom.UpdateStatus("시간 초과 — 포커스 확보 중단");
+                zoom.UpdateStatus("안전 타임아웃 — EnsureFocus 진행");
             else if (blocker != null)
                 zoom.UpdateStatus($"BLOCKED: {blocker.Title}");
             else if (methods.Any(m => m.Available))
@@ -348,6 +427,7 @@ public sealed class InputReadiness
             UserInputRecent = userRecent,
             UserYieldRequested = yieldRequested,
             UserYieldConfirmed = yieldConfirmed,
+            UserYieldFocusAcquired = yieldFocusAcquired,
             Zoom = zoom,
         };
     }
@@ -484,8 +564,11 @@ public sealed class InputReadiness
         // 포커스 양보 결과
         if (report.UserYieldRequested)
         {
-            Console.ForegroundColor = report.UserYieldConfirmed ? ConsoleColor.Green : ConsoleColor.Red;
-            Console.WriteLine($"  [YIELD] {(report.UserYieldConfirmed ? "User confirmed focus yield" : "Yield timed out — aborted")}");
+            Console.ForegroundColor = report.UserYieldConfirmed ? ConsoleColor.Green : ConsoleColor.Yellow;
+            var msg = report.UserYieldConfirmed
+                ? (report.UserYieldFocusAcquired ? "User confirmed focus yield" : "Auto-approved (user idle)")
+                : "Yield safety timeout";
+            Console.WriteLine($"  [YIELD] {msg}");
             Console.ResetColor();
         }
 
@@ -659,6 +742,11 @@ public sealed class InputReadiness
 
         // 핫키/키입력은 항상 SendInput 필요 (포커스리스 대안 없음)
         if (act is "hotkey" or "key" or "press_key")
+            return true;
+
+        // input 명령: focusless 여부와 관계없이 항상 yield 팝업 로직 진입
+        // (내부에서 전경+idle이면 자동승인, 비전경/유저활동이면 팝업)
+        if (act is "input")
             return true;
 
         // 텍스트 입력: UIA.Value / WmChar / WmSetText / EmReplaceSel / MSAA 중 하나 필요
