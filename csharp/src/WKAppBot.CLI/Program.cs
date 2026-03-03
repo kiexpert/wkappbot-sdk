@@ -75,10 +75,10 @@ internal partial class Program
             var restArgs = args.Skip(1).ToArray();
 
             // Global option: disable zoom overlay — intentionally obnoxious name to discourage use
-            if (restArgs.Any(a => a == "--i-dont-want-to-see-the-magnifier-overlay"))
+            if (restArgs.Any(a => a == "--i-dont-want-to-see-the-zoom-magnifier-overlay"))
             {
                 ActionApi.ZoomEnabled = false;
-                restArgs = restArgs.Where(a => a != "--i-dont-want-to-see-the-magnifier-overlay").ToArray();
+                restArgs = restArgs.Where(a => a != "--i-dont-want-to-see-the-zoom-magnifier-overlay").ToArray();
             }
 
             // Global Eye tick (for eye --global multi-parent monitor)
