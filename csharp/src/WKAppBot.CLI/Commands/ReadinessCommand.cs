@@ -12,13 +12,22 @@ internal partial class Program
 {
     static int ReadinessCommand(string[] args)
     {
-        // Usage: wkappbot readiness [grap] [--point X Y] [--zoom]
-        // No args → foreground window. grap → WindowFinder match. --point → ProbeAtPoint. --zoom → show zoom overlay.
+        if (args.Contains("--help") || args.Contains("-h"))
+            return Error(@"Usage: wkappbot readiness [grap] [--point X Y] [--yield]
+  Probe InputReadiness on target window (completely focusless).
+  Zoom overlay always shown (global --i-dont-want-to-see-the-zoom-magnifier-overlay to hide).
+
+Target:
+  (no args)           Foreground window (current focus)
+  <grap>              Window title pattern match
+
+Options:
+  --point X Y         ProbeAtPoint (coordinate-based Z-order analysis)
+  --yield             Force yield overlay (focus approval popup test)");
 
         bool pointMode = false;
         int pointX = 0, pointY = 0;
         string? grap = null;
-        bool showZoom = args.Contains("--zoom");
         bool testYield = args.Contains("--yield");
 
         for (int i = 0; i < args.Length; i++)
@@ -108,7 +117,7 @@ internal partial class Program
                 TargetHwnd = targetHwnd,
                 IntendedAction = testYield ? "input" : "readiness-probe", // --yield: force yield overlay
                 MainHwnd = NativeMethods.GetAncestor(targetHwnd, NativeMethods.GA_ROOT),
-                SkipZoom = !showZoom, // --zoom: show zoom overlay for testing
+                SkipZoom = false, // 돋보기 항상 표시 (글로벌 옵션으로만 숨김 가능)
             });
             swStep.Stop();
             Console.WriteLine($"[PROF] Probe={swStep.ElapsedMilliseconds}ms");
