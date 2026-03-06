@@ -245,6 +245,18 @@ internal partial class Program
                 var elAid = root.Properties.AutomationId.ValueOrDefault ?? "";
                 Console.WriteLine($"[A11Y] element: {elType} \"{elName}\" (aid=\"{elAid}\") in {tag}");
 
+                // Zoom: show magnifier/highlight on target element
+                var elRect = GetBoundingRect(root);
+                var elHwnd = GetElementHwnd(root);
+                ClickZoomHelper? zoom = null;
+                if (action != "highlight") // highlight manages its own zoom
+                {
+                    if (elHwnd != IntPtr.Zero)
+                        zoom = ClickZoomHelper.Begin(elHwnd, hwnd, $"a11y-{action}", $"{elType} \"{elName}\"");
+                    else if (elRect != null)
+                        zoom = ClickZoomHelper.BeginFromRect(elRect.Value, hwnd, $"a11y-{action}", $"{elType} \"{elName}\"");
+                }
+
                 success = action switch
                 {
                     "highlight" => A11yHighlight(root, hwnd),
@@ -262,9 +274,22 @@ internal partial class Program
                     "set-range" => A11ySetRange(root, rangeValue!.Value),
                     _ => A11yNotYet(action)
                 };
+
+                // Zoom result feedback + fade
+                if (zoom != null)
+                {
+                    if (success) zoom.ShowPass($"{action} OK");
+                    else zoom.ShowFail($"{action} FAIL");
+                    Thread.Sleep(800);
+                    zoom.Dispose();
+                }
             }
             else
             {
+                // Zoom: show magnifier/highlight on target window
+                ClickZoomHelper? zoom = null;
+                zoom = ClickZoomHelper.Begin(hwnd, hwnd, $"a11y-{action}", $"\"{title}\"");
+
                 success = action switch
                 {
                     "close" => A11yClose(automation, hwnd, tag, force, readiness),
@@ -276,6 +301,15 @@ internal partial class Program
                     "focus" => A11yFocus(hwnd, tag),
                     _ => A11yNotYet(action)
                 };
+
+                // Zoom result feedback + fade
+                if (zoom != null)
+                {
+                    if (success) zoom.ShowPass($"{action} OK");
+                    else zoom.ShowFail($"{action} FAIL");
+                    Thread.Sleep(800);
+                    zoom.Dispose();
+                }
             }
 
             if (success) ok++; else fail++;
