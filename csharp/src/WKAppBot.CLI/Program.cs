@@ -94,6 +94,14 @@ internal partial class Program
             // Policy broadcast only on Eye spawn (not every CLI command)
             // — prevents stdout pollution for ask/web/other commands
             
+            // Auto-detect exe name: if it contains "a11y", prepend "a11y" command
+            // e.g. a11y.exe find "*메모장*" → wkappbot a11y find "*메모장*"
+            var exeBaseName = Path.GetFileNameWithoutExtension(exePath).ToLowerInvariant();
+            if (exeBaseName.Contains("a11y") && (args.Length == 0 || args[0].ToLowerInvariant() != "a11y"))
+            {
+                args = new[] { "a11y" }.Concat(args).ToArray();
+            }
+
             if (args.Length == 0)
             {
                 PrintUsage();
