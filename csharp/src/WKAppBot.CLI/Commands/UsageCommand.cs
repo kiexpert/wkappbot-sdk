@@ -107,13 +107,19 @@ Utility:
       Auto-closes about:blank tabs, validates tab URL before insert.
   win-move <window-title> [--right-top] [--x N --y N]
       Move a window to a specific position.
-  a11y <action> <grap> [options]
-      A11y-first window control (UIA → Win32 fallback).
-      Actions: close, minimize, maximize, restore, move (--x --y), resize (--w --h)
+  a11y <action> <grap>[#uia-scope] [options]
+      Standardized a11y control — works whether target supports a11y or not.
+      UIA-first with Win32 fallback for every action.
+      Window actions: close, minimize, maximize, restore, focus, move, resize
+      Element actions (use #scope): read, invoke, click, toggle, expand,
+        collapse, select, scroll, type, set-value, set-range
       Options: --all  Apply to all matching windows
                --force  close: kill process if WM_CLOSE fails
                --force-close-ancestors  Include own process tree (default: skip)
+               --text ""..."" (type/set-value), --value N (set-range)
+               --direction up|down|left|right --amount small|large (scroll)
       Grap supports ';' OR syntax: ""*메모장*;*계산기*""
+      #scope targets UIA elements: ""*메모장*#*파일*"" → '파일' in Notepad
       Ancestor protection: self + parent processes auto-excluded from targets.
   screen off [--no-check]
       Turn off monitor immediately.
@@ -199,6 +205,34 @@ Data Directory:
         {
             if (args[i] == flag) return args[i + 1];
         }
+        return null;
+    }
+
+    /// <summary>
+    /// Busybox-style: detect command from exe name (symlink-friendly).
+    /// e.g. "a11y" → "a11y", "inspect" → "inspect", "wka11y" → "a11y"
+    /// </summary>
+    static string? DetectCommandFromExeName(string exeBaseName)
+    {
+        // Skip if running as wkappbot itself
+        if (exeBaseName == "wkappbot") return null;
+
+        // Exact match first (symlink named exactly as command)
+        string[] knownCommands = {
+            "a11y", "inspect", "ocr", "logcat", "capture", "scan",
+            "windows", "snapshot", "readiness", "ask"
+        };
+        foreach (var cmd in knownCommands)
+        {
+            if (exeBaseName == cmd) return cmd;
+        }
+
+        // Fuzzy: exe name contains command (e.g. "wka11y" contains "a11y")
+        foreach (var cmd in knownCommands)
+        {
+            if (exeBaseName.Contains(cmd)) return cmd;
+        }
+
         return null;
     }
 }
