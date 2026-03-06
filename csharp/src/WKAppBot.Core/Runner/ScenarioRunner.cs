@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using WKAppBot.Core.Scenario;
 using WKAppBot.Vision;
+using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.Core.Runner;
@@ -22,6 +23,12 @@ public sealed class ScenarioRunner
     /// Passed through to ActionExecutor.CreateZoom for per-step visual feedback.
     /// </summary>
     public Func<System.Drawing.Rectangle, IntPtr, string, string, IActionZoom?>? ZoomFactory { get; set; }
+
+    /// <summary>
+    /// [READINESS] Optional InputReadiness instance. Set by CLI layer.
+    /// Passed through to ActionExecutor.Readiness for pre-action blocker detection.
+    /// </summary>
+    public InputReadiness? ReadinessInstance { get; set; }
 
     public ScenarioRunner(bool verbose = false, bool watch = true, int watchIntervalMs = 200)
     {
@@ -152,6 +159,7 @@ public sealed class ScenarioRunner
             // 4. Run steps
             using var executor = new ActionExecutor(ctx, _verbose, visionCache, visionAnalyzer, simpleOcr);
             executor.CreateZoom = ZoomFactory; // [ZOOM] Pass through CLI layer factory
+            executor.Readiness = ReadinessInstance; // [READINESS] Pre-action blocker/minimize check
 
             for (int i = 0; i < doc.Steps.Count; i++)
             {

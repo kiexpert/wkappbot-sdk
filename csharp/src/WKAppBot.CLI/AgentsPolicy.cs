@@ -13,8 +13,6 @@ static class AgentPolicy
     public const string PolicyVersion = "2026.03.06";
     public const int ReminderMinutes = 10;
 
-    static Timer? policyTimer;
-
     static readonly string WorkspacePath = ResolveWorkspace();
 
     static readonly string PolicyFilePath =
@@ -125,78 +123,62 @@ agent-policy.txt
 
     public static void StartPolicyBroadcast()
     {
-        bool rewrite = false;
-        string policy = EmbeddedInitialPrompt;
-
         DateTime now = DateTime.UtcNow;
 
-        DateTime sourceTime =
-            File.GetLastWriteTimeUtc(
-                System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName);
-
+        // ── 이니셜 판단: 파일 생성시간(CreationTime) 기준 ──
+        // 파일 없음 / 생성 24시간 경과 / 생성시간 미래 → INITIAL 강제 출력
         if (!File.Exists(PolicyFilePath))
         {
-            rewrite = true;
+            BroadcastInitial();
         }
         else
         {
-            DateTime policyTime = File.GetLastWriteTimeUtc(PolicyFilePath);
+            DateTime createdUtc = File.GetCreationTimeUtc(PolicyFilePath);
+            DateTime modifiedUtc = File.GetLastWriteTimeUtc(PolicyFilePath);
 
-            if (policyTime > now)
-                rewrite = true;
-
-            if (!rewrite && now - policyTime > PolicyTTL)
-                rewrite = true;
-
-            if (!rewrite && policyTime < sourceTime)
-                rewrite = true;
-
-            if (!rewrite)
+            if (createdUtc > now || now - createdUtc > PolicyTTL)
             {
-                try
-                {
-                    policy = File.ReadAllText(PolicyFilePath);
-                }
-                catch
-                {
-                    rewrite = true;
-                }
+                // 생성 24시간 경과 or 미래 → 폴리시 재생성 (INITIAL)
+                BroadcastInitial();
             }
-        }
-
-        if (rewrite)
-        {
-            Broadcast("INITIAL", policy);
-
-            try
+            else if (now - modifiedUtc > TimeSpan.FromMinutes(ReminderMinutes))
             {
-                File.WriteAllText(PolicyFilePath, policy);
+                // 마지막 수정(=리마인더) 후 10분 경과 → 리마인더 append
+                BroadcastReminder(now);
             }
-            catch { }
+            // else: 최근에 출력됨 → 스킵 (노이즈 방지)
         }
+    }
 
-        policyTimer = new Timer(_ =>
+    static void BroadcastInitial()
+    {
+        Broadcast("INITIAL", EmbeddedInitialPrompt);
+
+        try
         {
-            Broadcast("REMINDER", EmbeddedReminderPrompt);
-        },
-        null,
-        TimeSpan.FromMinutes(ReminderMinutes),
-        TimeSpan.FromMinutes(ReminderMinutes));
+            File.WriteAllText(PolicyFilePath, EmbeddedInitialPrompt);
+        }
+        catch { }
+    }
 
-        AppDomain.CurrentDomain.ProcessExit += (_, __) =>
+    static void BroadcastReminder(DateTime now)
+    {
+        Broadcast("REMINDER", EmbeddedReminderPrompt);
+
+        try
         {
-            Broadcast("EXIT", EmbeddedReminderPrompt);
-
-            // Clean up PID-specific policy file
-            try { File.Delete(PolicyFilePath); } catch { }
-        };
+            // Append → 파일 변경시간 갱신 (다음 호출 시 "언제 리마인드했나" 판단 기준)
+            File.AppendAllText(PolicyFilePath,
+                $"\n--- REMINDER @ {now:yyyy-MM-dd HH:mm:ss} UTC ---\n");
+        }
+        catch { }
     }
 
     static void Broadcast(string type, string message)
     {
-        Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] POLICY {type}");
+        Console.WriteLine($"[POLICY_BEGIN:{type}]");
         Console.WriteLine(message);
-        Console.WriteLine("------------------------------------------------------------");
+        Console.WriteLine($"[POLICY_END:{type}]");
     }
 
     // Known agent workspace paths (hardcoded for this machine)

@@ -10,6 +10,12 @@ namespace WKAppBot.WebBot;
 /// </summary>
 public static class ChromeLauncher
 {
+    /// <summary>
+    /// Focus theft callback: (stolenByHwnd, prevFgHwnd) — called when Chrome steals focus during restore.
+    /// CLI layer hooks this to show FocuslessWarningOverlay.
+    /// </summary>
+    public static Action<IntPtr, IntPtr>? OnFocusTheft { get; set; }
+
     private static readonly string[] WindowsChromePaths =
     [
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Google", "Chrome", "Application", "chrome.exe"),
@@ -97,8 +103,8 @@ public static class ChromeLauncher
         arguments += " --disable-hang-monitor --disable-popup-blocking";
         // Force accessibility tree for web content — enables UIA to read page headings, text, links
         arguments += " --force-renderer-accessibility";
-        // Decent viewport for CDP screenshots (minimized anyway, but screenshots use this size)
-        arguments += " --window-size=1024,1024 --window-position=0,0";
+        // Viewport for CDP screenshots; start minimized to avoid stealing focus
+        arguments += " --window-size=1024,1024 --start-minimized";
         if (headless)
             arguments += " --headless=new";
 
@@ -132,7 +138,27 @@ public static class ChromeLauncher
             {
                 var json = await http.GetStringAsync($"http://localhost:{port}/json/version");
                 if (!string.IsNullOrEmpty(json))
+                {
+                    // Focusless restore: SW_SHOWNOACTIVATE (4) makes Chrome render
+                    // without stealing focus from the user's active window
+                    try
+                    {
+                        var prevFg = GetForegroundWindow();
+                        var mainHwnd = FindChromeMainWindow(process.Id);
+                        if (mainHwnd != IntPtr.Zero)
+                            ShowWindow(mainHwnd, 4); // SW_SHOWNOACTIVATE
+
+                        // Focus theft recovery: if Chrome stole focus, restore + warn
+                        var nowFg = GetForegroundWindow();
+                        if (prevFg != IntPtr.Zero && nowFg != prevFg)
+                        {
+                            SetForegroundWindow(prevFg);
+                            try { OnFocusTheft?.Invoke(mainHwnd, prevFg); } catch { }
+                        }
+                    }
+                    catch { }
                     return process;
+                }
             }
             catch { }
             await Task.Delay(200);
@@ -213,6 +239,44 @@ public static class ChromeLauncher
         }
         catch { return null; }
     }
+
+    // P/Invoke for focusless window restore + focus theft recovery
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern int GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    private static IntPtr FindChromeMainWindow(int pid)
+    {
+        IntPtr found = IntPtr.Zero;
+        var sb = new System.Text.StringBuilder(256);
+        EnumWindows((hwnd, _) =>
+        {
+            GetClassNameW(hwnd, sb, sb.Capacity);
+            if (sb.ToString() != "Chrome_WidgetWin_1") return true;
+            GetWindowThreadProcessId(hwnd, out int wndPid);
+            if (wndPid == pid)
+            {
+                found = hwnd;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
 }
-
-

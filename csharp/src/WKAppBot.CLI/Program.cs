@@ -91,7 +91,8 @@ internal partial class Program
         int exitCode = 1;
         try
         {
-            AgentPolicy.StartPolicyBroadcast();
+            // Policy broadcast only on Eye spawn (not every CLI command)
+            // — prevents stdout pollution for ask/web/other commands
             
             if (args.Length == 0)
             {
@@ -101,6 +102,12 @@ internal partial class Program
 
             var command = args[0].ToLowerInvariant();
             var restArgs = args.Skip(1).ToArray();
+
+            // [FL] Chrome focus theft → focusless warning overlay
+            WKAppBot.WebBot.ChromeLauncher.OnFocusTheft ??= (chromeHwnd, prevFgHwnd) =>
+            {
+                FocuslessWarningOverlay.Show(chromeHwnd, "Chrome 복원 시 포커스 강탈 → 즉시 복구됨", "chrome");
+            };
 
             // Global option: disable zoom overlay — intentionally obnoxious name to discourage use
             if (restArgs.Any(a => a == "--i-dont-want-to-see-the-zoom-magnifier-overlay"))
@@ -935,6 +942,9 @@ internal partial class Program
             var helper = ClickZoomHelper.BeginFromRect(screenRect, formHandle, action, label);
             return helper != null ? new ClickZoomAdapter(helper) : null;
         };
+
+        // [READINESS] Wire up InputReadiness for pre-action blocker/minimize check
+        runner.ReadinessInstance = CreateInputReadiness();
 
         var result = runner.Run(doc);
 
