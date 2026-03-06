@@ -5,13 +5,33 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // wkappbot logcat "*.txt;*.jsonl" "A11Y|ACT|FALLBACK"
+    // wkappbot logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]
+    // Default: current directory only. -r unlimited depth. -r=3 depth limit. --hq adds HQ+openclaw.
     static int LogcatCommand(string[] args)
     {
         var selfPid = Environment.ProcessId;
         var selfLogMarker = $"pid={selfPid}.txt";
-        var fileFilterArg = args.Length > 0 ? args[0] : "*.txt";
-        var messageFilterArg = args.Length > 1 ? args[1] : "*";
+        var fileFilterArg = "*.txt";
+        var messageFilterArg = "*";
+        string? baseDirOverride = null;
+        int maxDepth = 0; // 0 = current dir only, -1 = unlimited, N = depth limit
+        bool includeHq = false;
+
+        // Parse positional + named args
+        var positional = new List<string>();
+        for (int i = 0; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (a == "--basedir" && i + 1 < args.Length) { baseDirOverride = args[++i]; }
+            else if (a == "--recursive") { maxDepth = -1; }
+            else if (a == "-r") { maxDepth = -1; }
+            else if (a.StartsWith("-r=") && int.TryParse(a[3..], out var d)) { maxDepth = d; }
+            else if (a.StartsWith("--recursive=") && int.TryParse(a[12..], out var d2)) { maxDepth = d2; }
+            else if (a == "--hq") { includeHq = true; }
+            else { positional.Add(a); }
+        }
+        if (positional.Count > 0) fileFilterArg = positional[0];
+        if (positional.Count > 1) messageFilterArg = positional[1];
 
         var filePatterns = fileFilterArg.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (filePatterns.Length == 0) filePatterns = new[] { "*.txt" };
@@ -20,17 +40,23 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(messageFilterArg) && messageFilterArg != "*")
             msgRegex = new Regex(messageFilterArg, RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        Console.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' (Ctrl+C to stop)");
+        // Build watch directories: default = CWD (or --basedir)
+        var baseDir = baseDirOverride ?? Environment.CurrentDirectory;
+        var dirs = new List<string> { baseDir };
+
+        // --hq: add wkappbot.hq/logs + openclaw dirs
+        if (includeHq)
+        {
+            dirs.Add(Path.Combine(DataDir, "logs"));
+            dirs.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "agents", "main", "sessions"));
+            dirs.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "logs"));
+        }
+
+        var depthLabel = maxDepth == 0 ? "" : maxDepth == -1 ? " -r" : $" -r={maxDepth}";
+        Console.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")} (Ctrl+C to stop)");
 
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-
-        var dirs = new List<string>
-        {
-            Path.Combine(DataDir, "logs"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "agents", "main", "sessions"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "logs")
-        };
 
         var watchers = new List<FileSystemWatcher>();
         var offsets = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
@@ -41,18 +67,21 @@ internal partial class Program
         {
             if (!Directory.Exists(dir)) continue;
 
-            var w = new FileSystemWatcher(dir)
+            var watchDir = dir;
+            var w = new FileSystemWatcher(watchDir)
             {
-                IncludeSubdirectories = false,
+                IncludeSubdirectories = maxDepth != 0,
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
                 Filter = "*.*",
                 EnableRaisingEvents = true
             };
 
+            var capturedDir = watchDir; // closure capture
             FileSystemEventHandler onChange = (_, e) =>
             {
                 try
                 {
+                    if (maxDepth > 0 && GetRelativeDepth(e.FullPath, capturedDir) > maxDepth) return;
                     var fn = Path.GetFileName(e.FullPath);
                     if (!IsFilePatternMatch(fn, filePatterns)) return;
                     if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
@@ -65,6 +94,7 @@ internal partial class Program
             {
                 try
                 {
+                    if (maxDepth > 0 && GetRelativeDepth(e.FullPath, capturedDir) > maxDepth) return;
                     var fn = Path.GetFileName(e.FullPath);
                     if (!IsFilePatternMatch(fn, filePatterns)) return;
                     if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
@@ -98,6 +128,13 @@ internal partial class Program
             if (WildcardMatch(fileName, p)) return true;
         }
         return false;
+    }
+
+    static int GetRelativeDepth(string fullPath, string baseDir)
+    {
+        var rel = Path.GetRelativePath(baseDir, Path.GetDirectoryName(fullPath) ?? fullPath);
+        if (rel == ".") return 0;
+        return rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Length;
     }
 
     static bool WildcardMatch(string input, string pattern)

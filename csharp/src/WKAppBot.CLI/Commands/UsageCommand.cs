@@ -99,8 +99,8 @@ Utility:
       Record/read per-control automation notes.
   schedule add|list|remove|clear
       Manage scheduled prompts for auto-recovery.
-  logcat <fileFilter> <messageFilter>
-      Stream logs in real-time (Ctrl+C to stop).
+  logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]
+      Stream logs in real-time. Default: CWD only. -r unlimited, -r=3 depth 3. --hq adds HQ+openclaw.
   win-move <window-title> [--right-top] [--x N --y N]
       Move a window to a specific position.
   a11y <action> <grap> [options]
