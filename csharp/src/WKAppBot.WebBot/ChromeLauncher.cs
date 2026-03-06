@@ -78,7 +78,11 @@ public static class ChromeLauncher
     {
         // Check if Chrome is already listening on this port
         if (await IsPortActiveAsync(port))
+        {
+            // Existing Chrome — don't touch its windows!
+            // Caller uses CdpClient.EnsureCorrectWindowAsync() to handle positioning.
             return null;
+        }
 
         var chromePath = FindChrome()
             ?? throw new FileNotFoundException("Chrome not found. Install Chrome or add it to PATH.");
@@ -89,6 +93,10 @@ public static class ChromeLauncher
         // Kill any stale Chrome processes using our user-data-dir that aren't serving CDP
         // This prevents "profile lock" issues where a zombie Chrome holds the profile
         await KillStaleChromesAsync(userDataDir);
+
+        // Re-check: KillStaleChromesAsync may have freed the port for an existing healthy Chrome
+        if (await IsPortActiveAsync(port))
+            return null;
 
         var arguments = $"--remote-debugging-port={port} --user-data-dir=\"{userDataDir}\"";
         // Isolation & performance flags
@@ -101,10 +109,12 @@ public static class ChromeLauncher
         arguments += " --renderer-process-limit=2";  // Limit renderer processes
         arguments += " --disable-features=TranslateUI,BlinkGenPropertyTrees";
         arguments += " --disable-hang-monitor --disable-popup-blocking";
+        arguments += " --disable-session-crashed-bubble --disable-infobars --hide-crash-restore-bubble";
         // Force accessibility tree for web content — enables UIA to read page headings, text, links
         arguments += " --force-renderer-accessibility";
-        // Viewport for CDP screenshots; start minimized to avoid stealing focus
-        arguments += " --window-size=1024,1024 --start-minimized";
+        // Position at expected bounds from start. Focus guard handles focus theft.
+        var bounds = CdpClient.ExpectedBounds;
+        arguments += $" --window-size={bounds.W},{bounds.H} --window-position={bounds.X},{bounds.Y}";
         if (headless)
             arguments += " --headless=new";
 
@@ -139,21 +149,15 @@ public static class ChromeLauncher
                 var json = await http.GetStringAsync($"http://localhost:{port}/json/version");
                 if (!string.IsNullOrEmpty(json))
                 {
-                    // Focusless restore: SW_SHOWNOACTIVATE (4) makes Chrome render
-                    // without stealing focus from the user's active window
+                    // Position Chrome window at expected bounds.
+                    // Focus guard in caller handles any focus theft.
                     try
                     {
-                        var prevFg = GetForegroundWindow();
                         var mainHwnd = FindChromeMainWindow(process.Id);
                         if (mainHwnd != IntPtr.Zero)
-                            ShowWindow(mainHwnd, 4); // SW_SHOWNOACTIVATE
-
-                        // Focus theft recovery: if Chrome stole focus, restore + warn
-                        var nowFg = GetForegroundWindow();
-                        if (prevFg != IntPtr.Zero && nowFg != prevFg)
                         {
-                            SetForegroundWindow(prevFg);
-                            try { OnFocusTheft?.Invoke(mainHwnd, prevFg); } catch { }
+                            // SWP_NOACTIVATE(0x10)|SWP_NOZORDER(0x4)|SWP_NOOWNERZORDER(0x200)
+                            SetWindowPos(mainHwnd, IntPtr.Zero, bounds.X, bounds.Y, bounds.W, bounds.H, 0x0214);
                         }
                     }
                     catch { }
@@ -167,19 +171,21 @@ public static class ChromeLauncher
         throw new TimeoutException($"Chrome started but CDP endpoint not ready after 10s (port {port})");
     }
 
-    /// <summary>Check if CDP is already active on a port.</summary>
+    /// <summary>Check if CDP is already active on a port (retries once on failure).</summary>
     public static async Task<bool> IsPortActiveAsync(int port)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-        try
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+        for (int attempt = 0; attempt < 2; attempt++)
         {
-            var json = await http.GetStringAsync($"http://localhost:{port}/json/version");
-            return !string.IsNullOrEmpty(json);
+            try
+            {
+                var json = await http.GetStringAsync($"http://localhost:{port}/json/version");
+                if (!string.IsNullOrEmpty(json)) return true;
+            }
+            catch { }
+            if (attempt == 0) await Task.Delay(300);
         }
-        catch
-        {
-            return false;
-        }
+        return false;
     }
 
     /// <summary>
@@ -240,7 +246,7 @@ public static class ChromeLauncher
         catch { return null; }
     }
 
-    // P/Invoke for focusless window restore + focus theft recovery
+    // P/Invoke
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
@@ -249,6 +255,26 @@ public static class ChromeLauncher
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WINDOWPLACEMENT
+    {
+        public int length;
+        public int flags;
+        public int showCmd;
+        public int ptMinPosition_x, ptMinPosition_y;
+        public int ptMaxPosition_x, ptMaxPosition_y;
+        public int rcNormalPosition_left, rcNormalPosition_top, rcNormalPosition_right, rcNormalPosition_bottom;
+    }
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);

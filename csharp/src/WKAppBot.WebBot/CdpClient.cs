@@ -984,6 +984,354 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         return await EvalAsync("document.documentElement.outerHTML");
     }
 
+    // ── Window management (CDP Browser domain + Target domain) ──
+
+    /// <summary>
+    /// Expected WebBot window bounds (right side of virtual screen, near top).
+    /// Position: rightmost monitor upper area, 800x600.
+    /// Uses GetSystemMetrics (physical pixels) — same coordinate space as SetWindowPos/CDP.
+    /// For WPF Eye alignment, CLI computes separately using SystemParameters (logical px).
+    /// </summary>
+    public static (int X, int Y, int W, int H) ExpectedBounds => ComputeExpectedBounds();
+    private const int BoundsTolerance = 50;
+
+    private static (int X, int Y, int W, int H) ComputeExpectedBounds()
+    {
+        const int W = 800, H = 600;
+        const int Corner = 20; // offset from top-right corner of rightmost monitor
+        try
+        {
+            // Virtual screen = union of all monitors
+            int vx = GetSystemMetrics(76);  // SM_XVIRTUALSCREEN
+            int vw = GetSystemMetrics(78);  // SM_CXVIRTUALSCREEN
+            int rightEdge = vx + vw; // rightmost pixel of virtual screen
+
+            // Find the rightmost monitor's top-Y using MonitorFromPoint + GetMonitorInfo
+            // Point at top-right corner of virtual screen → belongs to rightmost monitor
+            int monitorTop = 0;
+            var pt = new POINT { x = rightEdge - 1, y = 0 };
+            var hMon = MonitorFromPoint(pt, 2 /* MONITOR_DEFAULTTONEAREST */);
+            if (hMon != IntPtr.Zero)
+            {
+                var mi = new MONITORINFO { cbSize = 40 }; // sizeof(MONITORINFO) = 40
+                if (GetMonitorInfo(hMon, ref mi))
+                    monitorTop = mi.rcMonitor_top;
+            }
+
+            int x = rightEdge - W - Corner;
+            int y = monitorTop + Corner;
+            return (x, y, W, H);
+        }
+        catch
+        {
+            return (100, Corner, W, H);
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int x, y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public int rcMonitor_left, rcMonitor_top, rcMonitor_right, rcMonitor_bottom;
+        public int rcWork_left, rcWork_top, rcWork_right, rcWork_bottom;
+        public int dwFlags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    /// <summary>
+    /// Get the Chrome window bounds for a given target via CDP Browser.getWindowForTarget.
+    /// Returns (windowId, left, top, width, height) or null if unavailable.
+    /// </summary>
+    public async Task<(int windowId, int left, int top, int width, int height)?> GetWindowForTargetAsync(string? targetId = null)
+    {
+        try
+        {
+            var param = new JsonObject();
+            if (targetId != null) param["targetId"] = targetId;
+            var result = await SendAsync("Browser.getWindowForTarget", param, timeoutMs: 3000);
+            if (result == null) return null;
+
+            var windowId = result["windowId"]?.GetValue<int>() ?? 0;
+            var bounds = result["bounds"];
+            if (bounds == null) return null;
+
+            return (windowId,
+                bounds["left"]?.GetValue<int>() ?? 0,
+                bounds["top"]?.GetValue<int>() ?? 0,
+                bounds["width"]?.GetValue<int>() ?? 0,
+                bounds["height"]?.GetValue<int>() ?? 0);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Set Chrome window bounds via CDP Browser.setWindowBounds.</summary>
+    public async Task<bool> SetWindowBoundsAsync(int windowId, int left, int top, int width, int height)
+    {
+        try
+        {
+            await SendAsync("Browser.setWindowBounds", new JsonObject
+            {
+                ["windowId"] = windowId,
+                ["bounds"] = new JsonObject
+                {
+                    ["left"] = left,
+                    ["top"] = top,
+                    ["width"] = width,
+                    ["height"] = height,
+                    ["windowState"] = "normal"
+                }
+            });
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Minimize Chrome window via CDP Browser.setWindowBounds. Focusless — no OS activation.</summary>
+    public async Task<bool> MinimizeWindowAsync(string? targetId = null)
+    {
+        try
+        {
+            var wb = await GetWindowForTargetAsync(targetId);
+            if (wb == null) return false;
+            await SendAsync("Browser.setWindowBounds", new JsonObject
+            {
+                ["windowId"] = wb.Value.windowId,
+                ["bounds"] = new JsonObject { ["windowState"] = "minimized" }
+            });
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Create a new Chrome window with a blank tab via CDP Target.createTarget.
+    /// Returns the new target's ID, or null on failure.
+    /// </summary>
+    public async Task<string?> CreateTargetInNewWindowAsync(string url = "about:blank")
+    {
+        try
+        {
+            var result = await SendAsync("Target.createTarget", new JsonObject
+            {
+                ["url"] = url,
+                ["newWindow"] = true
+            });
+            return result?["targetId"]?.GetValue<string>();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Switch this CdpClient to a different page target (disconnect + reconnect).
+    /// The port is needed to look up the new target's WebSocket URL from /json.
+    /// </summary>
+    public async Task<bool> SwitchToTargetAsync(string targetId, int port)
+    {
+        // Find new target's WebSocket URL
+        string? wsUrl = null;
+        try
+        {
+            var json = await _http.GetStringAsync($"http://localhost:{port}/json");
+            var targets = JsonSerializer.Deserialize<JsonArray>(json);
+            if (targets != null)
+            {
+                foreach (var t in targets)
+                {
+                    if (t?["id"]?.GetValue<string>() == targetId)
+                    {
+                        wsUrl = t?["webSocketDebuggerUrl"]?.GetValue<string>();
+                        break;
+                    }
+                }
+            }
+        }
+        catch { return false; }
+
+        if (wsUrl == null) return false;
+
+        // Disconnect current
+        _receiveCts?.Cancel();
+        if (_ws?.State == WebSocketState.Open)
+        {
+            try { await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None); }
+            catch { }
+        }
+        if (_receiveTask != null)
+        {
+            try { await _receiveTask; } catch { }
+        }
+        _ws?.Dispose();
+        _receiveCts?.Dispose();
+        _pending.Clear();
+
+        // Connect to new target
+        TargetId = targetId;
+        WebSocketUrl = wsUrl;
+        _ws = new ClientWebSocket();
+        await _ws.ConnectAsync(new Uri(wsUrl), CancellationToken.None);
+
+        _receiveCts = new CancellationTokenSource();
+        _receiveTask = ReceiveLoopAsync(_receiveCts.Token);
+
+        await SendAsync("Runtime.enable");
+        await SendAsync("Page.enable");
+        await SendAsync("DOM.enable");
+
+        try
+        {
+            var contextInfo = await SendAsync("Runtime.getExecutionContexts");
+            var contexts = contextInfo?["result"] as JsonArray;
+            var mainContext = contexts?.FirstOrDefault();
+            _currentContextId = mainContext?["id"]?.GetValue<int?>();
+        }
+        catch { }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Ensure CDP is connected to a tab identified by targetName.
+    /// Primary lookup: savedTargetId parameter (from AskTargetRegistry or caller).
+    /// Fallback: URL fragment scan, then create new tab.
+    /// </summary>
+    /// <param name="port">CDP port.</param>
+    /// <param name="targetName">Unique tab identifier (e.g. "gemini-a1b2c3d4").</param>
+    /// <param name="navigateUrl">URL to navigate after creating a new tab.</param>
+    /// <param name="savedTargetId">Previously saved target ID for reuse (from AskTargetRegistry).</param>
+    /// <param name="minimizeAfter">If true, minimize Chrome window after setup (for focusless CDP input).</param>
+    public async Task<string?> EnsureCorrectWindowAsync(int port, string? targetName = null, string? navigateUrl = null,
+        string? savedTargetId = null, bool minimizeAfter = false)
+    {
+        var (expX, expY, expW, expH) = ExpectedBounds;
+
+        // Step 0: Get all page targets
+        JsonArray? allTargets = null;
+        try
+        {
+            var json = await _http.GetStringAsync($"http://localhost:{port}/json");
+            allTargets = JsonSerializer.Deserialize<JsonArray>(json);
+        }
+        catch { return TargetId; }
+        if (allTargets == null) return TargetId;
+
+        // Step 1: Try saved target ID (from AskTargetRegistry — survives across CLI invocations)
+        if (!string.IsNullOrWhiteSpace(savedTargetId))
+        {
+            foreach (var target in allTargets)
+            {
+                if (target?["type"]?.GetValue<string>() != "page") continue;
+                var tid = target?["id"]?.GetValue<string>();
+                if (tid == savedTargetId)
+                {
+                    // Saved target still alive — reuse!
+                    if (tid != TargetId)
+                        await SwitchToTargetAsync(tid, port);
+                    if (minimizeAfter)
+                        await MinimizeWindowAsync(tid);
+                    return tid;
+                }
+            }
+            // Saved target no longer alive — fall through
+        }
+
+        // Step 2: Scan by URL fragment (legacy / backup)
+        var fragment = $"#wkbot-{targetName ?? "default"}";
+        foreach (var target in allTargets)
+        {
+            var type = target?["type"]?.GetValue<string>();
+            if (type != "page") continue;
+            var tid = target?["id"]?.GetValue<string>();
+            var url = target?["url"]?.GetValue<string>() ?? "";
+            if (tid == null || !url.Contains(fragment, StringComparison.Ordinal)) continue;
+
+            if (tid != TargetId)
+                await SwitchToTargetAsync(tid, port);
+            if (minimizeAfter)
+                await MinimizeWindowAsync(tid);
+            return tid;
+        }
+
+        // Step 3: Claim untagged tab (e.g. initial about:blank from ChromeLauncher)
+        foreach (var target in allTargets)
+        {
+            var type = target?["type"]?.GetValue<string>();
+            if (type != "page") continue;
+            var tid = target?["id"]?.GetValue<string>();
+            var url = target?["url"]?.GetValue<string>() ?? "";
+            if (tid == null) continue;
+            if (url.Contains("#wkbot-", StringComparison.Ordinal)) continue;
+
+            // Only claim blank or matching-host tabs
+            var isBlank = url.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
+                       || url.StartsWith("chrome:", StringComparison.OrdinalIgnoreCase);
+            var matchesHost = !string.IsNullOrWhiteSpace(navigateUrl)
+                           && url.Contains(new Uri(navigateUrl).Host, StringComparison.OrdinalIgnoreCase);
+            if (!isBlank && !matchesHost) continue;
+
+            if (tid != TargetId)
+                await SwitchToTargetAsync(tid, port);
+
+            // Navigate to requested URL
+            if (!string.IsNullOrWhiteSpace(navigateUrl))
+            {
+                try { await NavigateAsync(navigateUrl); }
+                catch { }
+            }
+
+            if (minimizeAfter)
+                await MinimizeWindowAsync(tid);
+            return tid;
+        }
+
+        // Step 4: Nothing usable — create new tab in existing window (avoid new window popup)
+        string? newTargetId = null;
+        try
+        {
+            var createUrl = navigateUrl ?? "about:blank";
+            var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
+            newTargetId = result?["targetId"]?.GetValue<string>();
+        }
+        catch { }
+
+        if (newTargetId == null)
+        {
+            // Fallback: new window
+            newTargetId = await CreateTargetInNewWindowAsync(navigateUrl ?? "about:blank");
+            if (newTargetId == null) return TargetId;
+
+            await Task.Delay(300);
+            var newWb = await GetWindowForTargetAsync(newTargetId);
+            if (newWb != null)
+                await SetWindowBoundsAsync(newWb.Value.windowId, expX, expY, expW, expH);
+        }
+
+        await Task.Delay(200);
+        await SwitchToTargetAsync(newTargetId, port);
+
+        if (minimizeAfter)
+            await MinimizeWindowAsync(newTargetId);
+        return newTargetId;
+    }
+
+    private static bool IsAtExpectedBounds(
+        (int windowId, int left, int top, int width, int height) wb,
+        int expX, int expY, int expW, int expH) =>
+        Math.Abs(wb.left - expX) < BoundsTolerance &&
+        Math.Abs(wb.top - expY) < BoundsTolerance &&
+        Math.Abs(wb.width - expW) < BoundsTolerance &&
+        Math.Abs(wb.height - expH) < BoundsTolerance;
+
     /// <summary>Disconnect from Chrome.</summary>
     public async Task DisconnectAsync()
     {

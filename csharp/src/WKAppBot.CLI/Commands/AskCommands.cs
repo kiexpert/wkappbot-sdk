@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using WKAppBot.WebBot;
+using NativeMethods = WKAppBot.Win32.Native.NativeMethods;
 
 namespace WKAppBot.CLI;
 
@@ -70,87 +71,55 @@ Examples:
 
     sealed record CdpPageTarget(string Id, string Url, string Title, string WebSocketDebuggerUrl);
 
-    // Stable tag per provider — reuses the same tab across invocations
-    static string BuildAskTargetTag(string provider) => $"wk-ask-{provider}";
+    // Stable tag per session+provider — reuses the same tab across CLI invocations within a session
+    // Format: {provider}-{sessionHash} (e.g. "gemini-a1b2c3d4")
+    static string BuildAskTargetTag(string provider)
+    {
+        var hash = GetSessionTag() ?? "default";
+        return $"{provider}-{hash}";
+    }
 
     /// <summary>
     /// Connect to CDP, launching Chrome if needed.
-    /// Default behavior: reuse an existing matching tab (single-tab friendly).
+    /// Uses AskTargetRegistry + EnsureCorrectWindowAsync for tab reuse.
+    /// Focus guard thread prevents Chrome from stealing keyboard focus.
     /// </summary>
     static CdpClient? EnsureCdpConnection(int port = 9222, string? preferredHost = null, bool newTab = false, string? targetTag = null)
     {
         var task = Task.Run(async () =>
         {
-            var active = await ChromeLauncher.IsPortActiveAsync(port);
-            if (!active)
-            {
-                // Launch Chrome directly with target URL (no about:blank)
-                var launchUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
-                Console.WriteLine($"[ASK] Launching Chrome → {launchUrl ?? "about:blank"}...");
-                await ChromeLauncher.LaunchAsync(port: port, url: launchUrl);
-                await Task.Delay(2500);
-            }
-
-            var pages = await GetPageTargetsAsync(port);
-            if (pages.Count == 0)
-            {
-                Console.WriteLine("[ASK] No page target found on CDP");
-                return (CdpClient?)null;
-            }
-
-            int targetIndex = -1;
-            string? pinnedId = null;
-
-            if (!string.IsNullOrWhiteSpace(targetTag))
-            {
-                pinnedId = AskTargetRegistry.GetTargetId(targetTag);
-                if (!string.IsNullOrWhiteSpace(pinnedId))
-                {
-                    targetIndex = pages.FindIndex(p => string.Equals(p.Id, pinnedId, StringComparison.OrdinalIgnoreCase));
-                    if (targetIndex < 0)
-                        AskTargetRegistry.RemoveTargetId(targetTag);
-                }
-            }
-
-            if (targetIndex < 0 && !string.IsNullOrWhiteSpace(preferredHost))
-            {
-                for (int i = 0; i < pages.Count; i++)
-                {
-                    var u = pages[i].Url ?? string.Empty;
-                    if (u.Contains(preferredHost, StringComparison.OrdinalIgnoreCase))
-                    {
-                        targetIndex = i;
-                        break;
-                    }
-                }
-            }
-
-            // Only force new tab if explicitly requested
-            if (newTab && targetIndex < 0)
-            {
-                var newTargetUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : "about:blank";
-                try
-                {
-                    using var http = new HttpClient();
-                    _ = await http.GetStringAsync($"http://localhost:{port}/json/new?{Uri.EscapeDataString(newTargetUrl)}");
-                    pages = await GetPageTargetsAsync(port);
-                    targetIndex = Math.Max(0, pages.Count - 1);
-                }
-                catch
-                {
-                    targetIndex = targetIndex < 0 ? 0 : targetIndex;
-                }
-            }
-
-            if (targetIndex < 0)
-                targetIndex = 0;
-
             try
             {
+                var active = await ChromeLauncher.IsPortActiveAsync(port);
+                if (!active)
+                {
+                    var launchUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
+                    Console.WriteLine($"[ASK] Launching Chrome → {launchUrl ?? "about:blank"}...");
+                    await ChromeLauncher.LaunchAsync(port: port, url: launchUrl);
+                    await Task.Delay(2500);
+                }
+
                 var cdp = new CdpClient();
-                await cdp.ConnectAsync(port, tabIndex: targetIndex, timeoutMs: 5000, preferredTargetTag: targetTag);
-                if (!string.IsNullOrWhiteSpace(targetTag) && !string.IsNullOrWhiteSpace(cdp.TargetId))
-                    AskTargetRegistry.SetTargetId(targetTag, cdp.TargetId);
+                await cdp.ConnectAsync(port, timeoutMs: 5000);
+
+                // Look up saved target from registry (survives across CLI invocations)
+                var savedTargetId = !string.IsNullOrWhiteSpace(targetTag) ? AskTargetRegistry.GetTargetId(targetTag) : null;
+                if (savedTargetId != null)
+                    Console.WriteLine($"[ASK] Registry hit: {targetTag} → {savedTargetId[..Math.Min(8, savedTargetId.Length)]}");
+
+                var navigateUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
+                var resolvedId = await cdp.EnsureCorrectWindowAsync(port, targetTag, navigateUrl,
+                    savedTargetId: savedTargetId);
+
+                // Save resolved target to registry for next invocation
+                if (resolvedId != null && !string.IsNullOrWhiteSpace(targetTag))
+                {
+                    AskTargetRegistry.SetTargetId(targetTag, resolvedId);
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"[ASK] Target: {targetTag} → {resolvedId[..Math.Min(8, resolvedId.Length)]}");
+                    Console.ResetColor();
+                }
+
                 return (CdpClient?)cdp;
             }
             catch (Exception ex)
@@ -234,6 +203,7 @@ Examples:
     static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab)
     {
         Console.WriteLine($"[ASK] Gemini: {question}");
+        using var focusGuard = new CdpFocusGuard();
 
         var targetTag = BuildAskTargetTag("gemini");
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
@@ -418,6 +388,7 @@ Examples:
     static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab)
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
+        using var focusGuard = new CdpFocusGuard();
 
         var targetTag = BuildAskTargetTag("gpt");
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
@@ -624,6 +595,8 @@ Examples:
             });
         }
 
+        Console.WriteLine($"[ASK] Sent! Waiting for response... (prevTurns={prevTurns}, send={sendResult})");
+
         // Wait for new assistant turn
         var sw = Stopwatch.StartNew();
         bool newTurnAppeared = false;
@@ -644,8 +617,8 @@ Examples:
                 "document.querySelectorAll('[data-message-author-role=\"assistant\"]').length") ?? "0";
             if (int.TryParse(cur, out var c) && c > prevTurns) { newTurnAppeared = true; break; }
 
-            if (sw.Elapsed.TotalSeconds > 10)
-                Console.WriteLine($"[ASK] Waiting for turn... ({cur} turns, {sw.Elapsed.TotalSeconds:F0}s)");
+            if (sw.Elapsed.TotalSeconds > 3)
+                Console.WriteLine($"[ASK] Waiting for turn... (now={cur}, prev={prevTurns}, {sw.Elapsed.TotalSeconds:F0}s)");
         }
         if (!newTurnAppeared)
         {
@@ -669,11 +642,15 @@ Examples:
                     var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
                     if (msgs.length === 0) return JSON.stringify({s:!!stop,t:''});
                     var last = msgs[msgs.length - 1];
-                    // A11y-first text extraction: .markdown innerText → textContent → aria-label
-                    var md = last.querySelector('.markdown');
+                    // A11y-first text extraction: skip result-thinking, prefer result-streaming or plain .markdown
+                    var md = last.querySelector('.markdown:not(.result-thinking)')
+                          || last.querySelector('.result-streaming')
+                          || last.querySelector('.markdown');
                     var txt = md ? (md.innerText || md.textContent) : '';
                     if (!txt) txt = last.innerText || last.textContent || '';
                     if (!txt) { var lbl = last.getAttribute('aria-label'); if (lbl) txt = lbl; }
+                    // If only result-thinking exists, treat as streaming (still generating)
+                    if (!txt && last.querySelector('.result-thinking')) stop = true;
                     return JSON.stringify({s:!!stop,t:txt||''});
                 })()
                 """);
@@ -705,6 +682,7 @@ Examples:
                 }
                 else { stableCount = 0; lastText = text; }
             }
+            // Silent wait — DOM debug logging removed
         }
 
         if (!string.IsNullOrEmpty(lastText))
@@ -714,6 +692,54 @@ Examples:
         }
         Console.WriteLine("[ASK] Timeout -- no response");
         return (false, null);
+    }
+
+    // ── Focus Guard ──
+    // Polls foreground window every 50ms and restores if Chrome steals it.
+    // Wraps the entire ask flow so the user's keyboard focus is never lost.
+
+    sealed class CdpFocusGuard : IDisposable
+    {
+        readonly IntPtr _protectedHwnd;
+        readonly CancellationTokenSource _cts = new();
+        readonly Task _task;
+        int _theftCount;
+
+        public CdpFocusGuard()
+        {
+            _protectedHwnd = NativeMethods.GetForegroundWindow();
+            _task = Task.Run(async () =>
+            {
+                while (!_cts.IsCancellationRequested)
+                {
+                    try
+                    {
+                        var fg = NativeMethods.GetForegroundWindow();
+                        if (_protectedHwnd != IntPtr.Zero && fg != _protectedHwnd && fg != IntPtr.Zero)
+                        {
+                            NativeMethods.SetForegroundWindow(_protectedHwnd);
+                            Interlocked.Increment(ref _theftCount);
+                        }
+                    }
+                    catch { }
+                    await Task.Delay(50);
+                }
+            });
+        }
+
+        public void Dispose()
+        {
+            _cts.Cancel();
+            try { _task.Wait(500); } catch { }
+            _cts.Dispose();
+            var count = _theftCount;
+            if (count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($"[FOCUS] Guard blocked {count} focus theft(s)");
+                Console.ResetColor();
+            }
+        }
     }
 
     // ── Slack Report ──

@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using WKAppBot.Core.Runner;
@@ -133,12 +135,64 @@ Options:
     static int GetPort(string[] args) =>
         int.TryParse(GetArgValue(args, "--port"), out var p) ? p : 9222;
 
-    static CdpClient ConnectCdp(int port, bool withBar = true, bool verifyWebBot = false)
+    /// <summary>
+    /// Compute a short session tag from the current Claude Code JSONL file path.
+    /// Same session → same hash → same Chrome tab across CLI invocations.
+    /// </summary>
+    static string? GetSessionTag()
+    {
+        try
+        {
+            var cpDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".claude", "projects");
+            if (!Directory.Exists(cpDir)) return null;
+
+            // Find most recently modified .jsonl = active session
+            var latest = Directory.EnumerateFiles(cpDir, "*.jsonl", SearchOption.AllDirectories)
+                .Select(f => { try { return new FileInfo(f); } catch { return null; } })
+                .Where(fi => fi is { Length: > 0 })
+                .OrderByDescending(fi => fi!.LastWriteTimeUtc)
+                .FirstOrDefault();
+
+            if (latest == null) return null;
+
+            // Short hash of the full path (8 hex chars = stable per session file)
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(latest.FullName));
+            return Convert.ToHexString(hash, 0, 4).ToLowerInvariant(); // 8 hex chars
+        }
+        catch { return null; }
+    }
+
+    static CdpClient ConnectCdp(int port, bool withBar = true, bool verifyWebBot = false, bool ensureWindow = true)
     {
         var cdp = new CdpClient();
         cdp.ConnectAsync(port).GetAwaiter().GetResult();
         if (withBar)
             cdp.InjectWebBotBar = true;
+
+        // Ensure we're connected to this session's tab in the correctly-positioned window.
+        // Uses URL fragment (#wkbot-{hash}) to identify "my" tab across CLI invocations.
+        if (ensureWindow)
+        {
+            try
+            {
+                var sessionTag = GetSessionTag();
+                var targetName = $"web-{sessionTag ?? "default"}";
+                var targetId = cdp.EnsureCorrectWindowAsync(port, targetName).GetAwaiter().GetResult();
+                if (targetId != null && targetId != cdp.TargetId)
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"[WEB] Switched to WebBot tab (tag={sessionTag ?? "?"}, target={targetId?[..8]})");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($"[WEB] Window check skipped: {ex.Message}");
+                Console.ResetColor();
+            }
+        }
 
         // Verify we're connected to a WebBot-managed Chrome, not user's normal browser
         if (verifyWebBot)
