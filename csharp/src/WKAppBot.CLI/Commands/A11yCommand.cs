@@ -21,6 +21,7 @@ internal partial class Program
             Console.WriteLine();
             Console.WriteLine($"  WKAppBot a11y {verStr}");
             Console.WriteLine($"  A MUD-style teleporter for AI to see and touch the real world.");
+            Console.WriteLine($"  find = look, read = examine, invoke = open the door.");
             Console.WriteLine($"  20 actions · 3-tier fallback · focusless · zoom overlay");
             Console.WriteLine($"  UIA → Win32 → SendInput — just works.");
             Console.WriteLine();
