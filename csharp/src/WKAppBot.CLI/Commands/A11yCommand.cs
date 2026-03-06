@@ -55,8 +55,18 @@ internal partial class Program
         if (action == "resize" && (mw == null || mh == null))
             return Error("resize requires --w N --h N");
 
-        // Find windows by grap (title pattern)
-        var windows = WindowFinder.FindByTitle(grap);
+        // Find windows by grap (title pattern) — supports ';' OR syntax
+        var grapPatterns = grap.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var windows = new List<WindowInfo>();
+        var seen = new HashSet<IntPtr>();
+        foreach (var pat in grapPatterns)
+        {
+            foreach (var w in WindowFinder.FindByTitle(pat))
+            {
+                if (seen.Add(w.Handle))
+                    windows.Add(w);
+            }
+        }
         if (windows.Count == 0)
             return Error($"No window found: \"{grap}\"");
 
