@@ -20,7 +20,7 @@ internal partial class Program
             var verStr = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
             Console.WriteLine();
             Console.WriteLine($"  WKAppBot a11y {verStr}");
-            Console.WriteLine($"  Standard Accessibility Actions for Windows Automation");
+            Console.WriteLine($"  A MUD-style teleporter for AI to see and touch the real world.");
             Console.WriteLine($"  20 actions · 3-tier fallback · focusless · zoom overlay");
             Console.WriteLine($"  UIA → Win32 → SendInput — just works.");
             Console.WriteLine();
