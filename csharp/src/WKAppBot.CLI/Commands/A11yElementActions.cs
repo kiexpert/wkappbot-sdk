@@ -543,6 +543,52 @@ internal partial class Program
 
     // ═══ Element Helpers ═══
 
+    /// <summary>
+    /// Ensure target element's tab is active. Walks up UIA parent chain looking for
+    /// unselected TabItem ancestors → auto-select them (focusless UIA SelectionItem).
+    /// Returns true if a tab was activated (caller may need to re-resolve scope).
+    /// </summary>
+    static bool EnsureTabActive(AutomationElement el)
+    {
+        try
+        {
+            var current = el;
+            for (int i = 0; i < 20; i++) // max 20 levels up
+            {
+                AutomationElement? parent;
+                try { parent = current.Parent; } catch { break; }
+                if (parent == null) break;
+
+                try
+                {
+                    var ct = parent.Properties.ControlType.ValueOrDefault;
+                    if (ct == ControlType.TabItem)
+                    {
+                        // Check if this TabItem is selected
+                        try
+                        {
+                            var selPat = parent.Patterns.SelectionItem;
+                            if (selPat.IsSupported && !selPat.Pattern.IsSelected.Value)
+                            {
+                                var tabName = parent.Properties.Name.ValueOrDefault ?? "(unnamed)";
+                                selPat.Pattern.Select();
+                                Console.WriteLine($"[A11Y] tab activated: \"{tabName}\"");
+                                Thread.Sleep(200);
+                                return true;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+
+                current = parent;
+            }
+        }
+        catch { }
+        return false;
+    }
+
     static IntPtr GetElementHwnd(AutomationElement el)
     {
         try
