@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using WKAppBot.Core.Scenario;
@@ -30,8 +31,33 @@ internal partial class Program
     /// All logs, profiles, output go here — keeps SDK/bin clean.
     /// HQ = HeadQuarters (본부: 경험치 축적 + 작전 기록 + 전과 보고)
     /// </summary>
-    static readonly string DataDir = Path.Combine(
+    internal static readonly string DataDir = Path.Combine(
         Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".", "wkappbot.hq");
+
+    internal static string GetCurrentSessionHash()
+    {
+        try
+        {
+            var sessionsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "agents", "main", "sessions");
+            if (!Directory.Exists(sessionsDir))
+                return "none";
+
+            var latestFile = Directory.GetFiles(sessionsDir, "*.jsonl")
+                .OrderByDescending(p => File.GetLastWriteTimeUtc(p))
+                .FirstOrDefault();
+            if (string.IsNullOrEmpty(latestFile) || !File.Exists(latestFile))
+                return "none";
+
+            using var sha = SHA256.Create();
+            var data = Encoding.UTF8.GetBytes(Path.GetFullPath(latestFile));
+            var hash = sha.ComputeHash(data);
+            return Convert.ToHexString(hash).ToLowerInvariant()[..16];
+        }
+        catch
+        {
+            return "none";
+        }
+    }
 
     static int Main(string[] args)
     {
@@ -65,6 +91,8 @@ internal partial class Program
         int exitCode = 1;
         try
         {
+            AgentPolicy.StartPolicyBroadcast();
+            
             if (args.Length == 0)
             {
                 PrintUsage();
@@ -351,7 +379,7 @@ internal partial class Program
         public string Cwd { get; set; } = "";  // working directory of the CLI process
     }
 
-    static string EyeTicksPath => Path.Combine(DataDir, "runtime", "eye_ticks.jsonl");
+    internal static string EyeTicksPath => Path.Combine(DataDir, "runtime", "eye_ticks.jsonl");
 
     static void EmitEyeTick(string command, string tag, string status)
     {

@@ -31,3 +31,8 @@ nul
 # Environment
 .env
 .vs/
+*.ps1
+*.png
+tmp/
+tmp*
+agent-policy*.txt
