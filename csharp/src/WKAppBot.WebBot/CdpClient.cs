@@ -1234,15 +1234,30 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                 var tid = target?["id"]?.GetValue<string>();
                 if (tid == savedTargetId)
                 {
-                    // Saved target still alive — reuse!
+                    // Saved target still alive — check browser window position + tab health
                     if (tid != TargetId)
                         await SwitchToTargetAsync(tid, port);
+
+                    // Position check: if user moved the window → abandon, create new
+                    var wb = await GetWindowForTargetAsync(tid);
+                    if (wb == null)
+                    {
+                        Console.WriteLine("[ASK] Cannot get window bounds — creating new window");
+                        break;
+                    }
+                    Console.WriteLine($"[ASK] Window at ({wb.Value.left},{wb.Value.top},{wb.Value.width},{wb.Value.height}), expected ({expX},{expY},{expW},{expH})");
+                    if (!IsAtExpectedBounds(wb.Value, expX, expY, expW, expH))
+                    {
+                        Console.WriteLine("[ASK] Browser not at expected position — creating new window");
+                        break; // fall through to Step 4
+                    }
+
                     if (minimizeAfter)
                         await MinimizeWindowAsync(tid);
                     return tid;
                 }
             }
-            // Saved target no longer alive — fall through
+            // Saved target no longer alive or window moved — fall through
         }
 
         // Step 2: Scan by URL fragment (legacy / backup)
@@ -1262,7 +1277,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             return tid;
         }
 
-        // Step 3: Claim untagged tab (e.g. initial about:blank from ChromeLauncher)
+        // Step 3: Claim untagged tab in correctly-positioned window
         foreach (var target in allTargets)
         {
             var type = target?["type"]?.GetValue<string>();
@@ -1279,8 +1294,12 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                            && url.Contains(new Uri(navigateUrl).Host, StringComparison.OrdinalIgnoreCase);
             if (!isBlank && !matchesHost) continue;
 
+            // Check window position — skip tabs in moved windows
             if (tid != TargetId)
                 await SwitchToTargetAsync(tid, port);
+            var twb = await GetWindowForTargetAsync(tid);
+            if (twb != null && !IsAtExpectedBounds(twb.Value, expX, expY, expW, expH))
+                continue; // window moved — don't claim this tab
 
             // Navigate to requested URL
             if (!string.IsNullOrWhiteSpace(navigateUrl))
@@ -1294,22 +1313,53 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             return tid;
         }
 
-        // Step 4: Nothing usable — create new tab in existing window (avoid new window popup)
+        // Step 4: Create new tab — prefer existing correctly-positioned window, else new window
         string? newTargetId = null;
-        try
-        {
-            var createUrl = navigateUrl ?? "about:blank";
-            var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
-            newTargetId = result?["targetId"]?.GetValue<string>();
-        }
-        catch { }
+        var createUrl = navigateUrl ?? "about:blank";
 
+        // First: check if any existing tab lives in a correctly-positioned window
+        // If so, create new tab there (reuse window, avoid stacking)
+        foreach (var target in allTargets)
+        {
+            if (target?["type"]?.GetValue<string>() != "page") continue;
+            var existingTid = target?["id"]?.GetValue<string>();
+            if (existingTid == null) continue;
+            try
+            {
+                // Temporarily switch to check its window bounds
+                if (existingTid != TargetId)
+                    await SwitchToTargetAsync(existingTid, port);
+                var existingWb = await GetWindowForTargetAsync(existingTid);
+                if (existingWb != null && IsAtExpectedBounds(existingWb.Value, expX, expY, expW, expH))
+                {
+                    // Found a correctly-positioned window — create tab here
+                    Console.WriteLine($"[ASK] Reusing window at ({existingWb.Value.left},{existingWb.Value.top}) for new tab");
+                    var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
+                    newTargetId = result?["targetId"]?.GetValue<string>();
+                    break;
+                }
+            }
+            catch { }
+        }
+
+        // No correctly-positioned window found — create new window
         if (newTargetId == null)
         {
-            // Fallback: new window
-            newTargetId = await CreateTargetInNewWindowAsync(navigateUrl ?? "about:blank");
-            if (newTargetId == null) return TargetId;
+            try { newTargetId = await CreateTargetInNewWindowAsync(createUrl); }
+            catch { }
 
+            if (newTargetId == null)
+            {
+                try
+                {
+                    var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
+                    newTargetId = result?["targetId"]?.GetValue<string>();
+                }
+                catch { }
+                if (newTargetId == null) return TargetId;
+            }
+
+            // Position new window at expected bounds
             await Task.Delay(300);
             var newWb = await GetWindowForTargetAsync(newTargetId);
             if (newWb != null)

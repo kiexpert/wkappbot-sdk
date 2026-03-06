@@ -270,34 +270,79 @@ Examples:
                     }
                 }
 
-                // Send button: a11y aria-label chain (multi-lang)
+                // Send: a11y-first (CDP real click on button) → focusless Enter fallback
+                // Keep trying until editor is empty (= message sent)
                 await Task.Delay(300);
-                var sendResult = await cdp.EvalAsync("""
-                    (() => {
-                        var btn = document.querySelector('button[aria-label="메시지 보내기"]')
-                               || document.querySelector('button[aria-label="Send message"]')
-                               || document.querySelector('button.send-button');
-                        if (!btn) return 'NO_BUTTON';
-                        btn.click();
-                        return 'SENT';
-                    })()
-                    """);
-                if (sendResult != "SENT")
+                var sendResult = "PENDING";
+                for (int sendAttempt = 0; sendAttempt < 5; sendAttempt++)
                 {
-                    // Fallback: Enter key
-                    await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                    // Check if editor still has text
+                    var remaining = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 0") ?? "0";
+                    if (remaining == "0" && sendAttempt > 0)
                     {
-                        ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
-                        ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
-                    });
-                    await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
-                    {
-                        ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
-                        ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
-                    });
-                }
+                        sendResult = $"SENT(attempt={sendAttempt})";
+                        break; // editor cleared = message sent!
+                    }
 
-                Console.WriteLine("[ASK] Sent! Waiting for response...");
+                    // Re-insert text if editor is empty (text didn't stick)
+                    if (remaining == "0" && sendAttempt == 0)
+                    {
+                        await InsertTextContentEditable(cdp, editorSel, question);
+                        await Task.Delay(200);
+                    }
+
+                    // A11y-first: find send button by aria-label → get bounding rect → CDP mouse click
+                    var clickResult = await cdp.EvalAsync("""
+                        (() => {
+                            var btn = document.querySelector('button[aria-label="메시지 보내기"]')
+                                   || document.querySelector('button[aria-label="Send message"]')
+                                   || document.querySelector('button.send-button');
+                            if (!btn || btn.disabled) return 'NO_BUTTON';
+                            var r = btn.getBoundingClientRect();
+                            if (r.width === 0 || r.height === 0) return 'INVISIBLE';
+                            return JSON.stringify({x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2)});
+                        })()
+                        """) ?? "NO_BUTTON";
+
+                    if (clickResult != "NO_BUTTON" && clickResult != "INVISIBLE" && clickResult.StartsWith("{"))
+                    {
+                        // A11y: CDP real mouse click at button center (focusless, no keyboard focus needed)
+                        try
+                        {
+                            var coords = System.Text.Json.Nodes.JsonNode.Parse(clickResult);
+                            var bx = coords?["x"]?.GetValue<int>() ?? 0;
+                            var by = coords?["y"]?.GetValue<int>() ?? 0;
+                            await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
+                            {
+                                ["type"] = "mousePressed", ["x"] = bx, ["y"] = by, ["button"] = "left", ["clickCount"] = 1
+                            });
+                            await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
+                            {
+                                ["type"] = "mouseReleased", ["x"] = bx, ["y"] = by, ["button"] = "left", ["clickCount"] = 1
+                            });
+                        }
+                        catch { }
+                    }
+                    else
+                    {
+                        // Fallback: focusless Enter key via CDP
+                        await Task.Delay(100);
+                        await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
+                            ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+                        });
+                        await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
+                            ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+                        });
+                    }
+                    await Task.Delay(500);
+                }
+                if (sendResult == "PENDING") sendResult = "FORCED(5x)";
+
+                Console.WriteLine($"[ASK] Sent! Waiting for response... (send={sendResult})");
 
                 // Wait for response — poll until text stabilizes
                 string? lastText = null;
@@ -569,20 +614,44 @@ Examples:
             }
         }
 
-        // ── Send: button click (a11y) → Enter key fallback ──
+        // ── A11y-first: find send button → CDP real mouse click → Enter fallback ──
         await Task.Delay(500);
         var sendResult = await cdp.EvalAsync("""
             (() => {
                 var btn = document.querySelector('button[data-testid="send-button"]')
                        || document.querySelector('button[aria-label*="보내기"]')
                        || document.querySelector('button[aria-label*="Send"]');
-                if (btn && !btn.disabled) { btn.click(); return 'CLICKED'; }
-                return 'NO_BTN';
+                if (!btn || btn.disabled) return 'NO_BTN';
+                var r = btn.getBoundingClientRect();
+                if (r.width === 0 || r.height === 0) return 'INVISIBLE';
+                return JSON.stringify({x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2)});
             })()
-            """);
+            """) ?? "NO_BTN";
+
+        if (sendResult != "NO_BTN" && sendResult != "INVISIBLE" && sendResult.StartsWith("{"))
+        {
+            // A11y: CDP real mouse click at button center
+            try
+            {
+                var coords = System.Text.Json.Nodes.JsonNode.Parse(sendResult);
+                var bx = coords?["x"]?.GetValue<int>() ?? 0;
+                var by = coords?["y"]?.GetValue<int>() ?? 0;
+                await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
+                {
+                    ["type"] = "mousePressed", ["x"] = bx, ["y"] = by, ["button"] = "left", ["clickCount"] = 1
+                });
+                await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
+                {
+                    ["type"] = "mouseReleased", ["x"] = bx, ["y"] = by, ["button"] = "left", ["clickCount"] = 1
+                });
+                sendResult = "CLICKED";
+            }
+            catch { sendResult = "CLICK_FAIL"; }
+        }
 
         if (sendResult != "CLICKED")
         {
+            // Fallback: focusless Enter key
             await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
             {
                 ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
@@ -593,6 +662,7 @@ Examples:
                 ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
                 ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
             });
+            sendResult = "ENTER";
         }
 
         Console.WriteLine($"[ASK] Sent! Waiting for response... (prevTurns={prevTurns}, send={sendResult})");
