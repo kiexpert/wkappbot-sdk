@@ -255,29 +255,57 @@ Examples:
                     await Task.Delay(3000);
                 }
 
-                // Wait for editor
-                for (int i = 0; i < 10; i++)
+                // A11y-first: find editor via selector chain
+                var editorSel = await WaitForEditorA11y(cdp,
+                    ".ql-editor",                                   // Quill class
+                    "[role='textbox'][contenteditable='true']",      // ARIA role
+                    "div[contenteditable='true']"                    // Generic
+                );
+                if (editorSel == null)
                 {
-                    var found = await cdp.EvalAsync("document.querySelector('.ql-editor') ? 'yes' : 'no'");
-                    if (found == "yes") break;
-                    await Task.Delay(500);
-                }
-
-                // Clear and insert question
-                await ClearContentEditable(cdp, ".ql-editor");
-                await Task.Delay(200);
-                var inserted = await InsertTextContentEditable(cdp, ".ql-editor", question);
-                if (!inserted)
-                {
-                    Console.WriteLine("[ASK] Failed to insert text");
+                    Console.WriteLine("[ASK] Editor not found");
                     return (false, (string?)null);
                 }
 
-                // Click send
+                // Clear + insert via CDP Input.insertText (a11y-first)
+                await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
+                await Task.Delay(100);
+                await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                {
+                    ["type"] = "keyDown", ["key"] = "a", ["code"] = "KeyA",
+                    ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
+                });
+                await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                {
+                    ["type"] = "keyUp", ["key"] = "a", ["code"] = "KeyA",
+                    ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
+                });
+                await Task.Delay(50);
+                await cdp.SendAsync("Input.insertText", new System.Text.Json.Nodes.JsonObject
+                {
+                    ["text"] = question
+                });
+                await Task.Delay(200);
+
+                // Verify insertion, fallback to execCommand
+                var verify = await cdp.EvalAsync(
+                    $"document.querySelector('{editorSel}')?.textContent?.length ?? 0") ?? "0";
+                if (verify == "0")
+                {
+                    var inserted = await InsertTextContentEditable(cdp, editorSel, question);
+                    if (!inserted)
+                    {
+                        Console.WriteLine("[ASK] Failed to insert text");
+                        return (false, (string?)null);
+                    }
+                }
+
+                // Send button: a11y aria-label chain (multi-lang)
                 await Task.Delay(300);
                 var sendResult = await cdp.EvalAsync("""
                     (() => {
                         var btn = document.querySelector('button[aria-label="메시지 보내기"]')
+                               || document.querySelector('button[aria-label="Send message"]')
                                || document.querySelector('button.send-button');
                         if (!btn) return 'NO_BUTTON';
                         btn.click();
@@ -286,8 +314,17 @@ Examples:
                     """);
                 if (sendResult != "SENT")
                 {
-                    Console.WriteLine($"[ASK] Send failed: {sendResult}");
-                    return (false, (string?)null);
+                    // Fallback: Enter key
+                    await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                    {
+                        ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
+                        ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+                    });
+                    await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                    {
+                        ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
+                        ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+                    });
                 }
 
                 Console.WriteLine("[ASK] Sent! Waiting for response...");
@@ -300,11 +337,17 @@ Examples:
                 while (sw.Elapsed.TotalSeconds < timeoutSec)
                 {
                     await Task.Delay(2000);
+                    // A11y-first: model-response → [role='article'] → generic text
                     var text = await cdp.EvalAsync("""
                         (() => {
                             var responses = document.querySelectorAll('model-response');
+                            if (responses.length === 0) {
+                                var articles = document.querySelectorAll('[role="article"]');
+                                responses = articles.length > 0 ? articles : responses;
+                            }
                             if (responses.length === 0) return '';
-                            return responses[responses.length - 1].textContent;
+                            var last = responses[responses.length - 1];
+                            return last.innerText || last.textContent || '';
                         })()
                         """);
 
@@ -367,6 +410,11 @@ Examples:
 
     // ── ChatGPT ──
 
+    // Persona prompt injected on fresh conversation to stabilize output format.
+    // Single-line to avoid ProseMirror multiline issues.
+    const string ChatGptPersona =
+        "You are a concise dev assistant. Reply in the same language as the question. Keep answers under 120 words. No disclaimers or filler. Confirm with: READY";
+
     static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab)
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
@@ -390,92 +438,40 @@ Examples:
                     await Task.Delay(3000);
                 }
 
-                // Wait for editor
-                for (int i = 0; i < 10; i++)
-                {
-                    var found = await cdp.EvalAsync("document.querySelector('#prompt-textarea') ? 'yes' : 'no'");
-                    if (found == "yes") break;
-                    await Task.Delay(500);
-                }
-
-                // Insert question
-                var inserted = await InsertTextContentEditable(cdp, "#prompt-textarea", question);
-                if (!inserted)
-                {
-                    Console.WriteLine("[ASK] Failed to insert text");
+                // Wait for ProseMirror editor
+                if (!await WaitForChatGptEditor(cdp))
                     return (false, (string?)null);
-                }
 
-                // Click send
-                await Task.Delay(300);
-                var sendResult = await cdp.EvalAsync("""
-                    (() => {
-                        var btn = document.querySelector('button[data-testid="send-button"]');
-                        if (!btn) {
-                            // Fallback: find button near composer with SVG
-                            var btns = document.querySelectorAll('button');
-                            for (var b of btns) {
-                                if (b.querySelector('svg') && b.closest('[class*="composer"]')) {
-                                    b.click();
-                                    return 'SENT';
-                                }
-                            }
-                            return 'NO_BUTTON';
-                        }
-                        btn.click();
-                        return 'SENT';
-                    })()
-                    """);
-                if (sendResult != "SENT")
+                // Check if this is a fresh conversation (no assistant turns yet)
+                var turnCountStr = await cdp.EvalAsync(
+                    "document.querySelectorAll('[data-message-author-role=\"assistant\"]').length") ?? "0";
+                int existingTurns = int.TryParse(turnCountStr, out var etc) ? etc : 0;
+
+                if (existingTurns == 0)
                 {
-                    Console.WriteLine($"[ASK] Send failed: {sendResult}");
-                    return (false, (string?)null);
-                }
-
-                Console.WriteLine("[ASK] Sent! Waiting for response...");
-
-                // Wait for response
-                string? lastText = null;
-                int stableCount = 0;
-                var sw = Stopwatch.StartNew();
-
-                while (sw.Elapsed.TotalSeconds < timeoutSec)
-                {
-                    await Task.Delay(2000);
-                    var text = await cdp.EvalAsync("""
-                        (() => {
-                            var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
-                            if (msgs.length === 0) return '';
-                            return msgs[msgs.length - 1].textContent;
-                        })()
-                        """);
-
-                    if (string.IsNullOrEmpty(text))
-                        continue;
-
-                    if (text == lastText)
+                    // Fresh conversation -- inject persona prompt first
+                    Console.WriteLine("[ASK] Fresh conversation -- injecting persona...");
+                    var (personaOk, personaResp) = await ChatGptSendAndWait(
+                        cdp, ChatGptPersona.Trim(), timeoutSec: 20);
+                    if (!personaOk)
                     {
-                        stableCount++;
-                        if (stableCount >= 2)
-                        {
-                            Console.WriteLine($"[ASK] Response received ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
-                            return (true, text);
-                        }
+                        Console.WriteLine("[ASK] Persona injection failed, continuing anyway");
                     }
                     else
                     {
-                        stableCount = 0;
-                        lastText = text;
+                        bool ready = (personaResp ?? "").Contains("READY", StringComparison.OrdinalIgnoreCase);
+                        Console.WriteLine($"[ASK] Persona: {(ready ? "READY" : personaResp?.Substring(0, Math.Min(50, personaResp.Length)))}");
                     }
                 }
 
-                if (!string.IsNullOrEmpty(lastText))
-                {
-                    Console.WriteLine($"[ASK] Timeout — partial response ({lastText.Length} chars)");
-                    return (true, lastText);
-                }
-                Console.WriteLine("[ASK] Timeout — no response");
-                return (false, (string?)null);
+                // Re-wait for editor readiness after persona exchange
+                if (!await WaitForChatGptEditor(cdp))
+                    return (false, (string?)null);
+                await Task.Delay(1000); // Let ChatGPT UI settle
+
+                // Send the actual question
+                var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec);
+                return (ok, answer);
             }
             catch (Exception ex)
             {
@@ -488,11 +484,10 @@ Examples:
 
         if (ok && answer != null)
         {
-            Console.WriteLine();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("── ChatGPT 답변 ──");
-            Console.ResetColor();
+            // Parseable output format with markers
+            Console.WriteLine("[ASK_ANSWER_BEGIN]");
             Console.WriteLine(answer.Length > 2000 ? answer[..2000] + "\n... (truncated)" : answer);
+            Console.WriteLine("[ASK_ANSWER_END]");
 
             if (slackReport)
                 ReportToSlack("ChatGPT", question, answer);
@@ -500,6 +495,225 @@ Examples:
 
         cdp.Dispose();
         return ok ? 0 : 1;
+    }
+
+    // A11y-first selector chain for ChatGPT editor (most stable → least stable)
+    static readonly string[] ChatGptEditorSelectors =
+    [
+        "#prompt-textarea",                              // Stable ID
+        "[role='textbox'][contenteditable='true']",      // ARIA role
+        ".ProseMirror[contenteditable='true']",          // ProseMirror class
+        "div[contenteditable='true']",                   // Generic fallback
+    ];
+
+    /// <summary>Wait for ChatGPT editor to be ready. Returns the working CSS selector.</summary>
+    static async Task<string?> WaitForChatGptEditorA11y(CdpClient cdp)
+    {
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            foreach (var sel in ChatGptEditorSelectors)
+            {
+                var found = await cdp.EvalAsync(
+                    $"document.querySelector('{sel}') ? 'yes' : 'no'");
+                if (found == "yes") return sel;
+            }
+            await Task.Delay(500);
+        }
+        Console.WriteLine("[ASK] Editor not found (a11y selector chain exhausted)");
+        return null;
+    }
+
+    // Kept for backward compat (returns bool)
+    static async Task<bool> WaitForChatGptEditor(CdpClient cdp)
+        => await WaitForChatGptEditorA11y(cdp) != null;
+
+    /// <summary>Generic a11y-first editor wait with custom selector chain.</summary>
+    static async Task<string?> WaitForEditorA11y(CdpClient cdp, params string[] selectors)
+    {
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            foreach (var sel in selectors)
+            {
+                var found = await cdp.EvalAsync($"document.querySelector('{sel}') ? 'yes' : 'no'");
+                if (found == "yes") return sel;
+            }
+            await Task.Delay(500);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Send a message in ChatGPT and wait for the response.
+    /// A11y-first: finds editor via ARIA selector chain, inserts text via CDP Input.insertText.
+    /// </summary>
+    static async Task<(bool ok, string? text)> ChatGptSendAndWait(
+        CdpClient cdp, string message, int timeoutSec)
+    {
+        var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+
+        // Count existing turns
+        var countBefore = await cdp.EvalAsync(
+            "document.querySelectorAll('[data-message-author-role=\"assistant\"]').length") ?? "0";
+        int prevTurns = int.TryParse(countBefore, out var tc) ? tc : 0;
+
+        // ── A11y-first: find editor via selector chain ──
+        var editorSel = await WaitForChatGptEditorA11y(cdp);
+        if (editorSel == null)
+            return (false, null);
+
+        // Clear: focus → selectAll → delete
+        await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
+        await Task.Delay(100);
+        await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+        {
+            ["type"] = "keyDown", ["key"] = "a", ["code"] = "KeyA",
+            ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2 // Ctrl
+        });
+        await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+        {
+            ["type"] = "keyUp", ["key"] = "a", ["code"] = "KeyA",
+            ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
+        });
+        await Task.Delay(50);
+
+        // Insert text via CDP Input.insertText (most reliable for contentEditable)
+        await cdp.SendAsync("Input.insertText", new System.Text.Json.Nodes.JsonObject
+        {
+            ["text"] = message
+        });
+        await Task.Delay(200);
+
+        // Verify text was inserted
+        var verify = await cdp.EvalAsync(
+            $"document.querySelector('{editorSel}')?.textContent?.length ?? 0") ?? "0";
+        if (verify == "0")
+        {
+            // Fallback: execCommand approach
+            Console.WriteLine("[ASK] CDP Input.insertText empty, fallback to execCommand");
+            var inserted = await InsertTextContentEditable(cdp, editorSel, message);
+            if (!inserted)
+            {
+                Console.WriteLine("[ASK] Failed to insert text");
+                return (false, null);
+            }
+        }
+
+        // ── Send: button click (a11y) → Enter key fallback ──
+        await Task.Delay(500);
+        var sendResult = await cdp.EvalAsync("""
+            (() => {
+                var btn = document.querySelector('button[data-testid="send-button"]')
+                       || document.querySelector('button[aria-label*="보내기"]')
+                       || document.querySelector('button[aria-label*="Send"]');
+                if (btn && !btn.disabled) { btn.click(); return 'CLICKED'; }
+                return 'NO_BTN';
+            })()
+            """);
+
+        if (sendResult != "CLICKED")
+        {
+            await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
+                ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+            });
+            await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
+                ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+            });
+        }
+
+        // Wait for new assistant turn
+        var sw = Stopwatch.StartNew();
+        bool newTurnAppeared = false;
+        while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
+        {
+            await Task.Delay(1000);
+
+            // URL change detection (new conversation resets turn count)
+            var newUrl = await cdp.EvalAsync("location.href") ?? "";
+            if (newUrl != currentUrl && newUrl.Contains("/c/"))
+            {
+                Console.WriteLine("[ASK] New conversation detected");
+                prevTurns = 0;
+                currentUrl = newUrl;
+            }
+
+            var cur = await cdp.EvalAsync(
+                "document.querySelectorAll('[data-message-author-role=\"assistant\"]').length") ?? "0";
+            if (int.TryParse(cur, out var c) && c > prevTurns) { newTurnAppeared = true; break; }
+
+            if (sw.Elapsed.TotalSeconds > 10)
+                Console.WriteLine($"[ASK] Waiting for turn... ({cur} turns, {sw.Elapsed.TotalSeconds:F0}s)");
+        }
+        if (!newTurnAppeared)
+        {
+            Console.WriteLine("[ASK] No new turn");
+            return (false, null);
+        }
+
+        // Poll until streaming finishes + text stabilizes
+        string? lastText = null;
+        int stableCount = 0;
+        sw.Restart();
+
+        while (sw.Elapsed.TotalSeconds < timeoutSec)
+        {
+            await Task.Delay(1500);
+            var stateJson = await cdp.EvalAsync("""
+                (() => {
+                    var stop = document.querySelector('button[data-testid="stop-button"]')
+                            || document.querySelector('button[aria-label="Stop streaming"]')
+                            || document.querySelector('button[aria-label="스트리밍 중지"]');
+                    var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
+                    if (msgs.length === 0) return JSON.stringify({s:!!stop,t:''});
+                    var last = msgs[msgs.length - 1];
+                    // A11y-first text extraction: .markdown innerText → textContent → aria-label
+                    var md = last.querySelector('.markdown');
+                    var txt = md ? (md.innerText || md.textContent) : '';
+                    if (!txt) txt = last.innerText || last.textContent || '';
+                    if (!txt) { var lbl = last.getAttribute('aria-label'); if (lbl) txt = lbl; }
+                    return JSON.stringify({s:!!stop,t:txt||''});
+                })()
+                """);
+
+            if (string.IsNullOrEmpty(stateJson)) continue;
+
+            string text = "";
+            bool streaming = false;
+            try
+            {
+                var node = System.Text.Json.Nodes.JsonNode.Parse(stateJson);
+                streaming = node?["s"]?.GetValue<bool>() ?? false;
+                text = node?["t"]?.GetValue<string>() ?? "";
+            }
+            catch { continue; }
+
+            if (streaming) { lastText = text; stableCount = 0; continue; }
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                if (text == lastText)
+                {
+                    stableCount++;
+                    if (stableCount >= 2)
+                    {
+                        Console.WriteLine($"[ASK] Response ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
+                        return (true, text);
+                    }
+                }
+                else { stableCount = 0; lastText = text; }
+            }
+        }
+
+        if (!string.IsNullOrEmpty(lastText))
+        {
+            Console.WriteLine($"[ASK] Timeout -- partial ({lastText.Length} chars)");
+            return (true, lastText);
+        }
+        Console.WriteLine("[ASK] Timeout -- no response");
+        return (false, null);
     }
 
     // ── Slack Report ──

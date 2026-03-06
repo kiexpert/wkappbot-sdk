@@ -55,6 +55,48 @@ public sealed class ActionExecutor : IDisposable
         _simpleOcr = simpleOcr;
     }
 
+    // ── [READINESS] Pre-action input readiness check ────────────
+
+    /// <summary>
+    /// Optional InputReadiness instance. Set by CLI layer to enable pre-action readiness checks.
+    /// When set, every a11y action triggers: readiness check → zoom → actual call.
+    /// </summary>
+    public InputReadiness? Readiness { get; set; }
+
+    /// <summary>
+    /// Lightweight readiness check before a11y action:
+    ///   1. Minimized → focusless restore (SW_SHOWNOACTIVATE)
+    ///   2. Blocker detection (~5ms, QuickMode)
+    /// Does NOT do full Probe — keeps action latency minimal.
+    /// </summary>
+    private void EnsureInputReady(FlaUI.Core.AutomationElements.AutomationElement? element, string action)
+    {
+        var mainHwnd = _ctx.MainWindowHandle;
+        if (mainHwnd == IntPtr.Zero) return;
+
+        // Step 1: Minimized → focusless restore
+        if (NativeMethods.IsIconic(mainHwnd))
+        {
+            Log($"  [READINESS] Window minimized — restoring (focusless)");
+            NativeMethods.ShowWindow(mainHwnd, NativeMethods.SW_SHOWNOACTIVATE);
+            Thread.Sleep(200); // wait for restore animation
+        }
+
+        // Step 2: Blocker detection (quick — ~5ms)
+        if (Readiness != null)
+        {
+            var blocker = Readiness.DetectBlocker(mainHwnd);
+            if (blocker != null)
+            {
+                Log($"  [READINESS] Blocker: {blocker.ClassName} \"{blocker.Title}\" — attempting dismiss");
+                var (handled, _) = Readiness.BlockerHandler?.TryHandle(mainHwnd, blocker)
+                                   ?? (false, false);
+                if (!handled)
+                    Log($"  [READINESS] Blocker not handled — continuing anyway");
+            }
+        }
+    }
+
     // ── [ZOOM] Overlay helper ───────────────────────────────
 
     /// <summary>
@@ -243,6 +285,7 @@ public sealed class ActionExecutor : IDisposable
     private string DoClick(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        EnsureInputReady(element, step.Action);
         BeginZoomForElement(element, step);
         if (element != null)
         {
@@ -289,6 +332,7 @@ public sealed class ActionExecutor : IDisposable
     private string DoDoubleClick(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        EnsureInputReady(element, step.Action);
         BeginZoomForElement(element, step);
         if (element != null)
         {
@@ -320,6 +364,7 @@ public sealed class ActionExecutor : IDisposable
     private string DoRightClick(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        EnsureInputReady(element, step.Action);
         BeginZoomForElement(element, step);
         if (element != null)
         {
@@ -363,6 +408,7 @@ public sealed class ActionExecutor : IDisposable
             try
             {
                 (element, _) = LocateElement(step);
+                EnsureInputReady(element, step.Action);
                 BeginZoomForElement(element, step);
                 if (element?.Patterns.Value.IsSupported == true)
                 {
@@ -572,6 +618,7 @@ public sealed class ActionExecutor : IDisposable
             try
             {
                 var (element, method) = LocateElement(step);
+                EnsureInputReady(element, step.Action);
                 BeginZoomForElement(element, step);
                 if (element != null)
                 {
@@ -627,6 +674,7 @@ public sealed class ActionExecutor : IDisposable
     private void DoToggle(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        EnsureInputReady(element, step.Action);
         BeginZoomForElement(element, step);
         if (element == null)
             throw new InvalidOperationException($"Cannot locate element for toggle: {step.Target?.AutomationId ?? step.Target?.Name ?? "(no target)"}");
@@ -682,6 +730,7 @@ public sealed class ActionExecutor : IDisposable
     private void DoExpandCollapse(StepDefinition step, StepResult result, bool expand)
     {
         var (element, method) = LocateElement(step);
+        EnsureInputReady(element, step.Action);
         BeginZoomForElement(element, step);
         if (element == null)
             throw new InvalidOperationException($"Cannot locate element for {(expand ? "expand" : "collapse")}");
@@ -725,6 +774,7 @@ public sealed class ActionExecutor : IDisposable
     private void DoSelect(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        EnsureInputReady(element, step.Action);
         BeginZoomForElement(element, step);
         if (element == null)
             throw new InvalidOperationException("Cannot locate element for select");
@@ -795,6 +845,7 @@ public sealed class ActionExecutor : IDisposable
     private void DoSetRange(StepDefinition step, StepResult result)
     {
         var (element, method) = LocateElement(step);
+        EnsureInputReady(element, step.Action);
         BeginZoomForElement(element, step);
         if (element == null)
             throw new InvalidOperationException("Cannot locate element for set_range");

@@ -227,6 +227,10 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
 - readiness 명령: InputReadiness 진단 (완전 포커스리스, 돋보기 강제, 전수조사/좌표기반)
 - 유령 돋보기: BeginFadeOut 시 포그라운드 스레드 승격 → 프로세스 종료 후에도 페이드아웃 생존
 - 돋보기 불투명도 50% → 77% (럭키세븐), eye tick/Probe [PROF] 프로파일링 태그
+- 코어 a11y InputReadiness: ActionExecutor 모든 UIA 액션에 EnsureInputReady (미니마이즈 복원+방해꾼감지+돋보기)
+- Chrome 포커스 강탈 방어: SW_SHOWNOACTIVATE + 즉시 복구 + FocuslessWarningOverlay 연동
+- AgentsPolicy 최적화: Timer 제거 → CreationTime(INITIAL)/LastWriteTime(REMINDER) 파일 시간 기반
+- ask gpt/gemini a11y-first: CDP Input.insertText, a11y selector chain, 페르소나+READY 마커
 
 ### Phase 8: puppet 패턴 매칭 — 미구현
 - FormTypeIdentifier Level 4: OCR 텍스트 vs 패턴 매칭으로 폼 자동 식별

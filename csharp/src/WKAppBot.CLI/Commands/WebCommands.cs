@@ -449,7 +449,11 @@ Options:
 
             var proc2 = Process.Start(psi);
             if (proc2 != null)
+            {
                 Console.WriteLine($"[EYE] Launched (PID={proc2.Id})");
+                // Policy broadcast when Eye first spawns (agent reads stdout)
+                AgentPolicy.StartPolicyBroadcast();
+            }
         }
         catch
         {
