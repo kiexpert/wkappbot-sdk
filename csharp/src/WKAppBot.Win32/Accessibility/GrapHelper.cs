@@ -94,9 +94,20 @@ public static class GrapHelper
     ///   "영웅문#실시간계좌"          → window → UIA scope
     ///   "영웅문/실시간계좌#Tab/탭"   → window → Win32 child → UIA "Tab" → "탭"
     /// </summary>
+    /// <summary>Overload without matchCount for backwards compat.</summary>
     public static (IntPtr hwnd, AutomationElement root, string? error)? ResolveFullGrap(
         string grap, UIA3Automation automation)
+        => ResolveFullGrap(grap, automation, 0, out _);
+
+    /// <summary>
+    /// Parse full grap and resolve to (hwnd, uiaRoot).
+    /// windowIndex: 0-based index into matching windows (default 0 = first match).
+    /// matchCount: out parameter — total matching windows found.
+    /// </summary>
+    public static (IntPtr hwnd, AutomationElement root, string? error)? ResolveFullGrap(
+        string grap, UIA3Automation automation, int windowIndex, out int matchCount)
     {
+        matchCount = 0;
         var (win32Segments, uiaPath) = SplitGrap(grap);
         if (win32Segments.Length == 0 && uiaPath == null)
             return (IntPtr.Zero, null!, "Empty grap pattern");
@@ -104,12 +115,16 @@ public static class GrapHelper
         if (win32Segments.Length == 0)
             return (IntPtr.Zero, null!, "No window title before '#'");
 
-        // First segment = main window title
+        // First segment = main window title — may match multiple windows
         var windows = Window.WindowFinder.FindByTitle(win32Segments[0]);
+        matchCount = windows.Count;
         if (windows.Count == 0)
             return (IntPtr.Zero, null!, $"Window not found: \"{win32Segments[0]}\"");
 
-        var targetHwnd = windows[0].Handle;
+        if (windowIndex >= windows.Count)
+            return (IntPtr.Zero, null!, $"--nth {windowIndex + 1} but only {windows.Count} match(es) for \"{win32Segments[0]}\"");
+
+        var targetHwnd = windows[windowIndex].Handle;
 
         // Walk Win32 children (segments[1..] before '#')
         for (int i = 1; i < win32Segments.Length; i++)

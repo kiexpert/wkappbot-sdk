@@ -1,4 +1,4 @@
-﻿# WKAppBot - Windows App Automation Test Framework
+﻿# WKAppBot v2.0 - Windows App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -93,8 +93,14 @@
 - 유저에게 여기(프롬프트)에서만 질문하지 말 것 (반드시 슬랙 동시 발송)
 
 ## Overview
-Claude Code 터미널에서 사용하는 범용 Windows 앱 UI 자동화 테스트 도구.
-YAML 시나리오 기반으로 Windows 앱을 자동 조작하고 결과를 검증한다.
+Windows a11y (접근성) 표준 액션 기반 앱 UI 자동화 프레임워크.
+CLI 한 줄로 UIA→Win32→SendInput 3티어 자동 폴백, 포커스리스 제어, 돋보기 피드백까지.
+YAML 시나리오 기반 자동 테스트도 지원.
+
+### Busybox-Style Shortcut
+- `a11y.exe` = symlink to `wkappbot.exe` → exe 이름으로 명령 자동 감지
+- `a11y click "*메모장*#*저장*"` = `wkappbot a11y click "*메모장*#*저장*"`
+- Known commands: a11y, inspect, ocr, logcat, capture, scan, windows, snapshot, readiness, ask
 
 ## Architecture
 
@@ -164,10 +170,11 @@ wkappbot schedule <subcommand>                # add/list/remove/clear (예약 �
 wkappbot logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]  # 실시간 로그 추적
 wkappbot ask gpt|gemini "question" [--slack] [--timeout N] [--new-tab]  # CDP 웹 AI 질문
 wkappbot a11y <action> <grap>[#uia-scope] [options]  # 표준 a11y 제어 (UIA→Win32 폴백)
-  # Window: close, minimize, maximize, restore, focus, move(--x --y), resize(--w --h)
-  # Element: read, invoke, click, toggle, expand, collapse, select, scroll, type(--text), set-value(--text), set-range(--value)
-  # #scope로 UIA 요소 지정: "*메모장*#*파일*" → 메모장의 '파일' 요소
-  # --all, --force, --force-close-ancestors
+  # Window (7): close, minimize, maximize, restore, focus, move(--x --y), resize(--w --h)
+  # Element (13): find, read, highlight, invoke, click, toggle, expand, collapse, select, scroll, type(--text), set-value(--text), set-range(--value)
+  # grap `#`scope: "*메모장*#*파일*" → 메모장 윈도우의 '파일' UIA 요소
+  # --all, --nth N (range: 2~4, ~3, 3~), --force, --force-close-ancestors
+  # 10-step auto pipeline: find → ancestor protect → blocker dismiss → restore → child walk → UIA scope → tab activate → zoom → execute → feedback
 ```
 
 ## Key Design Decisions
@@ -262,9 +269,15 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
 - a11y 매칭 윈도우 search key 출력 (hwnd 타겟팅 지원)
 - grap `;` OR 패턴 (a11y 실험), logcat `regex:` 파일 패턴, logcat CWD 스코핑+depth 제한
 - CLAUDE.md grap search key 포맷 문서화
-- a11y unified target selection: "collect all → select range → dispatch" single pipeline
-  - window-level and element-level share same flow (SplitGrap → FindByTitle → --nth/--all → dispatch)
-  - element-level now supports --nth range and --all (e.g. `a11y invoke "*app*#*btn*" --nth 2~`)
+- **v2.0 a11y 표준 액션 프레임워크** (20 actions: 7 window + 13 element)
+  - Unified pipeline: collect all → select range (--nth/--all) → dispatch
+  - 10-step auto pipeline: find → ancestor protect → blocker → restore → child → UIA scope → tab activate → zoom → execute → feedback
+  - Busybox exe name detection: `a11y.exe` symlink → auto command injection
+  - highlight action: ClickZoomHelper overlay on target element
+  - find action: Win32 children + UIA tree dump (MUD "look" command)
+  - EnsureTabActive: walk up UIA parents, auto-select unselected TabItem
+  - Zoom/magnifier on ALL actions (before + result feedback after)
+  - Source split: A11yCommand.cs (~320 lines) + A11yElementActions.cs (~600 lines)
 
 ### Phase 8: puppet 패턴 매칭 — 미구현
 - FormTypeIdentifier Level 4: OCR 텍스트 vs 패턴 매칭으로 폼 자동 식별
@@ -302,7 +315,9 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
 
 ## 배포 구조
 ```
-W:/SDK/bin/wkappbot.exe          # single-file EXE
+W:/SDK/bin/wkappbot.exe          # single-file EXE (v2.0)
+W:/SDK/bin/a11y.exe              # symlink → wkappbot.exe (busybox shortcut)
+W:/SDK/bin/wka11y.exe            # symlink → wkappbot.exe (busybox shortcut)
 W:/SDK/bin/wkappbot.hq/          # 본부 (handlers, profiles, runtime, logs, output)
 ```
 
