@@ -102,6 +102,9 @@ Examples:
                 var cdp = new CdpClient();
                 await cdp.ConnectAsync(port, timeoutMs: 5000);
 
+                // ── Cleanup: close all about:blank tabs ──
+                await CloseBlankTabs(port);
+
                 // Look up saved target from registry (survives across CLI invocations)
                 var savedTargetId = !string.IsNullOrWhiteSpace(targetTag) ? AskTargetRegistry.GetTargetId(targetTag) : null;
                 if (savedTargetId != null)
@@ -110,6 +113,43 @@ Examples:
                 var navigateUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
                 var resolvedId = await cdp.EnsureCorrectWindowAsync(port, targetTag, navigateUrl,
                     savedTargetId: savedTargetId);
+
+                // ── Tab URL validation: reject about:blank, verify correct host ──
+                if (!string.IsNullOrWhiteSpace(preferredHost))
+                {
+                    var tabUrl = await cdp.EvalAsync("location.href") ?? "";
+                    if (tabUrl == "about:blank" || !tabUrl.Contains(preferredHost, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($"[ASK] Wrong tab: {tabUrl} (expected {preferredHost})");
+
+                        if (tabUrl == "about:blank")
+                        {
+                            // about:blank is useless — close it and invalidate registry
+                            Console.WriteLine("[ASK] Closing about:blank...");
+                            try { await cdp.EvalAsync("window.close()"); } catch { }
+                            await Task.Delay(500);
+                        }
+
+                        // Invalidate saved target
+                        if (!string.IsNullOrWhiteSpace(targetTag))
+                            AskTargetRegistry.SetTargetId(targetTag, null!);
+
+                        // Reconnect — find or create correct tab
+                        Console.WriteLine($"[ASK] Reconnecting to {preferredHost}...");
+                        await cdp.ConnectAsync(port, timeoutMs: 5000);
+                        resolvedId = await cdp.EnsureCorrectWindowAsync(port, targetTag,
+                            $"https://{preferredHost}", savedTargetId: null);
+                        await Task.Delay(2000);
+
+                        tabUrl = await cdp.EvalAsync("location.href") ?? "";
+                        if (!tabUrl.Contains(preferredHost, StringComparison.OrdinalIgnoreCase))
+                        {
+                            await cdp.NavigateAsync($"https://{preferredHost}");
+                            await Task.Delay(3000);
+                        }
+                        Console.WriteLine($"[ASK] Now on: {await cdp.EvalAsync("location.href")}");
+                    }
+                }
 
                 // Save resolved target to registry for next invocation
                 if (resolvedId != null && !string.IsNullOrWhiteSpace(targetTag))
@@ -165,6 +205,23 @@ Examples:
     static async Task<bool> InsertTextContentEditable(CdpClient cdp, string selector, string text)
     {
         var escaped = text.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n");
+
+        // Tier 1: focusless — set innerHTML + dispatch InputEvent (React/ProseMirror picks it up)
+        var focusless = $$"""
+            (() => {
+                var el = document.querySelector('{{selector}}');
+                if (!el) return 'NOT_FOUND';
+                var p = el.querySelector('p');
+                if (p) { p.textContent = '{{escaped}}'; }
+                else { el.innerHTML = '<p>{{escaped}}</p>'; }
+                el.dispatchEvent(new InputEvent('input', {bubbles:true, inputType:'insertText', data:'{{escaped}}'}));
+                return el.textContent.length > 0 ? 'OK' : 'EMPTY';
+            })()
+            """;
+        var result = await cdp.EvalAsync(focusless);
+        if (result == "OK") return true;
+
+        // Tier 2: focus + execCommand (classic approach)
         var js = $$"""
             (() => {
                 var el = document.querySelector('{{selector}}');
@@ -180,7 +237,7 @@ Examples:
                 return el.textContent.length > 0 ? 'OK' : 'EMPTY';
             })()
             """;
-        var result = await cdp.EvalAsync(js);
+        result = await cdp.EvalAsync(js);
         return result == "OK";
     }
 
@@ -237,33 +294,35 @@ Examples:
                     return (false, (string?)null);
                 }
 
-                // Clear + insert via CDP Input.insertText (a11y-first)
-                await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
-                await Task.Delay(100);
-                await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                // ── Tier 1: focusless insert (a11y-first) ──
+                await ClearContentEditable(cdp, editorSel);
+                var inserted = await InsertTextContentEditable(cdp, editorSel, question);
+                if (!inserted)
                 {
-                    ["type"] = "keyDown", ["key"] = "a", ["code"] = "KeyA",
-                    ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
-                });
-                await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
-                {
-                    ["type"] = "keyUp", ["key"] = "a", ["code"] = "KeyA",
-                    ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
-                });
-                await Task.Delay(50);
-                await cdp.SendAsync("Input.insertText", new System.Text.Json.Nodes.JsonObject
-                {
-                    ["text"] = question
-                });
-                await Task.Delay(200);
+                    // ── Tier 2: CDP Input.insertText (needs focus) ──
+                    Console.WriteLine("[ASK] Focusless insert failed, trying CDP Input.insertText...");
+                    await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
+                    await Task.Delay(100);
+                    await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                    {
+                        ["type"] = "keyDown", ["key"] = "a", ["code"] = "KeyA",
+                        ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
+                    });
+                    await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                    {
+                        ["type"] = "keyUp", ["key"] = "a", ["code"] = "KeyA",
+                        ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
+                    });
+                    await Task.Delay(50);
+                    await cdp.SendAsync("Input.insertText", new System.Text.Json.Nodes.JsonObject
+                    {
+                        ["text"] = question
+                    });
+                    await Task.Delay(200);
 
-                // Verify insertion, fallback to execCommand
-                var verify = await cdp.EvalAsync(
-                    $"document.querySelector('{editorSel}')?.textContent?.length ?? 0") ?? "0";
-                if (verify == "0")
-                {
-                    var inserted = await InsertTextContentEditable(cdp, editorSel, question);
-                    if (!inserted)
+                    var verify = await cdp.EvalAsync(
+                        $"document.querySelector('{editorSel}')?.textContent?.length ?? 0") ?? "0";
+                    if (verify == "0")
                     {
                         Console.WriteLine("[ASK] Failed to insert text");
                         return (false, (string?)null);
@@ -447,6 +506,7 @@ Examples:
             try
             {
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+                Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (!currentUrl.Contains("chatgpt.com"))
                 {
                     Console.WriteLine("[ASK] Navigating to ChatGPT...");
@@ -455,12 +515,25 @@ Examples:
                 }
 
                 // Wait for ProseMirror editor
-                if (!await WaitForChatGptEditor(cdp))
+                var editorSel = await WaitForChatGptEditorA11y(cdp);
+                if (editorSel == null)
                     return (false, (string?)null);
+                Console.WriteLine($"[ASK] Editor found: {editorSel}");
 
-                // Check if this is a fresh conversation (no assistant turns yet)
-                var turnCountStr = await cdp.EvalAsync(
-                    "document.querySelectorAll('[data-message-author-role=\"assistant\"]').length") ?? "0";
+                // Check if this is a fresh conversation — try multiple selectors
+                var turnCountStr = await cdp.EvalAsync("""
+                    (() => {
+                        var c = document.querySelectorAll('[data-message-author-role="assistant"]').length;
+                        if (c > 0) return '' + c;
+                        c = document.querySelectorAll('article').length;
+                        if (c > 0) return '' + Math.floor(c / 2);
+                        c = document.querySelectorAll('[class*="agent-turn"]').length;
+                        if (c > 0) return '' + c;
+                        c = document.querySelectorAll('[data-testid*="conversation-turn"]').length;
+                        if (c > 0) return '' + Math.floor(c / 2);
+                        return '0';
+                    })()
+                    """) ?? "0";
                 int existingTurns = int.TryParse(turnCountStr, out var etc) ? etc : 0;
 
                 if (existingTurns == 0)
@@ -522,6 +595,49 @@ Examples:
         "div[contenteditable='true']",                   // Generic fallback
     ];
 
+    /// <summary>Close all about:blank tabs via CDP /json API.</summary>
+    static async Task CloseBlankTabs(int port)
+    {
+        try
+        {
+            using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            var json = await http.GetStringAsync($"http://127.0.0.1:{port}/json");
+            var targets = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsArray();
+            if (targets == null) return;
+            int closed = 0;
+            foreach (var t in targets)
+            {
+                var url = t?["url"]?.GetValue<string>() ?? "";
+                var id = t?["id"]?.GetValue<string>() ?? "";
+                if (url == "about:blank" && !string.IsNullOrEmpty(id))
+                {
+                    await http.GetAsync($"http://127.0.0.1:{port}/json/close/{id}");
+                    closed++;
+                }
+            }
+            if (closed > 0)
+                Console.WriteLine($"[ASK] Closed {closed} about:blank tab(s)");
+        }
+        catch { }
+    }
+
+    /// <summary>Count assistant turns — multi-selector for ChatGPT DOM changes.</summary>
+    static async Task<int> CountChatGptTurns(CdpClient cdp)
+    {
+        var result = await cdp.EvalAsync("""
+            (() => {
+                var c = document.querySelectorAll('[data-message-author-role="assistant"]').length;
+                if (c > 0) return '' + c;
+                c = document.querySelectorAll('[data-testid*="conversation-turn"]').length;
+                if (c > 0) return '' + Math.floor(c / 2);
+                c = document.querySelectorAll('article').length;
+                if (c > 0) return '' + Math.floor(c / 2);
+                return '0';
+            })()
+            """) ?? "0";
+        return int.TryParse(result, out var v) ? v : 0;
+    }
+
     /// <summary>Wait for ChatGPT editor to be ready. Returns the working CSS selector.</summary>
     static async Task<string?> WaitForChatGptEditorA11y(CdpClient cdp)
     {
@@ -567,47 +683,47 @@ Examples:
     {
         var currentUrl = await cdp.EvalAsync("location.href") ?? "";
 
-        // Count existing turns
-        var countBefore = await cdp.EvalAsync(
-            "document.querySelectorAll('[data-message-author-role=\"assistant\"]').length") ?? "0";
-        int prevTurns = int.TryParse(countBefore, out var tc) ? tc : 0;
+        // Count existing turns (multi-selector: ChatGPT DOM changes frequently)
+        int prevTurns = await CountChatGptTurns(cdp);
 
         // ── A11y-first: find editor via selector chain ──
         var editorSel = await WaitForChatGptEditorA11y(cdp);
         if (editorSel == null)
             return (false, null);
 
-        // Clear: focus → selectAll → delete
-        await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
-        await Task.Delay(100);
-        await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+        // ── Tier 1: focusless insert (a11y-first) ──
+        await ClearContentEditable(cdp, editorSel);
+        var inserted = await InsertTextContentEditable(cdp, editorSel, message);
+        // Verify what's actually in the editor
+        var editorContent = await cdp.EvalAsync(
+            $"document.querySelector('{editorSel}')?.textContent?.substring(0,80) || 'EMPTY'") ?? "EMPTY";
+        Console.WriteLine($"[ASK] After insert: {(inserted ? "OK" : "FAIL")}, editor=[{editorContent}]");
+        if (!inserted)
         {
-            ["type"] = "keyDown", ["key"] = "a", ["code"] = "KeyA",
-            ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2 // Ctrl
-        });
-        await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
-        {
-            ["type"] = "keyUp", ["key"] = "a", ["code"] = "KeyA",
-            ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
-        });
-        await Task.Delay(50);
+            // ── Tier 2: CDP Input.insertText (needs focus) ──
+            Console.WriteLine("[ASK] Focusless insert failed, trying CDP Input.insertText...");
+            await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
+            await Task.Delay(100);
+            await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "keyDown", ["key"] = "a", ["code"] = "KeyA",
+                ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2 // Ctrl
+            });
+            await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "keyUp", ["key"] = "a", ["code"] = "KeyA",
+                ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
+            });
+            await Task.Delay(50);
+            await cdp.SendAsync("Input.insertText", new System.Text.Json.Nodes.JsonObject
+            {
+                ["text"] = message
+            });
+            await Task.Delay(200);
 
-        // Insert text via CDP Input.insertText (most reliable for contentEditable)
-        await cdp.SendAsync("Input.insertText", new System.Text.Json.Nodes.JsonObject
-        {
-            ["text"] = message
-        });
-        await Task.Delay(200);
-
-        // Verify text was inserted
-        var verify = await cdp.EvalAsync(
-            $"document.querySelector('{editorSel}')?.textContent?.length ?? 0") ?? "0";
-        if (verify == "0")
-        {
-            // Fallback: execCommand approach
-            Console.WriteLine("[ASK] CDP Input.insertText empty, fallback to execCommand");
-            var inserted = await InsertTextContentEditable(cdp, editorSel, message);
-            if (!inserted)
+            var verify = await cdp.EvalAsync(
+                $"document.querySelector('{editorSel}')?.textContent?.length ?? 0") ?? "0";
+            if (verify == "0")
             {
                 Console.WriteLine("[ASK] Failed to insert text");
                 return (false, null);
@@ -665,7 +781,10 @@ Examples:
             sendResult = "ENTER";
         }
 
-        Console.WriteLine($"[ASK] Sent! Waiting for response... (prevTurns={prevTurns}, send={sendResult})");
+        // Check editor after send — should be empty if sent successfully
+        var afterSend = await cdp.EvalAsync(
+            $"document.querySelector('{editorSel}')?.textContent?.length ?? -1") ?? "-1";
+        Console.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={prevTurns})");
 
         // Wait for new assistant turn
         var sw = Stopwatch.StartNew();
@@ -683,9 +802,9 @@ Examples:
                 currentUrl = newUrl;
             }
 
-            var cur = await cdp.EvalAsync(
-                "document.querySelectorAll('[data-message-author-role=\"assistant\"]').length") ?? "0";
-            if (int.TryParse(cur, out var c) && c > prevTurns) { newTurnAppeared = true; break; }
+            var c = await CountChatGptTurns(cdp);
+            if (c > prevTurns) { newTurnAppeared = true; break; }
+            var cur = c.ToString();
 
             if (sw.Elapsed.TotalSeconds > 3)
                 Console.WriteLine($"[ASK] Waiting for turn... (now={cur}, prev={prevTurns}, {sw.Elapsed.TotalSeconds:F0}s)");
@@ -710,6 +829,8 @@ Examples:
                             || document.querySelector('button[aria-label="Stop streaming"]')
                             || document.querySelector('button[aria-label="스트리밍 중지"]');
                     var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
+                    if (msgs.length === 0) msgs = document.querySelectorAll('[data-testid*="conversation-turn"]');
+                    if (msgs.length === 0) msgs = document.querySelectorAll('article');
                     if (msgs.length === 0) return JSON.stringify({s:!!stop,t:''});
                     var last = msgs[msgs.length - 1];
                     // A11y-first text extraction: skip result-thinking, prefer result-streaming or plain .markdown

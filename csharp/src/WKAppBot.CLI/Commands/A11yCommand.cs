@@ -30,6 +30,7 @@ internal partial class Program
             Console.WriteLine("  resize: --w N --h N");
             Console.WriteLine("  --all     Apply to all matching windows (default: first only)");
             Console.WriteLine("  --force   close: kill process if WM_CLOSE fails (default: stop at WM_CLOSE)");
+            Console.WriteLine("  --force-close-ancestors  include own process tree (default: skip ancestors)");
             return 1;
         }
 
@@ -37,6 +38,7 @@ internal partial class Program
         var grap = args[1];
         bool all = args.Any(a => a == "--all");
         bool force = args.Any(a => a == "--force");
+        bool forceCloseAncestors = args.Any(a => a == "--force-close-ancestors");
 
         // Parse move/resize params
         int? mx = null, my = null, mw = null, mh = null;
@@ -67,10 +69,34 @@ internal partial class Program
                     windows.Add(w);
             }
         }
+        // Exclude self and ancestor processes (don't kill your own process tree!)
+        if (!forceCloseAncestors)
+        {
+            var selfPids = GetSelfAndAncestorPids();
+            windows.RemoveAll(w =>
+            {
+                NativeMethods.GetWindowThreadProcessId(w.Handle, out var pid);
+                if (selfPids.Contains((int)pid))
+                {
+                    Console.WriteLine($"[A11Y] skip (ancestor pid={pid}): \"{w.Title}\" (hwnd={w.Handle:X8})");
+                    return true;
+                }
+                return false;
+            });
+        }
+
         if (windows.Count == 0)
             return Error($"No window found: \"{grap}\"");
 
         var targets = all ? windows : new List<WindowInfo> { windows[0] };
+
+        // Show matched windows with search key so caller can use exact hwnd next time
+        foreach (var w in targets)
+        {
+            var r = w.Rect;
+            Console.WriteLine($"[A11Y] matched: [{w.ClassName}] \"{w.Title}\" (hwnd={w.Handle:X8} {r.Right - r.Left}x{r.Bottom - r.Top})");
+        }
+
         int ok = 0, fail = 0;
 
         using var automation = new UIA3Automation();
@@ -324,4 +350,25 @@ internal partial class Program
             return false;
         }
     }
+
+    /// <summary>Collect PIDs of self + ancestor processes (bash, code, claude, etc.).</summary>
+    static HashSet<int> GetSelfAndAncestorPids()
+    {
+        var pids = new HashSet<int>();
+        try
+        {
+            var proc = System.Diagnostics.Process.GetCurrentProcess();
+            pids.Add(proc.Id);
+            int pid = proc.Id;
+            for (int i = 0; i < 10 && pid > 0; i++)
+            {
+                int ppid = GetParentPid(pid);
+                if (ppid <= 0 || !pids.Add(ppid)) break;
+                pid = ppid;
+            }
+        }
+        catch { }
+        return pids;
+    }
+
 }
