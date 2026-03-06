@@ -1,4 +1,4 @@
-﻿# WKAppBot v2.0 - Windows App Automation Test Framework
+﻿# WKAppBot v2.1 - Windows App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -214,13 +214,19 @@ Phase 0: Already Focused? → Phase 1: Alert+Wait(3초) → Phase 2: Force Recov
 | OR 패턴 | `"*메모장*;*계산기*"` | `;` 구분 다중 매칭 (a11y에서 실험중) |
 | 경로 glob | `"**/#32770"` | GitHub-style (classPath 매칭) |
 | Win32 자식 | `"투혼/[0600]*"` | `/` 뒤 = MDI 자식 윈도우 매칭 |
-| **#UIA 스코프** | `"*영웅문*#*실시간계좌*"` | `#` 뒤 = UIA Name 매칭으로 루트 축소 |
-| UIA 다단 경로 | `"*영웅문*#*폼*#*Tab*"` | `#`/`/` 모두 UIA 계층 구분자 |
+| **#UIA 스코프** | `"영웅문#실시간계좌"` | `#` 뒤 = UIA Name/AutomationId 매칭으로 루트 축소 |
+| UIA 다단 경로 | `"영웅문#폼#Tab"` | `#`/`/` 모두 UIA 계층 구분자 |
+| **탭 포털** | `"Chrome#ChatGPT#모델"` | TabItem 매칭 → 자동 탭 전환 → RootWebArea 점프 |
+| **웹 a11y** | `"Chrome#Gemini#새 채팅"` | 탭 포털 경유 웹 요소 접근 (UIA, CDP 불필요!) |
+| aid 매칭 | `"Claude#email"` | Name 매칭 실패 시 AutomationId로 폴백 |
 
 > **`#` 스코프 = URL fragment 스타일**: `window/child#a11y-bookmark`
 > - `#` 앞: Win32 윈도우 탐색 (기존 grap)
-> - `#` 뒤: UIA 트리에서 Name 매칭 요소로 검색 루트 축소 (container-first)
-> - 적용 명령: `inspect`, `tab-select`, `uia-test` (나머지 점진 확대)
+> - `#` 뒤: UIA 트리에서 Name→AutomationId 매칭 (container-first)
+> - **탭 포털 (v2.1)**: `#`이 TabItem에 매칭되면 자동 탭 전환 + RootWebArea 점프
+>   - Chrome/Edge 탭, Electron 앱(Claude/VS Code) 웹 콘텐츠까지 도달
+>   - UIA만으로 동작 → CDP 불필요, 포커스리스!
+> - 적용 명령: `a11y` 전체, `inspect`, `tab-select`, `uia-test`
 
 ## YAML Scenario Format (요약)
 ```yaml
@@ -275,6 +281,12 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - Busybox exe name detection: `a11y.exe` symlink → auto command injection
   - highlight action: ClickZoomHelper overlay on target element
   - find action: Win32 children + UIA tree dump (MUD "look" command)
+- **v2.1 Tab Portal + Web A11y** — 합성 풀경로로 웹 컨트롤까지 접근
+  - Tab Portal: `#` 스코프에서 TabItem 매칭 → 자동 탭 전환 + RootWebArea 점프
+  - Chrome/Edge 탭 + Electron 앱(Claude/VS Code) 웹 콘텐츠 = UIA만으로 접근 (CDP 불필요!)
+  - AutomationId 매칭: Name 실패 시 aid 폴백 (`Claude#email` → aid="email")
+  - matched 출력에 search key 전체 표시 (processName 포함)
+  - MUD-style portal 배너: "A MUD-style portal for AI to see and touch the real world."
   - EnsureTabActive: walk up UIA parents, auto-select unselected TabItem
   - Zoom/magnifier on ALL actions (before + result feedback after)
   - Source split: A11yCommand.cs (~320 lines) + A11yElementActions.cs (~600 lines)

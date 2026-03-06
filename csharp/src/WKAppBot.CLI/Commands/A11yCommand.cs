@@ -20,7 +20,7 @@ internal partial class Program
             var verStr = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
             Console.WriteLine();
             Console.WriteLine($"  WKAppBot a11y {verStr}");
-            Console.WriteLine($"  A MUD-style teleporter for AI to see and touch the real world.");
+            Console.WriteLine($"  A MUD-style portal for AI to see and touch the real world.");
             Console.WriteLine($"  find = look, read = examine, invoke = open the door.");
             Console.WriteLine($"  20 actions · 3-tier fallback · focusless · zoom overlay");
             Console.WriteLine($"  UIA → Win32 → SendInput — just works.");
@@ -78,14 +78,21 @@ internal partial class Program
             Console.WriteLine();
             Console.WriteLine("═══ Examples ══════════════════════════════════════════════");
             Console.WriteLine("  a11y close 메모장                        Close Notepad");
-            Console.WriteLine("  a11y close \"메모장;계산기\" --all         Close all Notepad+Calc");
             Console.WriteLine("  a11y find 메모장 --depth 5               Explore element tree");
-            Console.WriteLine("  a11y highlight \"메모장#파일\"             Show where '파일' is");
             Console.WriteLine("  a11y invoke \"메모장#파일\"               Click '파일' menu");
             Console.WriteLine("  a11y type \"영웅문#종목코드\" --text \"005930\"");
             Console.WriteLine();
-            Console.WriteLine("  grap: plain text = substring match (no wildcards needed!)");
-            Console.WriteLine("        */? wildcards · regex: · `;` OR · `/` child · `#` UIA scope");
+            Console.WriteLine("═══ Synthesized Full-Path (v2.1) — Web Portal ══════════");
+            Console.WriteLine("  a11y find  \"Chrome#ChatGPT\"             Tab portal → web tree");
+            Console.WriteLine("  a11y invoke \"Chrome#Gemini#기본 메뉴\"    Tab → web button click");
+            Console.WriteLine("  a11y read  \"Claude#email\"               Electron aid match");
+            Console.WriteLine("  a11y select \"Chrome#Gemini\"             Focusless tab switch");
+            Console.WriteLine();
+            Console.WriteLine("  grap = synthesized path: Win32 → tab → web element");
+            Console.WriteLine("    메모장                plain text = substring match");
+            Console.WriteLine("    Chrome#ChatGPT#Send   # = UIA scope / tab portal / web a11y");
+            Console.WriteLine("    영웅문/0338#실시간계좌 / = Win32 child, # = UIA scope");
+            Console.WriteLine("    */? wildcards · regex: · `;` OR · aid fallback");
             Console.WriteLine();
             Console.WriteLine("─── © 2026 WilKim · github.com/kiexpert/WKAppBot ──────────");
             return 1;
@@ -185,21 +192,32 @@ internal partial class Program
             targets = new List<WindowInfo> { allWindows[0] };
 
         // ═══ STEP 4: Display matches ═══
+        // search key = grap pattern matching target string
+        static string SearchKey(WindowInfo wi)
+        {
+            var r = wi.Rect;
+            string proc;
+            try
+            {
+                NativeMethods.GetWindowThreadProcessId(wi.Handle, out uint pid);
+                proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName;
+            }
+            catch { proc = "?"; }
+            return $"[{wi.ClassName}] {wi.Title} ({proc} hwnd={wi.Handle:X8} {r.Right - r.Left}x{r.Bottom - r.Top})";
+        }
+
         if (allWindows.Count > 1)
         {
             for (int idx = 0; idx < allWindows.Count; idx++)
             {
                 var w = allWindows[idx];
-                var r = w.Rect;
                 var marker = targets.Contains(w) ? ">" : " ";
-                Console.WriteLine($"[A11Y] {marker} #{idx + 1} [{w.ClassName}] \"{w.Title}\" (hwnd={w.Handle:X8} {r.Right - r.Left}x{r.Bottom - r.Top})");
+                Console.WriteLine($"[A11Y] {marker} #{idx + 1} {SearchKey(w)}");
             }
         }
         else
         {
-            var w = targets[0];
-            var r = w.Rect;
-            Console.WriteLine($"[A11Y] matched: [{w.ClassName}] \"{w.Title}\" (hwnd={w.Handle:X8} {r.Right - r.Left}x{r.Bottom - r.Top})");
+            Console.WriteLine($"[A11Y] matched: {SearchKey(targets[0])}");
         }
 
         // ═══ STEP 5: Execute on each target ═══
