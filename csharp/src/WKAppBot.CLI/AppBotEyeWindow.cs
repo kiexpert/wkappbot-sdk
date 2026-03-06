@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using WKAppBot.WebBot;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -224,9 +225,11 @@ internal sealed class AppBotEyeOverlay : Window
         base.OnSourceInitialized(e);
         var helper = new WindowInteropHelper(this);
 
-        // Set WS_EX_NOACTIVATE so clicking the overlay doesn't steal focus from other windows
+        // WS_EX_NOACTIVATE: clicking won't steal focus
+        // WS_EX_TRANSPARENT: click-through — mouse events pass to window below (Chrome)
         var exStyle = GetWindowLongPtrCompat(helper.Handle, GWL_EXSTYLE);
-        SetWindowLongPtr(helper.Handle, GWL_EXSTYLE, new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE));
+        SetWindowLongPtr(helper.Handle, GWL_EXSTYLE,
+            new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT));
 
         // Hook WndProc to receive WM_APP "wake up" signal from WebBot commands
         var source = HwndSource.FromHwnd(helper.Handle);
@@ -439,6 +442,7 @@ internal sealed class AppBotEyeOverlay : Window
 
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_NOACTIVATE = 0x08000000;
+    private const int WS_EX_TRANSPARENT = 0x00000020; // click-through (untouchable!)
     private const int SW_RESTORE = 9;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
@@ -499,10 +503,14 @@ internal sealed class AppBotEyeHost : IDisposable
             }
             else
             {
-                // Place above the terminal/prompt area (bottom-right, offset up)
-                var screen = SystemParameters.WorkArea;
-                _window.Left = screen.Right - width - 10;
-                _window.Top = screen.Bottom - height - 80; // above taskbar + prompt
+                // Place at upper-right of rightmost monitor, 10px from corner
+                const int corner = 10;
+                var chromeBounds = CdpClient.ExpectedBounds; // reuse rightmost monitor detection
+                // Chrome is at (rightEdge-800-20), so rightEdge = X+800+20
+                var rightEdge = chromeBounds.X + chromeBounds.W + 20;
+                var monitorTop = chromeBounds.Y - 20; // remove Chrome's 20px offset to get monitor top
+                _window.Left = rightEdge - width - corner;
+                _window.Top = monitorTop + corner;
             }
 
             // Set owner window -- overlay follows Claude Desktop (minimize/restore together)
