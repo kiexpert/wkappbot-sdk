@@ -101,12 +101,20 @@ Utility:
       Manage scheduled prompts for auto-recovery.
   logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]
       Stream logs in real-time. Default: CWD only. -r unlimited, -r=3 depth 3. --hq adds HQ+openclaw.
+      File filter supports grap patterns: wildcards, regex: prefix, ';' OR.
+  ask gpt|gemini ""question"" [--slack] [--timeout N] [--new-tab]
+      Ask ChatGPT or Gemini via CDP. Focusless text insert (a11y-first).
+      Auto-closes about:blank tabs, validates tab URL before insert.
   win-move <window-title> [--right-top] [--x N --y N]
       Move a window to a specific position.
   a11y <action> <grap> [options]
       A11y-first window control (UIA → Win32 fallback).
       Actions: close, minimize, maximize, restore, move (--x --y), resize (--w --h)
-      Options: --all (apply to all matching windows)
+      Options: --all  Apply to all matching windows
+               --force  close: kill process if WM_CLOSE fails
+               --force-close-ancestors  Include own process tree (default: skip)
+      Grap supports ';' OR syntax: ""*메모장*;*계산기*""
+      Ancestor protection: self + parent processes auto-excluded from targets.
   screen off [--no-check]
       Turn off monitor immediately.
   com ls|use|current|methods|call
