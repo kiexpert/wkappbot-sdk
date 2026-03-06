@@ -178,11 +178,18 @@ Phase 0: Already Focused? → Phase 1: Alert+Wait(3초) → Phase 2: Force Recov
 `[WATCH]` 요소추적 / `[RUN]` 실행 / `[FOCUS]` 포커스 / `[VERIFY]` 검증 / `[BLOCK]` 방해꾼 / `[GUARD]` 포커스간섭 / `[ZOOM]` 돋보기 / `[STRESS]` 스트레스 / `[TOOLTIP]` 캘리브레이션 / `[SLACK]` 슬랙 / `[EXP]` 경험DB / `[KNOWHOW]` 노하우
 
 ### 4. grap 패턴 매칭
+
+**검색 대상 문자열 (search key)**: `[ClassName] Title (processName hwnd=XXXXXXXX WxH)`
+- 예: `[Notepad] 제목 없음 - 메모장 (Notepad.exe hwnd=001A0F2C 800x600)`
+- grap 패턴은 Title 먼저, 안 되면 전체 search key에 매칭 시도
+- `hwnd=` 로 핸들 직접 매칭 가능: `"*hwnd=001A0F2C*"`
+
 | 구문 | 예시 | 동작 |
 |------|------|------|
 | 리터럴 | `"plusButton"` | 정확 일치 |
 | 와일드카드 | `"*Button*"` | glob 스타일 |
 | 정규식 | `"regex:btn_\\d+"` | 정규식 |
+| OR 패턴 | `"*메모장*;*계산기*"` | `;` 구분 다중 매칭 (a11y에서 실험중) |
 | 경로 glob | `"**/#32770"` | GitHub-style (classPath 매칭) |
 | Win32 자식 | `"투혼/[0600]*"` | `/` 뒤 = MDI 자식 윈도우 매칭 |
 | **#UIA 스코프** | `"*영웅문*#*실시간계좌*"` | `#` 뒤 = UIA Name 매칭으로 루트 축소 |
