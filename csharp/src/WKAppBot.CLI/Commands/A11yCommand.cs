@@ -2,6 +2,7 @@ using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
 using WKAppBot.Win32.Accessibility;
+using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Window;
 using WKAppBot.Win32.Native;
 
@@ -12,6 +13,12 @@ internal partial class Program
     // wkappbot a11y <action> <grap> [options]
     // Actions: close, minimize, maximize, restore, move, resize
     // A11y-first (UIA WindowPattern/TransformPattern) -> Win32 fallback
+    //
+    // TODO (future):
+    // - grap에 hwnd 직접 지정: "#0x1A2B3C" 또는 "hwnd=0x..." 구문
+    // - --all로 매칭 전부 처리 (현재 구현됨)
+    // - invoke/click 액션 추가 (기존 uia-test --invoke / win-click --uia 통합)
+    // - Android ADB 폴백 (Phase 14): UIA → Win32 → ADB 3티어
     static int A11yCommand(string[] args)
     {
         if (args.Length < 2)
@@ -21,13 +28,15 @@ internal partial class Program
             Console.WriteLine("Options:");
             Console.WriteLine("  move:   --x N --y N");
             Console.WriteLine("  resize: --w N --h N");
-            Console.WriteLine("  --all   Apply to all matching windows (default: first only)");
+            Console.WriteLine("  --all     Apply to all matching windows (default: first only)");
+            Console.WriteLine("  --force   close: kill process if WM_CLOSE fails (default: stop at WM_CLOSE)");
             return 1;
         }
 
         var action = args[0].ToLowerInvariant();
         var grap = args[1];
         bool all = args.Any(a => a == "--all");
+        bool force = args.Any(a => a == "--force");
 
         // Parse move/resize params
         int? mx = null, my = null, mw = null, mh = null;
@@ -58,21 +67,43 @@ internal partial class Program
         automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
         automation.TransactionTimeout = TimeSpan.FromSeconds(5);
 
+        var readiness = CreateInputReadiness();
+
         foreach (var win in targets)
         {
             var hwnd = win.Handle;
             var title = WindowFinder.GetWindowText(hwnd);
             var tag = $"0x{hwnd.ToInt64():X} \"{title}\"";
 
+            // 입력위치확보: 방해꾼 감지 + dismiss (~5ms)
+            var blocker = readiness.DetectBlocker(hwnd);
+            if (blocker != null)
+            {
+                Console.WriteLine($"[A11Y] blocker detected: {blocker.ClassName} \"{blocker.Title}\" — dismissing");
+                readiness.BlockerHandler?.TryHandle(hwnd, blocker);
+                Thread.Sleep(300);
+            }
+
+            // 미니마이즈 상태면 복원 (close 제외 — close는 미니마이즈 상태에서도 가능)
+            if (action != "close" && action != "minimize")
+            {
+                if (NativeMethods.IsIconic(hwnd))
+                {
+                    Console.WriteLine($"[A11Y] {tag} is minimized — restoring first");
+                    NativeMethods.ShowWindow(hwnd, 9 /* SW_RESTORE */);
+                    Thread.Sleep(300);
+                }
+            }
+
             bool success = action switch
             {
-                "close" => A11yClose(automation, hwnd, tag),
+                "close" => A11yClose(automation, hwnd, tag, force, readiness),
                 "minimize" => A11ySetVisualState(automation, hwnd, tag, WindowVisualState.Minimized),
                 "maximize" => A11ySetVisualState(automation, hwnd, tag, WindowVisualState.Maximized),
                 "restore" => A11ySetVisualState(automation, hwnd, tag, WindowVisualState.Normal),
                 "move" => A11yMove(automation, hwnd, tag, mx!.Value, my!.Value),
                 "resize" => A11yResize(automation, hwnd, tag, mw!.Value, mh!.Value),
-                _ => false
+                _ => A11yNotYet(action)
             };
 
             if (success) ok++; else fail++;
@@ -82,10 +113,18 @@ internal partial class Program
         return fail > 0 ? 1 : 0;
     }
 
-    // -- Close: UIA WindowPattern.Close -> Win32 WM_CLOSE fallback --
-    static bool A11yClose(UIA3Automation automation, IntPtr hwnd, string tag)
+    static bool A11yNotYet(string action)
     {
-        // Try UIA WindowPattern first
+        Console.Error.WriteLine($"[A11Y] ERROR: '{action}' command is not implemented");
+        Console.Error.WriteLine("[A11Y] Supported: close, minimize, maximize, restore, move, resize");
+        Console.Error.WriteLine("[A11Y] TODO (not yet): invoke, click, scroll, toggle, select, set-range");
+        return false;
+    }
+
+    // -- Close: UIA WindowPattern.Close -> Win32 WM_CLOSE -> Process.Kill fallback --
+    static bool A11yClose(UIA3Automation automation, IntPtr hwnd, string tag, bool force, InputReadiness readiness)
+    {
+        // Tier 1: UIA WindowPattern (예의바른 닫기)
         try
         {
             var el = automation.FromHandle(hwnd);
@@ -95,26 +134,79 @@ internal partial class Program
                 Console.WriteLine($"[A11Y] close {tag} — UIA WindowPattern");
                 return true;
             }
-        }
-        catch { }
-
-        // Win32 fallback
-        try
-        {
-            NativeMethods.PostMessageW(hwnd, 0x0010 /* WM_CLOSE */, IntPtr.Zero, IntPtr.Zero);
-            Console.WriteLine($"[A11Y] close {tag} — Win32 WM_CLOSE");
-            return true;
+            Console.WriteLine($"[A11Y] close {tag} — UIA not supported, trying Win32 fallback");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[A11Y] close {tag} — FAIL: {ex.Message}");
-            return false;
+            Console.WriteLine($"[A11Y] close {tag} — UIA failed ({ex.Message}), trying Win32 fallback");
         }
+
+        // Tier 2: Win32 WM_CLOSE (정중한 종료 요청 — SendMessage로 매너있게 기다림)
+        try
+        {
+            NativeMethods.SendMessageTimeoutW(hwnd, 0x0010 /* WM_CLOSE */, IntPtr.Zero, IntPtr.Zero,
+                0x0002 /* SMTO_ABORTIFHUNG */, 3000, out _);
+            // 1초 대기 후 윈도우가 닫혔는지 확인
+            Thread.Sleep(1000);
+            if (!NativeMethods.IsWindow(hwnd))
+            {
+                Console.WriteLine($"[A11Y] close {tag} — Win32 WM_CLOSE (closed)");
+                return true;
+            }
+            // Tier 2.5: 방해꾼 다이얼로그 감지 → dismiss → 재확인
+            var blocker = readiness.DetectBlocker(hwnd);
+            if (blocker != null)
+            {
+                Console.WriteLine($"[A11Y] close {tag} — blocker: {blocker.ClassName} \"{blocker.Title}\" — dismissing");
+                readiness.BlockerHandler?.TryHandle(hwnd, blocker);
+                Thread.Sleep(500);
+                if (!NativeMethods.IsWindow(hwnd))
+                {
+                    Console.WriteLine($"[A11Y] close {tag} — closed after dismissing blocker");
+                    return true;
+                }
+            }
+
+            if (!force)
+            {
+                Console.WriteLine($"[A11Y] close {tag} — WM_CLOSE sent but window still alive (use --force to kill)");
+                return false;
+            }
+            Console.WriteLine($"[A11Y] close {tag} — WM_CLOSE sent but window still alive, --force → Process.Kill");
+        }
+        catch (Exception ex)
+        {
+            if (!force)
+            {
+                Console.Error.WriteLine($"[A11Y] close {tag} — Win32 WM_CLOSE failed ({ex.Message}), use --force to kill");
+                return false;
+            }
+            Console.WriteLine($"[A11Y] close {tag} — Win32 WM_CLOSE failed ({ex.Message}), --force → Process.Kill");
+        }
+
+        // Tier 3: Process.Kill (--force 전용 — 강제 종료)
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(hwnd, out var pid);
+            if (pid != 0)
+            {
+                var proc = System.Diagnostics.Process.GetProcessById((int)pid);
+                proc.Kill();
+                Console.WriteLine($"[A11Y] close {tag} — Process.Kill (pid={pid})");
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] close {tag} — all 3 tiers FAIL: {ex.Message}");
+        }
+        return false;
     }
 
     // -- Minimize/Maximize/Restore: UIA WindowPattern -> Win32 ShowWindow fallback --
     static bool A11ySetVisualState(UIA3Automation automation, IntPtr hwnd, string tag, WindowVisualState state)
     {
+        var name = state.ToString().ToLower();
         // Try UIA WindowPattern
         try
         {
@@ -122,11 +214,15 @@ internal partial class Program
             if (el.Patterns.Window.IsSupported)
             {
                 el.Patterns.Window.Pattern.SetWindowVisualState(state);
-                Console.WriteLine($"[A11Y] {state.ToString().ToLower()} {tag} — UIA WindowPattern");
+                Console.WriteLine($"[A11Y] {name} {tag} — UIA WindowPattern");
                 return true;
             }
+            Console.WriteLine($"[A11Y] {name} {tag} — UIA not supported, trying Win32 fallback");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[A11Y] {name} {tag} — UIA failed ({ex.Message}), trying Win32 fallback");
+        }
 
         // Win32 fallback
         int cmd = state switch
@@ -139,12 +235,12 @@ internal partial class Program
         try
         {
             NativeMethods.ShowWindow(hwnd, cmd);
-            Console.WriteLine($"[A11Y] {state.ToString().ToLower()} {tag} — Win32 ShowWindow({cmd})");
+            Console.WriteLine($"[A11Y] {name} {tag} — Win32 ShowWindow({cmd})");
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[A11Y] {state.ToString().ToLower()} {tag} — FAIL: {ex.Message}");
+            Console.Error.WriteLine($"[A11Y] {name} {tag} — Win32 fallback FAIL: {ex.Message}");
             return false;
         }
     }
@@ -162,8 +258,12 @@ internal partial class Program
                 Console.WriteLine($"[A11Y] move {tag} → ({x},{y}) — UIA TransformPattern");
                 return true;
             }
+            Console.WriteLine($"[A11Y] move {tag} — UIA not supported, trying Win32 fallback");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[A11Y] move {tag} — UIA failed ({ex.Message}), trying Win32 fallback");
+        }
 
         // Win32 fallback: SetWindowPos with NOSIZE
         try
@@ -175,7 +275,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[A11Y] move {tag} — FAIL: {ex.Message}");
+            Console.Error.WriteLine($"[A11Y] move {tag} — Win32 fallback FAIL: {ex.Message}");
             return false;
         }
     }
@@ -193,8 +293,12 @@ internal partial class Program
                 Console.WriteLine($"[A11Y] resize {tag} → ({w}x{h}) — UIA TransformPattern");
                 return true;
             }
+            Console.WriteLine($"[A11Y] resize {tag} — UIA not supported, trying Win32 fallback");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[A11Y] resize {tag} — UIA failed ({ex.Message}), trying Win32 fallback");
+        }
 
         // Win32 fallback: SetWindowPos with NOMOVE
         try
@@ -206,7 +310,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[A11Y] resize {tag} — FAIL: {ex.Message}");
+            Console.Error.WriteLine($"[A11Y] resize {tag} — Win32 fallback FAIL: {ex.Message}");
             return false;
         }
     }
