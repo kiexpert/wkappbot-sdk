@@ -189,6 +189,7 @@ internal partial class Program
                 "prompt-test" => PromptTestCommand(restArgs),
                 "readiness" => ReadinessCommand(restArgs),
                 "msaa-probe" => MsaaProbeCommand(restArgs),
+                "a11y" => A11yCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),
                 _ when command.StartsWith("kro-trial-", StringComparison.OrdinalIgnoreCase) => KroTrialSpecialCommand(command, restArgs),
