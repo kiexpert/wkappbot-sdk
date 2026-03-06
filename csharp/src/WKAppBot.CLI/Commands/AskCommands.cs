@@ -1,4 +1,8 @@
 using System.Diagnostics;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using WKAppBot.WebBot;
@@ -64,26 +68,29 @@ Examples:
         return 1;
     }
 
-    sealed record CdpPageTarget(string Url, string Title, string WebSocketDebuggerUrl);
+    sealed record CdpPageTarget(string Id, string Url, string Title, string WebSocketDebuggerUrl);
+
+    // Stable tag per provider — reuses the same tab across invocations
+    static string BuildAskTargetTag(string provider) => $"wk-ask-{provider}";
 
     /// <summary>
     /// Connect to CDP, launching Chrome if needed.
     /// Default behavior: reuse an existing matching tab (single-tab friendly).
     /// </summary>
-    static CdpClient? EnsureCdpConnection(int port = 9222, string? preferredHost = null, bool newTab = false)
+    static CdpClient? EnsureCdpConnection(int port = 9222, string? preferredHost = null, bool newTab = false, string? targetTag = null)
     {
         var task = Task.Run(async () =>
         {
-            // Ensure Chrome/CDP is alive first
             var active = await ChromeLauncher.IsPortActiveAsync(port);
             if (!active)
             {
-                Console.WriteLine("[ASK] Launching Chrome...");
-                await ChromeLauncher.LaunchAsync(port: port);
-                await Task.Delay(1500);
+                // Launch Chrome directly with target URL (no about:blank)
+                var launchUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
+                Console.WriteLine($"[ASK] Launching Chrome → {launchUrl ?? "about:blank"}...");
+                await ChromeLauncher.LaunchAsync(port: port, url: launchUrl);
+                await Task.Delay(2500);
             }
 
-            // Discover page targets
             var pages = await GetPageTargetsAsync(port);
             if (pages.Count == 0)
             {
@@ -91,14 +98,25 @@ Examples:
                 return (CdpClient?)null;
             }
 
-            int targetIndex = 0;
+            int targetIndex = -1;
+            string? pinnedId = null;
 
-            // Reuse existing tab by default
-            if (!string.IsNullOrWhiteSpace(preferredHost))
+            if (!string.IsNullOrWhiteSpace(targetTag))
+            {
+                pinnedId = AskTargetRegistry.GetTargetId(targetTag);
+                if (!string.IsNullOrWhiteSpace(pinnedId))
+                {
+                    targetIndex = pages.FindIndex(p => string.Equals(p.Id, pinnedId, StringComparison.OrdinalIgnoreCase));
+                    if (targetIndex < 0)
+                        AskTargetRegistry.RemoveTargetId(targetTag);
+                }
+            }
+
+            if (targetIndex < 0 && !string.IsNullOrWhiteSpace(preferredHost))
             {
                 for (int i = 0; i < pages.Count; i++)
                 {
-                    var u = pages[i].Url ?? "";
+                    var u = pages[i].Url ?? string.Empty;
                     if (u.Contains(preferredHost, StringComparison.OrdinalIgnoreCase))
                     {
                         targetIndex = i;
@@ -107,27 +125,32 @@ Examples:
                 }
             }
 
-            // Optional: open a new tab explicitly
-            if (newTab)
+            // Only force new tab if explicitly requested
+            if (newTab && targetIndex < 0)
             {
-                var newTargetUrl = "about:blank";
+                var newTargetUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : "about:blank";
                 try
                 {
                     using var http = new HttpClient();
                     _ = await http.GetStringAsync($"http://localhost:{port}/json/new?{Uri.EscapeDataString(newTargetUrl)}");
                     pages = await GetPageTargetsAsync(port);
-                    targetIndex = Math.Max(0, pages.Count - 1); // newest page target
+                    targetIndex = Math.Max(0, pages.Count - 1);
                 }
                 catch
                 {
-                    // Fallback silently to reuse mode
+                    targetIndex = targetIndex < 0 ? 0 : targetIndex;
                 }
             }
+
+            if (targetIndex < 0)
+                targetIndex = 0;
 
             try
             {
                 var cdp = new CdpClient();
-                await cdp.ConnectAsync(port, tabIndex: targetIndex, timeoutMs: 5000);
+                await cdp.ConnectAsync(port, tabIndex: targetIndex, timeoutMs: 5000, preferredTargetTag: targetTag);
+                if (!string.IsNullOrWhiteSpace(targetTag) && !string.IsNullOrWhiteSpace(cdp.TargetId))
+                    AskTargetRegistry.SetTargetId(targetTag, cdp.TargetId);
                 return (CdpClient?)cdp;
             }
             catch (Exception ex)
@@ -161,7 +184,8 @@ Examples:
 
                 var url = node?["url"]?.GetValue<string>() ?? "";
                 var title = node?["title"]?.GetValue<string>() ?? "";
-                result.Add(new CdpPageTarget(url, title, ws));
+                var id = node?["id"]?.GetValue<string>() ?? string.Empty;
+                result.Add(new CdpPageTarget(id, url, title, ws));
             }
         }
         catch { }
@@ -211,10 +235,12 @@ Examples:
     {
         Console.WriteLine($"[ASK] Gemini: {question}");
 
-        var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab);
+        var targetTag = BuildAskTargetTag("gemini");
+        var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
         LaunchAppBotEyeIfNeeded(9222);
+        cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
 
         var task = Task.Run(async () =>
         {
@@ -345,10 +371,12 @@ Examples:
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
 
-        var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab);
+        var targetTag = BuildAskTargetTag("gpt");
+        var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
         LaunchAppBotEyeIfNeeded(9222);
+        cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
 
         var task = Task.Run(async () =>
         {

@@ -861,8 +861,8 @@ public sealed class ClaudePromptHelper : IDisposable
         }
 
         RestoreFocus(prevFg, prompt.WindowHandle);
-        Console.WriteLine("  [PROMPT] Submitted (focus+Enter, 3x retry, unverified)");
-        return true; // Best-effort: text was set + Enter pressed 3 times
+        Console.WriteLine("  [PROMPT] Submit FAILED (focus+Enter, 3x retry, unverified)");
+        return false; // 3x Enter failed verification — likely rate-limited or UI blocked
     }
 
     /// <summary>

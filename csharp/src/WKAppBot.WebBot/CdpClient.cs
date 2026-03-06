@@ -11,7 +11,7 @@ namespace WKAppBot.WebBot;
 
 /// <summary>
 /// Minimal Chrome DevTools Protocol client using System.Net.WebSockets.
-/// Zero external dependencies — talks to Chrome via WebSocket JSON-RPC.
+/// Zero external dependencies -- talks to Chrome via WebSocket JSON-RPC.
 ///
 /// Usage:
 ///   var cdp = new CdpClient();
@@ -34,6 +34,8 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
 
     public bool IsConnected => _ws?.State == WebSocketState.Open;
     public string? WebSocketUrl { get; private set; }
+    public string? TargetId { get; private set; }
+    private int? _currentContextId;
 
     /// <summary>Chrome browser process ID (resolved from CDP port).</summary>
     public int ChromePid { get; private set; }
@@ -42,7 +44,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     /// Connect to Chrome's DevTools WebSocket.
     /// Chrome must be running with --remote-debugging-port=PORT.
     /// </summary>
-    public async Task ConnectAsync(int port = 9222, int tabIndex = 0, int timeoutMs = 10_000)
+    public async Task ConnectAsync(int port = 9222, int tabIndex = 0, int timeoutMs = 10_000, string? preferredTargetTag = null)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
         var ct = cts.Token;
@@ -53,22 +55,38 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         if (targets == null || targets.Count == 0)
             throw new InvalidOperationException("No Chrome targets found");
 
-        // Find the first 'page' type target
         string? wsUrl = null;
+        string? resolvedTargetId = null;
+        string? resolvedTargetUrl = null;
         foreach (var target in targets)
         {
             var type = target?["type"]?.GetValue<string>();
-            if (type == "page")
+            if (type != "page") continue;
+
+            var url = target?["url"]?.GetValue<string>();
+            var id = target?["id"]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(preferredTargetTag) && url != null && url.Contains(preferredTargetTag, StringComparison.OrdinalIgnoreCase))
             {
                 wsUrl = target?["webSocketDebuggerUrl"]?.GetValue<string>();
-                if (tabIndex-- <= 0 && wsUrl != null)
-                    break;
+                resolvedTargetId = id;
+                resolvedTargetUrl = url;
+                break;
+            }
+
+            if (tabIndex-- <= 0)
+            {
+                wsUrl = target?["webSocketDebuggerUrl"]?.GetValue<string>();
+                resolvedTargetId = id;
+                resolvedTargetUrl = url;
+                break;
             }
         }
+
 
         if (wsUrl == null)
             throw new InvalidOperationException("No page target with WebSocket URL found");
 
+        TargetId = resolvedTargetId;
         WebSocketUrl = wsUrl;
         _ws = new ClientWebSocket();
         await _ws.ConnectAsync(new Uri(wsUrl), ct);
@@ -76,9 +94,25 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         // Resolve Chrome browser PID from the CDP port
         ChromePid = ResolvePidFromPort(port);
 
-        // Start background receive loop
+        // Start background receive loop BEFORE sending commands (otherwise responses are never read)
         _receiveCts = new CancellationTokenSource();
         _receiveTask = ReceiveLoopAsync(_receiveCts.Token);
+
+        // Re-enable main-world contexts on every run
+        await SendAsync("Runtime.enable");
+        await SendAsync("Page.enable");
+        await SendAsync("DOM.enable");
+        await SendAsync("Page.getFrameTree");
+
+        // Refresh execution context
+        try
+        {
+            var contextInfo = await SendAsync("Runtime.getExecutionContexts");
+            var contexts = contextInfo?["result"] as JsonArray;
+            var mainContext = contexts?.FirstOrDefault();
+            _currentContextId = mainContext?["id"]?.GetValue<int?>();
+        }
+        catch { }
     }
 
     /// <summary>
@@ -223,13 +257,13 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                     document.getElementById('__wkappbot_bar')?.remove();
                     document.getElementById('__wkappbot_status')?.remove();
 
-                    // ── Shared style constants ──
+                    // -- Shared style constants --
                     const DARK = '#1a1a2e';
                     const FONT = "12px/24px 'Consolas', 'Courier New', monospace";
                     const CYAN = '#4fc3f7';
                     const GREEN = '#4caf50';
 
-                    // ── Top bar: brand + URL + dot ──
+                    // -- Top bar: brand + URL + dot --
                     const bar = document.createElement('div');
                     bar.id = '__wkappbot_bar';
                     bar.style.cssText = `
@@ -260,7 +294,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
 
                     bar.append(brand, sep, urlEl, dot);
 
-                    // ── Bottom status bar: action + time + counter ──
+                    // -- Bottom status bar: action + time + counter --
                     const status = document.createElement('div');
                     status.id = '__wkappbot_status';
                     status.style.cssText = `
@@ -307,7 +341,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                     // Some sites (Naver Finance etc) use overflow/scroll on body that clips fixed children
                     document.documentElement.appendChild(status);
 
-                    // Update title (short — no URL)
+                    // Update title (short -- no URL)
                     // Even pages with no title get at least "WKWebBot v0.1" in the window title bar
                     const origTitle = document.title || location.hostname || '';
                     document.title = origTitle ? origTitle + ' - WKWebBot v0.1' : 'WKWebBot v0.1';
@@ -437,7 +471,16 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         if (awaitPromise)
             parameters["awaitPromise"] = true;
 
-        var result = await SendAsync("Runtime.evaluate", parameters);
+        JsonNode? result;
+        if (_currentContextId.HasValue)
+        {
+            parameters["contextId"] = _currentContextId.Value;
+            result = await SendAsync("Runtime.evaluate", parameters);
+        }
+        else
+        {
+            result = await SendAsync("Runtime.evaluate", parameters);
+        }
 
         var valueNode = result?["result"]?["value"];
         if (valueNode == null) return null;
@@ -772,7 +815,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
-    /// Minimize Chrome window (focusless — does not steal focus from user's active window).
+    /// Minimize Chrome window (focusless -- does not steal focus from user's active window).
     /// CDP still works perfectly when Chrome is minimized!
     /// </summary>
     public void MinimizeChromeWindow()
@@ -975,7 +1018,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         _http.Dispose();
     }
 
-    // ── Background receive loop ──
+    // -- Background receive loop --
 
     private async Task ReceiveLoopAsync(CancellationToken ct)
     {
@@ -1011,7 +1054,13 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                     else
                         tcs.TrySetResult(msg["result"]);
                 }
-                // Events (has "method") — ignore for now, can be extended later
+                else
+                {
+                    var method = msg["method"]?.GetValue<string>();
+                    if (method == "Runtime.executionContextDestroyed")
+                        _currentContextId = null;
+                }
+                // Events (has "method") -- ignore for now, can be extended later
             }
             catch (OperationCanceledException)
             {
@@ -1023,4 +1072,19 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             }
         }
     }
+
+    public async Task ApplyTargetTagAsync(string? tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag) || _ws == null || _ws.State != WebSocketState.Open)
+            return;
+        try
+        {
+            await EvalAsync($"window.__wk_ask_tag = '{tag.Replace("'", "\'")}';");
+        }
+        catch
+        {
+            // best effort
+        }
+    }
+
 }

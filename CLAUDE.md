@@ -274,3 +274,4 @@ W:/SDK/bin/wkappbot.hq/          # 본부 (handlers, profiles, runtime, logs, ou
 - **memory/condition_search.md**: 조건검색 자동화 전략
 - **knowhow.md** (각 컨트롤 폴더): 컨트롤별 자동화 노하우
 - Windows 전용 (.NET 8.0 `net8.0-windows10.0.22621.0`), 한국어 UI 지원
+

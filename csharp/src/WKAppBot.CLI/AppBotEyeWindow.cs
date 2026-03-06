@@ -14,14 +14,14 @@ using System.Windows.Threading;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// "AppBot Eye" — semi-transparent WPF overlay that shows what the WebBot sees.
+/// "AppBot Eye" -- semi-transparent WPF overlay that shows what the WebBot sees.
 /// Programmatic UI (no XAML). Runs on a dedicated STA thread.
 ///
 /// Features:
 /// - Semi-transparent dark overlay with cyan border
 /// - CDP screenshot as full background (behind text)
 /// - Accessibility text overlay with larger font + auto-scroll animation
-/// - Click image → restore Chrome window
+/// - Click image -- restore Chrome window
 /// - Cloaking: ghosts (10% alpha) after inactivity, fades in on new content
 /// - Drag to move, always on top, never steals focus
 /// </summary>
@@ -41,7 +41,7 @@ internal sealed class AppBotEyeOverlay : Window
     private double _scrollOffset; // current scroll Y offset
     private bool _needsScroll; // text exceeds visible area
 
-    // Cloaking thresholds — 50s idle → dim, 60s → 10s fade-out → ghost (10%)
+    // Cloaking thresholds -- 50s idle = dim, 60s = 10s fade-out = ghost (10%)
     private const double ActiveOpacity = 0.85;
     private const double DimOpacity = 0.3;
     private const int DimAfterSeconds = 50;
@@ -56,7 +56,7 @@ internal sealed class AppBotEyeOverlay : Window
 
     public AppBotEyeOverlay(int width = 320, int height = 220)
     {
-        // Window properties — semi-transparent overlay
+        // Window properties -- semi-transparent overlay
         Title = "WK AppBot Eye";
         Width = width;
         Height = height;
@@ -85,7 +85,7 @@ internal sealed class AppBotEyeOverlay : Window
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // content area
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });  // footer
 
-        // ── Header: [●] AppBot Eye  [✕] ──
+        // -- Header: [*] AppBot Eye  [X] --
         var header = new DockPanel { Margin = new Thickness(6, 2, 6, 0) };
         header.MouseLeftButtonDown += (_, _) => DragMove(); // drag to move
 
@@ -111,7 +111,7 @@ internal sealed class AppBotEyeOverlay : Window
 
         var closeBtn = new TextBlock
         {
-            Text = " \u2715 ", // ✕
+            Text = " \u2715 ", // X close button
             Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
             FontFamily = new FontFamily("Consolas"),
             FontSize = 12,
@@ -128,14 +128,14 @@ internal sealed class AppBotEyeOverlay : Window
         header.Children.Add(closeBtn);
         Grid.SetRow(header, 0);
 
-        // ── Content area: Background image + text overlay ──
+        // -- Content area: Background image + text overlay --
         var contentGrid = new Grid();
 
         // Background: CDP screenshot (fills entire content area, dimmed)
         _image = new Image
         {
             Stretch = Stretch.Uniform,
-            Opacity = 0.35, // dimmed background — text is the star
+            Opacity = 0.35, // dimmed background -- text is the star
             Margin = new Thickness(2),
             Cursor = Cursors.Hand,
         };
@@ -174,7 +174,7 @@ internal sealed class AppBotEyeOverlay : Window
 
         Grid.SetRow(contentGrid, 1);
 
-        // ── Footer: URL + timestamp ──
+        // -- Footer: URL + timestamp --
         var footer = new DockPanel { Margin = new Thickness(6, 0, 6, 2) };
 
         _timeText = new TextBlock
@@ -225,7 +225,7 @@ internal sealed class AppBotEyeOverlay : Window
         var helper = new WindowInteropHelper(this);
 
         // Set WS_EX_NOACTIVATE so clicking the overlay doesn't steal focus from other windows
-        var exStyle = GetWindowLongPtr(helper.Handle, GWL_EXSTYLE);
+        var exStyle = GetWindowLongPtrCompat(helper.Handle, GWL_EXSTYLE);
         SetWindowLongPtr(helper.Handle, GWL_EXSTYLE, new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE));
 
         // Hook WndProc to receive WM_APP "wake up" signal from WebBot commands
@@ -233,14 +233,14 @@ internal sealed class AppBotEyeOverlay : Window
         source?.AddHook(WndProc);
     }
 
-    /// <summary>WM_APP handler — external "wake up" signal from WebBot commands.</summary>
+    /// <summary>WM_APP handler -- external "wake up" signal from WebBot commands.</summary>
     private const int WM_APP = 0x8000;
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WM_APP)
         {
-            // WebBot command sent us a wake-up signal — reset idle timer and uncloak
+            // WebBot command sent us a wake-up signal -- reset idle timer and uncloak
             _lastUpdate = DateTime.Now;
             if (_isCloaked) Uncloak();
             else if (Opacity < ActiveOpacity)
@@ -255,7 +255,7 @@ internal sealed class AppBotEyeOverlay : Window
     }
 
     /// <summary>Update the screenshot thumbnail from CDP PNG data.</summary>
-    /// <remarks>Does NOT reset _lastUpdate — screenshots arrive continuously while WebBot is alive.
+    /// <remarks>Does NOT reset _lastUpdate -- screenshots arrive continuously while WebBot is alive.
     /// Cloaking is based on content changes (URL/text), not screenshot freshness.</remarks>
     public void UpdateScreenshot(byte[] pngData)
     {
@@ -269,7 +269,7 @@ internal sealed class AppBotEyeOverlay : Window
             bi.EndInit();
             bi.Freeze(); // thread-safe!
             _image.Source = bi;
-            // Note: no _lastUpdate here — cloaking tracks content changes, not screenshot refresh
+            // Note: no _lastUpdate here -- cloaking tracks content changes, not screenshot refresh
         }
         catch { /* best effort */ }
     }
@@ -297,7 +297,7 @@ internal sealed class AppBotEyeOverlay : Window
     {
         try
         {
-            if (_axText.Text == text) return; // no change — don't reset scroll
+            if (_axText.Text == text) return; // no change -- don't reset scroll
 
             _axText.Text = text;
             _lastUpdate = DateTime.Now;
@@ -327,7 +327,7 @@ internal sealed class AppBotEyeOverlay : Window
         _chromeHwnd = hwnd;
     }
 
-    // ── Click image → restore Chrome window ──
+    // -- Click image: restore Chrome window --
 
     private void OnImageClick(object sender, MouseButtonEventArgs e)
     {
@@ -338,7 +338,7 @@ internal sealed class AppBotEyeOverlay : Window
         }
     }
 
-    // ── Cloaking (fade out/in) ──
+    // -- Cloaking (fade out/in) --
 
     private void SetupCloakTimer()
     {
@@ -413,14 +413,14 @@ internal sealed class AppBotEyeOverlay : Window
 
         if (elapsed >= CloakAfterSeconds && !_isCloaked)
         {
-            // Ghost mode — 10s fade to 10% alpha (still visible, just very faint)
+            // Ghost mode -- 10s fade to 10% alpha (still visible, just very faint)
             var anim = new DoubleAnimation(Opacity, 0.1, TimeSpan.FromSeconds(10));
             anim.Completed += (_, _) => { _isCloaked = true; };
             BeginAnimation(OpacityProperty, anim);
         }
         else if (elapsed >= DimAfterSeconds && elapsed < CloakAfterSeconds && Opacity > DimOpacity + 0.05)
         {
-            // Dim — reduce opacity
+            // Dim -- reduce opacity
             var anim = new DoubleAnimation(Opacity, DimOpacity, TimeSpan.FromSeconds(2));
             BeginAnimation(OpacityProperty, anim);
         }
@@ -435,17 +435,29 @@ internal sealed class AppBotEyeOverlay : Window
         BeginAnimation(OpacityProperty, anim);
     }
 
-    // ── Win32 P/Invoke ──
+    // -- Win32 P/Invoke --
 
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_NOACTIVATE = 0x08000000;
     private const int SW_RESTORE = 9;
 
-    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
     private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
 
-    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
     private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW", SetLastError = true)]
+    private static extern IntPtr GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW", SetLastError = true)]
+    private static extern IntPtr SetWindowLong(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    private static IntPtr GetWindowLongPtrCompat(IntPtr hWnd, int nIndex) =>
+        IntPtr.Size == 8 ? GetWindowLongPtr(hWnd, nIndex) : GetWindowLong(hWnd, nIndex);
+
+    private static IntPtr SetWindowLongPtrCompat(IntPtr hWnd, int nIndex, IntPtr dwNewLong) =>
+        IntPtr.Size == 8 ? SetWindowLongPtr(hWnd, nIndex, dwNewLong) : SetWindowLong(hWnd, nIndex, dwNewLong);
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -472,7 +484,7 @@ internal sealed class AppBotEyeHost : IDisposable
     public bool IsAlive => _uiThread?.IsAlive == true;
 
     /// <summary>Start the overlay window on a dedicated STA thread.</summary>
-    /// <param name="ownerHwnd">Optional parent window handle (e.g. Claude Desktop) — overlay follows it.</param>
+    /// <param name="ownerHwnd">Optional parent window handle (e.g. Claude Desktop) -- overlay follows it.</param>
     public void Start(int width = 320, int height = 220, int x = -1, int y = -1, IntPtr ownerHwnd = default)
     {
         _uiThread = new Thread(() =>
@@ -493,7 +505,7 @@ internal sealed class AppBotEyeHost : IDisposable
                 _window.Top = screen.Bottom - height - 80; // above taskbar + prompt
             }
 
-            // Set owner window — overlay follows Claude Desktop (minimize/restore together)
+            // Set owner window -- overlay follows Claude Desktop (minimize/restore together)
             if (ownerHwnd != IntPtr.Zero)
             {
                 try
@@ -503,13 +515,13 @@ internal sealed class AppBotEyeHost : IDisposable
                     // Owner window means: overlay shows on top of Claude Desktop,
                     // minimizes/restores with it, but retains its own Topmost + transparency
                 }
-                catch { /* best effort — continue without owner */ }
+                catch { /* best effort -- continue without owner */ }
             }
 
             _dispatcher = Dispatcher.CurrentDispatcher;
             _ready.Set();
             _window.Show();
-            Dispatcher.Run(); // message loop — blocks until InvokeShutdown()
+            Dispatcher.Run(); // message loop -- blocks until InvokeShutdown()
         });
         _uiThread.SetApartmentState(ApartmentState.STA);
         _uiThread.IsBackground = true;

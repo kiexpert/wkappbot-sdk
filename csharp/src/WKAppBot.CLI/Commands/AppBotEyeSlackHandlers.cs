@@ -249,13 +249,19 @@ internal partial class Program
 
         // Local helper: send ack "전달했습니다" and track it for later deletion
         // Deleted when slack reply is sent (not auto-deleted — stays visible until response)
-        void SendAndTrackAck(string ch, string threadKey, int promptCount = 1)
+        const string AckUsername = "클롣아이";
+        void SendAndTrackAck(string ch, string threadKey, int promptCount = 1, int totalAttempted = 0)
         {
-            var ackText = promptCount > 1
-                ? $"Claude {promptCount}곳에 전달했습니다!"
-                : $"Claude에 전달했습니다!";
-            var (ackOk, ackTs) = Task.Run(async () => await Send(ch,
-                ackText, threadKey)).GetAwaiter().GetResult();
+            string ackText;
+            if (totalAttempted > 0 && promptCount < totalAttempted)
+                ackText = $":warning: Claude {promptCount}/{totalAttempted}곳에 전달 (일부 실패)";
+            else if (promptCount > 1)
+                ackText = $"Claude {promptCount}곳에 전달했습니다!";
+            else
+                ackText = "Claude에 전달했습니다!";
+            var (ackOk, ackTs) = Task.Run(async () =>
+                await SlackSendViaApi(botToken, ch, ackText, threadKey, username: AckUsername))
+                .GetAwaiter().GetResult();
             if (ackOk && ackTs != null)
             {
                 pendingAcks[threadKey] = (ch, ackTs);
@@ -385,7 +391,7 @@ internal partial class Program
                 Console.WriteLine($"[EYE][SLACK] >> Mention broadcast: {mentionSent}/{allMentionPrompts.Count} prompts");
 
                 DeletePendingAck(ackThread);
-                SendAndTrackAck(msg.Channel, ackThread, mentionSent);
+                SendAndTrackAck(msg.Channel, ackThread, mentionSent, allMentionPrompts.Count);
             }
             else
             {
@@ -625,7 +631,7 @@ internal partial class Program
                     Console.WriteLine($"[EYE][SLACK] >> Thread broadcast: {trSent}/{allTrPrompts.Count} prompts");
 
                     DeletePendingAck(msg.ThreadTs!);
-                    SendAndTrackAck(msg.Channel, msg.ThreadTs!, trSent);
+                    SendAndTrackAck(msg.Channel, msg.ThreadTs!, trSent, allTrPrompts.Count);
                 }
                 else
                 {
@@ -737,7 +743,7 @@ internal partial class Program
                     Console.WriteLine($"[EYE][SLACK] >> Keyword broadcast: {kwSent}/{allKwPrompts.Count} prompts");
 
                     DeletePendingAck(kwThreadKey);
-                    SendAndTrackAck(msg.Channel, kwThreadKey, kwSent);
+                    SendAndTrackAck(msg.Channel, kwThreadKey, kwSent, allKwPrompts.Count);
                 }
                 else
                 {
@@ -848,7 +854,7 @@ internal partial class Program
                     if (sent > 0)
                     {
                         DeletePendingAck(allThreadKey);
-                        SendAndTrackAck(msg.Channel, allThreadKey, sent);
+                        SendAndTrackAck(msg.Channel, allThreadKey, sent, allPrompts.Count);
                         Console.WriteLine($"[EYE][SLACK] >> Broadcast complete: {sent}/{allPrompts.Count} prompts");
                     }
                 }
