@@ -245,6 +245,9 @@ internal partial class Program
                 var elAid = root.Properties.AutomationId.ValueOrDefault ?? "";
                 Console.WriteLine($"[A11Y] element: {elType} \"{elName}\" (aid=\"{elAid}\") in {tag}");
 
+                // Tab activation: if target is inside an unselected tab, activate it first
+                EnsureTabActive(root);
+
                 // Zoom: show magnifier/highlight on target element
                 var elRect = GetBoundingRect(root);
                 var elHwnd = GetElementHwnd(root);
