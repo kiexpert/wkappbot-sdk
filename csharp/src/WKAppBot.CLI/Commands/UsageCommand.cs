@@ -18,6 +18,27 @@ Usage:
 
 ═══ Public Commands ═══════════════════════════════════════════
 
+  a11y <action> <grap>[#uia-scope] [options]        (alias: a11y.exe / wka11y.exe)
+      Universal accessibility interface — 20 standard actions for ANY window.
+      3-tier fallback: UIA → Win32 → SendInput. Busybox: symlink `a11y.exe` works.
+
+      Auto-pipeline per action: blocker dismiss → minimize restore → tab activate
+        → zoom/magnifier → execute (3-tier) → result feedback (green/amber) → fade
+
+      Window (7):  close  minimize  maximize  restore  focus  move  resize
+      Element (13): read  find  highlight  invoke  click  toggle
+                    expand  collapse  select  scroll  type  set-value  set-range
+
+      Target:  --nth 3 | 3~ | ~3 | 2~4    --all    (default: first match)
+      Options: --depth N  --force  --text ""...""  --value N  --direction  --amount
+      Grap:    ';' OR  #scope  Ex: ""*메모장*#*파일*"" → Notepad's File menu
+
+      a11y find ""*app*"" --depth 5       # MUD: look (Win32 + UIA children)
+      a11y highlight ""*app*#*button*""   # visualize target with zoom overlay
+      a11y invoke ""*app*#*button*""      # click (UIA Invoke → BM_CLICK → SendInput)
+      a11y close ""*Chrome*"" --nth 2~    # close 2nd window onwards
+      a11y type ""*app*#*edit*"" --text ""hello""
+
   find <keyword> [--deep] [--limit N] [--process <name>]
       Unified search: window titles + UIA accessibility elements.
       --deep: Thorough search (depth 12, slower but finds more).
@@ -107,20 +128,6 @@ Utility:
       Auto-closes about:blank tabs, validates tab URL before insert.
   win-move <window-title> [--right-top] [--x N --y N]
       Move a window to a specific position.
-  a11y <action> <grap>[#uia-scope] [options]
-      Standardized a11y control — works whether target supports a11y or not.
-      UIA-first with Win32 fallback for every action.
-      Window actions: close, minimize, maximize, restore, focus, move, resize
-      Element actions (use #scope): read, invoke, click, toggle, expand,
-        collapse, select, scroll, type, set-value, set-range
-      Options: --all  Apply to all matching windows
-               --force  close: kill process if WM_CLOSE fails
-               --force-close-ancestors  Include own process tree (default: skip)
-               --text ""..."" (type/set-value), --value N (set-range)
-               --direction up|down|left|right --amount small|large (scroll)
-      Grap supports ';' OR syntax: ""*메모장*;*계산기*""
-      #scope targets UIA elements: ""*메모장*#*파일*"" → '파일' in Notepad
-      Ancestor protection: self + parent processes auto-excluded from targets.
   screen off [--no-check]
       Turn off monitor immediately.
   com ls|use|current|methods|call
