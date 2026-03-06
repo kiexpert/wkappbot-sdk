@@ -103,6 +103,10 @@ Utility:
       Stream logs in real-time (Ctrl+C to stop).
   win-move <window-title> [--right-top] [--x N --y N]
       Move a window to a specific position.
+  a11y <action> <grap> [options]
+      A11y-first window control (UIA → Win32 fallback).
+      Actions: close, minimize, maximize, restore, move (--x --y), resize (--w --h)
+      Options: --all (apply to all matching windows)
   screen off [--no-check]
       Turn off monitor immediately.
   com ls|use|current|methods|call
