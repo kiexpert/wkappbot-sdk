@@ -121,11 +121,19 @@ internal partial class Program
         return 0;
     }
 
+    // grap-style file pattern: "regex:..." for regex, "*" wildcard, ";" OR
     static bool IsFilePatternMatch(string fileName, string[] patterns)
     {
         foreach (var p in patterns)
         {
-            if (WildcardMatch(fileName, p)) return true;
+            if (p.StartsWith("regex:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Regex.IsMatch(fileName, p[6..], RegexOptions.IgnoreCase)) return true;
+            }
+            else
+            {
+                if (WildcardMatch(fileName, p)) return true;
+            }
         }
         return false;
     }
