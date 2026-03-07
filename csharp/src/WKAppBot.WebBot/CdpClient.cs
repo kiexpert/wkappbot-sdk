@@ -1336,10 +1336,11 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     public async Task<TabInfo?> FindTabByPatternAsync(int port, string pattern)
     {
         var tabs = await ListTabsAsync(port);
-        // Wildcard pattern → simple glob match on title+url
+        // If no wildcards, auto-wrap with * for substring match
+        var matchPattern = pattern.Contains('*') ? pattern : $"*{pattern}*";
         foreach (var tab in tabs)
         {
-            if (GlobMatch(tab.Title, pattern) || GlobMatch(tab.Url, pattern))
+            if (GlobMatch(tab.Title, matchPattern) || GlobMatch(tab.Url, matchPattern))
                 return tab;
         }
         return null;
@@ -1689,12 +1690,12 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                 var id = msg["id"]?.GetValue<int>();
                 if (id.HasValue && _pending.TryRemove(id.Value, out var tcs))
                 {
-                    var error = msg["error"];
+                    var error = msg.AsObject().ContainsKey("error") ? msg["error"] : null;
                     if (error != null)
                         tcs.TrySetException(new InvalidOperationException(
                             $"CDP error: {error["message"]?.GetValue<string>()}"));
                     else
-                        tcs.TrySetResult(msg["result"]);
+                        tcs.TrySetResult(msg.AsObject().ContainsKey("result") ? msg["result"] : null);
                 }
                 else
                 {
