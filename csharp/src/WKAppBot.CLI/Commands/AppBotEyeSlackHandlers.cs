@@ -233,8 +233,21 @@ internal partial class Program
         Console.WriteLine($"  [SLACK→PROMPT] 위치확보 OK — 입력 시작");
         Console.ResetColor();
 
+        // 입력 전 전경 기억 — TypeAndSubmit이 포커스를 뺏으면 복구용
+        var prevFg = NativeMethods.GetForegroundWindow();
+
         var result = promptHelper.TypeAndSubmit(prompt, text);
         report.Zoom?.Dispose();
+
+        // 포커스가 바뀌었으면 직전 전경으로 복구
+        if (prevFg != IntPtr.Zero && prevFg != prompt.WindowHandle
+            && NativeMethods.GetForegroundWindow() != prevFg)
+        {
+            Thread.Sleep(200);
+            NativeMethods.SmartSetForegroundWindow(prevFg);
+            Console.WriteLine($"  [SLACK→PROMPT] 직전 전경 복구: 0x{prevFg:X}");
+        }
+
         return result;
     }
 
