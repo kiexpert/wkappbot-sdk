@@ -1,4 +1,4 @@
-﻿# WKAppBot v3.1 - Windows App Automation Test Framework
+﻿# WKAppBot v3.1 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -119,6 +119,7 @@ csharp/src/
 ├── WKAppBot.Win32/         # NativeMethods, WindowFinder, AppScanner, ExperienceDb, UiaLocator, Input/*
 ├── WKAppBot.Vision/        # ChartAnalyzer, SimpleOcrAnalyzer, VisionCache, TooltipCalibrator
 ├── WKAppBot.WebBot/        # CdpClient, ChromeLauncher, SlackSocketClient
+├── WKAppBot.Android/       # AdbClient, AndroidA11yTree, AdbGrapRouter, AdbExperienceDb
 └── WKAppBot.Report/        # 리포트 생성 (스켈레톤)
 handlers/                   # 방해꾼 다이얼로그 핸들러 YAML
 scenarios/                  # YAML 테스트 시나리오
@@ -182,6 +183,12 @@ wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령 
   # --all, --nth N (range: 2~4, ~3, 3~), --depth N, --force, --force-close-ancestors, --timeout N, --interval N
   # 10-step auto pipeline: find → ancestor protect → blocker dismiss → restore → child walk → UIA scope → tab activate → zoom → execute → feedback
 wkappbot mcp                                   # MCP stdio 서버 (도구 1개: wkappbot)
+# Android ADB (adb:// grap scheme — USB 연결 디바이스 제어)
+wkappbot a11y inspect "adb://device/*pkg*#scope" [--depth N]  # Android a11y 트리
+wkappbot a11y click "adb://*pkg*#target"                      # Android 탭/클릭
+wkappbot a11y type "adb://*pkg*#input" --text "텍스트"         # Android 텍스트 입력
+wkappbot a11y windows "adb://"                                # 연결된 디바이스 목록
+wkappbot a11y screenshot "adb://device" [-o out.png]          # Android 스크린샷
 ```
 
 ## Key Design Decisions
@@ -226,6 +233,8 @@ Phase 0: Already Focused? → Phase 1: Alert+Wait(3초) → Phase 2: Force Recov
 | **탭 포털** | `"Chrome#ChatGPT#모델"` | TabItem 매칭 → 자동 탭 전환 → RootWebArea 점프 |
 | **웹 a11y** | `"Chrome#Gemini#새 채팅"` | 탭 포털 경유 웹 요소 접근 (UIA, CDP 불필요!) |
 | aid 매칭 | `"Claude#email"` | Name 매칭 실패 시 AutomationId로 폴백 |
+| **adb:// 안드로이드** | `"adb://Fold5/*heromts*#해외잔고"` | ADB USB 연결 Android 디바이스 제어 |
+| adb 자동감지 | `"adb://*heromts*"` | 단일 디바이스 자동선택, 패키지 매칭 |
 
 > **`#` 스코프 = URL fragment 스타일**: `window/child#a11y-bookmark`
 > - `#` 앞: Win32 윈도우 탐색 (기존 grap)
@@ -321,6 +330,20 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - `wait` 액션: 윈도우/UIA 요소 출현 폴링 대기 (--timeout, --interval)
   - `eval` 액션: CDP JavaScript 실행, #scope로 탭 힌트 매칭
   - MCP 에러 구조화: RunCliCaptureWithCode → exit code 기반 isError 플래그
+### v2.2 Android ADB Integration (Phase A+B 완료)
+- **WKAppBot.Android 프로젝트**: AdbClient, AdbDeviceRegistry, AdbGrapRouter, AndroidA11yTree, AdbExperienceDb
+- **adb:// URI 스키마**: `adb://device/package#scope` — Windows grap과 동일한 `#` scope 문법
+- **9개 액션**: inspect, find, windows, screenshot, click, read, scroll, type, close
+- **디바이스 탐색**: `adb devices -l` → model/serial/alias 매칭, 폴더블 듀얼 디스플레이 지원
+- **a11y 트리 파싱**: uiautomator dump XML → AndroidNode 트리, 500ms 캐시
+- **#scope 3패스**: content-desc → text → resource-id (Windows UIA Name → AutomationId와 동일)
+- **type 3티어 폴백**: ADB Keyboard IME → clipboard paste → ASCII input
+- **경험DB 축적**: A11Y (`profiles/{pkg}_exp/`) + OS (`experience/android/{pkg}/`) 듀얼 경로
+  - 트리 스냅샷 ring buffer (0~9), 액션 JSONL 로그, 노하우 방송
+- **MCP 설명 통합**: adb:// 예시 5개 추가
+- Phase C (미구현): AccessibilityService helper APK (실시간 이벤트, 빠른 트리)
+- Phase D (미구현): Android 경험DB 고도화 (컨트롤별 성공률, 좌표 학습)
+
 ### Phase 8: puppet 패턴 매칭 — 미구현
 - FormTypeIdentifier Level 4: OCR 텍스트 vs 패턴 매칭으로 폼 자동 식별
 
