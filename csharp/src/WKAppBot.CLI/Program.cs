@@ -65,6 +65,13 @@ internal partial class Program
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
 
+        // MCP stdio server — must run BEFORE TeeTextWriter (stdout = JSON-RPC only)
+        if (args.Length > 0 && args[0] == "mcp")
+        {
+            try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
+            return McpCommand(args.Skip(1).ToArray());
+        }
+
         // Enable DPI awareness
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
 
