@@ -168,7 +168,7 @@ wkappbot newchat "prompt" [--file f.txt]      # Claude Desktop 새채팅 열고 
 wkappbot readiness [grap] [--point X Y] [--yield] # InputReadiness 진단 (완전 포커스리스, 돋보기 강제)
 wkappbot schedule <subcommand>                # add/list/remove/clear (예약 프롬프트)
 wkappbot logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]  # 실시간 로그 추적
-wkappbot ask gpt|gemini "question" [--slack] [--timeout N] [--new-tab]  # CDP 웹 AI 질문
+wkappbot ask gpt|gemini "question" [--slack] [--timeout N] [--new-tab] [--image path.png]  # CDP 웹 AI 질문 (+이미지첨부)
 wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령 (MCP 유일 도구)
   # Discovery (4): inspect, windows, screenshot, ocr — 기존 명령 위임
   # Window (7): close, minimize, maximize, restore, focus, move(--x --y), resize(--w --h)
@@ -309,6 +309,11 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - `wait` 액션: 윈도우/UIA 요소 출현 폴링 대기 (--timeout, --interval)
   - `eval` 액션: CDP JavaScript 실행, #scope로 탭 힌트 매칭
   - MCP 에러 구조화: RunCliCaptureWithCode → exit code 기반 isError 플래그
+- **ask --image** — ChatGPT/Gemini 이미지 첨부 질문
+  - `wkappbot ask gpt "질문" --image screenshot.png`
+  - Tier 1: Synthetic ClipboardEvent + File blob (focusless, 클립보드 미사용)
+  - Tier 2: Win32 Clipboard.SetImage + CDP Ctrl+V (폴백)
+  - 업로드 완료 대기 후 텍스트 질문 삽입 → 전송
   - 26 actions (기존 24 + wait + eval)
 
 ### Phase 8: puppet 패턴 매칭 — 미구현

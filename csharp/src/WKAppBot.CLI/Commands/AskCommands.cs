@@ -26,6 +26,7 @@ internal partial class Program
         bool slackReport = false;
         bool newTab = false;
         int timeoutSec = 30;
+        string? imagePath = null;
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--slack")
@@ -34,6 +35,8 @@ internal partial class Program
                 newTab = true;
             else if (args[i] == "--timeout" && i + 1 < args.Length)
                 int.TryParse(args[++i], out timeoutSec);
+            else if (args[i] == "--image" && i + 1 < args.Length)
+                imagePath = args[++i];
             else
                 questionParts.Add(args[i]);
         }
@@ -41,10 +44,14 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(question))
             return AskUsage();
 
+        // Validate image path
+        if (imagePath != null && !File.Exists(imagePath))
+            return Error($"Image file not found: {imagePath}");
+
         return ai switch
         {
-            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab),
-            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab),
+            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, imagePath),
+            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, imagePath),
             _ => Error($"Unknown AI: {ai} (use gemini or gpt)")
         };
     }
@@ -55,17 +62,19 @@ internal partial class Program
 WKAppBot Ask — one-command AI Q&A via WebBot
 
 Usage:
-  wkappbot ask gemini ""question""  [--slack] [--timeout 30] [--new-tab]
-  wkappbot ask gpt ""question""     [--slack] [--timeout 30] [--new-tab]
+  wkappbot ask gemini ""question""  [--slack] [--timeout 30] [--new-tab] [--image path.png]
+  wkappbot ask gpt ""question""     [--slack] [--timeout 30] [--new-tab] [--image path.png]
 
 Options:
   --slack       Report answer to Slack channel
   --timeout N   Max seconds to wait for response (default: 30)
   --new-tab     Open in a new tab (default: reuse existing tab)
+  --image PATH  Attach image file (png/jpg) — pasted into chat before question
 
 Examples:
   wkappbot ask gemini ""오늘 코스피 특징주 알려줘""
   wkappbot ask gpt ""이 패턴 분석해줘"" --slack
+  wkappbot ask gpt ""이 UI 스크린샷의 요소 분석해줘"" --image screenshot.png
   wkappbot ask gpt ""새 탭으로 테스트"" --new-tab
 ");
         return 1;
@@ -306,9 +315,179 @@ Examples:
             """);
     }
 
+    // ── Image Paste ──
+
+    /// <summary>
+    /// Paste image into chat editor via CDP.
+    /// Tier 1: Synthetic ClipboardEvent with File blob (fully focusless, no real clipboard).
+    /// Tier 2: Win32 clipboard + CDP Ctrl+V (needs focus + visible viewport).
+    /// Returns true if image was pasted (upload indicator detected).
+    /// </summary>
+    static async Task<bool> PasteImageViaCdp(CdpClient cdp, string imagePath, string editorSelector)
+    {
+        var bytes = File.ReadAllBytes(imagePath);
+        var base64 = Convert.ToBase64String(bytes);
+        var ext = Path.GetExtension(imagePath).ToLowerInvariant();
+        var mimeType = ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".bmp" => "image/bmp",
+            _ => "image/png"
+        };
+        var fileName = Path.GetFileName(imagePath);
+        Console.WriteLine($"[ASK] Pasting image: {fileName} ({bytes.Length / 1024}KB, {mimeType})");
+
+        // Tier 1: Synthetic paste event with File blob (focusless — no real clipboard needed)
+        var pasteJs = $$"""
+            (async () => {
+                try {
+                    var b64 = '{{base64}}';
+                    var bin = atob(b64);
+                    var arr = new Uint8Array(bin.length);
+                    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                    var blob = new Blob([arr], {type: '{{mimeType}}'});
+                    var file = new File([blob], '{{fileName}}', {type: '{{mimeType}}'});
+                    var dt = new DataTransfer();
+                    dt.items.add(file);
+                    var el = document.querySelector('{{editorSelector}}');
+                    if (!el) return 'NO_EDITOR';
+                    el.focus();
+                    var evt = new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true});
+                    el.dispatchEvent(evt);
+                    return 'PASTED';
+                } catch(e) { return 'ERR:' + e.message; }
+            })()
+            """;
+        var result = await cdp.EvalAsync(pasteJs);
+        Console.WriteLine($"[ASK] Synthetic paste: {result}");
+
+        if (result == "PASTED")
+        {
+            // Wait for upload indicator (ChatGPT/Gemini show a thumbnail or progress)
+            for (int i = 0; i < 10; i++)
+            {
+                await Task.Delay(500);
+                var indicator = await cdp.EvalAsync("""
+                    (() => {
+                        // ChatGPT: file attachment area appears
+                        var gpt = document.querySelector('[data-testid="file-thumbnail"]')
+                                || document.querySelector('[class*="attachment"]')
+                                || document.querySelector('[class*="file-upload"]')
+                                || document.querySelector('img[src*="blob:"]');
+                        if (gpt) return 'GPT_ATTACHED';
+                        // Gemini: image preview in input area
+                        var gem = document.querySelector('.input-area img')
+                                || document.querySelector('[class*="uploaded"]')
+                                || document.querySelector('[class*="attachment"]')
+                                || document.querySelector('img[src*="blob:"]');
+                        if (gem) return 'GEM_ATTACHED';
+                        return 'NONE';
+                    })()
+                    """) ?? "NONE";
+
+                if (indicator != "NONE")
+                {
+                    Console.WriteLine($"[ASK] Image attached: {indicator} ({(i + 1) * 500}ms)");
+                    return true;
+                }
+            }
+            // Even if no indicator detected, the paste event was dispatched — proceed optimistically
+            Console.WriteLine("[ASK] No upload indicator, but paste dispatched — proceeding");
+            return true;
+        }
+
+        // Tier 2: Win32 clipboard + CDP Ctrl+V
+        Console.WriteLine("[ASK] Synthetic paste failed, trying clipboard + Ctrl+V...");
+        try
+        {
+            // Set image to clipboard on STA thread
+            var clipboardSet = false;
+            var staThread = new Thread(() =>
+            {
+                try
+                {
+                    using var img = System.Drawing.Image.FromFile(imagePath);
+                    System.Windows.Forms.Clipboard.SetImage(img);
+                    clipboardSet = true;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ASK] Clipboard.SetImage failed: {ex.Message}");
+                }
+            });
+            staThread.SetApartmentState(ApartmentState.STA);
+            staThread.Start();
+            staThread.Join(3000);
+
+            if (!clipboardSet)
+                return false;
+
+            // Focus editor
+            await cdp.EvalAsync($"document.querySelector('{editorSelector}')?.focus()");
+            await Task.Delay(200);
+
+            // Ctrl+V via CDP
+            await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "keyDown", ["key"] = "v", ["code"] = "KeyV",
+                ["windowsVirtualKeyCode"] = 86, ["modifiers"] = 2 // Ctrl
+            });
+            await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "keyUp", ["key"] = "v", ["code"] = "KeyV",
+                ["windowsVirtualKeyCode"] = 86, ["modifiers"] = 2
+            });
+            await Task.Delay(1000);
+
+            // Check for attachment
+            var attached = await cdp.EvalAsync("""
+                (() => {
+                    return document.querySelector('[data-testid="file-thumbnail"]')
+                        || document.querySelector('[class*="attachment"]')
+                        || document.querySelector('img[src*="blob:"]')
+                        ? 'YES' : 'NO';
+                })()
+                """) ?? "NO";
+
+            Console.WriteLine($"[ASK] Clipboard paste: {attached}");
+            return attached == "YES";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ASK] Clipboard paste failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>Wait for image upload to complete (progress indicator gone).</summary>
+    static async Task WaitForImageUpload(CdpClient cdp, int maxWaitMs = 15000)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < maxWaitMs)
+        {
+            await Task.Delay(500);
+            var uploading = await cdp.EvalAsync("""
+                (() => {
+                    var progress = document.querySelector('[class*="uploading"]')
+                                || document.querySelector('[class*="progress"]')
+                                || document.querySelector('[role="progressbar"]');
+                    return progress ? 'UPLOADING' : 'DONE';
+                })()
+                """) ?? "DONE";
+            if (uploading == "DONE")
+            {
+                Console.WriteLine($"[ASK] Image upload complete ({sw.ElapsedMilliseconds}ms)");
+                return;
+            }
+        }
+        Console.WriteLine("[ASK] Image upload wait timeout — proceeding");
+    }
+
     // ── Gemini ──
 
-    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab)
+    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, string? imagePath = null)
     {
         Console.WriteLine($"[ASK] Gemini: {question}");
         using var focusGuard = new CdpFocusGuard();
@@ -478,6 +657,14 @@ Examples:
                 // ── Browser exclusive: question input → send complete ──
                 using var questionLock = ChromeTabLock.Acquire("Gemini");
                 if (questionLock == null) return (false, (string?)null);
+
+                // ── Image paste (before text) ──
+                if (imagePath != null)
+                {
+                    var imgOk = await PasteImageViaCdp(cdp, imagePath, editorSel);
+                    if (imgOk) await WaitForImageUpload(cdp);
+                    else Console.WriteLine("[ASK] Image paste failed — sending text only");
+                }
 
                 // Tier 1: focusless insert (a11y-first)
                 await ClearContentEditable(cdp, editorSel);
@@ -749,9 +936,11 @@ Examples:
         "(4) For planning: numbered steps with specific commands/tools. " +
         "(5) For code: ONLY the code, no explanation unless asked. " +
         "(6) Keep answers under 150 words unless the question demands more. " +
-        "(7) Confirm you understood with exactly: READY";
+        "(7) No blank lines between paragraphs — keep output compact and dense, single-spaced. " +
+        "(8) For image analysis: output JSON with {label, text, x, y, w, h} for each UI element. " +
+        "(9) Confirm you understood with exactly: READY";
 
-    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab)
+    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, string? imagePath = null)
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
         using var focusGuard = new CdpFocusGuard();
@@ -834,7 +1023,7 @@ Examples:
                 await Task.Delay(1000); // Let ChatGPT UI settle
 
                 // Send the actual question (with 9s-delay retry on timeout)
-                var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec);
+                var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, imagePath);
                 if (!ok && string.IsNullOrEmpty(answer))
                 {
                     Console.WriteLine("[ASK] ChatGPT timeout — retrying in 9 seconds...");
@@ -962,7 +1151,7 @@ Examples:
     /// A11y-first: finds editor via ARIA selector chain, inserts text via CDP Input.insertText.
     /// </summary>
     static async Task<(bool ok, string? text)> ChatGptSendAndWait(
-        CdpClient cdp, string message, int timeoutSec)
+        CdpClient cdp, string message, int timeoutSec, string? imagePath = null)
     {
         // ── Phase 0: URL check + turn count (iconified OK) ──
         var currentUrl = await cdp.EvalAsync("location.href") ?? "";
@@ -981,6 +1170,14 @@ Examples:
         // ── Browser exclusive zone: prompt input → first response turn ──
         using var chatLock = ChromeTabLock.Acquire("ChatGPT");
         if (chatLock == null) return (false, null);
+
+        // ── Image paste (before text) ──
+        if (imagePath != null)
+        {
+            var imgOk = await PasteImageViaCdp(cdp, imagePath, editorSel);
+            if (imgOk) await WaitForImageUpload(cdp);
+            else Console.WriteLine("[ASK] Image paste failed — sending text only");
+        }
 
         // Tier 1: focusless insert (a11y-first)
         await ClearContentEditable(cdp, editorSel);
