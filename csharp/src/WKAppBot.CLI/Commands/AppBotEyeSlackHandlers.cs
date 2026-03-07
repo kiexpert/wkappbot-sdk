@@ -233,21 +233,8 @@ internal partial class Program
         Console.WriteLine($"  [SLACK→PROMPT] 위치확보 OK — 입력 시작");
         Console.ResetColor();
 
-        // 입력 전 전경 기억 — TypeAndSubmit이 포커스를 뺏으면 복구용
-        var prevFg = NativeMethods.GetForegroundWindow();
-
         var result = promptHelper.TypeAndSubmit(prompt, text);
         report.Zoom?.Dispose();
-
-        // 포커스가 바뀌었으면 직전 전경으로 복구
-        if (prevFg != IntPtr.Zero && prevFg != prompt.WindowHandle
-            && NativeMethods.GetForegroundWindow() != prevFg)
-        {
-            Thread.Sleep(200);
-            NativeMethods.SmartSetForegroundWindow(prevFg);
-            Console.WriteLine($"  [SLACK→PROMPT] 직전 전경 복구: 0x{prevFg:X}");
-        }
-
         return result;
     }
 
@@ -880,6 +867,8 @@ internal partial class Program
 
                 ClaudePromptHelper.AllowFocusSteal = true; // fallback path용
                 using var allPromptHelper = new ClaudePromptHelper();
+                // 브로드캐스트 전 전경 기억 — 핑 전달 후 원래 창으로 복구
+                var prevFgBeforeBroadcast = NativeMethods.GetForegroundWindow();
                 var allPrompts = allPromptHelper.FindAllPrompts();
 
                 if (allPrompts.Count > 0)
@@ -900,6 +889,15 @@ internal partial class Program
                         {
                             Console.WriteLine($"[EYE][SLACK] >> Broadcast error: {ex.Message}");
                         }
+                    }
+
+                    // 브로드캐스트 완료 → 직전 전경 복구
+                    if (prevFgBeforeBroadcast != IntPtr.Zero
+                        && NativeMethods.GetForegroundWindow() != prevFgBeforeBroadcast)
+                    {
+                        Thread.Sleep(200);
+                        NativeMethods.SmartSetForegroundWindow(prevFgBeforeBroadcast);
+                        Console.WriteLine($"[EYE][SLACK] >> 직전 전경 복구: 0x{prevFgBeforeBroadcast:X}");
                     }
 
                     if (sent > 0)
