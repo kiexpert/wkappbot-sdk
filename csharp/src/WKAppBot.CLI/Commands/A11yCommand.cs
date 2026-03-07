@@ -14,6 +14,13 @@ internal partial class Program
     // Unified pattern: find all -> select (--nth/--all) -> dispatch targets
     static int A11yCommand(string[] args)
     {
+        // ═══ ADB early dispatch: adb:// prefix → Android pipeline ═══
+        if (args.Length >= 2 && Android.AdbGrapRouter.IsAdbGrap(args[1]))
+            return AdbA11yDispatch(args);
+        // Also check if grap is first arg (discovery actions)
+        if (args.Length >= 1 && Android.AdbGrapRouter.IsAdbGrap(args[0]))
+            return AdbA11yDispatch(new[] { "inspect" }.Concat(args).ToArray());
+
         // ═══ Delegate actions (may not require grap) ═══
         if (args.Length >= 1)
         {
