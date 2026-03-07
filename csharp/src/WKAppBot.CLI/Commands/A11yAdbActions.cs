@@ -16,7 +16,7 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal partial class Program
 {
-    private static readonly Lazy<AdbExperienceDb> _adbExpDb = new(() => new AdbExperienceDb(DataDir));
+    private static readonly Lazy<AdbExperienceDb> _adbExpDb = new(() => new AdbExperienceDb(DataDir!));
     private static AdbExperienceDb AdbExpDb => _adbExpDb.Value;
 
     // ── Entry point ───────────────────────────────────────
