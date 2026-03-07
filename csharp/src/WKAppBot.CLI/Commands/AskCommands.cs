@@ -436,6 +436,26 @@ Examples:
                                 break;
                             }
                         }
+                        // Wait for Gemini to finish streaming (stop button gone + text stable)
+                        for (int stab = 0; stab < 10; stab++)
+                        {
+                            await Task.Delay(500);
+                            var streaming = await cdp.EvalAsync("""
+                                (() => {
+                                    var stop = document.querySelector('button[aria-label="응답 중지"], button[aria-label="Stop response"], button[aria-label="Stop"]');
+                                    if (stop) return 'STREAMING';
+                                    var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
+                                    if (mat) return 'STREAMING';
+                                    return 'IDLE';
+                                })()
+                                """) ?? "IDLE";
+                            if (streaming == "IDLE")
+                            {
+                                Console.WriteLine($"[ASK] Persona streaming done (stable after {(stab+1)*500}ms)");
+                                break;
+                            }
+                            if (stab == 9) Console.WriteLine("[ASK] Persona streaming timeout, proceeding anyway");
+                        }
                         // Re-find editor after persona exchange
                         editorSel = await WaitForEditorA11y(cdp,
                             ".ql-editor", "[role='textbox'][contenteditable='true']",
@@ -562,6 +582,11 @@ Examples:
                 Console.WriteLine($"[ASK] Sent! Waiting for response... (send={sendResult})");
                 questionLock.Release("sent");
 
+                // Count existing responses before polling (skip persona's READY etc.)
+                var preCountStr = await cdp.EvalAsync(
+                    "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+                int baseResponseCount = int.TryParse(preCountStr, out var brc) ? brc : 0;
+
                 // Register for tab handoff + activate peer's tab (we'll poll with textContent)
                 RegisterWaitingTab("gemini", cdp);
                 await HandoffTabToPeer("gemini");
@@ -577,22 +602,16 @@ Examples:
                 {
                     await Task.Delay(2000);
                     // A11y-first: model-response → [role='article'] → generic text
-                    // Also check page health — blank pages return early
-                    var text = await cdp.EvalAsync("""
-                        (() => {
-                            if (!document.body || !document.body.innerHTML || document.body.innerHTML.length < 100)
-                                return '\x01BLANK';
-                            var responses = document.querySelectorAll('model-response');
-                            if (responses.length === 0) {
-                                var articles = document.querySelectorAll('[role="article"]');
-                                responses = articles.length > 0 ? articles : responses;
-                            }
-                            if (responses.length === 0) return '';
-                            var last = responses[responses.length - 1];
-                            // textContent (not innerText) — works in background tabs without layout
-                            return last.textContent || '';
-                        })()
-                        """);
+                    // Only read NEW responses (skip persona exchange)
+                    var text = await cdp.EvalAsync(
+                        "(() => {" +
+                        "if (!document.body || !document.body.innerHTML || document.body.innerHTML.length < 100) return '\\x01BLANK';" +
+                        "var responses = document.querySelectorAll('model-response');" +
+                        "if (responses.length === 0) { var articles = document.querySelectorAll('[role=\"article\"]'); responses = articles.length > 0 ? articles : responses; }" +
+                        $"if (responses.length <= {baseResponseCount}) return '';" +
+                        "var last = responses[responses.length - 1];" +
+                        "return last.textContent || '';" +
+                        "})()");
 
                     // Blank/broken page detection
                     if (text == "\x01BLANK" || text == null)
