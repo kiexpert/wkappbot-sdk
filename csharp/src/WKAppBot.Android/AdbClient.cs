@@ -83,13 +83,78 @@ public class AdbClient
 
     public bool Screencap(string outputPath, string? serial = null, string? displayId = null)
     {
+        // Auto-detect active display for foldables (Fold5 etc.)
+        displayId ??= DetectActiveDisplayId(serial);
         var displayArg = displayId != null ? $" -d {displayId}" : "";
         var remotePath = "/data/local/tmp/wkappbot_screen.png";
         var r1 = Shell($"screencap -p{displayArg} {remotePath}", serial, 15000);
         if (r1.ExitCode != 0) return false;
 
         var r2 = Run($"pull {remotePath} \"{outputPath}\"", serial, 15000);
-        return r2.ExitCode == 0;
+        if (r2.ExitCode != 0) return false;
+
+        // Verify not blank (foldable may capture OFF display → tiny file)
+        try
+        {
+            var fi = new FileInfo(outputPath);
+            if (fi.Exists && fi.Length < 5000) // < 5KB = likely blank
+            {
+                // Retry with explicit display detection
+                var altDisplay = DetectActiveDisplayId(serial, force: true);
+                if (altDisplay != null && altDisplay != displayId)
+                {
+                    r1 = Shell($"screencap -p -d {altDisplay} {remotePath}", serial, 15000);
+                    if (r1.ExitCode == 0)
+                        Run($"pull {remotePath} \"{outputPath}\"", serial, 15000);
+                }
+            }
+        }
+        catch { /* best effort */ }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Detect active display ID for foldable devices.
+    /// Parses 'dumpsys display' for display with state=ON.
+    /// Returns null if only one display or detection fails.
+    /// </summary>
+    public string? DetectActiveDisplayId(string? serial = null, bool force = false)
+    {
+        var r = Shell("dumpsys display | grep -E 'DisplayDeviceInfo|state='", serial, 5000);
+        if (r.ExitCode != 0) return null;
+
+        // Parse display info lines: DisplayDeviceInfo{...uniqueId="local:XXXX",...}
+        // followed by state=ON or state=OFF
+        string? lastUniqueId = null;
+        string? activeId = null;
+        int displayCount = 0;
+
+        foreach (var line in r.StdOut.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("DisplayDeviceInfo"))
+            {
+                // Extract uniqueId from: uniqueId="local:4630946481096930692"
+                var uidMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"uniqueId=""local:(\d+)""");
+                if (uidMatch.Success)
+                {
+                    lastUniqueId = uidMatch.Groups[1].Value;
+                    displayCount++;
+                }
+                else
+                {
+                    lastUniqueId = null; // virtual display etc.
+                }
+            }
+            else if (trimmed.Contains("state=ON") && lastUniqueId != null)
+            {
+                activeId = lastUniqueId;
+            }
+        }
+
+        // Only return display ID if there are multiple physical displays (foldable)
+        return displayCount > 1 || force ? activeId : null;
     }
 
     // ── UI Automator dump ─────────────────────────────────
