@@ -173,9 +173,10 @@ wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령 
   # Discovery (4): inspect, windows, screenshot, ocr — 기존 명령 위임
   # Window (7): close, minimize, maximize, restore, focus, move(--x --y), resize(--w --h)
   # Element (13): find, read, highlight, invoke, click, toggle, expand, collapse, select, scroll, type(--text), set-value(--text), set-range(--value)
+  # Async (2): wait(--timeout --interval 폴링 대기), eval(--text "js" CDP 실행)
   # Web auto-fallback: Chrome/Electron 윈도우 → CSS selector 자동감지 → CDP 엔진
   # grap `#`scope: "*메모장*#*파일*" (UIA), "*Chrome*#button.submit" (CSS→CDP)
-  # --all, --nth N (range: 2~4, ~3, 3~), --depth N, --force, --force-close-ancestors
+  # --all, --nth N (range: 2~4, ~3, 3~), --depth N, --force, --force-close-ancestors, --timeout N, --interval N
   # 10-step auto pipeline: find → ancestor protect → blocker dismiss → restore → child walk → UIA scope → tab activate → zoom → execute → feedback
 wkappbot mcp                                   # MCP stdio 서버 (도구 1개: wkappbot)
 ```
@@ -304,6 +305,11 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - EnsureTabActive: walk up UIA parents, auto-select unselected TabItem
   - Zoom/magnifier on ALL actions (before + result feedback after)
   - Source split: A11yCommand.cs (~320 lines) + A11yElementActions.cs (~600 lines)
+- **v3.1 삼두협의체 보완** — wait/eval 액션 + MCP 에러 구조화
+  - `wait` 액션: 윈도우/UIA 요소 출현 폴링 대기 (--timeout, --interval)
+  - `eval` 액션: CDP JavaScript 실행, #scope로 탭 힌트 매칭
+  - MCP 에러 구조화: RunCliCaptureWithCode → exit code 기반 isError 플래그
+  - 26 actions (기존 24 + wait + eval)
 
 ### Phase 8: puppet 패턴 매칭 — 미구현
 - FormTypeIdentifier Level 4: OCR 텍스트 vs 패턴 매칭으로 폼 자동 식별

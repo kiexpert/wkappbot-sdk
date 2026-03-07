@@ -28,7 +28,8 @@ internal partial class Program
         "Window: close, minimize, maximize, restore, focus, move (--x/--y), resize (--w/--h)\n" +
         "Element: invoke, click, toggle, expand, collapse, select, scroll, type (--text), set-value (--text), set-range (--value)\n" +
         "Query: find, read, highlight\n" +
-        "Discovery: inspect (UIA element tree), windows (list all windows), screenshot (capture window), ocr (extract text)\n\n" +
+        "Discovery: inspect (UIA element tree), windows (list all windows), screenshot (capture window), ocr (extract text)\n" +
+        "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, --text)\n\n" +
         "## Fallback Chain (battle-tested!)\n" +
         "CSS selector on Chrome/Electron class → CDP engine → UIA fallback.\n" +
         "UIA pattern on web view class → if UIA fails → CDP retry.\n" +
@@ -64,5 +65,9 @@ internal partial class Program
         "- Type in native app: action=type, grap=\"*MyApp*#*SearchBox*\", text=\"hello\"\n" +
         "- Read web heading: action=read, grap=\"*Electron*#h1.title\"\n" +
         "- Invoke MFC button: action=invoke, grap=\"*영웅문*#*조회*\" (Korean stock HTS)\n" +
-        "- Toggle checkbox: action=toggle, grap=\"*Settings*#*DarkMode*\"";
+        "- Toggle checkbox: action=toggle, grap=\"*Settings*#*DarkMode*\"\n" +
+        "- Wait for dialog: action=wait, grap=\"*SaveAs*\", timeout=15000\n" +
+        "- Wait for element: action=wait, grap=\"*App*#*ProgressDone*\", timeout=30000\n" +
+        "- Eval JS in Chrome: action=eval, grap=\"*Chrome*\", text=\"document.title\"\n" +
+        "- Eval with tab hint: action=eval, grap=\"*Chrome*#ChatGPT\", text=\"document.querySelectorAll('article').length\"";
 }

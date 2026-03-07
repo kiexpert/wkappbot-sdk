@@ -40,7 +40,7 @@ internal partial class Program
             Console.WriteLine($"  WKAppBot a11y {verStr}");
             Console.WriteLine($"  A MUD-style portal for AI to see and touch the real world.");
             Console.WriteLine($"  find = look, read = examine, invoke = open the door.");
-            Console.WriteLine($"  24 actions · 3-tier fallback · focusless · zoom overlay");
+            Console.WriteLine($"  26 actions · 3-tier fallback · focusless · zoom overlay");
             Console.WriteLine($"  UIA → Win32 → SendInput + CDP web fallback — just works.");
             Console.WriteLine();
             Console.WriteLine("  Usage: a11y <action> <grap>[#uia-scope] [options]");
@@ -74,6 +74,10 @@ internal partial class Program
             Console.WriteLine("  type        Type text (--text \"...\") — focusless WM_CHAR");
             Console.WriteLine("  set-value   Set value directly (--text \"...\")");
             Console.WriteLine("  set-range   Set numeric range (--value N)");
+            Console.WriteLine();
+            Console.WriteLine("═══ Async Actions (2) ══════════════════════════════════");
+            Console.WriteLine("  wait        Poll until window/element appears (--timeout --interval)");
+            Console.WriteLine("  eval        Execute JavaScript via CDP (--text \"js expr\")");
             Console.WriteLine();
             Console.WriteLine("═══ Target Selection ══════════════════════════════════════");
             Console.WriteLine("  (default)   First match");
@@ -139,6 +143,8 @@ internal partial class Program
         string scrollAmount = "small";
         string? nthRaw = null;
         int findDepth = 3;
+        int timeoutMs = 10000;
+        int intervalMs = 500;
         for (int i = 2; i < args.Length; i++)
         {
             var a = args[i].ToLowerInvariant();
@@ -152,6 +158,8 @@ internal partial class Program
             else if (a == "--amount" && i + 1 < args.Length) { scrollAmount = args[++i].ToLowerInvariant(); }
             else if (a == "--nth" && i + 1 < args.Length) { nthRaw = args[++i]; }
             else if (a == "--depth" && i + 1 < args.Length && int.TryParse(args[i + 1], out var dv)) { findDepth = dv; i++; }
+            else if (a == "--timeout" && i + 1 < args.Length && int.TryParse(args[i + 1], out var tv)) { timeoutMs = tv; i++; }
+            else if (a == "--interval" && i + 1 < args.Length && int.TryParse(args[i + 1], out var iv)) { intervalMs = iv; i++; }
         }
 
         // Validate
@@ -159,10 +167,14 @@ internal partial class Program
             return Error("move requires --x N --y N");
         if (action == "resize" && (mw == null || mh == null))
             return Error("resize requires --w N --h N");
-        if ((action == "type" || action == "set-value") && text == null)
+        if ((action == "type" || action == "set-value" || action == "eval") && text == null)
             return Error($"{action} requires --text \"...\"");
         if (action == "set-range" && rangeValue == null)
             return Error("set-range requires --value N");
+
+        // ═══ Special: wait action (polls for window/element, early return) ═══
+        if (action == "wait")
+            return A11yWaitAction(grap, timeoutMs, intervalMs);
 
         var elementActions = new HashSet<string> {
             "invoke", "click", "toggle", "expand", "collapse", "select",
@@ -397,6 +409,7 @@ internal partial class Program
                     "move" => A11yMove(automation, hwnd, tag, mx!.Value, my!.Value),
                     "resize" => A11yResize(automation, hwnd, tag, mw!.Value, mh!.Value),
                     "focus" => A11yFocus(hwnd, tag),
+                    "eval" => A11yEvalJs(hwnd, tag, text!, uiaPath),
                     _ => A11yNotYet(action)
                 };
 
@@ -422,6 +435,7 @@ internal partial class Program
         Console.Error.WriteLine($"[A11Y] ERROR: '{action}' is not a valid action");
         Console.Error.WriteLine("[A11Y] Window: close, minimize, maximize, restore, move, resize, focus");
         Console.Error.WriteLine("[A11Y] Element: read, find, highlight, invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range");
+        Console.Error.WriteLine("[A11Y] Async: wait, eval");
         return false;
     }
 
@@ -636,6 +650,124 @@ internal partial class Program
         }
         catch { }
         return pids;
+    }
+
+    // ═══ Wait Action: poll for window/element appearance ═══
+
+    static int A11yWaitAction(string grap, int timeoutMs, int intervalMs)
+    {
+        var (win32Segments, uiaPath) = GrapHelper.SplitGrap(grap);
+        if (win32Segments.Length == 0)
+            return Error("No window title in grap pattern");
+
+        var firstSegPatterns = win32Segments[0]
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        bool needsUia = !string.IsNullOrEmpty(uiaPath);
+        Console.WriteLine($"[A11Y] wait — polling for \"{grap}\" (timeout={timeoutMs}ms, interval={intervalMs}ms)");
+
+        using var automation = needsUia ? new UIA3Automation() : null;
+        if (automation != null)
+        {
+            automation.ConnectionTimeout = TimeSpan.FromSeconds(2);
+            automation.TransactionTimeout = TimeSpan.FromSeconds(2);
+        }
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            foreach (var pat in firstSegPatterns)
+            {
+                var wins = WindowFinder.FindByTitle(pat);
+                if (wins.Count == 0) continue;
+
+                var hwnd = wins[0].Handle;
+
+                // Walk Win32 children
+                bool childOk = true;
+                for (int seg = 1; seg < win32Segments.Length; seg++)
+                {
+                    var child = WindowFinder.FindChildByPattern(hwnd, win32Segments[seg]);
+                    if (child == null) { childOk = false; break; }
+                    hwnd = child.Handle;
+                }
+                if (!childOk) continue;
+
+                // Window-only wait
+                if (!needsUia)
+                {
+                    Console.WriteLine($"[A11Y] wait — window found after {sw.ElapsedMilliseconds}ms: \"{wins[0].Title}\" (hwnd={hwnd:X8})");
+                    return 0;
+                }
+
+                // UIA scope wait
+                try
+                {
+                    var root = automation!.FromHandle(hwnd);
+                    var scoped = GrapHelper.FindUiaScope(root, uiaPath!);
+                    if (scoped != null)
+                    {
+                        var name = scoped.Properties.Name.ValueOrDefault ?? "";
+                        var type = "?";
+                        try { type = scoped.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                        Console.WriteLine($"[A11Y] wait — element found after {sw.ElapsedMilliseconds}ms: [{type}] \"{name}\"");
+                        return 0;
+                    }
+                }
+                catch { /* UIA timeout on stale elements, keep polling */ }
+            }
+
+            Thread.Sleep(intervalMs);
+        }
+
+        Console.Error.WriteLine($"[A11Y] wait — timeout after {timeoutMs}ms: \"{grap}\"");
+        return 1;
+    }
+
+    // ═══ Eval Action: execute JavaScript via CDP ═══
+
+    static bool A11yEvalJs(IntPtr hwnd, string tag, string jsExpression, string? tabHint)
+    {
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            var port = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)pid);
+            if (port <= 0)
+            {
+                Console.Error.WriteLine($"[A11Y] eval — no CDP port found for {tag}");
+                return false;
+            }
+
+            using var cdp = new WKAppBot.WebBot.CdpClient();
+            cdp.ConnectAsync(port).GetAwaiter().GetResult();
+
+            // Tab matching: prefer #scope hint, fallback to window title
+            var windowTitle = WindowFinder.GetWindowText(hwnd);
+            var tabMatch = !string.IsNullOrEmpty(tabHint) ? tabHint : windowTitle;
+            if (!string.IsNullOrEmpty(tabMatch))
+            {
+                var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
+                foreach (var tab in tabs)
+                {
+                    if (tab.Title.Contains(tabMatch, StringComparison.OrdinalIgnoreCase) ||
+                        tabMatch.Contains(tab.Title, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (tab.Id != cdp.TargetId)
+                            cdp.SwitchToTargetAsync(tab.Id, port).GetAwaiter().GetResult();
+                        break;
+                    }
+                }
+            }
+
+            var result = cdp.EvalAsync(jsExpression).GetAwaiter().GetResult();
+            Console.WriteLine($"[A11Y] eval result: {result}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] eval — error: {ex.Message}");
+            return false;
+        }
     }
 
     // ═══ WebView CDP Fallback ═══
