@@ -168,7 +168,8 @@ internal partial class Program
         });
 
         // ── 최소화 감지 → 포커스리스 리스토어 후 재 Probe ──
-        if (report.FormIconic)
+        bool wasMinimized = report.FormIconic;
+        if (wasMinimized)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"  [SLACK→PROMPT] 최소화 감지 → 포커스리스 리스토어 시도");
@@ -226,6 +227,9 @@ internal partial class Program
             Console.WriteLine($"  [SLACK→PROMPT] 위치확보 실패: {string.Join(", ", issues)}");
             Console.ResetColor();
             report.Zoom?.Dispose();
+            // 실패해도 리스토어했으면 재최소화
+            if (wasMinimized)
+                NativeMethods.ShowWindow(prompt.WindowHandle, NativeMethods.SW_SHOWMINNOACTIVE);
             return false;
         }
 
@@ -235,6 +239,14 @@ internal partial class Program
 
         var result = promptHelper.TypeAndSubmit(prompt, text);
         report.Zoom?.Dispose();
+
+        // 입력 완료 후 원래 최소화 상태로 복원 — 현재 창 가리지 않음
+        if (wasMinimized)
+        {
+            NativeMethods.ShowWindow(prompt.WindowHandle, NativeMethods.SW_SHOWMINNOACTIVE);
+            Console.WriteLine($"  [SLACK→PROMPT] 재최소화 완료 (SW_SHOWMINNOACTIVE)");
+        }
+
         return result;
     }
 
