@@ -826,6 +826,34 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
+    /// Restore Chrome window without stealing focus.
+    /// Uses SetWindowPlacement(SW_SHOWNOACTIVATE) which actually restores from
+    /// minimized state, unlike ShowWindow(SW_SHOWNOACTIVATE) which is a no-op
+    /// when the window is iconic.
+    /// </summary>
+    public void RestoreChromeWindow()
+    {
+        var hwnd = FindChromeMainWindow();
+        if (hwnd == IntPtr.Zero) return;
+
+        var iconic = IsIconic(hwnd);
+
+        if (iconic)
+        {
+            // ShowWindow(SW_RESTORE=9) is the only reliable way to un-minimize.
+            // It briefly activates, so restore user's foreground immediately after.
+            var prevFg = GetForegroundWindow();
+            ShowWindow(hwnd, 9); // SW_RESTORE
+            if (prevFg != IntPtr.Zero && prevFg != hwnd)
+                SetForegroundWindow(prevFg);
+        }
+        else
+        {
+            ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+        }
+    }
+
+    /// <summary>
     /// Set the Chrome window title bar directly via Win32 SetWindowText.
     /// Chrome ignores document.title for the window title in some profiles,
     /// so we force it via Win32 P/Invoke on the Chrome main window.
@@ -918,7 +946,25 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WINDOWPLACEMENT
+    {
+        public int length, flags, showCmd;
+        public System.Drawing.Point ptMinPosition, ptMaxPosition;
+        public System.Drawing.Rectangle rcNormalPosition;
+    }
+
     private const int SW_MINIMIZE = 6;
+    private const int SW_SHOWNOACTIVATE = 4;   // Show at previous size/position without activating
     private const int SW_SHOWMINNOACTIVE = 7;  // Show minimized without activating
 
     /// <summary>

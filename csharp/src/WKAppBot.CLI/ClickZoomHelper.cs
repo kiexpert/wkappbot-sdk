@@ -161,6 +161,126 @@ internal sealed class ClickZoomHelper : IDisposable
     }
 
     /// <summary>
+    /// Start zoom overlay for an iconic (minimized) window — shows zoom near its taskbar button.
+    /// Falls back to the window's restore position if taskbar button is not found.
+    /// </summary>
+    public static ClickZoomHelper? BeginForIconic(IntPtr hwnd, string source, string actionLabel)
+    {
+        try
+        {
+            // Try to find the taskbar button rect via UIA
+            var taskbarRect = FindTaskbarButtonRect(hwnd);
+            if (taskbarRect.HasValue)
+            {
+                var r = taskbarRect.Value;
+                var mode = ZoomMode.Magnifier;
+                int zW = r.Width * 3 + 16;
+                int zH = r.Height * 3 + 50;
+                int zX = r.Left + (r.Width / 2) - (zW / 2);
+                int zY = r.Top - zH - 8; // above the taskbar button
+
+                // Clamp to virtual screen
+                int vsX = NativeMethods.GetSystemMetrics(76);
+                int vsY = NativeMethods.GetSystemMetrics(77);
+                int vsW = NativeMethods.GetSystemMetrics(78);
+                int vsH = NativeMethods.GetSystemMetrics(79);
+                if (zX < vsX) zX = vsX;
+                if (zY < vsY) zY = vsY;
+                if (zX + zW > vsX + vsW) zX = vsX + vsW - zW;
+                if (zY + zH > vsY + vsH) zY = vsY + vsH - zH;
+
+                var host = new InputZoomHost();
+                host.Start(zX, zY, zW, zH, mode);
+                host.UpdateHeader($"[ZOOM:ICON] {source} \"{actionLabel}\"");
+
+                // Capture the taskbar button area as the initial image
+                var capturePng = CaptureScreenRect(r);
+                if (capturePng != null) host.UpdateImage(capturePng);
+                host.UpdateStatus($"⬜ minimized — restoring...");
+
+                Console.Write($"[ZOOM:ICON taskbar@({r.Left},{r.Top} {r.Width}x{r.Height})] ");
+                return new ClickZoomHelper(host, hwnd, hwnd);
+            }
+
+            // Fallback: use restored window position from WINDOWPLACEMENT
+            var wp = new NativeMethods.WINDOWPLACEMENT();
+            NativeMethods.GetWindowPlacement(hwnd, ref wp);
+            var nr = wp.rcNormalPosition;
+            if (nr.Width > 0 && nr.Height > 0)
+            {
+                int cx = nr.Left + nr.Width / 2;
+                int cy = nr.Top + nr.Height / 2;
+                var rect = new Rectangle(cx - 50, cy - 30, 100, 60);
+                var host = new InputZoomHost();
+                host.Start(cx - 170, cy - 120, 316, 230, ZoomMode.Magnifier);
+                host.UpdateHeader($"[ZOOM:ICON] {source} \"{actionLabel}\"");
+                host.UpdateStatus($"⬜ minimized — restoring...");
+                Console.Write($"[ZOOM:ICON restore@({nr.Left},{nr.Top} {nr.Width}x{nr.Height})] ");
+                return new ClickZoomHelper(host, hwnd, hwnd);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Write($"[ZOOM:ICON:ERR {ex.GetType().Name}] ");
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Find a taskbar button's screen rect for a given window handle via UIA.
+    /// </summary>
+    private static Rectangle? FindTaskbarButtonRect(IntPtr hwnd)
+    {
+        try
+        {
+            var title = NativeMethods.GetWindowTextW(hwnd);
+            if (string.IsNullOrEmpty(title)) return null;
+
+            using var automation = new FlaUI.UIA3.UIA3Automation();
+            var trayHwnd = NativeMethods.FindWindowW("Shell_TrayWnd", null);
+            if (trayHwnd == IntPtr.Zero) return null;
+
+            var tray = automation.FromHandle(trayHwnd);
+            // Search for ListItem or Button matching window title in taskbar
+            var items = tray.FindAllDescendants();
+            foreach (var item in items)
+            {
+                try
+                {
+                    var name = item.Properties.Name.ValueOrDefault ?? "";
+                    var ct = item.ControlType;
+                    if ((ct == FlaUI.Core.Definitions.ControlType.ListItem ||
+                         ct == FlaUI.Core.Definitions.ControlType.Button) &&
+                        name.Contains(title, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var br = item.Properties.BoundingRectangle.ValueOrDefault;
+                        if (br.Width > 0 && br.Height > 0)
+                            return new Rectangle((int)br.X, (int)br.Y, (int)br.Width, (int)br.Height);
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>Capture a screen rectangle as PNG bytes.</summary>
+    private static byte[]? CaptureScreenRect(Rectangle rect)
+    {
+        try
+        {
+            using var bmp = new System.Drawing.Bitmap(rect.Width, rect.Height);
+            using var g = Graphics.FromImage(bmp);
+            g.CopyFromScreen(rect.Left, rect.Top, 0, 0, rect.Size);
+            using var ms = new System.IO.MemoryStream();
+            bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            return ms.ToArray();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
     /// Start zoom overlay using UIA BoundingRectangle (for UIA elements without hWnd).
     /// </summary>
     /// <param name="screenRect">Element's screen-coordinate bounding rectangle</param>

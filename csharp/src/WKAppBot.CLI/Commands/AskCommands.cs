@@ -5,7 +5,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using FlaUI.UIA3;
 using WKAppBot.WebBot;
+using WKAppBot.Win32.Accessibility;
 using NativeMethods = WKAppBot.Win32.Native.NativeMethods;
 
 namespace WKAppBot.CLI;
@@ -69,6 +71,50 @@ Examples:
         return 1;
     }
 
+    // ── GrapHelper tab routing: find & switch browser tab via UIA before CDP ──
+
+    /// <summary>
+    /// Find a browser tab by title substring and switch to it via UIA (focusless).
+    /// Returns true if the tab was found and selected.
+    /// This runs BEFORE CDP connection — ensures the right tab is active so CDP
+    /// connects to the correct page without complex URL-matching logic.
+    /// </summary>
+    static bool EnsureTabViaGrap(string browserGrap, string tabPattern)
+    {
+        try
+        {
+            using var automation = new UIA3Automation();
+            var resolved = GrapHelper.ResolveFullGrap(browserGrap, automation);
+            if (resolved == null || resolved.Value.error != null)
+            {
+                Console.WriteLine($"[ASK] GrapHelper: browser not found ({browserGrap})");
+                return false;
+            }
+
+            var (_, root, _) = resolved.Value;
+            var tab = GrapHelper.FindByNameOrAid(root, tabPattern);
+            if (tab == null)
+            {
+                Console.WriteLine($"[ASK] GrapHelper: tab \"{tabPattern}\" not found");
+                return false;
+            }
+
+            if (!GrapHelper.IsTabItem(tab))
+            {
+                // Found something but it's not a TabItem — might be web content already visible
+                Console.WriteLine($"[ASK] GrapHelper: \"{tabPattern}\" matched but not a TabItem (already active?)");
+                return true;
+            }
+
+            return GrapHelper.SwitchToTab(tab);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ASK] GrapHelper tab routing failed: {ex.Message}");
+            return false;
+        }
+    }
+
     sealed record CdpPageTarget(string Id, string Url, string Title, string WebSocketDebuggerUrl);
 
     // Stable tag per session+provider — reuses the same tab across CLI invocations within a session
@@ -83,6 +129,8 @@ Examples:
     /// Connect to CDP, launching Chrome if needed.
     /// Uses AskTargetRegistry + EnsureCorrectWindowAsync for tab reuse.
     /// Focus guard thread prevents Chrome from stealing keyboard focus.
+    /// After setup, minimizes Chrome window — CDP works perfectly minimized,
+    /// and this prevents all focus theft issues.
     /// </summary>
     static CdpClient? EnsureCdpConnection(int port = 9222, string? preferredHost = null, bool newTab = false, string? targetTag = null)
     {
@@ -159,6 +207,9 @@ Examples:
                     Console.WriteLine($"[ASK] Target: {targetTag} → {resolvedId[..Math.Min(8, resolvedId.Length)]}");
                     Console.ResetColor();
                 }
+
+                // Don't minimize here — CDP Input.dispatch* needs a visible viewport.
+                // CdpFocusGuard handles focus theft. Minimize after interaction completes.
 
                 return (CdpClient?)cdp;
             }
@@ -262,6 +313,9 @@ Examples:
         Console.WriteLine($"[ASK] Gemini: {question}");
         using var focusGuard = new CdpFocusGuard();
 
+        // UIA tab routing: switch to Gemini tab before CDP connects (focusless)
+        if (!newTab) EnsureTabViaGrap("Chrome", "Gemini");
+
         var targetTag = BuildAskTargetTag("gemini");
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
@@ -273,28 +327,137 @@ Examples:
         {
             try
             {
-                // Navigate to Gemini if not already there
+                // ── Phase 1: Navigate (iconified OK — CDP works without rendering) ──
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
-                if (!currentUrl.Contains("gemini.google.com"))
+                Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
+                bool isOldGeminiConversation = currentUrl.Contains("gemini.google.com/app/")
+                    && currentUrl.Length > "https://gemini.google.com/app/".Length;
+                if (!currentUrl.Contains("gemini.google.com") || isOldGeminiConversation)
                 {
                     Console.WriteLine("[ASK] Navigating to Gemini...");
                     await cdp.NavigateAsync("https://gemini.google.com/app");
                     await Task.Delay(3000);
                 }
 
+                // Activate tab (no lock needed — just internal tab switch)
+                try
+                {
+                    var prevFg = NativeMethods.GetForegroundWindow();
+                    await cdp.BringToFrontAsync();
+                    if (prevFg != IntPtr.Zero) NativeMethods.SetForegroundWindow(prevFg);
+                    Console.WriteLine("[ASK] Tab activated (BringToFront OK)");
+                }
+                catch (Exception btfEx)
+                {
+                    Console.WriteLine($"[ASK] BringToFront failed: {btfEx.Message}");
+                }
+
+                // Diagnose tab state before editor search
+                var hiddenState = await cdp.EvalAsync("document.hidden + '|' + document.title + '|' + document.querySelectorAll('*').length");
+                Console.WriteLine($"[ASK] Tab state: {hiddenState}");
+
                 // A11y-first: find editor via selector chain
                 var editorSel = await WaitForEditorA11y(cdp,
                     ".ql-editor",                                   // Quill class
                     "[role='textbox'][contenteditable='true']",      // ARIA role
-                    "div[contenteditable='true']"                    // Generic
+                    "div[contenteditable='true']",                   // Generic
+                    "div.ql-editor",                                 // Quill with tag
+                    "rich-textarea [contenteditable]",               // Gemini new UI
+                    ".input-area [contenteditable]"                  // Gemini alt
                 );
                 if (editorSel == null)
                 {
+                    // Last resort: dump available contenteditable elements
+                    var ceDebug = await cdp.EvalAsync("""
+                        (() => {
+                            var ce = document.querySelectorAll('[contenteditable]');
+                            return Array.from(ce).map(e => e.tagName + '.' + (e.className||'').substring(0,40) + '[' + e.getAttribute('contenteditable') + ']').join(' | ');
+                        })()
+                        """);
+                    Console.WriteLine($"[ASK] contenteditable elements: {ceDebug}");
                     Console.WriteLine("[ASK] Editor not found");
                     return (false, (string?)null);
                 }
 
-                // ── Tier 1: focusless insert (a11y-first) ──
+                // ── Persona injection on fresh Gemini conversation ──
+                var geminiTurnCount = await cdp.EvalAsync(
+                    "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+                if (geminiTurnCount == "0")
+                {
+                    // ── Browser exclusive: persona input → send complete ──
+                    using var personaLock = ChromeTabLock.Acquire("Gemini/persona");
+                    if (personaLock == null) return (false, (string?)null);
+
+                    Console.WriteLine("[ASK] Fresh Gemini — injecting persona...");
+                    await ClearContentEditable(cdp, editorSel);
+                    await InsertTextContentEditable(cdp, editorSel, AskPersona);
+                    await Task.Delay(300);
+
+                    // Send persona (button click → Enter fallback)
+                    var personaSent = false;
+                    for (int ps = 0; ps < 5; ps++)
+                    {
+                        var rem = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 0") ?? "0";
+                        if (rem == "0" && ps > 0) { personaSent = true; break; }
+                        await cdp.EvalAsync("document.querySelector('button[aria-label=\"Send message\"], button[aria-label=\"메시지 보내기\"], .send-button, button.send-button')?.click()");
+                        await Task.Delay(500);
+                        await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
+                            ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+                        });
+                        await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
+                            ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+                        });
+                        await Task.Delay(500);
+                    }
+
+                    if (personaSent)
+                    {
+                        // Wait for Gemini to respond to persona (no lock needed — just polling)
+                        var psw = Stopwatch.StartNew();
+                        while (psw.Elapsed.TotalSeconds < 15)
+                        {
+                            await Task.Delay(1500);
+                            var resp = await cdp.EvalAsync("""
+                                (() => {
+                                    var r = document.querySelectorAll('model-response');
+                                    if (r.length === 0) r = document.querySelectorAll('[role="article"]');
+                                    if (r.length === 0) return '';
+                                    return (r[r.length-1].innerText || '').substring(0, 50);
+                                })()
+                                """) ?? "";
+                            if (resp.Length > 0)
+                            {
+                                bool ready = resp.Contains("READY", StringComparison.OrdinalIgnoreCase);
+                                Console.WriteLine($"[ASK] Persona: {(ready ? "READY" : resp)}");
+                                break;
+                            }
+                        }
+                        // Re-find editor after persona exchange
+                        editorSel = await WaitForEditorA11y(cdp,
+                            ".ql-editor", "[role='textbox'][contenteditable='true']",
+                            "div[contenteditable='true']", "div.ql-editor",
+                            "rich-textarea [contenteditable]", ".input-area [contenteditable]");
+                        if (editorSel == null)
+                        {
+                            Console.WriteLine("[ASK] Editor lost after persona");
+                            return (false, (string?)null);
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("[ASK] Persona injection failed, continuing anyway");
+                    }
+                }
+
+                // ── Browser exclusive: question input → send complete ──
+                using var questionLock = ChromeTabLock.Acquire("Gemini");
+                if (questionLock == null) return (false, (string?)null);
+
+                // Tier 1: focusless insert (a11y-first)
                 await ClearContentEditable(cdp, editorSel);
                 var inserted = await InsertTextContentEditable(cdp, editorSel, question);
                 if (!inserted)
@@ -350,41 +513,21 @@ Examples:
                         await Task.Delay(200);
                     }
 
-                    // A11y-first: find send button by aria-label → get bounding rect → CDP mouse click
+                    // JS click() — works even when Chrome is minimized (no viewport needed)
                     var clickResult = await cdp.EvalAsync("""
                         (() => {
                             var btn = document.querySelector('button[aria-label="메시지 보내기"]')
                                    || document.querySelector('button[aria-label="Send message"]')
                                    || document.querySelector('button.send-button');
                             if (!btn || btn.disabled) return 'NO_BUTTON';
-                            var r = btn.getBoundingClientRect();
-                            if (r.width === 0 || r.height === 0) return 'INVISIBLE';
-                            return JSON.stringify({x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2)});
+                            btn.click();
+                            return 'CLICKED';
                         })()
                         """) ?? "NO_BUTTON";
 
-                    if (clickResult != "NO_BUTTON" && clickResult != "INVISIBLE" && clickResult.StartsWith("{"))
+                    if (clickResult != "CLICKED")
                     {
-                        // A11y: CDP real mouse click at button center (focusless, no keyboard focus needed)
-                        try
-                        {
-                            var coords = System.Text.Json.Nodes.JsonNode.Parse(clickResult);
-                            var bx = coords?["x"]?.GetValue<int>() ?? 0;
-                            var by = coords?["y"]?.GetValue<int>() ?? 0;
-                            await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
-                            {
-                                ["type"] = "mousePressed", ["x"] = bx, ["y"] = by, ["button"] = "left", ["clickCount"] = 1
-                            });
-                            await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
-                            {
-                                ["type"] = "mouseReleased", ["x"] = bx, ["y"] = by, ["button"] = "left", ["clickCount"] = 1
-                            });
-                        }
-                        catch { }
-                    }
-                    else
-                    {
-                        // Fallback: focusless Enter key via CDP
+                        // Fallback: Enter key via CDP
                         await Task.Delay(100);
                         await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
                         {
@@ -402,18 +545,23 @@ Examples:
                 if (sendResult == "PENDING") sendResult = "FORCED(5x)";
 
                 Console.WriteLine($"[ASK] Sent! Waiting for response... (send={sendResult})");
+                questionLock.Release("sent");
 
                 // Wait for response — poll until text stabilizes
                 string? lastText = null;
                 int stableCount = 0;
                 var sw = Stopwatch.StartNew();
 
+                int geminiBlankCount = 0;
                 while (sw.Elapsed.TotalSeconds < timeoutSec)
                 {
                     await Task.Delay(2000);
                     // A11y-first: model-response → [role='article'] → generic text
+                    // Also check page health — blank pages return early
                     var text = await cdp.EvalAsync("""
                         (() => {
+                            if (!document.body || !document.body.innerHTML || document.body.innerHTML.length < 100)
+                                return '\x01BLANK';
                             var responses = document.querySelectorAll('model-response');
                             if (responses.length === 0) {
                                 var articles = document.querySelectorAll('[role="article"]');
@@ -424,6 +572,20 @@ Examples:
                             return last.innerText || last.textContent || '';
                         })()
                         """);
+
+                    // Blank/broken page detection
+                    if (text == "\x01BLANK" || text == null)
+                    {
+                        geminiBlankCount++;
+                        Console.WriteLine($"[ASK] Page blank/broken ({geminiBlankCount}/3)");
+                        if (geminiBlankCount >= 3)
+                        {
+                            Console.WriteLine("[ASK] Page unresponsive — aborting poll");
+                            break;
+                        }
+                        continue;
+                    }
+                    geminiBlankCount = 0;
 
                     if (string.IsNullOrEmpty(text))
                         continue;
@@ -478,21 +640,34 @@ Examples:
                 ReportToSlack("Gemini", question, cleaned);
         }
 
+        // Preserve Chrome's original state — don't force minimize
         cdp.Dispose();
         return ok ? 0 : 1;
     }
 
     // ── ChatGPT ──
 
-    // Persona prompt injected on fresh conversation to stabilize output format.
-    // Single-line to avoid ProseMirror multiline issues.
-    const string ChatGptPersona =
-        "You are a concise dev assistant. Reply in the same language as the question. Keep answers under 120 words. No disclaimers or filler. Confirm with: READY";
+    // Shared persona for external AI agents (ChatGPT, Gemini).
+    // Injected on fresh conversations to stabilize output format.
+    // Single-line to avoid ProseMirror/Quill multiline issues.
+    const string AskPersona =
+        "You are a senior dev consultant called by another AI agent (Claude) via CLI automation. " +
+        "I will ask you planning, debugging, and architecture questions. " +
+        "Rules: (1) Reply in the same language as the question. " +
+        "(2) Answer as if YOU were doing the task — give concrete steps, actual commands, and real code. " +
+        "(3) No disclaimers, no filler, no follow-up questions. " +
+        "(4) For planning: numbered steps with specific commands/tools. " +
+        "(5) For code: ONLY the code, no explanation unless asked. " +
+        "(6) Keep answers under 150 words unless the question demands more. " +
+        "(7) Confirm you understood with exactly: READY";
 
     static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab)
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
         using var focusGuard = new CdpFocusGuard();
+
+        // UIA tab routing: switch to ChatGPT tab before CDP connects (focusless)
+        if (!newTab) EnsureTabViaGrap("Chrome", "ChatGPT");
 
         var targetTag = BuildAskTargetTag("gpt");
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
@@ -505,6 +680,7 @@ Examples:
         {
             try
             {
+                // ── Phase 1: Navigate (iconified OK) ──
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (!currentUrl.Contains("chatgpt.com"))
@@ -513,6 +689,11 @@ Examples:
                     await cdp.NavigateAsync("https://chatgpt.com");
                     await Task.Delay(3000);
                 }
+
+                // Activate tab (no lock needed — just internal tab switch)
+                var prevFg = NativeMethods.GetForegroundWindow();
+                await cdp.BringToFrontAsync();
+                if (prevFg != IntPtr.Zero) NativeMethods.SetForegroundWindow(prevFg);
 
                 // Wait for ProseMirror editor
                 var editorSel = await WaitForChatGptEditorA11y(cdp);
@@ -536,12 +717,26 @@ Examples:
                     """) ?? "0";
                 int existingTurns = int.TryParse(turnCountStr, out var etc) ? etc : 0;
 
+                // Auto-rotate: stale conversations have virtualized DOM → empty text.
+                // Also avoids ChatGPT switching to "thinking" models on long conversations.
+                if (existingTurns >= 5)
+                {
+                    Console.WriteLine($"[ASK] Conversation has {existingTurns} turns, rotating to fresh...");
+                    await cdp.NavigateAsync("https://chatgpt.com");
+                    await Task.Delay(3000);
+                    existingTurns = 0;
+                    // Re-acquire editor after navigation
+                    editorSel = await WaitForChatGptEditorA11y(cdp);
+                    if (editorSel == null)
+                        return (false, (string?)null);
+                }
+
                 if (existingTurns == 0)
                 {
                     // Fresh conversation -- inject persona prompt first
                     Console.WriteLine("[ASK] Fresh conversation -- injecting persona...");
                     var (personaOk, personaResp) = await ChatGptSendAndWait(
-                        cdp, ChatGptPersona.Trim(), timeoutSec: 20);
+                        cdp, AskPersona.Trim(), timeoutSec: 20);
                     if (!personaOk)
                     {
                         Console.WriteLine("[ASK] Persona injection failed, continuing anyway");
@@ -582,6 +777,7 @@ Examples:
                 ReportToSlack("ChatGPT", question, answer);
         }
 
+        // Preserve Chrome's original state — don't force minimize
         cdp.Dispose();
         return ok ? 0 : 1;
     }
@@ -681,17 +877,25 @@ Examples:
     static async Task<(bool ok, string? text)> ChatGptSendAndWait(
         CdpClient cdp, string message, int timeoutSec)
     {
+        // ── Phase 0: URL check + turn count (iconified OK) ──
         var currentUrl = await cdp.EvalAsync("location.href") ?? "";
-
-        // Count existing turns (multi-selector: ChatGPT DOM changes frequently)
         int prevTurns = await CountChatGptTurns(cdp);
+
+        // Activate tab (no lock needed)
+        var prevFg = NativeMethods.GetForegroundWindow();
+        await cdp.BringToFrontAsync();
+        if (prevFg != IntPtr.Zero) NativeMethods.SetForegroundWindow(prevFg);
 
         // ── A11y-first: find editor via selector chain ──
         var editorSel = await WaitForChatGptEditorA11y(cdp);
         if (editorSel == null)
             return (false, null);
 
-        // ── Tier 1: focusless insert (a11y-first) ──
+        // ── Browser exclusive zone: prompt input → first response turn ──
+        using var chatLock = ChromeTabLock.Acquire("ChatGPT");
+        if (chatLock == null) return (false, null);
+
+        // Tier 1: focusless insert (a11y-first)
         await ClearContentEditable(cdp, editorSel);
         var inserted = await InsertTextContentEditable(cdp, editorSel, message);
         // Verify what's actually in the editor
@@ -730,44 +934,48 @@ Examples:
             }
         }
 
-        // ── A11y-first: find send button → CDP real mouse click → Enter fallback ──
+        // ── Send: JS click → verify → CDP Enter fallback ──
         await Task.Delay(500);
-        var sendResult = await cdp.EvalAsync("""
+        var sendResult = "PENDING";
+
+        // Tier 1: JS click (works minimized, but React may ignore .click())
+        var jsClick = await cdp.EvalAsync("""
             (() => {
                 var btn = document.querySelector('button[data-testid="send-button"]')
                        || document.querySelector('button[aria-label*="보내기"]')
                        || document.querySelector('button[aria-label*="Send"]');
                 if (!btn || btn.disabled) return 'NO_BTN';
-                var r = btn.getBoundingClientRect();
-                if (r.width === 0 || r.height === 0) return 'INVISIBLE';
-                return JSON.stringify({x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2)});
+                btn.click();
+                return 'CLICKED';
             })()
             """) ?? "NO_BTN";
 
-        if (sendResult != "NO_BTN" && sendResult != "INVISIBLE" && sendResult.StartsWith("{"))
+        if (jsClick == "CLICKED")
         {
-            // A11y: CDP real mouse click at button center
-            try
-            {
-                var coords = System.Text.Json.Nodes.JsonNode.Parse(sendResult);
-                var bx = coords?["x"]?.GetValue<int>() ?? 0;
-                var by = coords?["y"]?.GetValue<int>() ?? 0;
-                await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
-                {
-                    ["type"] = "mousePressed", ["x"] = bx, ["y"] = by, ["button"] = "left", ["clickCount"] = 1
-                });
-                await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
-                {
-                    ["type"] = "mouseReleased", ["x"] = bx, ["y"] = by, ["button"] = "left", ["clickCount"] = 1
-                });
-                sendResult = "CLICKED";
-            }
-            catch { sendResult = "CLICK_FAIL"; }
+            await Task.Delay(500);
+            var remaining = await cdp.EvalAsync(
+                $"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 99") ?? "99";
+            sendResult = remaining == "0" ? "JS_CLICK" : "CLICK_NOOP";
         }
 
-        if (sendResult != "CLICKED")
+        // Tier 2: UIA Invoke on send button (focusless, works minimized)
+        if (sendResult != "JS_CLICK")
         {
-            // Fallback: focusless Enter key
+            Console.WriteLine("[ASK] JS click didn't send, trying UIA invoke...");
+            if (TryUiaInvokeSendButton())
+            {
+                await Task.Delay(500);
+                var remaining = await cdp.EvalAsync(
+                    $"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 99") ?? "99";
+                sendResult = remaining == "0" ? "UIA_INVOKE" : "UIA_NOOP";
+            }
+        }
+
+        // Tier 3: CDP Enter key (needs visible viewport + editor focus)
+        if (sendResult != "JS_CLICK" && sendResult != "UIA_INVOKE")
+        {
+            await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
+            await Task.Delay(100);
             await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
             {
                 ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
@@ -778,7 +986,7 @@ Examples:
                 ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
                 ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
             });
-            sendResult = "ENTER";
+            sendResult = "CDP_ENTER";
         }
 
         // Check editor after send — should be empty if sent successfully
@@ -803,7 +1011,7 @@ Examples:
             }
 
             var c = await CountChatGptTurns(cdp);
-            if (c > prevTurns) { newTurnAppeared = true; break; }
+            if (c > prevTurns) { newTurnAppeared = true; chatLock.Release("first-byte"); break; }
             var cur = c.ToString();
 
             if (sw.Elapsed.TotalSeconds > 3)
@@ -815,74 +1023,200 @@ Examples:
             return (false, null);
         }
 
-        // Poll until streaming finishes + text stabilizes
-        string? lastText = null;
-        int stableCount = 0;
+        // ── Poll Phase 1: wait for streaming/thinking to finish (iconified — no rendering needed) ──
+        int streamExtensions = 0;
+        int blankPageCount = 0;
         sw.Restart();
 
         while (sw.Elapsed.TotalSeconds < timeoutSec)
         {
             await Task.Delay(1500);
+
+            // Lightweight check: is streaming/thinking still active?
+            // Also validates page health and checks if any response text has appeared.
             var stateJson = await cdp.EvalAsync("""
                 (() => {
+                    if (!document.body || !document.body.innerHTML || document.body.innerHTML.length < 100)
+                        return 'BLANK';
                     var stop = document.querySelector('button[data-testid="stop-button"]')
                             || document.querySelector('button[aria-label="Stop streaming"]')
                             || document.querySelector('button[aria-label="스트리밍 중지"]');
+                    var thinking = !!document.querySelector('.result-thinking');
                     var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
-                    if (msgs.length === 0) msgs = document.querySelectorAll('[data-testid*="conversation-turn"]');
                     if (msgs.length === 0) msgs = document.querySelectorAll('article');
-                    if (msgs.length === 0) return JSON.stringify({s:!!stop,t:''});
-                    var last = msgs[msgs.length - 1];
-                    // A11y-first text extraction: skip result-thinking, prefer result-streaming or plain .markdown
-                    var md = last.querySelector('.markdown:not(.result-thinking)')
-                          || last.querySelector('.result-streaming')
-                          || last.querySelector('.markdown');
-                    var txt = md ? (md.innerText || md.textContent) : '';
-                    if (!txt) txt = last.innerText || last.textContent || '';
-                    if (!txt) { var lbl = last.getAttribute('aria-label'); if (lbl) txt = lbl; }
-                    // If only result-thinking exists, treat as streaming (still generating)
-                    if (!txt && last.querySelector('.result-thinking')) stop = true;
-                    return JSON.stringify({s:!!stop,t:txt||''});
+                    var hasText = msgs.length > 0 && (msgs[msgs.length-1].innerText||'').trim().length > 0;
+                    if (!stop && !thinking) return hasText ? 'DONE' : 'DONE_EMPTY';
+                    return hasText ? 'STREAMING_HAS_TEXT' : 'STREAMING';
                 })()
-                """);
+                """) ?? "";
 
-            if (string.IsNullOrEmpty(stateJson)) continue;
-
-            string text = "";
-            bool streaming = false;
-            try
+            if (stateJson == "DONE" || stateJson == "DONE_EMPTY")
             {
-                var node = System.Text.Json.Nodes.JsonNode.Parse(stateJson);
-                streaming = node?["s"]?.GetValue<bool>() ?? false;
-                text = node?["t"]?.GetValue<string>() ?? "";
+                Console.WriteLine($"[ASK] Streaming complete ({sw.Elapsed.TotalSeconds:F0}s)");
+                break;
             }
-            catch { continue; }
 
-            if (streaming) { lastText = text; stableCount = 0; continue; }
-
-            if (!string.IsNullOrWhiteSpace(text))
+            // Blank/broken page detection — bail out early
+            if (stateJson == "BLANK" || string.IsNullOrEmpty(stateJson))
             {
-                if (text == lastText)
+                blankPageCount++;
+                Console.WriteLine($"[ASK] Page blank/broken ({blankPageCount}/3), {sw.Elapsed.TotalSeconds:F0}s");
+                if (blankPageCount >= 3)
                 {
-                    stableCount++;
-                    if (stableCount >= 2)
-                    {
-                        Console.WriteLine($"[ASK] Response ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
-                        return (true, text);
-                    }
+                    Console.WriteLine("[ASK] Page unresponsive — aborting poll");
+                    break;
                 }
-                else { stableCount = 0; lastText = text; }
+                continue;
             }
-            // Silent wait — DOM debug logging removed
+
+            blankPageCount = 0; // reset on valid response
+
+            // First-byte timeout: 20s of streaming with no text → likely stuck
+            // (thinking models like o3 need 10-15s before first text appears)
+            bool hasResponseText = stateJson == "STREAMING_HAS_TEXT";
+            if (!hasResponseText && sw.Elapsed.TotalSeconds >= 20)
+            {
+                Console.WriteLine("[ASK] No response text after 20s — aborting (first-byte timeout)");
+                break;
+            }
+
+            Console.WriteLine($"[ASK] Poll: streaming{(hasResponseText ? "+" : "")}, {sw.Elapsed.TotalSeconds:F0}s");
+
+            // Extend timeout while actively streaming/thinking (max 1 extension = 2x original timeout)
+            if (sw.Elapsed.TotalSeconds > timeoutSec * 0.8 && streamExtensions < 1)
+            {
+                streamExtensions++;
+                Console.WriteLine("[ASK] Still streaming/thinking, extending timeout...");
+                sw.Restart();
+            }
         }
 
-        if (!string.IsNullOrEmpty(lastText))
+        // ── Poll Phase 2: text extraction (CDP works iconic — DOM queries don't need rendering) ──
+
+        // Scroll into view + hydrate + extract
+        string? finalText = null;
+        for (int extractAttempt = 0; extractAttempt < 3; extractAttempt++)
         {
-            Console.WriteLine($"[ASK] Timeout -- partial ({lastText.Length} chars)");
-            return (true, lastText);
+            await cdp.EvalAsync("""
+                (() => {
+                    var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
+                    if (msgs.length === 0) msgs = document.querySelectorAll('article');
+                    if (msgs.length > 0) msgs[msgs.length-1].scrollIntoView({block:'end',behavior:'instant'});
+                })()
+                """);
+            await Task.Delay(300); // let React hydrate after scroll
+
+            var extractJson = await cdp.EvalAsync("""
+                (() => {
+                    var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
+                    if (msgs.length === 0) msgs = document.querySelectorAll('article');
+                    if (msgs.length === 0) return '';
+                    var last = msgs[msgs.length - 1];
+
+                    var md = last.querySelector('.markdown:not(.result-thinking):not(.result-thinking-content)')
+                          || last.querySelector('.result-streaming:not(.result-thinking)')
+                          || last.querySelector('.markdown:not(.result-thinking):not(.result-thinking-content)');
+
+                    var txt = md ? (md.innerText || md.textContent || '') : '';
+                    if (!txt && !last.querySelector('.result-thinking')) txt = last.innerText || last.textContent || '';
+
+                    // Fallback: innerHTML → strip tags
+                    if (!txt && md && md.innerHTML) {
+                        var tmp = document.createElement('div');
+                        tmp.innerHTML = md.innerHTML;
+                        txt = tmp.innerText || tmp.textContent || '';
+                    }
+                    // Fallback: Selection API
+                    if (!txt && md) {
+                        try { var r = document.createRange(); r.selectNodeContents(md); txt = r.toString(); r.detach(); } catch(e) {}
+                    }
+                    return txt?.trim() || '';
+                })()
+                """) ?? "";
+
+            if (!string.IsNullOrWhiteSpace(extractJson))
+            {
+                finalText = extractJson;
+                break;
+            }
+            // Hydration retry
+            if (extractAttempt < 2)
+                await Task.Delay(500);
+        }
+
+        if (!string.IsNullOrEmpty(finalText))
+        {
+            Console.WriteLine($"[ASK] Response ({finalText.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
+
+            // ── Final answer ready: focusless restore to show answer to user ──
+            ShowChromeAnswer(cdp);
+
+            return (true, finalText);
         }
         Console.WriteLine("[ASK] Timeout -- no response");
         return (false, null);
+    }
+
+    /// <summary>
+    /// 최종 답변 표시: Chrome을 포커스리스 리스토어하여 사용자에게 답변 페이지를 보여준다.
+    /// ask 플로우 전체는 아이콘화 상태로 진행 (CDP는 미니마이즈에서 정상 동작).
+    /// 최종 답변 추출 후에만 호출하여 결과를 시각적으로 확인할 수 있게 한다.
+    /// </summary>
+    static void ShowChromeAnswer(CdpClient cdp)
+    {
+        var chromeHwnd = cdp.GetChromeWindowHandle();
+        if (chromeHwnd == IntPtr.Zero || !NativeMethods.IsIconic(chromeHwnd))
+            return; // not minimized — already visible
+
+        var title = WKAppBot.Win32.Window.WindowFinder.GetWindowText(chromeHwnd);
+        Console.WriteLine($"[ASK] Showing answer — focusless restore \"{title}\"");
+
+        // Focusless restore: SW_RESTORE + immediately give focus back to previous window
+        var prevFg = NativeMethods.GetForegroundWindow();
+        NativeMethods.ShowWindow(chromeHwnd, 9); // SW_RESTORE
+        if (prevFg != IntPtr.Zero && prevFg != chromeHwnd)
+            NativeMethods.SetForegroundWindow(prevFg);
+    }
+
+    // ── UIA Send Button ──
+    // Tier 2 fallback: find and invoke the send button via UIA (completely focusless).
+    // Searches Chrome/ChatGPT windows for buttons matching send-related names.
+    static readonly string[] SendButtonNames = ["제출", "보내기", "Send message", "Send", "메시지 보내기"];
+
+    static bool TryUiaInvokeSendButton()
+    {
+        try
+        {
+            using var automation = new UIA3Automation();
+            // Try ChatGPT PWA first, then Chrome
+            foreach (var grap in new[] { "*ChatGPT*", "*Gemini*Chrome*", "*chrome*" })
+            {
+                var resolved = GrapHelper.ResolveFullGrap(grap, automation);
+                if (resolved == null || resolved.Value.error != null) continue;
+                var (_, root, _) = resolved.Value;
+
+                foreach (var name in SendButtonNames)
+                {
+                    var btn = GrapHelper.FindByNameOrAid(root, name);
+                    if (btn == null) continue;
+
+                    // Must be a Button with Invoke pattern
+                    if (btn.ControlType != FlaUI.Core.Definitions.ControlType.Button) continue;
+                    var invoke = btn.Patterns.Invoke.PatternOrDefault;
+                    if (invoke == null) continue;
+
+                    Console.WriteLine($"[ASK] UIA: found \"{btn.Name}\" ({btn.ControlType})");
+                    invoke.Invoke();
+                    Console.WriteLine("[ASK] UIA: Invoked!");
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ASK] UIA send failed: {ex.Message}");
+        }
+        return false;
     }
 
     // ── Focus Guard ──
@@ -931,6 +1265,59 @@ Examples:
                 Console.ResetColor();
             }
         }
+    }
+
+    // ── Chrome Tab Lock ──
+    // Cross-process mutex: only one ask command can own the browser at a time.
+    // Acquired before prompt input, auto-released after 9s or when first byte arrives.
+    // IDisposable — always safe, no manual release needed.
+
+    // Semaphore (not Mutex) — async/await can resume on different threads,
+    // and Mutex.ReleaseMutex() requires the same thread. Semaphore is thread-agnostic.
+    static readonly Semaphore ChromeTabSemaphore = new(1, 1, @"Global\WKAppBot_ChromeTabLock");
+
+    sealed class ChromeTabLock : IDisposable
+    {
+        readonly string _aiName;
+        readonly Timer _autoRelease;
+        int _released;
+
+        ChromeTabLock(string aiName)
+        {
+            _aiName = aiName;
+            // Auto-release after 9 seconds (safety net — prevents deadlock)
+            _autoRelease = new Timer(_ => Release("auto-9s"), null, 9000, Timeout.Infinite);
+        }
+
+        public static ChromeTabLock? Acquire(string aiName, int timeoutMs = 15000)
+        {
+            Console.WriteLine($"[ASK] Waiting for browser lock ({aiName})...");
+            try
+            {
+                if (ChromeTabSemaphore.WaitOne(timeoutMs))
+                {
+                    Console.WriteLine($"[ASK] Browser lock acquired ({aiName})");
+                    return new ChromeTabLock(aiName);
+                }
+            }
+            catch (AbandonedMutexException)
+            {
+                Console.WriteLine($"[ASK] Browser lock recovered ({aiName})");
+                return new ChromeTabLock(aiName);
+            }
+            Console.WriteLine($"[ASK] Browser lock timeout ({aiName})");
+            return null;
+        }
+
+        public void Release(string reason = "done")
+        {
+            if (Interlocked.CompareExchange(ref _released, 1, 0) != 0) return;
+            _autoRelease.Dispose();
+            try { ChromeTabSemaphore.Release(); } catch { }
+            Console.WriteLine($"[ASK] Browser lock released ({_aiName}, {reason})");
+        }
+
+        public void Dispose() => Release("dispose");
     }
 
     // ── Slack Report ──

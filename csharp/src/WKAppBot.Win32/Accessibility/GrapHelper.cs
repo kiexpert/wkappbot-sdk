@@ -17,7 +17,7 @@ namespace WKAppBot.Win32.Accessibility;
 ///   "영웅문/실시간계좌#aid1000"        → Win32 child → UIA scope "aid1000"
 ///   "영웅문/child#uia1/uia2"          → Win32 child → UIA "uia1" → "uia2"
 ///
-/// ═══ Browser tab portal (v2.0) ═══
+/// ═══ Browser tab portal (v2.1) ═══
 /// When a '#' segment matches a TabItem (browser tab), the grap engine:
 ///   1. Calls SelectionItem.Select() to switch to that tab (focusless!)
 ///   2. Waits for web content to load
@@ -38,6 +38,17 @@ namespace WKAppBot.Win32.Accessibility;
 ///   * / ? = glob wildcards
 ///   regex: prefix = regular expression
 /// Container-first: prefers Window/Pane/Group elements over leaf elements (TabItem/Button).
+///
+/// ═══ Public API (v2.1) ═══
+/// All core search/portal functions are public for reuse by other commands:
+///   FindUiaScope()         — multi-segment UIA path resolution with tab portal
+///   FindByNameOrAid()      — single element search by Name or AutomationId
+///   FindRootWebArea()      — locate Document[RootWebArea] for web content access
+///   SwitchToTab()          — focusless tab switch via SelectionItem/Invoke
+///   IsTabItem()            — check if element is a browser tab
+///   WalkTree()             — generic predicate-based tree walk
+///   SplitGrap()            — parse grap into Win32 + UIA segments
+///   ResolveFullGrap()      — end-to-end grap → (hwnd, element) resolution
 /// </summary>
 public static class GrapHelper
 {
@@ -47,6 +58,10 @@ public static class GrapHelper
         ControlType.Window, ControlType.Pane, ControlType.Group,
         ControlType.Tab, ControlType.Document, ControlType.Custom
     };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Public API: Grap parsing
+    // ═══════════════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Split grap into Win32 path (before first '#') and UIA path (after first '#').
@@ -65,180 +80,12 @@ public static class GrapHelper
 
         var win32Segments = win32Part.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
-        // Trim empty UIA part
         if (string.IsNullOrWhiteSpace(uiaPart))
             uiaPart = null;
 
         return (win32Segments, uiaPart);
     }
 
-    /// <summary>
-    /// Find UIA element by name path within a root element.
-    /// Supports multi-level paths with '/' or '#' separator (both equivalent in UIA context):
-    ///   "잔고확인"         → find container descendant with Name matching "잔고확인"
-    ///   "잔고확인/Tab"     → find "잔고확인", then "Tab" within it
-    /// Each segment uses PatternMatcher (wildcards, regex:, literal).
-    /// Container-first: Window/Pane/Group preferred over TabItem/Button.
-    ///
-    /// ═══ Browser Tab Portal ═══
-    /// When a segment matches a TabItem (browser tab), the engine:
-    ///   1. SelectionItem.Select() → switch tab (focusless)
-    ///   2. Navigate back to the window root
-    ///   3. Find Document[RootWebArea] → the newly-active tab's web content
-    ///   4. Continue matching remaining segments inside that Document
-    ///
-    /// Why? In Chrome/Edge UIA tree, TabItem and RootWebArea are siblings,
-    /// not parent-child. TabItem lives under [Tab], web content under [Pane]:
-    ///   Pane (browser frame)
-    ///   ├── Pane → Document "Google Gemini" [RootWebArea]  ← web content
-    ///   ├── Tab
-    ///   │   ├── TabItem "ChatGPT"    ← tab UI (only has Close button)
-    ///   │   └── TabItem "Gemini"
-    ///   └── ToolBar (address bar)
-    ///
-    /// So "Chrome#ChatGPT#Send" means:
-    ///   find TabItem "ChatGPT" → select it → jump to RootWebArea → find "Send"
-    /// </summary>
-    public static AutomationElement? FindUiaScope(
-        AutomationElement root, string uiaPath, int maxDepth = 15)
-    {
-        if (string.IsNullOrEmpty(uiaPath))
-            return root;
-
-        // In UIA context, '/' and '#' are equivalent separators
-        var segments = uiaPath.Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
-
-        // Keep reference to the window root for tab-portal jump-back
-        var windowRoot = root;
-        var current = root;
-        foreach (var segment in segments)
-        {
-            var matcher = PatternMatcher.Create(segment);
-            var found = WalkFindContainerFirst(current, matcher, maxDepth);
-            if (found == null)
-                return null;
-
-            // ═══ Tab Portal: TabItem → select tab → jump to RootWebArea ═══
-            // When we hit a browser TabItem, the remaining path segments refer to
-            // web content inside that tab, not UIA children of the TabItem itself.
-            // TabItem children are just tab UI (close button), not web content.
-            if (IsTabItem(found))
-            {
-                // Step 1: Switch to this tab (focusless via SelectionItem pattern)
-                try
-                {
-                    var si = found.Patterns.SelectionItem.PatternOrDefault;
-                    if (si != null)
-                    {
-                        si.Select();
-                        Console.WriteLine($"[GRAP] Tab portal: selected \"{found.Name}\"");
-                        Thread.Sleep(600); // wait for web content to render after tab switch
-                    }
-                    else
-                    {
-                        // Fallback: invoke if SelectionItem not available (e.g. Edge favorites)
-                        var inv = found.Patterns.Invoke.PatternOrDefault;
-                        if (inv != null) inv.Invoke();
-                        Console.WriteLine($"[GRAP] Tab portal: invoked \"{found.Name}\" (no SelectionItem)");
-                        Thread.Sleep(600);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"[GRAP] Tab switch failed: {ex.Message}");
-                    return null;
-                }
-
-                // Step 2: Jump to the freshly-loaded Document[RootWebArea]
-                // After tab switch, the active tab's web content appears as a
-                // Document element with aid="RootWebArea" somewhere under windowRoot.
-                var webRoot = FindRootWebArea(windowRoot, maxDepth: 10);
-                if (webRoot == null)
-                {
-                    Console.Error.WriteLine("[GRAP] Tab portal: RootWebArea not found after tab switch");
-                    return null;
-                }
-
-                Console.WriteLine($"[GRAP] Tab portal: jumped to Document \"{webRoot.Name}\"");
-                current = webRoot;
-                continue; // next segment searches inside the web content
-            }
-
-            current = found;
-        }
-
-        return current;
-    }
-
-    /// <summary>
-    /// Check if element is a browser TabItem (Chrome/Edge tab strip).
-    /// </summary>
-    private static bool IsTabItem(AutomationElement el)
-    {
-        try
-        {
-            return el.Properties.ControlType.ValueOrDefault == ControlType.TabItem;
-        }
-        catch { return false; }
-    }
-
-    /// <summary>
-    /// Find the active tab's web content: Document element with aid="RootWebArea".
-    /// This is the entry point to all web-page UIA elements (buttons, links, edits, etc).
-    /// Works for Chrome, Edge, and Electron apps (Claude, VS Code, Slack).
-    /// </summary>
-    private static AutomationElement? FindRootWebArea(AutomationElement root, int maxDepth)
-    {
-        return WalkFindFirst(root, maxDepth, depth: 0,
-            predicate: el =>
-            {
-                try
-                {
-                    var ct = el.Properties.ControlType.ValueOrDefault;
-                    if (ct != ControlType.Document) return false;
-                    var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
-                    // Primary: explicit RootWebArea aid (Chrome/Electron)
-                    if (aid == "RootWebArea") return true;
-                    // Fallback: any Document with a non-empty name (active page title)
-                    var name = el.Properties.Name.ValueOrDefault ?? "";
-                    return !string.IsNullOrEmpty(name) && aid != "active-frame";
-                }
-                catch { return false; }
-            });
-    }
-
-    /// <summary>
-    /// Generic predicate-based tree walk. Used by FindRootWebArea.
-    /// </summary>
-    private static AutomationElement? WalkFindFirst(
-        AutomationElement parent, int maxDepth, int depth,
-        Func<AutomationElement, bool> predicate)
-    {
-        if (depth > maxDepth) return null;
-        try
-        {
-            foreach (var child in parent.FindAllChildren())
-            {
-                try { if (predicate(child)) return child; } catch { }
-                var found = WalkFindFirst(child, maxDepth, depth + 1, predicate);
-                if (found != null) return found;
-            }
-        }
-        catch { }
-        return null;
-    }
-
-    /// <summary>
-    /// Parse full grap pattern and resolve to (hwnd, uiaRoot).
-    /// First '#' switches from Win32 mode to UIA mode:
-    ///   Before '#': '/' separates Win32 child windows
-    ///   After '#':  '/' and '#' are UIA scope separators
-    /// Examples:
-    ///   "영웅문"                     → main window only
-    ///   "영웅문/실시간계좌"          → window → Win32 child (MDI)
-    ///   "영웅문#실시간계좌"          → window → UIA scope
-    ///   "영웅문/실시간계좌#Tab/탭"   → window → Win32 child → UIA "Tab" → "탭"
-    /// </summary>
     /// <summary>Overload without matchCount for backwards compat.</summary>
     public static (IntPtr hwnd, AutomationElement root, string? error)? ResolveFullGrap(
         string grap, UIA3Automation automation)
@@ -293,36 +140,248 @@ public static class GrapHelper
         return (targetHwnd, root, null);
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Public API: UIA scope resolution (with tab portal)
+    // ═══════════════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Container-first search: finds element by name, preferring containers over leaves.
-    /// Two-pass approach:
-    ///   Pass 1: Walk tree looking for container types (Window/Pane/Group/Tab/Custom) with matching name
-    ///   Pass 2: If no container found, fall back to any element with matching name
-    /// This ensures "잔고확인" matches the Window form, not the TabItem tab.
+    /// Find UIA element by name path within a root element.
+    /// Supports multi-level paths with '/' or '#' separator (both equivalent).
+    ///
+    /// ═══ Browser Tab Portal ═══
+    /// When a segment matches a TabItem (browser tab), the engine:
+    ///   1. SelectionItem.Select() → switch tab (focusless)
+    ///   2. Navigate back to the window root
+    ///   3. Find Document[RootWebArea] → the newly-active tab's web content
+    ///   4. Continue matching remaining segments inside that Document
+    ///
+    /// Why? In Chrome/Edge UIA tree, TabItem and RootWebArea are siblings,
+    /// not parent-child. TabItem lives under [Tab], web content under [Pane]:
+    ///   Pane (browser frame)
+    ///   ├── Pane → Document "Google Gemini" [RootWebArea]  ← web content
+    ///   ├── Tab
+    ///   │   ├── TabItem "ChatGPT"    ← tab UI (only has Close button)
+    ///   │   └── TabItem "Gemini"
+    ///   └── ToolBar (address bar)
+    ///
+    /// So "Chrome#ChatGPT#Send" means:
+    ///   find TabItem "ChatGPT" → select it → jump to RootWebArea → find "Send"
     /// </summary>
-    private static AutomationElement? WalkFindContainerFirst(
-        AutomationElement root, PatternMatcher nameMatcher, int maxDepth)
+    public static AutomationElement? FindUiaScope(
+        AutomationElement root, string uiaPath, int maxDepth = 15)
     {
-        // Pass 1: containers only
-        var container = WalkFindFirst(root, nameMatcher, maxDepth, depth: 0, containersOnly: true);
+        if (string.IsNullOrEmpty(uiaPath))
+            return root;
+
+        var segments = uiaPath.Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
+
+        // Keep reference to the window root for tab-portal jump-back
+        var windowRoot = root;
+        var current = root;
+        foreach (var segment in segments)
+        {
+            var found = FindByNameOrAid(current, segment, maxDepth);
+            if (found == null)
+                return null;
+
+            // ═══ Tab Portal: TabItem → select tab → jump to RootWebArea ═══
+            if (IsTabItem(found))
+            {
+                var webRoot = SwitchToTabAndGetWebRoot(found, windowRoot);
+                if (webRoot == null) return null;
+                current = webRoot;
+                continue; // next segment searches inside the web content
+            }
+
+            current = found;
+        }
+
+        return current;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Public API: Element search
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Find first UIA element matching a name/aid pattern string.
+    /// Container-first: prefers Window/Pane/Group/Tab/Document over leaf elements.
+    /// Matches against Name first, then AutomationId as fallback.
+    /// Pattern supports: plain text (substring), wildcards (*/?), regex: prefix.
+    ///
+    /// Usage:
+    ///   var btn = GrapHelper.FindByNameOrAid(root, "새 채팅");     // Name substring
+    ///   var edit = GrapHelper.FindByNameOrAid(root, "email");      // aid fallback
+    ///   var item = GrapHelper.FindByNameOrAid(root, "regex:btn_\\d+"); // regex
+    /// </summary>
+    public static AutomationElement? FindByNameOrAid(
+        AutomationElement root, string pattern, int maxDepth = 15)
+    {
+        var matcher = PatternMatcher.Create(pattern);
+
+        // Pass 1: containers only (Window/Pane/Group/Tab/Document/Custom)
+        var container = WalkFindByMatcher(root, matcher, maxDepth, depth: 0, containersOnly: true);
         if (container != null) return container;
 
-        // Pass 2: any element (fallback for when scope target is a non-container)
-        return WalkFindFirst(root, nameMatcher, maxDepth, depth: 0, containersOnly: false);
+        // Pass 2: any element (fallback for leaf elements like Button/Edit/TabItem)
+        return WalkFindByMatcher(root, matcher, maxDepth, depth: 0, containersOnly: false);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Public API: Browser tab portal
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Check if element is a browser TabItem (Chrome/Edge tab strip).
+    /// </summary>
+    public static bool IsTabItem(AutomationElement el)
+    {
+        try { return el.Properties.ControlType.ValueOrDefault == ControlType.TabItem; }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Switch to a browser tab (focusless) via SelectionItem.Select() or Invoke fallback.
+    /// Returns true on success.
+    /// </summary>
+    public static bool SwitchToTab(AutomationElement tabItem)
+    {
+        try
+        {
+            var si = tabItem.Patterns.SelectionItem.PatternOrDefault;
+            if (si != null)
+            {
+                si.Select();
+                Console.WriteLine($"[GRAP] Tab portal: selected \"{tabItem.Name}\"");
+                Thread.Sleep(600);
+                return true;
+            }
+
+            // Fallback: invoke if SelectionItem not available (e.g. Edge favorites)
+            var inv = tabItem.Patterns.Invoke.PatternOrDefault;
+            if (inv != null)
+            {
+                inv.Invoke();
+                Console.WriteLine($"[GRAP] Tab portal: invoked \"{tabItem.Name}\" (no SelectionItem)");
+                Thread.Sleep(600);
+                return true;
+            }
+
+            Console.Error.WriteLine($"[GRAP] Tab switch: no SelectionItem or Invoke on \"{tabItem.Name}\"");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[GRAP] Tab switch failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Switch to a browser tab and return the web content root (Document[RootWebArea]).
+    /// Combines SwitchToTab() + FindRootWebArea() in one call.
+    ///
+    /// Usage:
+    ///   var tabItem = GrapHelper.FindByNameOrAid(chromeRoot, "ChatGPT");
+    ///   var webRoot = GrapHelper.SwitchToTabAndGetWebRoot(tabItem, chromeRoot);
+    ///   var sendBtn = GrapHelper.FindByNameOrAid(webRoot, "Send");
+    /// </summary>
+    public static AutomationElement? SwitchToTabAndGetWebRoot(
+        AutomationElement tabItem, AutomationElement windowRoot)
+    {
+        if (!SwitchToTab(tabItem)) return null;
+
+        var webRoot = FindRootWebArea(windowRoot);
+        if (webRoot == null)
+        {
+            Console.Error.WriteLine("[GRAP] Tab portal: RootWebArea not found after tab switch");
+            return null;
+        }
+
+        Console.WriteLine($"[GRAP] Tab portal: jumped to Document \"{webRoot.Name}\"");
+        return webRoot;
+    }
+
+    /// <summary>
+    /// Find the active tab's web content: Document element with aid="RootWebArea".
+    /// This is the entry point to all web-page UIA elements (buttons, links, edits, etc).
+    /// Works for Chrome, Edge, and Electron apps (Claude, VS Code, Slack).
+    ///
+    /// Usage:
+    ///   var webRoot = GrapHelper.FindRootWebArea(chromeRoot);
+    ///   // Now search within: GrapHelper.FindByNameOrAid(webRoot, "Send")
+    /// </summary>
+    public static AutomationElement? FindRootWebArea(AutomationElement root, int maxDepth = 10)
+    {
+        return WalkTree(root, maxDepth, el =>
+        {
+            try
+            {
+                var ct = el.Properties.ControlType.ValueOrDefault;
+                if (ct != ControlType.Document) return false;
+                var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
+                // Primary: explicit RootWebArea aid (Chrome/Electron)
+                if (aid == "RootWebArea") return true;
+                // Fallback: any Document with a non-empty name (active page title)
+                var name = el.Properties.Name.ValueOrDefault ?? "";
+                return !string.IsNullOrEmpty(name) && aid != "active-frame";
+            }
+            catch { return false; }
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Public API: Generic tree walk
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Generic predicate-based UIA tree walk. Recursively searches children
+    /// using FindAllChildren() to reach deep Electron/MFC subtrees.
+    ///
+    /// Usage:
+    ///   // Find any Edit element
+    ///   var edit = GrapHelper.WalkTree(root, 10, el =>
+    ///       el.Properties.ControlType.ValueOrDefault == ControlType.Edit);
+    ///
+    ///   // Find element with specific ClassName
+    ///   var mfc = GrapHelper.WalkTree(root, 8, el =>
+    ///       (el.Properties.ClassName.ValueOrDefault ?? "").Contains("MaskEdit"));
+    /// </summary>
+    public static AutomationElement? WalkTree(
+        AutomationElement root, int maxDepth, Func<AutomationElement, bool> predicate)
+    {
+        return WalkTreeInternal(root, maxDepth, depth: 0, predicate);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Internal: tree walk implementations
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private static AutomationElement? WalkTreeInternal(
+        AutomationElement parent, int maxDepth, int depth,
+        Func<AutomationElement, bool> predicate)
+    {
+        if (depth > maxDepth) return null;
+        try
+        {
+            foreach (var child in parent.FindAllChildren())
+            {
+                try { if (predicate(child)) return child; } catch { }
+                var found = WalkTreeInternal(child, maxDepth, depth + 1, predicate);
+                if (found != null) return found;
+            }
+        }
+        catch { }
+        return null;
     }
 
     /// <summary>
     /// Recursive walk to find first element with matching Name or AutomationId.
-    /// Uses FindAllChildren() recursion (not FindAllDescendants) to reach
-    /// deep Electron/MFC subtrees that FlaUI's flat search misses.
-    ///
-    /// Matching order per element:
-    ///   1. Name (display text, e.g. "새 채팅", "Google로 계속하기")
-    ///   2. AutomationId (developer id, e.g. "email", "RootWebArea", "MenuBar")
+    /// Matching order: Name first, then AutomationId as fallback.
     /// This allows "#email" to match aid="email" even when Name is empty.
     /// </summary>
-    private static AutomationElement? WalkFindFirst(
-        AutomationElement parent, PatternMatcher nameMatcher, int maxDepth, int depth,
+    private static AutomationElement? WalkFindByMatcher(
+        AutomationElement parent, PatternMatcher matcher, int maxDepth, int depth,
         bool containersOnly)
     {
         if (depth > maxDepth) return null;
@@ -336,15 +395,14 @@ public static class GrapHelper
                     // Match against Name first, then AutomationId as fallback
                     var name = child.Properties.Name.ValueOrDefault ?? "";
                     var aid = child.Properties.AutomationId.ValueOrDefault ?? "";
-                    bool nameMatch = !string.IsNullOrEmpty(name) && nameMatcher.IsMatch(name);
-                    bool aidMatch = !nameMatch && !string.IsNullOrEmpty(aid) && nameMatcher.IsMatch(aid);
+                    bool nameMatch = !string.IsNullOrEmpty(name) && matcher.IsMatch(name);
+                    bool aidMatch = !nameMatch && !string.IsNullOrEmpty(aid) && matcher.IsMatch(aid);
 
                     if (nameMatch || aidMatch)
                     {
                         if (!containersOnly)
                             return child;
 
-                        // Container check: is this a container type?
                         try
                         {
                             var ct = child.Properties.ControlType.ValueOrDefault;
@@ -356,8 +414,7 @@ public static class GrapHelper
                 }
                 catch { /* COM exceptions on some MFC elements */ }
 
-                // Recurse into children
-                var found = WalkFindFirst(child, nameMatcher, maxDepth, depth + 1, containersOnly);
+                var found = WalkFindByMatcher(child, matcher, maxDepth, depth + 1, containersOnly);
                 if (found != null) return found;
             }
         }
