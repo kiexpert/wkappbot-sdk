@@ -1,4 +1,4 @@
-﻿# WKAppBot v2.1 - Windows App Automation Test Framework
+﻿# WKAppBot v3.1 - Windows App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -160,7 +160,10 @@ wkappbot hts-stress <form.xmf> [-n 20] [--pattern repeat|memory|ctx-only]
 wkappbot uia-test <grap> [--invoke <name>]
 wkappbot zoom-demo <grap> [text]
 wkappbot web <subcommand> [options]           # CDP 웹 자동화 (open/navigate/click/type/eval/screenshot/...)
-wkappbot slack <subcommand>                   # send/reply/upload/screenshot/test/listen/catch-up
+wkappbot slack send "msg" [file.png] ["msg2"]  # 텍스트+파일 혼합 전송 (인수=줄, 파일=쓰레드 첨부)
+wkappbot slack reply "msg" [file.png] --msg TS # 쓰레드 답장+파일 첨부
+wkappbot slack upload <file> [--msg TS]        # 파일 업로드
+wkappbot slack <subcommand>                   # screenshot/test/listen/catch-up
 wkappbot knowhow <subcommand>                # write/read (Win32+Web 노하우)
 wkappbot eye [--port N] [--interval N]        # AppBotEye 글로벌 루프 (Slack+Prompt 항상 ON)
 wkappbot eye tick                             # one-shot: 모든 클롣/크로 카드 상태+생각 즉시 조회
@@ -168,7 +171,7 @@ wkappbot newchat "prompt" [--file f.txt]      # Claude Desktop 새채팅 열고 
 wkappbot readiness [grap] [--point X Y] [--yield] # InputReadiness 진단 (완전 포커스리스, 돋보기 강제)
 wkappbot schedule <subcommand>                # add/list/remove/clear (예약 프롬프트)
 wkappbot logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]  # 실시간 로그 추적
-wkappbot ask gpt|gemini "question" [--slack] [--timeout N] [--new-tab] [--image path.png]  # CDP 웹 AI 질문 (+이미지첨부)
+wkappbot ask gpt|gemini "line1" [file.png] "line2" [--slack] [--timeout N] [--new-tab]  # CDP 웹 AI 질문 (인수=줄, 파일=자동첨부, 응답이미지=자동캡처)
 wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령 (MCP 유일 도구)
   # Discovery (4): inspect, windows, screenshot, ocr — 기존 명령 위임
   # Window (7): close, minimize, maximize, restore, focus, move(--x --y), resize(--w --h)
@@ -305,17 +308,19 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - EnsureTabActive: walk up UIA parents, auto-select unselected TabItem
   - Zoom/magnifier on ALL actions (before + result feedback after)
   - Source split: A11yCommand.cs (~320 lines) + A11yElementActions.cs (~600 lines)
+- **v3.1 삼두협의체 + AI 이미지 캡처** — ask gpt/gemini 파워업
+  - ask: 인수=줄바꿈 구분, 파일 인수 자동감지+첨부, 인라인 `[file:name]` 마커
+  - AI 응답 이미지 자동 캡처: Canvas(원본품질) → CDP Screenshot(폴백) 4-tier
+  - DALL-E/Gemini 이미지 생성 대기 (IMG_GEN 상태 감지)
+  - 라이브 스트리밍 flush (ChatGPT/Gemini 응답 실시간 출력)
+  - web eval 탭 자동인식 (첫 인수=탭 패턴, substring 매칭)
+  - slack send/reply 파일 첨부 지원 (텍스트+파일 혼합, 쓰레드 업로드)
+  - CdpClient 안전성: awaitPromise, ContainsKey, FindTabByPattern substring
+  - 페르소나 이미지생성 규칙 추가
 - **v3.1 삼두협의체 보완** — wait/eval 액션 + MCP 에러 구조화
   - `wait` 액션: 윈도우/UIA 요소 출현 폴링 대기 (--timeout, --interval)
   - `eval` 액션: CDP JavaScript 실행, #scope로 탭 힌트 매칭
   - MCP 에러 구조화: RunCliCaptureWithCode → exit code 기반 isError 플래그
-- **ask --image** — ChatGPT/Gemini 이미지 첨부 질문
-  - `wkappbot ask gpt "질문" --image screenshot.png`
-  - Tier 1: Synthetic ClipboardEvent + File blob (focusless, 클립보드 미사용)
-  - Tier 2: Win32 Clipboard.SetImage + CDP Ctrl+V (폴백)
-  - 업로드 완료 대기 후 텍스트 질문 삽입 → 전송
-  - 26 actions (기존 24 + wait + eval)
-
 ### Phase 8: puppet 패턴 매칭 — 미구현
 - FormTypeIdentifier Level 4: OCR 텍스트 vs 패턴 매칭으로 폼 자동 식별
 
