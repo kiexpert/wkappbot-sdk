@@ -5,12 +5,12 @@ namespace WKAppBot.CLI;
 /// <summary>
 /// Android ADB dispatch for a11y commands.
 /// Handles adb:// grap patterns — routes to ADB instead of Win32/UIA.
+/// Experience DB integration: inspect/actions save to A11Y + OS paths.
 /// </summary>
 internal partial class Program
 {
-    private static readonly string HqPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        "SDK", "bin", "wkappbot.hq");
+    private static readonly Lazy<AdbExperienceDb> _adbExpDb = new(() => new AdbExperienceDb(DataDir));
+    private static AdbExperienceDb AdbExpDb => _adbExpDb.Value;
 
     // ── Entry point ───────────────────────────────────────
 
@@ -25,7 +25,7 @@ internal partial class Program
         var grap = AdbGrapRouter.Parse(grapStr);
 
         var adb = new AdbClient();
-        var registry = new AdbDeviceRegistry(adb, HqPath);
+        var registry = new AdbDeviceRegistry(adb, DataDir);
 
         // ── Resolve device ────────────────────────────────
         var resolved = registry.ResolveDevice(grap.Device);
@@ -164,7 +164,27 @@ internal partial class Program
 
         // Dump tree
         Console.WriteLine();
-        Console.Write(AndroidA11yTree.DumpTree(target, depth));
+        var treeDump = AndroidA11yTree.DumpTree(target, depth);
+        Console.Write(treeDump);
+
+        // ── Experience: save tree snapshot + broadcast paths/knowhow ──
+        var pkg = target.Package;
+        if (string.IsNullOrEmpty(pkg) && grap.Package != null)
+        {
+            var pkgs = tree.FindByPackage(root, grap.Package);
+            if (pkgs.Count > 0) pkg = pkgs[0].Package;
+        }
+        if (!string.IsNullOrEmpty(pkg))
+        {
+            var screenName = grap.Scopes.Length > 0 ? grap.Scopes[0] : null;
+            var saved = AdbExpDb.SaveTreeSnapshot(pkg, treeDump, screenName);
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"\n[EXP] tree → {Path.GetRelativePath(DataDir, saved)}");
+            Console.ResetColor();
+
+            BroadcastAdbPaths(pkg, screenName);
+        }
+
         return 0;
     }
 
@@ -172,7 +192,7 @@ internal partial class Program
 
     static int AdbScreenshot(AdbClient adb, string serial, string? displayId, string[] args)
     {
-        var output = Path.Combine(HqPath, "output", "android_screen.png");
+        var output = Path.Combine(DataDir, "output", "android_screen.png");
         for (int i = 0; i < args.Length; i++)
             if ((args[i] == "-o" || args[i] == "--output") && i + 1 < args.Length)
                 output = args[i + 1];
@@ -200,17 +220,13 @@ internal partial class Program
 
         Console.Write($"[ADB] Tap ({node.CenterX},{node.CenterY}) {node.DisplayName}... ");
         var r = adb.Tap(node.CenterX, node.CenterY, serial);
-        if (r.IsOk)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("OK");
-            Console.ResetColor();
-            return 0;
-        }
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"FAILED: {r.StdErr}");
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
-        return 1;
+
+        LogAdbAction("click", node, grap, serial, ok, ok ? null : r.StdErr);
+        return ok ? 0 : 1;
     }
 
     // ── Read ──────────────────────────────────────────────
@@ -260,10 +276,13 @@ internal partial class Program
 
         Console.Write($"[ADB] Swipe {direction}... ");
         var r = adb.Swipe(x1, y1, x2, y2, 300, serial);
-        Console.ForegroundColor = r.IsOk ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine(r.IsOk ? "OK" : $"FAILED: {r.StdErr}");
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
-        return r.IsOk ? 0 : 1;
+
+        LogAdbAction($"scroll-{direction}", node, grap, serial, ok, ok ? null : r.StdErr);
+        return ok ? 0 : 1;
     }
 
     // ── Type (text input) ─────────────────────────────────
@@ -301,6 +320,7 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("OK (ADB Keyboard)");
             Console.ResetColor();
+            LogAdbAction("type", node, grap, serial, true, $"ADB Keyboard, text={text}");
             return 0;
         }
 
@@ -312,6 +332,7 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("OK (clipboard paste)");
             Console.ResetColor();
+            LogAdbAction("type", node, grap, serial, true, $"clipboard paste, text={text}");
             return 0;
         }
 
@@ -324,6 +345,7 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("OK (ASCII input)");
                 Console.ResetColor();
+                LogAdbAction("type", node, grap, serial, true, $"ASCII input, text={text}");
                 return 0;
             }
         }
@@ -331,6 +353,7 @@ internal partial class Program
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine($"FAILED: {r.StdErr}");
         Console.ResetColor();
+        LogAdbAction("type", node, grap, serial, false, r.StdErr);
         return 1;
     }
 
@@ -358,10 +381,18 @@ internal partial class Program
 
         Console.Write($"[ADB] Force-stop {fullPkg}... ");
         var r = adb.ForceStop(fullPkg, serial);
-        Console.ForegroundColor = r.IsOk ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine(r.IsOk ? "OK" : $"FAILED: {r.StdErr}");
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
-        return r.IsOk ? 0 : 1;
+
+        if (!string.IsNullOrEmpty(fullPkg))
+            AdbExpDb.LogAction(fullPkg, new AdbActionLog
+            {
+                Action = "close", Package = fullPkg, Device = serial,
+                Success = ok, Detail = ok ? null : r.StdErr,
+            });
+        return ok ? 0 : 1;
     }
 
     // ── Helpers ───────────────────────────────────────────
@@ -432,5 +463,68 @@ internal partial class Program
         Console.WriteLine("[ADB] Supported: inspect, find, windows, screenshot, click, read, scroll, type, close");
         Console.ResetColor();
         return 1;
+    }
+
+    // ── Experience DB helpers ────────────────────────────
+
+    /// <summary>Log action result to experience DB (actions.jsonl)</summary>
+    static void LogAdbAction(string action, AndroidNode? node, AdbGrapInfo grap, string serial, bool success, string? detail)
+    {
+        var pkg = node?.Package ?? grap.Package;
+        if (string.IsNullOrEmpty(pkg)) return;
+
+        AdbExpDb.LogAction(pkg, new AdbActionLog
+        {
+            Action = action,
+            Target = node?.SearchKey,
+            Package = pkg,
+            Device = serial,
+            Success = success,
+            Detail = detail,
+            TapX = node?.CenterX,
+            TapY = node?.CenterY,
+        });
+    }
+
+    /// <summary>Broadcast A11Y/OS paths and knowhow files (mirrors Windows inspect pattern)</summary>
+    static void BroadcastAdbPaths(string package, string? screenName)
+    {
+        var a11yDir = AdbExpDb.GetA11yDir(package);
+        var osDir = AdbExpDb.GetOsDir(package);
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write("  [A11Y] ");
+        Console.ResetColor();
+        Console.WriteLine(Path.GetRelativePath(DataDir, a11yDir));
+
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.Write("  [OS]   ");
+        Console.ResetColor();
+        Console.WriteLine(Path.GetRelativePath(DataDir, osDir));
+
+        // Broadcast knowhow files
+        var knowhows = AdbExpDb.GetKnowhowFiles(package, screenName);
+        foreach (var (path, tag) in knowhows)
+        {
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.Write($"  [{tag}] ");
+            Console.ResetColor();
+            Console.WriteLine(Path.GetFileName(path));
+
+            // Show first 5 non-empty lines of knowhow
+            try
+            {
+                var lines = File.ReadAllLines(path)
+                    .Where(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith('#'))
+                    .Take(5);
+                foreach (var line in lines)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                    Console.WriteLine($"    {line}");
+                }
+                Console.ResetColor();
+            }
+            catch { /* ignore read errors */ }
+        }
     }
 }
