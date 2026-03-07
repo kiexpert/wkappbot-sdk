@@ -61,10 +61,11 @@ internal partial class Program
             return 1;
         }
 
-        // Parse --channel and --msg flags (--thread accepted as legacy alias)
+        // Parse --channel and --msg flags + auto-detect file attachments
         string? explicitChannel = null;
         string? threadTs = null;
         var textParts = new List<string>();
+        var filePaths = new List<string>();
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--channel" && i + 1 < args.Length)
@@ -75,13 +76,17 @@ internal partial class Program
             {
                 threadTs = args[++i];
             }
+            else if (!args[i].StartsWith("--") && File.Exists(args[i]))
+            {
+                filePaths.Add(args[i]);
+            }
             else
             {
                 textParts.Add(args[i]);
             }
         }
 
-        var replyText = string.Join(" ", textParts);
+        var replyText = string.Join("\n", textParts);
         // Bash history expansion escapes ! to \! even in single quotes — undo it
         replyText = replyText.Replace("\\!", "!");
         if (string.IsNullOrWhiteSpace(replyText))
@@ -140,7 +145,15 @@ internal partial class Program
         var threadNote = !string.IsNullOrEmpty(threadTs) ? " (in-thread)" : "";
         if (ok)
         {
-            Console.WriteLine($"[SLACK] Replied to #{channel}{threadNote}: {replyText}");
+            Console.WriteLine($"[SLACK] Replied to #{channel}{threadNote}: {replyText.Split('\n')[0]}{(textParts.Count > 1 ? $" (+{textParts.Count - 1} lines)" : "")}");
+            // Upload files in the same thread
+            foreach (var fp in filePaths)
+            {
+                var uploadArgs = new List<string> { "upload", fp };
+                if (!string.IsNullOrEmpty(threadTs)) { uploadArgs.Add("--msg"); uploadArgs.Add(threadTs); }
+                else { uploadArgs.Add("--channel"); uploadArgs.Add(channel); }
+                SlackUploadCommand(uploadArgs.ToArray());
+            }
             // Clear inbox after reply
             try { File.Delete(SlackInboxFile); } catch { }
         }
