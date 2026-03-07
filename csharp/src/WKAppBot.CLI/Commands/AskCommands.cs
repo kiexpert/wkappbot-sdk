@@ -1075,9 +1075,10 @@ Examples:
             $"document.querySelector('{editorSel}')?.textContent?.length ?? -1") ?? "-1";
         Console.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={prevTurns})");
 
-        // Wait for new assistant turn
+        // Wait for response start: turn count increase OR streaming/thinking indicators
+        // Uses querySelectorAll + textContent (works in background tabs without layout)
         var sw = Stopwatch.StartNew();
-        bool newTurnAppeared = false;
+        bool responseStarted = false;
         while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
         {
             await Task.Delay(1000);
@@ -1091,24 +1092,36 @@ Examples:
                 currentUrl = newUrl;
             }
 
-            var c = await CountChatGptTurns(cdp);
-            if (c > prevTurns)
+            // Multi-signal detection: turn count OR stop button OR thinking marker
+            var detectResult = await cdp.EvalAsync(
+                "(() => {" +
+                "var turns = document.querySelectorAll('[data-message-author-role=\"assistant\"]').length;" +
+                "if (turns === 0) turns = Math.floor((document.querySelectorAll('[data-testid*=\"conversation-turn\"]').length || document.querySelectorAll('article').length) / 2);" +
+                $"if (turns > {prevTurns}) return 'TURN_' + turns;" +
+                "var stop = document.querySelector('button[data-testid=\"stop-button\"]')" +
+                "|| document.querySelector('button[aria-label=\"Stop streaming\"]')" +
+                "|| document.querySelector('button[aria-label=\"\\uc2a4\\ud2b8\\ub9ac\\ubc0d \\uc911\\uc9c0\"]');" +
+                "if (stop) return 'STREAMING';" +
+                "if (document.querySelector('.result-thinking')) return 'THINKING';" +
+                "return 'WAITING_' + turns;" +
+                "})()") ?? "WAITING_0";
+
+            if (detectResult.StartsWith("TURN_") || detectResult == "STREAMING" || detectResult == "THINKING")
             {
-                newTurnAppeared = true;
+                responseStarted = true;
+                Console.WriteLine($"[ASK] Response detected: {detectResult}");
                 chatLock.Release("first-byte");
-                // Register for tab handoff + activate peer's tab (we'll poll with textContent)
                 RegisterWaitingTab("chatgpt", cdp);
                 await HandoffTabToPeer("chatgpt");
                 break;
             }
-            var cur = c.ToString();
 
             if (sw.Elapsed.TotalSeconds > 3)
-                Console.WriteLine($"[ASK] Waiting for turn... (now={cur}, prev={prevTurns}, {sw.Elapsed.TotalSeconds:F0}s)");
+                Console.WriteLine($"[ASK] Waiting for response... ({detectResult}, {sw.Elapsed.TotalSeconds:F0}s)");
         }
-        if (!newTurnAppeared)
+        if (!responseStarted)
         {
-            Console.WriteLine("[ASK] No new turn");
+            Console.WriteLine("[ASK] No response detected");
             return (false, null);
         }
 
