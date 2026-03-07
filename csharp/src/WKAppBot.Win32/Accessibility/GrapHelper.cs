@@ -214,7 +214,7 @@ public static class GrapHelper
     ///   find TabItem "ChatGPT" → select it → jump to RootWebArea → find "Send"
     /// </summary>
     public static AutomationElement? FindUiaScope(
-        AutomationElement root, string uiaPath, int maxDepth = 15)
+        AutomationElement root, string uiaPath, int maxDepth = 25)
     {
         if (string.IsNullOrEmpty(uiaPath))
             return root;
@@ -261,7 +261,7 @@ public static class GrapHelper
     ///   var item = GrapHelper.FindByNameOrAid(root, "regex:btn_\\d+"); // regex
     /// </summary>
     public static AutomationElement? FindByNameOrAid(
-        AutomationElement root, string pattern, int maxDepth = 15)
+        AutomationElement root, string pattern, int maxDepth = 25)
     {
         var matcher = PatternMatcher.Create(pattern);
 
