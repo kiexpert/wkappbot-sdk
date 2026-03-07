@@ -194,6 +194,47 @@ internal partial class Program
                     },
                     ["required"] = new JsonArray { "grap" }
                 }),
+
+            McpTool("wkappbot_navigate", "Navigate a Chrome tab to a URL.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["url"] = Prop("string", "URL to navigate to"),
+                        ["tab"] = Prop("string", "Tab pattern to find (wildcard *)")
+                    },
+                    ["required"] = new JsonArray { "url" }
+                }),
+
+            McpTool("wkappbot_web_click", "Click a web element by CSS selector in a Chrome tab.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["selector"] = Prop("string", "CSS selector of element to click"),
+                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
+                    },
+                    ["required"] = new JsonArray { "selector" }
+                }),
+
+            McpTool("wkappbot_web_type", "Type text into a web element by CSS selector.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["selector"] = Prop("string", "CSS selector of input element"),
+                        ["text"] = Prop("string", "Text to type"),
+                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
+                    },
+                    ["required"] = new JsonArray { "selector", "text" }
+                }),
+
+            McpTool("wkappbot_web_text", "Get text content of a web element by CSS selector.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["selector"] = Prop("string", "CSS selector of element"),
+                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
+                    },
+                    ["required"] = new JsonArray { "selector" }
+                }),
         };
 
         return new JsonObject { ["tools"] = tools };
@@ -234,6 +275,10 @@ internal partial class Program
                 "wkappbot_web_tabs" => RunCliCapture("web", new[] { "tabs" }),
                 "wkappbot_screenshot" => RunCliCaptureScreenshot(arguments),
                 "wkappbot_ocr" => RunCliCapture("ocr", BuildOcrArgs(arguments)),
+                "wkappbot_navigate" => RunCliCapture("web", BuildNavigateArgs(arguments)),
+                "wkappbot_web_click" => RunCliCapture("web", BuildWebClickArgs(arguments)),
+                "wkappbot_web_type" => RunCliCapture("web", BuildWebTypeArgs(arguments)),
+                "wkappbot_web_text" => RunCliCapture("web", BuildWebTextArgs(arguments)),
                 _ => $"Unknown tool: {toolName}"
             };
 
@@ -307,6 +352,39 @@ internal partial class Program
     {
         var list = new List<string>();
         if (args["grap"] is JsonNode g) list.Add(g.GetValue<string>());
+        return list.ToArray();
+    }
+
+    static string[] BuildNavigateArgs(JsonObject args)
+    {
+        var list = new List<string> { "navigate" };
+        if (args["url"] is JsonNode u) list.Add(u.GetValue<string>());
+        if (args["tab"] is JsonNode t) { list.Add("--tab"); list.Add(t.GetValue<string>()); }
+        return list.ToArray();
+    }
+
+    static string[] BuildWebClickArgs(JsonObject args)
+    {
+        var list = new List<string> { "click" };
+        if (args["selector"] is JsonNode s) list.Add(s.GetValue<string>());
+        if (args["tab"] is JsonNode t) { list.Add("--tab"); list.Add(t.GetValue<string>()); }
+        return list.ToArray();
+    }
+
+    static string[] BuildWebTypeArgs(JsonObject args)
+    {
+        var list = new List<string> { "type" };
+        if (args["selector"] is JsonNode s) list.Add(s.GetValue<string>());
+        if (args["text"] is JsonNode x) list.Add(x.GetValue<string>());
+        if (args["tab"] is JsonNode t) { list.Add("--tab"); list.Add(t.GetValue<string>()); }
+        return list.ToArray();
+    }
+
+    static string[] BuildWebTextArgs(JsonObject args)
+    {
+        var list = new List<string> { "text" };
+        if (args["selector"] is JsonNode s) list.Add(s.GetValue<string>());
+        if (args["tab"] is JsonNode t) { list.Add("--tab"); list.Add(t.GetValue<string>()); }
         return list.ToArray();
     }
 
