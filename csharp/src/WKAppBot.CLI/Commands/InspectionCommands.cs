@@ -1442,6 +1442,9 @@ internal partial class Program
         int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 0; // 0=unlimited
         bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null;
 
+        // Snapshot focus state once (standard API)
+        var focus = WindowFinder.FocusSnapshot.CaptureNow();
+
         // Process cache to avoid repeated Process.GetProcessById
         var processCache = new Dictionary<uint, string>();
         string GetProcessName(uint pid)
@@ -1480,11 +1483,10 @@ internal partial class Program
             // Skip wkappbot windows (Eye/Zoom overlays) — don't search ourselves
             if (processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
 
-            // Apply filters — ★ enriched search key: "[ClassName] Title (process hwnd=XX WxH)"
+            // Apply filters — ★ standard search key with focus flags
             if (filterTitle != null)
             {
-                var searchKey = $"[{className}] {title} ({processName} hwnd={hWnd:X8} {w}x{h})";
-                // Create() does substring matching for all modes (literal/glob/regex)
+                var searchKey = WindowFinder.BuildSearchKey(hWnd, className, title, processName, w, h, focus);
                 var m = PatternMatcher.Create(filterTitle);
                 if (!m.IsMatch(title) && !m.IsMatch(searchKey)) return null;
             }
