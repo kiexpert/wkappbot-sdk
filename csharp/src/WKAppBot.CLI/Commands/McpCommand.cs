@@ -235,6 +235,128 @@ internal partial class Program
                     },
                     ["required"] = new JsonArray { "selector" }
                 }),
+
+            McpTool("wkappbot_web_open", "Open Chrome with CDP and navigate to URL. App mode (clean window) by default.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["url"] = Prop("string", "URL to open"),
+                        ["headless"] = Prop("boolean", "Run headless (no visible window)"),
+                        ["browser"] = Prop("boolean", "Normal Chrome UI with address bar (for debugging)")
+                    }
+                }),
+
+            McpTool("wkappbot_web_dblclick", "Double-click a web element by CSS selector.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["selector"] = Prop("string", "CSS selector of element to double-click"),
+                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
+                    },
+                    ["required"] = new JsonArray { "selector" }
+                }),
+
+            McpTool("wkappbot_web_screenshot", "Capture page screenshot as PNG via CDP (page content only). Returns base64.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
+                    }
+                }),
+
+            McpTool("wkappbot_web_capture", "Capture Chrome window screenshot including title bar (Win32 PrintWindow). Returns base64.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject { }
+                }),
+
+            McpTool("wkappbot_web_wait", "Wait for a web element to appear (polling).",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["selector"] = Prop("string", "CSS selector to wait for"),
+                        ["timeout"] = Prop("integer", "Timeout in ms (default: 5000)")
+                    },
+                    ["required"] = new JsonArray { "selector" }
+                }),
+
+            McpTool("wkappbot_web_check", "Set checkbox checked state.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["selector"] = Prop("string", "CSS selector of checkbox"),
+                        ["checked"] = Prop("boolean", "Check state (default: true)")
+                    },
+                    ["required"] = new JsonArray { "selector" }
+                }),
+
+            McpTool("wkappbot_web_select", "Select an option in a <select> element.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["selector"] = Prop("string", "CSS selector of <select> element"),
+                        ["value"] = Prop("string", "Option value or text to select")
+                    },
+                    ["required"] = new JsonArray { "selector", "value" }
+                }),
+
+            McpTool("wkappbot_web_html", "Get full page HTML source.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
+                    }
+                }),
+
+            McpTool("wkappbot_web_url", "Get current page URL.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject { }
+                }),
+
+            McpTool("wkappbot_web_title", "Get current page title.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject { }
+                }),
+
+            McpTool("wkappbot_web_close", "Disconnect from Chrome CDP (does not close the browser).",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject { }
+                }),
+
+            McpTool("wkappbot_web_status", "Check if Chrome CDP is active.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject { }
+                }),
+
+            McpTool("wkappbot_web_restore", "Restore minimized Chrome window.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject { }
+                }),
+
+            McpTool("wkappbot_web_run", "Run a batch of web commands from a file.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["file"] = Prop("string", "Path to steps file (each line = web subcommand)"),
+                        ["delay"] = Prop("integer", "Delay between steps in ms")
+                    },
+                    ["required"] = new JsonArray { "file" }
+                }),
+
+            McpTool("wkappbot_web_file", "Set a file input element's value (for file uploads).",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["selector"] = Prop("string", "CSS selector of file input"),
+                        ["path"] = Prop("string", "File path to upload")
+                    },
+                    ["required"] = new JsonArray { "selector", "path" }
+                }),
         };
 
         return new JsonObject { ["tools"] = tools };
@@ -279,6 +401,21 @@ internal partial class Program
                 "wkappbot_web_click" => RunCliCapture("web", BuildWebClickArgs(arguments)),
                 "wkappbot_web_type" => RunCliCapture("web", BuildWebTypeArgs(arguments)),
                 "wkappbot_web_text" => RunCliCapture("web", BuildWebTextArgs(arguments)),
+                "wkappbot_web_open" => RunCliCapture("web", BuildWebOpenArgs(arguments)),
+                "wkappbot_web_dblclick" => RunCliCapture("web", BuildWebDblClickArgs(arguments)),
+                "wkappbot_web_screenshot" => RunCliCapture("web", BuildWebScreenshotArgs(arguments)),
+                "wkappbot_web_capture" => RunCliCapture("web", new[] { "capture" }),
+                "wkappbot_web_wait" => RunCliCapture("web", BuildWebWaitArgs(arguments)),
+                "wkappbot_web_check" => RunCliCapture("web", BuildWebCheckArgs(arguments)),
+                "wkappbot_web_select" => RunCliCapture("web", BuildWebSelectArgs(arguments)),
+                "wkappbot_web_html" => RunCliCapture("web", BuildWebHtmlArgs(arguments)),
+                "wkappbot_web_url" => RunCliCapture("web", new[] { "url" }),
+                "wkappbot_web_title" => RunCliCapture("web", new[] { "title" }),
+                "wkappbot_web_close" => RunCliCapture("web", new[] { "close" }),
+                "wkappbot_web_status" => RunCliCapture("web", new[] { "status" }),
+                "wkappbot_web_restore" => RunCliCapture("web", new[] { "restore" }),
+                "wkappbot_web_run" => RunCliCapture("web", BuildWebRunArgs(arguments)),
+                "wkappbot_web_file" => RunCliCapture("web", BuildWebFileArgs(arguments)),
                 _ => $"Unknown tool: {toolName}"
             };
 
@@ -385,6 +522,78 @@ internal partial class Program
         var list = new List<string> { "text" };
         if (args["selector"] is JsonNode s) list.Add(s.GetValue<string>());
         if (args["tab"] is JsonNode t) { list.Add("--tab"); list.Add(t.GetValue<string>()); }
+        return list.ToArray();
+    }
+
+    static string[] BuildWebOpenArgs(JsonObject args)
+    {
+        var list = new List<string> { "open" };
+        if (args["url"] is JsonNode u) list.Add(u.GetValue<string>());
+        if (args["headless"]?.GetValue<bool>() == true) list.Add("--headless");
+        if (args["browser"]?.GetValue<bool>() == true) list.Add("--browser");
+        return list.ToArray();
+    }
+
+    static string[] BuildWebDblClickArgs(JsonObject args)
+    {
+        var list = new List<string> { "dblclick" };
+        if (args["selector"] is JsonNode s) list.Add(s.GetValue<string>());
+        if (args["tab"] is JsonNode t) { list.Add("--tab"); list.Add(t.GetValue<string>()); }
+        return list.ToArray();
+    }
+
+    static string[] BuildWebScreenshotArgs(JsonObject args)
+    {
+        var list = new List<string> { "screenshot" };
+        if (args["tab"] is JsonNode t) { list.Add("--tab"); list.Add(t.GetValue<string>()); }
+        return list.ToArray();
+    }
+
+    static string[] BuildWebWaitArgs(JsonObject args)
+    {
+        var list = new List<string> { "wait" };
+        if (args["selector"] is JsonNode s) list.Add(s.GetValue<string>());
+        if (args["timeout"] is JsonNode t) { list.Add("--timeout"); list.Add(t.ToString()); }
+        return list.ToArray();
+    }
+
+    static string[] BuildWebCheckArgs(JsonObject args)
+    {
+        var list = new List<string> { "check" };
+        if (args["selector"] is JsonNode s) list.Add(s.GetValue<string>());
+        var isChecked = args["checked"]?.GetValue<bool>() ?? true;
+        list.Add(isChecked.ToString().ToLowerInvariant());
+        return list.ToArray();
+    }
+
+    static string[] BuildWebSelectArgs(JsonObject args)
+    {
+        var list = new List<string> { "select" };
+        if (args["selector"] is JsonNode s) list.Add(s.GetValue<string>());
+        if (args["value"] is JsonNode v) list.Add(v.GetValue<string>());
+        return list.ToArray();
+    }
+
+    static string[] BuildWebHtmlArgs(JsonObject args)
+    {
+        var list = new List<string> { "html" };
+        if (args["tab"] is JsonNode t) { list.Add("--tab"); list.Add(t.GetValue<string>()); }
+        return list.ToArray();
+    }
+
+    static string[] BuildWebRunArgs(JsonObject args)
+    {
+        var list = new List<string> { "run" };
+        if (args["file"] is JsonNode f) list.Add(f.GetValue<string>());
+        if (args["delay"] is JsonNode d) { list.Add("--delay"); list.Add(d.ToString()); }
+        return list.ToArray();
+    }
+
+    static string[] BuildWebFileArgs(JsonObject args)
+    {
+        var list = new List<string> { "file" };
+        if (args["selector"] is JsonNode s) list.Add(s.GetValue<string>());
+        if (args["path"] is JsonNode p) list.Add(p.GetValue<string>());
         return list.ToArray();
     }
 
