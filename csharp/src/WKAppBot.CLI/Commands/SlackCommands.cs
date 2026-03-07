@@ -176,13 +176,24 @@ internal partial class Program
     {
         if (args.Length < 2)
         {
-            Console.WriteLine("Usage: wkappbot slack send \"message text\"");
+            Console.WriteLine("Usage: wkappbot slack send \"message\" [file1.png] [\"message2\"] [file2.png] ...");
             return 1;
         }
 
-        var message = string.Join(" ", args.Skip(1));
+        // Parse: text parts + file attachments (auto-detect existing files)
+        var textParts = new List<string>();
+        var filePaths = new List<string>();
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (!args[i].StartsWith("--") && File.Exists(args[i]))
+                filePaths.Add(args[i]);
+            else
+                textParts.Add(args[i]);
+        }
+        var message = string.Join("\n", textParts);
         // Bash history expansion escapes ! to \! even in single quotes — undo it
         message = message.Replace("\\!", "!");
+
         var config = LoadSlackConfig();
         if (config == null) return 1;
 
@@ -194,14 +205,32 @@ internal partial class Program
             return 1;
         }
 
-        var (ok, _) = SlackSendViaApi(botToken, channel, message, username: BotUsername).GetAwaiter().GetResult();
+        // Send text message (get thread_ts for file uploads)
+        string? threadTs = null;
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            var (ok, ts) = SlackSendViaApi(botToken, channel, message, username: BotUsername).GetAwaiter().GetResult();
+            if (ok)
+            {
+                Console.WriteLine($"[SLACK] Sent: {message.Split('\n')[0]}{(textParts.Count > 1 ? $" (+{textParts.Count - 1} lines)" : "")}");
+                threadTs = ts;
+            }
+            else
+            {
+                Console.WriteLine("[SLACK] Failed to send message");
+                return 1;
+            }
+        }
 
-        if (ok)
-            Console.WriteLine($"[SLACK] Sent: {message}");
-        else
-            Console.WriteLine("[SLACK] Failed to send message");
+        // Upload files (threaded to the message if we got a ts)
+        foreach (var fp in filePaths)
+        {
+            var uploadArgs = new List<string> { "upload", fp };
+            if (threadTs != null) { uploadArgs.Add("--msg"); uploadArgs.Add(threadTs); }
+            SlackUploadCommand(uploadArgs.ToArray());
+        }
 
-        return ok ? 0 : 1;
+        return 0;
     }
 
     /// <summary>Test Slack connection.</summary>
