@@ -119,7 +119,7 @@ internal partial class Program
             ["serverInfo"] = new JsonObject
             {
                 ["name"] = "wkappbot",
-                ["version"] = "1.0.0"
+                ["version"] = "3.0.0"
             }
         };
     }
@@ -130,232 +130,25 @@ internal partial class Program
     {
         var tools = new JsonArray
         {
-            McpTool("wkappbot_inspect", "Inspect a window's UI Automation tree. Returns element hierarchy with names, types, and automation IDs.",
+            McpTool("wkappbot", A11yDesc,
                 new JsonObject {
                     ["type"] = "object",
                     ["properties"] = new JsonObject {
-                        ["grap"] = Prop("string", "Window pattern to match (wildcard * supported). Example: \"*Notepad*\""),
-                        ["depth"] = Prop("integer", "Tree depth limit (default: 3)")
-                    },
-                    ["required"] = new JsonArray { "grap" }
-                }),
-
-            McpTool("wkappbot_a11y", "Unified accessibility actions on windows AND web elements. Works on native apps (UIA) and Chrome/Electron web views (CDP auto-fallback). Actions: close, minimize, maximize, restore, focus, invoke, click, toggle, type, set-value, find, read. For web views: use CSS selectors after # (e.g. \"*Chrome*#button.submit\").",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["action"] = Prop("string", "Action: close, minimize, maximize, restore, focus, invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range, find, read, highlight"),
-                        ["grap"] = Prop("string", "Window#element pattern. Native: \"*Notepad*#*File*\" (UIA Name). Web: \"*Chrome*#button.submit\" (CSS selector, auto-detected). Mixed: Win32/child#UIA or CSS."),
+                        ["action"] = Prop("string",
+                            "Action to perform.\n" +
+                            "Control: close, minimize, maximize, restore, focus, move, resize\n" +
+                            "Element: invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range\n" +
+                            "Query: find, read, highlight\n" +
+                            "Discovery: inspect (UIA tree), windows (list windows), screenshot (capture), ocr (text extraction)"),
+                        ["grap"] = Prop("string",
+                            "Window#element grap pattern. Required for all actions except 'windows'.\n" +
+                            "Examples: \"*Notepad*\", \"*Chrome*#button.submit\", \"*App*#*MenuBar*#*File*\""),
                         ["text"] = Prop("string", "Text for type/set-value actions"),
-                        ["all"] = Prop("boolean", "Apply to all matching windows")
+                        ["depth"] = Prop("integer", "Tree depth for inspect/find (default: 3)"),
+                        ["process"] = Prop("string", "Filter by process name (for windows action)"),
+                        ["all"] = Prop("boolean", "Apply to ALL matching windows, or include hidden windows (for windows action)")
                     },
-                    ["required"] = new JsonArray { "action", "grap" }
-                }),
-
-            McpTool("wkappbot_windows", "List visible windows. Returns window titles, class names, handles, and sizes.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["grap"] = Prop("string", "Optional filter pattern (wildcard * supported)"),
-                        ["process"] = Prop("string", "Filter by process name"),
-                        ["all"] = Prop("boolean", "Include hidden windows")
-                    }
-                }),
-
-            McpTool("wkappbot_web_eval", "Evaluate JavaScript in a Chrome tab via CDP. Chrome must be running with --remote-debugging-port.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["expression"] = Prop("string", "JavaScript expression to evaluate"),
-                        ["tab"] = Prop("string", "Tab pattern to find by URL/title (wildcard *). If omitted, uses active tab.")
-                    },
-                    ["required"] = new JsonArray { "expression" }
-                }),
-
-            McpTool("wkappbot_web_tabs", "List all Chrome tabs (title, URL, ID). Requires Chrome with --remote-debugging-port.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject { }
-                }),
-
-            McpTool("wkappbot_screenshot", "Capture a window screenshot. Returns base64-encoded PNG.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["grap"] = Prop("string", "Window pattern to capture. If omitted, captures foreground window.")
-                    }
-                }),
-
-            McpTool("wkappbot_ocr", "Run OCR on a window or image. Returns recognized text.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["grap"] = Prop("string", "Window pattern or image file path")
-                    },
-                    ["required"] = new JsonArray { "grap" }
-                }),
-
-            McpTool("wkappbot_navigate", "Navigate a Chrome tab to a URL.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["url"] = Prop("string", "URL to navigate to"),
-                        ["tab"] = Prop("string", "Tab pattern to find (wildcard *)")
-                    },
-                    ["required"] = new JsonArray { "url" }
-                }),
-
-            McpTool("wkappbot_web_click", "Click a web element by CSS selector in a Chrome tab.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["selector"] = Prop("string", "CSS selector of element to click"),
-                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
-                    },
-                    ["required"] = new JsonArray { "selector" }
-                }),
-
-            McpTool("wkappbot_web_type", "Type text into a web element by CSS selector.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["selector"] = Prop("string", "CSS selector of input element"),
-                        ["text"] = Prop("string", "Text to type"),
-                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
-                    },
-                    ["required"] = new JsonArray { "selector", "text" }
-                }),
-
-            McpTool("wkappbot_web_text", "Get text content of a web element by CSS selector.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["selector"] = Prop("string", "CSS selector of element"),
-                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
-                    },
-                    ["required"] = new JsonArray { "selector" }
-                }),
-
-            McpTool("wkappbot_web_open", "Open Chrome with CDP and navigate to URL. App mode (clean window) by default.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["url"] = Prop("string", "URL to open"),
-                        ["headless"] = Prop("boolean", "Run headless (no visible window)"),
-                        ["browser"] = Prop("boolean", "Normal Chrome UI with address bar (for debugging)")
-                    }
-                }),
-
-            McpTool("wkappbot_web_dblclick", "Double-click a web element by CSS selector.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["selector"] = Prop("string", "CSS selector of element to double-click"),
-                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
-                    },
-                    ["required"] = new JsonArray { "selector" }
-                }),
-
-            McpTool("wkappbot_web_screenshot", "Capture page screenshot as PNG via CDP (page content only). Returns base64.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
-                    }
-                }),
-
-            McpTool("wkappbot_web_capture", "Capture Chrome window screenshot including title bar (Win32 PrintWindow). Returns base64.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject { }
-                }),
-
-            McpTool("wkappbot_web_wait", "Wait for a web element to appear (polling).",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["selector"] = Prop("string", "CSS selector to wait for"),
-                        ["timeout"] = Prop("integer", "Timeout in ms (default: 5000)")
-                    },
-                    ["required"] = new JsonArray { "selector" }
-                }),
-
-            McpTool("wkappbot_web_check", "Set checkbox checked state.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["selector"] = Prop("string", "CSS selector of checkbox"),
-                        ["checked"] = Prop("boolean", "Check state (default: true)")
-                    },
-                    ["required"] = new JsonArray { "selector" }
-                }),
-
-            McpTool("wkappbot_web_select", "Select an option in a <select> element.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["selector"] = Prop("string", "CSS selector of <select> element"),
-                        ["value"] = Prop("string", "Option value or text to select")
-                    },
-                    ["required"] = new JsonArray { "selector", "value" }
-                }),
-
-            McpTool("wkappbot_web_html", "Get full page HTML source.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["tab"] = Prop("string", "Tab pattern (wildcard *)")
-                    }
-                }),
-
-            McpTool("wkappbot_web_url", "Get current page URL.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject { }
-                }),
-
-            McpTool("wkappbot_web_title", "Get current page title.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject { }
-                }),
-
-            McpTool("wkappbot_web_close", "Disconnect from Chrome CDP (does not close the browser).",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject { }
-                }),
-
-            McpTool("wkappbot_web_status", "Check if Chrome CDP is active.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject { }
-                }),
-
-            McpTool("wkappbot_web_restore", "Restore minimized Chrome window.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject { }
-                }),
-
-            McpTool("wkappbot_web_run", "Run a batch of web commands from a file.",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["file"] = Prop("string", "Path to steps file (each line = web subcommand)"),
-                        ["delay"] = Prop("integer", "Delay between steps in ms")
-                    },
-                    ["required"] = new JsonArray { "file" }
-                }),
-
-            McpTool("wkappbot_web_file", "Set a file input element's value (for file uploads).",
-                new JsonObject {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject {
-                        ["selector"] = Prop("string", "CSS selector of file input"),
-                        ["path"] = Prop("string", "File path to upload")
-                    },
-                    ["required"] = new JsonArray { "selector", "path" }
+                    ["required"] = new JsonArray { "action" }
                 }),
         };
 
@@ -388,34 +181,11 @@ internal partial class Program
 
         try
         {
+            // All MCP calls route through unified "a11y" command
+            // a11y handles: inspect, windows, screenshot, ocr as delegate actions
             var output = toolName switch
             {
-                "wkappbot_inspect" => RunCliCapture("inspect", BuildInspectArgs(arguments)),
-                "wkappbot_a11y" => RunCliCapture("a11y", BuildA11yArgs(arguments)),
-                "wkappbot_windows" => RunCliCapture("windows", BuildWindowsArgs(arguments)),
-                "wkappbot_web_eval" => RunCliCapture("web", BuildWebEvalArgs(arguments)),
-                "wkappbot_web_tabs" => RunCliCapture("web", new[] { "tabs" }),
-                "wkappbot_screenshot" => RunCliCaptureScreenshot(arguments),
-                "wkappbot_ocr" => RunCliCapture("ocr", BuildOcrArgs(arguments)),
-                "wkappbot_navigate" => RunCliCapture("web", BuildNavigateArgs(arguments)),
-                "wkappbot_web_click" => RunCliCapture("web", BuildWebClickArgs(arguments)),
-                "wkappbot_web_type" => RunCliCapture("web", BuildWebTypeArgs(arguments)),
-                "wkappbot_web_text" => RunCliCapture("web", BuildWebTextArgs(arguments)),
-                "wkappbot_web_open" => RunCliCapture("web", BuildWebOpenArgs(arguments)),
-                "wkappbot_web_dblclick" => RunCliCapture("web", BuildWebDblClickArgs(arguments)),
-                "wkappbot_web_screenshot" => RunCliCapture("web", BuildWebScreenshotArgs(arguments)),
-                "wkappbot_web_capture" => RunCliCapture("web", new[] { "capture" }),
-                "wkappbot_web_wait" => RunCliCapture("web", BuildWebWaitArgs(arguments)),
-                "wkappbot_web_check" => RunCliCapture("web", BuildWebCheckArgs(arguments)),
-                "wkappbot_web_select" => RunCliCapture("web", BuildWebSelectArgs(arguments)),
-                "wkappbot_web_html" => RunCliCapture("web", BuildWebHtmlArgs(arguments)),
-                "wkappbot_web_url" => RunCliCapture("web", new[] { "url" }),
-                "wkappbot_web_title" => RunCliCapture("web", new[] { "title" }),
-                "wkappbot_web_close" => RunCliCapture("web", new[] { "close" }),
-                "wkappbot_web_status" => RunCliCapture("web", new[] { "status" }),
-                "wkappbot_web_restore" => RunCliCapture("web", new[] { "restore" }),
-                "wkappbot_web_run" => RunCliCapture("web", BuildWebRunArgs(arguments)),
-                "wkappbot_web_file" => RunCliCapture("web", BuildWebFileArgs(arguments)),
+                "wkappbot" => RunCliCapture("a11y", BuildUnifiedArgs(arguments)),
                 _ => $"Unknown tool: {toolName}"
             };
 
@@ -450,28 +220,16 @@ internal partial class Program
 
     // ── Argument builders ───────────────────────────────────────
 
-    static string[] BuildInspectArgs(JsonObject args)
+    static string[] BuildUnifiedArgs(JsonObject args)
     {
         var list = new List<string>();
+        var action = args["action"]?.GetValue<string>() ?? "inspect";
+        list.Add(action);
+        // grap is required for all except "windows" (optional)
         if (args["grap"] is JsonNode g) list.Add(g.GetValue<string>());
-        if (args["depth"] is JsonNode d) { list.Add("--depth"); list.Add(d.ToString()); }
-        return list.ToArray();
-    }
-
-    static string[] BuildA11yArgs(JsonObject args)
-    {
-        var list = new List<string>();
-        if (args["action"] is JsonNode a) list.Add(a.GetValue<string>());
-        if (args["grap"] is JsonNode g) list.Add(g.GetValue<string>());
+        // Action-specific params
         if (args["text"] is JsonNode t) { list.Add("--text"); list.Add(t.GetValue<string>()); }
-        if (args["all"]?.GetValue<bool>() == true) list.Add("--all");
-        return list.ToArray();
-    }
-
-    static string[] BuildWindowsArgs(JsonObject args)
-    {
-        var list = new List<string>();
-        if (args["grap"] is JsonNode g) list.Add(g.GetValue<string>());
+        if (args["depth"] is JsonNode d) { list.Add("--depth"); list.Add(d.ToString()); }
         if (args["process"] is JsonNode p) { list.Add("--process"); list.Add(p.GetValue<string>()); }
         if (args["all"]?.GetValue<bool>() == true) list.Add("--all");
         return list.ToArray();
