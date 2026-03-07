@@ -38,6 +38,7 @@ internal partial class Program
         return sub switch
         {
             "open" => WebOpenCommand(restArgs),
+            "tabs" => WebTabsCommand(restArgs),
             "eval" => WebEvalCommand(restArgs),
             "click" => WebClickCommand(restArgs),
             "dblclick" or "double-click" => WebDblClickCommand(restArgs),
@@ -122,8 +123,13 @@ Batch:
       Run a batch of web commands from a file.
       Each line is a web subcommand (e.g., ""click #btn"", ""type #name hello"").
 
+Tab Discovery:
+  tabs [--port N]
+      List all Chrome tabs (title + URL).
+
 Options:
   --port N     CDP port (default: 9222)
+  --tab <pat>  Find tab by URL/title pattern (* wildcard). No match = error (no blank tab).
   --timeout N  Timeout in ms for wait commands (default: 5000)
   -o <file>    Output file path (for screenshot/html)
 ");
@@ -208,6 +214,57 @@ Options:
         }
 
         return cdp;
+    }
+
+    /// <summary>Connect to CDP and switch to tab matching --tab pattern (if specified).</summary>
+    static CdpClient? ConnectCdpWithTab(string[] args, bool withBar = true)
+    {
+        var port = GetPort(args);
+        var tabPattern = GetArgValue(args, "--tab");
+
+        if (string.IsNullOrEmpty(tabPattern))
+            return ConnectCdp(port, withBar);
+
+        // Connect to first available tab, then find the right one
+        var cdp = new CdpClient();
+        cdp.ConnectAsync(port).GetAwaiter().GetResult();
+        if (withBar) cdp.InjectWebBotBar = true;
+
+        var matched = cdp.ConnectToTabAsync(port, tabPattern).GetAwaiter().GetResult();
+        if (!matched)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[WEB] No tab matching \"{tabPattern}\" found. Use 'wkappbot web tabs' to list.");
+            Console.ResetColor();
+            cdp.Dispose();
+            return null;
+        }
+        return cdp;
+    }
+
+    static int WebTabsCommand(string[] args)
+    {
+        var port = GetPort(args);
+        var cdp = new CdpClient();
+        cdp.ConnectAsync(port).GetAwaiter().GetResult();
+        var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
+        cdp.Dispose();
+
+        if (tabs.Count == 0)
+        {
+            Console.WriteLine("[WEB] No tabs found");
+            return 1;
+        }
+
+        Console.WriteLine($"[WEB] {tabs.Count} tab(s):");
+        foreach (var tab in tabs)
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write($"  {tab.Title}");
+            Console.ResetColor();
+            Console.WriteLine($"  {tab.Url}  [{tab.Id[..8]}]");
+        }
+        return 0;
     }
 
     // ── Helper: get web element screen rect for zoom overlay ────
@@ -552,13 +609,15 @@ Options:
     static int WebEvalCommand(string[] args)
     {
         if (args.Length == 0)
-            return Error("Usage: wkappbot web eval <expression> [--port N]");
+            return Error("Usage: wkappbot web eval <expression> [--port N] [--tab <pattern>]");
 
         int port = GetPort(args);
-        // Join all non-flag args as the expression (allows spaces)
-        var expression = string.Join(" ", args.TakeWhile(a => a != "--port"));
+        // Join all non-flag args as the expression (skip --port N and --tab N)
+        var expression = string.Join(" ", args.TakeWhile(a => a != "--port" && a != "--tab"));
 
-        using var cdp = ConnectCdp(port);
+        var cdpOrNull = ConnectCdpWithTab(args);
+        if (cdpOrNull == null) return 1;
+        using var cdp = cdpOrNull;
 
         // Auto-detect async expressions (async () => ...) and await the Promise
         bool isAsync = expression.TrimStart().StartsWith("(async") || expression.TrimStart().StartsWith("async");
@@ -717,7 +776,9 @@ Options:
         string output = GetArgValue(args, "-o")
             ?? Path.Combine(DataDir, "output", $"web_screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png");
 
-        using var cdp = ConnectCdp(port);
+        var cdpOrNull = ConnectCdpWithTab(args);
+        if (cdpOrNull == null) return 1;
+        using var cdp = cdpOrNull;
 
         Console.Write($"[WEB] Screenshot... ");
         var png = cdp.ScreenshotAsync().GetAwaiter().GetResult();

@@ -1178,6 +1178,79 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         catch { return null; }
     }
 
+    /// <summary>Tab info from CDP /json endpoint.</summary>
+    public record TabInfo(string Id, string Title, string Url, string? WsUrl);
+
+    /// <summary>List all page tabs via CDP /json.</summary>
+    public async Task<List<TabInfo>> ListTabsAsync(int port = 9222)
+    {
+        var result = new List<TabInfo>();
+        try
+        {
+            var json = await _http.GetStringAsync($"http://localhost:{port}/json");
+            var targets = JsonSerializer.Deserialize<JsonArray>(json);
+            if (targets == null) return result;
+            foreach (var t in targets)
+            {
+                if (t?["type"]?.GetValue<string>() != "page") continue;
+                result.Add(new TabInfo(
+                    t?["id"]?.GetValue<string>() ?? "",
+                    t?["title"]?.GetValue<string>() ?? "",
+                    t?["url"]?.GetValue<string>() ?? "",
+                    t?["webSocketDebuggerUrl"]?.GetValue<string>()));
+            }
+        }
+        catch { }
+        return result;
+    }
+
+    /// <summary>
+    /// Find a tab by URL/title pattern (wildcard * supported).
+    /// Returns null if no match found — never opens a new tab.
+    /// </summary>
+    public async Task<TabInfo?> FindTabByPatternAsync(int port, string pattern)
+    {
+        var tabs = await ListTabsAsync(port);
+        // Wildcard pattern → simple glob match on title+url
+        foreach (var tab in tabs)
+        {
+            if (GlobMatch(tab.Title, pattern) || GlobMatch(tab.Url, pattern))
+                return tab;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Connect to a specific tab by pattern match (URL or title).
+    /// Returns true if found and connected, false if no match.
+    /// </summary>
+    public async Task<bool> ConnectToTabAsync(int port, string pattern)
+    {
+        var tab = await FindTabByPatternAsync(port, pattern);
+        if (tab == null) return false;
+        if (tab.Id == TargetId) return true; // already connected
+        return await SwitchToTargetAsync(tab.Id, port);
+    }
+
+    static bool GlobMatch(string text, string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern)) return false;
+        // Simple wildcard: * matches any sequence
+        var parts = pattern.Split('*');
+        int idx = 0;
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (string.IsNullOrEmpty(parts[i])) continue;
+            var found = text.IndexOf(parts[i], idx, StringComparison.OrdinalIgnoreCase);
+            if (found < 0) return false;
+            if (i == 0 && !pattern.StartsWith("*") && found != 0) return false;
+            idx = found + parts[i].Length;
+        }
+        if (!pattern.EndsWith("*") && idx != text.Length && parts.Length > 0 && !string.IsNullOrEmpty(parts[^1]))
+            return false;
+        return true;
+    }
+
     /// <summary>
     /// Switch this CdpClient to a different page target (disconnect + reconnect).
     /// The port is needed to look up the new target's WebSocket URL from /json.
