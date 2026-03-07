@@ -30,6 +30,46 @@ internal partial class Program
                     _ => 1
                 };
             }
+            // ═══ Ask AI agents (삼두협의체) ═══
+            if (maybeAction is "ask-gpt" or "ask-gemini" or "ask")
+            {
+                var aiArgs = new List<string>();
+                string aiName;
+                if (maybeAction == "ask-gpt") aiName = "gpt";
+                else if (maybeAction == "ask-gemini") aiName = "gemini";
+                else if (args.Length >= 2 && args[1].ToLowerInvariant() is "gpt" or "gemini")
+                {
+                    aiName = args[1].ToLowerInvariant();
+                    aiArgs.Add(aiName);
+                    aiArgs.AddRange(args.Skip(2));
+                    return AskCommand(aiArgs.ToArray());
+                }
+                else
+                {
+                    Console.WriteLine("Usage: a11y ask-gpt \"question\" [file.png] | a11y ask-gemini \"question\" | a11y ask gpt|gemini \"question\"");
+                    return 1;
+                }
+                aiArgs.Add(aiName);
+                // Rebuild args: extract --text as question, grap as file, pass rest through
+                var restArgs = args.Skip(1).ToList();
+                for (int ri = 0; ri < restArgs.Count; ri++)
+                {
+                    if (restArgs[ri] == "--text" && ri + 1 < restArgs.Count)
+                    {
+                        aiArgs.Add(restArgs[ri + 1]); // question text
+                        ri++;
+                    }
+                    else if (!restArgs[ri].StartsWith("--"))
+                    {
+                        aiArgs.Add(restArgs[ri]); // file path or question
+                    }
+                    else
+                    {
+                        aiArgs.Add(restArgs[ri]); // pass flags through
+                    }
+                }
+                return AskCommand(aiArgs.ToArray());
+            }
         }
 
         if (args.Length < 2)

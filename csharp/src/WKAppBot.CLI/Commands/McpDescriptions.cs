@@ -29,7 +29,8 @@ internal partial class Program
         "Element: invoke, click, toggle, expand, collapse, select, scroll, type (--text), set-value (--text), set-range (--value)\n" +
         "Query: find, read, highlight\n" +
         "Discovery: inspect (UIA element tree), windows (list all windows), screenshot (capture window), ocr (extract text)\n" +
-        "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, --text)\n\n" +
+        "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, --text)\n" +
+        "AI Agents (삼두협의체): ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini) — auto image capture from responses\n\n" +
         "## Fallback Chain (battle-tested!)\n" +
         "CSS selector on Chrome/Electron class → CDP engine → UIA fallback.\n" +
         "UIA pattern on web view class → if UIA fails → CDP retry.\n" +
@@ -69,5 +70,8 @@ internal partial class Program
         "- Wait for dialog: action=wait, grap=\"*SaveAs*\", timeout=15000\n" +
         "- Wait for element: action=wait, grap=\"*App*#*ProgressDone*\", timeout=30000\n" +
         "- Eval JS in Chrome: action=eval, grap=\"*Chrome*\", text=\"document.title\"\n" +
-        "- Eval with tab hint: action=eval, grap=\"*Chrome*#ChatGPT\", text=\"document.querySelectorAll('article').length\"";
+        "- Eval with tab hint: action=eval, grap=\"*Chrome*#ChatGPT\", text=\"document.querySelectorAll('article').length\"\n" +
+        "- Ask GPT: action=ask-gpt, text=\"How to get text from owner-drawn MFC button?\"\n" +
+        "- Ask Gemini: action=ask-gemini, text=\"Analyze this UI screenshot\", grap=\"screenshot.png\"\n" +
+        "- Ask with image: action=ask-gpt, text=\"What buttons are in this dialog?\", grap=\"dialog.png\"";
 }
