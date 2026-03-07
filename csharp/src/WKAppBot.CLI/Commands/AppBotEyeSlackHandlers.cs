@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using WKAppBot.Core.Runner;
 using WKAppBot.WebBot;
 using WKAppBot.Win32.Input;
+using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
@@ -149,6 +150,7 @@ internal partial class Program
     /// <summary>
     /// 위치확보 후 프롬프트 입력. 모든 자동입력 전에 Probe 호출.
     /// 슬랙 요청 = AutoApproveYield (승인만 자동, 돋보기+확보는 정상).
+    /// 최소화 창 → SW_SHOWNOACTIVATE 포커스리스 리스토어 후 재시도.
     /// </summary>
     static bool ProbeAndSubmit(ClaudePromptHelper promptHelper, ClaudePromptHelper.PromptInfo prompt, string text)
     {
@@ -165,6 +167,42 @@ internal partial class Program
             SkipKnowhow = true, // 프롬프트는 노하우 불필요
         });
 
+        // ── 최소화 감지 → 포커스리스 리스토어 후 재 Probe ──
+        if (report.FormIconic)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [SLACK→PROMPT] 최소화 감지 → 포커스리스 리스토어 시도");
+            Console.ResetColor();
+            report.Zoom?.Dispose();
+
+            // SW_SHOWNOACTIVATE: 포커스 안 뺏고 원래 위치에 복원
+            var wp = new NativeMethods.WINDOWPLACEMENT();
+            wp.length = System.Runtime.InteropServices.Marshal.SizeOf(wp);
+            if (NativeMethods.GetWindowPlacement(prompt.WindowHandle, ref wp))
+            {
+                wp.showCmd = NativeMethods.SW_SHOWNOACTIVATE;
+                NativeMethods.SetWindowPlacement(prompt.WindowHandle, ref wp);
+                Console.WriteLine($"  [SLACK→PROMPT] 포커스리스 리스토어 완료 (SW_SHOWNOACTIVATE)");
+                Thread.Sleep(300); // UI 갱신 대기
+
+                // 재 Probe
+                report = readiness.Probe(new InputReadinessRequest
+                {
+                    TargetHwnd = prompt.WindowHandle,
+                    IntendedAction = "key",
+                    AutoApproveYield = true,
+                    SkipKnowhow = true,
+                });
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  [SLACK→PROMPT] GetWindowPlacement 실패");
+                Console.ResetColor();
+                return false;
+            }
+        }
+
         // ── 위치확보 결과 요약 ──
         var issues = new List<string>();
         if (report.ActiveBlocker != null)
@@ -176,7 +214,7 @@ internal partial class Program
         if (!report.FormEnabled)
             issues.Add("not-enabled");
         if (report.FormIconic)
-            issues.Add("minimized");
+            issues.Add("still-minimized");
         if (report.UserYieldRequested && !report.UserYieldConfirmed)
             issues.Add("yield-denied");
         if (report.UserYieldConfirmed && !report.UserYieldFocusAcquired)
