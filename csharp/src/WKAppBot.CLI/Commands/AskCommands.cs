@@ -562,9 +562,14 @@ Examples:
                 Console.WriteLine($"[ASK] Sent! Waiting for response... (send={sendResult})");
                 questionLock.Release("sent");
 
+                // Register for tab handoff + activate peer's tab (we'll poll with textContent)
+                RegisterWaitingTab("gemini", cdp);
+                await HandoffTabToPeer("gemini");
+
                 // Wait for response — poll until text stabilizes
                 string? lastText = null;
                 int stableCount = 0;
+                int lastTextLen = 0;
                 var sw = Stopwatch.StartNew();
 
                 int geminiBlankCount = 0;
@@ -606,6 +611,11 @@ Examples:
                     if (string.IsNullOrEmpty(text))
                         continue;
 
+                    // Streaming handoff: text growing → this tab is alive, give active tab to peer
+                    if (text.Length > lastTextLen && lastTextLen > 0)
+                        await HandoffTabToPeer("gemini");
+                    lastTextLen = text.Length;
+
                     // Check if response is still generating
                     if (text == lastText)
                     {
@@ -622,6 +632,9 @@ Examples:
                         lastText = text;
                     }
                 }
+
+                // Done — hand off tab to peer if still waiting
+                await HandoffTabToPeer("gemini");
 
                 // Timeout — return whatever we have
                 if (!string.IsNullOrEmpty(lastText))
@@ -656,6 +669,7 @@ Examples:
                 ReportToSlack("Gemini", question, cleaned);
         }
 
+        UnregisterWaitingTab("gemini");
         // Preserve Chrome's original state — don't force minimize
         cdp.Dispose();
         return ok ? 0 : 1;
@@ -793,6 +807,7 @@ Examples:
                 ReportToSlack("ChatGPT", question, answer);
         }
 
+        UnregisterWaitingTab("chatgpt");
         // Preserve Chrome's original state — don't force minimize
         cdp.Dispose();
         return ok ? 0 : 1;
@@ -1027,7 +1042,15 @@ Examples:
             }
 
             var c = await CountChatGptTurns(cdp);
-            if (c > prevTurns) { newTurnAppeared = true; chatLock.Release("first-byte"); break; }
+            if (c > prevTurns)
+            {
+                newTurnAppeared = true;
+                chatLock.Release("first-byte");
+                // Register for tab handoff + activate peer's tab (we'll poll with textContent)
+                RegisterWaitingTab("chatgpt", cdp);
+                await HandoffTabToPeer("chatgpt");
+                break;
+            }
             var cur = c.ToString();
 
             if (sw.Elapsed.TotalSeconds > 3)
@@ -1093,6 +1116,11 @@ Examples:
             // Exempt: THINKING state (o3/o4 models can think for 30s+ before first text)
             bool isThinking = stateJson == "THINKING" || stateJson == "THINKING_HAS_TEXT";
             bool hasResponseText = stateJson == "STREAMING_HAS_TEXT" || stateJson == "THINKING_HAS_TEXT";
+
+            // Streaming handoff: response text appearing → give active tab to peer
+            if (hasResponseText)
+                await HandoffTabToPeer("chatgpt");
+
             if (!hasResponseText && !isThinking && sw.Elapsed.TotalSeconds >= 20)
             {
                 Console.WriteLine("[ASK] No response text after 20s — aborting (first-byte timeout)");
@@ -1175,6 +1203,9 @@ Examples:
         if (!string.IsNullOrEmpty(finalText))
         {
             Console.WriteLine($"[ASK] Response ({finalText.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
+
+            // Done — hand off tab to peer if still waiting
+            await HandoffTabToPeer("chatgpt");
 
             // ── Final answer ready: focusless restore to show answer to user ──
             ShowChromeAnswer(cdp);
@@ -1292,6 +1323,48 @@ Examples:
                 Console.WriteLine($"[FOCUS] Guard blocked {count} focus theft(s)");
                 Console.ResetColor();
             }
+        }
+    }
+
+    // ── Tab Handoff: async 상부상조 ──
+    // When one AI's response starts, activate the other AI's tab via BringToFrontAsync.
+    // BringToFront = Chrome-internal tab switch only (no OS focus change = fully focusless).
+    // The streaming AI polls with textContent (works in background), so it doesn't need active tab.
+    // The waiting AI gets active tab → React renders at full speed → faster first-byte.
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, CdpClient> _waitingTabs = new();
+
+    /// <summary>
+    /// Register this AI's tab as "waiting for response" — eligible for tab handoff.
+    /// </summary>
+    static void RegisterWaitingTab(string aiName, CdpClient cdp)
+    {
+        _waitingTabs[aiName] = cdp;
+    }
+
+    /// <summary>
+    /// Unregister on completion.
+    /// </summary>
+    static void UnregisterWaitingTab(string aiName)
+    {
+        _waitingTabs.TryRemove(aiName, out _);
+    }
+
+    /// <summary>
+    /// Activate another waiting AI's tab (focusless — Chrome internal tab switch only).
+    /// Called when this AI's response starts streaming (= no longer needs active tab).
+    /// </summary>
+    static async Task HandoffTabToPeer(string myName)
+    {
+        foreach (var (name, cdp) in _waitingTabs)
+        {
+            if (string.Equals(name, myName, StringComparison.OrdinalIgnoreCase)) continue;
+            try
+            {
+                await cdp.BringToFrontAsync();
+                Console.WriteLine($"[ASK] Tab handoff: {myName} → {name} (focusless)");
+                return;
+            }
+            catch { }
         }
     }
 
