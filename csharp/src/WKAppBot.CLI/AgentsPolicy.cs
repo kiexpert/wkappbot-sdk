@@ -80,7 +80,14 @@ Encoding Safety
 - If a file's encoding looks wrong, fix it before making other changes.
 
 Tool Usage
-- WKAppBot is the command gateway.
+- WKAppBot is the command gateway. The standard command is `a11y`.
+- `a11y` is the ONE universal command: 24 actions covering discovery (inspect, windows, screenshot, ocr),
+  window control (close, minimize, maximize, restore, focus, move, resize),
+  element interaction (invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range),
+  and query (find, read, highlight).
+- Grap pattern targets windows: wildcards "*App*", regex "regex:...", OR "*a*;*b*", handle "*hwnd=XX*".
+- #scope drills into UIA elements: "*App*#*MenuBar*". CSS auto-detected for web views: "*Chrome*#button.submit".
+- 3-tier fallback: UIA -> Win32 -> SendInput (native), CSS -> CDP -> UIA (web views).
 - Use tools only when needed.
 - Do not repeatedly call the same tool without new information.
 - Explore files, commands, and logs before asking.

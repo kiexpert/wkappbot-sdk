@@ -14,6 +14,24 @@ internal partial class Program
     // Unified pattern: find all -> select (--nth/--all) -> dispatch targets
     static int A11yCommand(string[] args)
     {
+        // ═══ Delegate actions (may not require grap) ═══
+        if (args.Length >= 1)
+        {
+            var maybeAction = args[0].ToLowerInvariant();
+            if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr")
+            {
+                var delegateArgs = args.Skip(1).ToArray();
+                return maybeAction switch
+                {
+                    "inspect"    => InspectCommand(delegateArgs),
+                    "windows"    => WindowsCommand(delegateArgs),
+                    "screenshot" => CaptureCommand(delegateArgs),
+                    "ocr"        => OcrCommand(delegateArgs),
+                    _ => 1
+                };
+            }
+        }
+
         if (args.Length < 2)
         {
             var ver = typeof(Program).Assembly.GetName().Version;
@@ -22,10 +40,16 @@ internal partial class Program
             Console.WriteLine($"  WKAppBot a11y {verStr}");
             Console.WriteLine($"  A MUD-style portal for AI to see and touch the real world.");
             Console.WriteLine($"  find = look, read = examine, invoke = open the door.");
-            Console.WriteLine($"  20 actions · 3-tier fallback · focusless · zoom overlay");
-            Console.WriteLine($"  UIA → Win32 → SendInput — just works.");
+            Console.WriteLine($"  24 actions · 3-tier fallback · focusless · zoom overlay");
+            Console.WriteLine($"  UIA → Win32 → SendInput + CDP web fallback — just works.");
             Console.WriteLine();
             Console.WriteLine("  Usage: a11y <action> <grap>[#uia-scope] [options]");
+            Console.WriteLine();
+            Console.WriteLine("═══ Discovery Actions (4) ═════════════════════════════════");
+            Console.WriteLine("  inspect     UIA element tree (delegates to inspect command)");
+            Console.WriteLine("  windows     List visible windows (delegates to windows command)");
+            Console.WriteLine("  screenshot  Capture window screenshot (delegates to capture)");
+            Console.WriteLine("  ocr         OCR text extraction (delegates to ocr command)");
             Console.WriteLine();
             Console.WriteLine("═══ Window Actions (7) ════════════════════════════════════");
             Console.WriteLine("  close       Close window (UIA → WM_CLOSE → Process.Kill)");
