@@ -833,8 +833,14 @@ Examples:
                     return (false, (string?)null);
                 await Task.Delay(1000); // Let ChatGPT UI settle
 
-                // Send the actual question
+                // Send the actual question (with 9s-delay retry on timeout)
                 var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec);
+                if (!ok && string.IsNullOrEmpty(answer))
+                {
+                    Console.WriteLine("[ASK] ChatGPT timeout — retrying in 9 seconds...");
+                    await Task.Delay(9000);
+                    (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec);
+                }
                 return (ok, answer);
             }
             catch (Exception ex)
