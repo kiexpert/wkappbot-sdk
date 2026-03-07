@@ -29,6 +29,7 @@
     <ProjectReference Include="..\WKAppBot.Vision\WKAppBot.Vision.csproj" />
     <ProjectReference Include="..\WKAppBot.Report\WKAppBot.Report.csproj" />
     <ProjectReference Include="..\WKAppBot.WebBot\WKAppBot.WebBot.csproj" />
+    <ProjectReference Include="..\WKAppBot.Android\WKAppBot.Android.csproj" />
   </ItemGroup>
 
   <!-- Copy handler YAML files from project root to output + publish -->
