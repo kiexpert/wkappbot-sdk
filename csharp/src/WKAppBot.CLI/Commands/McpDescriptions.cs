@@ -56,6 +56,14 @@ internal partial class Program
         "### Dialog/Popup Auto-Dismissal\n" +
         "Unexpected popup blocking your automation? WKAppBot detects blocker windows (~5ms) " +
         "and auto-dismisses known dialog patterns. Experience DB learns which buttons work for each popup.\n\n" +
+        "## Android ADB (adb:// scheme)\n" +
+        "Prefix grap with adb:// to target Android devices via USB:\n" +
+        "- Format: adb://device/package#scope (same #scope logic as Windows UIA)\n" +
+        "- Auto-detect: adb://*heromts* (single device auto-select)\n" +
+        "- Device+package: adb://Fold5/*heromts*#해외잔고\n" +
+        "- Supported: inspect, find, windows, screenshot, click, read, scroll, type, close\n" +
+        "- Experience DB: tree snapshots + action logs saved to profiles/{pkg}_exp/ and experience/android/{pkg}/\n" +
+        "- Scope resolution: content-desc → text → resource-id (mirrors Windows UIA Name → AutomationId)\n\n" +
         "## Quick Examples\n" +
         "- List all windows: action=windows\n" +
         "- Inspect element tree: action=inspect, grap=\"*Notepad*\", depth=5\n" +
@@ -73,5 +81,10 @@ internal partial class Program
         "- Eval with tab hint: action=eval, grap=\"*Chrome*#ChatGPT\", text=\"document.querySelectorAll('article').length\"\n" +
         "- Ask GPT: action=ask-gpt, text=\"How to get text from owner-drawn MFC button?\"\n" +
         "- Ask Gemini: action=ask-gemini, text=\"Analyze this UI screenshot\", grap=\"screenshot.png\"\n" +
-        "- Ask with image: action=ask-gpt, text=\"What buttons are in this dialog?\", grap=\"dialog.png\"";
+        "- Ask with image: action=ask-gpt, text=\"What buttons are in this dialog?\", grap=\"dialog.png\"\n" +
+        "- Android devices: action=windows, grap=\"adb://\"\n" +
+        "- Android inspect: action=inspect, grap=\"adb://Fold5/*heromts*\", depth=10\n" +
+        "- Android click tab: action=click, grap=\"adb://*heromts*#미체결\"\n" +
+        "- Android type: action=type, grap=\"adb://*heromts*#검색\", text=\"삼성전자\"\n" +
+        "- Android screenshot: action=screenshot, grap=\"adb://SM*\"";
 }
