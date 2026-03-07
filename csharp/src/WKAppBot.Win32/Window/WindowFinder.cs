@@ -42,6 +42,9 @@ public static class WindowFinder
         // Cache process names by PID (avoid repeated lookups)
         var procNameCache = new Dictionary<uint, string>();
 
+        // Snapshot focus state once for flags + priority sorting
+        var focus = FocusSnapshot.CaptureNow();
+
         var results = new List<WindowInfo>();
         NativeMethods.EnumWindows((hWnd, _) =>
         {
@@ -64,8 +67,8 @@ public static class WindowFinder
             var w = rect.Right - rect.Left;
             var h = rect.Bottom - rect.Top;
 
-            // ★ Combined search key: "[ClassName] Title (processName hwnd=XX WxH)"
-            var searchKey = $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h})";
+            // ★ Standard search key with focus flags
+            var searchKey = BuildSearchKey(hWnd, cls, title, procName, w, h, focus);
 
             // Substring match: try title first, then full searchKey
             if (matcher.IsMatch(title) || matcher.IsMatch(searchKey))
@@ -73,7 +76,97 @@ public static class WindowFinder
 
             return true;
         }, IntPtr.Zero);
+
+        // Sort by focus priority: ★keyboard > ★mouse > ★foreground > Z-order
+        if (results.Count > 1)
+            results.Sort((a, b) => focus.GetPriority(b.Handle).CompareTo(focus.GetPriority(a.Handle)));
+
         return results;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Focus state snapshot + search key builder (standard for all callers)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Snapshot of current focus state for search key enrichment and priority sorting.
+    /// Create once per search operation via CaptureNow().
+    /// </summary>
+    public class FocusSnapshot
+    {
+        public IntPtr ForegroundHwnd { get; init; }
+        public IntPtr KeyboardHwnd { get; init; }
+        public IntPtr KeyboardRootHwnd { get; init; } // pre-computed GA_ROOT
+        public IntPtr MouseHwnd { get; init; }
+        public IntPtr MouseRootHwnd { get; init; }    // pre-computed GA_ROOT
+
+        public static FocusSnapshot CaptureNow()
+        {
+            var fg = NativeMethods.GetForegroundWindow();
+            var kb = IntPtr.Zero;
+            try
+            {
+                var gti = new NativeMethods.GUITHREADINFO
+                { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+                if (NativeMethods.GetGUIThreadInfo(0, ref gti))
+                    kb = gti.hwndFocus;
+            }
+            catch { }
+            var mouse = IntPtr.Zero;
+            try
+            {
+                NativeMethods.GetCursorPos(out var pt);
+                mouse = NativeMethods.WindowFromPoint(pt);
+            }
+            catch { }
+
+            // Pre-compute root ancestors once — avoids per-window GetAncestor calls
+            var kbRoot = kb != IntPtr.Zero ? NativeMethods.GetAncestor(kb, NativeMethods.GA_ROOT) : IntPtr.Zero;
+            var mouseRoot = mouse != IntPtr.Zero ? NativeMethods.GetAncestor(mouse, NativeMethods.GA_ROOT) : IntPtr.Zero;
+
+            return new FocusSnapshot
+            {
+                ForegroundHwnd = fg,
+                KeyboardHwnd = kb, KeyboardRootHwnd = kbRoot,
+                MouseHwnd = mouse, MouseRootHwnd = mouseRoot
+            };
+        }
+
+        /// <summary>Focus flags string for search key (e.g., " ★foreground ★keyboard").</summary>
+        public string GetFlags(IntPtr hWnd)
+        {
+            var flags = "";
+            if (hWnd == ForegroundHwnd) flags += " ★foreground";
+            if (hWnd == KeyboardHwnd || hWnd == KeyboardRootHwnd) flags += " ★keyboard";
+            if (hWnd == MouseHwnd || hWnd == MouseRootHwnd) flags += " ★mouse";
+            return flags;
+        }
+
+        /// <summary>Priority score for sorting: keyboard=3, mouse=2, foreground=1, other=0.</summary>
+        public int GetPriority(IntPtr hWnd) =>
+            (hWnd == KeyboardHwnd || hWnd == KeyboardRootHwnd) ? 3 :
+            (hWnd == MouseHwnd || hWnd == MouseRootHwnd) ? 2 :
+            (hWnd == ForegroundHwnd) ? 1 : 0;
+    }
+
+    /// <summary>
+    /// Build the standard enriched search key for a window.
+    /// Format: "[ClassName] Title (processName hwnd=XXXXXXXX WxH ★flags)"
+    /// Used by FindByTitle, WindowsCommand, and any grap-based search.
+    /// </summary>
+    public static string BuildSearchKey(IntPtr hWnd, string cls, string title,
+        string procName, int w, int h, FocusSnapshot? focus = null)
+    {
+        var flags = focus?.GetFlags(hWnd) ?? "";
+        return $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h}{flags})";
+    }
+
+    /// <summary>Check if childHwnd is a descendant of a top-level parentHwnd.</summary>
+    public static bool IsChildOfTopLevel(IntPtr childHwnd, IntPtr parentHwnd)
+    {
+        if (childHwnd == IntPtr.Zero || parentHwnd == IntPtr.Zero) return false;
+        var root = NativeMethods.GetAncestor(childHwnd, NativeMethods.GA_ROOT);
+        return root == parentHwnd;
     }
 
     /// <summary>
