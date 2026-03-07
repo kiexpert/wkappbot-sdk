@@ -883,8 +883,10 @@ internal partial class Program
             if (paragraph.Count > 0)
             {
                 Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                // 줄 합치되 너무 길면 잘라내기 (토큰 절약)
-                var text = string.Join(" ", paragraph);
+                // 줄 합치 + md 주석/마커 트림 + 연속 공백 정리 (토큰 절약)
+                var text = string.Join(" ", paragraph.Select(l =>
+                    l.TrimStart('-', '*', ' ', '\t', '`')));
+                text = System.Text.RegularExpressions.Regex.Replace(text, @"\s{2,}", " ").Trim();
                 if (text.Length > 200) text = text[..197] + "...";
                 Console.WriteLine(text);
                 Console.ResetColor();

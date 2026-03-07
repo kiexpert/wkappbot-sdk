@@ -502,29 +502,9 @@ internal partial class Program
         Console.ResetColor();
         Console.WriteLine(Path.GetRelativePath(DataDir, osDir));
 
-        // Broadcast knowhow files
+        // Broadcast knowhow files — reuse Windows ShowKnowhowBroadcast (title + first paragraph)
         var knowhows = AdbExpDb.GetKnowhowFiles(package, screenName);
         foreach (var (path, tag) in knowhows)
-        {
-            Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.Write($"  [{tag}] ");
-            Console.ResetColor();
-            Console.WriteLine(Path.GetFileName(path));
-
-            // Show first 5 non-empty lines of knowhow
-            try
-            {
-                var lines = File.ReadAllLines(path)
-                    .Where(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith('#'))
-                    .Take(5);
-                foreach (var line in lines)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                    Console.WriteLine($"    {line}");
-                }
-                Console.ResetColor();
-            }
-            catch { /* ignore read errors */ }
-        }
+            ShowKnowhowBroadcast(path, tag);
     }
 }
