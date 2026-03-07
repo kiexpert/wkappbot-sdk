@@ -60,6 +60,52 @@ public static class GrapHelper
     };
 
     // ═══════════════════════════════════════════════════════════════════════
+    // CSS vs UIA pattern detection
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Determine if a '#' scope pattern looks like a CSS selector rather than a UIA Name.
+    /// CSS indicators: starts with '.', contains '[', '>', '~', '+', ':', or is a tag name.
+    /// UIA indicators: contains '*' wildcard, starts with letter and has spaces (natural name).
+    /// </summary>
+    public static bool LooksLikeCssSelector(string? pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern)) return false;
+
+        // First segment only (before any / or # separator)
+        var firstSeg = pattern.Split(['/', '#'], 2)[0].Trim();
+        if (string.IsNullOrEmpty(firstSeg)) return false;
+
+        // Explicit CSS: starts with . or [ or contains CSS combinators
+        if (firstSeg.StartsWith('.') || firstSeg.StartsWith('['))
+            return true;
+        if (firstSeg.Contains('[') || firstSeg.Contains('>') || firstSeg.Contains('~') || firstSeg.Contains('+'))
+            return true;
+        // :pseudo selectors (but not regex: prefix)
+        if (firstSeg.Contains(':') && !firstSeg.StartsWith("regex:"))
+            return true;
+
+        // Explicit UIA: wildcard patterns are UIA names
+        if (firstSeg.Contains('*') || firstSeg.Contains('?'))
+            return false;
+
+        // Tag-like selectors: bare word with no spaces (div, button, input, a, span, etc.)
+        // But only common HTML tags — otherwise default to UIA Name
+        var lower = firstSeg.ToLowerInvariant();
+        var htmlTags = new HashSet<string> {
+            "div", "span", "button", "input", "textarea", "select", "a", "form",
+            "table", "tr", "td", "th", "ul", "ol", "li", "img", "p", "h1", "h2",
+            "h3", "h4", "h5", "h6", "nav", "header", "footer", "section", "article",
+            "label", "fieldset", "legend", "option", "iframe", "body", "html"
+        };
+        if (htmlTags.Contains(lower))
+            return true;
+
+        // Default: treat as UIA Name (backwards compatible)
+        return false;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // Public API: Grap parsing
     // ═══════════════════════════════════════════════════════════════════════
 

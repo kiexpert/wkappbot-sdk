@@ -82,16 +82,19 @@ internal partial class Program
             Console.WriteLine("  a11y invoke \"메모장#파일\"               Click '파일' menu");
             Console.WriteLine("  a11y type \"영웅문#종목코드\" --text \"005930\"");
             Console.WriteLine();
-            Console.WriteLine("═══ Synthesized Full-Path (v2.1) — Web Portal ══════════");
+            Console.WriteLine("═══ Synthesized Full-Path (v3.0) — Unified Web+Native ═══");
             Console.WriteLine("  a11y find  \"Chrome#ChatGPT\"             Tab portal → web tree");
             Console.WriteLine("  a11y invoke \"Chrome#Gemini#기본 메뉴\"    Tab → web button click");
-            Console.WriteLine("  a11y read  \"Claude#email\"               Electron aid match");
-            Console.WriteLine("  a11y select \"Chrome#Gemini\"             Focusless tab switch");
+            Console.WriteLine("  a11y click \"Chrome#button.submit\"       CSS → CDP auto-fallback!");
+            Console.WriteLine("  a11y type  \"Chrome#input[name=q]\" --text \"hello\"  CDP type");
+            Console.WriteLine("  a11y read  \"Claude#.editor\"             Electron + CDP read");
             Console.WriteLine();
-            Console.WriteLine("  grap = synthesized path: Win32 → tab → web element");
-            Console.WriteLine("    메모장                plain text = substring match");
-            Console.WriteLine("    Chrome#ChatGPT#Send   # = UIA scope / tab portal / web a11y");
-            Console.WriteLine("    영웅문/0338#실시간계좌 / = Win32 child, # = UIA scope");
+            Console.WriteLine("  grap = Win32#a11y — unified native + web path");
+            Console.WriteLine("    메모장                 plain text = UIA Name match");
+            Console.WriteLine("    Chrome#ChatGPT#Send    UIA scope / tab portal");
+            Console.WriteLine("    Chrome#button.submit   CSS selector → CDP auto-detect!");
+            Console.WriteLine("    Chrome#[aria-label=X]  CSS attr → CDP");
+            Console.WriteLine("    영웅문/0338#실시간계좌  / = Win32 child, # = UIA scope");
             Console.WriteLine("    */? wildcards · regex: · `;` OR · aid fallback");
             Console.WriteLine();
             Console.WriteLine("─── © 2026 WilKim · github.com/kiexpert/WKAppBot ──────────");
@@ -257,6 +260,25 @@ internal partial class Program
 
             if (isElementAction)
             {
+                // ── WebView CDP detection ──
+                // If window is Chrome/Electron AND # pattern looks like CSS → try CDP first
+                bool isWebView = WKAppBot.WebBot.CdpClient.IsWebViewClass(win.ClassName ?? "");
+                bool isCssPattern = !string.IsNullOrEmpty(uiaPath) && GrapHelper.LooksLikeCssSelector(uiaPath);
+
+                if (isWebView && isCssPattern)
+                {
+                    // WebView CDP path: resolve CSS selector via Chrome DevTools Protocol
+                    var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth);
+                    if (cdpResult != null)
+                    {
+                        success = cdpResult.Value;
+                        if (success) ok++; else fail++;
+                        continue;
+                    }
+                    // CDP failed or unavailable → fall through to UIA
+                    Console.WriteLine($"[A11Y] CDP unavailable, falling through to UIA");
+                }
+
                 AutomationElement root;
                 try { root = automation.FromHandle(hwnd); }
                 catch (Exception ex)
@@ -271,6 +293,18 @@ internal partial class Program
                     var scoped = GrapHelper.FindUiaScope(root, uiaPath);
                     if (scoped == null)
                     {
+                        // WebView UIA fallback: if UIA scope fails on a web view, try CDP
+                        if (isWebView && !isCssPattern)
+                        {
+                            Console.WriteLine($"[A11Y] UIA scope failed on web view, trying CDP with \"{uiaPath}\"");
+                            var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth);
+                            if (cdpResult != null)
+                            {
+                                success = cdpResult.Value;
+                                if (success) ok++; else fail++;
+                                continue;
+                            }
+                        }
                         Console.Error.WriteLine($"[A11Y] UIA scope not found: \"{uiaPath}\" in {tag}");
                         fail++;
                         continue;
@@ -580,5 +614,127 @@ internal partial class Program
         }
         catch { }
         return pids;
+    }
+
+    // ═══ WebView CDP Fallback ═══
+
+    /// <summary>
+    /// Try to perform an a11y action on a web view element via CDP.
+    /// Returns true/false on success/failure, or null if CDP is unavailable.
+    /// </summary>
+    static bool? TryWebViewCdpAction(IntPtr hwnd, string action, string cssSelector,
+        string? text, double? rangeValue, string scrollDir, string scrollAmount, int findDepth)
+    {
+        try
+        {
+            // Detect CDP port from the owning process
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            var port = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)pid);
+            if (port <= 0)
+            {
+                Console.WriteLine($"[A11Y] No CDP port found for PID {pid}");
+                return null; // CDP not available
+            }
+
+            Console.WriteLine($"[A11Y] WebView detected → CDP port={port}, selector=\"{cssSelector}\"");
+
+            using var cdp = new WKAppBot.WebBot.CdpClient();
+            cdp.ConnectAsync(port).GetAwaiter().GetResult();
+
+            // Find the right tab — match by window title
+            var windowTitle = WKAppBot.Win32.Window.WindowFinder.GetWindowText(hwnd);
+            if (!string.IsNullOrEmpty(windowTitle))
+            {
+                var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
+                foreach (var tab in tabs)
+                {
+                    if (tab.Title.Contains(windowTitle, StringComparison.OrdinalIgnoreCase) ||
+                        windowTitle.Contains(tab.Title, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (tab.Id != cdp.TargetId)
+                            cdp.SwitchToTargetAsync(tab.Id, port).GetAwaiter().GetResult();
+                        break;
+                    }
+                }
+            }
+
+            bool result = action switch
+            {
+                "click" or "invoke" => CdpClick(cdp, cssSelector),
+                "type" => CdpType(cdp, cssSelector, text ?? ""),
+                "set-value" => CdpSetValue(cdp, cssSelector, text ?? ""),
+                "read" or "find" => CdpReadElement(cdp, cssSelector),
+                "toggle" => CdpToggle(cdp, cssSelector),
+                "select" => CdpSelect(cdp, cssSelector, text ?? ""),
+                _ => CdpEvalAction(cdp, cssSelector, action)
+            };
+
+            Console.WriteLine($"[A11Y] CDP {action} → {(result ? "OK" : "FAIL")}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[A11Y] CDP fallback error: {ex.Message}");
+            return null; // Fall through to UIA
+        }
+    }
+
+    static bool CdpClick(WKAppBot.WebBot.CdpClient cdp, string selector)
+    {
+        cdp.ClickAsync(selector).GetAwaiter().GetResult();
+        return true;
+    }
+
+    static bool CdpType(WKAppBot.WebBot.CdpClient cdp, string selector, string text)
+    {
+        cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
+        return true;
+    }
+
+    static bool CdpSetValue(WKAppBot.WebBot.CdpClient cdp, string selector, string text)
+    {
+        var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+        var textEscaped = text.Replace("\\", "\\\\").Replace("'", "\\'");
+        cdp.EvalAsync($"(() => {{ var el = document.querySelector('{escaped}'); if(!el) return 'NOT_FOUND'; el.value = '{textEscaped}'; el.dispatchEvent(new Event('input', {{bubbles:true}})); return 'OK'; }})()").GetAwaiter().GetResult();
+        return true;
+    }
+
+    static bool CdpReadElement(WKAppBot.WebBot.CdpClient cdp, string selector)
+    {
+        var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+        var result = cdp.EvalAsync(
+            $"(() => {{ var el = document.querySelector('{escaped}'); if(!el) return 'NOT_FOUND'; " +
+            "return JSON.stringify({ tag: el.tagName, id: el.id, class: el.className, " +
+            "text: (el.textContent||'').substring(0,200), value: el.value||'', " +
+            "type: el.type||'', href: el.href||'', aria: el.getAttribute('aria-label')||'' }); }})()").GetAwaiter().GetResult();
+
+        if (result == "NOT_FOUND")
+        {
+            Console.Error.WriteLine($"[A11Y] CDP element not found: {selector}");
+            return false;
+        }
+        Console.WriteLine($"[A11Y] CDP read: {result}");
+        return true;
+    }
+
+    static bool CdpToggle(WKAppBot.WebBot.CdpClient cdp, string selector)
+    {
+        var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+        cdp.EvalAsync($"(() => {{ var el = document.querySelector('{escaped}'); if(!el) return; el.click(); }})()").GetAwaiter().GetResult();
+        return true;
+    }
+
+    static bool CdpSelect(WKAppBot.WebBot.CdpClient cdp, string selector, string value)
+    {
+        cdp.SelectAsync(selector, value).GetAwaiter().GetResult();
+        return true;
+    }
+
+    static bool CdpEvalAction(WKAppBot.WebBot.CdpClient cdp, string selector, string action)
+    {
+        Console.Error.WriteLine($"[A11Y] CDP action '{action}' not directly supported, trying JS click");
+        var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+        cdp.EvalAsync($"document.querySelector('{escaped}')?.click()").GetAwaiter().GetResult();
+        return true;
     }
 }
