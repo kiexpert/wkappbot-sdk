@@ -25,6 +25,7 @@ internal partial class Program
         var questionParts = new List<string>();
         bool slackReport = false;
         bool newTab = false;
+        bool newSession = false;
         int timeoutSec = 30;
         string? imagePath = null;
         for (int i = 1; i < args.Length; i++)
@@ -33,6 +34,8 @@ internal partial class Program
                 slackReport = true;
             else if (args[i] == "--new-tab")
                 newTab = true;
+            else if (args[i] == "--new-session")
+                newSession = true;
             else if (args[i] == "--timeout" && i + 1 < args.Length)
                 int.TryParse(args[++i], out timeoutSec);
             else if (args[i] == "--image" && i + 1 < args.Length)
@@ -50,8 +53,8 @@ internal partial class Program
 
         return ai switch
         {
-            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, imagePath),
-            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, imagePath),
+            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, imagePath, newSession),
+            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, imagePath, newSession),
             _ => Error($"Unknown AI: {ai} (use gemini or gpt)")
         };
     }
@@ -62,19 +65,21 @@ internal partial class Program
 WKAppBot Ask — one-command AI Q&A via WebBot
 
 Usage:
-  wkappbot ask gemini ""question""  [--slack] [--timeout 30] [--new-tab] [--image path.png]
-  wkappbot ask gpt ""question""     [--slack] [--timeout 30] [--new-tab] [--image path.png]
+  wkappbot ask gemini ""question""  [--slack] [--timeout 30] [--new-tab] [--new-session] [--image path.png]
+  wkappbot ask gpt ""question""     [--slack] [--timeout 30] [--new-tab] [--new-session] [--image path.png]
 
 Options:
-  --slack       Report answer to Slack channel
-  --timeout N   Max seconds to wait for response (default: 30)
-  --new-tab     Open in a new tab (default: reuse existing tab)
-  --image PATH  Attach image file (png/jpg) — pasted into chat before question
+  --slack         Report answer to Slack channel
+  --timeout N     Max seconds to wait for response (default: 30)
+  --new-tab       Open in a new tab (default: reuse existing tab)
+  --new-session   Start fresh conversation in existing tab (navigate to new chat URL)
+  --image PATH    Attach image file (png/jpg) — pasted into chat before question
 
 Examples:
   wkappbot ask gemini ""오늘 코스피 특징주 알려줘""
   wkappbot ask gpt ""이 패턴 분석해줘"" --slack
   wkappbot ask gpt ""이 UI 스크린샷의 요소 분석해줘"" --image screenshot.png
+  wkappbot ask gemini ""새 세션으로 질문"" --new-session
   wkappbot ask gpt ""새 탭으로 테스트"" --new-tab
 ");
         return 1;
@@ -487,7 +492,7 @@ Examples:
 
     // ── Gemini ──
 
-    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, string? imagePath = null)
+    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, string? imagePath = null, bool newSession = false)
     {
         Console.WriteLine($"[ASK] Gemini: {question}");
         using var focusGuard = new CdpFocusGuard();
@@ -509,9 +514,9 @@ Examples:
                 // ── Phase 1: Navigate (iconified OK — CDP works without rendering) ──
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
-                if (!currentUrl.Contains("gemini.google.com"))
+                if (newSession || !currentUrl.Contains("gemini.google.com"))
                 {
-                    Console.WriteLine("[ASK] Navigating to Gemini...");
+                    Console.WriteLine(newSession ? "[ASK] New session — navigating to fresh Gemini..." : "[ASK] Navigating to Gemini...");
                     await cdp.NavigateAsync("https://gemini.google.com/app");
                     await Task.Delay(3000);
                 }
@@ -781,9 +786,12 @@ Examples:
                 await HandoffTabToPeer("gemini");
 
                 // Wait for response — poll until text stabilizes
+                // Live flush: print new text as it arrives during streaming
                 string? lastText = null;
                 int stableCount = 0;
                 int lastTextLen = 0;
+                int lastFlushedLen = 0;
+                bool liveHeaderPrinted = false;
                 var sw = Stopwatch.StartNew();
 
                 int geminiBlankCount = 0;
@@ -819,6 +827,20 @@ Examples:
                     if (string.IsNullOrEmpty(text))
                         continue;
 
+                    // Live flush: print new text delta
+                    if (text.Length > lastFlushedLen)
+                    {
+                        if (!liveHeaderPrinted)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("── Gemini (streaming) ──");
+                            liveHeaderPrinted = true;
+                        }
+                        Console.Write(text.Substring(lastFlushedLen));
+                        Console.Out.Flush();
+                        lastFlushedLen = text.Length;
+                    }
+
                     // Streaming handoff: text growing → this tab is alive, give active tab to peer
                     if (text.Length > lastTextLen && lastTextLen > 0)
                         await HandoffTabToPeer("gemini");
@@ -830,6 +852,7 @@ Examples:
                         stableCount++;
                         if (stableCount >= 2) // stable for 4+ seconds
                         {
+                            if (liveHeaderPrinted) Console.WriteLine(); // newline after streamed text
                             Console.WriteLine($"[ASK] Response received ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
                             return (true, text);
                         }
@@ -940,7 +963,7 @@ Examples:
         "(8) For image analysis: output JSON with {label, text, x, y, w, h} for each UI element. " +
         "(9) Confirm you understood with exactly: READY";
 
-    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, string? imagePath = null)
+    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, string? imagePath = null, bool newSession = false)
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
         using var focusGuard = new CdpFocusGuard();
@@ -962,9 +985,9 @@ Examples:
                 // ── Phase 1: Navigate (iconified OK) ──
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
-                if (!currentUrl.Contains("chatgpt.com"))
+                if (newSession || !currentUrl.Contains("chatgpt.com"))
                 {
-                    Console.WriteLine("[ASK] Navigating to ChatGPT...");
+                    Console.WriteLine(newSession ? "[ASK] New session — navigating to fresh ChatGPT..." : "[ASK] Navigating to ChatGPT...");
                     await cdp.NavigateAsync("https://chatgpt.com");
                     await Task.Delay(3000);
                 }
@@ -1219,8 +1242,30 @@ Examples:
         }
 
         // ── Send: JS click → verify → CDP Enter fallback ──
+        // With image attachments, wait for send button to become enabled
+        if (imagePath != null)
+        {
+            for (int bw = 0; bw < 10; bw++)
+            {
+                var btnState = await cdp.EvalAsync("""
+                    (() => {
+                        var btn = document.querySelector('button[data-testid="send-button"]')
+                               || document.querySelector('button[aria-label*="보내기"]')
+                               || document.querySelector('button[aria-label*="Send"]');
+                        return btn ? (btn.disabled ? 'DISABLED' : 'ENABLED') : 'NOT_FOUND';
+                    })()
+                    """) ?? "NOT_FOUND";
+                if (btnState == "ENABLED") break;
+                Console.WriteLine($"[ASK] Send button: {btnState}, waiting...");
+                await Task.Delay(1000);
+            }
+        }
         await Task.Delay(500);
         var sendResult = "PENDING";
+
+        // Use turn count for send verification when image is attached
+        // (textContent check is unreliable with image attachments)
+        int preSendTurns = await CountChatGptTurns(cdp);
 
         // Tier 1: JS click (works minimized, but React may ignore .click())
         var jsClick = await cdp.EvalAsync("""
@@ -1236,10 +1281,19 @@ Examples:
 
         if (jsClick == "CLICKED")
         {
-            await Task.Delay(500);
-            var remaining = await cdp.EvalAsync(
-                $"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 99") ?? "99";
-            sendResult = remaining == "0" ? "JS_CLICK" : "CLICK_NOOP";
+            await Task.Delay(1000);
+            // Verify send: turn count increase OR editor emptied
+            var postTurns = await CountChatGptTurns(cdp);
+            if (postTurns > preSendTurns)
+            {
+                sendResult = "JS_CLICK";
+            }
+            else
+            {
+                var remaining = await cdp.EvalAsync(
+                    $"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 99") ?? "99";
+                sendResult = remaining == "0" ? "JS_CLICK" : "CLICK_NOOP";
+            }
         }
 
         // Tier 2: UIA Invoke on send button (focusless, works minimized)
@@ -1248,10 +1302,16 @@ Examples:
             Console.WriteLine("[ASK] JS click didn't send, trying UIA invoke...");
             if (TryUiaInvokeSendButton())
             {
-                await Task.Delay(500);
-                var remaining = await cdp.EvalAsync(
-                    $"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 99") ?? "99";
-                sendResult = remaining == "0" ? "UIA_INVOKE" : "UIA_NOOP";
+                await Task.Delay(1000);
+                var postTurns = await CountChatGptTurns(cdp);
+                if (postTurns > preSendTurns)
+                    sendResult = "UIA_INVOKE";
+                else
+                {
+                    var remaining = await cdp.EvalAsync(
+                        $"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 99") ?? "99";
+                    sendResult = remaining == "0" ? "UIA_INVOKE" : "UIA_NOOP";
+                }
             }
         }
 
@@ -1329,42 +1389,78 @@ Examples:
         }
 
         // ── Poll Phase 1: wait for streaming/thinking to finish (iconified — no rendering needed) ──
+        // Live flush: print new text as it arrives during streaming
         int streamExtensions = 0;
         int blankPageCount = 0;
+        int lastFlushedLen = 0;
+        bool liveHeaderPrinted = false;
         sw.Restart();
 
         while (sw.Elapsed.TotalSeconds < timeoutSec)
         {
             await Task.Delay(1500);
 
-            // Lightweight check: is streaming/thinking still active?
-            // Also validates page health and checks if any response text has appeared.
-            var stateJson = await cdp.EvalAsync("""
+            // Combined check: state + streaming text length + delta text for live flush
+            var stateJson = await cdp.EvalAsync($$"""
                 (() => {
                     if (!document.body || !document.body.innerHTML || document.body.innerHTML.length < 100)
-                        return 'BLANK';
+                        return JSON.stringify({s:'BLANK',len:0,delta:''});
                     var stop = document.querySelector('button[data-testid="stop-button"]')
                             || document.querySelector('button[aria-label="Stop streaming"]')
                             || document.querySelector('button[aria-label="스트리밍 중지"]');
                     var thinking = !!document.querySelector('.result-thinking');
                     var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
                     if (msgs.length === 0) msgs = document.querySelectorAll('article');
-                    // textContent (not innerText) — works in background tabs without layout/rendering
-                    var hasText = msgs.length > 0 && (msgs[msgs.length-1].textContent||'').trim().length > 0;
-                    if (!stop && !thinking) return hasText ? 'DONE' : 'DONE_EMPTY';
-                    if (thinking) return hasText ? 'THINKING_HAS_TEXT' : 'THINKING';
-                    return hasText ? 'STREAMING_HAS_TEXT' : 'STREAMING';
+                    var txt = msgs.length > 0 ? (msgs[msgs.length-1].textContent||'').trim() : '';
+                    var hasText = txt.length > 0;
+                    var state;
+                    if (!stop && !thinking) state = hasText ? 'DONE' : 'DONE_EMPTY';
+                    else if (thinking) state = hasText ? 'THINKING_HAS_TEXT' : 'THINKING';
+                    else state = hasText ? 'STREAMING_HAS_TEXT' : 'STREAMING';
+                    var delta = txt.length > {{lastFlushedLen}} ? txt.substring({{lastFlushedLen}}) : '';
+                    return JSON.stringify({s:state,len:txt.length,delta:delta});
                 })()
                 """) ?? "";
 
-            if (stateJson == "DONE" || stateJson == "DONE_EMPTY")
+            // Parse combined response
+            string state = "";
+            int textLen = 0;
+            string delta = "";
+            try
             {
+                var jo = JsonDocument.Parse(stateJson).RootElement;
+                state = jo.GetProperty("s").GetString() ?? "";
+                textLen = jo.GetProperty("len").GetInt32();
+                delta = jo.GetProperty("delta").GetString() ?? "";
+            }
+            catch
+            {
+                state = stateJson; // fallback: treat as plain state string
+            }
+
+            // Live flush: print new text delta
+            if (delta.Length > 0)
+            {
+                if (!liveHeaderPrinted)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("── ChatGPT (streaming) ──");
+                    liveHeaderPrinted = true;
+                }
+                Console.Write(delta);
+                Console.Out.Flush();
+                lastFlushedLen = textLen;
+            }
+
+            if (state == "DONE" || state == "DONE_EMPTY")
+            {
+                if (liveHeaderPrinted) Console.WriteLine(); // newline after streamed text
                 Console.WriteLine($"[ASK] Streaming complete ({sw.Elapsed.TotalSeconds:F0}s)");
                 break;
             }
 
             // Blank/broken page detection — bail out early
-            if (stateJson == "BLANK" || string.IsNullOrEmpty(stateJson))
+            if (state == "BLANK" || string.IsNullOrEmpty(state))
             {
                 blankPageCount++;
                 Console.WriteLine($"[ASK] Page blank/broken ({blankPageCount}/3), {sw.Elapsed.TotalSeconds:F0}s");
@@ -1380,8 +1476,8 @@ Examples:
 
             // First-byte timeout: 20s of streaming with no text → likely stuck
             // Exempt: THINKING state (o3/o4 models can think for 30s+ before first text)
-            bool isThinking = stateJson == "THINKING" || stateJson == "THINKING_HAS_TEXT";
-            bool hasResponseText = stateJson == "STREAMING_HAS_TEXT" || stateJson == "THINKING_HAS_TEXT";
+            bool isThinking = state == "THINKING" || state == "THINKING_HAS_TEXT";
+            bool hasResponseText = state == "STREAMING_HAS_TEXT" || state == "THINKING_HAS_TEXT";
 
             // Streaming handoff: response text appearing → give active tab to peer
             if (hasResponseText)
@@ -1393,7 +1489,9 @@ Examples:
                 break;
             }
 
-            Console.WriteLine($"[ASK] Poll: {(isThinking ? "thinking" : "streaming")}{(hasResponseText ? "+" : "")}, {sw.Elapsed.TotalSeconds:F0}s");
+            // Only print poll status when NOT live-flushing (avoid noise)
+            if (!liveHeaderPrinted)
+                Console.WriteLine($"[ASK] Poll: {(isThinking ? "thinking" : "streaming")}{(hasResponseText ? "+" : "")}, {sw.Elapsed.TotalSeconds:F0}s");
 
             // Extend timeout while actively streaming/thinking (max 1 extension = 2x original timeout)
             if (sw.Elapsed.TotalSeconds > timeoutSec * 0.8 && streamExtensions < 1)
