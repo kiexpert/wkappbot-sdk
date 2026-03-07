@@ -496,14 +496,29 @@ Examples:
                 // Keep trying until editor is empty (= message sent)
                 await Task.Delay(300);
                 var sendResult = "PENDING";
+                // Count model-responses before sending — detect response start as send confirmation
+                var preResponseCount = await cdp.EvalAsync(
+                    "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+
                 for (int sendAttempt = 0; sendAttempt < 5; sendAttempt++)
                 {
-                    // Check if editor still has text
+                    // Check if editor cleared OR response started (= already sent, don't re-send!)
                     var remaining = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 0") ?? "0";
                     if (remaining == "0" && sendAttempt > 0)
                     {
                         sendResult = $"SENT(attempt={sendAttempt})";
-                        break; // editor cleared = message sent!
+                        break;
+                    }
+                    // Response started = message was sent, stop clicking (avoids hitting stop button)
+                    if (sendAttempt > 0)
+                    {
+                        var curResponses = await cdp.EvalAsync(
+                            "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+                        if (curResponses != preResponseCount)
+                        {
+                            sendResult = $"RESPONSE_STARTED(attempt={sendAttempt})";
+                            break;
+                        }
                     }
 
                     // Re-insert text if editor is empty (text didn't stick)
@@ -569,7 +584,8 @@ Examples:
                             }
                             if (responses.length === 0) return '';
                             var last = responses[responses.length - 1];
-                            return last.innerText || last.textContent || '';
+                            // textContent (not innerText) — works in background tabs without layout
+                            return last.textContent || '';
                         })()
                         """);
 
@@ -1044,8 +1060,10 @@ Examples:
                     var thinking = !!document.querySelector('.result-thinking');
                     var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
                     if (msgs.length === 0) msgs = document.querySelectorAll('article');
-                    var hasText = msgs.length > 0 && (msgs[msgs.length-1].innerText||'').trim().length > 0;
+                    // textContent (not innerText) — works in background tabs without layout/rendering
+                    var hasText = msgs.length > 0 && (msgs[msgs.length-1].textContent||'').trim().length > 0;
                     if (!stop && !thinking) return hasText ? 'DONE' : 'DONE_EMPTY';
+                    if (thinking) return hasText ? 'THINKING_HAS_TEXT' : 'THINKING';
                     return hasText ? 'STREAMING_HAS_TEXT' : 'STREAMING';
                 })()
                 """) ?? "";
@@ -1072,15 +1090,16 @@ Examples:
             blankPageCount = 0; // reset on valid response
 
             // First-byte timeout: 20s of streaming with no text → likely stuck
-            // (thinking models like o3 need 10-15s before first text appears)
-            bool hasResponseText = stateJson == "STREAMING_HAS_TEXT";
-            if (!hasResponseText && sw.Elapsed.TotalSeconds >= 20)
+            // Exempt: THINKING state (o3/o4 models can think for 30s+ before first text)
+            bool isThinking = stateJson == "THINKING" || stateJson == "THINKING_HAS_TEXT";
+            bool hasResponseText = stateJson == "STREAMING_HAS_TEXT" || stateJson == "THINKING_HAS_TEXT";
+            if (!hasResponseText && !isThinking && sw.Elapsed.TotalSeconds >= 20)
             {
                 Console.WriteLine("[ASK] No response text after 20s — aborting (first-byte timeout)");
                 break;
             }
 
-            Console.WriteLine($"[ASK] Poll: streaming{(hasResponseText ? "+" : "")}, {sw.Elapsed.TotalSeconds:F0}s");
+            Console.WriteLine($"[ASK] Poll: {(isThinking ? "thinking" : "streaming")}{(hasResponseText ? "+" : "")}, {sw.Elapsed.TotalSeconds:F0}s");
 
             // Extend timeout while actively streaming/thinking (max 1 extension = 2x original timeout)
             if (sw.Elapsed.TotalSeconds > timeoutSec * 0.8 && streamExtensions < 1)
@@ -1091,7 +1110,16 @@ Examples:
             }
         }
 
-        // ── Poll Phase 2: text extraction (CDP works iconic — DOM queries don't need rendering) ──
+        // ── Poll Phase 2: text extraction ──
+        // BringToFront so innerText (which needs layout) works properly
+        try
+        {
+            var prevFg2 = NativeMethods.GetForegroundWindow();
+            await cdp.BringToFrontAsync();
+            if (prevFg2 != IntPtr.Zero) NativeMethods.SetForegroundWindow(prevFg2);
+        }
+        catch { }
+        await Task.Delay(300); // let React hydrate after tab activation
 
         // Scroll into view + hydrate + extract
         string? finalText = null;
