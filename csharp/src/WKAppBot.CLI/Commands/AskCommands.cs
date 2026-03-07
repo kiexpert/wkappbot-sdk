@@ -661,7 +661,46 @@ Examples:
                     Console.WriteLine($"[ASK] Timeout — partial response ({lastText.Length} chars)");
                     return (true, lastText);
                 }
-                Console.WriteLine("[ASK] Timeout — no response");
+                Console.WriteLine("[ASK] Timeout — no response, retrying once...");
+
+                // Retry: same page, re-insert and send (no reload, keeps session)
+                await Task.Delay(1000);
+                await ClearContentEditable(cdp, editorSel);
+                await InsertTextContentEditable(cdp, editorSel, question);
+                await Task.Delay(300);
+                await cdp.EvalAsync("""
+                    (() => {
+                        var btn = document.querySelector('button[aria-label="메시지 보내기"]')
+                               || document.querySelector('button[aria-label="Send message"]')
+                               || document.querySelector('button.send-button');
+                        if (btn && !btn.disabled) btn.click();
+                    })()
+                    """);
+                Console.WriteLine("[ASK] Retry: sent question");
+
+                // Poll retry (shorter timeout)
+                var retrySw = Stopwatch.StartNew();
+                string? retryText = null;
+                while (retrySw.Elapsed.TotalSeconds < 30)
+                {
+                    await Task.Delay(2000);
+                    var text = await cdp.EvalAsync(
+                        "(() => {" +
+                        "var r = document.querySelectorAll('model-response');" +
+                        "if (r.length === 0) { var a = document.querySelectorAll('[role=\"article\"]'); r = a.length > 0 ? a : r; }" +
+                        "if (r.length === 0) return '';" +
+                        "return r[r.length-1].textContent || '';" +
+                        "})()") ?? "";
+                    if (string.IsNullOrEmpty(text)) continue;
+                    if (text == retryText) { Console.WriteLine($"[ASK] Retry: response ({text.Length} chars)"); return (true, text); }
+                    retryText = text;
+                }
+                if (!string.IsNullOrEmpty(retryText))
+                {
+                    Console.WriteLine($"[ASK] Retry: partial ({retryText.Length} chars)");
+                    return (true, retryText);
+                }
+                Console.WriteLine("[ASK] Retry: also failed");
                 return (false, (string?)null);
             }
             catch (Exception ex)
