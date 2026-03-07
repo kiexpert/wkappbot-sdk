@@ -743,12 +743,16 @@ Examples:
                 (() => {
                     var imgs = document.querySelectorAll("{{selectorBase}}");
                     var result = [];
+                    var allImgs = document.querySelectorAll('img');
                     for (var img of imgs) {
                         var src = img.src || img.getAttribute('src') || '';
                         if (!src || src.startsWith('data:image/svg')) continue;
                         // Skip tiny icons/avatars (< 50px)
                         if (img.naturalWidth > 0 && img.naturalWidth < 50) continue;
-                        result.push({src: src, w: img.naturalWidth || 0, h: img.naturalHeight || 0});
+                        // Find global index for reliable re-lookup
+                        var idx = -1;
+                        for (var j = 0; j < allImgs.length; j++) { if (allImgs[j] === img) { idx = j; break; } }
+                        result.push({src: src, w: img.naturalWidth || 0, h: img.naturalHeight || 0, idx: idx});
                     }
                     return JSON.stringify(result);
                 })()
@@ -758,6 +762,7 @@ Examples:
             foreach (var img in imgs.EnumerateArray())
             {
                 var src = img.GetProperty("src").GetString() ?? "";
+                var imgIdx = img.TryGetProperty("idx", out var idxEl) ? idxEl.GetInt32() : -1;
                 if (string.IsNullOrEmpty(src) || knownImageUrls.Contains(src)) continue;
                 knownImageUrls.Add(src);
 
@@ -776,40 +781,91 @@ Examples:
                 try
                 {
                     byte[]? bytes = null;
-
-                    if (src.StartsWith("data:"))
+                    // Use global index for reliable re-lookup (avoids URL matching issues)
+                    string findImgJs;
+                    if (imgIdx >= 0)
                     {
-                        // data: URL — extract base64 directly
+                        findImgJs = $"document.querySelectorAll('img')[{imgIdx}]";
+                    }
+                    else
+                    {
+                        var srcSnippet = src.Replace("'", "\\'");
+                        if (srcSnippet.Length > 60) srcSnippet = srcSnippet.Substring(0, 60);
+                        findImgJs = $"Array.from(document.querySelectorAll('img')).find(i => i.src.includes('{srcSnippet}'))";
+                    }
+
+                    // ── Tier 1: Canvas rendering — reload with crossOrigin to avoid taint ──
+                    var canvasB64 = await cdp.EvalAsync($$"""
+                        (async () => {
+                            try {
+                                var origImg = {{findImgJs}};
+                                if (!origImg) return 'ERR:no_img';
+                                // Try direct canvas first (same-origin images)
+                                try {
+                                    if (origImg.complete && origImg.naturalWidth > 0) {
+                                        var c = document.createElement('canvas');
+                                        c.width = origImg.naturalWidth; c.height = origImg.naturalHeight;
+                                        c.getContext('2d').drawImage(origImg, 0, 0);
+                                        var d = c.toDataURL('image/png');
+                                        return d.substring(d.indexOf(',') + 1);
+                                    }
+                                } catch(e) { /* tainted — fall through to crossOrigin reload */ }
+                                // Reload with crossOrigin='anonymous' to avoid taint
+                                var src = origImg.src;
+                                if (!src.startsWith('data:') && !src.startsWith('blob:')) {
+                                    var newImg = new Image();
+                                    newImg.crossOrigin = 'anonymous';
+                                    var loaded = await new Promise((resolve) => {
+                                        newImg.onload = () => resolve(true);
+                                        newImg.onerror = () => resolve(false);
+                                        setTimeout(() => resolve(false), 5000);
+                                        newImg.src = src;
+                                    });
+                                    if (loaded && newImg.naturalWidth > 0) {
+                                        var c = document.createElement('canvas');
+                                        c.width = newImg.naturalWidth; c.height = newImg.naturalHeight;
+                                        c.getContext('2d').drawImage(newImg, 0, 0);
+                                        var d = c.toDataURL('image/png');
+                                        return d.substring(d.indexOf(',') + 1);
+                                    }
+                                }
+                                // data: or blob: direct canvas with wait
+                                if (!origImg.complete) await new Promise(r => { origImg.onload = r; setTimeout(r, 3000); });
+                                if (!origImg.naturalWidth) return 'ERR:no_natural';
+                                var c2 = document.createElement('canvas');
+                                c2.width = origImg.naturalWidth; c2.height = origImg.naturalHeight;
+                                c2.getContext('2d').drawImage(origImg, 0, 0);
+                                var d2 = c2.toDataURL('image/png');
+                                return d2.substring(d2.indexOf(',') + 1);
+                            } catch(e) { return 'ERR:' + e.message; }
+                        })()
+                        """, awaitPromise: true) ?? "ERR:null";
+                    if (!canvasB64.StartsWith("ERR:") && canvasB64.Length > 100)
+                    {
+                        bytes = Convert.FromBase64String(canvasB64);
+                        Console.WriteLine($"[ASK] Image captured via canvas ({w}x{h})");
+                    }
+                    else if (canvasB64.StartsWith("ERR:"))
+                    {
+                        Console.WriteLine($"[ASK] Canvas failed: {canvasB64}");
+                    }
+
+                    // ── Tier 2: data: URL direct extract ──
+                    if (bytes == null && src.StartsWith("data:"))
+                    {
                         var commaIdx = src.IndexOf(',');
                         if (commaIdx > 0)
                             bytes = Convert.FromBase64String(src.Substring(commaIdx + 1));
                     }
-                    else if (src.StartsWith("blob:"))
+
+                    // ── Tier 3: fetch with credentials (https: URLs) ──
+                    if (bytes == null && src.StartsWith("http"))
                     {
-                        // blob: URL — must fetch inside page context → canvas
-                        var b64 = await cdp.EvalAsync($$"""
+                        var fetchSrcEsc = src.Replace("\\", "\\\\").Replace("'", "\\'");
+                        var fetchB64 = await cdp.EvalAsync($$"""
                             (async () => {
                                 try {
-                                    var img = document.querySelector('img[src="{{src.Replace("\"", "\\\"")}}"]');
-                                    if (!img || !img.naturalWidth) return 'ERR:no_img';
-                                    var c = document.createElement('canvas');
-                                    c.width = img.naturalWidth; c.height = img.naturalHeight;
-                                    c.getContext('2d').drawImage(img, 0, 0);
-                                    var d = c.toDataURL('image/png');
-                                    return d.substring(d.indexOf(',') + 1);
-                                } catch(e) { return 'ERR:' + e.message; }
-                            })()
-                            """) ?? "ERR:null";
-                        if (!b64.StartsWith("ERR:"))
-                            bytes = Convert.FromBase64String(b64);
-                    }
-                    else
-                    {
-                        // https: URL — try fetch with cookies, then screenshot fallback
-                        var b64 = await cdp.EvalAsync($$"""
-                            (async () => {
-                                try {
-                                    var resp = await fetch('{{src.Replace("'", "\\'")}}', {credentials: 'include'});
+                                    var resp = await fetch('{{fetchSrcEsc}}', {credentials: 'include'});
                                     if (!resp.ok) return 'ERR:' + resp.status;
                                     var blob = await resp.blob();
                                     if (blob.size < 100) return 'ERR:empty';
@@ -824,58 +880,71 @@ Examples:
                                     });
                                 } catch(e) { return 'ERR:' + e.message; }
                             })()
-                            """) ?? "ERR:null";
-                        if (!b64.StartsWith("ERR:") && b64.Length > 100)
+                            """, awaitPromise: true) ?? "ERR:null";
+                        if (!fetchB64.StartsWith("ERR:") && fetchB64.Length > 100)
+                            bytes = Convert.FromBase64String(fetchB64);
+                    }
+
+                    // ── Tier 4: CDP Page.captureScreenshot with proper timing ──
+                    if (bytes == null)
+                    {
+                        try
                         {
-                            bytes = Convert.FromBase64String(b64);
-                        }
-                        else
-                        {
-                            // Fallback: screenshot the <img> element via CDP clip capture
+                            // Bring tab to front for accurate screenshot (ignore errors)
+                            try { await cdp.SendAsync("Page.bringToFront"); } catch { }
+
+                            // Scroll image into view, wait 2 frames for reflow, measure rect
                             var rectJson = await cdp.EvalAsync($$"""
-                                (() => {
-                                    var img = document.querySelector('img[src="{{src.Replace("\"", "\\\"")}}"]');
+                                (async () => {
+                                    var img = {{findImgJs}};
                                     if (!img) return '';
-                                    img.scrollIntoView({block:'center',behavior:'instant'});
+                                    img.scrollIntoView({block:'center', behavior:'instant'});
+                                    // Wait 2 animation frames for scroll + reflow
+                                    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
                                     var r = img.getBoundingClientRect();
-                                    return JSON.stringify({x:r.x,y:r.y,w:r.width,h:r.height});
+                                    var dpr = window.devicePixelRatio || 1;
+                                    if (r.width < 10 || r.height < 10) return '';
+                                    // Clamp to viewport
+                                    var x = Math.max(0, r.x), y = Math.max(0, r.y);
+                                    var w = Math.min(r.width, window.innerWidth - x);
+                                    var h = Math.min(r.height, window.innerHeight - y);
+                                    if (w < 10 || h < 10) return '';
+                                    return JSON.stringify({x:x, y:y, w:w, h:h, dpr:dpr});
                                 })()
-                                """) ?? "";
+                                """, awaitPromise: true) ?? "";
                             if (!string.IsNullOrEmpty(rectJson))
                             {
-                                try
+                                var rect = JsonDocument.Parse(rectJson).RootElement;
+                                var rx = rect.GetProperty("x").GetDouble();
+                                var ry = rect.GetProperty("y").GetDouble();
+                                var rw = rect.GetProperty("w").GetDouble();
+                                var rh = rect.GetProperty("h").GetDouble();
+                                var dpr = rect.TryGetProperty("dpr", out var dprEl) ? dprEl.GetDouble() : 1.0;
+
+                                Console.WriteLine($"[ASK] Screenshot clip: x={rx:F0} y={ry:F0} w={rw:F0} h={rh:F0} dpr={dpr}");
+                                var ssResult = await cdp.SendAsync("Page.captureScreenshot", new JsonObject
                                 {
-                                    var rect = JsonDocument.Parse(rectJson).RootElement;
-                                    var rx = rect.GetProperty("x").GetDouble();
-                                    var ry = rect.GetProperty("y").GetDouble();
-                                    var rw = rect.GetProperty("w").GetDouble();
-                                    var rh = rect.GetProperty("h").GetDouble();
-                                    if (rw > 10 && rh > 10)
+                                    ["format"] = "png",
+                                    ["clip"] = new JsonObject
                                     {
-                                        var ssResult = await cdp.SendAsync("Page.captureScreenshot", new JsonObject
-                                        {
-                                            ["format"] = "png",
-                                            ["clip"] = new JsonObject
-                                            {
-                                                ["x"] = rx, ["y"] = ry,
-                                                ["width"] = rw, ["height"] = rh,
-                                                ["scale"] = 1
-                                            }
-                                        });
-                                        var ssB64 = ssResult?["data"]?.ToString();
-                                        if (!string.IsNullOrEmpty(ssB64))
-                                        {
-                                            bytes = Convert.FromBase64String(ssB64);
-                                            w = (int)rw; h = (int)rh;
-                                            Console.WriteLine($"[ASK] Image captured via screenshot ({rw:F0}x{rh:F0})");
-                                        }
+                                        ["x"] = rx, ["y"] = ry,
+                                        ["width"] = rw, ["height"] = rh,
+                                        ["scale"] = 1
                                     }
-                                }
-                                catch (Exception ssEx)
+                                });
+                                var ssB64 = (ssResult as System.Text.Json.Nodes.JsonObject)?["data"]?.GetValue<string>();
+                                if (!string.IsNullOrEmpty(ssB64))
                                 {
-                                    Console.WriteLine($"[ASK] Screenshot fallback failed: {ssEx.Message}");
+                                    bytes = Convert.FromBase64String(ssB64);
+                                    w = (int)(rw * dpr); h = (int)(rh * dpr);
+                                    Console.WriteLine($"[ASK] Image captured via screenshot ({w}x{h}, dpr={dpr:F1})");
                                 }
                             }
+                        }
+                        catch (Exception ssEx)
+                        {
+                            Console.WriteLine($"[ASK] Screenshot fallback failed: {ssEx.GetType().Name}: {ssEx.Message}");
+                            Console.WriteLine($"[ASK] Screenshot stack: {ssEx.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
                         }
                     }
 
@@ -1392,7 +1461,8 @@ Examples:
         "(6) Keep answers under 150 words unless the question demands more. " +
         "(7) No blank lines between paragraphs — keep output compact and dense, single-spaced. " +
         "(8) For image analysis: output JSON with {label, text, x, y, w, h} for each UI element. " +
-        "(9) Confirm you understood with exactly: READY";
+        "(9) If asked to generate/create/draw an image, USE your image generation tool (DALL-E/Imagen). Do NOT make ASCII art. " +
+        "(10) Confirm you understood with exactly: READY";
 
     static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false)
     {
@@ -1838,12 +1908,23 @@ Examples:
                             || document.querySelector('button[aria-label="Stop streaming"]')
                             || document.querySelector('button[aria-label="스트리밍 중지"]');
                     var thinking = !!document.querySelector('.result-thinking');
+                    // Detect DALL-E image generation in progress (spinner/progress within assistant message)
+                    var lastAssist = document.querySelector('[data-message-author-role="assistant"]:last-of-type')
+                                  || document.querySelector('article:last-of-type');
+                    var imgGen = lastAssist && (
+                        !!lastAssist.querySelector('[role="progressbar"]')
+                        || !!lastAssist.querySelector('.animate-spin')
+                        || !!lastAssist.querySelector('svg.animate-spin')
+                        || !!lastAssist.querySelector('[data-testid="image-gen-progress"]')
+                        || !!(lastAssist.textContent||'').match(/(?:이미지|image|사진|그림|생성|creating|generating)/i)
+                    );
                     var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
                     if (msgs.length === 0) msgs = document.querySelectorAll('article');
                     var txt = msgs.length > 0 ? (msgs[msgs.length-1].textContent||'').trim() : '';
                     var hasText = txt.length > 0;
                     var state;
-                    if (!stop && !thinking) state = hasText ? 'DONE' : 'DONE_EMPTY';
+                    if (!stop && !thinking && !imgGen) state = hasText ? 'DONE' : 'DONE_EMPTY';
+                    else if (imgGen) state = 'IMG_GEN';
                     else if (thinking) state = hasText ? 'THINKING_HAS_TEXT' : 'THINKING';
                     else state = hasText ? 'STREAMING_HAS_TEXT' : 'STREAMING';
                     var delta = txt.length > {{lastFlushedLen}} ? txt.substring({{lastFlushedLen}}) : '';
@@ -1885,11 +1966,25 @@ Examples:
             var newImages = await DetectAndDownloadImages(cdp, knownImageUrls, "gpt");
             savedImages.AddRange(newImages);
 
+            // Image generation in progress — keep waiting (up to 90s for DALL-E)
+            if (state == "IMG_GEN")
+            {
+                if (!liveHeaderPrinted)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("── ChatGPT (streaming) ──");
+                    liveHeaderPrinted = true;
+                }
+                Console.Write(".");
+                Console.Out.Flush();
+                continue;
+            }
+
             if (state == "DONE" || state == "DONE_EMPTY")
             {
                 // If very little text and early in stream, wait a bit more
                 // (ChatGPT shows "이미지 분석 중" then goes idle briefly before actual response)
-                if (textLen < 50 && sw.Elapsed.TotalSeconds < 30)
+                if (textLen < 50 && sw.Elapsed.TotalSeconds < 60)
                 {
                     if (textLen > 0) Console.Write(".");
                     Console.Out.Flush();

@@ -609,13 +609,43 @@ Options:
     static int WebEvalCommand(string[] args)
     {
         if (args.Length == 0)
-            return Error("Usage: wkappbot web eval <expression> [--port N] [--tab <pattern>]");
+            return Error("Usage: wkappbot web eval [tab-pattern] <expression> [--port N] [--tab <pattern>]");
 
         int port = GetPort(args);
-        // Join all non-flag args as the expression (skip --port N and --tab N)
-        var expression = string.Join(" ", args.TakeWhile(a => a != "--port" && a != "--tab"));
+        var tabArg = GetArgValue(args, "--tab");
 
-        var cdpOrNull = ConnectCdpWithTab(args);
+        // Collect non-flag args (skip --port N, --tab N)
+        var nonFlagArgs = new List<string>();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--port" || args[i] == "--tab") { i++; continue; }
+            if (args[i].StartsWith("--")) continue;
+            nonFlagArgs.Add(args[i]);
+        }
+
+        // If 2+ non-flag args and first doesn't look like JS, treat it as tab pattern
+        string expression;
+        if (nonFlagArgs.Count >= 2 && tabArg == null
+            && !nonFlagArgs[0].Contains("(") && !nonFlagArgs[0].Contains(".")
+            && !nonFlagArgs[0].Contains("=") && !nonFlagArgs[0].Contains("["))
+        {
+            tabArg = nonFlagArgs[0];
+            expression = string.Join(" ", nonFlagArgs.Skip(1));
+        }
+        else
+        {
+            expression = string.Join(" ", nonFlagArgs);
+        }
+
+        // Build effective args with --tab if auto-detected
+        var effectiveArgs = new List<string>(args);
+        if (tabArg != null && !args.Contains("--tab"))
+        {
+            effectiveArgs.Add("--tab");
+            effectiveArgs.Add(tabArg);
+        }
+
+        var cdpOrNull = ConnectCdpWithTab(effectiveArgs.ToArray());
         if (cdpOrNull == null) return 1;
         using var cdp = cdpOrNull;
 
