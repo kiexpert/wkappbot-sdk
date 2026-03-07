@@ -186,7 +186,7 @@ internal partial class Program
                 if (seen.Add(w.Handle))
                     allWindows.Add(w);
 
-        if (!forceCloseAncestors)
+        if (action == "close" && !forceCloseAncestors)
         {
             var selfPids = GetSelfAndAncestorPids();
             allWindows.RemoveAll(w =>
@@ -284,14 +284,12 @@ internal partial class Program
 
             if (isElementAction)
             {
-                // ── WebView CDP detection ──
-                // If window is Chrome/Electron AND # pattern looks like CSS → try CDP first
-                bool isWebView = WKAppBot.WebBot.CdpClient.IsWebViewClass(win.ClassName ?? "");
+                // ── CDP Telepathy: if CSS pattern, try CDP first on ANY browser ──
                 bool isCssPattern = !string.IsNullOrEmpty(uiaPath) && GrapHelper.LooksLikeCssSelector(uiaPath);
 
-                if (isWebView && isCssPattern)
+                if (isCssPattern)
                 {
-                    // WebView CDP path: resolve CSS selector via Chrome DevTools Protocol
+                    // Telepathy: try CDP on any process that has a debugging port
                     var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth);
                     if (cdpResult != null)
                     {
@@ -299,8 +297,8 @@ internal partial class Program
                         if (success) ok++; else fail++;
                         continue;
                     }
-                    // CDP failed or unavailable → fall through to UIA
-                    Console.WriteLine($"[A11Y] CDP unavailable, falling through to UIA");
+                    // CDP not available → fall through to UIA (knock on the door)
+                    Console.WriteLine($"[A11Y] No CDP — falling through to UIA");
                 }
 
                 AutomationElement root;
@@ -317,10 +315,10 @@ internal partial class Program
                     var scoped = GrapHelper.FindUiaScope(root, uiaPath);
                     if (scoped == null)
                     {
-                        // WebView UIA fallback: if UIA scope fails on a web view, try CDP
-                        if (isWebView && !isCssPattern)
+                        // UIA failed → try CDP telepathy as fallback (any browser with CDP port)
+                        if (!isCssPattern && !string.IsNullOrEmpty(uiaPath))
                         {
-                            Console.WriteLine($"[A11Y] UIA scope failed on web view, trying CDP with \"{uiaPath}\"");
+                            Console.WriteLine($"[A11Y] UIA scope failed, trying CDP telepathy with \"{uiaPath}\"");
                             var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth);
                             if (cdpResult != null)
                             {
@@ -660,7 +658,7 @@ internal partial class Program
                 return null; // CDP not available
             }
 
-            Console.WriteLine($"[A11Y] WebView detected → CDP port={port}, selector=\"{cssSelector}\"");
+            Console.WriteLine($"[A11Y] Telepathy! CDP port={port}, selector=\"{cssSelector}\"");
 
             using var cdp = new WKAppBot.WebBot.CdpClient();
             cdp.ConnectAsync(port).GetAwaiter().GetResult();
