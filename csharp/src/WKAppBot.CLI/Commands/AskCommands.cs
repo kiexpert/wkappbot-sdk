@@ -330,13 +330,15 @@ Examples:
                 // ── Phase 1: Navigate (iconified OK — CDP works without rendering) ──
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
-                bool isOldGeminiConversation = currentUrl.Contains("gemini.google.com/app/")
-                    && currentUrl.Length > "https://gemini.google.com/app/".Length;
-                if (!currentUrl.Contains("gemini.google.com") || isOldGeminiConversation)
+                if (!currentUrl.Contains("gemini.google.com"))
                 {
                     Console.WriteLine("[ASK] Navigating to Gemini...");
                     await cdp.NavigateAsync("https://gemini.google.com/app");
                     await Task.Delay(3000);
+                }
+                else
+                {
+                    Console.WriteLine($"[ASK] Reusing Gemini session");
                 }
 
                 // Activate tab (no lock needed — just internal tab switch)
@@ -805,19 +807,9 @@ Examples:
                     """) ?? "0";
                 int existingTurns = int.TryParse(turnCountStr, out var etc) ? etc : 0;
 
-                // Auto-rotate: stale conversations have virtualized DOM → empty text.
-                // Also avoids ChatGPT switching to "thinking" models on long conversations.
-                if (existingTurns >= 5)
-                {
-                    Console.WriteLine($"[ASK] Conversation has {existingTurns} turns, rotating to fresh...");
-                    await cdp.NavigateAsync("https://chatgpt.com");
-                    await Task.Delay(3000);
-                    existingTurns = 0;
-                    // Re-acquire editor after navigation
-                    editorSel = await WaitForChatGptEditorA11y(cdp);
-                    if (editorSel == null)
-                        return (false, (string?)null);
-                }
+                // Reuse existing session — only inject persona on fresh (0 turns) conversations
+                if (existingTurns > 0)
+                    Console.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
 
                 if (existingTurns == 0)
                 {
