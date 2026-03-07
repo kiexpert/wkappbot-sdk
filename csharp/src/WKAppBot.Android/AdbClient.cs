@@ -148,6 +148,16 @@ public class AdbClient
     public AdbResult ForceStop(string package, string? serial = null)
         => Shell($"am force-stop {package}", serial);
 
+    public AdbResult LongPress(int x, int y, int durationMs = 1000, string? serial = null)
+        => Shell($"input swipe {x} {y} {x} {y} {durationMs}", serial);
+
+    public AdbResult Back(string? serial = null) => KeyEvent("4", serial);
+    public AdbResult Home(string? serial = null) => KeyEvent("3", serial);
+    public AdbResult RecentApps(string? serial = null) => KeyEvent("187", serial);
+
+    public AdbResult StartApp(string package, string? serial = null)
+        => Shell($"monkey -p {package} -c android.intent.category.LAUNCHER 1", serial);
+
     public string? GetCurrentActivity(string? serial = null)
     {
         var r = Shell("dumpsys window | grep mCurrentFocus", serial);

@@ -6,6 +6,13 @@ namespace WKAppBot.CLI;
 /// Android ADB dispatch for a11y commands.
 /// Handles adb:// grap patterns — routes to ADB instead of Win32/UIA.
 /// Experience DB integration: inspect/actions save to A11Y + OS paths.
+///
+/// Supported actions (26):
+///   Discovery: inspect, find, windows, screenshot, ocr
+///   Window: close, minimize, maximize, restore, focus, move, resize
+///   Element: read, highlight, invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range
+///   Async: wait, eval
+///   Android-specific: back, home, recent, long-press
 /// </summary>
 internal partial class Program
 {
@@ -59,15 +66,41 @@ internal partial class Program
         // ── Dispatch by action ────────────────────────────
         return action switch
         {
+            // Discovery
             "windows"    => AdbWindows(adb, registry),
             "inspect"    => AdbInspect(adb, serial, grap, args),
-            "find"       => AdbInspect(adb, serial, grap, args), // find = inspect for Android
+            "find"       => AdbInspect(adb, serial, grap, args),
             "screenshot" => AdbScreenshot(adb, serial, displayId, args),
+            "ocr"        => AdbOcr(adb, serial, displayId, args),
+            // Window
+            "close"      => AdbClose(adb, serial, grap),
+            "minimize"   => AdbKeyAction(adb, serial, "HOME", "minimize", () => adb.Home(serial)),
+            "maximize"   => AdbWindowStub("maximize"),
+            "restore"    => AdbKeyAction(adb, serial, "RECENT→select", "restore", () => adb.RecentApps(serial)),
+            "move"       => AdbWindowStub("move"),
+            "resize"     => AdbWindowStub("resize"),
+            // Element
             "click"      => AdbClick(adb, serial, grap),
+            "invoke"     => AdbClick(adb, serial, grap), // invoke = click alias
             "read"       => AdbRead(adb, serial, grap),
+            "highlight"  => AdbHighlight(adb, serial, grap),
+            "toggle"     => AdbToggle(adb, serial, grap),
+            "expand"     => AdbExpandCollapse(adb, serial, grap, expand: true),
+            "collapse"   => AdbExpandCollapse(adb, serial, grap, expand: false),
+            "select"     => AdbSelect(adb, serial, grap, args),
             "scroll"     => AdbScroll(adb, serial, grap, args),
             "type"       => AdbType(adb, serial, grap, args),
-            "close"      => AdbClose(adb, serial, grap),
+            "set-value"  => AdbSetValue(adb, serial, grap, args),
+            "set-range"  => AdbSetRange(adb, serial, grap, args),
+            "focus"      => AdbFocus(adb, serial, grap),
+            // Async
+            "wait"       => AdbWait(adb, serial, grap, args),
+            "eval"       => AdbEval(adb, serial, args),
+            // Android-specific
+            "back"       => AdbKeyAction(adb, serial, "BACK", "back", () => adb.Back(serial)),
+            "home"       => AdbKeyAction(adb, serial, "HOME", "home", () => adb.Home(serial)),
+            "recent"     => AdbKeyAction(adb, serial, "RECENT", "recent", () => adb.RecentApps(serial)),
+            "long-press" => AdbLongPress(adb, serial, grap, args),
             _ => AdbUnsupported(action)
         };
     }
@@ -211,6 +244,35 @@ internal partial class Program
         return 1;
     }
 
+    // ── OCR (screencap + local SimpleOcr) ─────────────────
+
+    static int AdbOcr(AdbClient adb, string serial, string? displayId, string[] args)
+    {
+        var imgPath = Path.Combine(DataDir, "output", "android_ocr_temp.png");
+        Console.Write("[ADB] Capturing for OCR... ");
+        if (!adb.Screencap(imgPath, serial, displayId))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("FAILED (screencap)");
+            Console.ResetColor();
+            return 1;
+        }
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("OK");
+        Console.ResetColor();
+
+        // Delegate to existing OCR command with the captured image
+        var ocrArgs = new List<string> { imgPath };
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--save" || args[i] == "-o")
+                ocrArgs.Add(args[i]);
+            if ((args[i] == "-o") && i + 1 < args.Length)
+                ocrArgs.Add(args[++i]);
+        }
+        return OcrCommand(ocrArgs.ToArray());
+    }
+
     // ── Click ─────────────────────────────────────────────
 
     static int AdbClick(AdbClient adb, string serial, AdbGrapInfo grap)
@@ -250,6 +312,161 @@ internal partial class Program
         Console.WriteLine($"  enabled:      {node.Enabled}  selected: {node.Selected}");
         Console.WriteLine($"  children:     {node.Children.Count}");
         return 0;
+    }
+
+    // ── Highlight (print bounds info for AI/MCP) ──────────
+
+    static int AdbHighlight(AdbClient adb, string serial, AdbGrapInfo grap)
+    {
+        var node = ResolveAdbTarget(adb, serial, grap);
+        if (node == null) return 1;
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[ADB] Highlight: {node.SearchKey}");
+        Console.ResetColor();
+        Console.WriteLine($"  bounds: {node.BoundsString}");
+        Console.WriteLine($"  center: ({node.CenterX},{node.CenterY})");
+        Console.WriteLine($"  size:   {node.Width}x{node.Height}");
+
+        // Also show siblings for context
+        if (node.Parent != null)
+        {
+            var siblings = node.Parent.Children.Where(c => c != node).Take(5).ToList();
+            if (siblings.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"  siblings ({node.Parent.Children.Count - 1}):");
+                foreach (var s in siblings)
+                    Console.WriteLine($"    [{s.ClassName}] {s.DisplayName} {s.BoundsString}");
+                Console.ResetColor();
+            }
+        }
+        return 0;
+    }
+
+    // ── Toggle (tap + verify checked state) ───────────────
+
+    static int AdbToggle(AdbClient adb, string serial, AdbGrapInfo grap)
+    {
+        var node = ResolveAdbTarget(adb, serial, grap);
+        if (node == null) return 1;
+
+        var beforeChecked = node.Checked;
+        Console.Write($"[ADB] Toggle ({(beforeChecked ? "ON→OFF" : "OFF→ON")}) {node.DisplayName}... ");
+
+        var r = adb.Tap(node.CenterX, node.CenterY, serial);
+        if (!r.IsOk)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"FAILED: {r.StdErr}");
+            Console.ResetColor();
+            LogAdbAction("toggle", node, grap, serial, false, r.StdErr);
+            return 1;
+        }
+
+        // Re-dump and verify state change
+        Thread.Sleep(500);
+        var tree = new AndroidA11yTree(adb);
+        var root = tree.GetRoot(serial, forceRefresh: true);
+        var afterNode = root != null ? ReResolveNode(tree, root, grap) : null;
+
+        if (afterNode != null && afterNode.Checked != beforeChecked)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"OK (checked={afterNode.Checked})");
+            Console.ResetColor();
+            LogAdbAction("toggle", node, grap, serial, true, $"checked: {beforeChecked}→{afterNode.Checked}");
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("OK (tap sent, state unverified)");
+            Console.ResetColor();
+            LogAdbAction("toggle", node, grap, serial, true, "state unverified");
+        }
+        return 0;
+    }
+
+    // ── Expand / Collapse (tap + verify subtree change) ───
+
+    static int AdbExpandCollapse(AdbClient adb, string serial, AdbGrapInfo grap, bool expand)
+    {
+        var node = ResolveAdbTarget(adb, serial, grap);
+        if (node == null) return 1;
+
+        var actionName = expand ? "expand" : "collapse";
+        var beforeChildren = node.Children.Count;
+        Console.Write($"[ADB] {(expand ? "Expand" : "Collapse")} {node.DisplayName} (children={beforeChildren})... ");
+
+        var r = adb.Tap(node.CenterX, node.CenterY, serial);
+        if (!r.IsOk)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"FAILED: {r.StdErr}");
+            Console.ResetColor();
+            LogAdbAction(actionName, node, grap, serial, false, r.StdErr);
+            return 1;
+        }
+
+        // Re-dump and check subtree delta
+        Thread.Sleep(500);
+        var tree = new AndroidA11yTree(adb);
+        var root = tree.GetRoot(serial, forceRefresh: true);
+        var afterNode = root != null ? ReResolveNode(tree, root, grap) : null;
+
+        if (afterNode != null)
+        {
+            var afterChildren = afterNode.Children.Count;
+            var delta = afterChildren - beforeChildren;
+            var verified = expand ? delta > 0 : delta < 0;
+            Console.ForegroundColor = verified ? ConsoleColor.Green : ConsoleColor.Yellow;
+            Console.WriteLine(verified
+                ? $"OK (children: {beforeChildren}→{afterChildren})"
+                : $"OK (tap sent, children: {beforeChildren}→{afterChildren})");
+            Console.ResetColor();
+            LogAdbAction(actionName, node, grap, serial, true, $"children: {beforeChildren}→{afterChildren}");
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("OK (tap sent, state unverified)");
+            Console.ResetColor();
+            LogAdbAction(actionName, node, grap, serial, true, "state unverified");
+        }
+        return 0;
+    }
+
+    // ── Select (tap target item) ──────────────────────────
+
+    static int AdbSelect(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
+    {
+        var node = ResolveAdbTarget(adb, serial, grap);
+        if (node == null) return 1;
+
+        Console.Write($"[ADB] Select {node.DisplayName}... ");
+        var r = adb.Tap(node.CenterX, node.CenterY, serial);
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
+        Console.ResetColor();
+
+        // Verify selected state
+        if (ok)
+        {
+            Thread.Sleep(300);
+            var tree = new AndroidA11yTree(adb);
+            var root = tree.GetRoot(serial, forceRefresh: true);
+            var afterNode = root != null ? ReResolveNode(tree, root, grap) : null;
+            if (afterNode != null && afterNode.Selected)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine("[ADB] Verified: selected=true");
+                Console.ResetColor();
+            }
+        }
+
+        LogAdbAction("select", node, grap, serial, ok, ok ? null : r.StdErr);
+        return ok ? 0 : 1;
     }
 
     // ── Scroll ────────────────────────────────────────────
@@ -311,50 +528,228 @@ internal partial class Program
         Console.WriteLine("OK");
         Thread.Sleep(200);
 
-        // Try ADB Keyboard IME broadcast first (supports Unicode/Korean)
-        Console.Write($"[ADB] Input text \"{text}\"... ");
-        var r = adb.BroadcastText(text, serial);
-        if (r.IsOk && r.StdOut.Contains("result=0"))
+        return AdbInputText(adb, serial, text, node, grap, "type");
+    }
+
+    // ── Set-Value (clear existing + type new text) ────────
+
+    static int AdbSetValue(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
+    {
+        string? text = null;
+        for (int i = 0; i < args.Length; i++)
+            if (args[i] == "--text" && i + 1 < args.Length)
+                text = args[i + 1];
+
+        if (text == null)
         {
-            // Broadcast succeeded — ADB Keyboard IME is active
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("OK (ADB Keyboard)");
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[ADB] --text required for set-value action");
             Console.ResetColor();
-            LogAdbAction("type", node, grap, serial, true, $"ADB Keyboard, text={text}");
-            return 0;
+            return 1;
         }
 
-        // Fallback: clipboard paste
-        Console.Write("(ADB Keyboard not available, trying clipboard paste)... ");
-        r = adb.ClipboardPaste(text, serial);
-        if (r.IsOk)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("OK (clipboard paste)");
-            Console.ResetColor();
-            LogAdbAction("type", node, grap, serial, true, $"clipboard paste, text={text}");
-            return 0;
-        }
+        var node = ResolveAdbTarget(adb, serial, grap);
+        if (node == null) return 1;
 
-        // Last resort: ASCII-only input text
-        if (text.All(c => c < 128))
+        // Tap to focus
+        Console.Write($"[ADB] Tap to focus ({node.CenterX},{node.CenterY})... ");
+        adb.Tap(node.CenterX, node.CenterY, serial);
+        Console.WriteLine("OK");
+        Thread.Sleep(200);
+
+        // Select all + delete existing text
+        Console.Write("[ADB] Clear existing text... ");
+        adb.KeyEvent("KEYCODE_MOVE_HOME", serial);
+        adb.Shell("input keyevent --longpress KEYCODE_SHIFT_LEFT KEYCODE_MOVE_END", serial);
+        Thread.Sleep(100);
+        adb.KeyEvent("KEYCODE_DEL", serial);
+        Thread.Sleep(100);
+        Console.WriteLine("OK");
+
+        return AdbInputText(adb, serial, text, node, grap, "set-value");
+    }
+
+    // ── Set-Range (seekbar: calculate position + tap) ─────
+
+    static int AdbSetRange(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
+    {
+        double? value = null;
+        for (int i = 0; i < args.Length; i++)
         {
-            r = adb.InputText(text, serial);
-            if (r.IsOk)
+            if (args[i] == "--value" && i + 1 < args.Length)
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("OK (ASCII input)");
-                Console.ResetColor();
-                LogAdbAction("type", node, grap, serial, true, $"ASCII input, text={text}");
-                return 0;
+                if (double.TryParse(args[i + 1], out var v))
+                    value = v;
             }
         }
 
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"FAILED: {r.StdErr}");
+        if (value == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[ADB] --value (0.0~1.0) required for set-range action");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var node = ResolveAdbTarget(adb, serial, grap);
+        if (node == null) return 1;
+
+        // Clamp 0~1, map to X position within bounds
+        var ratio = Math.Clamp(value.Value, 0.0, 1.0);
+        var targetX = node.BoundsLeft + (int)(node.Width * ratio);
+        var targetY = node.CenterY;
+
+        Console.Write($"[ADB] Set range {ratio:P0} → tap ({targetX},{targetY})... ");
+        var r = adb.Tap(targetX, targetY, serial);
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
-        LogAdbAction("type", node, grap, serial, false, r.StdErr);
+
+        LogAdbAction("set-range", node, grap, serial, ok, $"ratio={ratio:F2}");
+        return ok ? 0 : 1;
+    }
+
+    // ── Focus (tap element center) ────────────────────────
+
+    static int AdbFocus(AdbClient adb, string serial, AdbGrapInfo grap)
+    {
+        var node = ResolveAdbTarget(adb, serial, grap);
+        if (node == null) return 1;
+
+        Console.Write($"[ADB] Focus tap ({node.CenterX},{node.CenterY}) {node.DisplayName}... ");
+        var r = adb.Tap(node.CenterX, node.CenterY, serial);
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
+        Console.ResetColor();
+
+        LogAdbAction("focus", node, grap, serial, ok, ok ? null : r.StdErr);
+        return ok ? 0 : 1;
+    }
+
+    // ── Wait (poll until element appears) ─────────────────
+
+    static int AdbWait(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
+    {
+        var timeoutMs = 10000;
+        var intervalMs = 1000;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--timeout" && i + 1 < args.Length)
+                int.TryParse(args[i + 1], out timeoutMs);
+            if (args[i] == "--interval" && i + 1 < args.Length)
+                int.TryParse(args[i + 1], out intervalMs);
+        }
+
+        if (grap.Scopes.Length == 0 && grap.Package == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[ADB] wait requires a target (package and/or #scope)");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.Write($"[ADB] Waiting for '{grap.ScopePath ?? grap.Package}' (timeout={timeoutMs}ms)... ");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var tree = new AndroidA11yTree(adb);
+
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            var root = tree.GetRoot(serial, forceRefresh: true);
+            if (root != null)
+            {
+                var target = root;
+                if (grap.Package != null)
+                {
+                    var pkgs = tree.FindByPackage(root, grap.Package);
+                    if (pkgs.Count > 0) target = pkgs[0];
+                    else { Thread.Sleep(intervalMs); continue; }
+                }
+                if (grap.Scopes.Length > 0)
+                {
+                    var scoped = tree.ResolveScope(target, grap.Scopes);
+                    if (scoped != null)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"FOUND ({sw.ElapsedMilliseconds}ms) {scoped.SearchKey}");
+                        Console.ResetColor();
+                        return 0;
+                    }
+                }
+                else
+                {
+                    // Package-only wait — package found
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"FOUND ({sw.ElapsedMilliseconds}ms) {target.Package}");
+                    Console.ResetColor();
+                    return 0;
+                }
+            }
+            Thread.Sleep(intervalMs);
+        }
+
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"TIMEOUT ({timeoutMs}ms)");
+        Console.ResetColor();
         return 1;
+    }
+
+    // ── Eval (adb shell command execution) ────────────────
+
+    static int AdbEval(AdbClient adb, string serial, string[] args)
+    {
+        string? cmd = null;
+        for (int i = 0; i < args.Length; i++)
+            if (args[i] == "--text" && i + 1 < args.Length)
+                cmd = args[i + 1];
+
+        if (cmd == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[ADB] --text \"shell command\" required for eval action");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"[ADB] eval: {cmd}");
+        Console.ResetColor();
+
+        var r = adb.ShellRaw(cmd, serial, 30000);
+        if (!string.IsNullOrWhiteSpace(r.StdOut))
+            Console.Write(r.StdOut);
+        if (!string.IsNullOrWhiteSpace(r.StdErr))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Write(r.StdErr);
+            Console.ResetColor();
+        }
+
+        return r.ExitCode;
+    }
+
+    // ── Long-press ────────────────────────────────────────
+
+    static int AdbLongPress(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
+    {
+        var node = ResolveAdbTarget(adb, serial, grap);
+        if (node == null) return 1;
+
+        var durationMs = 1000;
+        for (int i = 0; i < args.Length; i++)
+            if (args[i] == "--duration" && i + 1 < args.Length)
+                int.TryParse(args[i + 1], out durationMs);
+
+        Console.Write($"[ADB] Long-press ({node.CenterX},{node.CenterY}) {durationMs}ms {node.DisplayName}... ");
+        var r = adb.LongPress(node.CenterX, node.CenterY, durationMs, serial);
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
+        Console.ResetColor();
+
+        LogAdbAction("long-press", node, grap, serial, ok, ok ? null : r.StdErr);
+        return ok ? 0 : 1;
     }
 
     // ── Close (force-stop app) ────────────────────────────
@@ -393,6 +788,29 @@ internal partial class Program
                 Success = ok, Detail = ok ? null : r.StdErr,
             });
         return ok ? 0 : 1;
+    }
+
+    // ── Key action helper (back/home/recent/minimize) ─────
+
+    static int AdbKeyAction(AdbClient adb, string serial, string keyName, string actionName, Func<AdbResult> action)
+    {
+        Console.Write($"[ADB] {actionName} (keyevent {keyName})... ");
+        var r = action();
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
+        Console.ResetColor();
+        return ok ? 0 : 1;
+    }
+
+    // ── Window stubs (not meaningful on Android) ──────────
+
+    static int AdbWindowStub(string action)
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[ADB] '{action}' is not supported on Android (apps are fullscreen)");
+        Console.ResetColor();
+        return 0; // Not an error — just no-op
     }
 
     // ── Helpers ───────────────────────────────────────────
@@ -456,11 +874,73 @@ internal partial class Program
         return target;
     }
 
+    /// <summary>Re-resolve the same target after tree refresh (for state verification)</summary>
+    static AndroidNode? ReResolveNode(AndroidA11yTree tree, AndroidNode root, AdbGrapInfo grap)
+    {
+        var target = root;
+        if (grap.Package != null)
+        {
+            var pkgs = tree.FindByPackage(root, grap.Package);
+            if (pkgs.Count == 0) return null;
+            target = pkgs[0];
+        }
+        if (grap.Scopes.Length > 0)
+            return tree.ResolveScope(target, grap.Scopes);
+        return target;
+    }
+
+    /// <summary>Shared text input logic: ADB Keyboard → clipboard paste → ASCII input</summary>
+    static int AdbInputText(AdbClient adb, string serial, string text, AndroidNode node, AdbGrapInfo grap, string actionName)
+    {
+        Console.Write($"[ADB] Input text \"{text}\"... ");
+        var r = adb.BroadcastText(text, serial);
+        if (r.IsOk && r.StdOut.Contains("result=0"))
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("OK (ADB Keyboard)");
+            Console.ResetColor();
+            LogAdbAction(actionName, node, grap, serial, true, $"ADB Keyboard, text={text}");
+            return 0;
+        }
+
+        Console.Write("(ADB Keyboard not available, trying clipboard paste)... ");
+        r = adb.ClipboardPaste(text, serial);
+        if (r.IsOk)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("OK (clipboard paste)");
+            Console.ResetColor();
+            LogAdbAction(actionName, node, grap, serial, true, $"clipboard paste, text={text}");
+            return 0;
+        }
+
+        if (text.All(c => c < 128))
+        {
+            r = adb.InputText(text, serial);
+            if (r.IsOk)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("OK (ASCII input)");
+                Console.ResetColor();
+                LogAdbAction(actionName, node, grap, serial, true, $"ASCII input, text={text}");
+                return 0;
+            }
+        }
+
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"FAILED: {r.StdErr}");
+        Console.ResetColor();
+        LogAdbAction(actionName, node, grap, serial, false, r.StdErr);
+        return 1;
+    }
+
     static int AdbUnsupported(string action)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[ADB] Action '{action}' not yet supported for Android");
-        Console.WriteLine("[ADB] Supported: inspect, find, windows, screenshot, click, read, scroll, type, close");
+        Console.WriteLine($"[ADB] Action '{action}' not supported for Android");
+        Console.WriteLine("[ADB] Supported: inspect find windows screenshot ocr | close minimize maximize restore | "
+            + "click invoke read highlight toggle expand collapse select scroll type set-value set-range focus | "
+            + "wait eval | back home recent long-press");
         Console.ResetColor();
         return 1;
     }
