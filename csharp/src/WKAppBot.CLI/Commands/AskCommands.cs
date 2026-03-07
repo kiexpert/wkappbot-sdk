@@ -721,6 +721,199 @@ Examples:
         or ".ts" or ".py" or ".java" or ".json" or ".yaml" or ".yml" or ".xml" or ".html"
         or ".htm" or ".csv" or ".css" or ".sql" or ".sh" or ".bat" or ".cfg" or ".ini";
 
+    // ── Response Image Detection & Download ──
+
+    /// <summary>
+    /// Detect new images in AI response and download them.
+    /// Returns list of saved file paths for inline markers.
+    /// Tracks already-downloaded images via knownImageUrls set.
+    /// </summary>
+    static async Task<List<string>> DetectAndDownloadImages(
+        CdpClient cdp, HashSet<string> knownImageUrls, string aiName, string? responseSelector = null)
+    {
+        var saved = new List<string>();
+        try
+        {
+            // Find all images in the latest response that we haven't seen yet
+            var selectorBase = responseSelector ?? (aiName == "gemini"
+                ? "model-response:last-of-type img, [role='article']:last-of-type img"
+                : "[data-message-author-role='assistant']:last-of-type img, article:last-of-type img");
+
+            var imgJson = await cdp.EvalAsync($$"""
+                (() => {
+                    var imgs = document.querySelectorAll("{{selectorBase}}");
+                    var result = [];
+                    for (var img of imgs) {
+                        var src = img.src || img.getAttribute('src') || '';
+                        if (!src || src.startsWith('data:image/svg')) continue;
+                        // Skip tiny icons/avatars (< 50px)
+                        if (img.naturalWidth > 0 && img.naturalWidth < 50) continue;
+                        result.push({src: src, w: img.naturalWidth || 0, h: img.naturalHeight || 0});
+                    }
+                    return JSON.stringify(result);
+                })()
+                """) ?? "[]";
+
+            var imgs = JsonDocument.Parse(imgJson).RootElement;
+            foreach (var img in imgs.EnumerateArray())
+            {
+                var src = img.GetProperty("src").GetString() ?? "";
+                if (string.IsNullOrEmpty(src) || knownImageUrls.Contains(src)) continue;
+                knownImageUrls.Add(src);
+
+                // Download image
+                var outputDir = Path.Combine(
+                    Environment.GetEnvironmentVariable("WKAPPBOT_HQ") ?? @"W:\SDK\bin\wkappbot.hq",
+                    "output");
+                Directory.CreateDirectory(outputDir);
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var idx = saved.Count + 1;
+                var w = img.GetProperty("w").GetInt32();
+                var h = img.GetProperty("h").GetInt32();
+                var fileName = $"{aiName}_gen_{timestamp}_{idx}.png";
+                var filePath = Path.Combine(outputDir, fileName);
+
+                try
+                {
+                    byte[]? bytes = null;
+
+                    if (src.StartsWith("data:"))
+                    {
+                        // data: URL — extract base64 directly
+                        var commaIdx = src.IndexOf(',');
+                        if (commaIdx > 0)
+                            bytes = Convert.FromBase64String(src.Substring(commaIdx + 1));
+                    }
+                    else if (src.StartsWith("blob:"))
+                    {
+                        // blob: URL — must fetch inside page context → canvas
+                        var b64 = await cdp.EvalAsync($$"""
+                            (async () => {
+                                try {
+                                    var img = document.querySelector('img[src="{{src.Replace("\"", "\\\"")}}"]');
+                                    if (!img || !img.naturalWidth) return 'ERR:no_img';
+                                    var c = document.createElement('canvas');
+                                    c.width = img.naturalWidth; c.height = img.naturalHeight;
+                                    c.getContext('2d').drawImage(img, 0, 0);
+                                    var d = c.toDataURL('image/png');
+                                    return d.substring(d.indexOf(',') + 1);
+                                } catch(e) { return 'ERR:' + e.message; }
+                            })()
+                            """) ?? "ERR:null";
+                        if (!b64.StartsWith("ERR:"))
+                            bytes = Convert.FromBase64String(b64);
+                    }
+                    else
+                    {
+                        // https: URL — try fetch with cookies, then screenshot fallback
+                        var b64 = await cdp.EvalAsync($$"""
+                            (async () => {
+                                try {
+                                    var resp = await fetch('{{src.Replace("'", "\\'")}}', {credentials: 'include'});
+                                    if (!resp.ok) return 'ERR:' + resp.status;
+                                    var blob = await resp.blob();
+                                    if (blob.size < 100) return 'ERR:empty';
+                                    return await new Promise((resolve) => {
+                                        var reader = new FileReader();
+                                        reader.onloadend = () => {
+                                            var r = reader.result || '';
+                                            var i = r.indexOf(',');
+                                            resolve(i > 0 ? r.substring(i + 1) : '');
+                                        };
+                                        reader.readAsDataURL(blob);
+                                    });
+                                } catch(e) { return 'ERR:' + e.message; }
+                            })()
+                            """) ?? "ERR:null";
+                        if (!b64.StartsWith("ERR:") && b64.Length > 100)
+                        {
+                            bytes = Convert.FromBase64String(b64);
+                        }
+                        else
+                        {
+                            // Fallback: screenshot the <img> element via CDP clip capture
+                            var rectJson = await cdp.EvalAsync($$"""
+                                (() => {
+                                    var img = document.querySelector('img[src="{{src.Replace("\"", "\\\"")}}"]');
+                                    if (!img) return '';
+                                    img.scrollIntoView({block:'center',behavior:'instant'});
+                                    var r = img.getBoundingClientRect();
+                                    return JSON.stringify({x:r.x,y:r.y,w:r.width,h:r.height});
+                                })()
+                                """) ?? "";
+                            if (!string.IsNullOrEmpty(rectJson))
+                            {
+                                try
+                                {
+                                    var rect = JsonDocument.Parse(rectJson).RootElement;
+                                    var rx = rect.GetProperty("x").GetDouble();
+                                    var ry = rect.GetProperty("y").GetDouble();
+                                    var rw = rect.GetProperty("w").GetDouble();
+                                    var rh = rect.GetProperty("h").GetDouble();
+                                    if (rw > 10 && rh > 10)
+                                    {
+                                        var ssResult = await cdp.SendAsync("Page.captureScreenshot", new JsonObject
+                                        {
+                                            ["format"] = "png",
+                                            ["clip"] = new JsonObject
+                                            {
+                                                ["x"] = rx, ["y"] = ry,
+                                                ["width"] = rw, ["height"] = rh,
+                                                ["scale"] = 1
+                                            }
+                                        });
+                                        var ssB64 = ssResult?["data"]?.ToString();
+                                        if (!string.IsNullOrEmpty(ssB64))
+                                        {
+                                            bytes = Convert.FromBase64String(ssB64);
+                                            w = (int)rw; h = (int)rh;
+                                            Console.WriteLine($"[ASK] Image captured via screenshot ({rw:F0}x{rh:F0})");
+                                        }
+                                    }
+                                }
+                                catch (Exception ssEx)
+                                {
+                                    Console.WriteLine($"[ASK] Screenshot fallback failed: {ssEx.Message}");
+                                }
+                            }
+                        }
+                    }
+
+                    if (bytes != null && bytes.Length > 100)
+                    {
+                        // Detect actual format from magic bytes for extension
+                        var ext = ".png";
+                        if (bytes.Length > 3 && bytes[0] == 0xFF && bytes[1] == 0xD8) ext = ".jpg";
+                        else if (bytes.Length > 4 && bytes[0] == 0x52 && bytes[1] == 0x49) ext = ".webp";
+                        fileName = $"{aiName}_gen_{timestamp}_{idx}{ext}";
+                        filePath = Path.Combine(outputDir, fileName);
+
+                        File.WriteAllBytes(filePath, bytes);
+                        saved.Add(filePath);
+                        Console.WriteLine();
+                        Console.WriteLine($"[image:{fileName} ({w}x{h}, {bytes.Length / 1024}KB)]");
+                        Console.Out.Flush();
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[ASK] Image download empty/small for: {src.Substring(0, Math.Min(80, src.Length))}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ASK] Image save failed: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Non-fatal — image detection is best-effort
+            if (!ex.Message.Contains("JSON")) // suppress parse noise
+                Console.WriteLine($"[ASK] Image detect error: {ex.Message}");
+        }
+        return saved;
+    }
+
     // ── Gemini ──
 
     static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false)
@@ -1019,6 +1212,8 @@ Examples:
                 int lastTextLen = 0;
                 int lastFlushedLen = 0;
                 bool liveHeaderPrinted = false;
+                var geminiKnownImages = new HashSet<string>();
+                var geminiSavedImages = new List<string>();
                 var sw = Stopwatch.StartNew();
 
                 int geminiBlankCount = 0;
@@ -1068,6 +1263,10 @@ Examples:
                         lastFlushedLen = text.Length;
                     }
 
+                    // Detect generated images in response
+                    var gemNewImages = await DetectAndDownloadImages(cdp, geminiKnownImages, "gemini");
+                    geminiSavedImages.AddRange(gemNewImages);
+
                     // Streaming handoff: text growing → this tab is alive, give active tab to peer
                     if (text.Length > lastTextLen && lastTextLen > 0)
                         await HandoffTabToPeer("gemini");
@@ -1079,8 +1278,13 @@ Examples:
                         stableCount++;
                         if (stableCount >= 2) // stable for 4+ seconds
                         {
+                            // Final image check
+                            var gemFinalImages = await DetectAndDownloadImages(cdp, geminiKnownImages, "gemini");
+                            geminiSavedImages.AddRange(gemFinalImages);
                             if (liveHeaderPrinted) Console.WriteLine(); // newline after streamed text
                             Console.WriteLine($"[ASK] Response received ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
+                            if (geminiSavedImages.Count > 0)
+                                Console.WriteLine($"[ASK] Downloaded {geminiSavedImages.Count} generated image(s)");
                             return (true, text);
                         }
                     }
@@ -1617,6 +1821,8 @@ Examples:
         int blankPageCount = 0;
         int lastFlushedLen = 0;
         bool liveHeaderPrinted = false;
+        var knownImageUrls = new HashSet<string>();
+        var savedImages = new List<string>();
         sw.Restart();
 
         while (sw.Elapsed.TotalSeconds < timeoutSec)
@@ -1675,6 +1881,10 @@ Examples:
                 lastFlushedLen = textLen;
             }
 
+            // Detect generated images in response (inline marker output)
+            var newImages = await DetectAndDownloadImages(cdp, knownImageUrls, "gpt");
+            savedImages.AddRange(newImages);
+
             if (state == "DONE" || state == "DONE_EMPTY")
             {
                 // If very little text and early in stream, wait a bit more
@@ -1685,8 +1895,13 @@ Examples:
                     Console.Out.Flush();
                     continue; // keep polling — likely just a transient idle gap
                 }
+                // Final image check before completion
+                var finalImages = await DetectAndDownloadImages(cdp, knownImageUrls, "gpt");
+                savedImages.AddRange(finalImages);
                 if (liveHeaderPrinted) Console.WriteLine(); // newline after streamed text
                 Console.WriteLine($"[ASK] Streaming complete ({sw.Elapsed.TotalSeconds:F0}s)");
+                if (savedImages.Count > 0)
+                    Console.WriteLine($"[ASK] Downloaded {savedImages.Count} generated image(s)");
                 break;
             }
 
