@@ -175,6 +175,15 @@ internal partial class Program
                 "eye" => AppBotEyeCommand(restArgs),
                 "slack" => SlackCommand(restArgs),
                 "web" => WebCommand(restArgs),
+                "mcp" => McpCommand(restArgs), // fallback (normally caught in Main early path)
+                // Web commands promoted to top-level
+                "eval" => WebCommand(new[] { "eval" }.Concat(restArgs).ToArray()),
+                "tabs" => WebCommand(new[] { "tabs" }.Concat(restArgs).ToArray()),
+                "navigate" or "nav" => WebCommand(new[] { "navigate" }.Concat(restArgs).ToArray()),
+                "web-click" => WebCommand(new[] { "click" }.Concat(restArgs).ToArray()),
+                "web-type" => WebCommand(new[] { "type" }.Concat(restArgs).ToArray()),
+                "web-screenshot" => WebCommand(new[] { "screenshot" }.Concat(restArgs).ToArray()),
+                "web-text" => WebCommand(new[] { "text" }.Concat(restArgs).ToArray()),
                 // Automation
                 "do" => DoCommand(restArgs),
                 "input" => InputCommand(restArgs),
