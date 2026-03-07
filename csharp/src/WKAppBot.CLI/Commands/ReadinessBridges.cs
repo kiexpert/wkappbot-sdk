@@ -29,6 +29,51 @@ internal partial class Program
         };
     }
 
+    // ── 공용 입력위치확보: iconic zoom + focusless restore + blocker dismiss ──
+
+    /// <summary>
+    /// Shared input readiness pipeline for any window: iconic zoom → focusless restore → blocker dismiss.
+    /// Used by A11yCommand, AskCommands, and any command that needs a window ready for interaction.
+    /// Returns true if the window was restored from iconic state.
+    /// </summary>
+    internal static bool EnsureWindowReady(IntPtr hwnd, string actionLabel, string title, InputReadiness? readiness = null)
+    {
+        bool wasIconic = false;
+
+        // Step 1: Iconic → focusless restore with zoom
+        if (NativeMethods.IsIconic(hwnd))
+        {
+            wasIconic = true;
+            Console.WriteLine($"[A11Y] 0x{hwnd.ToInt64():X} \"{title}\" minimized — restoring (focusless)");
+            using var iconicZoom = ClickZoomHelper.BeginForIconic(hwnd, actionLabel, $"\"{title}\"");
+            var prevFg = NativeMethods.GetForegroundWindow();
+            NativeMethods.ShowWindow(hwnd, 9); // SW_RESTORE
+            if (prevFg != IntPtr.Zero && prevFg != hwnd)
+                NativeMethods.SetForegroundWindow(prevFg);
+            Thread.Sleep(300);
+            iconicZoom?.UpdateImage();
+            iconicZoom?.ShowPass("restored");
+            Thread.Sleep(600);
+        }
+
+        // Step 2: Blocker detection + dismiss (~5ms)
+        if (readiness != null)
+        {
+            var blocker = readiness.DetectBlocker(hwnd);
+            if (blocker != null)
+            {
+                Console.WriteLine($"[A11Y] blocker: {blocker.ClassName} \"{blocker.Title}\" — dismissing");
+                readiness.BlockerHandler?.TryHandle(hwnd, blocker);
+                Thread.Sleep(300);
+                blocker = readiness.DetectBlocker(hwnd);
+                if (blocker != null)
+                    Console.WriteLine($"[A11Y] blocker persists: {blocker.ClassName} \"{blocker.Title}\"");
+            }
+        }
+
+        return wasIconic;
+    }
+
     // ── Bridge: TryHandleBlocker → adapter ──
 
     /// <summary>

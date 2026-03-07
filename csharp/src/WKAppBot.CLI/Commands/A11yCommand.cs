@@ -249,25 +249,9 @@ internal partial class Program
             }
             if (childError) { fail++; continue; }
 
-            // Blocker check
-            var blocker = readiness.DetectBlocker(hwnd);
-            if (blocker != null)
-            {
-                Console.WriteLine($"[A11Y] blocker: {blocker.ClassName} \"{blocker.Title}\" — dismissing");
-                readiness.BlockerHandler?.TryHandle(hwnd, blocker);
-                Thread.Sleep(300);
-            }
-
-            // Minimize restore (except close/minimize)
+            // ── 입력위치확보 (EnsureInputReady) ──
             if (action != "close" && action != "minimize")
-            {
-                if (NativeMethods.IsIconic(hwnd))
-                {
-                    Console.WriteLine($"[A11Y] {tag} minimized — restoring");
-                    NativeMethods.ShowWindow(hwnd, 9);
-                    Thread.Sleep(300);
-                }
-            }
+                EnsureWindowReady(hwnd, $"a11y-{action}", title, readiness);
 
             bool success;
 
