@@ -139,14 +139,17 @@ internal partial class Program
                             "Control: close, minimize, maximize, restore, focus, move, resize\n" +
                             "Element: invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range\n" +
                             "Query: find, read, highlight\n" +
-                            "Discovery: inspect (UIA tree), windows (list windows), screenshot (capture), ocr (text extraction)"),
+                            "Discovery: inspect (UIA tree), windows (list windows), screenshot (capture), ocr (text extraction)\n" +
+                            "Async: wait (poll until element appears), eval (execute JavaScript via CDP)"),
                         ["grap"] = Prop("string",
                             "Window#element grap pattern. Required for all actions except 'windows'.\n" +
                             "Examples: \"*Notepad*\", \"*Chrome*#button.submit\", \"*App*#*MenuBar*#*File*\""),
                         ["text"] = Prop("string", "Text for type/set-value actions"),
                         ["depth"] = Prop("integer", "Tree depth for inspect/find (default: 3)"),
                         ["process"] = Prop("string", "Filter by process name (for windows action)"),
-                        ["all"] = Prop("boolean", "Apply to ALL matching windows, or include hidden windows (for windows action)")
+                        ["all"] = Prop("boolean", "Apply to ALL matching windows, or include hidden windows (for windows action)"),
+                        ["timeout"] = Prop("integer", "Timeout in ms for wait action (default: 10000)"),
+                        ["interval"] = Prop("integer", "Polling interval in ms for wait action (default: 500)")
                     },
                     ["required"] = new JsonArray { "action" }
                 }),
@@ -183,13 +186,13 @@ internal partial class Program
         {
             // All MCP calls route through unified "a11y" command
             // a11y handles: inspect, windows, screenshot, ocr as delegate actions
-            var output = toolName switch
+            var (output, exitCode) = toolName switch
             {
-                "wkappbot" => RunCliCapture("a11y", BuildUnifiedArgs(arguments)),
-                _ => $"Unknown tool: {toolName}"
+                "wkappbot" => RunCliCaptureWithCode("a11y", BuildUnifiedArgs(arguments)),
+                _ => ($"Unknown tool: {toolName}", 1)
             };
 
-            return new JsonObject
+            var result = new JsonObject
             {
                 ["content"] = new JsonArray
                 {
@@ -200,6 +203,9 @@ internal partial class Program
                     }
                 }
             };
+            if (exitCode != 0)
+                result["isError"] = true;
+            return result;
         }
         catch (Exception ex)
         {
@@ -231,6 +237,8 @@ internal partial class Program
         if (args["text"] is JsonNode t) { list.Add("--text"); list.Add(t.GetValue<string>()); }
         if (args["depth"] is JsonNode d) { list.Add("--depth"); list.Add(d.ToString()); }
         if (args["process"] is JsonNode p) { list.Add("--process"); list.Add(p.GetValue<string>()); }
+        if (args["timeout"] is JsonNode to) { list.Add("--timeout"); list.Add(to.ToString()); }
+        if (args["interval"] is JsonNode iv) { list.Add("--interval"); list.Add(iv.ToString()); }
         if (args["all"]?.GetValue<bool>() == true) list.Add("--all");
         return list.ToArray();
     }
@@ -360,16 +368,21 @@ internal partial class Program
     /// <summary>
     /// Run a wkappbot CLI command and capture its console output as a string.
     /// Temporarily redirects Console.Out to a StringWriter.
+    /// Returns (output, exitCode) for error structuring.
     /// </summary>
-    static string RunCliCapture(string command, string[] args)
+    static (string output, int exitCode) RunCliCaptureWithCode(string command, string[] args)
     {
         var sw = new StringWriter();
+        var errSw = new StringWriter();
         var prevOut = Console.Out;
+        var prevErr = Console.Error;
         Console.SetOut(sw);
+        Console.SetError(errSw);
 
+        int exitCode = 0;
         try
         {
-            _ = command switch
+            exitCode = command switch
             {
                 "inspect" => InspectCommand(args),
                 "a11y" => A11yCommand(args),
@@ -382,13 +395,27 @@ internal partial class Program
         catch (Exception ex)
         {
             sw.WriteLine($"Error: {ex.Message}");
+            exitCode = 1;
         }
         finally
         {
             Console.SetOut(prevOut);
+            Console.SetError(prevErr);
         }
 
-        return sw.ToString().Trim();
+        // Merge stdout + stderr (stderr contains error details)
+        var output = sw.ToString().Trim();
+        var errOutput = errSw.ToString().Trim();
+        if (!string.IsNullOrEmpty(errOutput))
+            output = string.IsNullOrEmpty(output) ? errOutput : $"{output}\n{errOutput}";
+
+        return (output, exitCode);
+    }
+
+    static string RunCliCapture(string command, string[] args)
+    {
+        var (output, _) = RunCliCaptureWithCode(command, args);
+        return output;
     }
 
     static string RunCliCaptureScreenshot(JsonObject args)
