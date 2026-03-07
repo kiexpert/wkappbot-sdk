@@ -140,12 +140,12 @@ internal partial class Program
                     ["required"] = new JsonArray { "grap" }
                 }),
 
-            McpTool("wkappbot_a11y", "Perform accessibility actions on windows/elements. Actions: close, minimize, maximize, restore, focus, invoke, click, toggle, type, set-value, find.",
+            McpTool("wkappbot_a11y", "Unified accessibility actions on windows AND web elements. Works on native apps (UIA) and Chrome/Electron web views (CDP auto-fallback). Actions: close, minimize, maximize, restore, focus, invoke, click, toggle, type, set-value, find, read. For web views: use CSS selectors after # (e.g. \"*Chrome*#button.submit\").",
                 new JsonObject {
                     ["type"] = "object",
                     ["properties"] = new JsonObject {
-                        ["action"] = Prop("string", "Action to perform: close, minimize, maximize, restore, focus, invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range, find"),
-                        ["grap"] = Prop("string", "Window/element pattern. Use # for UIA scope: \"*Notepad*#*File*\""),
+                        ["action"] = Prop("string", "Action: close, minimize, maximize, restore, focus, invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range, find, read, highlight"),
+                        ["grap"] = Prop("string", "Window#element pattern. Native: \"*Notepad*#*File*\" (UIA Name). Web: \"*Chrome*#button.submit\" (CSS selector, auto-detected). Mixed: Win32/child#UIA or CSS."),
                         ["text"] = Prop("string", "Text for type/set-value actions"),
                         ["all"] = Prop("boolean", "Apply to all matching windows")
                     },

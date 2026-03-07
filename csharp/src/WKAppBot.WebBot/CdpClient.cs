@@ -1178,6 +1178,131 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         catch { return null; }
     }
 
+    // ── Static: CDP port detection from process ─────────────────
+
+    /// <summary>
+    /// Detect CDP debugging port from a process's command line arguments.
+    /// Parses --remote-debugging-port=NNNN from the process command line via WMI.
+    /// Returns 0 if not found or not a Chromium-based process.
+    /// </summary>
+    /// <summary>Known CDP ports to probe (common defaults).</summary>
+    private static readonly int[] KnownCdpPorts = [9222, 9223, 9224, 9225, 9229];
+
+    public static int DetectCdpPort(int processId)
+    {
+        // Strategy: check known ports via netstat → match to target PID
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "netstat",
+                Arguments = "-ano",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var proc = Process.Start(psi);
+            if (proc == null) return 0;
+            var output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(3000);
+
+            // Get all PIDs in the process tree (chrome spawns many child processes)
+            var targetPids = GetProcessTreePids(processId);
+
+            foreach (var port in KnownCdpPorts)
+            {
+                var needle = $":{port}";
+                foreach (var rawLine in output.Split('\n'))
+                {
+                    var line = rawLine.Trim();
+                    if (!line.Contains(needle) || !line.Contains("LISTENING")) continue;
+                    var parts = line.Split([' '], StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 5) continue;
+                    if (!parts[1].EndsWith(needle)) continue;
+                    if (int.TryParse(parts[^1], out var listenPid) && targetPids.Contains(listenPid))
+                        return port;
+                }
+            }
+
+            // Broader scan: any LISTENING port owned by this process tree in high range
+            foreach (var rawLine in output.Split('\n'))
+            {
+                var line = rawLine.Trim();
+                if (!line.Contains("LISTENING")) continue;
+                var parts = line.Split([' '], StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 5) continue;
+                if (!int.TryParse(parts[^1], out var listenPid) || !targetPids.Contains(listenPid)) continue;
+                var local = parts[1]; // e.g. "127.0.0.1:9222"
+                var colonIdx = local.LastIndexOf(':');
+                if (colonIdx < 0) continue;
+                if (int.TryParse(local[(colonIdx + 1)..], out var foundPort) && foundPort >= 9222 && foundPort <= 9999)
+                {
+                    // Verify it's actually a CDP endpoint
+                    try
+                    {
+                        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                        var json = http.GetStringAsync($"http://localhost:{foundPort}/json/version").GetAwaiter().GetResult();
+                        if (json.Contains("Browser") || json.Contains("webSocketDebuggerUrl"))
+                            return foundPort;
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    private static HashSet<int> GetProcessTreePids(int rootPid)
+    {
+        var pids = new HashSet<int> { rootPid };
+        try
+        {
+            // Simple: get all processes with same name as root
+            var rootProc = Process.GetProcessById(rootPid);
+            var name = rootProc.ProcessName;
+            rootProc.Dispose();
+            foreach (var p in Process.GetProcessesByName(name))
+            {
+                pids.Add(p.Id);
+                p.Dispose();
+            }
+        }
+        catch { }
+        return pids;
+    }
+
+    /// <summary>
+    /// Detect CDP port from a process name (e.g. "chrome", "msedge", "code").
+    /// Scans all processes with that name and returns the first found port.
+    /// </summary>
+    public static int DetectCdpPortByName(string processName)
+    {
+        try
+        {
+            foreach (var p in Process.GetProcessesByName(processName))
+            {
+                try
+                {
+                    var port = DetectCdpPort(p.Id);
+                    if (port > 0) return port;
+                }
+                finally { p.Dispose(); }
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    /// <summary>
+    /// Check if a window class name indicates a Chromium-based web view.
+    /// </summary>
+    public static bool IsWebViewClass(string className)
+    {
+        return className is "Chrome_WidgetWin_1" or "Chrome_WidgetWin_0"
+            or "Chromium_WidgetWin_1" or "Chromium_WidgetWin_0";
+    }
+
     /// <summary>Tab info from CDP /json endpoint.</summary>
     public record TabInfo(string Id, string Title, string Url, string? WsUrl);
 
