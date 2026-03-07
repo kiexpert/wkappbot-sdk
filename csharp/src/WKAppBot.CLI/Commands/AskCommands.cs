@@ -53,7 +53,10 @@ internal partial class Program
             else
                 questionParts.Add(args[i]);
         }
-        var question = string.Join(" ", questionParts);
+        // If files are interspersed, join with newlines so each text segment gets its own line
+        var question = attachFiles.Count > 0
+            ? string.Join("\n", questionParts)
+            : string.Join(" ", questionParts);
         if (string.IsNullOrWhiteSpace(question))
             return AskUsage();
 
