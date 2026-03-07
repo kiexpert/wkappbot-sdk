@@ -22,12 +22,13 @@ internal partial class Program
 
         var ai = args[0].ToLowerInvariant();
         // Collect question (everything after AI name, excluding flags)
+        // Auto-detect file paths: if arg is an existing file, attach it + insert [file:name] marker
         var questionParts = new List<string>();
+        var attachFiles = new List<string>();
         bool slackReport = false;
         bool newTab = false;
         bool newSession = false;
         int timeoutSec = 30;
-        string? imagePath = null;
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--slack")
@@ -39,7 +40,16 @@ internal partial class Program
             else if (args[i] == "--timeout" && i + 1 < args.Length)
                 int.TryParse(args[++i], out timeoutSec);
             else if (args[i] == "--image" && i + 1 < args.Length)
-                imagePath = args[++i];
+            {
+                var imgArg = args[++i];
+                attachFiles.Add(imgArg);
+                questionParts.Add($"[file:{Path.GetFileName(imgArg)}]");
+            }
+            else if (!args[i].StartsWith("--") && File.Exists(args[i]))
+            {
+                attachFiles.Add(args[i]);
+                questionParts.Add($"[file:{Path.GetFileName(args[i])}]"); // inline marker at arg position
+            }
             else
                 questionParts.Add(args[i]);
         }
@@ -47,14 +57,19 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(question))
             return AskUsage();
 
-        // Validate image path
-        if (imagePath != null && !File.Exists(imagePath))
-            return Error($"Image file not found: {imagePath}");
+        // Validate file paths
+        foreach (var f in attachFiles)
+        {
+            if (!File.Exists(f))
+                return Error($"File not found: {f}");
+        }
+        if (attachFiles.Count > 0)
+            Console.WriteLine($"[ASK] Attaching {attachFiles.Count} file(s): {string.Join(", ", attachFiles.Select(Path.GetFileName))}");
 
         return ai switch
         {
-            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, imagePath, newSession),
-            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, imagePath, newSession),
+            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, attachFiles, newSession),
+            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, attachFiles, newSession),
             _ => Error($"Unknown AI: {ai} (use gemini or gpt)")
         };
     }
@@ -65,22 +80,26 @@ internal partial class Program
 WKAppBot Ask — one-command AI Q&A via WebBot
 
 Usage:
-  wkappbot ask gemini ""question""  [--slack] [--timeout 30] [--new-tab] [--new-session] [--image path.png]
-  wkappbot ask gpt ""question""     [--slack] [--timeout 30] [--new-tab] [--new-session] [--image path.png]
+  wkappbot ask gemini ""question"" [files...] [--slack] [--timeout 30] [--new-tab] [--new-session]
+  wkappbot ask gpt ""question"" [files...]   [--slack] [--timeout 30] [--new-tab] [--new-session]
 
 Options:
   --slack         Report answer to Slack channel
   --timeout N     Max seconds to wait for response (default: 30)
   --new-tab       Open in a new tab (default: reuse existing tab)
   --new-session   Start fresh conversation in existing tab (navigate to new chat URL)
-  --image PATH    Attach image file (png/jpg) — pasted into chat before question
+
+File attachment:
+  Any argument that matches an existing file path is auto-attached.
+  Images (png/jpg/gif/webp/bmp) → clipboard paste, other files → file input.
+  Multiple files supported — attached in order before sending the question.
 
 Examples:
   wkappbot ask gemini ""오늘 코스피 특징주 알려줘""
   wkappbot ask gpt ""이 패턴 분석해줘"" --slack
-  wkappbot ask gpt ""이 UI 스크린샷의 요소 분석해줘"" --image screenshot.png
+  wkappbot ask gpt ""이 UI 분석해줘"" screenshot.png
+  wkappbot ask gpt ""코드 리뷰해줘"" main.cs test.log
   wkappbot ask gemini ""새 세션으로 질문"" --new-session
-  wkappbot ask gpt ""새 탭으로 테스트"" --new-tab
 ");
         return 1;
     }
@@ -490,9 +509,221 @@ Examples:
         Console.WriteLine("[ASK] Image upload wait timeout — proceeding");
     }
 
+    static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+        { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp" };
+
+    /// <summary>Attach multiple files: images via clipboard paste, other files via hidden file input.</summary>
+    static async Task AttachFilesViaCdp(CdpClient cdp, List<string> files, string editorSelector)
+    {
+        foreach (var filePath in files)
+        {
+            var ext = Path.GetExtension(filePath);
+            if (ImageExtensions.Contains(ext))
+            {
+                // Image: clipboard paste (Tier 1 synthetic → Tier 2 Win32 clipboard + Ctrl+V)
+                var imgOk = await PasteImageViaCdp(cdp, filePath, editorSelector);
+                if (imgOk) await WaitForImageUpload(cdp);
+                else Console.WriteLine($"[ASK] Image paste failed: {Path.GetFileName(filePath)}");
+            }
+            else
+            {
+                // Non-image file: use hidden file input element
+                var fileOk = await AttachFileViaFileInput(cdp, filePath);
+                if (fileOk) await WaitForImageUpload(cdp); // reuse upload wait
+                else Console.WriteLine($"[ASK] File attach failed: {Path.GetFileName(filePath)}");
+            }
+            await Task.Delay(500); // settle between attachments
+        }
+    }
+
+    /// <summary>
+    /// Attach a non-image file via CDP DOM.setFileInputFiles on hidden file input.
+    /// Works for txt, cs, log, pdf, etc. Fully focusless — no clipboard involved.
+    /// Tier 1: DOM.setFileInputFiles + change event
+    /// Tier 2: Synthetic drop event with DataTransfer (for React apps that ignore file input)
+    /// </summary>
+    static async Task<bool> AttachFileViaFileInput(CdpClient cdp, string filePath)
+    {
+        var fileName = Path.GetFileName(filePath);
+        var absPath = Path.GetFullPath(filePath);
+        var fileSize = new FileInfo(absPath).Length;
+        Console.WriteLine($"[ASK] Attaching file: {fileName} ({fileSize / 1024}KB)");
+
+        try
+        {
+            // ── Tier 1: DOM.setFileInputFiles on hidden <input type="file"> ──
+            // First, try clicking attachment button to ensure file input is in DOM
+            await cdp.EvalAsync("""
+                (() => {
+                    var btn = document.querySelector('button[aria-label*="Attach"]')
+                           || document.querySelector('button[aria-label*="첨부"]')
+                           || document.querySelector('button[aria-label*="Upload"]')
+                           || document.querySelector('button[data-testid*="attach"]')
+                           || document.querySelector('button[data-testid*="upload"]');
+                    if (btn) btn.click();
+                })()
+                """);
+            await Task.Delay(500);
+
+            // Get all file inputs (some pages have multiple)
+            var docResult = await cdp.SendAsync("DOM.getDocument", new JsonObject());
+            var rootNodeId = docResult?["root"]?["nodeId"]?.GetValue<int>() ?? 0;
+
+            if (rootNodeId > 0)
+            {
+                // Try querySelectorAll for multiple file inputs
+                var queryResult = await cdp.SendAsync("DOM.querySelectorAll", new JsonObject
+                {
+                    ["nodeId"] = rootNodeId,
+                    ["selector"] = "input[type=\"file\"]"
+                });
+
+                var nodeIds = queryResult?["nodeIds"]?.AsArray();
+                if (nodeIds != null && nodeIds.Count > 0)
+                {
+                    // Try each file input until one works
+                    foreach (var nodeIdVal in nodeIds)
+                    {
+                        var nodeId = nodeIdVal?.GetValue<int>() ?? 0;
+                        if (nodeId == 0) continue;
+
+                        try
+                        {
+                            await cdp.SendAsync("DOM.setFileInputFiles", new JsonObject
+                            {
+                                ["nodeId"] = nodeId,
+                                ["files"] = new JsonArray { absPath.Replace('\\', '/') }
+                            });
+                            Console.WriteLine($"[ASK] File input set (nodeId={nodeId})");
+                        }
+                        catch { continue; }
+
+                        // Fire change event (React needs this to detect the file)
+                        await cdp.EvalAsync($$$"""
+                            (() => {{
+                                var inputs = document.querySelectorAll('input[type="file"]');
+                                for (var inp of inputs) {{
+                                    if (inp.files && inp.files.length > 0) {{
+                                        inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+                                        inp.dispatchEvent(new Event('input', {{bubbles: true}}));
+                                        return 'FIRED';
+                                    }}
+                                }}
+                                return 'NO_FILES';
+                            }})()
+                            """);
+                        await Task.Delay(1500);
+
+                        // Check if attachment appeared
+                        if (await CheckFileAttached(cdp))
+                        {
+                            Console.WriteLine($"[ASK] File attached via input: {fileName}");
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // ── Tier 2: Synthetic drop event with DataTransfer ──
+            Console.WriteLine("[ASK] File input failed, trying drag-drop...");
+            var bytes = File.ReadAllBytes(absPath);
+            var base64 = Convert.ToBase64String(bytes);
+            var ext = Path.GetExtension(absPath).ToLowerInvariant();
+            var mimeType = ext switch
+            {
+                ".txt" or ".log" or ".md" => "text/plain",
+                ".cs" or ".js" or ".ts" or ".py" or ".java" => "text/plain",
+                ".json" => "application/json",
+                ".yaml" or ".yml" => "text/yaml",
+                ".xml" => "application/xml",
+                ".html" or ".htm" => "text/html",
+                ".csv" => "text/csv",
+                ".pdf" => "application/pdf",
+                _ => "application/octet-stream"
+            };
+
+            var dropResult = await cdp.EvalAsync($$"""
+                (async () => {
+                    try {
+                        var b64 = '{{base64}}';
+                        var bin = atob(b64);
+                        var arr = new Uint8Array(bin.length);
+                        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                        var blob = new Blob([arr], {type: '{{mimeType}}'});
+                        var file = new File([blob], '{{fileName}}', {type: '{{mimeType}}'});
+                        var dt = new DataTransfer();
+                        dt.items.add(file);
+                        // Try drop on editor area
+                        var target = document.querySelector('#prompt-textarea')
+                                  || document.querySelector('[contenteditable="true"]')
+                                  || document.querySelector('[role="textbox"]');
+                        if (!target) return 'NO_TARGET';
+                        target.dispatchEvent(new DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true}));
+                        return 'DROPPED';
+                    } catch(e) { return 'ERR:' + e.message; }
+                })()
+                """);
+            Console.WriteLine($"[ASK] Drop event: {dropResult}");
+
+            if (dropResult == "DROPPED")
+            {
+                await Task.Delay(1500);
+                if (await CheckFileAttached(cdp))
+                {
+                    Console.WriteLine($"[ASK] File attached via drop: {fileName}");
+                    return true;
+                }
+            }
+
+            // ── Tier 3: If text file, just append content inline as code block ──
+            if (fileSize < 50_000 && IsTextFile(ext))
+            {
+                Console.WriteLine($"[ASK] Falling back to inline text for: {fileName}");
+                return false; // caller will handle — file content in question text would be too big
+            }
+
+            Console.WriteLine($"[ASK] All attachment methods failed for: {fileName}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ASK] File attach error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>Check if any file attachment indicator is visible in the page.</summary>
+    static async Task<bool> CheckFileAttached(CdpClient cdp)
+    {
+        var attached = await cdp.EvalAsync("""
+            (() => {
+                // ChatGPT indicators
+                if (document.querySelector('[data-testid="file-thumbnail"]')) return 'YES';
+                if (document.querySelector('[data-testid*="attachment"]')) return 'YES';
+                // Generic indicators (both ChatGPT and Gemini)
+                if (document.querySelector('[class*="attachment"]')) return 'YES';
+                if (document.querySelector('[class*="file-upload"]')) return 'YES';
+                if (document.querySelector('[class*="uploaded-file"]')) return 'YES';
+                if (document.querySelector('img[src*="blob:"]')) return 'YES';
+                // Gemini file chip
+                if (document.querySelector('[class*="file-chip"]')) return 'YES';
+                if (document.querySelector('[class*="upload-chip"]')) return 'YES';
+                // Count file inputs with files set
+                var inputs = document.querySelectorAll('input[type="file"]');
+                for (var inp of inputs) { if (inp.files && inp.files.length > 0) return 'INPUT_HAS_FILES'; }
+                return 'NO';
+            })()
+            """) ?? "NO";
+        return attached != "NO";
+    }
+
+    static bool IsTextFile(string ext) => ext is ".txt" or ".log" or ".md" or ".cs" or ".js"
+        or ".ts" or ".py" or ".java" or ".json" or ".yaml" or ".yml" or ".xml" or ".html"
+        or ".htm" or ".csv" or ".css" or ".sql" or ".sh" or ".bat" or ".cfg" or ".ini";
+
     // ── Gemini ──
 
-    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, string? imagePath = null, bool newSession = false)
+    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false)
     {
         Console.WriteLine($"[ASK] Gemini: {question}");
         using var focusGuard = new CdpFocusGuard();
@@ -663,13 +894,9 @@ Examples:
                 using var questionLock = ChromeTabLock.Acquire("Gemini");
                 if (questionLock == null) return (false, (string?)null);
 
-                // ── Image paste (before text) ──
-                if (imagePath != null)
-                {
-                    var imgOk = await PasteImageViaCdp(cdp, imagePath, editorSel);
-                    if (imgOk) await WaitForImageUpload(cdp);
-                    else Console.WriteLine("[ASK] Image paste failed — sending text only");
-                }
+                // ── File attachments (before text) ──
+                if (attachFiles?.Count > 0)
+                    await AttachFilesViaCdp(cdp, attachFiles, editorSel);
 
                 // Tier 1: focusless insert (a11y-first)
                 await ClearContentEditable(cdp, editorSel);
@@ -963,7 +1190,7 @@ Examples:
         "(8) For image analysis: output JSON with {label, text, x, y, w, h} for each UI element. " +
         "(9) Confirm you understood with exactly: READY";
 
-    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, string? imagePath = null, bool newSession = false)
+    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false)
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
         using var focusGuard = new CdpFocusGuard();
@@ -1046,7 +1273,7 @@ Examples:
                 await Task.Delay(1000); // Let ChatGPT UI settle
 
                 // Send the actual question (with 9s-delay retry on timeout)
-                var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, imagePath);
+                var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, attachFiles);
                 if (!ok && string.IsNullOrEmpty(answer))
                 {
                     Console.WriteLine("[ASK] ChatGPT timeout — retrying in 9 seconds...");
@@ -1174,7 +1401,7 @@ Examples:
     /// A11y-first: finds editor via ARIA selector chain, inserts text via CDP Input.insertText.
     /// </summary>
     static async Task<(bool ok, string? text)> ChatGptSendAndWait(
-        CdpClient cdp, string message, int timeoutSec, string? imagePath = null)
+        CdpClient cdp, string message, int timeoutSec, List<string>? attachFiles = null)
     {
         // ── Phase 0: URL check + turn count (iconified OK) ──
         var currentUrl = await cdp.EvalAsync("location.href") ?? "";
@@ -1194,13 +1421,9 @@ Examples:
         using var chatLock = ChromeTabLock.Acquire("ChatGPT");
         if (chatLock == null) return (false, null);
 
-        // ── Image paste (before text) ──
-        if (imagePath != null)
-        {
-            var imgOk = await PasteImageViaCdp(cdp, imagePath, editorSel);
-            if (imgOk) await WaitForImageUpload(cdp);
-            else Console.WriteLine("[ASK] Image paste failed — sending text only");
-        }
+        // ── File attachments (before text) ──
+        if (attachFiles?.Count > 0)
+            await AttachFilesViaCdp(cdp, attachFiles, editorSel);
 
         // Tier 1: focusless insert (a11y-first)
         await ClearContentEditable(cdp, editorSel);
@@ -1242,8 +1465,8 @@ Examples:
         }
 
         // ── Send: JS click → verify → CDP Enter fallback ──
-        // With image attachments, wait for send button to become enabled
-        if (imagePath != null)
+        // With file attachments, wait for send button to become enabled
+        if (attachFiles?.Count > 0)
         {
             for (int bw = 0; bw < 10; bw++)
             {
@@ -1454,6 +1677,14 @@ Examples:
 
             if (state == "DONE" || state == "DONE_EMPTY")
             {
+                // If very little text and early in stream, wait a bit more
+                // (ChatGPT shows "이미지 분석 중" then goes idle briefly before actual response)
+                if (textLen < 50 && sw.Elapsed.TotalSeconds < 30)
+                {
+                    if (textLen > 0) Console.Write(".");
+                    Console.Out.Flush();
+                    continue; // keep polling — likely just a transient idle gap
+                }
                 if (liveHeaderPrinted) Console.WriteLine(); // newline after streamed text
                 Console.WriteLine($"[ASK] Streaming complete ({sw.Elapsed.TotalSeconds:F0}s)");
                 break;
@@ -1483,7 +1714,7 @@ Examples:
             if (hasResponseText)
                 await HandoffTabToPeer("chatgpt");
 
-            if (!hasResponseText && !isThinking && sw.Elapsed.TotalSeconds >= 20)
+            if (!hasResponseText && !isThinking && lastFlushedLen == 0 && sw.Elapsed.TotalSeconds >= 20)
             {
                 Console.WriteLine("[ASK] No response text after 20s — aborting (first-byte timeout)");
                 break;
