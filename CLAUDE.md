@@ -271,6 +271,9 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - 각 액션별 UIA → Win32 → SendInput 3티어 폴백
 - ask 포커스리스 텍스트 삽입 (innerHTML+InputEvent Tier 1), 탭 URL 검증, about:blank 자동 정리
 - ask 턴 감지 다중 셀렉터 (data-message-author-role / conversation-turn / article 폴백)
+- ask 탭 핸드오프 — 동시 질문 시 GPT↔Gemini 탭 상부상조 (BringToFront, 포커스리스)
+  - 스트리밍 중 텍스트 증가/완료 시 자동 탭 양보, 페르소나 완료 대기 후 실제 질문 전송
+  - baseResponseCount로 페르소나 응답 스킵, 새 응답만 감지
 - a11y 조상 프로세스 보호 (자기 프로세스 트리 자동 제외, --force-close-ancestors로 해제)
 - a11y 매칭 윈도우 search key 출력 (hwnd 타겟팅 지원)
 - grap `;` OR 패턴 (a11y 실험), logcat `regex:` 파일 패턴, logcat CWD 스코핑+depth 제한
