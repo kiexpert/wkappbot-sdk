@@ -7,10 +7,6 @@
     <LangVersion>12</LangVersion>
   </PropertyGroup>
 
-  <!-- No external dependencies — uses System.Net.WebSockets + System.Text.Json (built-in) -->
-
-  <ItemGroup>
-    <ProjectReference Include="..\WKAppBot.Abstractions\WKAppBot.Abstractions.csproj" />
-  </ItemGroup>
+  <!-- Zero dependencies — interfaces only -->
 
 </Project>

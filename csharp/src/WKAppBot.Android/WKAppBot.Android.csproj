@@ -7,6 +7,8 @@
     <LangVersion>12</LangVersion>
   </PropertyGroup>
 
-  <!-- No external dependencies — uses System.Diagnostics.Process + System.Xml.Linq + System.Text.Json (built-in) -->
+  <ItemGroup>
+    <ProjectReference Include="..\WKAppBot.Abstractions\WKAppBot.Abstractions.csproj" />
+  </ItemGroup>
 
 </Project>

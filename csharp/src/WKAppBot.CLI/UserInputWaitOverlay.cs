@@ -40,6 +40,8 @@ internal sealed class UserInputWaitWindow : Window
 
     public event Action? Confirmed;
 
+    public bool UseChime { get; set; } // true = 차임벨, false(기본) = 카라오케
+
     public UserInputWaitWindow(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds, int resetSeconds = 30)
     {
         _ownerHwnd = ownerHwnd;
@@ -148,8 +150,8 @@ internal sealed class UserInputWaitWindow : Window
         _countdownTimer.Tick += OnCountdownTick;
         _countdownTimer.Start();
 
-        // 정중한 요청 차임벨 (창 표시 시 재생)
-        Loaded += (_, _) => PlayChime();
+        // 음성 안내: 카라오케(기본) or 차임벨(UseChime)
+        Loaded += (_, _) => { if (UseChime) PlayChime(); else PlaySpeakAnnounce(); };
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -245,7 +247,24 @@ internal sealed class UserInputWaitWindow : Window
         }
     }
 
-    // ── Chime: 정중한 요청 멜로디 (C5→E5→G5→C6 메이저 아르페지오) ──
+    // ── Speak: 카라오케 음성 안내 (기본) ──
+
+    private static void PlaySpeakAnnounce()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "wkappbot",
+                Arguments = "speak \"포커스 양보가 필요합니다\" --bg",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+        }
+        catch { /* best effort — fallback to silent */ }
+    }
+
+    // ── Chime: 정중한 요청 멜로디 (C5→E5→G5→C6 메이저 아르페지오, 옵션) ──
 
     private static void PlayChime()
     {

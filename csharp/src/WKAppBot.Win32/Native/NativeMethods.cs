@@ -92,6 +92,15 @@ public static partial class NativeMethods
     public const uint GA_ROOTOWNER = 3;
 
     [DllImport("user32.dll")]
+    public static extern bool IsChild(IntPtr hWndParent, IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool SetPropW(IntPtr hWnd, string lpString, IntPtr hData);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr GetPropW(IntPtr hWnd, string lpString);
+
+    [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
     // ── GUI thread info (cross-validate focus target) ────────────

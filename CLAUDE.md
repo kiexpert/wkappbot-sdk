@@ -170,6 +170,7 @@ wkappbot eye [--port N] [--interval N]        # AppBotEye 글로벌 루프 (Slac
 wkappbot eye tick                             # one-shot: 모든 클롣/크로 카드 상태+생각 즉시 조회
 wkappbot newchat "prompt" [--file f.txt]      # Claude Desktop 새채팅 열고 프롬프트 입력 (focusless)
 wkappbot readiness [grap] [--point X Y] [--yield] # InputReadiness 진단 (완전 포커스리스, 돋보기 강제)
+wkappbot speak "text" [--bg] [--size N]          # Windows TTS 카라오케 오버레이 (--bg: 백그라운드)
 wkappbot schedule <subcommand>                # add/list/remove/clear (예약 프롬프트)
 wkappbot logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]  # 실시간 로그 추적
 wkappbot ask gpt|gemini "line1" [file.png] "line2" [--slack] [--timeout N] [--new-tab]  # CDP 웹 AI 질문 (인수=줄, 파일=자동첨부, 응답이미지=자동캡처)
@@ -180,7 +181,7 @@ wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령 
   # Async (2): wait(--timeout --interval 폴링 대기), eval(--text "js" CDP 실행)
   # Web auto-fallback: Chrome/Electron 윈도우 → CSS selector 자동감지 → CDP 엔진
   # grap `#`scope: "*메모장*#*파일*" (UIA), "*Chrome*#button.submit" (CSS→CDP)
-  # --all, --nth N (range: 2~4, ~3, 3~), --depth N, --force, --force-close-ancestors, --timeout N, --interval N
+  # --all, --nth N (range: 2~4, ~3, 3~), --depth N, --force, --force-close-ancestors, --timeout N, --interval N, --speak
   # 10-step auto pipeline: find → ancestor protect → blocker dismiss → restore → child walk → UIA scope → tab activate → zoom → execute → feedback
 wkappbot mcp                                   # MCP stdio 서버 (도구 1개: wkappbot)
 # Android ADB (adb:// grap scheme — USB 연결 디바이스 제어)
@@ -352,6 +353,21 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - ask 명령 포커스리스 강화: CdpFocusGuard 삭제, SetForegroundWindow 완전 제거
   - Chrome 리스토어: SW_RESTORE → SW_SHOWNOACTIVATE (포커스리스)
   - UiaLocator.GetFocusChain: FocusedElement → parent chain → target window boundary 트림
+- **AAR (Action-Aware Readiness) Phase 1~7 완료**
+  - IActionTarget 공통 인터페이스 (WKAppBot.Abstractions, zero-dep)
+  - 플랫폼별 구현: UiaActionTarget (Win32), AndroidNode (ADB), CdpActionTarget (CDP)
+  - 6-stage 파이프라인: Global → Target Resolution → Occlusion → Stability → Stale → Action-Specific
+  - 3-state 반환: null=blocked, ==target=success, !=target=retarget
+  - close 중첩 리타겟 (maxDepth=3 + cycle guard)
+  - Stability Probe: 100ms 2-shot BoundingRect 비교 + Win32 SetProp 캐시 (5초 TTL, 프로세스 간 공유)
+  - Stale element 감지: COM ProcessId 접근으로 유효성 확인
+  - DetectBlocker 자식창 오인 수정: IsChild/GA_ROOT 체크 (RichEditD2DPT 등 오인 방지)
+  - **UIA 내부 모달 감지** (Phase 7): WinUI/WPF 저장 다이얼로그 자동 감지
+    - close 4티어: UIA Close → UIA 내부 모달 → WM_CLOSE+DetectBlocker → --force Process.Kill
+    - 기본: 저장 다이얼로그 감지 시 중단 ("use --force to dismiss without saving")
+    - --force: "저장하지 않음"/"Don't Save"/"Cancel" 등 자동 클릭
+  - **핫 포커스 체인 모든 a11y 액션 출력**: 윈도우 검색 직후 UIA 포커스 체인 표시
+  - Key files: ActionReadiness.cs, AdbActionReadiness.cs, CdpActionReadiness.cs, CdpActionTarget.cs
 ### v2.2 Android ADB Integration (Phase A+B+C 완료)
 - **WKAppBot.Android 프로젝트**: AdbClient, AdbDeviceRegistry, AdbGrapRouter, AndroidA11yTree, AdbExperienceDb
 - **adb:// URI 스키마**: `adb://device/package#scope` — Windows grap과 동일한 `#` scope 문법

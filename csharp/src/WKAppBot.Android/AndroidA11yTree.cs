@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using WKAppBot.Abstractions;
 
 namespace WKAppBot.Android;
 
@@ -280,7 +281,7 @@ public class AndroidA11yTree
 
 // ── Android Node ──────────────────────────────────────────
 
-public class AndroidNode
+public class AndroidNode : IActionTarget
 {
     public int Index { get; set; }
     public string Text { get; set; } = "";
@@ -339,6 +340,21 @@ public class AndroidNode
     public int Width => BoundsRight - BoundsLeft;
     public int Height => BoundsBottom - BoundsTop;
     public string BoundsString => $"[{BoundsLeft},{BoundsTop}][{BoundsRight},{BoundsBottom}]";
+
+    // ── IActionTarget explicit implementation ─────────────────
+    // DisplayName, ClassName, Enabled, Focused already match by name.
+
+    string? IActionTarget.Identifier => ResourceId;
+    string IActionTarget.BackendType => "ADB";
+    object? IActionTarget.NativeHandle => this;
+    (int Left, int Top, int Right, int Bottom) IActionTarget.BoundingRect
+        => (BoundsLeft, BoundsTop, BoundsRight, BoundsBottom);
+    bool IActionTarget.Visible => Enabled && Width > 0 && Height > 0;
+    bool IActionTarget.IsOffscreen => false;
+    bool IActionTarget.IsWindow => false;
+    string? IActionTarget.WindowState => null;
+    IActionTarget? IActionTarget.Parent => Parent;
+    IReadOnlyList<IActionTarget> IActionTarget.Children => Children;
 
     /// <summary>
     /// Windows-compatible search key for grap pattern matching.

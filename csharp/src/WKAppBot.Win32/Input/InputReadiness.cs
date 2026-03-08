@@ -512,7 +512,10 @@ public sealed class InputReadiness
                 // 같은 최상위 클래스(Chrome_WidgetWin_1 등) → 형제 윈도우, blocker 아님
                 bool isSiblingWindow = fgCls == mainCls
                     && NativeMethods.GetAncestor(fg, NativeMethods.GA_ROOT) == fg;
-                if (!isSiblingWindow)
+                // mainHwnd의 자손(child/grandchild) → 편집 영역 등, blocker 아님
+                bool isDescendant = NativeMethods.GetAncestor(fg, NativeMethods.GA_ROOT) == mainHwnd
+                    || NativeMethods.IsChild(mainHwnd, fg);
+                if (!isSiblingWindow && !isDescendant)
                     blockerHwnd = fg;
             }
         }
