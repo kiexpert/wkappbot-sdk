@@ -1,6 +1,8 @@
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
+using WKAppBot.Abstractions;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Window;
@@ -181,6 +183,7 @@ internal partial class Program
         bool all = args.Any(a => a == "--all");
         bool force = args.Any(a => a == "--force");
         bool forceCloseAncestors = args.Any(a => a == "--force-close-ancestors");
+        bool speak = args.Any(a => a == "--speak");
 
         // Parse action-specific params
         int? mx = null, my = null, mw = null, mh = null;
@@ -306,12 +309,23 @@ internal partial class Program
             Console.WriteLine($"[A11Y] matched: {SearchKey(targets[0])}");
         }
 
+        // ═══ STEP 4.5: Hot focus chain (show on all actions) ═══
+        try
+        {
+            using var uiaFocus = new UiaLocator();
+            var focusChain = uiaFocus.GetFocusChain(targets[0].Handle);
+            if (!string.IsNullOrEmpty(focusChain))
+                Console.Error.Write(focusChain);
+        }
+        catch { /* best effort */ }
+
         // ═══ STEP 5: Execute on each target ═══
         int ok = 0, fail = 0;
         using var automation = new UIA3Automation();
         automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
         automation.TransactionTimeout = TimeSpan.FromSeconds(5);
         var readiness = CreateInputReadiness();
+        var aar = CreateActionReadiness(readiness);
 
         foreach (var win in targets)
         {
@@ -335,7 +349,9 @@ internal partial class Program
             }
             if (childError) { fail++; continue; }
 
-            // ── 입력위치확보 (EnsureInputReady) ──
+            // ── AAR: 윈도우 레벨 입력위치확보 ──
+            // Window-level readiness: iconic restore + blocker dismiss
+            // Element-level readiness runs later after UIA scope resolution
             if (action != "close" && action != "minimize")
                 EnsureWindowReady(hwnd, $"a11y-{action}", title, readiness);
 
@@ -349,7 +365,7 @@ internal partial class Program
                 if (isCssPattern)
                 {
                     // Telepathy: try CDP on any process that has a debugging port
-                    var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth);
+                    var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak);
                     if (cdpResult != null)
                     {
                         success = cdpResult.Value;
@@ -378,7 +394,7 @@ internal partial class Program
                         if (!isCssPattern && !string.IsNullOrEmpty(uiaPath))
                         {
                             Console.WriteLine($"[A11Y] UIA scope failed, trying CDP telepathy with \"{uiaPath}\"");
-                            var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth);
+                            var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak);
                             if (cdpResult != null)
                             {
                                 success = cdpResult.Value;
@@ -401,6 +417,27 @@ internal partial class Program
 
                 // Tab activation: if target is inside an unselected tab, activate it first
                 EnsureTabActive(root);
+
+                // ── AAR: element-level readiness check ──
+                if (action is not ("read" or "find" or "highlight"))
+                {
+                    var aarTarget = new UiaActionTarget(root);
+                    var aarCtx = new ReadinessContext { Hwnd = hwnd };
+                    var aarResult = aar.Ensure(action, aarTarget, aarCtx);
+                    if (aarResult == null)
+                    {
+                        Console.Error.WriteLine($"[A11Y] AAR blocked: {action} on \"{elName}\"");
+                        fail++;
+                        continue;
+                    }
+                    if (aarResult != aarTarget)
+                    {
+                        // Retarget: AAR found a popup/modal — switch root
+                        Console.WriteLine($"[A11Y] AAR retarget: \"{aarResult.DisplayName}\"");
+                        if (aarResult is UiaActionTarget retargetUia)
+                            root = retargetUia.Element;
+                    }
+                }
 
                 // Zoom: show magnifier/highlight on target element
                 var elRect = GetBoundingRect(root);
@@ -432,6 +469,27 @@ internal partial class Program
                     _ => A11yNotYet(action)
                 };
 
+                // --speak: TTS 카라오케 (a11y 공통 옵션)
+                if (speak && success)
+                {
+                    var speakText = root.Properties.Name.ValueOrDefault;
+                    try { if (string.IsNullOrEmpty(speakText)) speakText = root.Patterns.Value.PatternOrDefault?.Value?.ValueOrDefault?.ToString(); } catch { }
+                    if (!string.IsNullOrWhiteSpace(speakText))
+                    {
+                        try
+                        {
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                            {
+                                FileName = "wkappbot",
+                                Arguments = $"speak \"{speakText.Replace("\"", "'")}\" --bg",
+                                UseShellExecute = false,
+                                CreateNoWindow = true
+                            });
+                        }
+                        catch { /* best effort */ }
+                    }
+                }
+
                 // Zoom result feedback + fade
                 if (zoom != null)
                 {
@@ -443,6 +501,37 @@ internal partial class Program
             }
             else
             {
+                // ── AAR: window-level readiness check ──
+                if (action is not ("close" or "minimize"))
+                {
+                    var aarTarget = new UiaActionTarget(automation.FromHandle(hwnd));
+                    var aarCtx = new ReadinessContext { Hwnd = hwnd };
+                    var aarResult = aar.Ensure(action, aarTarget, aarCtx);
+                    if (aarResult == null)
+                    {
+                        Console.Error.WriteLine($"[A11Y] AAR blocked: {action} on \"{title}\"");
+                        fail++;
+                        continue;
+                    }
+                }
+                else if (action == "close")
+                {
+                    // close: AAR retarget → dismiss child popup first
+                    var aarTarget = new UiaActionTarget(automation.FromHandle(hwnd));
+                    var aarCtx = new ReadinessContext { Hwnd = hwnd };
+                    var aarResult = aar.Ensure(action, aarTarget, aarCtx);
+                    if (aarResult != null && aarResult != aarTarget && aarResult is UiaActionTarget retUia)
+                    {
+                        var retHwnd = retUia.NativeHandle is IntPtr h ? h : IntPtr.Zero;
+                        if (retHwnd != IntPtr.Zero)
+                        {
+                            Console.WriteLine($"[A11Y] AAR: closing child popup \"{aarResult.DisplayName}\" first");
+                            NativeMethods.SendMessageTimeoutW(retHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 3000, out _);
+                            Thread.Sleep(500);
+                        }
+                    }
+                }
+
                 // Zoom: show magnifier/highlight on target window
                 ClickZoomHelper? zoom = null;
                 zoom = ClickZoomHelper.Begin(hwnd, hwnd, $"a11y-{action}", $"\"{title}\"");
@@ -506,10 +595,35 @@ internal partial class Program
             if (el.Patterns.Window.IsSupported)
             {
                 el.Patterns.Window.Pattern.Close();
-                Console.WriteLine($"[A11Y] close {tag} — UIA WindowPattern");
-                return true;
+                Thread.Sleep(500);
+                if (!NativeMethods.IsWindow(hwnd))
+                {
+                    Console.WriteLine($"[A11Y] close {tag} — UIA WindowPattern");
+                    return true;
+                }
+                // Window still alive — save dialog may have appeared (WinUI internal modal)
+                Console.WriteLine($"[A11Y] close {tag} — UIA Close sent but window still alive, checking internal modal...");
+                if (HasUiaInternalModal(automation, hwnd, out var modalButtonName))
+                {
+                    if (force)
+                    {
+                        DismissUiaInternalModal(automation, hwnd, tag, modalButtonName);
+                        Thread.Sleep(500);
+                        if (!NativeMethods.IsWindow(hwnd))
+                        {
+                            Console.WriteLine($"[A11Y] close {tag} — closed after UIA modal dismiss");
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[A11Y] close {tag} — save dialog detected! use --force to dismiss without saving");
+                        return false;
+                    }
+                }
+                // Fall through to Win32 WM_CLOSE tier
             }
-            Console.WriteLine($"[A11Y] close {tag} — UIA not supported, trying Win32");
+            Console.WriteLine($"[A11Y] close {tag} — UIA not sufficient, trying Win32");
         }
         catch (Exception ex)
         {
@@ -535,6 +649,33 @@ internal partial class Program
                 {
                     Console.WriteLine($"[A11Y] close {tag} — closed after dismiss");
                     return true;
+                }
+            }
+            // UIA internal modal detection (WinUI/WPF save dialogs — no separate Win32 popup)
+            if (HasUiaInternalModal(automation, hwnd, out var wmModalBtn))
+            {
+                if (force)
+                {
+                    DismissUiaInternalModal(automation, hwnd, tag, wmModalBtn);
+                    Thread.Sleep(500);
+                    if (!NativeMethods.IsWindow(hwnd))
+                    {
+                        Console.WriteLine($"[A11Y] close {tag} — closed after UIA modal dismiss");
+                        return true;
+                    }
+                    // Retry WM_CLOSE after dismiss
+                    NativeMethods.SendMessageTimeoutW(hwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 3000, out _);
+                    Thread.Sleep(500);
+                    if (!NativeMethods.IsWindow(hwnd))
+                    {
+                        Console.WriteLine($"[A11Y] close {tag} — closed after retry WM_CLOSE");
+                        return true;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[A11Y] close {tag} — save dialog detected! use --force to dismiss without saving");
+                    return false;
                 }
             }
             if (!force)
@@ -563,6 +704,91 @@ internal partial class Program
             Console.Error.WriteLine($"[A11Y] close {tag} — all tiers FAIL: {ex.Message}");
         }
         return false;
+    }
+
+    /// <summary>Known dismiss button names for save dialogs (priority-ordered: don't-save first).</summary>
+    static readonly string[] SaveDialogDismissNames = [
+        "저장하지 않음", "Don't Save", "Don\u2019t Save",
+        "아니오", "No",
+        "취소", "Cancel",
+        "닫기", "Close",
+    ];
+
+    /// <summary>
+    /// Detect UIA internal modal dialog (WinUI/WPF save dialogs — no separate Win32 popup).
+    /// Returns true if a dismiss-able button was found, with the button name in <paramref name="buttonName"/>.
+    /// Does NOT click the button — caller decides based on --force flag.
+    /// </summary>
+    static bool HasUiaInternalModal(UIA3Automation automation, IntPtr hwnd, out string buttonName)
+    {
+        buttonName = "";
+        try
+        {
+            var root = automation.FromHandle(hwnd);
+            if (root == null) return false;
+
+            var cf = new ConditionFactory(new UIA3PropertyLibrary());
+            var buttons = root.FindAllDescendants(cf.ByControlType(ControlType.Button));
+            if (buttons == null || buttons.Length == 0) return false;
+
+            foreach (var dismissName in SaveDialogDismissNames)
+            {
+                foreach (var btn in buttons)
+                {
+                    try
+                    {
+                        var name = btn.Name;
+                        if (!string.IsNullOrEmpty(name) && name.Equals(dismissName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            buttonName = name;
+                            return true;
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Click the dismiss button in a UIA internal modal dialog.
+    /// Called only when --force is specified.
+    /// </summary>
+    static void DismissUiaInternalModal(UIA3Automation automation, IntPtr hwnd, string tag, string buttonName)
+    {
+        try
+        {
+            var root = automation.FromHandle(hwnd);
+            if (root == null) return;
+
+            var cf = new ConditionFactory(new UIA3PropertyLibrary());
+            var buttons = root.FindAllDescendants(cf.ByControlType(ControlType.Button));
+            if (buttons == null) return;
+
+            foreach (var btn in buttons)
+            {
+                try
+                {
+                    var name = btn.Name;
+                    if (!string.IsNullOrEmpty(name) && name.Equals(buttonName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($"[A11Y] close {tag} — UIA internal modal: clicking \"{name}\" (--force)");
+                        if (btn.Patterns.Invoke.IsSupported)
+                            btn.Patterns.Invoke.Pattern.Invoke();
+                        else
+                            btn.Patterns.LegacyIAccessible.Pattern.DoDefaultAction();
+                        return;
+                    }
+                }
+                catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] close {tag} — UIA modal dismiss failed: {ex.Message}");
+        }
     }
 
     static bool A11ySetVisualState(UIA3Automation automation, IntPtr hwnd, string tag, WindowVisualState state)
@@ -824,7 +1050,7 @@ internal partial class Program
     /// Returns true/false on success/failure, or null if CDP is unavailable.
     /// </summary>
     static bool? TryWebViewCdpAction(IntPtr hwnd, string action, string cssSelector,
-        string? text, double? rangeValue, string scrollDir, string scrollAmount, int findDepth)
+        string? text, double? rangeValue, string scrollDir, string scrollAmount, int findDepth, bool speak = false)
     {
         try
         {
@@ -859,6 +1085,25 @@ internal partial class Program
                 }
             }
 
+            // ── AAR: Action-Aware Readiness for CDP ──
+            if (action is not ("read" or "find" or "inspect" or "highlight" or "screenshot" or "ocr" or "eval"))
+            {
+                var cdpAar = new WKAppBot.WebBot.CdpActionReadiness();
+                var (offX, offY) = WKAppBot.WebBot.CdpActionTarget.GetWindowContentOffset(cdp);
+                var cdpTarget = WKAppBot.WebBot.CdpActionTarget.Query(cdp, cssSelector, offX, offY);
+                if (cdpTarget != null)
+                {
+                    var cdpCtx = new WKAppBot.Abstractions.ReadinessContext { Hwnd = hwnd };
+                    var aarResult = cdpAar.Ensure(action, cdpTarget, cdpCtx);
+                    if (aarResult == null)
+                    {
+                        Console.Error.WriteLine($"[A11Y] AAR blocked CDP {action} on \"{cssSelector}\"");
+                        return false;
+                    }
+                }
+                // cdpTarget == null → element not found; let the action itself handle NOT_FOUND
+            }
+
             bool result = action switch
             {
                 "click" or "invoke" => CdpClick(cdp, cssSelector),
@@ -871,6 +1116,29 @@ internal partial class Program
             };
 
             Console.WriteLine($"[A11Y] CDP {action} → {(result ? "OK" : "FAIL")}");
+
+            // --speak: TTS for CDP results too
+            if (speak && result && (action == "read" || action == "find"))
+            {
+                // Re-fetch text content for speak
+                try
+                {
+                    var esc2 = cssSelector.Replace("\\", "\\\\").Replace("'", "\\'");
+                    var txt = cdp.EvalAsync($"document.querySelector('{esc2}')?.textContent?.substring(0,200)||''").GetAwaiter().GetResult();
+                    if (!string.IsNullOrWhiteSpace(txt) && txt != "''")
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "wkappbot",
+                            Arguments = $"speak \"{txt.Replace("\"", "'")}\" --bg",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        });
+                    }
+                }
+                catch { /* best effort */ }
+            }
+
             return result;
         }
         catch (Exception ex)

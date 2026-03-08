@@ -90,8 +90,9 @@ internal partial class Program
 
         var prevFg = NativeMethods.GetForegroundWindow();
 
-        // ── Step 1: /clear + Enter ──
-        if (!SetValueAndSubmit(editEl, vsHwnd, "/clear"))
+        // ── Step 1: /clear via keyboard (slash command menu needs keystroke input!) ──
+        Console.WriteLine("[NEWCHAT] Using keyboard input for slash command (v2)");
+        if (!TypeSlashCommandAndSubmit(editEl, vsHwnd, "/clear"))
             return Error("[NEWCHAT] Failed to send /clear");
         Console.WriteLine("[NEWCHAT] /clear submitted — waiting 3s for reset...");
         Thread.Sleep(3000);
@@ -125,6 +126,55 @@ internal partial class Program
         Console.WriteLine("[NEWCHAT] SUCCESS — /clear + prompt submitted!");
         Console.ResetColor();
         return 0;
+    }
+
+    /// <summary>
+    /// Type a slash command via keyboard input so the autocomplete menu appears,
+    /// then press Enter to select it. SetValue bypasses the menu!
+    /// </summary>
+    static bool TypeSlashCommandAndSubmit(FlaUI.Core.AutomationElements.AutomationElement editEl, IntPtr hwnd, string command)
+    {
+        try
+        {
+            // Focus the edit element first
+            try { editEl.Focus(); Thread.Sleep(100); }
+            catch
+            {
+                NativeMethods.SmartSetForegroundWindow(hwnd);
+                Thread.Sleep(300);
+            }
+
+            // Clear any existing text
+            KeyboardInput.Hotkey(new[] { "ctrl", "a" });
+            Thread.Sleep(50);
+            KeyboardInput.PressKey("delete");
+            Thread.Sleep(100);
+
+            // Type each character via SendInput so the slash command menu triggers
+            foreach (var ch in command)
+            {
+                KeyboardInput.TypeText(ch.ToString());
+                Thread.Sleep(50); // delay for menu to react per keystroke
+            }
+            Console.WriteLine($"[NEWCHAT] Typed '{command}' via keyboard");
+
+            // Wait for autocomplete menu to appear and settle
+            Thread.Sleep(500);
+
+            // DEBUG: pause before Enter to let user inspect the menu
+            Console.WriteLine("[NEWCHAT] DEBUG: /clear typed, waiting 10s before Enter — check VS Code for menu!");
+            Thread.Sleep(10000);
+
+            // Press Enter to select the slash command
+            KeyboardInput.PressKey("enter");
+            Thread.Sleep(200);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[NEWCHAT] TypeSlashCommand failed: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>

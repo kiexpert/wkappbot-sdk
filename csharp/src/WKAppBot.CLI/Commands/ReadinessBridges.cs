@@ -1,3 +1,4 @@
+using WKAppBot.Abstractions;
 using WKAppBot.Core.Runner;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Native;
@@ -28,6 +29,14 @@ internal partial class Program
             ElevationRequester = new ElevationRequesterAdapter(),
         };
     }
+
+    // ── 팩토리: ActionReadiness (AAR) 생성 ──
+
+    /// <summary>
+    /// Create an ActionReadiness (AAR) instance wrapping the given InputReadiness.
+    /// </summary>
+    internal static ActionReadiness CreateActionReadiness(InputReadiness readiness)
+        => new(readiness);
 
     // ── 공용 입력위치확보: iconic zoom + focusless restore + blocker dismiss ──
 

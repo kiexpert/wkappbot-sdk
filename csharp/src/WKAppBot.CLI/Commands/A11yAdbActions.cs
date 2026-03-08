@@ -1,3 +1,4 @@
+using WKAppBot.Abstractions;
 using WKAppBot.Android;
 
 namespace WKAppBot.CLI;
@@ -63,6 +64,26 @@ internal partial class Program
 
         var (serial, displayId) = resolved.Value;
 
+        // ── AAR: device-level readiness ──────────────────
+        var adbAar = new AdbActionReadiness(adb);
+        // Quick global check: device awake? (skip for discovery/window actions)
+        if (action is not ("windows" or "inspect" or "find" or "screenshot" or "ocr"
+            or "read" or "highlight"))
+        {
+            // Use a dummy target for global-only check — Stage 0 only needs serial
+            var globalCtx = new ReadinessContext { Serial = serial };
+            // Create a minimal target from current activity for global check
+            var globalResult = adbAar.Ensure(action,
+                new AdbDummyTarget(), globalCtx);
+            if (globalResult == null)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("[ADB] AAR: device not ready (screen off?)");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+
         // ── Dispatch by action ────────────────────────────
         return action switch
         {
@@ -77,12 +98,12 @@ internal partial class Program
             "minimize"   => AdbKeyAction(adb, serial, "HOME", "minimize", () => adb.Home(serial)),
             "maximize"   => AdbWindowStub("maximize"),
             "restore"    => AdbKeyAction(adb, serial, "RECENT→select", "restore", () => adb.RecentApps(serial)),
-            "move"       => AdbWindowStub("move"),
-            "resize"     => AdbWindowStub("resize"),
+            "move"       => AdbMove(adb, serial, grap, args),
+            "resize"     => AdbResize(adb, serial, grap, args),
             // Element
             "click"      => AdbClick(adb, serial, grap),
             "invoke"     => AdbClick(adb, serial, grap), // invoke = click alias
-            "read"       => AdbRead(adb, serial, grap),
+            "read"       => AdbRead(adb, serial, grap, args),
             "highlight"  => AdbHighlight(adb, serial, grap),
             "toggle"     => AdbToggle(adb, serial, grap),
             "expand"     => AdbExpandCollapse(adb, serial, grap, expand: true),
@@ -284,6 +305,7 @@ internal partial class Program
     {
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
+        VerifyInputFocus(adb, serial, node); // warn only, proceed anyway
 
         Console.Write($"[ADB] Tap ({node.CenterX},{node.CenterY}) {node.DisplayName}... ");
         var r = adb.Tap(node.CenterX, node.CenterY, serial);
@@ -291,6 +313,7 @@ internal partial class Program
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
+        if (!ok) DumpFailureDiagnostics(adb, serial);
 
         LogAdbAction("click", node, grap, serial, ok, ok ? null : r.StdErr);
         return ok ? 0 : 1;
@@ -298,7 +321,7 @@ internal partial class Program
 
     // ── Read ──────────────────────────────────────────────
 
-    static int AdbRead(AdbClient adb, string serial, AdbGrapInfo grap)
+    static int AdbRead(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
@@ -316,6 +339,29 @@ internal partial class Program
         Console.WriteLine($"  focusable:    {node.Focusable}  focused: {node.Focused}");
         Console.WriteLine($"  enabled:      {node.Enabled}  selected: {node.Selected}");
         Console.WriteLine($"  children:     {node.Children.Count}");
+
+        // --speak: TTS 카라오케로 텍스트 읽어주기
+        if (args.Contains("--speak"))
+        {
+            var speakText = !string.IsNullOrEmpty(node.Text) ? node.Text
+                : !string.IsNullOrEmpty(node.ContentDesc) ? node.ContentDesc
+                : node.DisplayName;
+            if (!string.IsNullOrWhiteSpace(speakText))
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "wkappbot",
+                        Arguments = $"speak \"{speakText.Replace("\"", "'")}\" --bg",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                }
+                catch { /* best effort */ }
+            }
+        }
+
         return 0;
     }
 
@@ -355,6 +401,7 @@ internal partial class Program
     {
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
+        VerifyInputFocus(adb, serial, node);
 
         var beforeChecked = node.Checked;
         Console.Write($"[ADB] Toggle ({(beforeChecked ? "ON→OFF" : "OFF→ON")}) {node.DisplayName}... ");
@@ -398,6 +445,7 @@ internal partial class Program
     {
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
+        VerifyInputFocus(adb, serial, node);
 
         var actionName = expand ? "expand" : "collapse";
         var beforeChildren = node.Children.Count;
@@ -447,6 +495,7 @@ internal partial class Program
     {
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
+        VerifyInputFocus(adb, serial, node);
 
         Console.Write($"[ADB] Select {node.DisplayName}... ");
         var r = adb.Tap(node.CenterX, node.CenterY, serial);
@@ -454,6 +503,7 @@ internal partial class Program
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
+        if (!ok) DumpFailureDiagnostics(adb, serial);
 
         // Verify selected state
         if (ok)
@@ -480,6 +530,7 @@ internal partial class Program
     {
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
+        VerifyInputFocus(adb, serial, node);
 
         var direction = "down";
         for (int i = 0; i < args.Length; i++)
@@ -502,6 +553,7 @@ internal partial class Program
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
+        if (!ok) DumpFailureDiagnostics(adb, serial);
 
         LogAdbAction($"scroll-{direction}", node, grap, serial, ok, ok ? null : r.StdErr);
         return ok ? 0 : 1;
@@ -533,6 +585,9 @@ internal partial class Program
         Console.WriteLine("OK");
         Thread.Sleep(200);
 
+        // Verify focus landed on target
+        if (!VerifyInputFocus(adb, serial, node)) return 1;
+
         return AdbInputText(adb, serial, text, node, grap, "type");
     }
 
@@ -561,6 +616,9 @@ internal partial class Program
         adb.Tap(node.CenterX, node.CenterY, serial);
         Console.WriteLine("OK");
         Thread.Sleep(200);
+
+        // Verify focus landed on target
+        if (!VerifyInputFocus(adb, serial, node)) return 1;
 
         // Select all + delete existing text
         Console.Write("[ADB] Clear existing text... ");
@@ -598,6 +656,7 @@ internal partial class Program
 
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
+        VerifyInputFocus(adb, serial, node);
 
         // Clamp 0~1, map to X position within bounds
         var ratio = Math.Clamp(value.Value, 0.0, 1.0);
@@ -610,6 +669,7 @@ internal partial class Program
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
+        if (!ok) DumpFailureDiagnostics(adb, serial);
 
         LogAdbAction("set-range", node, grap, serial, ok, $"ratio={ratio:F2}");
         return ok ? 0 : 1;
@@ -621,6 +681,7 @@ internal partial class Program
     {
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
+        VerifyInputFocus(adb, serial, node);
 
         Console.Write($"[ADB] Focus tap ({node.CenterX},{node.CenterY}) {node.DisplayName}... ");
         var r = adb.Tap(node.CenterX, node.CenterY, serial);
@@ -628,6 +689,7 @@ internal partial class Program
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
+        if (!ok) DumpFailureDiagnostics(adb, serial);
 
         LogAdbAction("focus", node, grap, serial, ok, ok ? null : r.StdErr);
         return ok ? 0 : 1;
@@ -740,6 +802,7 @@ internal partial class Program
     {
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
+        VerifyInputFocus(adb, serial, node); // warn only — coordinate action
 
         var durationMs = 1000;
         for (int i = 0; i < args.Length; i++)
@@ -752,6 +815,7 @@ internal partial class Program
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
+        if (!ok) DumpFailureDiagnostics(adb, serial);
 
         LogAdbAction("long-press", node, grap, serial, ok, ok ? null : r.StdErr);
         return ok ? 0 : 1;
@@ -785,6 +849,7 @@ internal partial class Program
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
         Console.ResetColor();
+        if (!ok) DumpFailureDiagnostics(adb, serial);
 
         if (!string.IsNullOrEmpty(fullPkg))
             AdbExpDb.LogAction(fullPkg, new AdbActionLog
@@ -801,6 +866,182 @@ internal partial class Program
     {
         Console.Write($"[ADB] {actionName} (keyevent {keyName})... ");
         var r = action();
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
+        Console.ResetColor();
+        if (!ok) DumpFailureDiagnostics(adb, serial);
+        return ok ? 0 : 1;
+    }
+
+    // ── Move / Resize (DeX freeform via am task resize) ──
+
+    /// <summary>Find task ID for package via dumpsys activity recents</summary>
+    static int? FindTaskId(AdbClient adb, string serial, string packagePattern)
+    {
+        var r = adb.Shell("dumpsys activity recents", serial, 5000);
+        if (!r.IsOk) return null;
+
+        var matcher = GrapMatcher.Create(packagePattern);
+        foreach (var line in r.StdOut.Split('\n'))
+        {
+            // * Recent #0: Task{xxx #24927 type=standard A=10254:com.android.chrome}
+            var trimmed = line.Trim();
+            if (!trimmed.StartsWith("* Recent") && !trimmed.StartsWith("Recent")) continue;
+
+            // Task ID is the second # in the line: "Recent #0: Task{xxx #24925 type=..."
+            var firstHash = trimmed.IndexOf('#');
+            if (firstHash < 0) continue;
+            var secondHash = trimmed.IndexOf('#', firstHash + 1);
+            if (secondHash < 0) continue;
+            var spaceAfter = trimmed.IndexOf(' ', secondHash);
+            if (spaceAfter < 0) continue;
+            if (!int.TryParse(trimmed[(secondHash + 1)..spaceAfter], out var taskId)) continue;
+
+            // Check if package matches (after A= or in the line)
+            var aIdx = trimmed.IndexOf("A=");
+            if (aIdx >= 0)
+            {
+                var pkg = trimmed[(aIdx + 2)..].TrimEnd('}').Trim();
+                // A=10254:com.android.chrome → extract package after ':'
+                var colonIdx = pkg.IndexOf(':');
+                if (colonIdx >= 0) pkg = pkg[(colonIdx + 1)..];
+                if (matcher.IsMatch(pkg)) return taskId;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Get current window bounds from dumpsys window (fast, no uiautomator dump)</summary>
+    static (int left, int top, int right, int bottom)? GetCurrentBounds(AdbClient adb, string serial, string? packagePattern)
+    {
+        if (string.IsNullOrEmpty(packagePattern)) return null;
+
+        var matcher = GrapMatcher.Create(packagePattern);
+        var r = adb.Shell("dumpsys window windows", serial, 5000);
+        if (!r.IsOk) return null;
+
+        bool inMatchingWindow = false;
+        foreach (var line in r.StdOut.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("Window #") && trimmed.Contains("Window{"))
+            {
+                inMatchingWindow = false;
+                var pkgStart = trimmed.IndexOf("u0 ");
+                if (pkgStart >= 0)
+                {
+                    var pkgStr = trimmed[(pkgStart + 3)..].TrimEnd(':', '}');
+                    var slashIdx = pkgStr.IndexOf('/');
+                    if (slashIdx >= 0) pkgStr = pkgStr[..slashIdx];
+                    if (matcher.IsMatch(pkgStr)) inMatchingWindow = true;
+                }
+            }
+            if (inMatchingWindow && trimmed.Contains("mBounds=Rect("))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(trimmed,
+                    @"mBounds=Rect\((\d+),\s*(\d+)\s*-\s*(\d+),\s*(\d+)\)");
+                if (match.Success)
+                    return (int.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value),
+                            int.Parse(match.Groups[3].Value), int.Parse(match.Groups[4].Value));
+            }
+        }
+        return null;
+    }
+
+    static int AdbMove(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
+    {
+        int? x = null, y = null;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--x" && i + 1 < args.Length && int.TryParse(args[i + 1], out var vx)) x = vx;
+            if (args[i] == "--y" && i + 1 < args.Length && int.TryParse(args[i + 1], out var vy)) y = vy;
+        }
+
+        if (x == null && y == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[ADB] --x and/or --y required for move action");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var pkg = grap.Package ?? "*";
+        var taskId = FindTaskId(adb, serial, pkg);
+        if (taskId == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[ADB] Task not found for package '{pkg}'");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var bounds = GetCurrentBounds(adb, serial, grap.Package);
+        if (bounds == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[ADB] Cannot determine current window bounds");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var (cl, ct, cr, cb) = bounds.Value;
+        var w = cr - cl;
+        var h = cb - ct;
+        var newL = x ?? cl;
+        var newT = y ?? ct;
+
+        Console.Write($"[ADB] Move task {taskId} → ({newL},{newT}) {w}x{h}... ");
+        var r = adb.Shell($"am task resize {taskId} {newL} {newT} {newL + w} {newT + h}", serial);
+        var ok = r.IsOk;
+        Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
+        Console.ResetColor();
+        return ok ? 0 : 1;
+    }
+
+    static int AdbResize(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
+    {
+        int? w = null, h = null;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--w" && i + 1 < args.Length && int.TryParse(args[i + 1], out var vw)) w = vw;
+            if (args[i] == "--h" && i + 1 < args.Length && int.TryParse(args[i + 1], out var vh)) h = vh;
+        }
+
+        if (w == null && h == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[ADB] --w and/or --h required for resize action");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var pkg = grap.Package ?? "*";
+        var taskId = FindTaskId(adb, serial, pkg);
+        if (taskId == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[ADB] Task not found for package '{pkg}'");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var bounds = GetCurrentBounds(adb, serial, grap.Package);
+        if (bounds == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[ADB] Cannot determine current window bounds");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var (cl, ct, cr, cb) = bounds.Value;
+        var newW = w ?? (cr - cl);
+        var newH = h ?? (cb - ct);
+
+        Console.Write($"[ADB] Resize task {taskId} → {newW}x{newH} at ({cl},{ct})... ");
+        var r = adb.Shell($"am task resize {taskId} {cl} {ct} {cl + newW} {ct + newH}", serial);
         var ok = r.IsOk;
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine(ok ? "OK" : $"FAILED: {r.StdErr}");
@@ -935,8 +1176,147 @@ internal partial class Program
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine($"FAILED: {r.StdErr}");
         Console.ResetColor();
+        DumpFailureDiagnostics(adb, serial);
         LogAdbAction(actionName, node, grap, serial, false, r.StdErr);
         return 1;
+    }
+
+    // ── Pre-input focus verification ──────────────────
+
+    /// <summary>
+    /// Verify the target node has keyboard focus using the already-dumped tree (no re-dump).
+    /// Walks Parent chain to root, then searches for focused node.
+    /// If focused node ≠ target → dump hot focus chain + IME as warning, return false.
+    /// </summary>
+    static bool VerifyInputFocus(AdbClient adb, string serial, AndroidNode targetNode)
+    {
+        try
+        {
+            // Walk up to root from target (tree already dumped by ResolveAdbTarget)
+            var root = targetNode;
+            while (root.Parent != null) root = root.Parent;
+
+            var focused = FindFocusedNode(root);
+            if (focused == null) return true; // no focus info → proceed
+
+            // Match by resource-id or content-desc or text
+            bool matches = false;
+            if (!string.IsNullOrEmpty(targetNode.ResourceId) && targetNode.ResourceId == focused.ResourceId)
+                matches = true;
+            else if (!string.IsNullOrEmpty(targetNode.ContentDesc) && targetNode.ContentDesc == focused.ContentDesc)
+                matches = true;
+            else if (!string.IsNullOrEmpty(targetNode.Text) && targetNode.Text == focused.Text)
+                matches = true;
+            else if (targetNode.ClassName == focused.ClassName
+                     && targetNode.BoundsLeft == focused.BoundsLeft && targetNode.BoundsTop == focused.BoundsTop)
+                matches = true; // same class + same position
+
+            if (!matches)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                var targetLabel = !string.IsNullOrEmpty(targetNode.ShortResourceId) ? targetNode.ShortResourceId : targetNode.DisplayName;
+                var focusLabel = !string.IsNullOrEmpty(focused.ShortResourceId) ? focused.ShortResourceId : focused.DisplayName;
+                var msg = $"focus mismatch — target: {targetLabel}, focused: {focusLabel}";
+                Console.WriteLine($"[ADB] ⚠ {msg}");
+                Console.ResetColor();
+                DumpFailureDiagnostics(adb, serial);
+
+                // Device notification + TTS speak (best effort, background)
+                try
+                {
+                    adb.Shell($"cmd notification post -t WKAppBot FOCUS_WARN '⚠ {targetLabel} ≠ {focusLabel}'", serial);
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "wkappbot",
+                        Arguments = $"speak \"포커스 불일치: {targetLabel}\" --bg",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                }
+                catch { /* best effort */ }
+
+                return false;
+            }
+        }
+        catch { /* best effort */ }
+        return true;
+    }
+
+    private static AndroidNode? FindFocusedNode(AndroidNode node)
+    {
+        if (node.Focused) return node;
+        foreach (var child in node.Children)
+        {
+            var found = FindFocusedNode(child);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    // ── Failure diagnostics (hot focus + IME) ─────────
+
+    /// <summary>
+    /// On action failure, dump hot focus chain + IME status for instant diagnosis.
+    /// Shows: focused element chain + IME visibility (HoneyBoard, SwiftKey, etc.)
+    /// </summary>
+    static void DumpFailureDiagnostics(AdbClient adb, string serial)
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("[ADB] ── failure diagnostics ──");
+        Console.ResetColor();
+
+        // 1. Hot focus chain from fresh tree dump
+        try
+        {
+            var tree = new AndroidA11yTree(adb);
+            var root = tree.GetRoot(serial, forceRefresh: true);
+            if (root != null)
+            {
+                var focusChain = AndroidA11yTree.GetFocusChain(root);
+                if (!string.IsNullOrEmpty(focusChain))
+                    Console.Write(focusChain);
+                else
+                    Console.WriteLine("  (no focused element detected)");
+            }
+        }
+        catch { /* best effort */ }
+
+        // 2. IME status
+        try
+        {
+            var r = adb.Shell("dumpsys input_method | grep -E 'mCurId|mInputShown|mWindowVisible'", serial, 3000);
+            if (r.IsOk)
+            {
+                var lines = r.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                string? imeId = null;
+                bool imeShown = false;
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("mCurId="))
+                    {
+                        // mCurId=com.samsung.android.honeyboard/.service.HoneyBoardService → "honeyboard"
+                        var val = trimmed["mCurId=".Length..];
+                        var slash = val.IndexOf('/');
+                        var pkg = slash >= 0 ? val[..slash] : val;
+                        var dot = pkg.LastIndexOf('.');
+                        imeId = dot >= 0 ? pkg[(dot + 1)..] : pkg;
+                    }
+                    else if (trimmed.Contains("mInputShown=true"))
+                        imeShown = true;
+                }
+
+                if (imeId != null)
+                {
+                    var icon = imeShown ? "⚡" : "○";
+                    var state = imeShown ? "visible" : "hidden";
+                    Console.ForegroundColor = imeShown ? ConsoleColor.Magenta : ConsoleColor.DarkGray;
+                    Console.WriteLine($"  {icon} [IME] {imeId} ({state})");
+                    Console.ResetColor();
+                }
+            }
+        }
+        catch { /* best effort */ }
     }
 
     static int AdbUnsupported(string action)
@@ -991,5 +1371,24 @@ internal partial class Program
         var knowhows = AdbExpDb.GetKnowhowFiles(package, screenName);
         foreach (var (path, tag) in knowhows)
             ShowKnowhowBroadcast(path, tag);
+    }
+
+    /// <summary>Minimal IActionTarget for device-level AAR global check (no real element).</summary>
+    private sealed class AdbDummyTarget : IActionTarget
+    {
+        public string DisplayName => "(device)";
+        public string? Identifier => null;
+        public string? ClassName => null;
+        public string BackendType => "ADB";
+        public object? NativeHandle => null;
+        public (int Left, int Top, int Right, int Bottom) BoundingRect => (0, 0, 1, 1);
+        public bool Focused => false;
+        public bool Enabled => true;
+        public bool Visible => true;
+        public bool IsOffscreen => false;
+        public bool IsWindow => false;
+        public string? WindowState => null;
+        public IActionTarget? Parent => null;
+        public IReadOnlyList<IActionTarget> Children => [];
     }
 }
