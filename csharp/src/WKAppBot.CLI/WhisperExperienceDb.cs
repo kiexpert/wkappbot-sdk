@@ -1,0 +1,598 @@
+using System.Speech.AudioFormat;
+using System.Speech.Recognition;
+using System.Text.Json;
+using NAudio.Lame;
+using NAudio.Wave;
+
+namespace WKAppBot.CLI;
+
+/// <summary>
+/// Whisper Experience DB — token JSONL logging + Windows STT auto-labeling.
+/// Logs every non-silence frame with 32-bit token, mode, levels, and optional STT label.
+///
+/// Architecture:
+///   WhisperEngine.OnFrame → WhisperExperienceDb.LogFrame()
+///   Windows STT (parallel) → recognized text tagged to recent token window
+///
+/// Storage: wkappbot.hq/profiles/whisper_exp/
+///   tokens_{date}.jsonl  — per-frame token log
+///   stt_{date}.jsonl     — STT recognition results with token window
+/// </summary>
+internal sealed class WhisperExperienceDb : IDisposable
+{
+    private readonly string _basePath;
+    private StreamWriter? _tokenWriter;
+    private StreamWriter? _sttWriter;
+    private string _currentDate = "";
+    private readonly object _writeLock = new();
+
+    // STT engine + WASAPI loopback (system audio → STT for learning)
+    private SpeechRecognitionEngine? _sttEngine;
+    private Thread? _sttThread;
+    private volatile bool _sttRunning;
+    private volatile string? _lastSttResult;
+    private long _lastSttTicks;
+    private volatile string _lastSttMode = "QUIET"; // mode at recognition time
+    private WasapiLoopbackCapture? _loopback;
+    private SttPipeStream? _sttPipe;
+
+    // Recent token window for STT alignment
+    private readonly List<(long ticks, uint token, string mode)> _tokenWindow = new();
+    private const int TokenWindowSize = 60; // ~2 seconds at 33fps
+    private volatile string _currentMode = "QUIET"; // updated every LogFrame
+
+    // MP3 segment recording (voice activity → sentence-level MP3 files)
+    private string? _wavDir;
+    private LameMP3FileWriter? _mp3Writer;
+    private string? _wavPath; // current segment file path
+    private volatile bool _isRecording;
+    private int _quietFrames;
+    private const int QuietTrailFrames = 33; // ~1 second trailing silence before cut
+    private readonly object _wavLock = new();
+    private volatile string? _segmentSttLabel; // STT draft label for current segment
+
+    // Auto-study trigger: fires when _unknown/ reaches threshold
+    private int _autoStudyThreshold = 10;
+    private volatile bool _autoStudyRunning;
+    /// <summary>Fired when _unknown/ folder reaches threshold. Handler should run study in background.</summary>
+    public event Action<int>? OnAutoStudyNeeded; // arg = file count
+
+    public bool IsLogging => _tokenWriter != null;
+    public bool IsSttActive => _sttRunning;
+
+    public WhisperExperienceDb(string? basePath = null)
+    {
+        _basePath = basePath ?? Path.Combine(
+            AppContext.BaseDirectory, "wkappbot.hq", "profiles", "whisper_exp");
+        Directory.CreateDirectory(_basePath);
+    }
+
+    /// <summary>Start JSONL token logging.</summary>
+    public void StartLogging()
+    {
+        EnsureWriter();
+    }
+
+    /// <summary>Start Windows STT fed by WASAPI loopback (system audio → STT for learning).</summary>
+    public bool StartStt()
+    {
+        if (_sttRunning) return true;
+
+        try
+        {
+            // Prefer English recognizer (YouTube content) — Korean segments → _unknown/ → Gemini handles
+            var recognizers = SpeechRecognitionEngine.InstalledRecognizers();
+            var chosen = recognizers.FirstOrDefault(r => r.Culture.Name.StartsWith("en"))
+                      ?? recognizers.FirstOrDefault(r => r.Culture.Name.StartsWith("ko"))
+                      ?? recognizers.First();
+            Console.WriteLine($"[WHISPER] STT recognizer: {chosen.Description} ({chosen.Culture.Name})");
+            _sttEngine = new SpeechRecognitionEngine(chosen);
+
+            _sttEngine.LoadGrammar(new DictationGrammar());
+
+            // WASAPI loopback → resample to 16kHz mono 16bit → pipe to STT
+            _loopback = new WasapiLoopbackCapture();
+            _sttPipe = new SttPipeStream();
+            var srcFormat = _loopback.WaveFormat;
+
+            _loopback.DataAvailable += (_, e) =>
+            {
+                // Stereo resample (48kHz float → 16kHz 16bit stereo) for WAV recording
+                var src1 = new RawSourceWaveStream(new MemoryStream(e.Buffer, 0, e.BytesRecorded), srcFormat);
+                using var stereoResampler = new MediaFoundationResampler(src1, new WaveFormat(16000, 16, 2))
+                {
+                    ResamplerQuality = 30,
+                };
+                var stereoBuf = new byte[e.BytesRecorded];
+                int stereoRead = stereoResampler.Read(stereoBuf, 0, stereoBuf.Length);
+                if (stereoRead > 0)
+                    WriteWavData(stereoBuf, stereoRead);
+
+                // Mono resample (48kHz float → 16kHz 16bit mono) for STT engine
+                var src2 = new RawSourceWaveStream(new MemoryStream(e.Buffer, 0, e.BytesRecorded), srcFormat);
+                using var monoResampler = new MediaFoundationResampler(src2, new WaveFormat(16000, 16, 1))
+                {
+                    ResamplerQuality = 30,
+                };
+                var monoBuf = new byte[e.BytesRecorded];
+                int monoRead = monoResampler.Read(monoBuf, 0, monoBuf.Length);
+                if (monoRead > 0)
+                    _sttPipe.Write(monoBuf, 0, monoRead);
+            };
+
+            var sttFormat = new SpeechAudioFormatInfo(16000, AudioBitsPerSample.Sixteen, AudioChannel.Mono);
+            _sttEngine.SetInputToAudioStream(_sttPipe, sttFormat);
+
+            WireSttEvents();
+
+            _loopback.StartRecording();
+
+            _sttRunning = true;
+            _sttThread = new Thread(() =>
+            {
+                try { _sttEngine.RecognizeAsync(RecognizeMode.Multiple); }
+                catch (Exception ex)
+                {
+                    _sttRunning = false;
+                    Console.Error.WriteLine($"[WHISPER] STT RecognizeAsync failed: {ex.Message}");
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "WhisperSTT",
+            };
+            _sttThread.Start();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[WHISPER] STT loopback failed: {ex.Message}, falling back to mic");
+            // Fallback: mic input
+            try { _loopback?.Dispose(); } catch { }
+            _loopback = null;
+            _sttPipe = null;
+            return StartSttMic();
+        }
+    }
+
+    /// <summary>Fallback: STT from default microphone.</summary>
+    private bool StartSttMic()
+    {
+        try
+        {
+            if (_sttEngine == null)
+            {
+                var recognizers = SpeechRecognitionEngine.InstalledRecognizers();
+                var chosen = recognizers.FirstOrDefault(r => r.Culture.Name.StartsWith("en"))
+                          ?? recognizers.FirstOrDefault(r => r.Culture.Name.StartsWith("ko"))
+                          ?? recognizers.First();
+                _sttEngine = new SpeechRecognitionEngine(chosen);
+            }
+
+            if (_sttEngine.Grammars.Count == 0)
+                _sttEngine.LoadGrammar(new DictationGrammar());
+            _sttEngine.SetInputToDefaultAudioDevice();
+
+            WireSttEvents();
+
+            _sttRunning = true;
+            _sttThread = new Thread(() =>
+            {
+                try { _sttEngine.RecognizeAsync(RecognizeMode.Multiple); }
+                catch (Exception ex)
+                {
+                    _sttRunning = false;
+                    Console.Error.WriteLine($"[WHISPER] STT-Mic RecognizeAsync failed: {ex.Message}");
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "WhisperSTT-Mic",
+            };
+            _sttThread.Start();
+            return true;
+        }
+        catch
+        {
+            _sttEngine?.Dispose();
+            _sttEngine = null;
+            return false;
+        }
+    }
+
+    private bool _eventsWired;
+    private void WireSttEvents()
+    {
+        if (_eventsWired || _sttEngine == null) return;
+        _eventsWired = true;
+
+        _sttEngine.SpeechRecognized += (_, e) =>
+        {
+            Console.Error.WriteLine($"[WHISPER:STT] recognized: \"{e.Result.Text}\" conf={e.Result.Confidence:F2}");
+            if (e.Result.Confidence < 0.3f) return;
+
+            var result = new SttResult
+            {
+                Ticks = DateTime.UtcNow.Ticks,
+                Text = e.Result.Text,
+                Confidence = e.Result.Confidence,
+                TokenWindow = GetRecentTokens(),
+            };
+
+            _lastSttResult = e.Result.Text;
+            _lastSttTicks = result.Ticks;
+            _lastSttMode = _currentMode;
+            if (_isRecording) _segmentSttLabel = e.Result.Text; // label WAV with STT draft
+
+            WriteSttResult(result);
+        };
+
+        _sttEngine.SpeechRecognitionRejected += (_, e) =>
+        {
+            var topAlt = e.Result.Alternates.Count > 0 ? e.Result.Alternates[0] : null;
+            Console.Error.WriteLine($"[WHISPER:STT] rejected: alts={e.Result.Alternates.Count} top=\"{topAlt?.Text}\" conf={topAlt?.Confidence:F2}");
+            if (e.Result.Alternates.Count > 0)
+            {
+                var best = e.Result.Alternates[0];
+                if (best.Confidence >= 0.15f)
+                {
+                    var result = new SttResult
+                    {
+                        Ticks = DateTime.UtcNow.Ticks,
+                        Text = $"?{best.Text}",
+                        Confidence = best.Confidence,
+                        TokenWindow = GetRecentTokens(),
+                    };
+
+                    _lastSttResult = result.Text;
+                    _lastSttTicks = result.Ticks;
+                    _lastSttMode = _currentMode;
+
+                    WriteSttResult(result);
+                }
+            }
+        };
+    }
+
+    /// <summary>Log a single frame (call from WhisperEngine.OnFrame).</summary>
+    public void LogFrame(WhisperFrame frame)
+    {
+        _currentMode = frame.Mode;
+
+        // WAV segment recording: voice activity detection
+        if (frame.Mode == "QUIET")
+        {
+            if (_isRecording)
+            {
+                _quietFrames++;
+                if (_quietFrames >= QuietTrailFrames)
+                    StopWavSegment();
+            }
+            return; // skip silence for token log
+        }
+        else
+        {
+            _quietFrames = 0;
+            if (!_isRecording)
+                StartWavSegment(frame.Mode);
+        }
+
+        var ticks = DateTime.UtcNow.Ticks;
+
+        // Track token window for STT alignment
+        lock (_tokenWindow)
+        {
+            _tokenWindow.Add((ticks, frame.Token, frame.Mode));
+            while (_tokenWindow.Count > TokenWindowSize)
+                _tokenWindow.RemoveAt(0);
+        }
+
+        // Write token JSONL
+        EnsureWriter();
+        var entry = new TokenEntry
+        {
+            T = ticks,
+            Tk = frame.Token,
+            M = frame.Mode,
+            L = frame.Levels,
+            E = Math.Round(frame.MaxEnergy, 6),
+        };
+
+        lock (_writeLock)
+        {
+            _tokenWriter?.WriteLine(JsonSerializer.Serialize(entry,
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+        }
+    }
+
+    /// <summary>Flush and rotate writers if date changed.</summary>
+    public void Flush()
+    {
+        lock (_writeLock)
+        {
+            _tokenWriter?.Flush();
+            _sttWriter?.Flush();
+        }
+    }
+
+    private string[] GetRecentTokens()
+    {
+        lock (_tokenWindow)
+        {
+            return _tokenWindow
+                .TakeLast(20)
+                .Select(t => $"{t.token:X8}:{t.mode[0]}")
+                .ToArray();
+        }
+    }
+
+    private void EnsureWriter()
+    {
+        var date = DateTime.Now.ToString("yyyyMMdd");
+        if (date == _currentDate && _tokenWriter != null) return;
+
+        lock (_writeLock)
+        {
+            _tokenWriter?.Flush();
+            _tokenWriter?.Dispose();
+            _sttWriter?.Flush();
+            _sttWriter?.Dispose();
+
+            _currentDate = date;
+            _tokenWriter = new StreamWriter(
+                Path.Combine(_basePath, $"tokens_{date}.jsonl"), append: true)
+            { AutoFlush = false };
+            _sttWriter = new StreamWriter(
+                Path.Combine(_basePath, $"stt_{date}.jsonl"), append: true)
+            { AutoFlush = false };
+        }
+    }
+
+    private void StartWavSegment(string mode)
+    {
+        lock (_wavLock)
+        {
+            if (_isRecording) return;
+            _wavDir ??= Path.Combine(_basePath, "wav");
+            Directory.CreateDirectory(_wavDir);
+
+            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+            var tag = mode == "WHSPR" ? "W" : "V";
+            _wavPath = Path.Combine(_wavDir, $"{stamp}_{tag}.mp3");
+            _segmentSttLabel = null; // reset label for new segment
+            try
+            {
+                var waveFormat = new WaveFormat(16000, 16, 2); // stereo
+                _mp3Writer = new LameMP3FileWriter(_wavPath, waveFormat, 64); // 64kbps — good for speech
+                _isRecording = true;
+            }
+            catch { _mp3Writer = null; _wavPath = null; }
+        }
+    }
+
+    private void StopWavSegment()
+    {
+        lock (_wavLock)
+        {
+            _isRecording = false;
+            // Append 0.5s silence padding for clear sentence boundary
+            try
+            {
+                var silence = new byte[32000]; // 0.5s at 16kHz 16bit stereo = 32000 bytes
+                _mp3Writer?.Write(silence, 0, silence.Length);
+            }
+            catch { }
+            try { _mp3Writer?.Dispose(); } catch { }
+            _mp3Writer = null;
+
+            // Move WAV into STT-labeled folder: wav/_unknown/xxx.wav → wav/the_best_time/xxx.wav
+            // Same word → same folder → auto-categorized training dataset!
+            if (_wavPath != null)
+            {
+                try
+                {
+                    var label = _segmentSttLabel != null
+                        ? SanitizeFileName(_segmentSttLabel)
+                        : "_unknown";
+                    if (label.Length == 0) label = "_unknown";
+
+                    var targetDir = Path.Combine(_wavDir!, label);
+                    Directory.CreateDirectory(targetDir);
+                    var newPath = Path.Combine(targetDir, Path.GetFileName(_wavPath));
+                    if (!File.Exists(newPath))
+                        File.Move(_wavPath, newPath);
+                }
+                catch { /* move is best-effort */ }
+            }
+            _wavPath = null;
+            _segmentSttLabel = null;
+        }
+
+        // Check auto-study trigger
+        CheckAutoStudyTrigger();
+    }
+
+    private void CheckAutoStudyTrigger()
+    {
+        if (_autoStudyRunning || OnAutoStudyNeeded == null) return;
+        try
+        {
+            var unknownDir = Path.Combine(_basePath, "wav", "_unknown");
+            if (!Directory.Exists(unknownDir)) return;
+            var count = Directory.GetFiles(unknownDir, "*.mp3").Length;
+            if (count >= _autoStudyThreshold)
+            {
+                _autoStudyRunning = true;
+                OnAutoStudyNeeded.Invoke(count);
+            }
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Call when auto-study batch completes (success or fail).</summary>
+    public void NotifyAutoStudyDone() => _autoStudyRunning = false;
+
+    private static string SanitizeFileName(string text)
+    {
+        // Keep first ~40 chars, replace invalid chars with underscore, trim
+        if (text.Length > 40) text = text[..40];
+        var invalid = Path.GetInvalidFileNameChars();
+        var sb = new System.Text.StringBuilder(text.Length);
+        foreach (var c in text)
+            sb.Append(invalid.Contains(c) || c == '?' ? '_' : c == ' ' ? '_' : c);
+        return sb.ToString().Trim('_');
+    }
+
+    /// <summary>Write resampled audio to MP3 segment (called from loopback callback).</summary>
+    internal void WriteWavData(byte[] buffer, int count)
+    {
+        if (!_isRecording || count <= 0) return;
+        lock (_wavLock)
+        {
+            try { _mp3Writer?.Write(buffer, 0, count); }
+            catch { /* ignore write errors */ }
+        }
+    }
+
+    private void WriteSttResult(SttResult result)
+    {
+        EnsureWriter();
+        lock (_writeLock)
+        {
+            _sttWriter?.WriteLine(JsonSerializer.Serialize(result,
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+            _sttWriter?.Flush(); // STT events are rare, flush immediately
+        }
+    }
+
+    public void Stop()
+    {
+        _sttRunning = false;
+        StopWavSegment(); // close any active WAV segment
+        try { _loopback?.StopRecording(); } catch { }
+        try { _loopback?.Dispose(); } catch { }
+        _loopback = null;
+        try { _sttPipe?.Close(); } catch { }
+        _sttPipe = null;
+        try { _sttEngine?.RecognizeAsyncCancel(); } catch { }
+        try { _sttEngine?.Dispose(); } catch { }
+        _sttEngine = null;
+
+        Flush();
+        lock (_writeLock)
+        {
+            _tokenWriter?.Dispose();
+            _tokenWriter = null;
+            _sttWriter?.Dispose();
+            _sttWriter = null;
+        }
+    }
+
+    public void Dispose() => Stop();
+
+    /// <summary>Get stats for display.</summary>
+    public (string? lastStt, long lastSttTicks, string lastSttMode, int windowSize) GetStatus()
+        => (_lastSttResult, _lastSttTicks, _lastSttMode, _tokenWindow.Count);
+
+    // ── JSON models ──
+
+    private sealed class TokenEntry
+    {
+        public long T { get; set; }      // UTC ticks
+        public uint Tk { get; set; }     // 32-bit token
+        public string M { get; set; } = ""; // mode
+        public int[] L { get; set; } = []; // levels[8]
+        public double E { get; set; }    // maxEnergy
+    }
+
+    private sealed class SttResult
+    {
+        public long Ticks { get; set; }
+        public string Text { get; set; } = "";
+        public float Confidence { get; set; }
+        public string[] TokenWindow { get; set; } = []; // recent tokens at recognition time
+    }
+}
+
+/// <summary>
+/// Circular buffer Stream for piping WASAPI loopback audio to SpeechRecognitionEngine.
+/// Write side (loopback callback) never blocks. Read side (STT engine) blocks when empty.
+/// </summary>
+internal sealed class SttPipeStream : Stream
+{
+    private readonly byte[] _buffer = new byte[64 * 1024]; // 64KB ring
+    private int _writePos;
+    private int _readPos;
+    private int _count;
+    private readonly object _lock = new();
+    private bool _closed;
+
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => true;
+    public override long Length => _count;
+    public override long Position { get => 0; set { } }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        lock (_lock)
+        {
+            while (_count == 0 && !_closed)
+                Monitor.Wait(_lock, 100);
+
+            if (_count == 0 && _closed) return 0;
+
+            int toRead = Math.Min(count, _count);
+            int firstChunk = Math.Min(toRead, _buffer.Length - _readPos);
+            Array.Copy(_buffer, _readPos, buffer, offset, firstChunk);
+            if (toRead > firstChunk)
+                Array.Copy(_buffer, 0, buffer, offset + firstChunk, toRead - firstChunk);
+
+            _readPos = (_readPos + toRead) % _buffer.Length;
+            _count -= toRead;
+            return toRead;
+        }
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        lock (_lock)
+        {
+            if (_closed) return;
+
+            // Drop oldest data if buffer full (prefer freshness over completeness)
+            int space = _buffer.Length - _count;
+            if (count > space)
+            {
+                int drop = count - space;
+                _readPos = (_readPos + drop) % _buffer.Length;
+                _count -= drop;
+            }
+
+            int toWrite = Math.Min(count, _buffer.Length);
+            int srcOffset = offset + count - toWrite; // take the latest bytes if trimmed
+            int firstChunk = Math.Min(toWrite, _buffer.Length - _writePos);
+            Array.Copy(buffer, srcOffset, _buffer, _writePos, firstChunk);
+            if (toWrite > firstChunk)
+                Array.Copy(buffer, srcOffset + firstChunk, _buffer, 0, toWrite - firstChunk);
+
+            _writePos = (_writePos + toWrite) % _buffer.Length;
+            _count += toWrite;
+            Monitor.PulseAll(_lock);
+        }
+    }
+
+    public override void Close()
+    {
+        lock (_lock)
+        {
+            _closed = true;
+            Monitor.PulseAll(_lock);
+        }
+        base.Close();
+    }
+
+    public override void Flush() { }
+    public override long Seek(long offset, SeekOrigin origin) => 0;
+    public override void SetLength(long value) { }
+}
