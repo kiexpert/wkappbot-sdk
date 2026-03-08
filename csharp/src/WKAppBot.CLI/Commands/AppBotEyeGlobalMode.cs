@@ -1068,6 +1068,7 @@ internal partial class Program
             latest = ReadLatestTick(out tickRead, out tickParse);
             _cachedLatestTick = latest;
             _cachedCards = ReadEyeCards(staleSeconds: 86400); // 24 hours
+            SupplementCardsFromPrompts(_cachedCards);
         }
         swTick.Stop();
 
@@ -1315,9 +1316,10 @@ internal partial class Program
             Console.WriteLine($"[PROF] PromptPreview={msPrompt}ms (stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms)");
             Console.Out.Flush();
 
-            // ── Phase 3: ReadEyeCards ──
+            // ── Phase 3: ReadEyeCards + prompt-based discovery ──
             swPhase.Restart();
             var cards = ReadEyeCards(staleSeconds: 86400); // 24 hours
+            SupplementCardsFromPrompts(cards);
             swPhase.Stop();
             var msCards = swPhase.ElapsedMilliseconds;
             Console.WriteLine($"[PROF] ReadEyeCards={msCards}ms (count={cards.Count})");
@@ -1903,15 +1905,25 @@ internal partial class Program
                         ? (string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : c.ParentTitle)
                         : cwdTag;
                     sb.AppendLine($"[{header}] {c.ParentName}:{c.ParentPid}");
-                    // If last tick is older than 30s, show idle state instead of stale command info
-                    if (age > 30)
+                    // Context % per card (CWD → session JSONL size → ctx%)
+                    var ctxTag = "";
+                    var (cardCtx, jsonlAge) = GetContextInfoForCwd(c.Cwd);
+                    if (cardCtx >= 0) ctxTag = $" ctx={cardCtx}%";
+                    // For prompt-discovered cards, use JSONL age instead of tick age
+                    if (c.LastTag == "prompt-discovered" && jsonlAge != null)
                     {
-                        sb.AppendLine($"클롣 상태: 대기중 ({ageText})");
+                        var jAge = (int)jsonlAge.Value.TotalSeconds;
+                        var jAgeText = jAge < 60 ? $"{jAge}초 전" : jAge < 3600 ? $"{jAge / 60}분 전" : $"{jAge / 3600}시간 전";
+                        sb.AppendLine($"클롣 상태: 대기중 ({jAgeText}){ctxTag}");
+                    }
+                    else if (age > 30)
+                    {
+                        sb.AppendLine($"클롣 상태: 대기중 ({ageText}){ctxTag}");
                     }
                     else
                     {
                         sb.AppendLine($"클롣 작업: {c.LastTag}");
-                        sb.AppendLine($"클롣 상태: {c.LastStatus} ({ageText})");
+                        sb.AppendLine($"클롣 상태: {c.LastStatus} ({ageText}){ctxTag}");
                     }
                     // 클롣 생각: CWD별 Claude Code 세션에서 최신 assistant 텍스트
                     var clotThought = ReadClotThoughtForCwd(c.Cwd);
@@ -2195,6 +2207,82 @@ internal partial class Program
     /// Per-CWD cache to avoid re-reading unchanged files.
     /// </summary>
     static readonly Dictionary<string, (string file, string preview, long len, DateTime mtime)> _clotThoughtCache = new();
+
+    /// <summary>Extract CWD from VS Code window title. Pattern: "... - FolderName - Visual Studio Code"</summary>
+    static string? ExtractCwdFromVsCodeTitle(string title)
+    {
+        // VS Code title: "file.cs - WKAppBot - Visual Studio Code" → "WKAppBot"
+        // Then try to find matching directory in common roots
+        // Handle suffixes: "... - Visual Studio Code", "... - Visual Studio Code - Modified", etc.
+        var vscIdx = title.IndexOf(" - Visual Studio Code", StringComparison.OrdinalIgnoreCase);
+        if (vscIdx < 0) return null;
+        var withoutSuffix = title[..vscIdx]; // "file.cs - WKAppBot"
+        var lastDash = withoutSuffix.LastIndexOf(" - ", StringComparison.Ordinal);
+        var folderName = lastDash >= 0 ? withoutSuffix[(lastDash + 3)..].Trim() : withoutSuffix.Trim();
+        if (string.IsNullOrEmpty(folderName)) return null;
+
+        // Search common code roots for a directory matching this name
+        var searchRoots = new[] { @"W:\GitHub", @"W:\HTS_Project", @"C:\Users\edenc\projects" };
+        foreach (var root in searchRoots)
+        {
+            var candidate = Path.Combine(root, folderName);
+            if (Directory.Exists(candidate)) return candidate;
+        }
+        // Fallback: reverse-map from ~/.claude/projects/ dir names
+        // e.g. "w--GitHub-WKAppBot" → ends with "-WKAppBot" → match "WKAppBot"
+        // Then reverse: "w--GitHub-WKAppBot" → "w:\GitHub\WKAppBot"
+        var cpDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects");
+        if (Directory.Exists(cpDir))
+        {
+            var suffix2 = "-" + folderName.Replace('_', '-');
+            foreach (var dir in Directory.GetDirectories(cpDir))
+            {
+                var dirName = Path.GetFileName(dir);
+                if (dirName != null && dirName.EndsWith(suffix2, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Reverse: "w--GitHub-WKAppBot" → "w:\GitHub\WKAppBot"
+                    var reversed = dirName.Replace("--", ":\\", StringComparison.Ordinal)
+                                          .Replace('-', '\\');
+                    // Underscores were replaced with dashes in the mapping, can't perfectly reverse
+                    if (Directory.Exists(reversed)) return reversed;
+                    return reversed; // best effort — GetContextPctForCwd will re-map anyway
+                }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Get context usage % and JSONL age for a specific CWD's session.</summary>
+    static (int pct, TimeSpan? age) GetContextInfoForCwd(string? cwd)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return (-1, null);
+        try
+        {
+            var projName = cwd.Replace(':', '-').Replace('\\', '-').Replace('/', '-').Replace('_', '-');
+            var projDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects", projName);
+            if (!Directory.Exists(projDir)) return (-1, null);
+
+            // Find most recently modified JSONL (= active session)
+            string? latestFile = null;
+            DateTime latestMtime = DateTime.MinValue;
+            foreach (var jsonl in Directory.GetFiles(projDir, "*.jsonl"))
+            {
+                try
+                {
+                    var mtime = File.GetLastWriteTimeUtc(jsonl);
+                    if (mtime > latestMtime) { latestMtime = mtime; latestFile = jsonl; }
+                }
+                catch { }
+            }
+            if (latestFile == null) return (-1, null);
+            var size = new FileInfo(latestFile).Length;
+            var pct = size > 0 ? (int)(size / (1024.0 * 1024.0) / 40.0 * 100) : -1;
+            var age = DateTime.UtcNow - latestMtime;
+            return (pct, age);
+        }
+        catch { return (-1, null); }
+    }
 
     static string ReadClotThoughtForCwd(string? cwd)
     {
@@ -2646,6 +2734,38 @@ internal partial class Program
 
     static bool IsMetaTag(string? tag) =>
         !string.IsNullOrWhiteSpace(tag) && _metaTags.Contains(tag!);
+
+    /// <summary>Supplement tick-based cards with VS Code windows that have no tick (idle Claude Code sessions).</summary>
+    static void SupplementCardsFromPrompts(List<EyeParentCard> cards)
+    {
+        try
+        {
+            var cardCwds = new HashSet<string>(cards.Select(c => c.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/')),
+                StringComparer.OrdinalIgnoreCase);
+            using var discHelper = new ClaudePromptHelper();
+            var allPrompts = discHelper.FindAllPrompts();
+            foreach (var p in allPrompts)
+            {
+                if (p.HostType != "vscode-claudecode" && p.HostType != "Code") continue;
+                var cwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
+                if (string.IsNullOrEmpty(cwd)) continue;
+                var cwdKey = cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
+                if (cardCwds.Contains(cwdKey)) continue;
+                cards.Add(new EyeParentCard
+                {
+                    ParentPid = p.WindowHandle.ToInt32(),
+                    ParentName = "Code",
+                    ParentTitle = p.WindowTitle,
+                    LastTag = "prompt-discovered",
+                    LastStatus = "idle",
+                    LastTsUtc = DateTime.UtcNow.AddMinutes(-1),
+                    Cwd = cwd,
+                });
+                cardCwds.Add(cwdKey);
+            }
+        }
+        catch { }
+    }
 
     static List<EyeParentCard> ReadEyeCards(int staleSeconds = 86400)
     {

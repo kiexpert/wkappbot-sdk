@@ -1,0 +1,800 @@
+using System.Diagnostics;
+using System.Speech.Recognition;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using NAudio.Wave;
+using NAudio.Lame;
+
+namespace WKAppBot.CLI;
+
+/// <summary>
+/// whisper study — batch MP3 audio segments → Gemini transcription with word-level timing.
+///
+/// Architecture:
+///   1. Scan whisper_exp/wav/ for MP3 files (prioritize _unknown/)
+///   2. Concat N files into a multi-minute batch file (NAudio)
+///   3. Send to Gemini with karaoke prompt → word-level JSON with timing + speaker
+///   4. Parse response → move files to correct label folders
+///   5. Save analysis to study_{date}.jsonl
+///
+/// Usage:
+///   wkappbot whisper study [--batch N] [--engine gemini] [--dry-run]
+///   wkappbot whisper stats
+/// </summary>
+internal partial class Program
+{
+    static int WhisperStudyCommand(string[] args)
+    {
+        if (args.Length > 0 && args[0] == "stats")
+            return WhisperStatsCommand();
+
+        // Parse options
+        int batchSize = 10;
+        bool dryRun = false;
+        string engine = "gemini"; // gemini (default) or gpt
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--batch" && i + 1 < args.Length)
+                int.TryParse(args[++i], out batchSize);
+            else if (args[i] == "--dry-run")
+                dryRun = true;
+            else if (args[i] == "--engine" && i + 1 < args.Length)
+                engine = args[++i].ToLowerInvariant();
+        }
+        batchSize = Math.Clamp(batchSize, 1, 50);
+
+        var basePath = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq", "profiles", "whisper_exp");
+        var wavDir = Path.Combine(basePath, "wav");
+        if (!Directory.Exists(wavDir))
+        {
+            Console.WriteLine("[STUDY] No wav/ directory found. Run whisper first to record audio segments.");
+            return 1;
+        }
+
+        // Collect MP3 files: prioritize _unknown/, then other folders
+        var mp3Files = CollectMp3Files(wavDir, batchSize);
+        if (mp3Files.Count == 0)
+        {
+            Console.WriteLine("[STUDY] No MP3 files to study.");
+            return 0;
+        }
+
+        Console.WriteLine($"[STUDY] Found {mp3Files.Count} MP3 files for batch analysis");
+        foreach (var f in mp3Files)
+            Console.WriteLine($"  {Path.GetRelativePath(wavDir, f)}");
+
+        // ── STT re-labeling pass: Windows Speech Recognition on each file (offline, no YouTube noise) ──
+        Console.WriteLine($"[STUDY] STT re-labeling {mp3Files.Count} files...");
+        var sttLabels = SttRelabelFiles(mp3Files);
+        int sttOk = sttLabels.Values.Count(v => !string.IsNullOrEmpty(v.Text));
+        Console.WriteLine($"[STUDY] STT recognized {sttOk}/{mp3Files.Count} files");
+
+        // Concat MP3s into a single batch file with silence separators
+        var batchFile = Path.Combine(basePath, $"study_batch_{DateTime.Now:yyyyMMdd_HHmmss}.mp3");
+        var segmentMap = ConcatMp3Files(mp3Files, batchFile);
+        if (segmentMap == null || segmentMap.Count == 0)
+        {
+            Console.WriteLine("[STUDY] Failed to concat MP3 files.");
+            return 1;
+        }
+
+        Console.WriteLine($"[STUDY] Batch file: {batchFile} ({new FileInfo(batchFile).Length / 1024}KB, {segmentMap.Count} segments)");
+
+        // Build the karaoke prompt
+        var prompt = BuildKaraokePrompt(segmentMap);
+        Console.WriteLine($"[STUDY] Prompt length: {prompt.Length} chars");
+
+        if (dryRun)
+        {
+            Console.WriteLine("[STUDY] Dry run — prompt:");
+            Console.WriteLine(prompt);
+            try { File.Delete(batchFile); } catch { }
+            return 0;
+        }
+
+        // Send to AI via existing ask infrastructure (Gemini primary, GPT fallback)
+        Console.WriteLine($"[STUDY] Sending to {engine}...");
+        var (success, response) = AskAiForStudy(batchFile, prompt, engine);
+        if (!success || string.IsNullOrWhiteSpace(response))
+        {
+            // Fallback: if Gemini failed, try GPT
+            if (engine == "gemini")
+            {
+                Console.WriteLine("[STUDY] Gemini failed — trying GPT fallback...");
+                (success, response) = AskAiForStudy(batchFile, prompt, "gpt");
+            }
+            if (!success || string.IsNullOrWhiteSpace(response))
+            {
+                Console.WriteLine("[STUDY] AI query failed or empty response.");
+                // Keep batch file for manual retry
+                return 1;
+            }
+        }
+
+        Console.WriteLine($"[STUDY] Response length: {response.Length} chars");
+
+        // Parse JSON response
+        var studyResults = ParseStudyResponse(response, segmentMap);
+        if (studyResults == null || studyResults.Count == 0)
+        {
+            Console.WriteLine("[STUDY] Failed to parse response. Raw:");
+            Console.WriteLine(response.Length > 2000 ? response[..2000] + "..." : response);
+            SaveRawResponse(basePath, response, segmentMap);
+            return 1;
+        }
+
+        Console.WriteLine($"[STUDY] Parsed {studyResults.Count} segments");
+
+        // Move files to correct label folders (Gemini transcript preferred, STT fallback)
+        int moved = 0;
+        foreach (var result in studyResults)
+        {
+            if (result.SourceFile == null || !File.Exists(result.SourceFile)) continue;
+
+            // Gemini transcript is primary; STT is fallback if Gemini returned empty
+            var transcript = result.Transcript;
+            if (string.IsNullOrWhiteSpace(transcript) && sttLabels.TryGetValue(result.SourceFile, out var sttFb))
+                transcript = sttFb.Text;
+
+            var label = SanitizeFolderName(transcript ?? "_unknown");
+            if (string.IsNullOrWhiteSpace(label)) label = "_unknown";
+
+            var currentFolder = Path.GetFileName(Path.GetDirectoryName(result.SourceFile)) ?? "";
+            string destPath;
+            if (currentFolder == label)
+            {
+                destPath = result.SourceFile;
+                Console.WriteLine($"  [=] {Path.GetFileName(result.SourceFile)} already in [{label}]");
+            }
+            else
+            {
+                var targetDir = Path.Combine(wavDir, label);
+                Directory.CreateDirectory(targetDir);
+                destPath = Path.Combine(targetDir, Path.GetFileName(result.SourceFile));
+                if (File.Exists(destPath))
+                    continue; // duplicate
+                try
+                {
+                    File.Move(result.SourceFile, destPath);
+                    moved++;
+                    Console.WriteLine($"  [→] {Path.GetFileName(result.SourceFile)} → [{label}]");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"  [!] Move failed: {ex.Message}");
+                    continue;
+                }
+            }
+
+            // Drop companion JSON (always — update even for already-in-place files)
+            DropCompanionJson(destPath, result, sttLabels);
+        }
+        Console.WriteLine($"[STUDY] Moved {moved}/{studyResults.Count} files");
+
+        // Save study results to JSONL
+        SaveStudyResults(basePath, studyResults);
+
+        // Cleanup batch file
+        try { File.Delete(batchFile); } catch { }
+
+        Console.WriteLine("[STUDY] Done!");
+        return 0;
+    }
+
+    /// <summary>Collect MP3 files, prioritizing: no companion JSON > _unknown/ > other folders.</summary>
+    static List<string> CollectMp3Files(string wavDir, int maxCount)
+    {
+        // Gather all MP3s from all directories
+        var allMp3s = new List<string>();
+
+        // _unknown/ folder
+        var unknownDir = Path.Combine(wavDir, "_unknown");
+        if (Directory.Exists(unknownDir))
+            allMp3s.AddRange(Directory.GetFiles(unknownDir, "*.mp3"));
+
+        // Other subfolders
+        foreach (var subDir in Directory.GetDirectories(wavDir).OrderBy(d => d))
+        {
+            if (Path.GetFileName(subDir) == "_unknown") continue;
+            allMp3s.AddRange(Directory.GetFiles(subDir, "*.mp3"));
+        }
+
+        // Root wav/ folder
+        allMp3s.AddRange(Directory.GetFiles(wavDir, "*.mp3")
+            .Where(f => !Path.GetFileName(f).StartsWith("study_batch_")));
+
+        // Sort by companion JSON age: no JSON = MinValue (oldest/first), then by JSON write time
+        return allMp3s
+            .OrderBy(f =>
+            {
+                var jp = Path.ChangeExtension(f, ".json");
+                return File.Exists(jp) ? File.GetLastWriteTime(jp) : DateTime.MinValue;
+            })
+            .ThenBy(f => f)
+            .Take(maxCount)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Concat MP3 files into single file with 1-second silence between segments.
+    /// Returns list of (startMs, durationMs, sourceFile) for each segment.
+    /// </summary>
+    static List<StudySegmentMap>? ConcatMp3Files(List<string> files, string outputPath)
+    {
+        var segments = new List<StudySegmentMap>();
+        try
+        {
+            var stereoFormat = new WaveFormat(16000, 16, 2);
+            using var mp3Writer = new LameMP3FileWriter(outputPath, stereoFormat, 64);
+
+            int currentMs = 0;
+            var silenceBytes = new byte[32000]; // 0.5s at 16kHz 16bit stereo
+
+            for (int i = 0; i < files.Count; i++)
+            {
+                // Add silence separator between segments
+                if (i > 0)
+                {
+                    mp3Writer.Write(silenceBytes, 0, silenceBytes.Length);
+                    mp3Writer.Write(silenceBytes, 0, silenceBytes.Length); // 1.0s total silence
+                    currentMs += 1000;
+                }
+
+                var startMs = currentMs;
+                try
+                {
+                    using var reader = new Mp3FileReader(files[i]);
+                    // Resample to match output format
+                    using var resampler = new MediaFoundationResampler(reader, stereoFormat)
+                    {
+                        ResamplerQuality = 30,
+                    };
+
+                    var buf = new byte[8192];
+                    int totalBytes = 0;
+                    int read;
+                    while ((read = resampler.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        mp3Writer.Write(buf, 0, read);
+                        totalBytes += read;
+                    }
+
+                    // Calculate duration: bytes / (sampleRate * channels * bytesPerSample)
+                    var durationMs = (int)(totalBytes / (16000.0 * 2 * 2) * 1000);
+                    currentMs += durationMs;
+
+                    segments.Add(new StudySegmentMap
+                    {
+                        Index = i + 1,
+                        StartMs = startMs,
+                        DurationMs = durationMs,
+                        SourceFile = files[i],
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[STUDY] Skip {Path.GetFileName(files[i])}: {ex.Message}");
+                }
+            }
+
+            return segments;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[STUDY] Concat failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Build the English karaoke prompt for Gemini.</summary>
+    static string BuildKaraokePrompt(List<StudySegmentMap> segments)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("You are a professional audio transcription and analysis tool.");
+        sb.AppendLine("I'm building a karaoke system for language learning.");
+        sb.AppendLine();
+        sb.AppendLine("This audio file contains multiple short speech segments separated by ~1 second silence gaps.");
+        sb.AppendLine("Each segment is a short phrase or sentence from an English lesson or conversation.");
+        sb.AppendLine();
+        sb.AppendLine("Segment timing map (approximate):");
+        foreach (var seg in segments)
+        {
+            var endMs = seg.StartMs + seg.DurationMs;
+            sb.AppendLine($"  Segment {seg.Index}: {seg.StartMs}ms ~ {endMs}ms (file: {Path.GetFileName(seg.SourceFile)})");
+        }
+        sb.AppendLine();
+        sb.AppendLine("For EACH segment, provide a JSON object with:");
+        sb.AppendLine("1. Full transcript of the speech");
+        sb.AppendLine("2. Word-level timing (start_ms relative to segment start, duration_ms)");
+        sb.AppendLine("3. Speaker identification (speaker_1, speaker_2, etc. — different voices get different IDs)");
+        sb.AppendLine("4. L/R stereo phase analysis if noticeable (phase_lr_deg: estimated degrees, 0=center)");
+        sb.AppendLine("5. Confidence score (0.0~1.0) — how confident you are in the transcript accuracy");
+        sb.AppendLine("6. Detected language code (e.g. \"en\", \"ko\", \"ja\", \"zh\")");
+        sb.AppendLine("7. silence_before_ms — milliseconds of silence/noise BEFORE the first word starts speaking");
+        sb.AppendLine();
+        sb.AppendLine("Respond with ONLY a JSON array, no markdown fences, no explanation:");
+        sb.AppendLine("[");
+        sb.AppendLine("  {");
+        sb.AppendLine("    \"segment\": 1,");
+        sb.AppendLine("    \"transcript\": \"Hello, how are you today?\",");
+        sb.AppendLine("    \"speaker\": \"speaker_1\",");
+        sb.AppendLine("    \"confidence\": 0.95,");
+        sb.AppendLine("    \"language\": \"en\",");
+        sb.AppendLine("    \"silence_before_ms\": 120,");
+        sb.AppendLine("    \"words\": [");
+        sb.AppendLine("      {\"word\": \"Hello\", \"start_ms\": 120, \"dur_ms\": 350, \"phase_lr_deg\": 0.0},");
+        sb.AppendLine("      {\"word\": \"how\", \"start_ms\": 520, \"dur_ms\": 200, \"phase_lr_deg\": 0.0}");
+        sb.AppendLine("    ]");
+        sb.AppendLine("  }");
+        sb.AppendLine("]");
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Send batch audio to AI (Gemini or GPT) via `ask` command and capture response.
+    /// Reuses existing AskCommand infrastructure (persona, tab routing, file attachment, streaming).
+    /// </summary>
+    static (bool success, string? response) AskAiForStudy(string audioFile, string prompt, string engine = "gemini")
+    {
+        // Write prompt to temp file (too long for command line arg)
+        var promptFile = Path.Combine(Path.GetTempPath(), $"whisper_study_prompt_{DateTime.Now:HHmmss}.txt");
+        File.WriteAllText(promptFile, prompt);
+
+        try
+        {
+            // Capture console output from AskCommand
+            var originalOut = Console.Out;
+            var capture = new StringWriter();
+            var tee = new StudyCaptureWriter(originalOut, capture); // write to both console and capture
+            Console.SetOut(tee);
+
+            try
+            {
+                // Call AskCommand directly: ask <engine> "prompt text" audioFile.mp3 --timeout 120
+                // File args are auto-detected by AskCommand (existing file → attachment)
+                var askArgs = new List<string> { engine };
+
+                // Add audio file first (auto-detected as attachment by AskCommand)
+                if (File.Exists(audioFile))
+                    askArgs.Add(audioFile);
+
+                // Add prompt text lines (each line = separate arg for AskCommand)
+                foreach (var line in prompt.Split('\n'))
+                {
+                    var trimmed = line.TrimEnd('\r');
+                    if (trimmed.Length > 0)
+                        askArgs.Add(trimmed);
+                }
+
+                askArgs.Add("--timeout");
+                askArgs.Add("120");
+
+                Console.WriteLine($"[STUDY] Calling: ask {engine} <{askArgs.Count - 2} lines> {Path.GetFileName(audioFile)} --timeout 120");
+                AskCommand(askArgs.ToArray());
+            }
+            finally
+            {
+                Console.SetOut(originalOut);
+            }
+
+            // Extract AI answer from captured output
+            var output = capture.ToString();
+            var response = ExtractGeminiAnswer(output);
+            return (response != null, response);
+        }
+        finally
+        {
+            try { File.Delete(promptFile); } catch { }
+        }
+    }
+
+    /// <summary>Extract Gemini answer text from captured ask command output.</summary>
+    static string? ExtractGeminiAnswer(string output)
+    {
+        // Prefer full answer markers (not truncated)
+        const string beginMarker = "[ASK_FULL_ANSWER_BEGIN]";
+        const string endMarker = "[ASK_FULL_ANSWER_END]";
+        var beginIdx = output.IndexOf(beginMarker);
+        var endIdx = output.IndexOf(endMarker);
+        if (beginIdx >= 0 && endIdx > beginIdx)
+        {
+            var answer = output[(beginIdx + beginMarker.Length)..endIdx].Trim();
+            if (answer.Length > 0) return answer;
+        }
+
+        // Fallback: truncated display output
+        const string marker = "── Gemini 답변 ──";
+        var idx = output.IndexOf(marker);
+        if (idx < 0) return null;
+
+        var answerStart = idx + marker.Length;
+        while (answerStart < output.Length && (output[answerStart] == '\r' || output[answerStart] == '\n'))
+            answerStart++;
+
+        if (answerStart >= output.Length) return null;
+        var fallback = output[answerStart..].Trim();
+        if (fallback.EndsWith("... (truncated)"))
+            fallback = fallback[..^"... (truncated)".Length].Trim();
+
+        return fallback.Length > 0 ? fallback : null;
+    }
+
+    /// <summary>
+    /// Run Windows STT (SpeechRecognitionEngine) on each MP3 file individually.
+    /// Converts MP3→WAV in temp, runs synchronous Recognize(), returns per-file labels.
+    /// Offline processing = no YouTube audio interference.
+    /// </summary>
+    static Dictionary<string, SttLabel> SttRelabelFiles(List<string> mp3Files)
+    {
+        var results = new Dictionary<string, SttLabel>(StringComparer.OrdinalIgnoreCase);
+
+        // Pick best recognizer (English preferred for YouTube content)
+        var recognizers = SpeechRecognitionEngine.InstalledRecognizers();
+        var chosen = recognizers.FirstOrDefault(r => r.Culture.Name.StartsWith("en"))
+                  ?? recognizers.FirstOrDefault(r => r.Culture.Name.StartsWith("ko"))
+                  ?? recognizers.FirstOrDefault();
+        if (chosen == null)
+        {
+            Console.WriteLine("[STT] No speech recognizer available");
+            return results;
+        }
+        Console.WriteLine($"[STT] Using: {chosen.Description} ({chosen.Culture.Name})");
+
+        for (int fi = 0; fi < mp3Files.Count; fi++)
+        {
+            var mp3Path = mp3Files[fi];
+            var fileName = Path.GetFileName(mp3Path);
+            string? wavTemp = null;
+            try
+            {
+                // Convert MP3 → WAV temp file (SpeechRecognitionEngine requires WAV)
+                wavTemp = Path.Combine(Path.GetTempPath(), $"stt_{Guid.NewGuid():N}.wav");
+                using (var reader = new Mp3FileReader(mp3Path))
+                {
+                    // Resample to 16kHz mono (optimal for speech recognition)
+                    var monoFormat = new WaveFormat(16000, 16, 1);
+                    using var resampler = new MediaFoundationResampler(reader, monoFormat)
+                    {
+                        ResamplerQuality = 30,
+                    };
+                    WaveFileWriter.CreateWaveFile(wavTemp, resampler);
+                }
+
+                // Run synchronous recognition
+                using var engine = new SpeechRecognitionEngine(chosen);
+                engine.LoadGrammar(new DictationGrammar());
+                engine.SetInputToWaveFile(wavTemp);
+
+                var result = engine.Recognize(TimeSpan.FromSeconds(30));
+                if (result != null && result.Confidence >= 0.3f)
+                {
+                    // Embed STT result in filename: seg_001.mp3 → seg_001_hello_how_are_you.mp3
+                    var sttTag = SanitizeSttTag(result.Text);
+                    var newPath = mp3Path;
+                    if (!string.IsNullOrEmpty(sttTag))
+                    {
+                        var dir = Path.GetDirectoryName(mp3Path) ?? "";
+                        var nameNoExt = Path.GetFileNameWithoutExtension(mp3Path);
+                        // Don't re-tag if already tagged (avoid stacking)
+                        if (!nameNoExt.Contains("_stt_"))
+                        {
+                            var newName = $"{nameNoExt}_stt_{sttTag}.mp3";
+                            newPath = Path.Combine(dir, newName);
+                            try
+                            {
+                                File.Move(mp3Path, newPath);
+                                // Update mp3Files list entry for downstream (concat, move)
+                                mp3Files[fi] = newPath;
+                            }
+                            catch { newPath = mp3Path; } // rename failed, keep original
+                        }
+                    }
+                    results[newPath] = new SttLabel(result.Text, result.Confidence);
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"  [STT] {Path.GetFileName(newPath)}: \"{result.Text}\" ({result.Confidence:P0})");
+                    Console.ResetColor();
+                }
+                else
+                {
+                    results[mp3Path] = new SttLabel("", 0f);
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"  [STT] {fileName}: (no recognition)");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                results[mp3Path] = new SttLabel("", 0f);
+                Console.WriteLine($"  [STT] {fileName}: error — {ex.Message}");
+            }
+            finally
+            {
+                if (wavTemp != null) try { File.Delete(wavTemp); } catch { }
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>Drop companion JSON with full analysis next to an MP3 file.</summary>
+    static void DropCompanionJson(string mp3Path, StudyResult result, Dictionary<string, SttLabel> sttLabels)
+    {
+        try
+        {
+            var jsonPath = Path.ChangeExtension(mp3Path, ".json");
+            var sttEntry = (result.SourceFile != null && sttLabels.TryGetValue(result.SourceFile, out var sttE))
+                ? sttE : new SttLabel("", 0f);
+
+            int mp3DurationMs = 0;
+            try
+            {
+                using var dur = new Mp3FileReader(mp3Path);
+                mp3DurationMs = (int)dur.TotalTime.TotalMilliseconds;
+            }
+            catch { }
+
+            var companion = new
+            {
+                source = Path.GetFileName(result.SourceFile ?? mp3Path),
+                transcript = result.Transcript,
+                confidence = result.Confidence,
+                language = result.Language,
+                silenceBeforeMs = result.SilenceBeforeMs,
+                stt = sttEntry.Text,
+                sttConfidence = Math.Round(sttEntry.Confidence, 3),
+                speaker = result.Speaker,
+                durationMs = mp3DurationMs,
+                words = result.Words.Select(w => new { w.Word, w.StartMs, w.DurMs, w.PhaseLrDeg }),
+                segmentStartMs = result.SegmentStartMs,
+                segmentDurationMs = result.SegmentDurationMs,
+                analyzedAt = DateTime.Now.ToString("o"),
+            };
+            File.WriteAllText(jsonPath, JsonSerializer.Serialize(companion,
+                new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [!] JSON write failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>TextWriter that writes to two targets simultaneously (for output capture).</summary>
+    sealed class StudyCaptureWriter : TextWriter
+    {
+        private readonly TextWriter _a, _b;
+        public StudyCaptureWriter(TextWriter a, TextWriter b) { _a = a; _b = b; }
+        public override Encoding Encoding => _a.Encoding;
+        public override void Write(char value) { _a.Write(value); _b.Write(value); }
+        public override void Write(string? value) { _a.Write(value); _b.Write(value); }
+        public override void WriteLine(string? value) { _a.WriteLine(value); _b.WriteLine(value); }
+        public override void Flush() { _a.Flush(); _b.Flush(); }
+    }
+
+    /// <summary>Parse Gemini's JSON response into study results.</summary>
+    static List<StudyResult>? ParseStudyResponse(string response, List<StudySegmentMap> segments)
+    {
+        // Extract JSON array from response (might be wrapped in markdown fences)
+        var json = response;
+        var jsonStart = json.IndexOf('[');
+        var jsonEnd = json.LastIndexOf(']');
+        if (jsonStart < 0 || jsonEnd < 0 || jsonEnd <= jsonStart)
+        {
+            Console.WriteLine("[STUDY] No JSON array found in response");
+            return null;
+        }
+        json = json[jsonStart..(jsonEnd + 1)];
+
+        try
+        {
+            var arr = JsonSerializer.Deserialize<JsonArray>(json);
+            if (arr == null) return null;
+
+            var results = new List<StudyResult>();
+            foreach (var node in arr)
+            {
+                var segIndex = node?["segment"]?.GetValue<int>() ?? 0;
+                var transcript = node?["transcript"]?.GetValue<string>() ?? "";
+                var speaker = node?["speaker"]?.GetValue<string>() ?? "speaker_1";
+                var confidence = node?["confidence"]?.GetValue<double>() ?? 0;
+                var language = node?["language"]?.GetValue<string>() ?? "";
+                var silenceBeforeMs = node?["silence_before_ms"]?.GetValue<int>() ?? 0;
+
+                // Match to source file
+                var seg = segments.FirstOrDefault(s => s.Index == segIndex);
+                if (seg == null && segIndex > 0 && segIndex <= segments.Count)
+                    seg = segments[segIndex - 1];
+
+                var words = new List<StudyWord>();
+                if (node?["words"] is JsonArray wordsArr)
+                {
+                    foreach (var w in wordsArr)
+                    {
+                        words.Add(new StudyWord
+                        {
+                            Word = w?["word"]?.GetValue<string>() ?? "",
+                            StartMs = w?["start_ms"]?.GetValue<int>() ?? 0,
+                            DurMs = w?["dur_ms"]?.GetValue<int>() ?? 0,
+                            PhaseLrDeg = w?["phase_lr_deg"]?.GetValue<double>() ?? 0,
+                        });
+                    }
+                }
+
+                results.Add(new StudyResult
+                {
+                    Segment = segIndex,
+                    Transcript = transcript,
+                    Speaker = speaker,
+                    Confidence = confidence,
+                    Language = language,
+                    SilenceBeforeMs = silenceBeforeMs,
+                    Words = words,
+                    SourceFile = seg?.SourceFile,
+                    SegmentStartMs = seg?.StartMs ?? 0,
+                    SegmentDurationMs = seg?.DurationMs ?? 0,
+                });
+            }
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[STUDY] JSON parse error: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Save study results to JSONL.</summary>
+    static void SaveStudyResults(string basePath, List<StudyResult> results)
+    {
+        var jsonlPath = Path.Combine(basePath, $"study_{DateTime.Now:yyyyMMdd}.jsonl");
+        using var writer = new StreamWriter(jsonlPath, append: true);
+        var opts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        foreach (var r in results)
+        {
+            writer.WriteLine(JsonSerializer.Serialize(r, opts));
+        }
+        Console.WriteLine($"[STUDY] Results saved to {jsonlPath}");
+    }
+
+    /// <summary>Save raw response for debugging.</summary>
+    static void SaveRawResponse(string basePath, string response, List<StudySegmentMap> segments)
+    {
+        var rawPath = Path.Combine(basePath, $"study_raw_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+        var sb = new StringBuilder();
+        sb.AppendLine("=== Segment Map ===");
+        foreach (var seg in segments)
+            sb.AppendLine($"  {seg.Index}: {seg.StartMs}ms, {seg.DurationMs}ms, {seg.SourceFile}");
+        sb.AppendLine("\n=== Raw Response ===");
+        sb.AppendLine(response);
+        File.WriteAllText(rawPath, sb.ToString());
+        Console.WriteLine($"[STUDY] Raw response saved to {rawPath}");
+    }
+
+    /// <summary>Sanitize STT text for embedding in filename (short, filesystem-safe).</summary>
+    static string SanitizeSttTag(string text)
+    {
+        text = text.Trim().ToLowerInvariant();
+        if (text.Length > 40) text = text[..40]; // keep it short
+        var invalid = Path.GetInvalidFileNameChars();
+        var sb = new StringBuilder(text.Length);
+        foreach (var c in text)
+            sb.Append(invalid.Contains(c) || c == ' ' ? '_' : c);
+        var result = sb.ToString().Trim('_');
+        while (result.Contains("__")) result = result.Replace("__", "_");
+        return result;
+    }
+
+    static string SanitizeFolderName(string text)
+    {
+        // Use first meaningful phrase as folder name (max 60 chars)
+        text = text.Trim();
+        if (text.Length > 60) text = text[..60];
+        var invalid = Path.GetInvalidFileNameChars();
+        var sb = new StringBuilder(text.Length);
+        foreach (var c in text)
+            sb.Append(invalid.Contains(c) ? '_' : c == ' ' ? '_' : c);
+        var result = sb.ToString().Trim('_').ToLowerInvariant();
+        // Collapse multiple underscores
+        while (result.Contains("__")) result = result.Replace("__", "_");
+        return result.Length == 0 ? "_unknown" : result;
+    }
+
+    // ── Stats subcommand ──
+
+    static int WhisperStatsCommand()
+    {
+        var basePath = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq", "profiles", "whisper_exp");
+        var wavDir = Path.Combine(basePath, "wav");
+        if (!Directory.Exists(wavDir))
+        {
+            Console.WriteLine("[STATS] No wav/ directory found.");
+            return 0;
+        }
+
+        Console.WriteLine("[STATS] Whisper Study Statistics");
+        Console.WriteLine(new string('─', 60));
+
+        int totalFiles = 0;
+        long totalSize = 0;
+        var folders = new List<(string name, int count, long size)>();
+
+        foreach (var dir in Directory.GetDirectories(wavDir).OrderBy(d => d))
+        {
+            var mp3s = Directory.GetFiles(dir, "*.mp3");
+            if (mp3s.Length == 0) continue;
+            var dirSize = mp3s.Sum(f => new FileInfo(f).Length);
+            folders.Add((Path.GetFileName(dir), mp3s.Length, dirSize));
+            totalFiles += mp3s.Length;
+            totalSize += dirSize;
+        }
+
+        // Root files
+        var rootMp3s = Directory.GetFiles(wavDir, "*.mp3")
+            .Where(f => !Path.GetFileName(f).StartsWith("study_batch_")).ToArray();
+        if (rootMp3s.Length > 0)
+        {
+            var rootSize = rootMp3s.Sum(f => new FileInfo(f).Length);
+            folders.Insert(0, ("(root)", rootMp3s.Length, rootSize));
+            totalFiles += rootMp3s.Length;
+            totalSize += rootSize;
+        }
+
+        foreach (var (name, count, size) in folders)
+        {
+            var marker = name == "_unknown" ? " ←" : "";
+            Console.WriteLine($"  {name,-40} {count,4} files  {size / 1024,6}KB{marker}");
+        }
+        Console.WriteLine(new string('─', 60));
+        Console.WriteLine($"  {"Total",-40} {totalFiles,4} files  {totalSize / 1024,6}KB");
+
+        // Study results
+        var jsonlFiles = Directory.GetFiles(basePath, "study_*.jsonl");
+        if (jsonlFiles.Length > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("[STATS] Study sessions:");
+            foreach (var jf in jsonlFiles.OrderByDescending(f => f))
+            {
+                var lines = File.ReadAllLines(jf).Length;
+                Console.WriteLine($"  {Path.GetFileName(jf)}: {lines} entries");
+            }
+        }
+
+        return 0;
+    }
+
+    // ── JSON models ──
+
+    record SttLabel(string Text, float Confidence);
+
+    sealed class StudySegmentMap
+    {
+        public int Index { get; set; }
+        public int StartMs { get; set; }
+        public int DurationMs { get; set; }
+        public string SourceFile { get; set; } = "";
+    }
+
+    sealed class StudyResult
+    {
+        public int Segment { get; set; }
+        public string Transcript { get; set; } = "";
+        public string Speaker { get; set; } = "speaker_1";
+        public double Confidence { get; set; }
+        public string Language { get; set; } = "";
+        public int SilenceBeforeMs { get; set; }
+        public List<StudyWord> Words { get; set; } = new();
+        public string? SourceFile { get; set; }
+        public int SegmentStartMs { get; set; }
+        public int SegmentDurationMs { get; set; }
+    }
+
+    sealed class StudyWord
+    {
+        public string Word { get; set; } = "";
+        public int StartMs { get; set; }
+        public int DurMs { get; set; }
+        public double PhaseLrDeg { get; set; }
+    }
+}
