@@ -260,6 +260,7 @@ internal sealed class WhisperExperienceDb : IDisposable
         _currentMode = frame.Mode;
 
         // WAV segment recording: voice activity detection
+        // LOUD is still recorded — learning data for noise pattern analysis
         if (frame.Mode == "QUIET")
         {
             if (_isRecording)
