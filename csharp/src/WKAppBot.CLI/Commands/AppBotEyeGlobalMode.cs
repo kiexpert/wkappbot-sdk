@@ -394,8 +394,8 @@ internal partial class Program
             whisperEngine = null;
         }
 
-        // ── Context usage monitor + auto-relay ──
-        // Track warned sizes per JSONL path — only re-warn if size actually increased
+        // ── Context usage monitor (per-card) ──
+        // Track warned sizes per CWD — only re-warn if size actually increased
         var contextWarnedSizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         const double ContextLimitMB = 40.0; // empirical: sessions hit limit ~40MB JSONL
 
@@ -501,113 +501,80 @@ internal partial class Program
                                 catch { }
                             }
 
-                            // ── Context usage monitor (~every 5s, same as Claude status) ──
+                            // ── Per-card context usage monitor ──
+                            // Iterate all known cards (tick-based + prompt-discovered), check each CWD's ctx%
                             try
                             {
-                                var claudeProjectsDir = Path.Combine(
-                                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                                    ".claude", "projects");
-                                if (Directory.Exists(claudeProjectsDir))
+                                foreach (var card in _cachedCards)
                                 {
-                                    // Find most recently modified .jsonl (= active session)
-                                    // Refresh() forces OS-level re-read (no .NET FileInfo attr cache)
-                                    var latest = Directory.EnumerateFiles(claudeProjectsDir, "*.jsonl", SearchOption.AllDirectories)
-                                        .Select(f => { try { var fi = new FileInfo(f); fi.Refresh(); return fi; } catch { return null; } })
-                                        .Where(fi => fi != null && fi.Length > 0)
-                                        .OrderByDescending(fi => fi!.LastWriteTimeUtc)
-                                        .FirstOrDefault();
-                                    if (latest != null)
+                                    if (string.IsNullOrWhiteSpace(card.Cwd)) continue;
+                                    var (pct, _, jsonlPath, fileSize) = GetContextInfoForCwdEx(card.Cwd);
+                                    if (pct < 90 || jsonlPath == null) continue;
+
+                                    var cwdKey = card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
+                                    contextWarnedSizes.TryGetValue(cwdKey, out long prevWarnedSize);
+                                    if (fileSize <= prevWarnedSize) continue; // already warned at this size
+
+                                    var sizeMB = fileSize / (1024.0 * 1024.0);
+                                    var cwdTag = AbbreviateCwd(card.Cwd);
+                                    contextWarnedSizes[cwdKey] = fileSize;
+
+                                    if (pct >= 95 && !string.IsNullOrEmpty(slackBotToken))
                                     {
-                                        // Staleness check: if JSONL hasn't been written in 2+ min,
-                                        // it's an old/abandoned session — skip context monitor.
-                                        var staleMinutes = (DateTime.UtcNow - latest.LastWriteTimeUtc).TotalMinutes;
-                                        if (staleMinutes > 2.0)
+                                        Console.ForegroundColor = ConsoleColor.Red;
+                                        Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 즉시 인수인계하세요!");
+                                        Console.WriteLine($"[EYE] 명령: wkappbot newchat \"인수인계 프롬프트\"");
+                                        Console.ResetColor();
+                                        Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                            $":rotating_light: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣이 아직 인수인계 안 했습니다! `wkappbot newchat` 실행 필요",
+                                            username: botUsername)).Wait(3000);
+                                    }
+                                    else if (pct >= 90 && !string.IsNullOrEmpty(slackBotToken))
+                                    {
+                                        Console.ForegroundColor = ConsoleColor.Yellow;
+                                        Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 인수인계 준비하세요");
+                                        Console.ResetColor();
+
+                                        // Build handoff prompt
+                                        var handoff = BuildHandoffPrompt(jsonlPath, _cachedCards, sizeMB, ContextLimitMB);
+
+                                        // ① Slack 알림
+                                        Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                            $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 인수인계 프롬프트를 전달합니다.",
+                                            username: botUsername)).Wait(3000);
+
+                                        // ② Find prompt for this CWD and deliver nudge
+                                        try
                                         {
-                                            goto skipContextMonitor;
-                                        }
-
-                                        var sizeMB = latest.Length / (1024.0 * 1024.0);
-                                        var pct = (int)(sizeMB / ContextLimitMB * 100);
-                                        _lastContextPct = pct;
-
-                                        // Size-based dedup: only warn if size actually increased since last warning
-                                        contextWarnedSizes.TryGetValue(latest.FullName, out long prevWarnedSize);
-                                        bool sizeIncreased = latest.Length > prevWarnedSize;
-
-                                        if (pct >= 95 && sizeIncreased && !string.IsNullOrEmpty(slackBotToken))
-                                        {
-                                            contextWarnedSizes[latest.FullName] = latest.Length;
-                                            Console.ForegroundColor = ConsoleColor.Red;
-                                            Console.WriteLine($"[EYE] 🚨 Context 95%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 즉시 인수인계하세요!");
-                                            Console.WriteLine($"[EYE] 명령: wkappbot newchat \"인수인계 프롬프트\"");
-                                            Console.ResetColor();
-                                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                                $":rotating_light: *컨텍스트 95%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣이 아직 인수인계 안 했습니다! `wkappbot newchat` 실행 필요",
-                                                username: botUsername)).Wait(3000);
-                                        }
-                                        else if (pct >= 90 && sizeIncreased && !string.IsNullOrEmpty(slackBotToken))
-                                        {
-                                            contextWarnedSizes[latest.FullName] = latest.Length;
-                                            Console.ForegroundColor = ConsoleColor.Yellow;
-                                            Console.WriteLine($"[EYE] ⚠️ Context 90%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 인수인계 프롬프트 생성 중...");
-                                            Console.ResetColor();
-
-                                            // Build handoff prompt from session + cards
-                                            var handoff = BuildHandoffPrompt(latest.FullName, _cachedCards, sizeMB, ContextLimitMB);
-                                            Console.WriteLine($"[EYE] Handoff prompt ({handoff.Length} chars):");
-                                            Console.WriteLine(handoff);
-
-                                            // ① Slack 알림
-                                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                                $":warning: *컨텍스트 90%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 인수인계 프롬프트를 전달합니다.",
-                                                username: botUsername)).Wait(3000);
-
-                                            // ② Extract CWD from JSONL → find the CORRECT prompt window for this project
-                                            string? jsonlCwd = ExtractCwdFromJsonl(latest.FullName);
-                                            if (jsonlCwd != null)
+                                            using var ctxHelper = new ClaudePromptHelper();
+                                            var pi = ctxHelper.FindPromptForCwd(card.Cwd);
+                                            if (pi != null)
                                             {
-                                                Console.WriteLine($"[EYE] JSONL CWD: {jsonlCwd}");
+                                                Console.WriteLine($"[EYE] ✅ [{cwdTag}] Found prompt: \"{pi.WindowTitle}\"");
+                                                ClaudePromptHelper.AllowFocusSteal = true;
                                                 try
                                                 {
-                                                    using var ctxHelper = new ClaudePromptHelper();
-                                                    var pi = ctxHelper.FindPromptForCwd(jsonlCwd);
-                                                    if (pi != null)
-                                                    {
-                                                        Console.WriteLine($"[EYE] ✅ Found matching prompt: \"{pi.WindowTitle}\" ({pi.HostType})");
-                                                        // Temporarily allow focus steal for handoff delivery
-                                                        ClaudePromptHelper.AllowFocusSteal = true;
-                                                        try
-                                                        {
-                                                            var nudge = $"⚠️ 컨텍스트 90% 도달! ({sizeMB:F1}/{ContextLimitMB}MB)\n"
-                                                                + "Electron이 무거워서 새 대화 열기가 실패할 수 있습니다.\n"
-                                                                + "인수인계 전에 부하가 심한 잔여 프로세스를 정리하세요 (불필요한 탭 닫기, 빌드 프로세스 종료 등).\n"
-                                                                + "준비되면 아래 명령을 실행:\n\n"
-                                                                + $"wkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
-                                                            ctxHelper.TypeAndSubmit(pi, nudge);
-                                                            Console.WriteLine("[EYE] ✅ Handoff nudge sent to matched prompt");
-                                                        }
-                                                        finally { ClaudePromptHelper.AllowFocusSteal = false; }
-                                                    }
-                                                    else
-                                                    {
-                                                        Console.WriteLine("[EYE] ⚠️ No matching prompt for CWD — nudge skipped, check Slack");
-                                                    }
+                                                    var nudge = $"⚠️ 컨텍스트 {pct}% 도달! ({sizeMB:F1}/{ContextLimitMB}MB)\n"
+                                                        + "준비되면 아래 명령을 실행:\n\n"
+                                                        + $"wkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
+                                                    ctxHelper.TypeAndSubmit(pi, nudge);
+                                                    Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent");
                                                 }
-                                                catch (Exception ex)
-                                                {
-                                                    Console.WriteLine($"[EYE] ⚠️ Handoff nudge failed: {ex.Message}");
-                                                }
+                                                finally { ClaudePromptHelper.AllowFocusSteal = false; }
                                             }
                                             else
                                             {
-                                                Console.WriteLine("[EYE] ⚠️ Could not extract CWD from JSONL — nudge skipped, check Slack");
+                                                Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] No matching prompt — check Slack");
                                             }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Handoff failed: {ex.Message}");
                                         }
                                     }
                                 }
                             }
                             catch { /* best-effort */ }
-                            skipContextMonitor:;
 
                             // Slack status streaming (edit same message)
                             if (slackClient != null && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
@@ -2255,13 +2222,20 @@ internal partial class Program
     /// <summary>Get context usage % and JSONL age for a specific CWD's session.</summary>
     static (int pct, TimeSpan? age) GetContextInfoForCwd(string? cwd)
     {
-        if (string.IsNullOrWhiteSpace(cwd)) return (-1, null);
+        var (pct, age, _, _) = GetContextInfoForCwdEx(cwd);
+        return (pct, age);
+    }
+
+    /// <summary>Extended version: also returns JSONL path and file size (for context monitor dedup)</summary>
+    static (int pct, TimeSpan? age, string? jsonlPath, long fileSize) GetContextInfoForCwdEx(string? cwd)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return (-1, null, null, 0);
         try
         {
             var projName = cwd.Replace(':', '-').Replace('\\', '-').Replace('/', '-').Replace('_', '-');
             var projDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects", projName);
-            if (!Directory.Exists(projDir)) return (-1, null);
+            if (!Directory.Exists(projDir)) return (-1, null, null, 0);
 
             // Find most recently modified JSONL (= active session)
             string? latestFile = null;
@@ -2275,13 +2249,13 @@ internal partial class Program
                 }
                 catch { }
             }
-            if (latestFile == null) return (-1, null);
+            if (latestFile == null) return (-1, null, null, 0);
             var size = new FileInfo(latestFile).Length;
             var pct = size > 0 ? (int)(size / (1024.0 * 1024.0) / 40.0 * 100) : -1;
             var age = DateTime.UtcNow - latestMtime;
-            return (pct, age);
+            return (pct, age, latestFile, size);
         }
-        catch { return (-1, null); }
+        catch { return (-1, null, null, 0); }
     }
 
     static string ReadClotThoughtForCwd(string? cwd)

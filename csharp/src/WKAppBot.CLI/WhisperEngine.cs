@@ -223,12 +223,22 @@ internal sealed class WhisperEngine : IDisposable
 
             // Mode detection
             bool isSilence = maxEnergy < 0.001;
+
+            // Upper energy gate: if maxEnergy exceeds whisper ceiling, it's external noise
+            // (car horn, YouTube, music, etc.) — whisper physically can't produce this much energy.
+            // Ceiling = 4× signal mid average (whisper rarely exceeds 2× mid)
+            double midAvg = 0;
+            for (int b = 0; b < BandCount; b++) midAvg += _signalMid[b];
+            midAvg /= BandCount;
+            bool isTooLoud = !isSilence && maxEnergy > midAvg * 4;
+
             int voiceThreshold = MaxLevel / 2;
             bool isVoiced = levels[0] >= voiceThreshold;
             int whisperSum = levels[3] + levels[4] + levels[5] + levels[6];
-            bool isWhisper = !isVoiced && !isSilence && whisperSum > 4;
+            bool isWhisper = !isVoiced && !isSilence && !isTooLoud && whisperSum > 4;
 
             string mode = isSilence ? "QUIET"
+                : isTooLoud ? "LOUD"
                 : isVoiced ? "VOICE"
                 : isWhisper ? "WHSPR"
                 : "NOISE";

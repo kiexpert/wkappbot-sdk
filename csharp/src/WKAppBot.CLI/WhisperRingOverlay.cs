@@ -417,6 +417,7 @@ internal sealed class WhisperRingWindow : Window
             "VOICE" => ModeBrushVoice,
             "WHSPR" => ModeBrushWhisper,
             "NOISE" => ModeBrushNoise,
+            "LOUD" => ModeBrushNoise, // red-ish — external noise filtered out
             _ => ModeBrushQuiet,
         };
 
@@ -426,6 +427,7 @@ internal sealed class WhisperRingWindow : Window
             "VOICE" => Color.FromRgb(0xFF, 0xCC, 0x22),
             "WHSPR" => Color.FromRgb(0x44, 0xFF, 0x88),
             "NOISE" => Color.FromRgb(0xFF, 0x66, 0x44),
+            "LOUD" => Color.FromRgb(0xFF, 0x22, 0x22),  // bright red = too loud for whisper
             _ => Color.FromRgb(0x44, 0x44, 0x55),
         };
         _coreDot.Fill = new SolidColorBrush(coreColor);
@@ -458,11 +460,13 @@ internal sealed class WhisperRingWindow : Window
             _sttText.Opacity = Math.Max(0, 1.0 - sttAgeSec / 5.0);
             _sttText.Foreground = Brushes.White;
         }
-        else if (mode == "QUIET")
+        else if (mode == "QUIET" || mode == "LOUD")
         {
-            // Quiet → clock
+            // Quiet/Loud → clock (LOUD = external noise, not whisper input)
             _sttText.Text = DateTime.Now.ToString("HH:mm:ss");
-            _sttText.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
+            _sttText.Foreground = mode == "LOUD"
+                ? new SolidColorBrush(Color.FromRgb(0xFF, 0x44, 0x44))
+                : new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
             _sttText.Opacity = 0.7;
         }
         else
