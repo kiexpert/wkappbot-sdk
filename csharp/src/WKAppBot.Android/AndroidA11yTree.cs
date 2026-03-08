@@ -76,20 +76,25 @@ public class AndroidA11yTree
     /// <summary>Produce inspect-style tree output matching Windows format</summary>
     public static string DumpTree(AndroidNode node, int maxDepth = 5, int indent = 0)
     {
+        var hotNodes = GetFocusChainNodes(node);
         var sb = new System.Text.StringBuilder();
-        DumpNode(sb, node, maxDepth, indent, 0);
+        DumpNode(sb, node, maxDepth, indent, 0, hotNodes);
         return sb.ToString();
     }
 
-    private static void DumpNode(System.Text.StringBuilder sb, AndroidNode node, int maxDepth, int baseIndent, int depth)
+    private static void DumpNode(System.Text.StringBuilder sb, AndroidNode node, int maxDepth,
+        int baseIndent, int depth, HashSet<AndroidNode> hotNodes)
     {
-        if (depth > maxDepth) return;
+        bool isHot = hotNodes.Contains(node);
+        if (depth > maxDepth && !isHot) return;
+
         var prefix = new string(' ', (baseIndent + depth) * 2);
         var flags = "";
         if (node.Clickable) flags += "*";
         if (node.Scrollable) flags += "~";
         if (node.Checkable) flags += "?";
         if (node.Checked) flags += "!";
+        if (node.Focused) flags += "⌨";
 
         var label = node.DisplayName;
         var rid = node.ShortResourceId;
@@ -100,7 +105,7 @@ public class AndroidA11yTree
         sb.AppendLine($" {node.BoundsString}");
 
         foreach (var child in node.Children)
-            DumpNode(sb, child, maxDepth, baseIndent, depth + 1);
+            DumpNode(sb, child, maxDepth, baseIndent, depth + 1, hotNodes);
     }
 
     // ── XML parsing ───────────────────────────────────────
@@ -207,6 +212,69 @@ public class AndroidA11yTree
             if (found != null) return found;
         }
         return null;
+    }
+
+    // ── Hot Focus Chain ────────────────────────────────────
+
+    /// <summary>
+    /// Find the focused node and build parent chain (focused → ... → root).
+    /// Returns formatted string or empty if no focused node found.
+    /// </summary>
+    public static string GetFocusChain(AndroidNode root)
+    {
+        var focused = FindInTree(root, n => n.Focused);
+        if (focused == null) return "";
+
+        // Build chain: focused → parent → ... → root
+        var chain = new List<AndroidNode>();
+        var cur = focused;
+        while (cur != null)
+        {
+            chain.Add(cur);
+            cur = cur.Parent;
+        }
+
+        if (chain.Count <= 1) return ""; // focus is on root itself
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("── hot focus (Android) ──");
+        for (int i = 0; i < chain.Count; i++)
+        {
+            var node = chain[i];
+            var indent = new string(' ', i * 2);
+            var arrow = i == 0 ? "⌨ " : "└ ";
+            var label = node.DisplayName;
+            var labelStr = !string.IsNullOrEmpty(label)
+                ? (label.Length > 40 ? $" \"{label[..37]}...\"" : $" \"{label}\"")
+                : "";
+            var rid = node.ShortResourceId;
+            var ridStr = !string.IsNullOrEmpty(rid) ? $" ({rid})" : "";
+            var flags = "";
+            if (node.Clickable) flags += "*";
+            if (node.Scrollable) flags += "~";
+            if (node.Checked) flags += "!";
+
+            sb.AppendLine($"  {indent}{arrow}[{node.ClassName}]{flags}{labelStr}{ridStr} {node.BoundsString}");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Collect the set of nodes on the hot focus chain (for depth-independent rendering).
+    /// </summary>
+    public static HashSet<AndroidNode> GetFocusChainNodes(AndroidNode root)
+    {
+        var set = new HashSet<AndroidNode>();
+        var focused = FindInTree(root, n => n.Focused);
+        if (focused == null) return set;
+
+        var cur = focused;
+        while (cur != null)
+        {
+            set.Add(cur);
+            cur = cur.Parent;
+        }
+        return set;
     }
 }
 

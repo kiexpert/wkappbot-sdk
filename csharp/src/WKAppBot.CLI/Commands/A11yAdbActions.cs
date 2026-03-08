@@ -195,7 +195,12 @@ internal partial class Program
             }
         }
 
-        // Dump tree
+        // Hot focus chain (depth-irrelevant — orthogonal axis)
+        var focusChain = AndroidA11yTree.GetFocusChain(target);
+        if (!string.IsNullOrEmpty(focusChain))
+            Console.Write(focusChain);
+
+        // Dump tree (hot focus nodes rendered regardless of depth limit)
         Console.WriteLine();
         var treeDump = AndroidA11yTree.DumpTree(target, depth);
         Console.Write(treeDump);
