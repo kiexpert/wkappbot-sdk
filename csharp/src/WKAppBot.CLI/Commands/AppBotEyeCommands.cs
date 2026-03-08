@@ -73,6 +73,7 @@ internal partial class Program
             }
         }
 
+        Console.Title = "AppBotEye"; // for a11y close targeting (avoid matching VS Code)
         TryHideConsoleWindow();
         Console.WriteLine("[EYE] Starting WK AppBot Eye (GlobalMode)");
         return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs);

@@ -134,6 +134,7 @@ public static class ChromeLauncher
             FileName = chromePath,
             Arguments = arguments,
             UseShellExecute = false,
+            WindowStyle = ProcessWindowStyle.Minimized, // launch iconic → no focus theft
         };
 
         var process = Process.Start(psi)
@@ -156,6 +157,8 @@ public static class ChromeLauncher
                         var mainHwnd = FindChromeMainWindow(process.Id);
                         if (mainHwnd != IntPtr.Zero)
                         {
+                            // Restore from minimized → focusless (SW_SHOWNOACTIVATE=4)
+                            ShowWindow(mainHwnd, 4);
                             // SWP_NOACTIVATE(0x10)|SWP_NOZORDER(0x4)|SWP_NOOWNERZORDER(0x200)
                             SetWindowPos(mainHwnd, IntPtr.Zero, bounds.X, bounds.Y, bounds.W, bounds.H, 0x0214);
                         }

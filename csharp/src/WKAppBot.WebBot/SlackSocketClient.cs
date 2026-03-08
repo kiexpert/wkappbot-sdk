@@ -339,13 +339,15 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         {
             if (threadTs != null && OnSelfMessage != null)
             {
+                var username = eventNode["username"]?.GetValue<string>();
                 OnSelfMessage.Invoke(new SlackMessage
                 {
                     Channel = channel ?? "",
                     User = user ?? "",
                     Text = text ?? "",
                     Timestamp = ts ?? "",
-                    ThreadTs = threadTs
+                    ThreadTs = threadTs,
+                    Username = username
                 });
             }
             return;
@@ -518,6 +520,8 @@ public record SlackMessage
     public string? ThreadTs { get; init; }
     /// <summary>Bot ID. Non-null when the message was sent by a bot (used to filter own messages).</summary>
     public string? BotId { get; init; }
+    /// <summary>Bot username override (chat.postMessage username param). Used to identify which session posted.</summary>
+    public string? Username { get; init; }
 }
 
 /// <summary>Slack Block Kit interactive action (button click, etc.).</summary>

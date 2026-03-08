@@ -1,4 +1,4 @@
-﻿# WKAppBot v3.1 - Windows + Android App Automation Test Framework
+﻿# WKAppBot v3.2 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -341,6 +341,17 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - `wait` 액션: 윈도우/UIA 요소 출현 폴링 대기 (--timeout, --interval)
   - `eval` 액션: CDP JavaScript 실행, #scope로 탭 힌트 매칭
   - MCP 에러 구조화: RunCliCaptureWithCode → exit code 기반 isError 플래그
+- **v3.2 Hot Focus Chain + Gemini 파일첨부 + 포커스리스 강화**
+  - Hot Focus Chain: Win32 `GetGUIThreadInfo` + UIA `FocusedElement` → 포커스 체인 항상 출력
+  - 포커스 체인은 Depth와 직교하는 별개 축 — depth 제한과 무관하게 항상 표시
+  - 윈도우 스타일 태그: [min], [max], [disabled], [topmost], [noact], [layered], [tool]
+  - 소유 팝업 + 포커스 자식창 정보 출력 (windows 명령)
+  - 모든 a11y 명령에 적용 (inspect, scan, windows — "엑빌 공통")
+  - Gemini 파일 첨부: CDP trusted gesture (`Input.dispatchMouseEvent`) + Win32 파일 다이얼로그 자동화
+  - 파일 첨부 4티어: UIA native dialog (Tier 0) → CDP chooser (Tier 0.5) → DOM setFileInputFiles (Tier 1) → drag-drop (Tier 2)
+  - ask 명령 포커스리스 강화: CdpFocusGuard 삭제, SetForegroundWindow 완전 제거
+  - Chrome 리스토어: SW_RESTORE → SW_SHOWNOACTIVATE (포커스리스)
+  - UiaLocator.GetFocusChain: FocusedElement → parent chain → target window boundary 트림
 ### v2.2 Android ADB Integration (Phase A+B+C 완료)
 - **WKAppBot.Android 프로젝트**: AdbClient, AdbDeviceRegistry, AdbGrapRouter, AndroidA11yTree, AdbExperienceDb
 - **adb:// URI 스키마**: `adb://device/package#scope` — Windows grap과 동일한 `#` scope 문법
@@ -395,6 +406,19 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
 - **원인 추정**: cond-add 명령의 입력 루프에서 PatrolWaitLoop/DialogHandlerManager 체크가 빠져있거나, EnsureFocus 단계에서만 방해꾼 체크가 돌아가고 PostMessage/UIA Invoke 경로에는 체크가 없음
 - **해야 할 것**: 포커스 입력을 시도할 때 방해꾼 체크가 입력확보 단계에서 돌아가도록 구조 개선. 특히 UIA Invoke 실패 후 팝업 감지 → 자동 dismiss → 재시도 패턴 필요
 - **우선순위**: 나중에 볼 것 (2026-03-02 기록)
+
+### TODO: 크롬 창 내부 좌표 기반 돋보기 (CDP + a11y)
+- **아이디어**: a11y BoundingRect 좌표로 크롬/Electron 창 내부에 돋보기 오버레이 배치
+- UIA BoundingRect = 스크린 좌표, CDP getBoundingClientRect + 윈도우 오프셋 = 스크린 좌표
+- 활용: speak 오버레이 정확 배치, 웹 요소 하이라이트, 클롣 확장 패널 위치 감지
+- **우선순위**: 나중에 볼 것 (2026-03-08 기록)
+
+### TODO: 유령 돋보기 프로세스가 publish 잠금 유발
+- **문제**: 돋보기(InputZoomWindow) BeginFadeOut이 포그라운드 스레드 승격(`IsBackground=false`) → 프로세스 종료 후에도 페이드아웃 애니메이션이 살아남아 wkappbot.exe 잠금
+- **증상**: publish 시 EXE 덮어쓰기 실패 (`.new.exe` 폴백) 또는 구버전 실행
+- **현재 대응**: `taskkill //f //im wkappbot.exe` 후 publish
+- **해야 할 것**: 페이드아웃 완료 후 자동 종료 보장, 또는 Background 스레드로 복귀하는 타이머 추가
+- **우선순위**: 나중에 볼 것 (2026-03-08 기록)
 
 ## 배포 구조
 ```

@@ -315,6 +315,85 @@ internal partial class Program
         // ── FSW hybrid: event-driven file change detection ──
         InitFileWatchers();
 
+        // ── Whisper Spectrum Ring (always-on mic → radial HUD overlay) ──
+        WhisperEngine? whisperEngine = null;
+        WhisperRingHost? whisperRing = null;
+        WhisperExperienceDb? whisperExp = null;
+        try
+        {
+            whisperEngine = new WhisperEngine();
+            if (whisperEngine.Start())
+            {
+                whisperRing = new WhisperRingHost();
+                // Position: left of Eye window (Eye is at top-right corner)
+                int ringX = Math.Max(0, posX - 190);
+                int ringY = posY;
+                whisperRing.Start(ringX, ringY);
+
+                // Experience DB: token logging + STT auto-labeling
+                whisperExp = new WhisperExperienceDb();
+                whisperExp.StartLogging();
+                bool sttOk = whisperExp.StartStt();
+
+                // Auto-study: when _unknown/ reaches 10 files, run study in background
+                var expRef = whisperExp; // capture for closure
+                whisperExp.OnAutoStudyNeeded += (count) =>
+                {
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try
+                        {
+                            Console.ForegroundColor = ConsoleColor.Magenta;
+                            Console.WriteLine($"[WHISPER] Auto-study triggered: {count} files in _unknown/");
+                            Console.ResetColor();
+                            WhisperStudyCommand(["--batch", count.ToString()]);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[WHISPER] Auto-study error: {ex.Message}");
+                        }
+                        finally
+                        {
+                            expRef.NotifyAutoStudyDone();
+                        }
+                    });
+                };
+
+                whisperEngine.OnFrame += (frame) =>
+                {
+                    if (whisperRing.IsAlive)
+                    {
+                        var (lastStt, lastSttTicks, lastSttMode, _) = whisperExp?.GetStatus() ?? (null, 0, "QUIET", 0);
+                        long ageTicks = lastStt != null ? DateTime.UtcNow.Ticks - lastSttTicks : long.MaxValue;
+                        whisperRing.UpdateSpectrum(frame.Levels, frame.MaxLevel,
+                            frame.Mode, frame.Token, frame.RecentTokens, lastStt, ageTicks, lastSttMode);
+                    }
+                    whisperExp?.LogFrame(frame);
+                };
+
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.WriteLine($"[EYE] Whisper Ring started at ({ringX},{ringY})");
+                Console.WriteLine($"[EYE] Whisper ExpDB: logging=ON stt={( sttOk ? "ON" : "OFF" )}");
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine("[EYE] Whisper Ring skipped (no microphone)");
+                Console.ResetColor();
+                whisperEngine.Dispose();
+                whisperEngine = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"[EYE] Whisper Ring init failed: {ex.Message}");
+            Console.ResetColor();
+            whisperEngine?.Dispose();
+            whisperEngine = null;
+        }
+
         // ── Context usage monitor + auto-relay ──
         // Track warned sizes per JSONL path — only re-warn if size actually increased
         var contextWarnedSizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
@@ -940,6 +1019,16 @@ internal partial class Program
         // ── Cleanup ──
         WKAppBot.Win32.Native.NativeMethods.SetThreadExecutionState(
             WKAppBot.Win32.Native.NativeMethods.ES_CONTINUOUS);
+
+        // ── Cleanup Whisper Ring + ExpDB ──
+        if (whisperEngine != null)
+        {
+            whisperExp?.Stop();
+            whisperEngine.Dispose();
+            whisperRing?.BeginFadeOut();
+            Thread.Sleep(1200);
+            whisperRing?.Dispose();
+        }
 
         // ── Cleanup FSW watchers ──
         DisposeFileWatchers();

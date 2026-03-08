@@ -24,6 +24,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NAudio.Lame" Version="2.1.0" />
+    <PackageReference Include="System.Speech" Version="8.*" />
+    <PackageReference Include="NAudio" Version="2.*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\WKAppBot.Core\WKAppBot.Core.csproj" />
     <ProjectReference Include="..\WKAppBot.Win32\WKAppBot.Win32.csproj" />
     <ProjectReference Include="..\WKAppBot.Vision\WKAppBot.Vision.csproj" />
@@ -38,13 +44,14 @@
     <Content Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="handlers" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
-  <!-- Post-publish: kill AppBotEye → copy EXE + handlers to W:\SDK\bin\ -->
+  <!-- Post-publish: kill Eye → deploy EXE (Eye relaunch: wkappbot eye manually or via script) -->
   <Target Name="DeployToSdkBin" AfterTargets="Publish">
+    <!-- Step 1: Kill Eye + whisper + ghosts (taskkill by image name = safe for VS Code/code.exe) -->
+    <Exec Command="taskkill /f /im wkappbot.exe 2>nul" IgnoreExitCode="true" />
+    <!-- Step 2: Copy handlers -->
     <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
-    <!-- Copy EXE: direct overwrite if unlocked, .new.exe fallback if Eye is running (hot-reload will swap) -->
-    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot; &amp;&amp; echo [Deploy] wkappbot.exe updated || ( copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.new.exe&quot; &amp;&amp; echo [Deploy] Staged as wkappbot.new.exe — Eye will hot-swap )" IgnoreExitCode="true" />
-    <!-- Emit eye tick: build verification + card update (find-host attaches to Claude session) -->
-    <Exec Command="cd /d W:\GitHub\WKAppBot &amp;&amp; W:\SDK\bin\wkappbot.exe tick build &quot;publish 완료&quot; --find-host" IgnoreExitCode="true" />
+    <!-- Step 3: Copy EXE (Eye killed → no lock) -->
+    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot; &amp;&amp; echo [Deploy] wkappbot.exe updated" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
     <_HandlersPublish Include="$(PublishDir)handlers\**\*.*" />

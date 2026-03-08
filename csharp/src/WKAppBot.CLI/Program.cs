@@ -201,6 +201,8 @@ internal partial class Program
                 "hts-stress" => HtsStressCommand(restArgs),
                 "tooltip-probe" => TooltipProbeCommand(restArgs),
                 // Utility
+                "speak" => SpeakCommand(restArgs),
+                "whisper" => WhisperCommand(restArgs),
                 "newchat" => NewChatCommand(restArgs),
                 "schedule" => ScheduleCommand(restArgs),
                 "knowhow" => KnowhowCommand(restArgs),

@@ -262,6 +262,11 @@ internal partial class Program
         else
         {
             using var uia = new UiaLocator();
+            // Hot focus chain (always shown, depth-independent)
+            var focusChain = uia.GetFocusChain(inspectHandle);
+            if (!string.IsNullOrEmpty(focusChain))
+                Console.Write(focusChain);
+
             string tree;
             if (!string.IsNullOrEmpty(uiaScopePath))
             {
@@ -732,6 +737,12 @@ internal partial class Program
         Console.ResetColor();
 
         using var uia = new UiaLocator();
+
+        // Hot focus chain (always shown, depth-independent)
+        var focusChain = uia.GetFocusChain(hWnd);
+        if (!string.IsNullOrEmpty(focusChain))
+            Console.Write(focusChain);
+
         var tree = uia.DumpTree(hWnd, depth);
 
         // Count interactive elements for summary
@@ -1520,6 +1531,19 @@ internal partial class Program
             string displayTitle = title.Length > 60 ? title[..57] + "..." : title;
             if (string.IsNullOrEmpty(displayTitle)) displayTitle = "(no title)";
 
+            // Collect style tags for automation-relevant properties
+            int style = NativeMethods.GetWindowLongW(hWnd, NativeMethods.GWL_STYLE);
+            int exStyle = NativeMethods.GetWindowLongW(hWnd, NativeMethods.GWL_EXSTYLE);
+            var tags = new List<string>(4);
+            if (NativeMethods.IsIconic(hWnd)) tags.Add("min");
+            else if ((style & 0x01000000 /*WS_MAXIMIZE*/) != 0) tags.Add("max");
+            if ((style & NativeMethods.WS_DISABLED) != 0) tags.Add("disabled");
+            if ((exStyle & NativeMethods.WS_EX_TOPMOST) != 0) tags.Add("topmost");
+            if ((exStyle & NativeMethods.WS_EX_NOACTIVATE) != 0) tags.Add("noact");
+            if ((exStyle & NativeMethods.WS_EX_LAYERED) != 0) tags.Add("layered");
+            if ((exStyle & NativeMethods.WS_EX_TOOLWINDOW) != 0) tags.Add("tool");
+            var ownerHwnd = NativeMethods.GetWindow(hWnd, 4 /*GW_OWNER*/);
+
             Console.ForegroundColor = isForeground ? ConsoleColor.Green
                 : (visible && !string.IsNullOrEmpty(title)) ? ConsoleColor.White
                 : ConsoleColor.DarkGray;
@@ -1529,12 +1553,152 @@ internal partial class Program
             Console.ResetColor();
             Console.Write($"  ({className}) {w}x{h}{vis}  [{process} pid={pid}]");
             if (isForeground) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" ★"); Console.ResetColor(); }
+            if (tags.Count > 0 || ownerHwnd != IntPtr.Zero)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                if (tags.Count > 0) Console.Write($" [{string.Join(",", tags)}]");
+                if (ownerHwnd != IntPtr.Zero) Console.Write($" owner={ownerHwnd:X}");
+                Console.ResetColor();
+            }
+            Console.WriteLine();
+
+            // Show focus child + owned popup (foreground or filtered matches)
+            if (!isChild && (isForeground || hasFilter))
+                PrintFocusAndPopup(hWnd);
+        }
+
+        void PrintFocusAndPopup(IntPtr hWnd)
+        {
+            // 1. Keyboard focus child via GetGUIThreadInfo for this window's thread
+            var threadId = NativeMethods.GetWindowThreadProcessId(hWnd, out _);
+            if (threadId != 0)
+            {
+                var gti = new NativeMethods.GUITHREADINFO
+                    { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+                bool gtiOk = NativeMethods.GetGUIThreadInfo(threadId, ref gti);
+                // Show focus child (skip if focus == self — no extra info)
+                if (gtiOk && gti.hwndFocus != IntPtr.Zero && gti.hwndFocus != hWnd)
+                {
+                    var focusBuf = new StringBuilder(256);
+                    NativeMethods.GetWindowTextW(gti.hwndFocus, focusBuf, focusBuf.Capacity);
+                    var focusClassBuf = new StringBuilder(128);
+                    NativeMethods.GetClassNameW(gti.hwndFocus, focusClassBuf, focusClassBuf.Capacity);
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write("    ⌨ focus: ");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    var focusTitle = focusBuf.ToString();
+                    Console.WriteLine($"[{gti.hwndFocus:X8}] \"{(focusTitle.Length > 40 ? focusTitle[..37] + "..." : focusTitle)}\" ({focusClassBuf})");
+                    Console.ResetColor();
+                }
+            }
+
+            // 2. Owned popup/dialog windows (other top-levels whose owner = hWnd)
+            var popups = new List<IntPtr>();
+            NativeMethods.EnumWindows((h, _) =>
+            {
+                if (h == hWnd) return true;
+                if (!NativeMethods.IsWindowVisible(h)) return true;
+                var owner = NativeMethods.GetWindow(h, 4 /*GW_OWNER*/);
+                if (owner == hWnd)
+                    popups.Add(h);
+                return true;
+            }, IntPtr.Zero);
+
+            foreach (var popup in popups)
+            {
+                var pTitleBuf = new StringBuilder(256);
+                NativeMethods.GetWindowTextW(popup, pTitleBuf, pTitleBuf.Capacity);
+                var pClassBuf = new StringBuilder(128);
+                NativeMethods.GetClassNameW(popup, pClassBuf, pClassBuf.Capacity);
+                NativeMethods.GetWindowRect(popup, out var pRect);
+                var pTitle = pTitleBuf.ToString();
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Write("    ◇ popup: ");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine($"[{popup:X8}] \"{(pTitle.Length > 40 ? pTitle[..37] + "..." : pTitle)}\" ({pClassBuf}) {pRect.Right - pRect.Left}x{pRect.Bottom - pRect.Top}");
+                Console.ResetColor();
+            }
+        }
+
+        // ── Hot Focus Line helper ──
+        static void PrintHotFocusLine(IntPtr fgWnd, WindowFinder.FocusSnapshot focus, Func<uint, string> getProcessName)
+        {
+            if (fgWnd == IntPtr.Zero) return;
+
+            // Get keyboard focus hwnd
+            var kbFocus = focus.KeyboardHwnd;
+            if (kbFocus == IntPtr.Zero) kbFocus = fgWnd;
+
+            // Build chain: focus → parent → parent → ... → top-level
+            var chain = new List<IntPtr>();
+            var seen = new HashSet<IntPtr>();
+            var cur = kbFocus;
+            while (cur != IntPtr.Zero && seen.Add(cur))
+            {
+                chain.Add(cur);
+                cur = NativeMethods.GetParent(cur);
+            }
+            // Ensure foreground window is in chain (it might be root already)
+            if (!seen.Contains(fgWnd))
+                chain.Add(fgWnd);
+
+            Console.WriteLine("── hot focus ──");
+            var titleBuf = new StringBuilder(256);
+            var classBuf = new StringBuilder(128);
+
+            for (int i = 0; i < chain.Count; i++)
+            {
+                var h = chain[i];
+                titleBuf.Clear(); classBuf.Clear();
+                NativeMethods.GetWindowTextW(h, titleBuf, titleBuf.Capacity);
+                NativeMethods.GetClassNameW(h, classBuf, classBuf.Capacity);
+                NativeMethods.GetWindowThreadProcessId(h, out uint pid);
+                NativeMethods.GetWindowRect(h, out var rect);
+                int w = rect.Right - rect.Left, ht = rect.Bottom - rect.Top;
+
+                string indent = new string(' ', i * 2);
+                string arrow = i == 0 ? "⌨ " : "└ ";
+                string title = titleBuf.ToString();
+                string displayTitle = title.Length > 50 ? title[..47] + "..." : title;
+                if (string.IsNullOrEmpty(displayTitle)) displayTitle = "(no title)";
+                string proc = getProcessName(pid);
+
+                // Style tags
+                int style = NativeMethods.GetWindowLongW(h, NativeMethods.GWL_STYLE);
+                int exStyle = NativeMethods.GetWindowLongW(h, NativeMethods.GWL_EXSTYLE);
+                var tags = new List<string>(3);
+                if (NativeMethods.IsIconic(h)) tags.Add("min");
+                else if ((style & 0x01000000) != 0) tags.Add("max");
+                if ((style & NativeMethods.WS_DISABLED) != 0) tags.Add("disabled");
+                if ((exStyle & NativeMethods.WS_EX_TOPMOST) != 0) tags.Add("topmost");
+
+                Console.ForegroundColor = i == 0 ? ConsoleColor.Magenta : ConsoleColor.DarkGray;
+                Console.Write($"  {indent}{arrow}");
+                Console.ForegroundColor = i == 0 ? ConsoleColor.White : ConsoleColor.Gray;
+                Console.Write($"[{h:X8}] \"{displayTitle}\" ({classBuf}) {w}x{ht}");
+                if (!string.IsNullOrEmpty(proc))
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($"  [{proc}]");
+                }
+                if (tags.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.Write($" [{string.Join(",", tags)}]");
+                }
+                if (h == fgWnd) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" ★"); }
+                Console.ResetColor();
+                Console.WriteLine();
+            }
             Console.WriteLine();
         }
 
         IntPtr fgWnd = NativeMethods.GetForegroundWindow();
         int totalCount = 0;
         int uiaMatchWindows = 0;
+
+        // ── Hot Focus Line: focused child → parent → ... → top-level ──
+        PrintHotFocusLine(fgWnd, focus, GetProcessName);
 
         // EnumWindows enumerates in Z-order (front to back) — no re-sort needed!
         bool hasPathSearch = filterTitle != null && (filterTitle.Contains('/') || filterTitle.Contains("**"));

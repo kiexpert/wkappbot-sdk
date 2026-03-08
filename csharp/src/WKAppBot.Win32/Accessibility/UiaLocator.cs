@@ -1324,6 +1324,90 @@ public sealed class UiaLocator : IDisposable
         catch { /* some elements throw on FindAllChildren */ }
     }
 
+    /// <summary>
+    /// Get the UIA focus chain: focused element → parent → ... → root.
+    /// Returns lines like: "⌨ [Button] "OK" aid="1" (100,200 80x26)"
+    /// Each line is indented by depth. First line = deepest focused element.
+    /// Returns empty string if no focused element or focus is outside the given window.
+    /// </summary>
+    public string GetFocusChain(IntPtr hWnd)
+    {
+        try
+        {
+            var focused = _automation.FocusedElement();
+            if (focused == null) return "";
+
+            // Build chain from focused → parent → ... → root
+            var chain = new List<AutomationElement>();
+            var cur = focused;
+            int safety = 50;
+            while (cur != null && safety-- > 0)
+            {
+                chain.Add(cur);
+                try { cur = _automation.TreeWalkerFactory.GetRawViewWalker().GetParent(cur); }
+                catch { break; }
+            }
+
+            // Check if the chain contains our target window
+            var rootEl = _automation.FromHandle(hWnd);
+            bool containsTarget = false;
+            foreach (var el in chain)
+            {
+                try
+                {
+                    if (el.Properties.NativeWindowHandle.IsSupported)
+                    {
+                        var elHwnd = el.Properties.NativeWindowHandle.Value;
+                        if (elHwnd == hWnd) { containsTarget = true; break; }
+                    }
+                }
+                catch { }
+            }
+            if (!containsTarget) return "";
+
+            // Trim chain: stop at the target window's root element
+            var trimmed = new List<AutomationElement>();
+            foreach (var el in chain)
+            {
+                trimmed.Add(el);
+                try
+                {
+                    if (el.Properties.NativeWindowHandle.IsSupported && el.Properties.NativeWindowHandle.Value == hWnd)
+                        break;
+                }
+                catch { }
+            }
+
+            if (trimmed.Count <= 1) return ""; // focus is on root itself
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("── hot focus (UIA) ──");
+            for (int i = 0; i < trimmed.Count; i++)
+            {
+                var el = trimmed[i];
+                string name, aid, ctStr, rectStr;
+                try { name = el.Name ?? ""; } catch { name = ""; }
+                try { aid = el.AutomationId ?? ""; } catch { aid = ""; }
+                try { ctStr = el.ControlType.ToString(); } catch { ctStr = "?"; }
+                try
+                {
+                    var rect = el.BoundingRectangle;
+                    rectStr = $"({rect.X},{rect.Y} {rect.Width}x{rect.Height})";
+                }
+                catch { rectStr = ""; }
+
+                string indent = new string(' ', i * 2);
+                string arrow = i == 0 ? "⌨ " : "└ ";
+                string displayName = name.Length > 40 ? name[..37] + "..." : name;
+                string aidStr = !string.IsNullOrEmpty(aid) ? $" aid=\"{aid}\"" : "";
+
+                sb.AppendLine($"  {indent}{arrow}[{ctStr}] \"{displayName}\"{aidStr} {rectStr}");
+            }
+            return sb.ToString();
+        }
+        catch { return ""; }
+    }
+
     public void Dispose()
     {
         _automation.Dispose();
