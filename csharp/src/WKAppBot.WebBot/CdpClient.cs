@@ -30,6 +30,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     private readonly ConcurrentDictionary<int, TaskCompletionSource<JsonNode?>> _pending = new();
     private CancellationTokenSource? _receiveCts;
     private Task? _receiveTask;
+    private TaskCompletionSource<JsonNode?>? _fileChooserTcs;
     private readonly HttpClient _http = new();
 
     public bool IsConnected => _ws?.State == WebSocketState.Open;
@@ -812,6 +813,121 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     public async Task BringToFrontAsync()
     {
         await SendAsync("Page.bringToFront");
+    }
+
+    /// <summary>
+    /// Intercept file chooser dialog and provide files programmatically.
+    /// Steps: 1) Enable interception 2) Trigger the file chooser (caller clicks upload button)
+    /// 3) Wait for Page.fileChooserOpened event 4) Accept with the file path.
+    /// </summary>
+    public async Task<bool> SetFileViaChooserAsync(string absolutePath, int timeoutMs = 5000)
+    {
+        try
+        {
+            // Enable file chooser interception
+            await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = true });
+
+            // Prepare to receive the event
+            _fileChooserTcs = new TaskCompletionSource<JsonNode?>();
+
+            // Click the upload button (Gemini: "파일 업로드 메뉴 열기")
+            var clickResult = await EvalAsync("""
+                (() => {
+                    var btn = document.querySelector('button[aria-label*="파일 업로드"]')
+                           || document.querySelector('button[aria-label*="Upload"]')
+                           || document.querySelector('button[aria-label*="Attach"]')
+                           || document.querySelector('button[aria-label*="첨부"]')
+                           || document.querySelector('button[aria-label*="Add file"]');
+                    if (btn) { btn.click(); return 'CLICKED:' + btn.getAttribute('aria-label'); }
+                    return 'NO_BTN';
+                })()
+            """);
+            Console.WriteLine($"[CDP] FileChooser step1: {clickResult}");
+
+            // Wait for file chooser event (direct open — non-menu buttons)
+            using var cts = new CancellationTokenSource(timeoutMs);
+            cts.Token.Register(() => _fileChooserTcs.TrySetCanceled());
+
+            try
+            {
+                await _fileChooserTcs.Task;
+            }
+            catch (TaskCanceledException)
+            {
+                // File chooser didn't open — a menu opened. Click "파일 업로드" / "Upload file" menu item
+                var menuResult = await EvalAsync("""
+                    (() => {
+                        var items = document.querySelectorAll('[role=menuitem], [role=option]');
+                        for (var item of items) {
+                            var t = (item.textContent || '').trim();
+                            if (t === '파일 업로드' || t === 'Upload file' || t === 'Upload'
+                                || t.includes('컴퓨터') || t.includes('Computer') || t.includes('내 컴퓨터')) {
+                                item.click();
+                                return 'CLICKED:' + t;
+                            }
+                        }
+                        // Broader fallback
+                        var all = document.querySelectorAll('[role=menuitem], [role=option], li, button');
+                        for (var item of all) {
+                            var t = (item.textContent || '').trim();
+                            if (t && (t.includes('업로드') || t.includes('Upload'))) {
+                                item.click();
+                                return 'CLICKED_BROAD:' + t;
+                            }
+                        }
+                        return 'NO_MENU_ITEM';
+                    })()
+                """);
+                Console.WriteLine($"[CDP] FileChooser step2 menu: {menuResult}");
+
+                // Re-enable interception and prepare new TCS before waiting
+                await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = true });
+                _fileChooserTcs = new TaskCompletionSource<JsonNode?>();
+
+                // If menu item was found but chooser didn't fire, the dialog may need a moment
+                await Task.Delay(500);
+
+                using var cts2 = new CancellationTokenSource(5000);
+                cts2.Token.Register(() => _fileChooserTcs.TrySetCanceled());
+
+                try { await _fileChooserTcs.Task; }
+                catch (TaskCanceledException)
+                {
+                    Console.WriteLine("[CDP] FileChooser: no event after menu click");
+                    return false;
+                }
+            }
+
+            // Accept file chooser with our file
+            var filePath = absolutePath.Replace('\\', '/');
+            await SendAsync("Page.handleFileChooser", new JsonObject
+            {
+                ["action"] = "accept",
+                ["files"] = new JsonArray { filePath },
+            });
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CDP] FileChooser error: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            _fileChooserTcs = null;
+            try { await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = false }); }
+            catch { }
+        }
+    }
+
+    /// <summary>
+    /// Disable CDP file chooser interception so the native OS file dialog can open.
+    /// </summary>
+    public async Task DisableFileChooserInterception()
+    {
+        try { await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = false }); }
+        catch { }
     }
 
     /// <summary>
@@ -1702,8 +1818,9 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                     var method = msg["method"]?.GetValue<string>();
                     if (method == "Runtime.executionContextDestroyed")
                         _currentContextId = null;
+                    else if (method == "Page.fileChooserOpened")
+                        _fileChooserTcs?.TrySetResult(msg["params"]);
                 }
-                // Events (has "method") -- ignore for now, can be extended later
             }
             catch (OperationCanceledException)
             {

@@ -32,6 +32,25 @@ internal partial class Program
         return $"(Slack @{user} → \"{ExePath}\" slack send \"퐁~! 지금 뭐뭐 완료하고 머머 하고있습니다~!\")";
     }
 
+    /// <summary>Per-target delivery result for ack message.</summary>
+    record DeliveryResult(string ShortName, bool Sent);
+
+    /// <summary>Extract short project name from VS Code window title (e.g., "채팅제목 - WKAppBot - Visual Studio Code" → "WKAppBot").</summary>
+    static string ExtractProjectName(ClaudePromptHelper.PromptInfo pi)
+    {
+        var title = pi.WindowTitle;
+        // VS Code: "... - ProjectName - Visual Studio Code"
+        if (title.Contains(" - Visual Studio Code", StringComparison.OrdinalIgnoreCase))
+        {
+            var parts = title.Split(" - ");
+            if (parts.Length >= 3) return parts[^2].Trim();
+        }
+        // Claude Desktop: just "Claude"
+        if (pi.HostType == "claude-desktop") return "Claude Desktop";
+        // Fallback: first 20 chars of title
+        return title.Length > 20 ? title[..20] + "…" : title;
+    }
+
     /// <summary>
     /// CWD 기반으로 "내 창" 프롬프트를 정확히 찾는다.
     /// FindAllPrompts → CWD 폴더명이 윈도우 타이틀에 포함된 창 우선 → fallback: FindPrompt.
@@ -288,7 +307,8 @@ internal partial class Program
         // Local helper: send ack "전달했습니다" and track it for later deletion
         // Deleted when slack reply is sent (not auto-deleted — stays visible until response)
         const string AckUsername = "클롣아이";
-        void SendAndTrackAck(string ch, string threadKey, int promptCount = 1, int totalAttempted = 0)
+        void SendAndTrackAck(string ch, string threadKey, int promptCount = 1, int totalAttempted = 0,
+            List<DeliveryResult>? results = null)
         {
             string ackText;
             if (totalAttempted > 0 && promptCount < totalAttempted)
@@ -297,6 +317,15 @@ internal partial class Program
                 ackText = $"Claude {promptCount}곳에 전달했습니다!";
             else
                 ackText = "Claude에 전달했습니다!";
+
+            // Append per-target status if available
+            if (results != null && results.Count > 0)
+            {
+                var lines = results.Select(r =>
+                    $"• {r.ShortName} {(r.Sent ? ":white_check_mark:" : ":x:")}");
+                ackText += "\n" + string.Join("\n", lines);
+            }
+
             var (ackOk, ackTs) = Task.Run(async () =>
                 await SlackSendViaApi(botToken, ch, ackText, threadKey, username: AckUsername))
                 .GetAwaiter().GetResult();
@@ -412,16 +441,19 @@ internal partial class Program
 
                 var replyThread = msg.ThreadTs ?? msg.Timestamp;
                 int mentionSent = 0;
+                var mentionResults = new List<DeliveryResult>();
                 foreach (var pi in allMentionPrompts)
                 {
                     try
                     {
                         var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, replyThread)}";
-                        if (ProbeAndSubmit(promptHelper, pi, promptText))
-                            mentionSent++;
+                        var ok = ProbeAndSubmit(promptHelper, pi, promptText);
+                        mentionResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
+                        if (ok) mentionSent++;
                     }
                     catch (Exception ex)
                     {
+                        mentionResults.Add(new DeliveryResult(ExtractProjectName(pi), false));
                         Console.WriteLine($"[EYE][SLACK] Mention broadcast error: {ex.Message}");
                     }
                 }
@@ -429,7 +461,7 @@ internal partial class Program
                 Console.WriteLine($"[EYE][SLACK] >> Mention broadcast: {mentionSent}/{allMentionPrompts.Count} prompts");
 
                 DeletePendingAck(ackThread);
-                SendAndTrackAck(msg.Channel, ackThread, mentionSent, allMentionPrompts.Count);
+                SendAndTrackAck(msg.Channel, ackThread, mentionSent, allMentionPrompts.Count, mentionResults);
             }
             else
             {
@@ -501,12 +533,18 @@ internal partial class Program
         slack.OnSelfMessage += (msg) =>
         {
             if (string.IsNullOrEmpty(msg.ThreadTs)) return;
-            // If this bot just posted a REAL response (not ack), delete the pending ack
-            if (!msg.Text.StartsWith("Claude에 전달했습니다!"))
+            // Skip ack messages (posted by "클롣아이") — never trigger self-deletion
+            if (msg.Username == AckUsername) return;
+            // Only delete ack if the replying session matches THIS Eye's botUsername
+            // (prevents other sessions' replies from deleting our ack too early)
+            if (!string.IsNullOrEmpty(msg.Username) && !string.IsNullOrEmpty(botUsername)
+                && !msg.Username.Equals(botUsername, StringComparison.OrdinalIgnoreCase))
             {
-                DeletePendingAck(msg.ThreadTs);
-                Console.WriteLine($"[EYE][SLACK] Deleted ack in thread {msg.ThreadTs} (bot replied)");
+                Console.WriteLine($"[EYE][SLACK] Ack preserved: reply from \"{msg.Username}\" ≠ \"{botUsername}\"");
+                return;
             }
+            DeletePendingAck(msg.ThreadTs);
+            Console.WriteLine($"[EYE][SLACK] Deleted ack in thread {msg.ThreadTs} (bot replied)");
         };
 
         // Handle channel messages (thread reply forwarding + keyword monitoring + plan approval)
@@ -653,23 +691,26 @@ internal partial class Program
                     }
 
                     int trSent = 0;
+                    var trResults = new List<DeliveryResult>();
                     foreach (var pi in allTrPrompts)
                     {
                         try
                         {
                             var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, msg.ThreadTs!, "thread reply")}";
-                            if (ProbeAndSubmit(trPromptHelper, pi, promptText))
-                                trSent++;
+                            var ok = ProbeAndSubmit(trPromptHelper, pi, promptText);
+                            trResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
+                            if (ok) trSent++;
                         }
                         catch (Exception ex)
                         {
+                            trResults.Add(new DeliveryResult(ExtractProjectName(pi), false));
                             Console.WriteLine($"[EYE][SLACK] Thread broadcast error: {ex.Message}");
                         }
                     }
                     Console.WriteLine($"[EYE][SLACK] >> Thread broadcast: {trSent}/{allTrPrompts.Count} prompts");
 
                     DeletePendingAck(msg.ThreadTs!);
-                    SendAndTrackAck(msg.Channel, msg.ThreadTs!, trSent, allTrPrompts.Count);
+                    SendAndTrackAck(msg.Channel, msg.ThreadTs!, trSent, allTrPrompts.Count, trResults);
                 }
                 else
                 {
@@ -765,23 +806,26 @@ internal partial class Program
 
                     var kwReplyThread = msg.ThreadTs ?? msg.Timestamp;
                     int kwSent = 0;
+                    var kwResults = new List<DeliveryResult>();
                     foreach (var pi in allKwPrompts)
                     {
                         try
                         {
                             var promptText = $"{cleanKwText}{threadContext}\n{SlackReplySuffix(msg.User, kwReplyThread, $"keyword:\"{matchedKw}\"")}";
-                            if (ProbeAndSubmit(kwPromptHelper, pi, promptText))
-                                kwSent++;
+                            var ok = ProbeAndSubmit(kwPromptHelper, pi, promptText);
+                            kwResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
+                            if (ok) kwSent++;
                         }
                         catch (Exception ex)
                         {
+                            kwResults.Add(new DeliveryResult(ExtractProjectName(pi), false));
                             Console.WriteLine($"[EYE][SLACK] Keyword broadcast error: {ex.Message}");
                         }
                     }
                     Console.WriteLine($"[EYE][SLACK] >> Keyword broadcast: {kwSent}/{allKwPrompts.Count} prompts");
 
                     DeletePendingAck(kwThreadKey);
-                    SendAndTrackAck(msg.Channel, kwThreadKey, kwSent, allKwPrompts.Count);
+                    SendAndTrackAck(msg.Channel, kwThreadKey, kwSent, allKwPrompts.Count, kwResults);
                 }
                 else
                 {
@@ -874,12 +918,15 @@ internal partial class Program
                 if (allPrompts.Count > 0)
                 {
                     int sent = 0;
+                    var broadcastResults = new List<DeliveryResult>();
                     foreach (var pi in allPrompts)
                     {
                         try
                         {
                             var promptText = $"{cleanAll}\n{SlackSendSuffix(msg.User)}";
-                            if (ProbeAndSubmit(allPromptHelper, pi, promptText))
+                            var ok = ProbeAndSubmit(allPromptHelper, pi, promptText);
+                            broadcastResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
+                            if (ok)
                             {
                                 sent++;
                                 Console.WriteLine($"[EYE][SLACK] >> Broadcast [{sent}/{allPrompts.Count}]: sent to \"{(pi.WindowTitle.Length > 40 ? pi.WindowTitle[..37] + "..." : pi.WindowTitle)}\"");
@@ -887,6 +934,7 @@ internal partial class Program
                         }
                         catch (Exception ex)
                         {
+                            broadcastResults.Add(new DeliveryResult(ExtractProjectName(pi), false));
                             Console.WriteLine($"[EYE][SLACK] >> Broadcast error: {ex.Message}");
                         }
                     }
@@ -903,7 +951,7 @@ internal partial class Program
                     if (sent > 0)
                     {
                         DeletePendingAck(allThreadKey);
-                        SendAndTrackAck(msg.Channel, allThreadKey, sent, allPrompts.Count);
+                        SendAndTrackAck(msg.Channel, allThreadKey, sent, allPrompts.Count, broadcastResults);
                         Console.WriteLine($"[EYE][SLACK] >> Broadcast complete: {sent}/{allPrompts.Count} prompts");
                     }
                 }

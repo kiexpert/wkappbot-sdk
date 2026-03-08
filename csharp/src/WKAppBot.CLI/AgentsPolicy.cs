@@ -121,6 +121,7 @@ AGENT REMINDER
 - Keep responses short (<80 words).
 - If stuck or planning is needed, run:
   wkappbot ask gpt "Problem: <1 sentence>. Goal: <1 sentence>. Best approach?"
+- ALWAYS use English when asking GPT/Gemini (Korean = 3-4x token waste).
 - Follow the TODO list automatically.
 
 Tip

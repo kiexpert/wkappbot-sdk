@@ -243,7 +243,6 @@ Examples:
                 }
 
                 // Don't minimize here — CDP Input.dispatch* needs a visible viewport.
-                // CdpFocusGuard handles focus theft. Minimize after interaction completes.
 
                 return (CdpClient?)cdp;
             }
@@ -552,19 +551,62 @@ Examples:
 
         try
         {
+            // ── Tier 0: Native OS file dialog via UIA ──
+            // Gemini opens a native OS file dialog that CDP can't intercept.
+            // Ensure CDP interception is OFF so the dialog actually appears.
+            await cdp.DisableFileChooserInterception();
+            Console.WriteLine("[ASK] Trying native file dialog (UIA)...");
+            var uiaOk = await TryAttachViaFileDialog(cdp, absPath);
+            if (uiaOk)
+            {
+                Console.WriteLine($"[ASK] File attached via UIA dialog: {fileName}");
+                await Task.Delay(2000);
+                return true;
+            }
+
+            // ── Tier 0.5: CDP File Chooser Interception (fallback) ──
+            Console.WriteLine("[ASK] Trying CDP file chooser...");
+            var chooserOk = await cdp.SetFileViaChooserAsync(absPath, timeoutMs: 5000);
+            if (chooserOk)
+            {
+                Console.WriteLine($"[ASK] File attached via chooser: {fileName}");
+                await Task.Delay(1500);
+                return true;
+            }
+
+            Console.WriteLine("[ASK] File dialog not available, trying DOM approach...");
+
             // ── Tier 1: DOM.setFileInputFiles on hidden <input type="file"> ──
-            // First, try clicking attachment button to ensure file input is in DOM
+            // Click upload button → if menu appears, click "파일 업로드" item → input[type=file] appears
             await cdp.EvalAsync("""
                 (() => {
                     var btn = document.querySelector('button[aria-label*="Attach"]')
                            || document.querySelector('button[aria-label*="첨부"]')
                            || document.querySelector('button[aria-label*="Upload"]')
+                           || document.querySelector('button[aria-label*="파일 업로드"]')
                            || document.querySelector('button[data-testid*="attach"]')
                            || document.querySelector('button[data-testid*="upload"]');
                     if (btn) btn.click();
                 })()
                 """);
-            await Task.Delay(500);
+            await Task.Delay(800);
+
+            // If a menu opened, click the "파일 업로드" / "Upload file" menu item
+            await cdp.EvalAsync("""
+                (() => {
+                    var items = document.querySelectorAll('[role=menuitem], [role=option]');
+                    for (var item of items) {
+                        var t = (item.textContent || '').trim();
+                        if (t === '파일 업로드' || t === 'Upload file' || t === 'Upload'
+                            || t.includes('컴퓨터') || t.includes('Computer')) {
+                            item.click();
+                            return 'CLICKED:' + t;
+                        }
+                    }
+                    return 'NO_MENU';
+                })()
+                """);
+            await Task.Delay(800);
 
             // Get all file inputs (some pages have multiple)
             var docResult = await cdp.SendAsync("DOM.getDocument", new JsonObject());
@@ -580,6 +622,7 @@ Examples:
                 });
 
                 var nodeIds = queryResult?["nodeIds"]?.AsArray();
+                Console.WriteLine($"[ASK] Found {nodeIds?.Count ?? 0} file input(s)");
                 if (nodeIds != null && nodeIds.Count > 0)
                 {
                     // Try each file input until one works
@@ -597,23 +640,28 @@ Examples:
                             });
                             Console.WriteLine($"[ASK] File input set (nodeId={nodeId})");
                         }
-                        catch { continue; }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[ASK] File input set failed (nodeId={nodeId}): {ex.Message}");
+                            continue;
+                        }
 
-                        // Fire change event (React needs this to detect the file)
-                        await cdp.EvalAsync($$$"""
-                            (() => {{
+                        // Fire change event (Angular/React needs this to detect the file)
+                        var fireResult = await cdp.EvalAsync("""
+                            (() => {
                                 var inputs = document.querySelectorAll('input[type="file"]');
-                                for (var inp of inputs) {{
-                                    if (inp.files && inp.files.length > 0) {{
-                                        inp.dispatchEvent(new Event('change', {{bubbles: true}}));
-                                        inp.dispatchEvent(new Event('input', {{bubbles: true}}));
-                                        return 'FIRED';
-                                    }}
-                                }}
+                                for (var inp of inputs) {
+                                    if (inp.files && inp.files.length > 0) {
+                                        inp.dispatchEvent(new Event('change', {bubbles: true}));
+                                        inp.dispatchEvent(new Event('input', {bubbles: true}));
+                                        return 'FIRED:' + inp.files[0].name;
+                                    }
+                                }
                                 return 'NO_FILES';
-                            }})()
+                            })()
                             """);
-                        await Task.Delay(1500);
+                        Console.WriteLine($"[ASK] Change event: {fireResult}");
+                        await Task.Delay(2000);
 
                         // Check if attachment appeared
                         if (await CheckFileAttached(cdp))
@@ -621,6 +669,7 @@ Examples:
                             Console.WriteLine($"[ASK] File attached via input: {fileName}");
                             return true;
                         }
+                        Console.WriteLine("[ASK] File input: attachment not detected in UI");
                     }
                 }
             }
@@ -640,6 +689,11 @@ Examples:
                 ".html" or ".htm" => "text/html",
                 ".csv" => "text/csv",
                 ".pdf" => "application/pdf",
+                ".mp3" => "audio/mpeg",
+                ".wav" => "audio/wav",
+                ".ogg" => "audio/ogg",
+                ".m4a" => "audio/mp4",
+                ".mp4" => "video/mp4",
                 _ => "application/octet-stream"
             };
 
@@ -706,9 +760,15 @@ Examples:
                 if (document.querySelector('[class*="file-upload"]')) return 'YES';
                 if (document.querySelector('[class*="uploaded-file"]')) return 'YES';
                 if (document.querySelector('img[src*="blob:"]')) return 'YES';
-                // Gemini file chip
+                // Gemini file chip / upload indicator
                 if (document.querySelector('[class*="file-chip"]')) return 'YES';
                 if (document.querySelector('[class*="upload-chip"]')) return 'YES';
+                if (document.querySelector('[class*="file-container"]')) return 'YES';
+                if (document.querySelector('[class*="upload-container"]')) return 'YES';
+                if (document.querySelector('[class*="inline-file"]')) return 'YES';
+                if (document.querySelector('[class*="file-preview"]')) return 'YES';
+                if (document.querySelector('uploader-thumbnail')) return 'YES';
+                if (document.querySelector('mat-chip')) return 'YES';
                 // Count file inputs with files set
                 var inputs = document.querySelectorAll('input[type="file"]');
                 for (var inp of inputs) { if (inp.files && inp.files.length > 0) return 'INPUT_HAS_FILES'; }
@@ -716,6 +776,234 @@ Examples:
             })()
             """) ?? "NO";
         return attached != "NO";
+    }
+
+    /// <summary>
+    /// Open Gemini upload menu → click "파일 업로드" → OS file dialog appears → UIA type path + click Open.
+    /// Returns true if file was successfully attached via the native dialog.
+    /// </summary>
+    static async Task<bool> TryAttachViaFileDialog(CdpClient cdp, string absPath)
+    {
+        try
+        {
+            // Check if file open dialog is already open
+            IntPtr existingDialog = FindFileOpenDialog();
+            if (existingDialog == IntPtr.Zero)
+            {
+                // Open the upload menu with a TRUSTED click (Input.dispatchMouseEvent)
+                // Chrome requires trusted user gestures to open <input type="file"> dialogs.
+                // CDP Runtime.evaluate clicks are NOT trusted → dialog won't open.
+                var btnRect = await cdp.EvalAsync("""
+                    (() => {
+                        var btn = document.querySelector('button[aria-label*="파일 업로드"]')
+                               || document.querySelector('button[aria-label*="Upload"]')
+                               || document.querySelector('button[aria-label*="Attach"]');
+                        if (!btn) return 'NO_BTN';
+                        var r = btn.getBoundingClientRect();
+                        return Math.round(r.x + r.width/2) + ',' + Math.round(r.y + r.height/2);
+                    })()
+                """);
+                if (btnRect == "NO_BTN") return false;
+
+                var parts = btnRect!.Split(',');
+                if (parts.Length != 2) return false;
+                var bx = int.Parse(parts[0]);
+                var by = int.Parse(parts[1]);
+
+                // Trusted click on upload button
+                await CdpTrustedClick(cdp, bx, by);
+                Console.WriteLine($"[ASK] UIA dialog: upload btn trusted click at ({bx},{by})");
+                await Task.Delay(600);
+
+                // Now find and click the "파일 업로드" menu item with trusted gesture
+                var menuRect = await cdp.EvalAsync("""
+                    (() => {
+                        var items = document.querySelectorAll('[role=menuitem]');
+                        for (var item of items) {
+                            var t = (item.textContent || '').trim();
+                            if (t === '파일 업로드' || t === 'Upload file' || t === 'Upload') {
+                                var r = item.getBoundingClientRect();
+                                return Math.round(r.x + r.width/2) + ',' + Math.round(r.y + r.height/2) + ':' + t;
+                            }
+                        }
+                        return 'NO_ITEM';
+                    })()
+                """);
+                Console.WriteLine($"[ASK] UIA dialog: menu={menuRect}");
+                if (menuRect == "NO_ITEM") return false;
+
+                var menuParts = menuRect!.Split(':');
+                var coords = menuParts[0].Split(',');
+                var mx = int.Parse(coords[0]);
+                var my = int.Parse(coords[1]);
+
+                // Trusted click on menu item → triggers <input type="file">.click() with user gesture
+                await CdpTrustedClick(cdp, mx, my);
+                Console.WriteLine($"[ASK] UIA dialog: menu item trusted click at ({mx},{my})");
+            }
+            else
+            {
+                Console.WriteLine($"[ASK] UIA dialog: reusing existing dialog hwnd={existingDialog:X}");
+            }
+
+            // Wait for OS file dialog to appear (#32770 with title "열기"/"Open" or ComboBoxEx32 child)
+            IntPtr dialogHwnd = IntPtr.Zero;
+            for (int i = 0; i < 20; i++) // 4 seconds max
+            {
+                await Task.Delay(200);
+                dialogHwnd = FindFileOpenDialog();
+                if (dialogHwnd != IntPtr.Zero) break;
+            }
+
+            if (dialogHwnd == IntPtr.Zero)
+            {
+                Console.WriteLine("[ASK] UIA dialog: no file dialog found");
+                return false;
+            }
+            Console.WriteLine($"[ASK] UIA dialog: found hwnd={dialogHwnd:X}");
+
+            // Step 4: Find the filename edit via Win32 (ComboBoxEx32 → ComboBox → Edit chain)
+            // Standard Windows file dialog structure: Dialog → ComboBoxEx32(cid=1148) → ComboBox → Edit
+            var comboEx = NativeMethods.FindWindowExW(dialogHwnd, IntPtr.Zero, "ComboBoxEx32", null);
+            IntPtr editHwnd = IntPtr.Zero;
+            if (comboEx != IntPtr.Zero)
+            {
+                var combo = NativeMethods.FindWindowExW(comboEx, IntPtr.Zero, "ComboBox", null);
+                if (combo != IntPtr.Zero)
+                    editHwnd = NativeMethods.FindWindowExW(combo, IntPtr.Zero, "Edit", null);
+                if (editHwnd == IntPtr.Zero)
+                    editHwnd = NativeMethods.FindWindowExW(comboEx, IntPtr.Zero, "Edit", null);
+            }
+            // Fallback: search for any Edit with control id 1148
+            if (editHwnd == IntPtr.Zero)
+            {
+                NativeMethods.EnumChildWindows(dialogHwnd, (h, _) =>
+                {
+                    var cidBuf = new StringBuilder(32);
+                    NativeMethods.GetClassNameW(h, cidBuf, cidBuf.Capacity);
+                    if (cidBuf.ToString() == "Edit")
+                    {
+                        editHwnd = h;
+                        return false;
+                    }
+                    return true;
+                }, IntPtr.Zero);
+            }
+
+            if (editHwnd == IntPtr.Zero)
+            {
+                Console.WriteLine("[ASK] UIA dialog: filename edit not found");
+                NativeMethods.SendMessageW(dialogHwnd, 0x0010 /*WM_CLOSE*/, IntPtr.Zero, IntPtr.Zero);
+                return false;
+            }
+
+            // Set the filename via WM_SETTEXT (Win32 — most reliable for file dialogs)
+            NativeMethods.SendMessageW(editHwnd, 0x000C /*WM_SETTEXT*/, IntPtr.Zero, absPath);
+            Console.WriteLine($"[ASK] UIA dialog: path set via WM_SETTEXT");
+
+            await Task.Delay(300);
+
+            // Step 5: Click "열기" button — find by control ID 1 (standard Open button)
+            // GetDlgItem equivalent: find the button with control ID 1
+            var openBtnHwnd = NativeMethods.FindWindowExW(dialogHwnd, IntPtr.Zero, "Button", null);
+            // The first Button child is usually "열기(O)" / "Open". Click via BM_CLICK.
+            if (openBtnHwnd != IntPtr.Zero)
+            {
+                NativeMethods.SendMessageW(openBtnHwnd, 0x00F5 /*BM_CLICK*/, IntPtr.Zero, IntPtr.Zero);
+                Console.WriteLine("[ASK] UIA dialog: Open BM_CLICK sent");
+            }
+            else
+            {
+                // Fallback: press Enter on dialog
+                Console.WriteLine("[ASK] UIA dialog: Open button not found, posting Enter");
+                NativeMethods.PostMessageW(dialogHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x0D, IntPtr.Zero);
+            }
+
+            // Step 6: Wait for dialog to close and file to appear in Gemini
+            for (int i = 0; i < 15; i++)
+            {
+                await Task.Delay(300);
+                if (!NativeMethods.IsWindow(dialogHwnd))
+                {
+                    Console.WriteLine("[ASK] UIA dialog: dialog closed OK");
+                    await Task.Delay(1500);
+                    return true;
+                }
+            }
+
+            Console.WriteLine("[ASK] UIA dialog: dialog didn't close");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ASK] UIA dialog error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Send a trusted mouse click via CDP Input.dispatchMouseEvent.
+    /// This creates a real user gesture that Chrome trusts for file dialog opening.
+    /// </summary>
+    static async Task CdpTrustedClick(CdpClient cdp, int x, int y)
+    {
+        await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
+        {
+            ["type"] = "mousePressed", ["x"] = x, ["y"] = y,
+            ["button"] = "left", ["clickCount"] = 1
+        });
+        await Task.Delay(50);
+        await cdp.SendAsync("Input.dispatchMouseEvent", new System.Text.Json.Nodes.JsonObject
+        {
+            ["type"] = "mouseReleased", ["x"] = x, ["y"] = y,
+            ["button"] = "left", ["clickCount"] = 1
+        });
+    }
+
+    /// <summary>
+    /// Enumerate all top-level #32770 dialogs and find one that looks like a file-open dialog.
+    /// Strategy: title match ("열기"/"Open") first, then structural match (ComboBoxEx32/DUIViewWndClassName child).
+    /// </summary>
+    static IntPtr FindFileOpenDialog()
+    {
+        IntPtr result = IntPtr.Zero;
+        var classBuf = new StringBuilder(256);
+        var titleBuf = new StringBuilder(256);
+
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+
+            classBuf.Clear();
+            NativeMethods.GetClassNameW(hWnd, classBuf, classBuf.Capacity);
+            if (classBuf.ToString() != "#32770") return true;
+
+            titleBuf.Clear();
+            NativeMethods.GetWindowTextW(hWnd, titleBuf, titleBuf.Capacity);
+            var title = titleBuf.ToString();
+
+            // Title match — most reliable
+            if (title is "열기" or "Open" or "파일 열기" or "Open File")
+            {
+                result = hWnd;
+                Console.WriteLine($"[ASK] FindFileOpenDialog: title match '{title}' hwnd={hWnd:X}");
+                return false; // stop
+            }
+
+            // Structural match — file dialog has ComboBoxEx32 (filename field) + DUIViewWndClassName (file list)
+            var combo = NativeMethods.FindWindowExW(hWnd, IntPtr.Zero, "ComboBoxEx32", null);
+            var dui = NativeMethods.FindWindowExW(hWnd, IntPtr.Zero, "DUIViewWndClassName", null);
+            if (combo != IntPtr.Zero && dui != IntPtr.Zero)
+            {
+                result = hWnd;
+                Console.WriteLine($"[ASK] FindFileOpenDialog: structural match '{title}' hwnd={hWnd:X}");
+                return false; // stop
+            }
+
+            return true; // continue
+        }, IntPtr.Zero);
+
+        return result;
     }
 
     static bool IsTextFile(string ext) => ext is ".txt" or ".log" or ".md" or ".cs" or ".js"
@@ -989,7 +1277,6 @@ Examples:
     static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false)
     {
         Console.WriteLine($"[ASK] Gemini: {question}");
-        using var focusGuard = new CdpFocusGuard();
 
         // UIA tab routing: switch to Gemini tab before CDP connects (focusless)
         if (!newTab) EnsureTabViaGrap("Chrome", "Gemini");
@@ -1022,9 +1309,7 @@ Examples:
                 // Activate tab (no lock needed — just internal tab switch)
                 try
                 {
-                    var prevFg = NativeMethods.GetForegroundWindow();
                     await cdp.BringToFrontAsync();
-                    if (prevFg != IntPtr.Zero) NativeMethods.SetForegroundWindow(prevFg);
                     Console.WriteLine("[ASK] Tab activated (BringToFront OK)");
                 }
                 catch (Exception btfEx)
@@ -1436,6 +1721,11 @@ Examples:
             var cleaned = answer.StartsWith("Gemini의 응답") ? answer["Gemini의 응답".Length..] : answer;
             Console.WriteLine(cleaned.Length > 2000 ? cleaned[..2000] + "\n... (truncated)" : cleaned);
 
+            // Full answer marker (for programmatic capture by whisper study etc.)
+            Console.WriteLine("[ASK_FULL_ANSWER_BEGIN]");
+            Console.WriteLine(cleaned);
+            Console.WriteLine("[ASK_FULL_ANSWER_END]");
+
             if (slackReport)
                 ReportToSlack("Gemini", question, cleaned);
         }
@@ -1468,7 +1758,6 @@ Examples:
     static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false)
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
-        using var focusGuard = new CdpFocusGuard();
 
         // UIA tab routing: switch to ChatGPT tab before CDP connects (focusless)
         if (!newTab) EnsureTabViaGrap("Chrome", "ChatGPT");
@@ -1495,9 +1784,7 @@ Examples:
                 }
 
                 // Activate tab (no lock needed — just internal tab switch)
-                var prevFg = NativeMethods.GetForegroundWindow();
                 await cdp.BringToFrontAsync();
-                if (prevFg != IntPtr.Zero) NativeMethods.SetForegroundWindow(prevFg);
 
                 // Wait for ProseMirror editor
                 var editorSel = await WaitForChatGptEditorA11y(cdp);
@@ -1682,10 +1969,8 @@ Examples:
         var currentUrl = await cdp.EvalAsync("location.href") ?? "";
         int prevTurns = await CountChatGptTurns(cdp);
 
-        // Activate tab (no lock needed)
-        var prevFg = NativeMethods.GetForegroundWindow();
+        // Activate tab (no lock needed — Chrome-internal tab switch, no OS focus change)
         await cdp.BringToFrontAsync();
-        if (prevFg != IntPtr.Zero) NativeMethods.SetForegroundWindow(prevFg);
 
         // ── A11y-first: find editor via selector chain ──
         var editorSel = await WaitForChatGptEditorA11y(cdp);
@@ -2048,9 +2333,7 @@ Examples:
         // BringToFront so innerText (which needs layout) works properly
         try
         {
-            var prevFg2 = NativeMethods.GetForegroundWindow();
             await cdp.BringToFrontAsync();
-            if (prevFg2 != IntPtr.Zero) NativeMethods.SetForegroundWindow(prevFg2);
         }
         catch { }
         await Task.Delay(300); // let React hydrate after tab activation
@@ -2136,11 +2419,8 @@ Examples:
         var title = WKAppBot.Win32.Window.WindowFinder.GetWindowText(chromeHwnd);
         Console.WriteLine($"[ASK] Showing answer — focusless restore \"{title}\"");
 
-        // Focusless restore: SW_RESTORE + immediately give focus back to previous window
-        var prevFg = NativeMethods.GetForegroundWindow();
-        NativeMethods.ShowWindow(chromeHwnd, 9); // SW_RESTORE
-        if (prevFg != IntPtr.Zero && prevFg != chromeHwnd)
-            NativeMethods.SetForegroundWindow(prevFg);
+        // Focusless restore: SW_SHOWNOACTIVATE won't steal focus
+        NativeMethods.ShowWindow(chromeHwnd, 4); // SW_SHOWNOACTIVATE
     }
 
     // ── UIA Send Button ──
@@ -2182,54 +2462,6 @@ Examples:
             Console.WriteLine($"[ASK] UIA send failed: {ex.Message}");
         }
         return false;
-    }
-
-    // ── Focus Guard ──
-    // Polls foreground window every 50ms and restores if Chrome steals it.
-    // Wraps the entire ask flow so the user's keyboard focus is never lost.
-
-    sealed class CdpFocusGuard : IDisposable
-    {
-        readonly IntPtr _protectedHwnd;
-        readonly CancellationTokenSource _cts = new();
-        readonly Task _task;
-        int _theftCount;
-
-        public CdpFocusGuard()
-        {
-            _protectedHwnd = NativeMethods.GetForegroundWindow();
-            _task = Task.Run(async () =>
-            {
-                while (!_cts.IsCancellationRequested)
-                {
-                    try
-                    {
-                        var fg = NativeMethods.GetForegroundWindow();
-                        if (_protectedHwnd != IntPtr.Zero && fg != _protectedHwnd && fg != IntPtr.Zero)
-                        {
-                            NativeMethods.SetForegroundWindow(_protectedHwnd);
-                            Interlocked.Increment(ref _theftCount);
-                        }
-                    }
-                    catch { }
-                    await Task.Delay(50);
-                }
-            });
-        }
-
-        public void Dispose()
-        {
-            _cts.Cancel();
-            try { _task.Wait(500); } catch { }
-            _cts.Dispose();
-            var count = _theftCount;
-            if (count > 0)
-            {
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine($"[FOCUS] Guard blocked {count} focus theft(s)");
-                Console.ResetColor();
-            }
-        }
     }
 
     // ── Tab Handoff: async 상부상조 ──
