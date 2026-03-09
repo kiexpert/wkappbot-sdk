@@ -274,20 +274,21 @@ internal sealed class WhisperExperienceDb : IDisposable
     {
         _currentMode = frame.Mode;
 
-        // WAV segment recording: voice activity detection
-        // LOUD is still recorded — learning data for noise pattern analysis
-        if (frame.Mode == "QUIET")
+        // WAV segment recording: only VOICE/WHSPR are speech — everything else is silence
+        bool isSpeech = frame.Mode == "VOICE" || frame.Mode == "WHSPR";
+        if (!isSpeech)
         {
             if (_isRecording)
             {
                 _quietFrames++;
                 if (_quietFrames >= QuietTrailFrames)
                 {
+                    Console.WriteLine($"[WHISPER:CUT] speech={_segmentFrames}f({_segmentFrames*30}ms) trail={QuietTrailFrames}f mode={frame.Mode}");
                     StopWavSegment();
                     _segmentFrames = 0;
                 }
             }
-            return; // skip silence for token log
+            if (frame.Mode == "QUIET") return; // skip silence for token log
         }
         else
         {
@@ -296,6 +297,15 @@ internal sealed class WhisperExperienceDb : IDisposable
                 StartWavSegment(frame.Mode);
             _segmentFrames++;
             _segmentSoundCodes.Add(frame.SoundCode);
+
+            // Long sentence warning: 9s (~300 frames) → debug dump (once per sentence)
+            if (_segmentFrames == 300)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[WHISPER:LONG] 9s+ sentence! frames={_segmentFrames} mode={frame.Mode} sc=0x{frame.SoundCode:X4} energy={frame.MaxEnergy:F4}");
+                Console.WriteLine($"[WHISPER:LONG] unique_codes={_segmentSoundCodes.Distinct().Count()}/{_segmentSoundCodes.Count} quiet_streak={_quietFrames}");
+                Console.ResetColor();
+            }
         }
 
         var ticks = DateTime.UtcNow.Ticks;
@@ -429,7 +439,7 @@ internal sealed class WhisperExperienceDb : IDisposable
                         int step = Math.Max(1, deduped.Count / 8);
                         for (int i = 0; i < deduped.Count && sampled.Count < 8; i += step)
                             sampled.Add(deduped[i]);
-                        var scStr = string.Join("-", sampled.Select(c => $"{c:X4}"));
+                        var scStr = string.Join("-", sampled.Select(FormatSoundCodeOct));
                         var dir = Path.GetDirectoryName(_wavPath)!;
                         var origName = Path.GetFileName(_wavPath);
                         var newName = $"{scStr}_{origName}";
@@ -437,7 +447,7 @@ internal sealed class WhisperExperienceDb : IDisposable
                         if (!File.Exists(newPath))
                             File.Move(_wavPath, newPath);
                         // Human-readable: decode each sound code to band abbreviations
-                        var readable = string.Join(" ", sampled.Select(DecodeSoundCode));
+                        var readable = string.Join(" ", sampled.Select(FormatSoundCodeOct));
                         Console.WriteLine($"[WHISPER] {newName}  ({deduped.Count} codes, {_segmentSoundCodes.Count} frames)");
                         Console.WriteLine($"[WHISPER] {readable}");
                     }
@@ -486,20 +496,14 @@ internal sealed class WhisperExperienceDb : IDisposable
     /// <summary>Call when auto-study batch completes (success or fail).</summary>
     public void NotifyAutoStudyDone() => _autoStudyRunning = false;
 
-    private static readonly string[] BandShort = ["Vx", "Ph", "Ve", "Or", "Hi", "Bu", "Sb", "Br"];
-
-    /// <summary>Decode 15-bit sound code to band abbreviations: "Sb Bu Hi Or Vx"</summary>
-    private static string DecodeSoundCode(ushort sc)
+    /// <summary>Decode 15-bit sound code to octal 5-digit string (each digit = band index 0-7).</summary>
+    private static string FormatSoundCodeOct(ushort sc)
     {
         if (sc == 0) return "..";
-        var sb = new System.Text.StringBuilder(14);
+        var buf = new char[5];
         for (int r = 0; r < 5; r++)
-        {
-            int idx = (sc >> (12 - r * 3)) & 0x7;
-            if (r > 0) sb.Append(' ');
-            sb.Append(BandShort[idx]);
-        }
-        return sb.ToString();
+            buf[r] = (char)('0' + ((sc >> (12 - r * 3)) & 0x7));
+        return new string(buf).TrimStart('0');
     }
 
     private static string SanitizeFileName(string text)
