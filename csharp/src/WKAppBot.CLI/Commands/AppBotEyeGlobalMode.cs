@@ -389,9 +389,14 @@ internal partial class Program
                 // Mic PCM → parallel MP3 recording for Gemini STT
                 whisperEngine.OnMicData += (buf, len) => whisperExp?.WriteMicData(buf, len);
 
-                // Mic segment ready → send to Gemini for transcription
+                // Mic segment ready → Gemini STT (DISABLED: BringToFront/file dialog steals focus)
+                // TODO: Re-enable after ask gemini is fully focusless (BringToFront removed + setFileInputFiles-first)
                 whisperExp.OnMicSegmentReady += (mp3Path) =>
                 {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"[WHISPER:GEMINI] STT disabled (focusless WIP): {Path.GetFileName(mp3Path)}");
+                    Console.ResetColor();
+                    if (false) // disabled until fully focusless
                     ThreadPool.QueueUserWorkItem(_ =>
                     {
                         try
