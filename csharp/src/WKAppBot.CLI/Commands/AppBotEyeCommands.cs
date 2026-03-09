@@ -75,8 +75,24 @@ internal partial class Program
 
         Console.Title = "AppBotEye"; // for a11y close targeting (avoid matching VS Code)
         TryHideConsoleWindow();
+
+        // Elevated proxy mode: if running as admin, start Named Pipe server alongside Eye
+        bool elevated = args.Any(a => a == "--elevated") || ElevationHelper.IsElevated();
+        if (elevated)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("[EYE] Running as ADMIN — elevated proxy pipe will be available");
+            Console.ResetColor();
+        }
+
+        // Hot-swap blue-green: --replace-pid <pid> → close old Eye after first render
+        int replacePid = 0;
+        for (int i = 0; i < args.Length; i++)
+            if (args[i] == "--replace-pid" && i + 1 < args.Length)
+                int.TryParse(args[i + 1], out replacePid);
+
         Console.WriteLine("[EYE] Starting WK AppBot Eye (GlobalMode)");
-        return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs);
+        return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, elevated, replacePid);
     }
 
     // ── P/Invoke declarations (shared across all AppBotEye partial class files) ──

@@ -1576,7 +1576,7 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     {
         var (expX, expY, expW, expH) = ExpectedBounds;
 
-        // Step 0: Get all page targets
+        // Step 0: Get all page targets + immediately close any about:blank tabs (waste of resources)
         JsonArray? allTargets = null;
         try
         {
@@ -1585,6 +1585,23 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         }
         catch { return TargetId; }
         if (allTargets == null) return TargetId;
+
+        // Sweep: close all about:blank tabs on sight (they serve no purpose and waste tokens)
+        int blanksClosed = 0;
+        for (int i = allTargets.Count - 1; i >= 0; i--)
+        {
+            var t = allTargets[i];
+            var tUrl = t?["url"]?.GetValue<string>() ?? "";
+            var tId = t?["id"]?.GetValue<string>() ?? "";
+            if (tUrl == "about:blank" && !string.IsNullOrEmpty(tId))
+            {
+                try { await _http.GetAsync($"http://localhost:{port}/json/close/{tId}"); } catch { }
+                allTargets.RemoveAt(i);
+                blanksClosed++;
+            }
+        }
+        if (blanksClosed > 0)
+            Console.WriteLine($"[WEB] Closed {blanksClosed} about:blank tab(s) on sight");
 
         // Step 1: Try saved target ID (from AskTargetRegistry — survives across CLI invocations)
         if (!string.IsNullOrWhiteSpace(savedTargetId))
@@ -1675,8 +1692,16 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         }
 
         // Step 4: Create new tab — prefer existing correctly-positioned window, else new window
+        // IMPORTANT: Never create about:blank tabs — they persist and waste resources.
+        // If no navigateUrl, just return whatever tab we're currently on.
+        if (string.IsNullOrWhiteSpace(navigateUrl))
+        {
+            Console.WriteLine("[WEB] No navigateUrl — reusing current tab (avoiding about:blank)");
+            return TargetId;
+        }
+
         string? newTargetId = null;
-        var createUrl = navigateUrl ?? "about:blank";
+        var createUrl = navigateUrl;
 
         // First: check if any existing tab lives in a correctly-positioned window
         // If so, create new tab there (reuse window, avoid stacking)

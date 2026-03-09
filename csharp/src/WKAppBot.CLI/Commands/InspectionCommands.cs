@@ -75,6 +75,11 @@ internal partial class Program
         var mainWin = windows[0];
         Console.WriteLine($"Window: [{mainWin.Handle:X8}] \"{mainWin.Title}\"");
 
+        // Elevation auto-detect: delegate to admin proxy if target is elevated
+        var (delegated, delegateExit) = ElevationHelper.TryDelegateIfElevated(
+            mainWin.Handle, "a11y", new[] { "find" }.Concat(args).ToArray());
+        if (delegated) return delegateExit;
+
         // Walk Win32 children (segments before '#')
         IntPtr targetHwnd = mainWin.Handle;
         for (int si = 1; si < win32Segments.Length; si++)
@@ -190,6 +195,11 @@ internal partial class Program
         }
 
         var mainWin = windows[0];
+
+        // Elevation auto-detect: delegate to admin proxy if target is elevated
+        var (delegated, delegateExit) = ElevationHelper.TryDelegateIfElevated(
+            mainWin.Handle, "inspect", args);
+        if (delegated) return delegateExit;
 
         // Walk Win32 children (segments before '#')
         IntPtr inspectHandle = mainWin.Handle;
