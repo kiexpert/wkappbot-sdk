@@ -25,6 +25,20 @@ internal partial class Program
 
     static int NewChatCommand(string[] args)
     {
+        // ── Mutex guard: prevent concurrent/duplicate newchat runs ──
+        var lockFile = Path.Combine(Path.GetTempPath(), "wkappbot_newchat.lock");
+        try
+        {
+            var lockAge = File.Exists(lockFile) ? DateTime.UtcNow - File.GetLastWriteTimeUtc(lockFile) : TimeSpan.MaxValue;
+            if (lockAge.TotalSeconds < 30)
+            {
+                Console.WriteLine($"[NEWCHAT] SKIPPED — another newchat ran {lockAge.TotalSeconds:F0}s ago (cooldown 30s)");
+                return 0;
+            }
+            File.WriteAllText(lockFile, $"{DateTime.UtcNow:O} pid={Environment.ProcessId}");
+        }
+        catch { /* best-effort lock */ }
+
         // ── Parse args ──
         string? text = null;
         var filePath = GetArgValue(args, "--file");
@@ -159,13 +173,9 @@ internal partial class Program
             Console.WriteLine($"[NEWCHAT] Typed '{command}' via keyboard");
 
             // Wait for autocomplete menu to appear and settle
-            Thread.Sleep(500);
+            Thread.Sleep(800);
 
-            // DEBUG: pause before Enter to let user inspect the menu
-            Console.WriteLine("[NEWCHAT] DEBUG: /clear typed, waiting 10s before Enter — check VS Code for menu!");
-            Thread.Sleep(10000);
-
-            // Press Enter to select the slash command
+            // Press Enter once to select the slash command from menu
             KeyboardInput.PressKey("enter");
             Thread.Sleep(200);
             return true;

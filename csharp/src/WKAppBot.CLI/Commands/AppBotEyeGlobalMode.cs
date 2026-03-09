@@ -304,6 +304,7 @@ internal partial class Program
         // ── Hot-reload: track EXE timestamp ──
         var exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
         var exeStartTime = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.MinValue;
+        bool hotReloadTriggered = false;
 
         var keepAwakeSw = Stopwatch.StartNew();
         WKAppBot.Win32.Native.NativeMethods.SetThreadExecutionState(
@@ -887,35 +888,45 @@ internal partial class Program
             {
                 try
                 {
-                    var newExePath = Path.Combine(Path.GetDirectoryName(exePath) ?? "", "wkappbot.new.exe");
+                    var exeDir = Path.GetDirectoryName(exePath) ?? "";
+                    var exeName = Path.GetFileNameWithoutExtension(exePath);
+                    var newExePath = Path.Combine(exeDir, $"{exeName}.new.exe");
+                    var oldExePath = Path.Combine(exeDir, $"{exeName}.old.exe");
+
                     if (File.Exists(newExePath))
                     {
-                        // .new.exe staged by PostPublish (EXE was locked) — swap and restart
+                        // .new.exe staged — rename-swap: running→.old, new→running
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine("[EYE] Hot-reload: wkappbot.new.exe detected — swapping");
+                        Console.WriteLine("[EYE] Hot-reload: .new.exe detected — rename-swap");
                         Console.ResetColor();
-                        bool swapped = false;
                         try
                         {
-                            File.Delete(exePath);
+                            // 1. Delete previous .old.exe if lingering
+                            if (File.Exists(oldExePath))
+                                File.Delete(oldExePath);
+                            // 2. Rename running EXE → .old.exe (Windows allows rename of running EXE!)
+                            File.Move(exePath, oldExePath);
+                            // 3. Rename .new.exe → original name
                             File.Move(newExePath, exePath);
-                            Console.WriteLine("[EYE] Hot-reload: EXE swapped successfully");
-                            swapped = true;
+                            Console.WriteLine("[EYE] Hot-reload: swap OK (.exe→.old.exe, .new.exe→.exe)");
+                            hotReloadTriggered = true;
+                            break;
                         }
                         catch (Exception swapEx)
                         {
                             Console.WriteLine($"[EYE] Hot-reload: swap failed ({swapEx.Message})");
-                            // Delete .new.exe to prevent infinite restart loop
-                            try { File.Delete(newExePath); } catch { }
-                            Console.WriteLine("[EYE] Hot-reload: deleted .new.exe to prevent restart loop — continuing");
+                            // Rollback: if original was renamed but new move failed
+                            if (!File.Exists(exePath) && File.Exists(oldExePath))
+                                try { File.Move(oldExePath, exePath); } catch { }
                         }
-                        if (swapped) break; // only restart if swap succeeded
                     }
                     else if (File.GetLastWriteTimeUtc(exePath) != exeStartTime)
                     {
+                        // EXE directly overwritten (publish without lock) — just restart
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine("[EYE] Hot-reload: EXE changed — shutting down");
+                        Console.WriteLine("[EYE] Hot-reload: EXE timestamp changed — restarting");
                         Console.ResetColor();
+                        hotReloadTriggered = true;
                         break;
                     }
                 }
@@ -1008,6 +1019,27 @@ internal partial class Program
                 slackClient.Dispose();
             }
             catch { }
+        }
+
+        // ── Hot-reload: re-launch self with same args ──
+        if (hotReloadTriggered && File.Exists(exePath))
+        {
+            try
+            {
+                Console.WriteLine($"[EYE] Hot-reload: re-launching {Path.GetFileName(exePath)} eye");
+                var psi = new ProcessStartInfo
+                {
+                    FileName = exePath,
+                    Arguments = "eye",
+                    UseShellExecute = false,
+                };
+                Process.Start(psi);
+                Console.WriteLine("[EYE] Hot-reload: new process started — exiting old");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EYE] Hot-reload: re-launch failed: {ex.Message}");
+            }
         }
 
         return 0;
