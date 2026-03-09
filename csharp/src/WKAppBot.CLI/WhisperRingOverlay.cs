@@ -273,20 +273,13 @@ internal sealed class WhisperRingWindow : Window
         Content = root;
     }
 
-    // Band short names for sound code display (2-char abbreviations)
-    private static readonly string[] BandShort = ["Vx", "Ph", "Ve", "Or", "Hi", "Bu", "Sb", "Br"];
-
-    /// <summary>Format 15-bit sound code as ranked band abbreviations (e.g. "Sb Bu Hi Or Vx").</summary>
+    /// <summary>Format 15-bit sound code as octal digits (no leading zeros). Each digit = band index 0-7.</summary>
     private static string FormatSoundCode(ushort sc)
     {
-        var sb = new System.Text.StringBuilder(14);
+        var buf = new char[5];
         for (int r = 0; r < 5; r++)
-        {
-            int idx = (sc >> (12 - r * 3)) & 0x7;
-            if (r > 0) sb.Append(' ');
-            sb.Append(BandShort[idx]);
-        }
-        return sb.ToString();
+            buf[r] = (char)('0' + ((sc >> (12 - r * 3)) & 0x7));
+        return new string(buf).TrimStart('0');
     }
 
     /// <summary>Update a single arc segment geometry.</summary>
@@ -461,14 +454,6 @@ internal sealed class WhisperRingWindow : Window
             _coreGlow.Fill = rg;
         }
 
-        // Sound code (15-bit: top 5 bands by energy, 3-bit index each)
-        // Format: 5 band abbreviations e.g. "Sb.Bu.HR.OR.Vl" (rank1→rank5)
-        string scText = FormatSoundCode(soundCode);
-        _tokenText.Text = scText;
-        _tokenText.Foreground = mode == "WHSPR"
-            ? new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0xBB))
-            : new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
-
         // Recent sound codes — RLE string append (skip consecutive duplicates)
         if (soundCode != _scLast)
         {
@@ -478,6 +463,16 @@ internal sealed class WhisperRingWindow : Window
                 ? _scTrail[(_scTrail.Length - 60)..] + " " + tag
                 : (_scTrail.Length > 0 ? _scTrail + " " + tag : tag);
         }
+
+        // Clock area: last 3~4 sound codes from trail
+        // Trim trail to last ~24 chars for clock display
+        var clockTrail = _scTrail.Length > 24 ? _scTrail[(_scTrail.Length - 24)..] : _scTrail;
+        _tokenText.Text = clockTrail;
+        _tokenText.Foreground = mode == "WHSPR"
+            ? new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0xBB))
+            : new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
+
+        // Bottom bar: full trail (last ~40 chars)
         _recentText.Text = _scTrail.Length > 40 ? _scTrail[(_scTrail.Length - 40)..] : _scTrail;
 
         // Bottom text: STT word (always priority, any mode) / clock (fallback)

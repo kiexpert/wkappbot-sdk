@@ -62,6 +62,8 @@ internal sealed class WhisperEngine : IDisposable
     // State
     private readonly List<uint> _recentTokens = new();
     private int _frameCount;
+    private bool _inWhisper; // hysteresis state for WHSPR detection
+    private double[] _prevBandEnergies = new double[BandCount]; // for spectral flux
 
     /// <summary>Fired on each analysis frame (~33fps).</summary>
     public event Action<WhisperFrame>? OnFrame;
@@ -109,7 +111,7 @@ internal sealed class WhisperEngine : IDisposable
                     short sample = (short)(e.Buffer[i] | (e.Buffer[i + 1] << 8));
                     _ringBuffer[_ringPos] = sample / 32768f;
                     _ringPos = (_ringPos + 1) % FftSize;
-                    if (_ringPos == 0) _bufferReady = true;
+                    _bufferReady = true; // sliding window: always ready
                 }
             }
             // Forward raw mic PCM for parallel recording
@@ -147,7 +149,7 @@ internal sealed class WhisperEngine : IDisposable
 
         while (!ct.IsCancellationRequested)
         {
-            Thread.Sleep(30); // ~33fps
+            Thread.Sleep(10); // ~100fps — 10ms sliding window for Korean phoneme capture
             if (!_bufferReady) continue;
 
             // Copy ring buffer with Hann window
@@ -263,10 +265,26 @@ internal sealed class WhisperEngine : IDisposable
             midAvg /= BandCount;
             bool isTooLoud = !isSilence && maxEnergy > midAvg * 4;
 
+            // Spectral Flux: sum of positive energy changes across bands
+            // High flux = speech (non-stationary), low flux = fan/hum (stationary)
+            double spectralFlux = 0;
+            for (int b = 0; b < BandCount; b++)
+            {
+                double diff = rawEnergies[b] - _prevBandEnergies[b];
+                if (diff > 0) spectralFlux += diff;
+                _prevBandEnergies[b] = rawEnergies[b];
+            }
+
             int voiceThreshold = MaxLevel / 2;
             bool isVoiced = levels[0] >= voiceThreshold;
             int whisperSum = levels[3] + levels[4] + levels[5] + levels[6];
-            bool isWhisper = !isVoiced && !isSilence && !isTooLoud && whisperSum > 4;
+            // Hysteresis: start requires >8, sustain requires >4
+            int whisperGate = _inWhisper ? 4 : 8;
+            // Spectral flux gate: low flux = stationary noise, not speech
+            // Only block if flux is very low (< 1% of midAvg) — don't over-filter
+            bool hasFlux = spectralFlux > midAvg * 0.01;
+            bool isWhisper = !isVoiced && !isSilence && !isTooLoud && whisperSum > whisperGate && hasFlux;
+            _inWhisper = isWhisper;
 
             string mode = isSilence ? "QUIET"
                 : isTooLoud ? "LOUD"
@@ -274,9 +292,17 @@ internal sealed class WhisperEngine : IDisposable
                 : isWhisper ? "WHSPR"
                 : "NOISE";
 
-            // Gate sound code: only VOICE/WHSPR produce meaningful band rankings
-            // QUIET/NOISE/LOUD = near noise floor or external noise → rankings are random
-            if (mode != "VOICE" && mode != "WHSPR")
+            // Gate sound code: need meaningful energy above noise floor
+            // Mode alone isn't enough — weak WHSPR with low energy = random band rankings
+            // Require at least one band with clean energy ≥ 30% of its signal mid
+            bool hasStrongBand = false;
+            for (int b = 0; b < BandCount; b++)
+            {
+                double clean = cleanEnergies[b];
+                double mid = Math.Max(_signalMid[b] - _noiseAvg[b], 0.001);
+                if (clean >= mid * 0.3) { hasStrongBand = true; break; }
+            }
+            if (!hasStrongBand || (mode != "VOICE" && mode != "WHSPR"))
                 soundCode = 0;
 
             if (!isSilence)
