@@ -319,6 +319,11 @@ internal partial class Program
         }
         catch { /* best effort */ }
 
+        // ═══ STEP 4.9: Elevation auto-detect → Elevated Eye Proxy delegation ═══
+        var (delegated, delegateExit) = ElevationHelper.TryDelegateIfElevated(
+            targets[0].Handle, "a11y", args);
+        if (delegated) return delegateExit;
+
         // ═══ STEP 5: Execute on each target ═══
         int ok = 0, fail = 0;
         using var automation = new UIA3Automation();

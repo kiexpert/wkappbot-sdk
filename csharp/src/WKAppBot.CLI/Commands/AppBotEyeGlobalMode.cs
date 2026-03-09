@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using WKAppBot.Core.Runner;
 using WKAppBot.WebBot;
+using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
@@ -76,14 +77,17 @@ internal partial class Program
     static volatile bool _fswTickDirty;
     static volatile bool _fswPromptDirty;
     static volatile string? _fswPromptChangedFile; // last changed file name for filtering
+    static volatile bool _fswExeDirty; // hot-swap: exe binary changed
     static FileSystemWatcher? _fswTick;
     static FileSystemWatcher? _fswPrompt;
+    static FileSystemWatcher? _fswExe;
+    static FileSystemWatcher? _fswExeNew; // hot-swap: .new.exe staged file
 
     // ── Memory tracking ──
     static long _prevWorkingSetMB;
     static long _peakWorkingSetMB;
 
-    static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs)
+    static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs, bool elevated = false, int replacePid = 0)
     {
         if (posX < 0 || posY < 0)
         {
@@ -106,6 +110,14 @@ internal partial class Program
 
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+        // ── Elevated proxy pipe server (runs alongside Eye when admin) ──
+        Task? elevatedProxyTask = null;
+        if (elevated)
+        {
+            elevatedProxyTask = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
+            Console.WriteLine("[EYE] Elevated proxy pipe server started");
+        }
 
         if (_lastTickActivityUtc == DateTime.MinValue) _lastTickActivityUtc = DateTime.UtcNow;
         if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
@@ -411,6 +423,22 @@ internal partial class Program
                 Console.WriteLine("[EYE] tick timeout (>3s) - self terminate");
                 break;
             }
+
+            // ── Hot-swap blue-green: first render OK → old Eye exits on its own (return 0) ──
+            if (replacePid > 0 && frameCount == 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.WriteLine($"[EYE:HOT-SWAP] First render OK — old Eye (PID={replacePid}) exiting on its own");
+                Console.ResetColor();
+                replacePid = 0;
+                // Old Eye does return 0 right after Process.Start — 1s should be enough
+                Thread.Sleep(1000);
+                TryDeleteOldExe();
+            }
+
+            // ── Hot-swap cleanup: try delete .old.exe every ~10s (non-blocking fallback) ──
+            if (frameCount % 100 == 50)
+                TryDeleteOldExe();
 
             // ── Claude Desktop status detection (~every 5 sec) ──
             if (frameCount % 50 == 0)
@@ -882,10 +910,11 @@ internal partial class Program
                 }
             }
 
-            // ── Hot-reload check (~every 5 sec) ──
-            // Detects: (1) EXE timestamp change (direct overwrite), (2) .new.exe staged (locked EXE fallback)
-            if (frameCount % 50 == 0 && exeStartTime != DateTime.MinValue)
+            // ── Hot-swap: FSW-driven instant detection + blue-green restart ──
+            // FSW flag checked every frame (~100ms) — no 5s polling delay
+            if (_fswExeDirty && exeStartTime != DateTime.MinValue)
             {
+                _fswExeDirty = false; // consume flag
                 try
                 {
                     var exeDir = Path.GetDirectoryName(exePath) ?? "";
@@ -895,36 +924,32 @@ internal partial class Program
 
                     if (File.Exists(newExePath))
                     {
-                        // .new.exe staged — rename-swap: running→.old, new→running
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine("[EYE] Hot-reload: .new.exe detected — rename-swap");
+                        // .new.exe staged — rename-swap (running exe CAN be renamed on Windows!)
+                        Console.ForegroundColor = ConsoleColor.Magenta;
+                        Console.WriteLine("[EYE:HOT-SWAP] .new.exe detected — rename-swap");
                         Console.ResetColor();
                         try
                         {
-                            // 1. Delete previous .old.exe if lingering
-                            if (File.Exists(oldExePath))
-                                File.Delete(oldExePath);
-                            // 2. Rename running EXE → .old.exe (Windows allows rename of running EXE!)
-                            File.Move(exePath, oldExePath);
-                            // 3. Rename .new.exe → original name
-                            File.Move(newExePath, exePath);
-                            Console.WriteLine("[EYE] Hot-reload: swap OK (.exe→.old.exe, .new.exe→.exe)");
+                            if (File.Exists(oldExePath)) File.Delete(oldExePath);
+                            File.Move(exePath, oldExePath);    // running exe → .old.exe (OK!)
+                            File.Move(newExePath, exePath);     // .new.exe → wkappbot.exe
+                            Console.WriteLine("[EYE:HOT-SWAP] swap OK (.exe→.old, .new→.exe)");
                             hotReloadTriggered = true;
                             break;
                         }
                         catch (Exception swapEx)
                         {
-                            Console.WriteLine($"[EYE] Hot-reload: swap failed ({swapEx.Message})");
-                            // Rollback: if original was renamed but new move failed
+                            Console.WriteLine($"[EYE:HOT-SWAP] swap failed ({swapEx.Message})");
+                            // Rollback if partial
                             if (!File.Exists(exePath) && File.Exists(oldExePath))
                                 try { File.Move(oldExePath, exePath); } catch { }
                         }
                     }
                     else if (File.GetLastWriteTimeUtc(exePath) != exeStartTime)
                     {
-                        // EXE directly overwritten (publish without lock) — just restart
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine("[EYE] Hot-reload: EXE timestamp changed — restarting");
+                        // Direct overwrite succeeded (exe wasn't locked somehow)
+                        Console.ForegroundColor = ConsoleColor.Magenta;
+                        Console.WriteLine("[EYE:HOT-SWAP] EXE timestamp changed — binary updated!");
                         Console.ResetColor();
                         hotReloadTriggered = true;
                         break;
@@ -1021,27 +1046,49 @@ internal partial class Program
             catch { }
         }
 
-        // ── Hot-reload: re-launch self with same args ──
+        // ── Hot-swap: launch new Eye FIRST (instant), then graceful cleanup ──
         if (hotReloadTriggered && File.Exists(exePath))
         {
             try
             {
-                Console.WriteLine($"[EYE] Hot-reload: re-launching {Path.GetFileName(exePath)} eye");
+                // Reconstruct original args + add --replace-pid for blue-green handoff
+                var origArgs = Environment.GetCommandLineArgs().Skip(1).ToList();
+                // Remove any previous --replace-pid
+                for (int ri = origArgs.Count - 1; ri >= 0; ri--)
+                    if (origArgs[ri] == "--replace-pid" && ri + 1 < origArgs.Count)
+                    { origArgs.RemoveAt(ri + 1); origArgs.RemoveAt(ri); }
+                origArgs.Add("--replace-pid");
+                origArgs.Add(Environment.ProcessId.ToString());
+                var argsStr = string.Join(" ", origArgs.Select(a =>
+                    a.Contains(' ') ? $"\"{a}\"" : a));
+
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.WriteLine($"[EYE:HOT-SWAP] Launching new Eye: {Path.GetFileName(exePath)} {argsStr}");
+                Console.ResetColor();
+
                 var psi = new ProcessStartInfo
                 {
-                    FileName = exePath,
-                    Arguments = "eye",
-                    UseShellExecute = false,
+                    FileName = exePath,  // always original path (rename-swap already done)
+                    Arguments = argsStr,
+                    UseShellExecute = false, // inherit admin token from parent
                 };
                 Process.Start(psi);
-                Console.WriteLine("[EYE] Hot-reload: new process started — exiting old");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EYE] Hot-reload: re-launch failed: {ex.Message}");
+                Console.WriteLine($"[EYE:HOT-SWAP] Re-launch failed: {ex.Message}");
             }
         }
 
+        // ── Graceful shutdown: stop proxy pipe (let in-flight requests finish) ──
+        if (elevatedProxyTask != null)
+        {
+            cts.Cancel();
+            try { elevatedProxyTask.Wait(3000); } catch { }
+            Console.WriteLine("[EYE] Elevated proxy pipe stopped");
+        }
+
+        Console.WriteLine("[EYE:HOT-SWAP] Old Eye shutting down");
         return 0;
     }
 
@@ -1280,12 +1327,66 @@ internal partial class Program
         {
             Console.WriteLine($"[EYE][FSW] Prompt watcher init failed: {ex.Message}");
         }
+
+        // ── 3. EXE file watcher (hot-swap: instant binary change detection) ──
+        try
+        {
+            var selfExe = Environment.ProcessPath ?? "";
+            var exeDir = Path.GetDirectoryName(selfExe);
+            var exeFile = Path.GetFileName(selfExe);
+            if (exeDir != null && Directory.Exists(exeDir) && !string.IsNullOrEmpty(exeFile))
+            {
+                _fswExe = new FileSystemWatcher(exeDir)
+                {
+                    Filter = exeFile,
+                    IncludeSubdirectories = false,
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.CreationTime,
+                    EnableRaisingEvents = true
+                };
+                _fswExe.Changed += (_, _) => _fswExeDirty = true;
+                _fswExe.Created += (_, _) => _fswExeDirty = true;
+                // Also watch for .new.exe (staged swap)
+                _fswExeNew = new FileSystemWatcher(exeDir)
+                {
+                    Filter = Path.GetFileNameWithoutExtension(exeFile) + ".new.exe",
+                    IncludeSubdirectories = false,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.CreationTime | NotifyFilters.LastWrite | NotifyFilters.Size,
+                    EnableRaisingEvents = true
+                };
+                _fswExeNew.Changed += (_, _) => _fswExeDirty = true;
+                _fswExeNew.Created += (_, _) => _fswExeDirty = true;
+                Console.WriteLine($"[EYE][FSW] Hot-swap watcher: {exeDir}/{exeFile}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE][FSW] Hot-swap watcher init failed: {ex.Message}");
+        }
+    }
+
+    static void TryDeleteOldExe()
+    {
+        try
+        {
+            var myExe = Environment.ProcessPath ?? "";
+            var oldExe = Path.Combine(
+                Path.GetDirectoryName(myExe) ?? "",
+                Path.GetFileNameWithoutExtension(myExe) + ".old.exe");
+            if (File.Exists(oldExe))
+            {
+                File.Delete(oldExe);
+                Console.WriteLine($"[EYE:HOT-SWAP] Cleaned up {Path.GetFileName(oldExe)}");
+            }
+        }
+        catch { } // still locked — 10s polling will retry
     }
 
     static void DisposeFileWatchers()
     {
         try { if (_fswTick != null) { _fswTick.EnableRaisingEvents = false; _fswTick.Dispose(); _fswTick = null; } } catch { }
         try { if (_fswPrompt != null) { _fswPrompt.EnableRaisingEvents = false; _fswPrompt.Dispose(); _fswPrompt = null; } } catch { }
+        try { if (_fswExe != null) { _fswExe.EnableRaisingEvents = false; _fswExe.Dispose(); _fswExe = null; } } catch { }
+        try { if (_fswExeNew != null) { _fswExeNew.EnableRaisingEvents = false; _fswExeNew.Dispose(); _fswExeNew = null; } } catch { }
         Console.WriteLine("[EYE][FSW] Watchers disposed");
     }
 

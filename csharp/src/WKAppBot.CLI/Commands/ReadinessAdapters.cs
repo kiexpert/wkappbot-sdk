@@ -71,9 +71,10 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
 // ── ElevationRequesterAdapter ────────────────────────────────────
 
 /// <summary>
-/// IElevationRequester 구현: UAC runas 로 관리자 재시작.
-/// 동일 커맨드라인 인자로 재시작, UAC 승인 시 원본 프로세스 종료.
-/// UAC 취소 시 false 반환 → 포커스리스 메서드로 계속.
+/// IElevationRequester 구현: Elevated Eye Proxy 우선, 없으면 UAC runas.
+/// 1. Elevated Eye 프록시가 살아있으면 → Pipe로 명령 위임 (투명 중계)
+/// 2. 없으면 → Elevated Eye 시작 시도 → 프록시로 명령 위임
+/// 3. UAC 취소 → false 반환 → 포커스리스 메서드로 계속
 /// Tag: [READINESS]
 /// </summary>
 internal sealed class ElevationRequesterAdapter : IElevationRequester
@@ -84,10 +85,24 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
         Console.WriteLine($"  [ELEVATION] {targetProcessName} (PID {targetPid}) is elevated — requesting admin rights...");
         Console.ResetColor();
 
+        // Strategy 1: Use existing elevated Eye proxy
+        if (ElevatedEyeClient.IsAvailable())
+        {
+            Console.WriteLine("  [ELEVATION] Elevated Eye proxy found — delegating command");
+            return DelegateViaProxy();
+        }
+
+        // Strategy 2: Launch elevated Eye, then delegate
+        Console.WriteLine("  [ELEVATION] No elevated Eye — launching admin Eye proxy...");
+        if (ElevationHelper.LaunchElevatedEye())
+        {
+            return DelegateViaProxy();
+        }
+
+        // Strategy 3: Fallback — relaunch self as admin (legacy)
         try
         {
             var exePath = Environment.ProcessPath ?? "wkappbot.exe";
-            // Reconstruct arguments: skip argv[0] (exe path), re-quote as needed
             var rawArgs = Environment.GetCommandLineArgs();
             var args = string.Join(" ", rawArgs.Skip(1).Select(a =>
                 a.Contains(' ') || a.Contains('"') ? $"\"{a.Replace("\"", "\\\"")}\"" : a));
@@ -101,7 +116,7 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
             };
 
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"  [ELEVATION] Relaunching: {Path.GetFileName(exePath)} {args}");
+            Console.WriteLine($"  [ELEVATION] Fallback: relaunching as admin: {Path.GetFileName(exePath)} {args}");
             Console.ResetColor();
 
             var proc = Process.Start(psi);
@@ -109,7 +124,7 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
             {
                 proc.WaitForExit();
                 Environment.Exit(proc.ExitCode);
-                return true; // 방어적 — Environment.Exit 이후 도달 안 함
+                return true;
             }
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) // ERROR_CANCELLED
@@ -125,7 +140,28 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
             Console.ResetColor();
         }
 
-        return false; // UAC 거부 or 실패 → 계속 진행
+        return false;
+    }
+
+    /// <summary>Delegate current command to elevated Eye proxy and exit.</summary>
+    private bool DelegateViaProxy()
+    {
+        var rawArgs = Environment.GetCommandLineArgs();
+        // args[0] = exe path, args[1] = command, args[2..] = rest
+        if (rawArgs.Length < 2) return false;
+
+        var command = rawArgs[1];
+        var args = rawArgs.Skip(2).ToArray();
+
+        var exitCode = ElevatedEyeClient.ExecuteViaProxy(command, args);
+        if (exitCode >= 0)
+        {
+            Environment.Exit(exitCode);
+            return true; // unreachable after Exit
+        }
+
+        Console.WriteLine("  [ELEVATION] Proxy delegation failed — falling back to runas");
+        return false;
     }
 }
 

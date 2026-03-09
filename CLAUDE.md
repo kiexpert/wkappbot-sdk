@@ -1,4 +1,4 @@
-﻿# WKAppBot v3.2 - Windows + Android App Automation Test Framework
+﻿# WKAppBot v3.3 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -368,6 +368,24 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
     - --force: "저장하지 않음"/"Don't Save"/"Cancel" 등 자동 클릭
   - **핫 포커스 체인 모든 a11y 액션 출력**: 윈도우 검색 직후 UIA 포커스 체인 표시
   - Key files: ActionReadiness.cs, AdbActionReadiness.cs, CdpActionReadiness.cs, CdpActionTarget.cs
+- **Elevated Eye Proxy** — UIPI 바이패스 Named Pipe 프록시
+  - 관리자 앱(VS 등) UIA 트리 접근 불가 → 관리자 Eye가 대리 실행
+  - 3-Strategy: ① 기존 프록시 파이프 → ② 관리자 Eye 자동 시작 → ③ 경고 후 폴스루
+  - ACL-enabled pipe: AuthenticatedUserSid ReadWrite + BuiltinAdminSid FullControl
+  - 자기 프로세스 순환참조 방지 (wkappbot 클래스명 감지 → skip)
+  - 적용: a11y (STEP 4.9), inspect, find 명령 자동 위임
+  - Key files: ElevatedEyeProxy.cs, A11yCommand.cs, InspectionCommands.cs
+- **Eye Hot-Swap** — publish만으로 자동 바이너리 교체
+  - FSW 즉시 감지: wkappbot.exe Changed + wkappbot.new.exe Created/Changed
+  - 실행 중 EXE는 rename 가능 (Windows) → .exe→.old, .new→.exe rename-swap
+  - Blue-green: old Eye가 새 Eye 시작 → 파이프 그레이스풀 3초 대기 → 자기 종료
+  - 새 Eye: 10초 폴링으로 .old.exe 삭제 (1초 즉삭 시도 후 폴백)
+  - csproj deploy: 직접 복사 시도 → 실패 시 .new.exe 스테이징
+  - 관리자 토큰: UseShellExecute=false로 부모→자식 상속
+  - Key files: AppBotEyeGlobalMode.cs, AppBotEyeCommands.cs, WKAppBot.CLI.csproj
+- **ask 명령 고도화** — 삼두협의체 + AI 이미지 응답 개선
+  - AskCommands.cs 대규모 리팩터 (스트리밍/이미지캡처/탭핸드오프 안정화)
+  - CdpClient 안정성: 탭 URL 매칭, 에러 핸들링 강화
 ### v2.2 Android ADB Integration (Phase A+B+C 완료)
 - **WKAppBot.Android 프로젝트**: AdbClient, AdbDeviceRegistry, AdbGrapRouter, AndroidA11yTree, AdbExperienceDb
 - **adb:// URI 스키마**: `adb://device/package#scope` — Windows grap과 동일한 `#` scope 문법
