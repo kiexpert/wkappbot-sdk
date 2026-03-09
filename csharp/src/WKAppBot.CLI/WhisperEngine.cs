@@ -66,6 +66,9 @@ internal sealed class WhisperEngine : IDisposable
     /// <summary>Fired on each analysis frame (~33fps).</summary>
     public event Action<WhisperFrame>? OnFrame;
 
+    /// <summary>Fired on each mic audio buffer (raw 16kHz 16bit mono PCM).</summary>
+    public event Action<byte[], int>? OnMicData;
+
     /// <summary>Current device index (default 0).</summary>
     public int DeviceIndex { get; set; }
 
@@ -109,6 +112,8 @@ internal sealed class WhisperEngine : IDisposable
                     if (_ringPos == 0) _bufferReady = true;
                 }
             }
+            // Forward raw mic PCM for parallel recording
+            OnMicData?.Invoke(e.Buffer, e.BytesRecorded);
         };
 
         try { _waveIn.StartRecording(); }
@@ -137,6 +142,7 @@ internal sealed class WhisperEngine : IDisposable
     {
         var fftBuffer = new Complex[FftSize];
         var bandEnergies = new double[BandCount];
+        var ranked = new int[BandCount];
         var ct = _cts!.Token;
 
         while (!ct.IsCancellationRequested)
@@ -221,6 +227,31 @@ internal sealed class WhisperEngine : IDisposable
                 if (clean > maxEnergy) maxEnergy = clean;
             }
 
+            // ── 음코드 (SoundCode): top 5 bands by energy, 3bit index each = 15bit ──
+            // Band indices sorted by clean energy descending → pack top 5 into ushort
+            // MSB first: rank1(bit14-12) | rank2(bit11-9) | rank3(bit8-6) | rank4(bit5-3) | rank5(bit2-0)
+            var cleanEnergies = new double[BandCount];
+            for (int b = 0; b < BandCount; b++)
+                cleanEnergies[b] = Math.Max(0, rawEnergies[b] - _noiseAvg[b]);
+
+            for (int b = 0; b < BandCount; b++) ranked[b] = b;
+            // Simple insertion sort (8 elements, descending by cleanEnergies)
+            for (int i = 1; i < BandCount; i++)
+            {
+                int key = ranked[i];
+                double keyVal = cleanEnergies[key];
+                int j = i - 1;
+                while (j >= 0 && cleanEnergies[ranked[j]] < keyVal)
+                {
+                    ranked[j + 1] = ranked[j];
+                    j--;
+                }
+                ranked[j + 1] = key;
+            }
+            ushort soundCode = 0;
+            for (int r = 0; r < 5; r++)
+                soundCode |= (ushort)(ranked[r] << (12 - r * 3));
+
             // Mode detection
             bool isSilence = maxEnergy < 0.001;
 
@@ -243,6 +274,11 @@ internal sealed class WhisperEngine : IDisposable
                 : isWhisper ? "WHSPR"
                 : "NOISE";
 
+            // Gate sound code: only VOICE/WHSPR produce meaningful band rankings
+            // QUIET/NOISE/LOUD = near noise floor or external noise → rankings are random
+            if (mode != "VOICE" && mode != "WHSPR")
+                soundCode = 0;
+
             if (!isSilence)
             {
                 _recentTokens.Add(token);
@@ -262,6 +298,7 @@ internal sealed class WhisperEngine : IDisposable
                 MaxLevel = MaxLevel,
                 Mode = mode,
                 Token = token,
+                SoundCode = soundCode,
                 RecentTokens = recent,
                 FrameCount = _frameCount,
                 MaxEnergy = maxEnergy,
@@ -318,6 +355,8 @@ internal sealed class WhisperFrame
     public int MaxLevel { get; init; }
     public string Mode { get; init; } = "QUIET";
     public uint Token { get; init; }
+    /// <summary>15-bit sound code: top 5 bands by energy, 3-bit index each (MSB=rank1).</summary>
+    public ushort SoundCode { get; init; }
     public string RecentTokens { get; init; } = "";
     public int FrameCount { get; init; }
     public double MaxEnergy { get; init; }

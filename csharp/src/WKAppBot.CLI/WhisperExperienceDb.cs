@@ -47,9 +47,23 @@ internal sealed class WhisperExperienceDb : IDisposable
     private string? _wavPath; // current segment file path
     private volatile bool _isRecording;
     private int _quietFrames;
+    private int _segmentFrames; // voice frames in current segment (for min-length gate)
     private const int QuietTrailFrames = 33; // ~1 second trailing silence before cut
+    private const int MinSegmentFrames = 100; // ~3 seconds — skip tiny bursts for Gemini
     private readonly object _wavLock = new();
     private volatile string? _segmentSttLabel; // STT draft label for current segment
+
+    // Mic MP3 segment recording (parallel to loopback MP3, for Gemini STT)
+    private LameMP3FileWriter? _micMp3Writer;
+    private string? _micMp3Path;
+    private readonly object _micWavLock = new();
+
+    // Sound code accumulator for segment filename
+    private readonly List<ushort> _segmentSoundCodes = new();
+
+    // Gemini STT callback: fires when mic segment is ready for transcription
+    /// <summary>Fired when a mic voice segment MP3 is ready. Handler should send to Gemini.</summary>
+    public event Action<string>? OnMicSegmentReady; // arg = mp3 file path
 
     // Auto-study trigger: fires when _unknown/ reaches threshold
     private int _autoStudyThreshold = 10;
@@ -59,6 +73,7 @@ internal sealed class WhisperExperienceDb : IDisposable
 
     public bool IsLogging => _tokenWriter != null;
     public bool IsSttActive => _sttRunning;
+    public int SegmentFrames => _segmentFrames;
 
     public WhisperExperienceDb(string? basePath = null)
     {
@@ -267,7 +282,10 @@ internal sealed class WhisperExperienceDb : IDisposable
             {
                 _quietFrames++;
                 if (_quietFrames >= QuietTrailFrames)
+                {
                     StopWavSegment();
+                    _segmentFrames = 0;
+                }
             }
             return; // skip silence for token log
         }
@@ -276,6 +294,8 @@ internal sealed class WhisperExperienceDb : IDisposable
             _quietFrames = 0;
             if (!_isRecording)
                 StartWavSegment(frame.Mode);
+            _segmentFrames++;
+            _segmentSoundCodes.Add(frame.SoundCode);
         }
 
         var ticks = DateTime.UtcNow.Ticks;
@@ -361,6 +381,8 @@ internal sealed class WhisperExperienceDb : IDisposable
             var tag = mode == "WHSPR" ? "W" : "V";
             _wavPath = Path.Combine(_wavDir, $"{stamp}_{tag}.mp3");
             _segmentSttLabel = null; // reset label for new segment
+            _segmentFrames = 0; // reset frame counter
+            _segmentSoundCodes.Clear();
             try
             {
                 var waveFormat = new WaveFormat(16000, 16, 2); // stereo
@@ -369,10 +391,12 @@ internal sealed class WhisperExperienceDb : IDisposable
             }
             catch { _mp3Writer = null; _wavPath = null; }
         }
+        StartMicSegment(); // parallel mic recording for Gemini STT
     }
 
     private void StopWavSegment()
     {
+        int frames = _segmentFrames;
         lock (_wavLock)
         {
             _isRecording = false;
@@ -386,27 +410,56 @@ internal sealed class WhisperExperienceDb : IDisposable
             try { _mp3Writer?.Dispose(); } catch { }
             _mp3Writer = null;
 
-            // Move WAV into STT-labeled folder: wav/_unknown/xxx.wav → wav/the_best_time/xxx.wav
-            // Same word → same folder → auto-categorized training dataset!
+            // Rename with sound code sequence: 3A1F-5C2E-7D04_20260309_1443_V.mp3
+            // Sound code first (for sorting/matching), timestamp second
             if (_wavPath != null)
             {
                 try
                 {
-                    var label = _segmentSttLabel != null
-                        ? SanitizeFileName(_segmentSttLabel)
-                        : "_unknown";
-                    if (label.Length == 0) label = "_unknown";
+                    if (_segmentSoundCodes.Count > 0)
+                    {
+                        // Deduplicate consecutive identical sound codes (RLE)
+                        var deduped = new List<ushort> { _segmentSoundCodes[0] };
+                        for (int i = 1; i < _segmentSoundCodes.Count; i++)
+                            if (_segmentSoundCodes[i] != deduped[^1])
+                                deduped.Add(_segmentSoundCodes[i]);
 
-                    var targetDir = Path.Combine(_wavDir!, label);
-                    Directory.CreateDirectory(targetDir);
-                    var newPath = Path.Combine(targetDir, Path.GetFileName(_wavPath));
-                    if (!File.Exists(newPath))
-                        File.Move(_wavPath, newPath);
+                        // Sample up to 8 evenly-spaced from deduped sequence
+                        var sampled = new List<ushort>();
+                        int step = Math.Max(1, deduped.Count / 8);
+                        for (int i = 0; i < deduped.Count && sampled.Count < 8; i += step)
+                            sampled.Add(deduped[i]);
+                        var scStr = string.Join("-", sampled.Select(c => $"{c:X4}"));
+                        var dir = Path.GetDirectoryName(_wavPath)!;
+                        var origName = Path.GetFileName(_wavPath);
+                        var newName = $"{scStr}_{origName}";
+                        var newPath = Path.Combine(dir, newName);
+                        if (!File.Exists(newPath))
+                            File.Move(_wavPath, newPath);
+                        // Human-readable: decode each sound code to band abbreviations
+                        var readable = string.Join(" ", sampled.Select(DecodeSoundCode));
+                        Console.WriteLine($"[WHISPER] {newName}  ({deduped.Count} codes, {_segmentSoundCodes.Count} frames)");
+                        Console.WriteLine($"[WHISPER] {readable}");
+                    }
                 }
-                catch { /* move is best-effort */ }
+                catch { /* rename is best-effort */ }
             }
             _wavPath = null;
-            _segmentSttLabel = null;
+        }
+
+        // Stop mic segment + fire Gemini event (only for meaningful sentences)
+        if (frames >= MinSegmentFrames)
+            StopMicSegment();
+        else
+        {
+            // Too short — discard mic segment silently
+            lock (_micWavLock)
+            {
+                try { _micMp3Writer?.Dispose(); } catch { }
+                _micMp3Writer = null;
+                if (_micMp3Path != null) try { File.Delete(_micMp3Path); } catch { }
+                _micMp3Path = null;
+            }
         }
 
         // Check auto-study trigger
@@ -433,6 +486,22 @@ internal sealed class WhisperExperienceDb : IDisposable
     /// <summary>Call when auto-study batch completes (success or fail).</summary>
     public void NotifyAutoStudyDone() => _autoStudyRunning = false;
 
+    private static readonly string[] BandShort = ["Vx", "Ph", "Ve", "Or", "Hi", "Bu", "Sb", "Br"];
+
+    /// <summary>Decode 15-bit sound code to band abbreviations: "Sb Bu Hi Or Vx"</summary>
+    private static string DecodeSoundCode(ushort sc)
+    {
+        if (sc == 0) return "..";
+        var sb = new System.Text.StringBuilder(14);
+        for (int r = 0; r < 5; r++)
+        {
+            int idx = (sc >> (12 - r * 3)) & 0x7;
+            if (r > 0) sb.Append(' ');
+            sb.Append(BandShort[idx]);
+        }
+        return sb.ToString();
+    }
+
     private static string SanitizeFileName(string text)
     {
         // Keep first ~40 chars, replace invalid chars with underscore, trim
@@ -452,6 +521,59 @@ internal sealed class WhisperExperienceDb : IDisposable
         {
             try { _mp3Writer?.Write(buffer, 0, count); }
             catch { /* ignore write errors */ }
+        }
+    }
+
+    /// <summary>Write mic PCM data to mic MP3 segment (16kHz 16bit mono from WhisperEngine).</summary>
+    internal void WriteMicData(byte[] buffer, int count)
+    {
+        if (!_isRecording || count <= 0) return;
+        lock (_micWavLock)
+        {
+            try { _micMp3Writer?.Write(buffer, 0, count); }
+            catch { /* ignore write errors */ }
+        }
+    }
+
+    private void StartMicSegment()
+    {
+        lock (_micWavLock)
+        {
+            if (_micMp3Writer != null) return;
+            _wavDir ??= Path.Combine(_basePath, "wav");
+            var micDir = Path.Combine(_wavDir, "_mic");
+            Directory.CreateDirectory(micDir);
+            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+            _micMp3Path = Path.Combine(micDir, $"mic_{stamp}.mp3");
+            try
+            {
+                var waveFormat = new WaveFormat(16000, 16, 1); // mono mic
+                _micMp3Writer = new LameMP3FileWriter(_micMp3Path, waveFormat, 64);
+            }
+            catch { _micMp3Writer = null; _micMp3Path = null; }
+        }
+    }
+
+    private void StopMicSegment()
+    {
+        string? completedPath;
+        lock (_micWavLock)
+        {
+            // Append 0.3s silence for clean ending
+            try { _micMp3Writer?.Write(new byte[9600], 0, 9600); } catch { }
+            try { _micMp3Writer?.Dispose(); } catch { }
+            _micMp3Writer = null;
+            completedPath = _micMp3Path;
+            _micMp3Path = null;
+        }
+        // Fire event for Gemini transcription
+        if (completedPath != null && File.Exists(completedPath))
+        {
+            var fi = new FileInfo(completedPath);
+            if (fi.Length > 2000) // skip tiny segments (< ~0.1s)
+                OnMicSegmentReady?.Invoke(completedPath);
+            else
+                try { File.Delete(completedPath); } catch { }
         }
     }
 
