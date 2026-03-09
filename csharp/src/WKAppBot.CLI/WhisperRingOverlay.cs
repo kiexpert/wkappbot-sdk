@@ -449,32 +449,23 @@ internal sealed class WhisperRingWindow : Window
         // Recent tokens
         _recentText.Text = recentTokens;
 
-        // Bottom text: mode label (primary) / STT word (override) / clock (quiet)
+        // Bottom text: STT word (always priority, any mode) / clock (fallback)
         double sttAgeSec = sttAgeTicks / (double)TimeSpan.TicksPerSecond;
         bool hasStt = !string.IsNullOrEmpty(sttText) && sttAgeSec < 5.0;
 
         if (hasStt)
         {
-            // STT recognized → show word briefly (fades over 5s)
+            // STT word — show regardless of mode (LOUD/VOICE/WHSPR all pass through)
             _sttText.Text = sttText!.Length > 12 ? sttText[..12] : sttText;
             _sttText.Opacity = Math.Max(0, 1.0 - sttAgeSec / 5.0);
             _sttText.Foreground = Brushes.White;
         }
-        else if (mode == "QUIET" || mode == "LOUD")
-        {
-            // Quiet/Loud → clock (LOUD = external noise, not whisper input)
-            _sttText.Text = DateTime.Now.ToString("HH:mm:ss");
-            _sttText.Foreground = mode == "LOUD"
-                ? new SolidColorBrush(Color.FromRgb(0xFF, 0x44, 0x44))
-                : new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
-            _sttText.Opacity = 0.7;
-        }
         else
         {
-            // Active sound, no recent STT → clock (mode already shown by ring colors)
+            // No recent STT → clock
             _sttText.Text = DateTime.Now.ToString("HH:mm:ss");
             _sttText.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
-            _sttText.Opacity = 0.5;
+            _sttText.Opacity = mode == "QUIET" ? 0.7 : 0.5;
         }
     }
 
