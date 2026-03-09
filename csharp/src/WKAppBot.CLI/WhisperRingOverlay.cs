@@ -273,13 +273,10 @@ internal sealed class WhisperRingWindow : Window
         Content = root;
     }
 
-    /// <summary>Format 15-bit sound code as octal digits (no leading zeros). Each digit = band index 0-7.</summary>
+    /// <summary>Format 15-bit sound code as octal (no leading zeros). Each octal digit = band index 0-7.</summary>
     private static string FormatSoundCode(ushort sc)
     {
-        var buf = new char[5];
-        for (int r = 0; r < 5; r++)
-            buf[r] = (char)('0' + ((sc >> (12 - r * 3)) & 0x7));
-        return new string(buf).TrimStart('0');
+        return Convert.ToString(sc, 8);
     }
 
     /// <summary>Update a single arc segment geometry.</summary>

@@ -142,7 +142,28 @@ Examples:
                 return true;
             }
 
-            return GrapHelper.SwitchToTab(tab);
+            // Zoom on tab before switching (focusless visual feedback)
+            ClickZoomHelper? tabZoom = null;
+            try
+            {
+                var tabRect = tab.BoundingRectangle;
+                if (tabRect.Width > 0 && tabRect.Height > 0)
+                {
+                    var hwnd = resolved.Value.hwnd;
+                    var screenRect = new System.Drawing.Rectangle(
+                        (int)tabRect.X, (int)tabRect.Y, (int)tabRect.Width, (int)tabRect.Height);
+                    tabZoom = ClickZoomHelper.BeginFromRect(screenRect, hwnd, "tab-select", tabPattern);
+                }
+            }
+            catch { }
+
+            var ok = GrapHelper.SwitchToTab(tab);
+            if (ok)
+                tabZoom?.ShowPass("tab activated");
+            else
+                tabZoom?.ShowFail("tab switch failed");
+            tabZoom?.Dispose();
+            return ok;
         }
         catch (Exception ex)
         {
@@ -244,7 +265,25 @@ Examples:
                     Console.ResetColor();
                 }
 
-                // Don't minimize here — CDP Input.dispatch* needs a visible viewport.
+                // ── InputReadiness: blocker check + focusless minimize restore ──
+                var chromeHwnd = cdp.GetChromeWindowHandle();
+                if (chromeHwnd != IntPtr.Zero)
+                {
+                    var readiness = new WKAppBot.Win32.Input.InputReadiness();
+                    var blocker = readiness.DetectBlocker(chromeHwnd);
+                    if (blocker != null)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"[AAR:CDP] Blocker: {blocker.Title} (hwnd={blocker.Handle:X})");
+                        Console.ResetColor();
+                    }
+                    if (NativeMethods.IsIconic(chromeHwnd))
+                    {
+                        Console.WriteLine($"[AAR:CDP] Chrome minimized — focusless restore");
+                        NativeMethods.ShowWindow(chromeHwnd, 4); // SW_SHOWNOACTIVATE
+                        await Task.Delay(300);
+                    }
+                }
 
                 return (CdpClient?)cdp;
             }
@@ -553,33 +592,10 @@ Examples:
 
         try
         {
-            // ── Tier 0: Native OS file dialog via UIA ──
-            // Gemini opens a native OS file dialog that CDP can't intercept.
-            // Ensure CDP interception is OFF so the dialog actually appears.
-            await cdp.DisableFileChooserInterception();
-            Console.WriteLine("[ASK] Trying native file dialog (UIA)...");
-            var uiaOk = await TryAttachViaFileDialog(cdp, absPath);
-            if (uiaOk)
-            {
-                Console.WriteLine($"[ASK] File attached via UIA dialog: {fileName}");
-                await Task.Delay(2000);
-                return true;
-            }
-
-            // ── Tier 0.5: CDP File Chooser Interception (fallback) ──
-            Console.WriteLine("[ASK] Trying CDP file chooser...");
-            var chooserOk = await cdp.SetFileViaChooserAsync(absPath, timeoutMs: 5000);
-            if (chooserOk)
-            {
-                Console.WriteLine($"[ASK] File attached via chooser: {fileName}");
-                await Task.Delay(1500);
-                return true;
-            }
-
-            Console.WriteLine("[ASK] File dialog not available, trying DOM approach...");
-
-            // ── Tier 1: DOM.setFileInputFiles on hidden <input type="file"> ──
-            // Click upload button → if menu appears, click "파일 업로드" item → input[type=file] appears
+            // ── Tier 1 FIRST: DOM.setFileInputFiles (fully focusless!) ──
+            // Try CDP DOM approach before native dialog — no focus theft at all.
+            Console.WriteLine("[ASK] Trying focusless DOM file attach...");
+            // Click upload button via JS eval (focusless) → input[type=file] appears
             await cdp.EvalAsync("""
                 (() => {
                     var btn = document.querySelector('button[aria-label*="Attach"]')
@@ -676,8 +692,30 @@ Examples:
                 }
             }
 
+            // ── Tier 0.5: CDP File Chooser Interception (focusless) ──
+            Console.WriteLine("[ASK] DOM failed, trying CDP file chooser...");
+            var chooserOk = await cdp.SetFileViaChooserAsync(absPath, timeoutMs: 5000);
+            if (chooserOk)
+            {
+                Console.WriteLine($"[ASK] File attached via chooser: {fileName}");
+                await Task.Delay(1500);
+                return true;
+            }
+
+            // ── Tier 0: Native OS file dialog via UIA (STEALS FOCUS — last resort) ──
+            // Only try this if focusless tiers all failed.
+            await cdp.DisableFileChooserInterception();
+            Console.WriteLine("[ASK] Trying native file dialog (UIA) — may steal focus...");
+            var uiaOk = await TryAttachViaFileDialog(cdp, absPath);
+            if (uiaOk)
+            {
+                Console.WriteLine($"[ASK] File attached via UIA dialog: {fileName}");
+                await Task.Delay(2000);
+                return true;
+            }
+
             // ── Tier 2: Synthetic drop event with DataTransfer ──
-            Console.WriteLine("[ASK] File input failed, trying drag-drop...");
+            Console.WriteLine("[ASK] All focusless tiers failed, trying drag-drop...");
             var bytes = File.ReadAllBytes(absPath);
             var base64 = Convert.ToBase64String(bytes);
             var ext = Path.GetExtension(absPath).ToLowerInvariant();
@@ -940,6 +978,167 @@ Examples:
         {
             Console.WriteLine($"[ASK] UIA dialog error: {ex.Message}");
             return false;
+        }
+    }
+
+    // ── CDP InputReadiness: ensure Chrome window is ready for CDP actions ──
+    // Detects blockers, restores from minimized (focusless), guards focus theft.
+
+    /// <summary>
+    /// Ensure Chrome window is ready for a CDP action. Focusless approach:
+    /// 1. DetectBlocker (~5ms) — check for blocking popups
+    /// 2. Minimized restore (SW_SHOWNOACTIVATE — no focus steal)
+    /// 3. Zoom overlay on target element (visual feedback)
+    /// 4. Focus theft guard: snapshot + restore after action
+    /// Returns (ready, prevForeground, zoom) — caller disposes zoom after action.
+    /// </summary>
+    static async Task<(bool ready, IntPtr prevFg, ClickZoomHelper? zoom)> EnsureCdpReadyAsync(
+        CdpClient cdp, string action, string? cssSelector = null, string? label = null)
+    {
+        var prevFg = NativeMethods.GetForegroundWindow();
+        ClickZoomHelper? zoom = null;
+        try
+        {
+            var chromeHwnd = cdp.GetChromeWindowHandle();
+            if (chromeHwnd == IntPtr.Zero)
+            {
+                Console.WriteLine($"[AAR:CDP] Chrome window not found for {action}");
+                return (false, prevFg, null);
+            }
+
+            // Blocker/minimize already handled in EnsureCdpConnection.
+            // Here: zoom overlay — show WHICH TAB is being targeted.
+            // Background tab = user can't see the editor, so zoom on the tab strip item.
+
+            // Strategy 1: Find the tab via UIA (shows tab title = user knows which AI)
+            try
+            {
+                var pageTitle = await cdp.EvalAsync("document.title") ?? "";
+                if (!string.IsNullOrEmpty(pageTitle))
+                {
+                    using var automation = new UIA3Automation();
+                    var chromeEl = automation.FromHandle(chromeHwnd);
+                    // Walk tab strip for matching title (substring match)
+                    var tabs = chromeEl.FindAllDescendants(cf =>
+                        cf.ByControlType(FlaUI.Core.Definitions.ControlType.TabItem));
+                    foreach (var tab in tabs)
+                    {
+                        var tabName = tab.Name ?? "";
+                        if (tabName.Contains(label ?? "", StringComparison.OrdinalIgnoreCase)
+                            || tabName.Contains(pageTitle[..Math.Min(20, pageTitle.Length)], StringComparison.OrdinalIgnoreCase))
+                        {
+                            var tabRect = tab.BoundingRectangle;
+                            if (tabRect.Width > 0 && tabRect.Height > 0)
+                            {
+                                var screenRect = new System.Drawing.Rectangle(
+                                    (int)tabRect.X, (int)tabRect.Y, (int)tabRect.Width, (int)tabRect.Height);
+                                Console.Write($"[ZOOM:TAB \"{tabName[..Math.Min(20, tabName.Length)]}\"] ");
+                                zoom = ClickZoomHelper.BeginFromRect(screenRect, chromeHwnd, $"cdp-{action}", label ?? action);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception tex)
+            {
+                Console.Write($"[ZOOM:TAB:ERR {tex.GetType().Name}] ");
+            }
+
+            // Fallback: zoom on Chrome window itself
+            if (zoom == null)
+            {
+                try
+                {
+                    NativeMethods.GetWindowRect(chromeHwnd, out var winRect);
+                    if (winRect.Width > 0 && winRect.Height > 0)
+                    {
+                        var screenRect = new System.Drawing.Rectangle(
+                            winRect.Left, winRect.Top, winRect.Width, winRect.Height);
+                        zoom = ClickZoomHelper.BeginFromRect(screenRect, chromeHwnd, $"cdp-{action}", label ?? action);
+                    }
+                }
+                catch { }
+            }
+
+            Console.WriteLine($"[AAR:CDP] Ready: {action}");
+            return (true, prevFg, zoom);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AAR:CDP] Error: {ex.Message}");
+            return (true, prevFg, zoom);
+        }
+    }
+
+    /// <summary>
+    /// Check if Chrome stole focus and restore if so.
+    /// </summary>
+    static void GuardCdpFocusTheft(CdpClient cdp, IntPtr prevFg, string action)
+    {
+        if (prevFg == IntPtr.Zero) return;
+        var curFg = NativeMethods.GetForegroundWindow();
+        if (curFg == prevFg) return;
+
+        NativeMethods.GetWindowThreadProcessId(curFg, out uint curPid);
+        var chromeHwnd = cdp.GetChromeWindowHandle();
+        if (chromeHwnd == IntPtr.Zero) return;
+        NativeMethods.GetWindowThreadProcessId(chromeHwnd, out uint chromePid);
+
+        if (curPid == chromePid)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[AAR:CDP:FOCUS] Chrome stole focus during {action}! Restoring...");
+            Console.ResetColor();
+            NativeMethods.SetForegroundWindow(prevFg);
+        }
+    }
+
+    // ── CDP Zoom: show magnifier on CDP target element ──
+    // Gets element's bounding rect (viewport coords) + Chrome window offset → screen coords → ClickZoomHelper.
+
+    /// <summary>
+    /// Begin zoom overlay on a CDP element identified by CSS selector.
+    /// Returns null on failure (non-critical — zoom is informational only).
+    /// </summary>
+    static ClickZoomHelper? BeginCdpZoom(CdpClient cdp, string cssSelector, string action, string label)
+    {
+        try
+        {
+            var chromeHwnd = cdp.GetChromeWindowHandle();
+            if (chromeHwnd == IntPtr.Zero) return null;
+
+            // Get element bounding rect in viewport coords
+            // Task.Run avoids sync-over-async deadlock when caller is already on async context
+            var rectStr = Task.Run(() => cdp.EvalAsync($@"
+                (() => {{
+                    var el = document.querySelector('{cssSelector.Replace("'", "\\'")}');
+                    if (!el) return 'NO_EL';
+                    var r = el.getBoundingClientRect();
+                    return Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.width) + ',' + Math.round(r.height);
+                }})()
+            ")).WaitAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
+
+            if (string.IsNullOrEmpty(rectStr) || rectStr == "NO_EL") return null;
+
+            var parts = rectStr.Split(',');
+            if (parts.Length != 4) return null;
+            int vx = int.Parse(parts[0]), vy = int.Parse(parts[1]);
+            int vw = int.Parse(parts[2]), vh = int.Parse(parts[3]);
+            if (vw <= 0 || vh <= 0) return null;
+
+            // Chrome window client area offset → screen coords
+            var pt = new WKAppBot.Win32.Native.POINT(0, 0);
+            NativeMethods.ClientToScreen(chromeHwnd, ref pt);
+
+            var screenRect = new System.Drawing.Rectangle(pt.X + vx, pt.Y + vy, vw, vh);
+            Console.Write($"[ZOOM:CDP {action}] ");
+            return ClickZoomHelper.BeginFromRect(screenRect, chromeHwnd, $"cdp-{action}", label);
+        }
+        catch (Exception ex)
+        {
+            Console.Write($"[ZOOM:CDP:ERR {ex.GetType().Name}] ");
+            return null;
         }
     }
 
@@ -1308,16 +1507,8 @@ Examples:
                     Console.WriteLine($"[ASK] Reusing Gemini session");
                 }
 
-                // Activate tab (no lock needed — just internal tab switch)
-                try
-                {
-                    await cdp.BringToFrontAsync();
-                    Console.WriteLine("[ASK] Tab activated (BringToFront OK)");
-                }
-                catch (Exception btfEx)
-                {
-                    Console.WriteLine($"[ASK] BringToFront failed: {btfEx.Message}");
-                }
+                // NOTE: BringToFront removed — steals OS focus.
+                // CDP insertText/eval/setFileInputFiles all work on background tabs.
 
                 // Diagnose tab state before editor search
                 var hiddenState = await cdp.EvalAsync("document.hidden + '|' + document.title + '|' + document.querySelectorAll('*').length");
@@ -1444,6 +1635,9 @@ Examples:
                 using var questionLock = ChromeTabLock.Acquire("Gemini");
                 if (questionLock == null) return (false, (string?)null);
 
+                // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
+                var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Gemini");
+
                 // ── File attachments (before text) ──
                 if (attachFiles?.Count > 0)
                     await AttachFilesViaCdp(cdp, attachFiles, editorSel);
@@ -1478,10 +1672,15 @@ Examples:
                         $"document.querySelector('{editorSel}')?.textContent?.length ?? 0") ?? "0";
                     if (verify == "0")
                     {
+                        zoom?.ShowFail("insert failed");
+                        zoom?.Dispose();
                         Console.WriteLine("[ASK] Failed to insert text");
                         return (false, (string?)null);
                     }
                 }
+
+                // ── Focus theft detection: restore if Chrome stole focus ──
+                GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
 
                 // Send: a11y-first (CDP real click on button) → focusless Enter fallback
                 // Keep trying until editor is empty (= message sent)
@@ -1549,6 +1748,10 @@ Examples:
                     await Task.Delay(500);
                 }
                 if (sendResult == "PENDING") sendResult = "FORCED(5x)";
+
+                // Zoom feedback: sent successfully
+                zoom?.ShowPass($"sent ({sendResult})");
+                zoom?.Dispose();
 
                 Console.WriteLine($"[ASK] Sent! Waiting for response... (send={sendResult})");
                 questionLock.Release("sent");
@@ -1785,8 +1988,7 @@ Examples:
                     await Task.Delay(3000);
                 }
 
-                // Activate tab (no lock needed — just internal tab switch)
-                await cdp.BringToFrontAsync();
+                // NOTE: BringToFront removed — steals OS focus. CDP works on background tabs.
 
                 // Wait for ProseMirror editor
                 var editorSel = await WaitForChatGptEditorA11y(cdp);
@@ -1971,8 +2173,7 @@ Examples:
         var currentUrl = await cdp.EvalAsync("location.href") ?? "";
         int prevTurns = await CountChatGptTurns(cdp);
 
-        // Activate tab (no lock needed — Chrome-internal tab switch, no OS focus change)
-        await cdp.BringToFrontAsync();
+        // NOTE: BringToFront removed — steals OS focus. CDP works on background tabs.
 
         // ── A11y-first: find editor via selector chain ──
         var editorSel = await WaitForChatGptEditorA11y(cdp);
@@ -1982,6 +2183,9 @@ Examples:
         // ── Browser exclusive zone: prompt input → first response turn ──
         using var chatLock = ChromeTabLock.Acquire("ChatGPT");
         if (chatLock == null) return (false, null);
+
+        // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
+        var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "ChatGPT");
 
         // ── File attachments (before text) ──
         if (attachFiles?.Count > 0)
@@ -2117,6 +2321,11 @@ Examples:
             });
             sendResult = "CDP_ENTER";
         }
+
+        // Zoom feedback + focus guard
+        zoom?.ShowPass($"sent ({sendResult})");
+        zoom?.Dispose();
+        GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
 
         // Check editor after send — should be empty if sent successfully
         var afterSend = await cdp.EvalAsync(
@@ -2332,13 +2541,8 @@ Examples:
         }
 
         // ── Poll Phase 2: text extraction ──
-        // BringToFront so innerText (which needs layout) works properly
-        try
-        {
-            await cdp.BringToFrontAsync();
-        }
-        catch { }
-        await Task.Delay(300); // let React hydrate after tab activation
+        // NOTE: BringToFront removed — innerText works on background tabs too.
+        await Task.Delay(300);
 
         // Scroll into view + hydrate + extract
         string? finalText = null;
@@ -2466,11 +2670,9 @@ Examples:
         return false;
     }
 
-    // ── Tab Handoff: async 상부상조 ──
-    // When one AI's response starts, activate the other AI's tab via BringToFrontAsync.
-    // BringToFront = Chrome-internal tab switch only (no OS focus change = fully focusless).
-    // The streaming AI polls with textContent (works in background), so it doesn't need active tab.
-    // The waiting AI gets active tab → React renders at full speed → faster first-byte.
+    // ── Tab Handoff: disabled ──
+    // BringToFront actually steals OS focus (not just Chrome-internal).
+    // CDP eval/insertText work fine on background tabs, so handoff is unnecessary.
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string, CdpClient> _waitingTabs = new();
 
     /// <summary>
@@ -2490,23 +2692,10 @@ Examples:
     }
 
     /// <summary>
-    /// Activate another waiting AI's tab (focusless — Chrome internal tab switch only).
-    /// Called when this AI's response starts streaming (= no longer needs active tab).
+    /// Tab handoff disabled — BringToFront steals OS focus.
+    /// CDP works fine on background tabs, no handoff needed.
     /// </summary>
-    static async Task HandoffTabToPeer(string myName)
-    {
-        foreach (var (name, cdp) in _waitingTabs)
-        {
-            if (string.Equals(name, myName, StringComparison.OrdinalIgnoreCase)) continue;
-            try
-            {
-                await cdp.BringToFrontAsync();
-                Console.WriteLine($"[ASK] Tab handoff: {myName} → {name} (focusless)");
-                return;
-            }
-            catch { }
-        }
-    }
+    static Task HandoffTabToPeer(string myName) => Task.CompletedTask;
 
     // ── Chrome Tab Lock ──
     // Cross-process mutex: only one ask command can own the browser at a time.
@@ -2665,10 +2854,8 @@ Examples:
                     Console.WriteLine($"[ASK] Reusing Claude session");
                 }
 
-                // Activate tab
-                try { await cdp.BringToFrontAsync(); }
-                catch (Exception btfEx) { Console.WriteLine($"[ASK] BringToFront failed: {btfEx.Message}"); }
-                await Task.Delay(1000); // Let Claude.ai UI settle after tab activation
+                // NOTE: BringToFront removed — steals OS focus. CDP works on background tabs.
+                await Task.Delay(1000);
 
                 // ── Phase 2: Find editor ──
                 var editorSel = await WaitForClaudeEditorA11y(cdp);
@@ -2685,12 +2872,17 @@ Examples:
                 using var chatLock = ChromeTabLock.Acquire("Claude");
                 if (chatLock == null) return (false, (string?)null);
 
+                // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
+                var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Claude");
+
                 var inserted = await InsertTextClaudeProseMirror(cdp, editorSel, question);
                 var editorContent = await cdp.EvalAsync(
                     $"document.querySelector('{editorSel}')?.textContent?.substring(0,80) || 'EMPTY'") ?? "EMPTY";
                 Console.WriteLine($"[ASK] After insert: {(inserted ? "OK" : "FAIL")}, editor=[{editorContent}]");
                 if (!inserted)
                 {
+                    zoom?.ShowFail("insert failed");
+                    zoom?.Dispose();
                     Console.WriteLine("[ASK] Failed to insert text into Claude editor");
                     return (false, (string?)null);
                 }
@@ -2746,6 +2938,11 @@ Examples:
                     });
                     sendResult = "CDP_ENTER";
                 }
+
+                // Zoom feedback + focus guard
+                zoom?.ShowPass($"sent ({sendResult})");
+                zoom?.Dispose();
+                GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
 
                 var afterSend = await cdp.EvalAsync(
                     $"document.querySelector('{editorSel}')?.textContent?.length ?? -1") ?? "-1";

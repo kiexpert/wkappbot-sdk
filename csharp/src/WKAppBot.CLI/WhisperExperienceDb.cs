@@ -48,7 +48,8 @@ internal sealed class WhisperExperienceDb : IDisposable
     private volatile bool _isRecording;
     private int _quietFrames;
     private int _segmentFrames; // voice frames in current segment (for min-length gate)
-    private const int QuietTrailFrames = 33; // ~1 second trailing silence before cut
+    private const int PauseFrames = 33;      // ~330ms silence = ".." (comma, short breath)
+    private const int SentenceEndFrames = 99; // ~1s silence = "." (period, sentence end → cut)
     private const int MinSegmentFrames = 100; // ~3 seconds — skip tiny bursts for Gemini
     private readonly object _wavLock = new();
     private volatile string? _segmentSttLabel; // STT draft label for current segment
@@ -281,9 +282,13 @@ internal sealed class WhisperExperienceDb : IDisposable
             if (_isRecording)
             {
                 _quietFrames++;
-                if (_quietFrames >= QuietTrailFrames)
+                // ".." comma: short breath between syllables → insert pause marker (once)
+                if (_quietFrames == PauseFrames)
+                    _segmentSoundCodes.Add(0); // 0 = pause marker → "-0-" in filename
+                // "." period: long silence → sentence end → cut!
+                if (_quietFrames >= SentenceEndFrames)
                 {
-                    Console.WriteLine($"[WHISPER:CUT] speech={_segmentFrames}f({_segmentFrames*30}ms) trail={QuietTrailFrames}f mode={frame.Mode}");
+                    Console.WriteLine($"[WHISPER:.] speech={_segmentFrames}f({_segmentFrames * 10}ms) pause={_quietFrames}f mode={frame.Mode}");
                     StopWavSegment();
                     _segmentFrames = 0;
                 }
@@ -439,7 +444,7 @@ internal sealed class WhisperExperienceDb : IDisposable
                         int step = Math.Max(1, deduped.Count / 8);
                         for (int i = 0; i < deduped.Count && sampled.Count < 8; i += step)
                             sampled.Add(deduped[i]);
-                        var scStr = string.Join("-", sampled.Select(FormatSoundCodeOct));
+                        var scStr = string.Join("-", sampled.Select(c => FormatSoundCode(c, forFile: true)));
                         var dir = Path.GetDirectoryName(_wavPath)!;
                         var origName = Path.GetFileName(_wavPath);
                         var newName = $"{scStr}_{origName}";
@@ -447,7 +452,7 @@ internal sealed class WhisperExperienceDb : IDisposable
                         if (!File.Exists(newPath))
                             File.Move(_wavPath, newPath);
                         // Human-readable: decode each sound code to band abbreviations
-                        var readable = string.Join(" ", sampled.Select(FormatSoundCodeOct));
+                        var readable = string.Join(" ", sampled.Select(c => FormatSoundCode(c)));
                         Console.WriteLine($"[WHISPER] {newName}  ({deduped.Count} codes, {_segmentSoundCodes.Count} frames)");
                         Console.WriteLine($"[WHISPER] {readable}");
                     }
@@ -496,14 +501,11 @@ internal sealed class WhisperExperienceDb : IDisposable
     /// <summary>Call when auto-study batch completes (success or fail).</summary>
     public void NotifyAutoStudyDone() => _autoStudyRunning = false;
 
-    /// <summary>Decode 15-bit sound code to octal 5-digit string (each digit = band index 0-7).</summary>
-    private static string FormatSoundCodeOct(ushort sc)
+    /// <summary>Format sound code as octal digits (no leading zeros). 0 = pause marker.</summary>
+    private static string FormatSoundCode(ushort sc, bool forFile = false)
     {
-        if (sc == 0) return "..";
-        var buf = new char[5];
-        for (int r = 0; r < 5; r++)
-            buf[r] = (char)('0' + ((sc >> (12 - r * 3)) & 0x7));
-        return new string(buf).TrimStart('0');
+        if (sc == 0) return forFile ? "0" : "..";
+        return Convert.ToString(sc, 8);
     }
 
     private static string SanitizeFileName(string text)
