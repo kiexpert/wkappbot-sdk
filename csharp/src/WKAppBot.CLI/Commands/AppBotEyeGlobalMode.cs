@@ -378,10 +378,41 @@ internal partial class Program
                     {
                         var (lastStt, lastSttTicks, lastSttMode, _) = whisperExp?.GetStatus() ?? (null, 0, "QUIET", 0);
                         long ageTicks = lastStt != null ? DateTime.UtcNow.Ticks - lastSttTicks : long.MaxValue;
+                        int segFrames = whisperExp?.SegmentFrames ?? 0;
                         whisperRing.UpdateSpectrum(frame.Levels, frame.MaxLevel,
-                            frame.Mode, frame.Token, frame.RecentTokens, lastStt, ageTicks, lastSttMode);
+                            frame.Mode, frame.Token, frame.RecentTokens, lastStt, ageTicks, lastSttMode,
+                            segFrames, frame.SoundCode);
                     }
                     whisperExp?.LogFrame(frame);
+                };
+
+                // Mic PCM → parallel MP3 recording for Gemini STT
+                whisperEngine.OnMicData += (buf, len) => whisperExp?.WriteMicData(buf, len);
+
+                // Mic segment ready → send to Gemini for transcription
+                whisperExp.OnMicSegmentReady += (mp3Path) =>
+                {
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try
+                        {
+                            Console.ForegroundColor = ConsoleColor.Cyan;
+                            Console.WriteLine($"[WHISPER:GEMINI] Sending mic segment: {Path.GetFileName(mp3Path)}");
+                            Console.ResetColor();
+                            // Use existing ask gemini infrastructure
+                            var exitCode = AskCommand(["gemini",
+                                "Transcribe this Korean speech to text. Reply ONLY with the transcription, nothing else.",
+                                mp3Path, "--timeout", "15"]);
+                            if (exitCode == 0)
+                                Console.WriteLine("[WHISPER:GEMINI] Transcription complete");
+                            else
+                                Console.WriteLine($"[WHISPER:GEMINI] Transcription failed (exit={exitCode})");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[WHISPER:GEMINI] Error: {ex.Message}");
+                        }
+                    });
                 };
 
                 Console.ForegroundColor = ConsoleColor.Magenta;
@@ -420,8 +451,15 @@ internal partial class Program
             var (tickDirty, promptDirty) = CheckGlobalDirtyFlags(forceFull);
             if (!TryRunOneGlobalTick(host, timeoutMs: 3000, forceFull, tickDirty, promptDirty))
             {
-                Console.WriteLine("[EYE] tick timeout (>3s) - self terminate");
-                break;
+                if (frameCount < 3)
+                {
+                    Console.WriteLine($"[EYE] tick timeout (>3s) on frame {frameCount} — startup grace, continuing");
+                }
+                else
+                {
+                    Console.WriteLine("[EYE] tick timeout (>3s) - self terminate");
+                    break;
+                }
             }
 
             // ── Hot-swap blue-green: first render OK → old Eye exits on its own (return 0) ──

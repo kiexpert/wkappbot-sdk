@@ -34,6 +34,10 @@ internal sealed class WhisperRingWindow : Window
     private readonly TextBlock _sttText;    // STT recognized word(s)
     private readonly WpfEllipse _coreGlow;
     private readonly WpfEllipse _coreDot;
+
+    // Sound code RLE trail string (just append + trim front)
+    private string _scTrail = "";
+    private ushort _scLast = ushort.MaxValue;
     private readonly Canvas _pointerLayer;                      // pointer-only layer (blur without affecting text)
     private readonly System.Windows.Shapes.Line _pointer;      // energy centroid pointer (current)
     private readonly WpfEllipse _pointerDot;                   // pointer tip dot (current)
@@ -269,6 +273,22 @@ internal sealed class WhisperRingWindow : Window
         Content = root;
     }
 
+    // Band short names for sound code display (2-char abbreviations)
+    private static readonly string[] BandShort = ["Vx", "Ph", "Ve", "Or", "Hi", "Bu", "Sb", "Br"];
+
+    /// <summary>Format 15-bit sound code as ranked band abbreviations (e.g. "Sb Bu Hi Or Vx").</summary>
+    private static string FormatSoundCode(ushort sc)
+    {
+        var sb = new System.Text.StringBuilder(14);
+        for (int r = 0; r < 5; r++)
+        {
+            int idx = (sc >> (12 - r * 3)) & 0x7;
+            if (r > 0) sb.Append(' ');
+            sb.Append(BandShort[idx]);
+        }
+        return sb.ToString();
+    }
+
     /// <summary>Update a single arc segment geometry.</summary>
     private void UpdateArc(int bandIndex, double startAngleDeg, double sweepDeg, double thickness, double cx, double cy)
     {
@@ -301,7 +321,8 @@ internal sealed class WhisperRingWindow : Window
     /// Called from WhisperRingHost on the WPF dispatcher thread.
     /// </summary>
     public void UpdateSpectrum(int[] levels, int maxLevel, string mode, uint token, string recentTokens,
-        string? sttText = null, long sttAgeTicks = long.MaxValue, string sttMode = "QUIET")
+        string? sttText = null, long sttAgeTicks = long.MaxValue, string sttMode = "QUIET",
+        int segFrames = 0, ushort soundCode = 0)
     {
         double cx = _canvas.Width / 2, cy = _canvas.Height / 2;
         double arcSpan = (360.0 - BandCount * GapAngle) / BandCount;
@@ -440,14 +461,24 @@ internal sealed class WhisperRingWindow : Window
             _coreGlow.Fill = rg;
         }
 
-        // Token hex — cyan for readability
-        _tokenText.Text = $"0x{token:X8}";
+        // Sound code (15-bit: top 5 bands by energy, 3-bit index each)
+        // Format: 5 band abbreviations e.g. "Sb.Bu.HR.OR.Vl" (rank1→rank5)
+        string scText = FormatSoundCode(soundCode);
+        _tokenText.Text = scText;
         _tokenText.Foreground = mode == "WHSPR"
             ? new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0xBB))
             : new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
 
-        // Recent tokens
-        _recentText.Text = recentTokens;
+        // Recent sound codes — RLE string append (skip consecutive duplicates)
+        if (soundCode != _scLast)
+        {
+            _scLast = soundCode;
+            var tag = soundCode == 0 ? ".." : FormatSoundCode(soundCode);
+            _scTrail = _scTrail.Length > 80
+                ? _scTrail[(_scTrail.Length - 60)..] + " " + tag
+                : (_scTrail.Length > 0 ? _scTrail + " " + tag : tag);
+        }
+        _recentText.Text = _scTrail.Length > 40 ? _scTrail[(_scTrail.Length - 40)..] : _scTrail;
 
         // Bottom text: STT word (always priority, any mode) / clock (fallback)
         double sttAgeSec = sttAgeTicks / (double)TimeSpan.TicksPerSecond;
@@ -459,6 +490,15 @@ internal sealed class WhisperRingWindow : Window
             _sttText.Text = sttText!.Length > 12 ? sttText[..12] : sttText;
             _sttText.Opacity = Math.Max(0, 1.0 - sttAgeSec / 5.0);
             _sttText.Foreground = Brushes.White;
+        }
+        else if (segFrames > 0 && mode != "QUIET")
+        {
+            // Recording: show frame count (voice activity counter)
+            _sttText.Text = $"♪{segFrames}";
+            _sttText.Foreground = segFrames >= 100
+                ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88))  // green = sentence ready
+                : new SolidColorBrush(Color.FromRgb(0xFF, 0xAA, 0x00)); // amber = still short
+            _sttText.Opacity = 0.9;
         }
         else
         {
@@ -571,11 +611,12 @@ internal sealed class WhisperRingHost : IDisposable
 
     /// <summary>Push new spectrum data to the ring overlay.</summary>
     public void UpdateSpectrum(int[] levels, int maxLevel, string mode, uint token, string recentTokens,
-        string? sttText = null, long sttAgeTicks = long.MaxValue, string sttMode = "QUIET")
+        string? sttText = null, long sttAgeTicks = long.MaxValue, string sttMode = "QUIET",
+        int segFrames = 0, ushort soundCode = 0)
     {
         _dispatcher?.BeginInvoke(() =>
         {
-            _window?.UpdateSpectrum(levels, maxLevel, mode, token, recentTokens, sttText, sttAgeTicks, sttMode);
+            _window?.UpdateSpectrum(levels, maxLevel, mode, token, recentTokens, sttText, sttAgeTicks, sttMode, segFrames, soundCode);
             _window?.EnsureTopmost();
         });
     }
