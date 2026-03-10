@@ -93,6 +93,10 @@ internal partial class Program
     // LaunchAppBotEyeIfNeededCore checks this to prevent duplicate Eye spawns.
     static System.Threading.Mutex? _eyeRunMutex;
 
+    // ── SupplementCardsFromPrompts cache (30s TTL) ──
+    static List<ClaudePromptHelper.PromptInfo>? _cachedAllPrompts;
+    static DateTime _cachedAllPromptsExpiry = DateTime.MinValue;
+
     static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs, bool elevated = false, int replacePid = 0)
     {
         if (posX < 0 || posY < 0)
@@ -2956,8 +2960,24 @@ internal partial class Program
         {
             var cardCwds = new HashSet<string>(cards.Select(c => c.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/')),
                 StringComparer.OrdinalIgnoreCase);
-            using var discHelper = new ClaudePromptHelper();
-            var allPrompts = discHelper.FindAllPrompts();
+
+            // 30s TTL cache — FindAllPrompts does UIA tree scan per window (slow for large sessions)
+            List<ClaudePromptHelper.PromptInfo> allPrompts;
+            var now = DateTime.UtcNow;
+            if (_cachedAllPrompts != null && now < _cachedAllPromptsExpiry)
+            {
+                allPrompts = _cachedAllPrompts;
+            }
+            else
+            {
+                var sw = Stopwatch.StartNew();
+                using var discHelper = new ClaudePromptHelper();
+                allPrompts = discHelper.FindAllPrompts();
+                sw.Stop();
+                _cachedAllPrompts = allPrompts;
+                _cachedAllPromptsExpiry = now.AddSeconds(30);
+                Console.WriteLine($"[EYE] FindAllPrompts scan: {sw.ElapsedMilliseconds}ms ({allPrompts.Count} prompts) — next cache expires in 30s");
+            }
             foreach (var p in allPrompts)
             {
                 if (p.HostType != "vscode-claudecode" && p.HostType != "Code") continue;
