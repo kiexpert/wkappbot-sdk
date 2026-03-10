@@ -331,8 +331,29 @@ public sealed class ClaudePromptHelper : IDisposable
         {
             var root = _automation.FromHandle(hWnd);
             if (root == null) return null;
-            var turnForm = root.FindFirstDescendant(
-                new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+
+            // Optimization: turn-form is always at the bottom of the chat document.
+            // Instead of FindFirstDescendant (full tree scan), find Document first (shallow),
+            // then scan its direct children for turn-form (the input area is the last child).
+            AutomationElement? turnForm = null;
+            try
+            {
+                // Fast path: find Document/RootWebArea (1-2 levels deep in Electron)
+                var doc = root.FindFirstDescendant(
+                    new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Document));
+                if (doc != null)
+                {
+                    // turn-form is a direct child of the document root — scan children only (no deep descent)
+                    turnForm = doc.FindFirstChild(
+                        new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+                }
+            }
+            catch { }
+
+            // Fallback: full tree scan (slower but safe)
+            if (turnForm == null)
+                turnForm = root.FindFirstDescendant(
+                    new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
             if (turnForm == null) return null;
 
             var inputGroup = turnForm.FindFirstChild(
