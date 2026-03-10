@@ -511,7 +511,8 @@ internal partial class Program
                 }
                 else
                 {
-                    Console.WriteLine("[EYE] tick timeout (>3s) - self terminate");
+                    Console.WriteLine("[EYE] tick timeout (>3s) - self terminate + restart");
+                    hotReloadTriggered = true; // trigger self-restart via hot-swap path
                     break;
                 }
             }
