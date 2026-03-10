@@ -28,6 +28,7 @@ Usage:
       Window (7):  close  minimize  maximize  restore  focus  move  resize
       Element (13): read  find  highlight  invoke  click  toggle
                     expand  collapse  select  scroll  type  set-value  set-range
+      Utility:     clipboard  clipboard-read  clipboard-write (text/files/mixed)
 
       Target:  --nth 3 | 3~ | ~3 | 2~4    --all    (default: first match)
       Options: --depth N  --force  --text ""...""  --value N  --direction  --amount
@@ -134,6 +135,10 @@ Utility:
       COM adapter commands (session per folder).
   telegram send ""text""
       Send message via Telegram (A11Y-first).
+  suggest ""text""
+      Send suggestion/feature request to Slack (auto-tags CWD workspace).
+  claude-usage
+      Probe Claude Desktop usage (session/weekly %) via UIA. Slack alerts at 85%/95%.
 
 General Options:
   -v, --verbose   Verbose output

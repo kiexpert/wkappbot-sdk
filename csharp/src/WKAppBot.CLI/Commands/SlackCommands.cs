@@ -181,16 +181,8 @@ internal partial class Program
             return 1;
         }
 
-        // Parse: text parts + file attachments (auto-detect existing files)
-        var textParts = new List<string>();
-        var filePaths = new List<string>();
-        for (int i = 1; i < args.Length; i++)
-        {
-            if (!args[i].StartsWith("--") && File.Exists(args[i]))
-                filePaths.Add(args[i]);
-            else
-                textParts.Add(args[i]);
-        }
+        // Parse: text parts + file attachments (shared ParseTextAndFiles)
+        var (textParts, filePaths) = ParseTextAndFiles(args, startIndex: 1);
         var message = string.Join("\n", textParts);
         // Bash history expansion escapes ! to \! even in single quotes — undo it
         message = message.Replace("\\!", "!");

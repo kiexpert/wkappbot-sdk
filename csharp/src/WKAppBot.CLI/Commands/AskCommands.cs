@@ -21,14 +21,12 @@ internal partial class Program
             return AskUsage();
 
         var ai = args[0].ToLowerInvariant();
-        // Collect question (everything after AI name, excluding flags)
-        // Auto-detect file paths: if arg is an existing file, attach it + insert [file:name] marker
-        var questionParts = new List<string>();
-        var attachFiles = new List<string>();
+        // Extract flags first, then use shared ParseTextAndFilesWithMarkers for text+files
         bool slackReport = false;
         bool newTab = false;
         bool newSession = false;
         int timeoutSec = 30;
+        var remaining = new List<string>();
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--slack")
@@ -40,20 +38,11 @@ internal partial class Program
             else if (args[i] == "--timeout" && i + 1 < args.Length)
                 int.TryParse(args[++i], out timeoutSec);
             else if (args[i] == "--image" && i + 1 < args.Length)
-            {
-                var imgArg = args[++i];
-                attachFiles.Add(imgArg);
-                questionParts.Add($"[file:{Path.GetFileName(imgArg)}]");
-            }
-            else if (!args[i].StartsWith("--") && File.Exists(args[i]))
-            {
-                attachFiles.Add(args[i]);
-                questionParts.Add($"[file:{Path.GetFileName(args[i])}]"); // inline marker at arg position
-            }
+                remaining.Add(args[++i]); // --image path treated as file arg
             else
-                questionParts.Add(args[i]);
+                remaining.Add(args[i]);
         }
-        // Each argument gets its own line for readability
+        var (questionParts, attachFiles) = ParseTextAndFilesWithMarkers(remaining.ToArray());
         var question = string.Join("\n", questionParts);
         if (string.IsNullOrWhiteSpace(question))
             return AskUsage();

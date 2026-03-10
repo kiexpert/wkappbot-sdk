@@ -128,6 +128,11 @@ internal partial class Program
             Console.WriteLine("  wait        Poll until window/element appears (--timeout --interval)");
             Console.WriteLine("  eval        Execute JavaScript via CDP (--text \"js expr\")");
             Console.WriteLine();
+            Console.WriteLine("═══ Utility ═══════════════════════════════════════════════");
+            Console.WriteLine("  clipboard        Read clipboard text (Unicode + CP949 auto-detect)");
+            Console.WriteLine("  clipboard-write  Write text/files to clipboard");
+            Console.WriteLine("                   \"line1\" \"line2\" → text, file paths → CF_HDROP");
+            Console.WriteLine();
             Console.WriteLine("═══ Target Selection ══════════════════════════════════════");
             Console.WriteLine("  (default)   First match");
             Console.WriteLine("  --nth 3     3rd match only");
@@ -229,6 +234,55 @@ internal partial class Program
 
         if (action == "set-range" && rangeValue == null)
             return Error("set-range requires --value N");
+
+        // ═══ Special: clipboard (no window needed) ═══
+        if (action == "clipboard" && args.Length <= 1)
+        {
+            Console.WriteLine("═══ Clipboard ═════════════════════════════════════════════");
+            Console.WriteLine("  a11y clipboard                         Show this help");
+            Console.WriteLine("  a11y clipboard-read                    Read text (Unicode + CP949)");
+            Console.WriteLine("  a11y clipboard-write \"text\" ...        Write text (CF_UNICODETEXT)");
+            Console.WriteLine("  a11y clipboard-write file.png ...      Copy files (CF_HDROP)");
+            Console.WriteLine("  a11y clipboard-write \"msg\" img.png     Mixed: text→.txt + files");
+            Console.WriteLine();
+            Console.WriteLine("  Mixed mode uses [file:name] markers inline, like `ask` command.");
+            return 0;
+        }
+        if (action is "clipboard-read" or "clipboard")
+            return ClipboardRead();
+        if (action is "clipboard-write" or "clipboard-copy")
+        {
+            // args[1..] = payload (slack send / ask style: text+file mixed)
+            var payload = args.Skip(1).Where(a => !a.StartsWith("--")).ToArray();
+            if (payload.Length == 0)
+                return Error("clipboard-write requires text: a11y clipboard-write \"line1\" \"line2\"");
+
+            // Separate files vs text with [file:] markers (shared ParseTextAndFilesWithMarkers)
+            var (textParts, files) = ParseTextAndFilesWithMarkers(payload);
+
+            // Mixed text+files → text as .txt (with [file:] markers), all as CF_HDROP
+            if (files.Count > 0 && textParts.Any(p => !p.StartsWith("[file:")))
+            {
+                var textContent = string.Join(Environment.NewLine, textParts);
+                var firstText = textParts.FirstOrDefault(p => !p.StartsWith("[file:")) ?? "clipboard";
+                var preview = firstText.Length > 20 ? firstText[..20] : firstText;
+                var safeName = string.Concat(preview.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
+                if (string.IsNullOrEmpty(safeName)) safeName = "clipboard";
+                var tmpFile = Path.Combine(Path.GetTempPath(), $"{safeName}.txt");
+                File.WriteAllText(tmpFile, textContent, System.Text.Encoding.UTF8);
+                files.Insert(0, tmpFile);
+                Console.WriteLine($"[CLIPBOARD] text → {tmpFile}");
+                Console.WriteLine($"  preview: {textContent.Replace(Environment.NewLine, " | ")}");
+                return ClipboardWriteFiles(files.ToArray());
+            }
+
+            // Files only → CF_HDROP
+            if (files.Count > 0)
+                return ClipboardWriteFiles(files.ToArray());
+
+            // Text only → CF_UNICODETEXT
+            return ClipboardWrite(string.Join(Environment.NewLine, textParts));
+        }
 
         // ═══ Special: wait action (polls for window/element, early return) ═══
         if (action == "wait")

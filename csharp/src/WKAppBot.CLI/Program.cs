@@ -262,6 +262,8 @@ internal partial class Program
                 "win-move" => WindowMoveCommand(restArgs),
                 "screen" => ScreenCommand(restArgs),
                 "clipboard" => ClipboardCommand(restArgs),
+                "claude-usage" => A11yClaudeUsage(),
+                "suggest" => SuggestCommand(restArgs),
                 "zoom-demo" => ZoomDemoCommand(restArgs),
                 "tick" => TickCommand(restArgs),
                 // External
