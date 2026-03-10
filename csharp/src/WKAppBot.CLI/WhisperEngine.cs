@@ -77,8 +77,20 @@ internal sealed class WhisperEngine : IDisposable
     private int _scRunCount;      // consecutive frames with same code
     private ushort _confirmedSc;  // last confirmed (stable) sound code
 
+    // Phase 1-B: Syllable tokenization state
+    private ushort _syllableCode;        // currently active syllable code (0 = none)
+    private int _syllableFrames;         // frame count accumulated for current syllable
+    private int _syllableSilenceFrames;  // consecutive non-confirmed frames since last syllable
+    private const int SyllableSilenceGate = 10; // silence frames before emitting pending token
+
     /// <summary>Fired on each analysis frame (~33fps).</summary>
     public event Action<WhisperFrame>? OnFrame;
+
+    /// <summary>
+    /// Fired when a syllable token is completed (code transition or silence timeout).
+    /// Compresses the 100fps confirmed stream into {code, frames} tokens.
+    /// </summary>
+    public event Action<SyllableToken>? OnSyllableToken;
 
     /// <summary>Fired on each mic audio buffer (raw 16kHz 16bit mono PCM).</summary>
     public event Action<byte[], int>? OnMicData;
@@ -494,7 +506,11 @@ internal sealed class WhisperEngine : IDisposable
             }
             ushort soundCode = 0;
             for (int r = 0; r < 5; r++)
-                soundCode |= (ushort)(ranked[r] << (12 - r * 3));
+            {
+                int idx = ranked[r];
+                int gray = idx ^ (idx >> 1); // Gray encode: adjacent bands differ by 1 bit only
+                soundCode |= (ushort)(gray << (12 - r * 3));
+            }
 
             // Mode detection
             bool isSilence = maxEnergy < 0.001;
@@ -562,6 +578,36 @@ internal sealed class WhisperEngine : IDisposable
             else if (soundCode == 0)
             {
                 _scRunCount = 0; // silence resets run
+            }
+
+            // Phase 1-B: Syllable tokenization — compress confirmed stream to {code, frames} tokens
+            if (_confirmedSc != 0)
+            {
+                if (_syllableCode == 0 || _syllableCode != _confirmedSc)
+                {
+                    // Code transition: emit completed token, start new one
+                    if (_syllableCode != 0)
+                        OnSyllableToken?.Invoke(new SyllableToken { Code = _syllableCode, Frames = _syllableFrames });
+                    _syllableCode = _confirmedSc;
+                    _syllableFrames = 1;
+                }
+                else
+                {
+                    _syllableFrames++;
+                }
+                _syllableSilenceFrames = 0;
+            }
+            else if (_syllableCode != 0)
+            {
+                // Non-confirmed frame while syllable is active
+                _syllableSilenceFrames++;
+                if (_syllableSilenceFrames >= SyllableSilenceGate)
+                {
+                    OnSyllableToken?.Invoke(new SyllableToken { Code = _syllableCode, Frames = _syllableFrames });
+                    _syllableCode = 0;
+                    _syllableFrames = 0;
+                    _syllableSilenceFrames = 0;
+                }
             }
 
             if (!isSilence)
@@ -649,6 +695,24 @@ internal sealed class WhisperEngine : IDisposable
 
     /// <summary>Band info for UI display.</summary>
     public static (int Lo, int Hi, string Name)[] GetBands() => Bands;
+
+    /// <summary>Gray encode: n ^ (n >> 1). Adjacent band indices differ by 1 bit only.</summary>
+    public static int GrayEncode(int n) => n ^ (n >> 1);
+
+    /// <summary>Gray decode: recovers original band index from gray-encoded value.</summary>
+    public static int GrayDecode(int gray) { int n = 0; for (int g = gray; g != 0; g >>= 1) n ^= g; return n; }
+
+    /// <summary>
+    /// Extract the 5 Gray-encoded band indices from a 15-bit SoundCode.
+    /// Returns raw gray values (NOT decoded). Use GrayDecode() to get original band indices.
+    /// </summary>
+    public static int[] SoundCodeToGrayRanks(ushort code)
+    {
+        var ranks = new int[5];
+        for (int r = 0; r < 5; r++)
+            ranks[r] = (code >> (12 - r * 3)) & 0x7;
+        return ranks;
+    }
 
     // ── DUET clustering: group TF bins by IPD direction ──
 
@@ -1004,4 +1068,23 @@ internal sealed class WhisperFrame
     public int[]? VoiceLevels { get; init; }
     /// <summary>Confirmed sound code (stable across SyllableFrames). 0 if not yet confirmed.</summary>
     public ushort ConfirmedSoundCode { get; init; }
+}
+
+/// <summary>
+/// Phase 1-B: Syllable token — a stable sound code + its duration in frames.
+/// Compresses the raw 100fps confirmed stream: consecutive same codes → one token.
+/// Code uses Gray-encoded band indices (see WhisperEngine.GrayDecode to recover original).
+/// </summary>
+internal sealed class SyllableToken
+{
+    /// <summary>15-bit Gray-encoded SoundCode (top-5 bands, rank-order permutation).</summary>
+    public ushort Code { get; init; }
+
+    /// <summary>Number of confirmed frames this code was stable (~10ms each at 100fps).</summary>
+    public int Frames { get; init; }
+
+    /// <summary>Approximate duration in milliseconds (Frames × 10ms).</summary>
+    public int DurationMs => Frames * 10;
+
+    public override string ToString() => $"SC:{Code:X4} {DurationMs}ms({Frames}fr)";
 }

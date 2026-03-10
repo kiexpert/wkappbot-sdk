@@ -519,23 +519,15 @@ Options:
                 return; // silently wake up — no log needed for non-web commands
             }
 
-            // Fallback: check if any wkappbot.exe "eye" process already running
-            // (GlobalMode has no WPF window, so FindWindow above will miss it)
-            var myPid = Environment.ProcessId;
-            var myName = Path.GetFileNameWithoutExtension(Environment.ProcessPath ?? "wkappbot");
-            foreach (var p in Process.GetProcessesByName(myName))
+            // Fallback: check named mutex — GlobalMode Eye creates "Global\WKAppBotEyeGlobal" on startup
+            // This is reliable unlike WPF window detection (GlobalMode has no WPF window)
+            try
             {
-                try
-                {
-                    if (p.Id == myPid) continue; // skip self
-                    // Check if command line contains "eye" (not "eye tick")
-                    // Use MainModule.FileName match + StartInfo is unavailable for other processes
-                    // Simple heuristic: another wkappbot.exe running = likely eye
-                    p.Dispose();
-                    return; // another wkappbot already running — skip launch
-                }
-                catch { p.Dispose(); }
+                using var m = System.Threading.Mutex.OpenExisting(@"Global\WKAppBotEyeGlobal");
+                return; // GlobalMode Eye is running — skip launch
             }
+            catch (System.Threading.WaitHandleCannotBeOpenedException) { } // mutex not found → Eye not running
+            catch { } // access denied or other error → assume Eye not running
 
             // Launch AppBotEye as detached background process
             var exePath = Environment.ProcessPath;

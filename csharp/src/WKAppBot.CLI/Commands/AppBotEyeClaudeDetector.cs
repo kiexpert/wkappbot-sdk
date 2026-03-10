@@ -514,6 +514,8 @@ internal partial class Program
                                 name.Contains("한도를 초과", StringComparison.OrdinalIgnoreCase) ||
                                 name.Contains("사용 한도", StringComparison.OrdinalIgnoreCase))
                             {
+                                // Log the trigger text for debugging
+                                Console.WriteLine($"[EYE] Rate limit trigger text: \"{(name.Length > 80 ? name[..80] + "…" : name)}\"");
                                 // Try to extract reset time from this element or siblings
                                 var resetTime = ParseResetTime(name);
                                 if (resetTime == null)
@@ -762,6 +764,7 @@ internal partial class Program
                 fullText.Contains("한도를 초과", StringComparison.OrdinalIgnoreCase) ||
                 fullText.Contains("사용 한도", StringComparison.OrdinalIgnoreCase))
             {
+                Console.WriteLine($"[EYE] Rate limit trigger (OCR): \"{(fullText.Length > 120 ? fullText[..120] + "…" : fullText)}\"");
                 // Extract reset time from OCR text
                 var resetTime = ParseResetTime(fullText);
                 var displayText = resetTime != null

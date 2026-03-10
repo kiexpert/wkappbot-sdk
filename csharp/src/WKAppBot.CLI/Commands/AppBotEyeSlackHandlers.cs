@@ -126,7 +126,15 @@ internal partial class Program
 
         if (botUsernames.Count == 0)
         {
-            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no bot usernames found, sending to all");
+            // 참가 봇 없음 (원본 메시지 삭제됐거나 처음 도착한 쓰레드)
+            // → 전체 브로드캐스트 대신 Eye 본인 CWD 창에만 전달
+            var myPrompt = FindMyPrompt(promptHelper);
+            if (myPrompt != null)
+            {
+                Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no bot usernames — delivering to own CWD window only");
+                return new List<ClaudePromptHelper.PromptInfo> { myPrompt };
+            }
+            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no bot usernames, own CWD not found — sending to all");
             return allPrompts;
         }
 
@@ -171,6 +179,13 @@ internal partial class Program
             return matched;
         }
 
+        // 봇 username은 있는데 프롬프트 매칭 안 됨 → Eye 본인 CWD 창에만 전달
+        var myFallback = FindMyPrompt(promptHelper);
+        if (myFallback != null)
+        {
+            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no match for [{string.Join(", ", botUsernames)}] — delivering to own CWD window only");
+            return new List<ClaudePromptHelper.PromptInfo> { myFallback };
+        }
         Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no prompt match for usernames [{string.Join(", ", botUsernames)}], sending to all");
         return allPrompts;
     }

@@ -816,35 +816,62 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
-    /// Intercept file chooser dialog and provide files programmatically.
-    /// Steps: 1) Enable interception 2) Trigger the file chooser (caller clicks upload button)
-    /// 3) Wait for Page.fileChooserOpened event 4) Accept with the file path.
+    /// Activate this tab in Chrome WITHOUT stealing OS foreground window.
+    /// Uses Target.activateTarget which makes the tab active in Chrome internally
+    /// (Chrome-level tab switch) without triggering an OS SetForegroundWindow call.
+    /// Unlike Page.bringToFront which explicitly brings Chrome to front.
+    /// </summary>
+    public async Task ActivateTabAsync()
+    {
+        try
+        {
+            var tid = TargetId;
+            if (!string.IsNullOrEmpty(tid))
+            {
+                await SendAsync("Target.activateTarget", new JsonObject { ["targetId"] = tid });
+                Console.WriteLine($"[CDP] Tab activated (focusless): {tid[..8]}…");
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Intercept file chooser dialog and provide files programmatically (fully focusless).
+    /// Uses Input.dispatchMouseEvent (trusted gesture) so Chrome opens the file chooser,
+    /// which is intercepted by Page.setInterceptFileChooserDialog BEFORE the native OS dialog
+    /// appears → no focus stealing at all.
+    /// Steps: 1) Enable interception 2) Trusted-click upload button 3) Wait for fileChooserOpened
+    ///         4) If menu appeared, trusted-click menu item + wait again 5) handleFileChooser
     /// </summary>
     public async Task<bool> SetFileViaChooserAsync(string absolutePath, int timeoutMs = 5000)
     {
         try
         {
-            // Enable file chooser interception
+            // Enable file chooser interception BEFORE the click — intercepts before OS dialog opens
             await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = true });
-
-            // Prepare to receive the event
             _fileChooserTcs = new TaskCompletionSource<JsonNode?>();
 
-            // Click the upload button (Gemini: "파일 업로드 메뉴 열기")
-            var clickResult = await EvalAsync("""
+            // Get upload button coords for trusted gesture
+            var btnInfo = await EvalAsync("""
                 (() => {
                     var btn = document.querySelector('button[aria-label*="파일 업로드"]')
                            || document.querySelector('button[aria-label*="Upload"]')
                            || document.querySelector('button[aria-label*="Attach"]')
                            || document.querySelector('button[aria-label*="첨부"]')
                            || document.querySelector('button[aria-label*="Add file"]');
-                    if (btn) { btn.click(); return 'CLICKED:' + btn.getAttribute('aria-label'); }
-                    return 'NO_BTN';
+                    if (!btn) return 'NO_BTN';
+                    var r = btn.getBoundingClientRect();
+                    return Math.round(r.x + r.width/2) + ',' + Math.round(r.y + r.height/2) + ':' + (btn.getAttribute('aria-label') || '');
                 })()
             """);
-            Console.WriteLine($"[CDP] FileChooser step1: {clickResult}");
+            Console.WriteLine($"[CDP] FileChooser btn: {btnInfo}");
+            if (btnInfo == "NO_BTN") return false;
 
-            // Wait for file chooser event (direct open — non-menu buttons)
+            // Trusted gesture click — Chrome treats this as real user input for file chooser
+            var btnCoords = btnInfo!.Split(':')[0].Split(',');
+            await TrustedClickAsync(int.Parse(btnCoords[0]), int.Parse(btnCoords[1]));
+
+            // Wait for file chooser event (direct open — no menu)
             using var cts = new CancellationTokenSource(timeoutMs);
             cts.Token.Register(() => _fileChooserTcs.TrySetCanceled());
 
@@ -854,16 +881,16 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             }
             catch (TaskCanceledException)
             {
-                // File chooser didn't open — a menu opened. Click "파일 업로드" / "Upload file" menu item
-                var menuResult = await EvalAsync("""
+                // Menu opened instead of direct file chooser — find and trusted-click menu item
+                var menuInfo = await EvalAsync("""
                     (() => {
                         var items = document.querySelectorAll('[role=menuitem], [role=option]');
                         for (var item of items) {
                             var t = (item.textContent || '').trim();
                             if (t === '파일 업로드' || t === 'Upload file' || t === 'Upload'
                                 || t.includes('컴퓨터') || t.includes('Computer') || t.includes('내 컴퓨터')) {
-                                item.click();
-                                return 'CLICKED:' + t;
+                                var r = item.getBoundingClientRect();
+                                return Math.round(r.x + r.width/2) + ',' + Math.round(r.y + r.height/2) + ':' + t;
                             }
                         }
                         // Broader fallback
@@ -871,41 +898,41 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                         for (var item of all) {
                             var t = (item.textContent || '').trim();
                             if (t && (t.includes('업로드') || t.includes('Upload'))) {
-                                item.click();
-                                return 'CLICKED_BROAD:' + t;
+                                var r = item.getBoundingClientRect();
+                                return Math.round(r.x + r.width/2) + ',' + Math.round(r.y + r.height/2) + ':' + t;
                             }
                         }
                         return 'NO_MENU_ITEM';
                     })()
                 """);
-                Console.WriteLine($"[CDP] FileChooser step2 menu: {menuResult}");
+                Console.WriteLine($"[CDP] FileChooser menu: {menuInfo}");
+                if (menuInfo == "NO_MENU_ITEM") return false;
 
-                // Re-enable interception and prepare new TCS before waiting
+                // Re-enable interception + reset TCS before trusted-click
                 await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = true });
                 _fileChooserTcs = new TaskCompletionSource<JsonNode?>();
 
-                // If menu item was found but chooser didn't fire, the dialog may need a moment
-                await Task.Delay(500);
+                var menuCoords = menuInfo!.Split(':')[0].Split(',');
+                await TrustedClickAsync(int.Parse(menuCoords[0]), int.Parse(menuCoords[1]));
 
                 using var cts2 = new CancellationTokenSource(5000);
                 cts2.Token.Register(() => _fileChooserTcs.TrySetCanceled());
-
                 try { await _fileChooserTcs.Task; }
                 catch (TaskCanceledException)
                 {
-                    Console.WriteLine("[CDP] FileChooser: no event after menu click");
+                    Console.WriteLine("[CDP] FileChooser: no event after menu trusted-click");
                     return false;
                 }
             }
 
-            // Accept file chooser with our file
+            // Accept — Chrome provides file to the page without opening native OS dialog
             var filePath = absolutePath.Replace('\\', '/');
             await SendAsync("Page.handleFileChooser", new JsonObject
             {
                 ["action"] = "accept",
                 ["files"] = new JsonArray { filePath },
             });
-
+            Console.WriteLine($"[CDP] FileChooser: accepted (focusless)");
             return true;
         }
         catch (Exception ex)
@@ -919,6 +946,22 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             try { await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = false }); }
             catch { }
         }
+    }
+
+    /// <summary>Send a trusted mouse click via CDP Input.dispatchMouseEvent (page coords).</summary>
+    async Task TrustedClickAsync(int x, int y)
+    {
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+        {
+            ["type"] = "mousePressed", ["x"] = x, ["y"] = y,
+            ["button"] = "left", ["clickCount"] = 1
+        });
+        await Task.Delay(50);
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+        {
+            ["type"] = "mouseReleased", ["x"] = x, ["y"] = y,
+            ["button"] = "left", ["clickCount"] = 1
+        });
     }
 
     /// <summary>
@@ -1616,19 +1659,13 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                     if (tid != TargetId)
                         await SwitchToTargetAsync(tid, port);
 
-                    // Position check: if user moved the window → abandon, create new
+                    // Position check: log only — saved target tab is always reused regardless of position
+                    // (window may have been moved by user, but we still want to reuse this tab)
                     var wb = await GetWindowForTargetAsync(tid);
-                    if (wb == null)
-                    {
-                        Console.WriteLine("[ASK] Cannot get window bounds — creating new window");
-                        break;
-                    }
-                    Console.WriteLine($"[ASK] Window at ({wb.Value.left},{wb.Value.top},{wb.Value.width},{wb.Value.height}), expected ({expX},{expY},{expW},{expH})");
-                    if (!IsAtExpectedBounds(wb.Value, expX, expY, expW, expH))
-                    {
-                        Console.WriteLine("[ASK] Browser not at expected position — creating new window");
-                        break; // fall through to Step 4
-                    }
+                    if (wb != null)
+                        Console.WriteLine($"[ASK] Window at ({wb.Value.left},{wb.Value.top},{wb.Value.width},{wb.Value.height})");
+                    else
+                        Console.WriteLine("[ASK] Cannot get window bounds (OK — reusing tab anyway)");
 
                     if (minimizeAfter)
                         await MinimizeWindowAsync(tid);
@@ -1672,19 +1709,25 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                            && url.Contains(new Uri(navigateUrl).Host, StringComparison.OrdinalIgnoreCase);
             if (!isBlank && !matchesHost) continue;
 
-            // Check window position — skip tabs in moved windows
             if (tid != TargetId)
                 await SwitchToTargetAsync(tid, port);
-            var twb = await GetWindowForTargetAsync(tid);
-            if (twb != null && !IsAtExpectedBounds(twb.Value, expX, expY, expW, expH))
-                continue; // window moved — don't claim this tab
 
-            // Navigate to requested URL
-            if (!string.IsNullOrWhiteSpace(navigateUrl))
+            // matchesHost tabs: reuse regardless of window position (already on right site)
+            // blank tabs: check window position (only claim blank tabs in expected window)
+            if (isBlank && !matchesHost)
             {
-                try { await NavigateAsync(navigateUrl); }
-                catch { }
+                var twb = await GetWindowForTargetAsync(tid);
+                if (twb != null && !IsAtExpectedBounds(twb.Value, expX, expY, expW, expH))
+                    continue; // blank tab in wrong window — skip
+
+                // Navigate blank to requested URL
+                if (!string.IsNullOrWhiteSpace(navigateUrl))
+                {
+                    try { await NavigateAsync(navigateUrl); }
+                    catch { }
+                }
             }
+            // matchesHost: already on correct site — no need to navigate
 
             if (minimizeAfter)
                 await MinimizeWindowAsync(tid);

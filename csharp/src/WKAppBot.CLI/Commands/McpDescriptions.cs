@@ -26,10 +26,10 @@ internal partial class Program
         "- Detection: starts with . or [ → CSS; contains > ~ + : or HTML tags → CSS; contains * ? → UIA\n\n" +
         "## Actions\n" +
         "Window: close, minimize, maximize, restore, focus, move (--x/--y), resize (--w/--h)\n" +
-        "Element: invoke, click, toggle, expand, collapse, select, scroll, type (--text, also keystroke/hotkey), set-value (--text), set-range (--value)\n" +
+        "Element: invoke, click, toggle, expand, collapse, select, scroll, type (\"text\", also keystroke/hotkey), set-value (\"text\"), set-range (--value)\n" +
         "Query: find, read, highlight\n" +
         "Discovery: inspect (UIA element tree), windows (list all windows), screenshot (capture window), ocr (extract text)\n" +
-        "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, --text)\n" +
+        "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, \"js expr\")\n" +
         "Utility: clipboard (show help), clipboard-read (read text), clipboard-write (write text/files — mixed mode with [file:] markers)\n" +
         "AI Agents (삼두협의체): ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini) — auto image capture from responses\n\n" +
         "## Fallback Chain (battle-tested!)\n" +

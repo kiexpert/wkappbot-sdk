@@ -89,6 +89,10 @@ internal partial class Program
     static long _prevWorkingSetMB;
     static long _peakWorkingSetMB;
 
+    // Named mutex: signals GlobalMode Eye is running (no WPF window to detect otherwise)
+    // LaunchAppBotEyeIfNeededCore checks this to prevent duplicate Eye spawns.
+    static System.Threading.Mutex? _eyeRunMutex;
+
     static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs, bool elevated = false, int replacePid = 0)
     {
         if (posX < 0 || posY < 0)
@@ -119,6 +123,9 @@ internal partial class Program
                 finally { proc.Dispose(); }
             }
         }
+
+        // Acquire named mutex — signals to other processes that GlobalMode Eye is running
+        _eyeRunMutex = new System.Threading.Mutex(true, @"Global\WKAppBotEyeGlobal", out _);
 
         using var host = new AppBotEyeHost();
         host.Start(width, height, posX, posY, ownerHwnd: IntPtr.Zero);
@@ -608,8 +615,11 @@ internal partial class Program
                                 try
                                 {
                                     var alertMsg = $":rotating_light: *Rate Limit!* {claudeStatus.Item2}";
+                                    // Use "클롣아이" username for rate limit alerts — visually distinct,
+                                    // user won't confuse it with a regular chat message and delete it.
+                                    // (Deleted thread → participant lookup fails → broadcast bug)
                                     Task.Run(async () =>
-                                        await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: botUsername))
+                                        await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: "클롣아이"))
                                         .Wait(5000);
                                 }
                                 catch { }
@@ -641,7 +651,7 @@ internal partial class Program
                                         Console.ResetColor();
                                         Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                                             $":rotating_light: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣이 아직 인수인계 안 했습니다! `wkappbot newchat` 실행 필요",
-                                            username: botUsername)).Wait(3000);
+                                            username: "클롣아이")).Wait(3000);
                                     }
                                     else if (pct >= 90 && !string.IsNullOrEmpty(slackBotToken))
                                     {
@@ -652,12 +662,7 @@ internal partial class Program
                                         // Build handoff prompt
                                         var handoff = BuildHandoffPrompt(jsonlPath, _cachedCards, sizeMB, ContextLimitMB);
 
-                                        // ① Slack 알림
-                                        Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                            $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 인수인계 프롬프트를 전달합니다.",
-                                            username: botUsername)).Wait(3000);
-
-                                        // ② Find prompt for this CWD and deliver nudge
+                                        // ① Find prompt for this CWD, then Slack result
                                         try
                                         {
                                             using var ctxHelper = new ClaudePromptHelper();
@@ -673,17 +678,28 @@ internal partial class Program
                                                         + $"wkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
                                                     ctxHelper.TypeAndSubmit(pi, nudge);
                                                     Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent");
+                                                    // Slack: 실제 전달 성공 후에만 알림
+                                                    Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                                        $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 인수인계 프롬프트를 전달했습니다.",
+                                                        username: "클롣아이")).Wait(3000);
                                                 }
                                                 finally { ClaudePromptHelper.AllowFocusSteal = false; }
                                             }
                                             else
                                             {
                                                 Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] No matching prompt — check Slack");
+                                                // Slack: 전달 실패 알림 (Claude 창 못 찾음)
+                                                Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                                    $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\nClaude 창을 찾지 못해 인수인계 미전달! 직접 확인해주세요.",
+                                                    username: "클롣아이")).Wait(3000);
                                             }
                                         }
                                         catch (Exception ex)
                                         {
                                             Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Handoff failed: {ex.Message}");
+                                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                                                $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n인수인계 전달 오류: {ex.Message}",
+                                                username: "클롣아이")).Wait(3000);
                                         }
                                     }
                                 }
