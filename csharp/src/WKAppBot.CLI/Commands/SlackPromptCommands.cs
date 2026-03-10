@@ -61,31 +61,20 @@ internal partial class Program
             return 1;
         }
 
-        // Parse --channel and --msg flags + auto-detect file attachments
+        // Parse --channel and --msg flags, then text+files via shared ParseTextAndFiles
         string? explicitChannel = null;
         string? threadTs = null;
-        var textParts = new List<string>();
-        var filePaths = new List<string>();
+        var remaining = new List<string>();
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--channel" && i + 1 < args.Length)
-            {
                 explicitChannel = args[++i];
-            }
             else if ((args[i] == "--msg" || args[i] == "--thread") && i + 1 < args.Length)
-            {
                 threadTs = args[++i];
-            }
-            else if (!args[i].StartsWith("--") && File.Exists(args[i]))
-            {
-                filePaths.Add(args[i]);
-            }
             else
-            {
-                textParts.Add(args[i]);
-            }
+                remaining.Add(args[i]);
         }
-
+        var (textParts, filePaths) = ParseTextAndFiles(remaining.ToArray());
         var replyText = string.Join("\n", textParts);
         // Bash history expansion escapes ! to \! even in single quotes — undo it
         replyText = replyText.Replace("\\!", "!");

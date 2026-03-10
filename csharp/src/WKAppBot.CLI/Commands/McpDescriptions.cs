@@ -30,6 +30,7 @@ internal partial class Program
         "Query: find, read, highlight\n" +
         "Discovery: inspect (UIA element tree), windows (list all windows), screenshot (capture window), ocr (extract text)\n" +
         "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, --text)\n" +
+        "Utility: clipboard (show help), clipboard-read (read text), clipboard-write (write text/files — mixed mode with [file:] markers)\n" +
         "AI Agents (삼두협의체): ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini) — auto image capture from responses\n\n" +
         "## Fallback Chain (battle-tested!)\n" +
         "CSS selector on Chrome/Electron class → CDP engine → UIA fallback.\n" +
@@ -87,5 +88,9 @@ internal partial class Program
         "- Android inspect: action=inspect, grap=\"adb://Fold5/*heromts*\", depth=10\n" +
         "- Android click tab: action=click, grap=\"adb://*heromts*#미체결\"\n" +
         "- Android type: action=type, grap=\"adb://*heromts*#검색\", text=\"삼성전자\"\n" +
-        "- Android screenshot: action=screenshot, grap=\"adb://SM*\"";
+        "- Android screenshot: action=screenshot, grap=\"adb://SM*\"\n" +
+        "- Clipboard read: action=clipboard-read (Unicode + CP949 auto-detect)\n" +
+        "- Clipboard write text: action=clipboard-write, text=\"hello world\"\n" +
+        "- Clipboard copy files: action=clipboard-write, grap=\"report.pdf\" (CF_HDROP)\n" +
+        "- Clipboard mixed: action=clipboard-write — pass text+file args, text→.txt with [file:] markers";
 }
