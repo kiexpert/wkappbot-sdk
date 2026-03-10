@@ -87,9 +87,16 @@ internal partial class Program
         // Parse options
         bool use8Band = args.Any(a => a == "--8band");
         bool useRing = args.Any(a => a == "--ring") || args.Any(a => a == "--hud");
+        bool hardKill = args.Any(a => a == "--kill");
         int deviceIndex = 0;
+        float noiseGateDb = -65f;
+        float killLevelDb = 0f; // 0 = auto
         for (int i = 0; i < args.Length - 1; i++)
+        {
             if (args[i] == "--device" && int.TryParse(args[i + 1], out var d)) deviceIndex = d;
+            if (args[i] == "--gate" && float.TryParse(args[i + 1], out var g)) noiseGateDb = g;
+            if (args[i] == "--kill-db" && float.TryParse(args[i + 1], out var k)) { killLevelDb = k; hardKill = true; }
+        }
 
         var bands = use8Band ? MelBands8 : MelBands16;
         int bandCount = bands.Length;
@@ -118,6 +125,8 @@ internal partial class Program
         }
         Console.WriteLine($"[WHISPER] Using device [{deviceIndex}]");
         if (useRing) Console.WriteLine("[WHISPER] Ring HUD overlay enabled (--ring)");
+        if (hardKill) Console.WriteLine($"[WHISPER] DUET hard kill enabled (kill-db={killLevelDb})");
+        Console.WriteLine($"[WHISPER] Noise gate: {noiseGateDb} dBFS");
         Console.WriteLine("[WHISPER] Press Ctrl+C to stop\n");
 
         // Ring HUD overlay (--ring mode, 8-band only for now)

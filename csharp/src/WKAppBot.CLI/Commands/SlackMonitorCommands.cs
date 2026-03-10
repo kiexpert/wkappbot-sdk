@@ -486,11 +486,10 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Get the timestamp of the latest message in a channel.
-    /// Used to check if our status streaming message is still at the bottom.
-    /// Returns null if channel is empty or API call fails.
+    /// Get the latest message in a channel: (ts, reply_count).
+    /// Used to check if our status streaming message is still at the bottom and has no replies.
     /// </summary>
-    static async Task<string?> GetChannelLatestMessageTs(string botToken, string channel)
+    static async Task<(string? ts, int replyCount)> GetChannelLatestMessageInfo(string botToken, string channel)
     {
         using var http = new HttpClient();
         using var req = new HttpRequestMessage(HttpMethod.Get,
@@ -501,12 +500,22 @@ internal partial class Program
         var body = await resp.Content.ReadAsStringAsync();
         var json = JsonSerializer.Deserialize<JsonNode>(body);
         var ok = json?["ok"]?.GetValue<bool>() ?? false;
-        if (!ok) return null;
+        if (!ok) return (null, 0);
 
         var messages = json?["messages"]?.AsArray();
-        if (messages == null || messages.Count == 0) return null;
+        if (messages == null || messages.Count == 0) return (null, 0);
 
-        return messages[0]?["ts"]?.GetValue<string>();
+        var msg = messages[0];
+        var ts = msg?["ts"]?.GetValue<string>();
+        var replyCount = msg?["reply_count"]?.GetValue<int>() ?? 0;
+        return (ts, replyCount);
+    }
+
+    /// Backward-compat wrapper.
+    static async Task<string?> GetChannelLatestMessageTs(string botToken, string channel)
+    {
+        var (ts, _) = await GetChannelLatestMessageInfo(botToken, channel);
+        return ts;
     }
 
     // ── Pending Ack file-based IPC ──────────────────────────────

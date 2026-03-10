@@ -386,6 +386,17 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
 - **ask 명령 고도화** — 삼두협의체 + AI 이미지 응답 개선
   - AskCommands.cs 대규모 리팩터 (스트리밍/이미지캡처/탭핸드오프 안정화)
   - CdpClient 안정성: 탭 URL 매칭, 에러 핸들링 강화
+- **v3.5 Readiness Probe 통합 + type 통합 + 연쇄 dismiss**
+  - Readiness Probe 모든 a11y 액션 적용: 돋보기(read-only 포함) + 포커스 양보 팝업(interaction)
+  - Blocker retarget: 팝업이 타겟을 가리면 자동 전환 (사람 눈과 동일 UX)
+  - 연쇄 다이얼로그 자동 루프: 핸들러 dismiss 후 1초 대기 → 재감지 (최대 5회)
+  - `--repeat` 옵션: 액션 반복 실행으로 연쇄 알럿 한 방 처리 (최대 10회)
+  - type 통합: hotkey/keystroke → type 별칭, 4티어 폴백 (UIA Value → WM_CHAR → MSAA → SendKeys)
+  - SendKeys `+`/`-` 상태키 표기법: `+Shift hello -Shift`, `+Ctrl s` (LIFO 스택 자동 릴리스)
+  - VkKeyScanW 기반 문자별 Shift 자동 래핑 (대소문자/특수문자)
+  - Eye 업타임 라이브 표시 (타이틀바), DUET 판정 전환 로그 `[DUET]`
+  - slack list 메시지 잘림 수정 (70자 고정 → 터미널 폭 동적)
+  - MCP description 업데이트: type keystroke 별칭 + SendKeys 예시
 ### v2.2 Android ADB Integration (Phase A+B+C 완료)
 - **WKAppBot.Android 프로젝트**: AdbClient, AdbDeviceRegistry, AdbGrapRouter, AndroidA11yTree, AdbExperienceDb
 - **adb:// URI 스키마**: `adb://device/package#scope` — Windows grap과 동일한 `#` scope 문법

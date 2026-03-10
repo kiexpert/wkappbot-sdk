@@ -1,76 +1,165 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text;
 using WKAppBot.Win32.Native;
 
 namespace WKAppBot.CLI;
 
+/// <summary>
+/// Fullscreen black overlay form — WS_EX_NOACTIVATE from birth (CreateParams).
+/// Never steals focus, never appears in taskbar, never triggers lock screen feel.
+/// </summary>
+internal sealed class ScreenBlankForm : System.Windows.Forms.Form
+{
+    protected override System.Windows.Forms.CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= 0x08000000 | 0x00000080; // WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
+            return cp;
+        }
+    }
+
+    public ScreenBlankForm()
+    {
+        FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
+        BackColor = System.Drawing.Color.Black;
+        TopMost = true;
+        ShowInTaskbar = false;
+        StartPosition = System.Windows.Forms.FormStartPosition.Manual;
+
+        // Cover all monitors (virtual screen)
+        int vx = NativeMethods.GetSystemMetrics(76); // SM_XVIRTUALSCREEN
+        int vy = NativeMethods.GetSystemMetrics(77); // SM_YVIRTUALSCREEN
+        int vw = NativeMethods.GetSystemMetrics(78); // SM_CXVIRTUALSCREEN
+        int vh = NativeMethods.GetSystemMetrics(79); // SM_CYVIRTUALSCREEN
+        Bounds = new System.Drawing.Rectangle(vx, vy, vw, vh);
+    }
+}
+
 internal partial class Program
 {
+    // _screenBlankForm is declared in AppBotEyeGlobalMode.cs (shared partial class)
+
     static int ScreenCommand(string[] args)
     {
         if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
         {
             Console.WriteLine("Usage:");
-            Console.WriteLine("  wkappbot screen off [--no-check]");
-            Console.WriteLine("      Turn off monitor immediately (WM_SYSCOMMAND/SC_MONITORPOWER=2).");
-            Console.WriteLine("      Default: ensure Eye window, capture it, and fail if image is nearly black.");
+            Console.WriteLine("  wkappbot screen off [--duration N]");
+            Console.WriteLine("      Black out all monitors with fullscreen overlay (no power API, no sleep).");
+            Console.WriteLine("      --duration N: auto-restore after N seconds (default: 60s safety net)");
+            Console.WriteLine("  wkappbot screen on");
+            Console.WriteLine("      Remove black overlay immediately.");
             return 0;
         }
 
         var sub = args[0].ToLowerInvariant();
-        var noCheck = args.Any(a => a.Equals("--no-check", StringComparison.OrdinalIgnoreCase));
+
+        if (sub == "on")
+        {
+            if (_screenBlankForm != null)
+            {
+                CloseScreenBlank();
+                Console.WriteLine("[SCREEN] blank removed");
+            }
+            else
+            {
+                Console.WriteLine("[SCREEN] no blank active");
+            }
+            return 0;
+        }
 
         if (sub != "off")
             return Error($"Unknown screen subcommand: {sub}");
 
-        var eye = FindEyeWindow();
-        if (eye == IntPtr.Zero)
+        // Parse --duration N (default 60s safety net — prevents accidental permanent blank)
+        int durationSec = 60;
+        for (int i = 1; i < args.Length; i++)
         {
-            Console.WriteLine("[SCREEN] Eye window not found. starting background eye...");
-            StartEyeBackground();
-            Thread.Sleep(1500);
-            eye = FindEyeWindow();
+            if (args[i].Equals("--duration", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                int.TryParse(args[++i], out durationSec);
+                if (durationSec <= 0) durationSec = 60;
+            }
         }
 
-        // WM_SYSCOMMAND(0x0112), SC_MONITORPOWER(0xF170), lParam=2 (power off)
-        var hwndBroadcast = new IntPtr(0xFFFF);
-        NativeMethods.SendMessageW(hwndBroadcast, 0x0112, new IntPtr(0xF170), new IntPtr(2));
-        Console.WriteLine("[SCREEN] monitor off command sent");
-
-        if (noCheck)
+        if (_screenBlankForm != null)
         {
-            Console.WriteLine("[SCREEN] check skipped (--no-check)");
+            Console.WriteLine("[SCREEN] blank already active");
             return 0;
         }
 
-        Thread.Sleep(3000);
-
-        bool wkAlive = Process.GetProcessesByName("wkappbot").Length > 0;
-        bool nodeAlive = Process.GetProcessesByName("node").Length > 0;
-
-        if (eye == IntPtr.Zero)
+        // Create fullscreen black overlay — NO focus steal, NO power API
+        var ready = new ManualResetEventSlim(false);
+        var thread = new Thread(() =>
         {
-            Console.WriteLine($"[SCREEN] runtime check: wkappbot={(wkAlive ? "alive" : "down")}, node={(nodeAlive ? "alive" : "down")}, eye=missing");
-            return 3;
-        }
+            var form = new ScreenBlankForm();
 
-        var shot = Path.Combine(DataDir, "screen_off_eye_check.png");
-        if (!TryCaptureWindow(eye, shot, out var nearBlack, out var brightRatio))
+            form.FormClosed += (_, _) => { _screenBlankForm = null; };
+            _screenBlankForm = form;
+
+            // Snapshot cursor position — compare later to distinguish mouse vs keyboard
+            NativeMethods.GetCursorPos(out var startCursor);
+            var startEnv = Environment.TickCount;
+            string wakeReason = "timeout";
+
+            // Poll every 200ms: if user input detected OR duration expired → close
+            var poll = new System.Windows.Forms.Timer { Interval = 200 };
+            poll.Tick += (_, _) =>
+            {
+                uint idleMs = NativeMethods.GetUserIdleMs();
+                bool userInput = idleMs < 500;
+                bool expired = (Environment.TickCount - startEnv) >= durationSec * 1000;
+                if (userInput || expired)
+                {
+                    poll.Stop();
+                    if (userInput)
+                    {
+                        NativeMethods.GetCursorPos(out var nowCursor);
+                        bool mouseMoved = Math.Abs(nowCursor.X - startCursor.X) > 5 ||
+                                          Math.Abs(nowCursor.Y - startCursor.Y) > 5;
+                        wakeReason = mouseMoved ? "mouse" : "keyboard";
+                    }
+                    form.Tag = wakeReason; // pass to FormClosed
+                    form.Close();
+                }
+            };
+            // Start polling after grace period (CLI input + Enter keystroke needs time to age out)
+            var grace = new System.Windows.Forms.Timer { Interval = 3000 };
+            grace.Tick += (_, _) => { grace.Stop(); poll.Start(); };
+            grace.Start();
+
+            form.Shown += (_, _) => ready.Set();
+            form.Show(); // Show without activation (WS_EX_NOACTIVATE handles this)
+            System.Windows.Forms.Application.Run(form);
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = false; // keep process alive until form closes
+        thread.Name = "ScreenBlank";
+        thread.Start();
+
+        // Wait for form to appear
+        ready.Wait(3000);
+        Console.WriteLine($"[SCREEN] blank ON — all monitors blacked out (auto-off in {durationSec}s, or move mouse/key to restore)");
+
+        // Wait for form to close (process must stay alive for the overlay thread)
+        thread.Join();
+        Console.WriteLine("[SCREEN] blank OFF — restored");
+
+        return 0;
+    }
+
+    static void CloseScreenBlank()
+    {
+        var form = _screenBlankForm;
+        if (form != null && !form.IsDisposed)
         {
-            Console.WriteLine($"[SCREEN] runtime check: wkappbot={(wkAlive ? "alive" : "down")}, node={(nodeAlive ? "alive" : "down")}, eye-capture=failed");
-            return 4;
+            form.BeginInvoke(() => form.Close());
         }
-
-        Console.WriteLine($"[SCREEN] runtime check: wkappbot={(wkAlive ? "alive" : "down")}, node={(nodeAlive ? "alive" : "down")}, eye-bright-ratio={brightRatio:F4}, shot={shot}");
-
-        if (nearBlack)
-        {
-            Console.WriteLine("[SCREEN] FAIL: eye shot is nearly black (likely lock-screen or inaccessible desktop)");
-            return 5;
-        }
-
-        return (wkAlive && nodeAlive) ? 0 : 2;
+        _screenBlankForm = null;
     }
 
     static void StartEyeBackground()

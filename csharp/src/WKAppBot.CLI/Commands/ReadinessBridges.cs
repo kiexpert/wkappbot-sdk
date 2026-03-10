@@ -65,18 +65,25 @@ internal partial class Program
             Thread.Sleep(600);
         }
 
-        // Step 2: Blocker detection + dismiss (~5ms)
+        // Step 2: Blocker detection + chain dismiss (핸들러 발동 시 연쇄 체크)
         if (readiness != null)
         {
-            var blocker = readiness.DetectBlocker(hwnd);
-            if (blocker != null)
+            const int maxChain = 5;
+            for (int chain = 0; chain < maxChain; chain++)
             {
-                Console.WriteLine($"[A11Y] blocker: {blocker.ClassName} \"{blocker.Title}\" — dismissing");
-                readiness.BlockerHandler?.TryHandle(hwnd, blocker);
-                Thread.Sleep(300);
-                blocker = readiness.DetectBlocker(hwnd);
-                if (blocker != null)
+                var blocker = readiness.DetectBlocker(hwnd);
+                if (blocker == null) break;
+
+                Console.WriteLine(chain == 0
+                    ? $"[A11Y] blocker: {blocker.ClassName} \"{blocker.Title}\" — dismissing"
+                    : $"[A11Y] chain blocker #{chain + 1}: {blocker.ClassName} \"{blocker.Title}\" — dismissing");
+                var (handled, _) = readiness.BlockerHandler?.TryHandle(hwnd, blocker) ?? (false, false);
+                if (!handled)
+                {
                     Console.WriteLine($"[A11Y] blocker persists: {blocker.ClassName} \"{blocker.Title}\"");
+                    break;
+                }
+                Thread.Sleep(1000); // 연쇄 다이얼로그 출현 대기
             }
         }
 

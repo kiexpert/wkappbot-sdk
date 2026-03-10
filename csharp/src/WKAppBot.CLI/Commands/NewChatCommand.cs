@@ -188,54 +188,45 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Set text via UIA Value pattern, then submit with Enter key.
-    /// For Chromium webview Edit: SetValue sets the text, then we need
-    /// focus + Enter to trigger submission.
+    /// Set text via clipboard paste, then submit with Enter key.
+    /// UIA Value.SetValue doesn't fire DOM input events in Chromium webview
+    /// — clipboard paste (Ctrl+V) reliably triggers React/Svelte state updates.
     /// </summary>
     static bool SetValueAndSubmit(FlaUI.Core.AutomationElements.AutomationElement editEl, IntPtr hwnd, string text)
     {
-        // Set text via UIA Value pattern (focusless!)
         try
         {
-            var vp = editEl.Patterns.Value;
-            if (vp.IsSupported && !vp.Pattern.IsReadOnly.Value)
+            // Focus the edit element (required for SendInput)
+            try { editEl.Focus(); Thread.Sleep(100); }
+            catch
             {
-                vp.Pattern.SetValue(text);
-                Console.WriteLine($"[NEWCHAT] Value.SetValue OK ({text.Length} chars)");
-            }
-            else
-            {
-                Console.WriteLine("[NEWCHAT] Value pattern not writable, trying clipboard...");
                 NativeMethods.SmartSetForegroundWindow(hwnd);
-                Thread.Sleep(200);
-                ClaudePromptHelper.SetClipboardTextPublic(text);
-                KeyboardInput.Hotkey(new[] { "ctrl", "v" });
                 Thread.Sleep(300);
             }
+
+            // Clear any existing text
+            KeyboardInput.Hotkey(new[] { "ctrl", "a" });
+            Thread.Sleep(50);
+            KeyboardInput.PressKey("delete");
+            Thread.Sleep(100);
+
+            // Paste via clipboard (fires DOM input/change events in Chromium!)
+            ClaudePromptHelper.SetClipboardTextPublic(text);
+            Thread.Sleep(50);
+            KeyboardInput.Hotkey(new[] { "ctrl", "v" });
+            Console.WriteLine($"[NEWCHAT] Clipboard paste OK ({text.Length} chars)");
+            Thread.Sleep(500); // let React/Svelte process the input event
+
+            // Submit with Enter
+            KeyboardInput.PressKey("enter");
+            Thread.Sleep(200);
+            return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[NEWCHAT] SetValue failed: {ex.Message}");
+            Console.WriteLine($"[NEWCHAT] SetValueAndSubmit failed: {ex.Message}");
             return false;
         }
-
-        // Submit: focus element + Enter
-        // (Enter requires focus — acceptable for deliberate newchat operation)
-        try
-        {
-            editEl.Focus();
-            Thread.Sleep(100);
-        }
-        catch
-        {
-            // Focus failed — bring window to foreground as fallback
-            NativeMethods.SmartSetForegroundWindow(hwnd);
-            Thread.Sleep(300);
-        }
-
-        KeyboardInput.PressKey("enter");
-        Thread.Sleep(200);
-        return true;
     }
 
     // ═══════════════════════════════════════════════════════════════════

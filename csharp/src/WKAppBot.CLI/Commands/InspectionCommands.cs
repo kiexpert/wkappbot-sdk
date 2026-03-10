@@ -80,6 +80,16 @@ internal partial class Program
             mainWin.Handle, "a11y", new[] { "find" }.Concat(args).ToArray());
         if (delegated) return delegateExit;
 
+        // Blocker detection (bug report: find should show blocker info)
+        try
+        {
+            var readiness = CreateInputReadiness();
+            var blockerInfo = readiness.DetectBlocker(mainWin.Handle);
+            if (blockerInfo != null)
+                Console.WriteLine($"[BLOCK] Blocker detected: \"{blockerInfo.Title}\" (class={blockerInfo.ClassName}, hwnd=0x{blockerInfo.Handle.ToInt64():X8})");
+        }
+        catch { /* best effort */ }
+
         // Walk Win32 children (segments before '#')
         IntPtr targetHwnd = mainWin.Handle;
         for (int si = 1; si < win32Segments.Length; si++)
@@ -237,6 +247,16 @@ internal partial class Program
 
         // 노하우 방송: 프로파일 매칭 → 해당 폼 폴더의 knowhow.md
         BroadcastInspectKnowhow(mainWin.Handle, mainWin.ClassName, matchedFormId, matchedFormTitle);
+
+        // Blocker detection (bug report: inspect should show blocker info)
+        try
+        {
+            var readiness = CreateInputReadiness();
+            var blockerInfo = readiness.DetectBlocker(inspectHandle);
+            if (blockerInfo != null)
+                Console.WriteLine($"[BLOCK] Blocker detected: \"{blockerInfo.Title}\" (class={blockerInfo.ClassName}, hwnd=0x{blockerInfo.Handle.ToInt64():X8})");
+        }
+        catch { /* best effort */ }
 
         Console.WriteLine();
 

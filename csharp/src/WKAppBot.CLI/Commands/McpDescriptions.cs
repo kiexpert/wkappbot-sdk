@@ -26,7 +26,7 @@ internal partial class Program
         "- Detection: starts with . or [ → CSS; contains > ~ + : or HTML tags → CSS; contains * ? → UIA\n\n" +
         "## Actions\n" +
         "Window: close, minimize, maximize, restore, focus, move (--x/--y), resize (--w/--h)\n" +
-        "Element: invoke, click, toggle, expand, collapse, select, scroll, type (--text), set-value (--text), set-range (--value)\n" +
+        "Element: invoke, click, toggle, expand, collapse, select, scroll, type (--text, also keystroke/hotkey), set-value (--text), set-range (--value)\n" +
         "Query: find, read, highlight\n" +
         "Discovery: inspect (UIA element tree), windows (list all windows), screenshot (capture window), ocr (extract text)\n" +
         "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, --text)\n" +
@@ -72,6 +72,7 @@ internal partial class Program
         "- Close all Notepads: action=close, grap=\"*Notepad*\", all=true\n" +
         "- Click web button: action=click, grap=\"*Chrome*#button.primary\"\n" +
         "- Type in native app: action=type, grap=\"*MyApp*#*SearchBox*\", text=\"hello\"\n" +
+        "- Keystroke/hotkey: action=type, grap=\"*App*\", text=\"Ctrl+S\" (also: \"+Shift hello -Shift\", \"F5\")\n" +
         "- Read web heading: action=read, grap=\"*Electron*#h1.title\"\n" +
         "- Invoke MFC button: action=invoke, grap=\"*영웅문*#*조회*\" (Korean stock HTS)\n" +
         "- Toggle checkbox: action=toggle, grap=\"*Settings*#*DarkMode*\"\n" +

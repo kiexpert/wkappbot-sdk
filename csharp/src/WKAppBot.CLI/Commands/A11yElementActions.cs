@@ -371,6 +371,21 @@ internal partial class Program
         }
         catch { }
 
+        // Tier 4: SendKeys keystroke fallback (requires focus)
+        try
+        {
+            Console.WriteLine("[A11Y] type — focusless failed, falling back to SendKeys (focus required)");
+            NativeMethods.SetForegroundWindow(hwnd);
+            Thread.Sleep(100);
+            WKAppBot.Win32.Input.KeyboardInput.SendKeys(text);
+            Console.WriteLine($"[A11Y] type — SendKeys keystroke ({text.Length} chars)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] type — SendKeys failed: {ex.Message}");
+        }
+
         Console.Error.WriteLine("[A11Y] type — no input method available");
         return false;
     }

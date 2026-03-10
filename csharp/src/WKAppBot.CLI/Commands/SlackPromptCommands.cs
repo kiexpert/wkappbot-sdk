@@ -492,4 +492,211 @@ internal partial class Program
 
         return messages.Where(m => m != null).Select(m => m!).ToList();
     }
+
+    /// <summary>
+    /// wkappbot slack list [thread_ts] [--limit N] [--delete-pattern "pat"]
+    /// List recent channel messages or thread replies with full Slack metadata.
+    /// thread_ts auto-detected: if first non-flag arg looks like "1234.5678", treat as thread.
+    /// </summary>
+    static int SlackListCommand(string[] args)
+    {
+        var config = LoadSlackConfig();
+        if (config == null) return 1;
+        var botToken = config["bot_token"]?.GetValue<string>();
+        var channel = config["channel"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
+        {
+            Console.WriteLine("[SLACK] bot_token or channel missing in config.");
+            return 1;
+        }
+
+        int limit = 20;
+        string? deletePattern = null;
+        string? threadTs = null;
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (args[i] == "--limit" && i + 1 < args.Length)
+                int.TryParse(args[++i], out limit);
+            else if (args[i] == "--delete-pattern" && i + 1 < args.Length)
+                deletePattern = args[++i];
+            else if (args[i] == "--thread" && i + 1 < args.Length)
+                threadTs = args[++i];
+            else if ((args[i] == "--channel" || args[i] == "-c") && i + 1 < args.Length)
+                channel = args[++i];
+            else if (args[i].StartsWith("C0", StringComparison.Ordinal) && args[i].Length >= 8)
+                channel = args[i]; // auto-detect channel ID: "C0A21P52EAH"
+            else if (args[i].Contains('.') && char.IsDigit(args[i][0]))
+                threadTs = args[i]; // auto-detect ts: "1234567890.123456"
+        }
+
+        List<JsonNode> messages;
+        if (threadTs != null)
+        {
+            // Try as thread parent first
+            messages = Task.Run(async () =>
+                await SlackFetchRepliesAsync(botToken, channel, threadTs, limit))
+                .GetAwaiter().GetResult();
+
+            // If empty or single (no replies) → maybe it's a reply ts, not the parent
+            // Fetch that message to find its thread_ts (parent)
+            if (messages.Count <= 1)
+            {
+                var probe = Task.Run(async () =>
+                    await SlackFetchHistoryAsync(botToken, channel, oldest: threadTs, limit: 1, inclusive: true))
+                    .GetAwaiter().GetResult();
+                var parentTs = probe.FirstOrDefault()?["thread_ts"]?.GetValue<string>();
+                if (parentTs != null && parentTs != threadTs)
+                {
+                    Console.WriteLine($"[SLACK] ts={threadTs} is a reply → parent={parentTs}");
+                    threadTs = parentTs;
+                    messages = Task.Run(async () =>
+                        await SlackFetchRepliesAsync(botToken, channel, threadTs, limit))
+                        .GetAwaiter().GetResult();
+                }
+            }
+            Console.WriteLine($"[SLACK] Thread ts={threadTs}:");
+        }
+        else
+        {
+            messages = Task.Run(async () =>
+                await SlackFetchHistoryAsync(botToken, channel, limit: limit))
+                .GetAwaiter().GetResult();
+        }
+
+        if (messages.Count == 0)
+        {
+            Console.WriteLine("[SLACK] No messages found.");
+            return 0;
+        }
+
+        // Collect delete candidates
+        var toDelete = new List<(string ts, string preview)>();
+
+        var header = threadTs != null
+            ? $"[SLACK] Thread ({messages.Count} messages):"
+            : $"[SLACK] Channel messages (latest {messages.Count}):";
+        Console.WriteLine(header);
+        Console.WriteLine(new string('─', 120));
+
+        foreach (var m in messages)
+        {
+            var ts = m["ts"]?.GetValue<string>() ?? "?";
+            var user = m["username"]?.GetValue<string>()
+                    ?? m["user"]?.GetValue<string>() ?? "?";
+            var subtype = m["subtype"]?.GetValue<string>() ?? "";
+            var text = (m["text"]?.GetValue<string>() ?? "").Replace("\n", " ");
+            var replyCount = m["reply_count"]?.GetValue<int>() ?? 0;
+            var replyUsers = m["reply_users_count"]?.GetValue<int>() ?? 0;
+            var latestReply = m["latest_reply"]?.GetValue<string>();
+
+            // Timestamp → human-readable
+            string timeStr = ts;
+            if (ts.IndexOf('.') is int dot and > 0
+                && long.TryParse(ts.AsSpan(0, dot), out var epoch))
+            {
+                var dt = DateTimeOffset.FromUnixTimeSeconds(epoch).ToLocalTime();
+                timeStr = dt.ToString("MM-dd HH:mm:ss");
+            }
+
+            // Reactions
+            var reactions = m["reactions"]?.AsArray();
+            var reactStr = "";
+            if (reactions != null && reactions.Count > 0)
+            {
+                var parts = reactions.Select(r =>
+                    $":{r!["name"]}:{r["count"]}").Take(3);
+                reactStr = $" [{string.Join(" ", parts)}]";
+            }
+
+            // Files/attachments
+            var files = m["files"]?.AsArray();
+            var fileStr = "";
+            if (files != null && files.Count > 0)
+            {
+                var names = files.Select(f => f!["name"]?.GetValue<string>() ?? "?").Take(2);
+                fileStr = $" 📎{string.Join(",", names)}";
+            }
+
+            // Attachments (link unfurls, etc.)
+            var attachments = m["attachments"]?.AsArray();
+            var attachStr = attachments != null && attachments.Count > 0
+                ? $" 🔗{attachments.Count}" : "";
+
+            // Thread info
+            var threadStr = "";
+            if (replyCount > 0)
+            {
+                threadStr = $" 💬{replyCount}({replyUsers}人)";
+                if (latestReply != null && latestReply.IndexOf('.') is int ld and > 0
+                    && long.TryParse(latestReply.AsSpan(0, ld), out var lrEpoch))
+                {
+                    var lrDt = DateTimeOffset.FromUnixTimeSeconds(lrEpoch).ToLocalTime();
+                    threadStr += $" last={lrDt:HH:mm}";
+                }
+            }
+
+            // Edited
+            var edited = m["edited"] != null ? " ✏️" : "";
+
+            // Pinned
+            var pinned = m["pinned_to"] != null ? " 📌" : "";
+
+            // Bot/app info
+            var botLabel = "";
+            if (!string.IsNullOrEmpty(subtype)) botLabel += $" ({subtype})";
+            var botId = m["bot_id"]?.GetValue<string>();
+            if (botId != null) botLabel += $" bot={botId[..Math.Min(8, botId.Length)]}";
+
+            // Truncate text
+            var maxLen = Console.WindowWidth > 40 ? Console.WindowWidth - 30 : 120;
+            var preview = text.Length > maxLen ? text[..maxLen] + "…" : text;
+
+            Console.Write($"  {timeStr} | ");
+            Console.ForegroundColor = replyCount > 0 ? ConsoleColor.Cyan : ConsoleColor.Gray;
+            Console.Write($"{user,-22}");
+            Console.ResetColor();
+            Console.Write($"{threadStr}{reactStr}{fileStr}{attachStr}{edited}{pinned}{botLabel}");
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"    ts={ts}  {preview}");
+            Console.ResetColor();
+
+            // Check delete pattern
+            if (deletePattern != null && replyCount == 0
+                && WildcardMatch(text, deletePattern))
+            {
+                toDelete.Add((ts, preview));
+            }
+        }
+
+        Console.WriteLine(new string('─', 120));
+        Console.WriteLine($"  Total: {messages.Count} messages");
+
+        // ── Delete matching messages ──
+        if (deletePattern != null && toDelete.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"\n[SLACK] Deleting {toDelete.Count} messages matching \"{deletePattern}\" (r=0 only):");
+            Console.ResetColor();
+            int deleted = 0;
+            foreach (var (ts, preview) in toDelete)
+            {
+                var ok = Task.Run(async () =>
+                    await SlackDeleteMessageAsync(botToken, channel, ts))
+                    .GetAwaiter().GetResult();
+                var status = ok ? "✓" : "✗";
+                Console.WriteLine($"  {status} {ts} | {preview}");
+                if (ok) deleted++;
+                Thread.Sleep(300); // rate limit
+            }
+            Console.WriteLine($"  Deleted: {deleted}/{toDelete.Count}");
+        }
+        else if (deletePattern != null)
+        {
+            Console.WriteLine($"\n[SLACK] No r=0 messages matching \"{deletePattern}\".");
+        }
+
+        return 0;
+    }
+
 }

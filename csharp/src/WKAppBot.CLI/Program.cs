@@ -95,6 +95,30 @@ internal partial class Program
         var tee = new TeeTextWriter(Console.Out, logFile);
         Console.SetOut(tee);
 
+        // ── Crash handler: dump stack trace to log, DON'T move to old/ (crash evidence) ──
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            try
+            {
+                var ex = e.ExceptionObject as Exception;
+                var crashMsg = $"\n[CRASH] Unhandled exception — process terminating\n" +
+                               $"[CRASH] {ex?.GetType().FullName}: {ex?.Message}\n" +
+                               $"[CRASH] {ex?.StackTrace}\n";
+                if (ex?.InnerException != null)
+                    crashMsg += $"[CRASH] Inner: {ex.InnerException.GetType().FullName}: {ex.InnerException.Message}\n" +
+                                $"[CRASH] Inner stack: {ex.InnerException.StackTrace}\n";
+                // Write to tee (goes to both console + file)
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(crashMsg);
+                Console.ResetColor();
+                // Flush and close file WITHOUT moving to old/ — crash log stays in logs/
+                Console.SetOut(tee.OriginalConsole);
+                tee.ForceCloseWithoutMove();
+                Console.Error.WriteLine($"[CRASH] Log saved (not moved to old/): {tee.LogPath}");
+            }
+            catch { /* last resort — at least don't mask the original crash */ }
+        };
+
         int exitCode = 1;
         try
         {
@@ -131,6 +155,35 @@ internal partial class Program
             {
                 ActionApi.ZoomEnabled = false;
                 restArgs = restArgs.Where(a => a != "--i-dont-want-to-see-the-zoom-magnifier-overlay").ToArray();
+            }
+
+            // Global option: --timeout N (seconds, supports decimal like 1.5)
+            // After timeout, exit with code 124 (GNU timeout convention) to return shell control.
+            // The process terminates — use this when you need a time-bounded command.
+            double globalTimeoutSec = 0;
+            for (int ti = 0; ti < restArgs.Length; ti++)
+            {
+                if (restArgs[ti] == "--timeout" && ti + 1 < restArgs.Length)
+                {
+                    var raw = restArgs[ti + 1].TrimEnd('s', 'S'); // allow "1.5s"
+                    if (double.TryParse(raw, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var tv) && tv > 0)
+                    {
+                        globalTimeoutSec = tv;
+                    }
+                    restArgs = restArgs.Take(ti).Concat(restArgs.Skip(ti + 2)).ToArray();
+                    break;
+                }
+            }
+            if (globalTimeoutSec > 0)
+            {
+                var timeoutMs = (int)(globalTimeoutSec * 1000);
+                var timer = new System.Threading.Timer(_ =>
+                {
+                    Console.Error.WriteLine($"[TIMEOUT] {globalTimeoutSec}s elapsed — exiting (code 124)");
+                    try { Console.Out.Flush(); Console.Error.Flush(); } catch { }
+                    Environment.Exit(124);
+                }, null, timeoutMs, Timeout.Infinite);
             }
 
             // Global Eye tick (for eye --global multi-parent monitor)
@@ -208,6 +261,7 @@ internal partial class Program
                 "knowhow" => KnowhowCommand(restArgs),
                 "win-move" => WindowMoveCommand(restArgs),
                 "screen" => ScreenCommand(restArgs),
+                "clipboard" => ClipboardCommand(restArgs),
                 "zoom-demo" => ZoomDemoCommand(restArgs),
                 "tick" => TickCommand(restArgs),
                 // External

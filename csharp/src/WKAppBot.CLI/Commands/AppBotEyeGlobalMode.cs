@@ -42,6 +42,8 @@ internal partial class Program
     static DateTime _lastKeepAwakeUtc = DateTime.MinValue;
     static string _lastPromptSource = "none";
 
+    static System.Windows.Forms.Form? _screenBlankForm;
+
     static string _lastPromptSessionFile = "";
     static int _lastPromptLineIndex = -1;
     static int _lastContextPct = -1;  // context usage % for tick display
@@ -94,6 +96,28 @@ internal partial class Program
             var (x, y) = GetRightmostMonitorAnchor(width, height);
             posX = x;
             posY = y;
+        }
+
+        // ── Kill stale Eye processes (non-hot-swap start only) ──
+        if (replacePid == 0)
+        {
+            int myPid = Environment.ProcessId;
+            foreach (var proc in Process.GetProcessesByName("wkappbot"))
+            {
+                if (proc.Id == myPid) continue;
+                try
+                {
+                    // Check if it's an Eye process by its command line containing "eye"
+                    // Simple heuristic: any other wkappbot process is fair game on fresh start
+                    proc.Kill();
+                    proc.WaitForExit(3000);
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[EYE] Killed stale Eye (PID={proc.Id})");
+                    Console.ResetColor();
+                }
+                catch { /* already exited */ }
+                finally { proc.Dispose(); }
+            }
         }
 
         using var host = new AppBotEyeHost();
@@ -192,12 +216,48 @@ internal partial class Program
                     Console.WriteLine("[EYE] Slack Socket Mode connected (GlobalMode)");
                     Console.ResetColor();
 
-                    // Startup: delete previous status message (stale idle/status from last Eye session)
-                    if (previousStatusTs != null)
+                    // Startup: sweep ALL stale bot status/idle messages (not just saved ts)
+                    // Fixes: hot-swap race leaves orphan idle messages in channel
                     {
-                        Console.WriteLine($"[EYE] Deleting previous status message (ts={previousStatusTs})");
-                        Task.Run(async () => await SlackDeleteMessageAsync(
-                            slackBotToken!, slackChannel!, previousStatusTs)).Wait(3000);
+                        int swept = 0;
+                        try
+                        {
+                            using var http = new HttpClient();
+                            http.DefaultRequestHeaders.Authorization =
+                                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", slackBotToken);
+                            var histUrl = $"https://slack.com/api/conversations.history?channel={slackChannel}&limit=20";
+                            var histResp = http.GetStringAsync(histUrl).GetAwaiter().GetResult();
+                            var histJson = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(histResp);
+                            if (histJson?["ok"]?.GetValue<bool>() == true && histJson["messages"] is System.Text.Json.Nodes.JsonArray msgs)
+                            {
+                                foreach (var m in msgs)
+                                {
+                                    var text = m?["text"]?.GetValue<string>() ?? "";
+                                    var botId = m?["bot_id"]?.GetValue<string>();
+                                    var subtype = m?["subtype"]?.GetValue<string>();
+                                    // Only delete bot messages that are status/idle patterns
+                                    if (botId != null || subtype == "bot_message")
+                                    {
+                                        bool isStatus = text.StartsWith(":zzz:") || text.StartsWith(":gear:")
+                                            || text.StartsWith(":clipboard:") || text.StartsWith(":memo:")
+                                            || text.StartsWith(":warning:") || text.StartsWith(":robot_face:");
+                                        if (isStatus)
+                                        {
+                                            var ts = m?["ts"]?.GetValue<string>();
+                                            if (ts != null)
+                                            {
+                                                Task.Run(async () => await SlackDeleteMessageAsync(
+                                                    slackBotToken!, slackChannel!, ts)).Wait(2000);
+                                                swept++;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                        if (swept > 0)
+                            Console.WriteLine($"[EYE] Swept {swept} stale status message(s)");
                         try { File.WriteAllText(statusTsFile, ""); } catch { }
                         previousStatusTs = null;
                     }
@@ -381,7 +441,7 @@ internal partial class Program
                         int segFrames = whisperExp?.SegmentFrames ?? 0;
                         whisperRing.UpdateSpectrum(frame.Levels, frame.MaxLevel,
                             frame.Mode, frame.Token, frame.RecentTokens, lastStt, ageTicks, lastSttMode,
-                            segFrames, frame.SoundCode);
+                            segFrames, frame.SoundCode, frame.VoiceLevels);
                     }
                     whisperExp?.LogFrame(frame);
                 };
@@ -389,35 +449,17 @@ internal partial class Program
                 // Mic PCM → parallel MP3 recording for Gemini STT
                 whisperEngine.OnMicData += (buf, len) => whisperExp?.WriteMicData(buf, len);
 
-                // Mic segment ready → Gemini STT (DISABLED: BringToFront/file dialog steals focus)
-                // TODO: Re-enable after ask gemini is fully focusless (BringToFront removed + setFileInputFiles-first)
+                // Mic segment ready → move to _unknown/ for batch Gemini STT (no real-time processing)
                 whisperExp.OnMicSegmentReady += (mp3Path) =>
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"[WHISPER:GEMINI] STT disabled (focusless WIP): {Path.GetFileName(mp3Path)}");
-                    Console.ResetColor();
-                    if (false) // disabled until fully focusless
-                    ThreadPool.QueueUserWorkItem(_ =>
+                    try
                     {
-                        try
-                        {
-                            Console.ForegroundColor = ConsoleColor.Cyan;
-                            Console.WriteLine($"[WHISPER:GEMINI] Sending mic segment: {Path.GetFileName(mp3Path)}");
-                            Console.ResetColor();
-                            // Use existing ask gemini infrastructure
-                            var exitCode = AskCommand(["gemini",
-                                "Transcribe this Korean speech to text. Reply ONLY with the transcription, nothing else.",
-                                mp3Path, "--timeout", "15"]);
-                            if (exitCode == 0)
-                                Console.WriteLine("[WHISPER:GEMINI] Transcription complete");
-                            else
-                                Console.WriteLine($"[WHISPER:GEMINI] Transcription failed (exit={exitCode})");
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[WHISPER:GEMINI] Error: {ex.Message}");
-                        }
-                    });
+                        var unknownDir = Path.Combine(Path.GetDirectoryName(mp3Path)!, "..", "_unknown");
+                        Directory.CreateDirectory(unknownDir);
+                        var dest = Path.Combine(unknownDir, Path.GetFileName(mp3Path));
+                        File.Move(mp3Path, dest);
+                    }
+                    catch { /* best effort */ }
                 };
 
                 Console.ForegroundColor = ConsoleColor.Magenta;

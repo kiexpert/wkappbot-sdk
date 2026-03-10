@@ -130,14 +130,23 @@ internal partial class Program
             return allPrompts;
         }
 
-        // "클롣 [WKAppBot]" → "WKAppBot" 추출
+        // "클롣 [WG-WKAppBot]" → "WG-WKAppBot" 추출 + leaf name도 추가
+        // AbbreviateCwd("W:\GitHub\WKAppBot") = "WG-WKAppBot" → leaf = "WKAppBot"
+        // 윈도우 타이틀엔 원본 폴더명("WKAppBot")만 있으므로 leaf도 매칭 시도
         var cwdNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var uname in botUsernames)
         {
             var start = uname.IndexOf('[');
             var end = uname.IndexOf(']');
             if (start >= 0 && end > start)
-                cwdNames.Add(uname[(start + 1)..end]);
+            {
+                var tag = uname[(start + 1)..end];
+                cwdNames.Add(tag);
+                // Also add leaf part: "WG-WKAppBot" → "WKAppBot"
+                var lastDash = tag.LastIndexOf('-');
+                if (lastDash >= 0 && lastDash < tag.Length - 1)
+                    cwdNames.Add(tag[(lastDash + 1)..]);
+            }
         }
 
         // 프롬프트 윈도우 타이틀에서 매칭
@@ -170,11 +179,31 @@ internal partial class Program
     /// 위치확보 후 프롬프트 입력. 모든 자동입력 전에 Probe 호출.
     /// 슬랙 요청 = AutoApproveYield (승인만 자동, 돋보기+확보는 정상).
     /// 최소화 창 → SW_SHOWNOACTIVATE 포커스리스 리스토어 후 재시도.
+    /// slackMsgTs: dedup용 Slack 메시지 ts — 프롬프트 창 Win32 Prop에 저장, Eye 재시작에도 생존.
     /// </summary>
-    static bool ProbeAndSubmit(ClaudePromptHelper promptHelper, ClaudePromptHelper.PromptInfo prompt, string text)
+    static bool ProbeAndSubmit(ClaudePromptHelper promptHelper, ClaudePromptHelper.PromptInfo prompt, string text, string? slackMsgTs = null)
     {
         var shortTitle = prompt.WindowTitle.Length > 40
             ? prompt.WindowTitle[..37] + "..." : prompt.WindowTitle;
+
+        // ── Dedup: check if this message was already forwarded to this prompt window ──
+        if (slackMsgTs != null && prompt.WindowHandle != IntPtr.Zero)
+        {
+            var stored = NativeMethods.GetPropW(prompt.WindowHandle, "WKAppBot_LastSlackTs");
+            if (stored != IntPtr.Zero)
+            {
+                var storedTs = stored.ToInt64();
+                // Parse Slack ts integer part (seconds since epoch)
+                var dotIdx = slackMsgTs.IndexOf('.');
+                var tsSecStr = dotIdx > 0 ? slackMsgTs[..dotIdx] : slackMsgTs;
+                if (long.TryParse(tsSecStr, out var msgTsSec) && msgTsSec <= storedTs)
+                {
+                    Console.WriteLine($"  [SLACK→PROMPT] DEDUP: ts={slackMsgTs} already forwarded to 0x{prompt.WindowHandle:X} (stored={storedTs})");
+                    return false;
+                }
+            }
+        }
+
         Console.WriteLine($"  [SLACK→PROMPT] 위치확보 시작: 0x{prompt.WindowHandle:X} \"{shortTitle}\"");
 
         var readiness = CreateInputReadiness();
@@ -254,6 +283,19 @@ internal partial class Program
 
         var result = promptHelper.TypeAndSubmit(prompt, text);
         report.Zoom?.Dispose();
+
+        // ── Store forwarded ts on prompt window (survives Eye restart) ──
+        if (result && slackMsgTs != null && prompt.WindowHandle != IntPtr.Zero)
+        {
+            var dotIdx = slackMsgTs.IndexOf('.');
+            var tsSecStr = dotIdx > 0 ? slackMsgTs[..dotIdx] : slackMsgTs;
+            if (long.TryParse(tsSecStr, out var msgTsSec))
+            {
+                NativeMethods.SetPropW(prompt.WindowHandle, "WKAppBot_LastSlackTs", new IntPtr(msgTsSec));
+                Console.WriteLine($"  [SLACK→PROMPT] Stored ts={msgTsSec} on 0x{prompt.WindowHandle:X}");
+            }
+        }
+
         return result;
     }
 
@@ -447,7 +489,7 @@ internal partial class Program
                     try
                     {
                         var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, replyThread)}";
-                        var ok = ProbeAndSubmit(promptHelper, pi, promptText);
+                        var ok = ProbeAndSubmit(promptHelper, pi, promptText, msg.Timestamp);
                         mentionResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
                         if (ok) mentionSent++;
                     }
@@ -697,7 +739,7 @@ internal partial class Program
                         try
                         {
                             var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, msg.ThreadTs!, "thread reply")}";
-                            var ok = ProbeAndSubmit(trPromptHelper, pi, promptText);
+                            var ok = ProbeAndSubmit(trPromptHelper, pi, promptText, msg.Timestamp);
                             trResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
                             if (ok) trSent++;
                         }
@@ -812,7 +854,7 @@ internal partial class Program
                         try
                         {
                             var promptText = $"{cleanKwText}{threadContext}\n{SlackReplySuffix(msg.User, kwReplyThread, $"keyword:\"{matchedKw}\"")}";
-                            var ok = ProbeAndSubmit(kwPromptHelper, pi, promptText);
+                            var ok = ProbeAndSubmit(kwPromptHelper, pi, promptText, msg.Timestamp);
                             kwResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
                             if (ok) kwSent++;
                         }
@@ -924,7 +966,7 @@ internal partial class Program
                         try
                         {
                             var promptText = $"{cleanAll}\n{SlackSendSuffix(msg.User)}";
-                            var ok = ProbeAndSubmit(allPromptHelper, pi, promptText);
+                            var ok = ProbeAndSubmit(allPromptHelper, pi, promptText, msg.Timestamp);
                             broadcastResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
                             if (ok)
                             {

@@ -137,8 +137,15 @@ internal partial class Program
             if (string.IsNullOrWhiteSpace(transcript) && sttLabels.TryGetValue(result.SourceFile, out var sttFb))
                 transcript = sttFb.Text;
 
-            var label = SanitizeFolderName(transcript ?? "_unknown");
-            if (string.IsNullOrWhiteSpace(label)) label = "_unknown";
+            // Non-speech audio types → dedicated folders (noise/music/instrument DB)
+            string label;
+            if (result.AudioType != "speech" && result.AudioType != "mixed")
+                label = $"_{result.AudioType}"; // _noise, _music, _instrument
+            else
+            {
+                label = SanitizeFolderName(transcript ?? "_unknown");
+                if (string.IsNullOrWhiteSpace(label)) label = "_unknown";
+            }
 
             var currentFolder = Path.GetFileName(Path.GetDirectoryName(result.SourceFile)) ?? "";
             string destPath;
@@ -172,8 +179,16 @@ internal partial class Program
         }
         Console.WriteLine($"[STUDY] Moved {moved}/{studyResults.Count} files");
 
+        // ── Sound code → 초성 phoneme mapping ──
+        int mapped = BuildPhonemeMap(basePath, studyResults);
+        if (mapped > 0)
+            Console.WriteLine($"[STUDY] Phoneme map: {mapped} new entries");
+
         // Save study results to JSONL
         SaveStudyResults(basePath, studyResults);
+
+        // ── Self-healing: reconcile phoneme_map conflicts + requeue low-confidence ──
+        SelfHeal(basePath, wavDir);
 
         // Cleanup batch file
         try { File.Delete(batchFile); } catch { }
@@ -295,7 +310,11 @@ internal partial class Program
         sb.AppendLine("I'm building a karaoke system for language learning.");
         sb.AppendLine();
         sb.AppendLine("This audio file contains multiple short speech segments separated by ~1 second silence gaps.");
-        sb.AppendLine("Each segment is a short phrase or sentence from an English lesson or conversation.");
+        sb.AppendLine("Segments are PRIMARILY Korean, but may contain English, Japanese, or other languages mixed in.");
+        sb.AppendLine("Some segments may be NON-SPEECH. Classify each segment's audio_type:");
+        sb.AppendLine("  \"speech\" = human voice, \"music\" = song/BGM, \"instrument\" = piano/guitar/etc,");
+        sb.AppendLine("  \"noise\" = keyboard/click/fan/ambient, \"mixed\" = speech+music overlap.");
+        sb.AppendLine("For non-speech: set confidence=0, transcript=\"(noise)\"/\"(music)\"/\"(instrument)\".");
         sb.AppendLine();
         sb.AppendLine("Segment timing map (approximate):");
         foreach (var seg in segments)
@@ -312,6 +331,7 @@ internal partial class Program
         sb.AppendLine("5. Confidence score (0.0~1.0) — how confident you are in the transcript accuracy");
         sb.AppendLine("6. Detected language code (e.g. \"en\", \"ko\", \"ja\", \"zh\")");
         sb.AppendLine("7. silence_before_ms — milliseconds of silence/noise BEFORE the first word starts speaking");
+        sb.AppendLine("8. audio_type — one of: speech, music, instrument, noise, mixed");
         sb.AppendLine();
         sb.AppendLine("Respond with ONLY a JSON array, no markdown fences, no explanation:");
         sb.AppendLine("[");
@@ -322,6 +342,7 @@ internal partial class Program
         sb.AppendLine("    \"confidence\": 0.95,");
         sb.AppendLine("    \"language\": \"en\",");
         sb.AppendLine("    \"silence_before_ms\": 120,");
+        sb.AppendLine("    \"audio_type\": \"speech\",");
         sb.AppendLine("    \"words\": [");
         sb.AppendLine("      {\"word\": \"Hello\", \"start_ms\": 120, \"dur_ms\": 350, \"phase_lr_deg\": 0.0},");
         sb.AppendLine("      {\"word\": \"how\", \"start_ms\": 520, \"dur_ms\": 200, \"phase_lr_deg\": 0.0}");
@@ -598,6 +619,7 @@ internal partial class Program
                 var speaker = node?["speaker"]?.GetValue<string>() ?? "speaker_1";
                 var confidence = node?["confidence"]?.GetValue<double>() ?? 0;
                 var language = node?["language"]?.GetValue<string>() ?? "";
+                var audioType = node?["audio_type"]?.GetValue<string>() ?? "speech";
                 var silenceBeforeMs = node?["silence_before_ms"]?.GetValue<int>() ?? 0;
 
                 // Match to source file
@@ -627,6 +649,7 @@ internal partial class Program
                     Speaker = speaker,
                     Confidence = confidence,
                     Language = language,
+                    AudioType = audioType,
                     SilenceBeforeMs = silenceBeforeMs,
                     Words = words,
                     SourceFile = seg?.SourceFile,
@@ -783,6 +806,7 @@ internal partial class Program
         public string Speaker { get; set; } = "speaker_1";
         public double Confidence { get; set; }
         public string Language { get; set; } = "";
+        public string AudioType { get; set; } = "speech"; // speech/music/instrument/noise/mixed
         public int SilenceBeforeMs { get; set; }
         public List<StudyWord> Words { get; set; } = new();
         public string? SourceFile { get; set; }
@@ -796,5 +820,235 @@ internal partial class Program
         public int StartMs { get; set; }
         public int DurMs { get; set; }
         public double PhaseLrDeg { get; set; }
+    }
+
+    // ── Sound code → 초성 phoneme mapping ──
+    // MP3 filename: "45012-63547-..._W.mp3" → first code = 45012
+    // Transcript: "카드결제" → first char '카' → 초성 'ㅋ'
+    // Append mapping: {code: 45012, cho: "ㅋ", transcript: "카드결제", ts: ...}
+
+    /// <summary>Korean 초성 (initial consonant) table — index into Unicode Hangul Jamo.</summary>
+    private static readonly string[] Choseong =
+    [
+        "ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ",
+        "ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"
+    ];
+
+    /// <summary>Extract 초성 from a Korean syllable char. Returns null for non-Korean.</summary>
+    static string? GetChoseong(char c)
+    {
+        if (c < '\uAC00' || c > '\uD7A3') return null;
+        int index = (c - '\uAC00') / (21 * 28);
+        return index < Choseong.Length ? Choseong[index] : null;
+    }
+
+    /// <summary>Parse first sound code from MP3 filename (before first '-' or '_').</summary>
+    static ushort ParseFirstSoundCode(string mp3Path)
+    {
+        var name = Path.GetFileNameWithoutExtension(mp3Path);
+        // Format: "45012-63547-23456-0_20260310_154642_559_W"
+        var dash = name.IndexOf('-');
+        var token = dash > 0 ? name[..dash] : name;
+        return ushort.TryParse(token, out var code) ? code : (ushort)0;
+    }
+
+    /// <summary>Build phoneme map: first sound code → 초성 of transcript's first Korean char.</summary>
+    static int BuildPhonemeMap(string basePath, List<StudyResult> results)
+    {
+        var mapPath = Path.Combine(basePath, "phoneme_map.jsonl");
+        int count = 0;
+
+        try
+        {
+            using var writer = new StreamWriter(mapPath, append: true, encoding: System.Text.Encoding.UTF8);
+            foreach (var result in results)
+            {
+                if (result.SourceFile == null || string.IsNullOrWhiteSpace(result.Transcript))
+                    continue;
+
+                var code = ParseFirstSoundCode(result.SourceFile);
+                if (code == 0) continue;
+
+                // Find first Korean character in transcript (null = non-speech)
+                string? cho = null;
+                string syllable = "";
+                foreach (char c in result.Transcript)
+                {
+                    cho = GetChoseong(c);
+                    if (cho != null) { syllable = c.ToString(); break; }
+                }
+                // Non-Korean transcript → check if English letter (first alpha char)
+                string? firstAlpha = null;
+                if (cho == null)
+                {
+                    foreach (char c in result.Transcript)
+                        if (char.IsLetter(c)) { firstAlpha = c.ToString().ToLowerInvariant(); break; }
+                }
+
+                var entry = new
+                {
+                    sc = code,
+                    cho,                     // null = non-Korean (noise, English, etc.)
+                    syllable,                // "카", "" if non-Korean
+                    alpha = firstAlpha,      // "h" for "hello", null if Korean
+                    type = result.AudioType, // speech/music/instrument/noise/mixed
+                    lang = result.Language,   // ko/en/ja/zh/...
+                    transcript = result.Transcript.Length > 20
+                        ? result.Transcript[..20] : result.Transcript,
+                    confidence = Math.Round(result.Confidence, 2),
+                    t = DateTime.UtcNow.Ticks,
+                };
+                writer.WriteLine(JsonSerializer.Serialize(entry));
+                count++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[STUDY] Phoneme map error: {ex.Message}");
+        }
+        return count;
+    }
+
+    // ── Self-Healing Pipeline ──
+    // After each study batch: reconcile conflicts, requeue low-confidence, migrate noise.
+    // Architecture: append-only phoneme_map.jsonl → majority vote → canonical label.
+
+    static void SelfHeal(string basePath, string wavDir)
+    {
+        var mapPath = Path.Combine(basePath, "phoneme_map.jsonl");
+        if (!File.Exists(mapPath)) return;
+
+        try
+        {
+            // 1. Load all phoneme_map entries, group by sound code
+            var entries = new List<PhonemeEntry>();
+            foreach (var line in File.ReadLines(mapPath))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                try
+                {
+                    var doc = JsonSerializer.Deserialize<JsonNode>(line);
+                    if (doc == null) continue;
+                    entries.Add(new PhonemeEntry
+                    {
+                        Sc = (ushort)(doc["sc"]?.GetValue<int>() ?? 0),
+                        Cho = doc["cho"]?.GetValue<string>(),
+                        Type = doc["type"]?.GetValue<string>() ?? "speech",
+                        Transcript = doc["transcript"]?.GetValue<string>() ?? "",
+                        Confidence = doc["confidence"]?.GetValue<double>() ?? 0,
+                    });
+                }
+                catch { }
+            }
+
+            if (entries.Count == 0) return;
+
+            var grouped = entries.Where(e => e.Sc > 0).GroupBy(e => e.Sc).ToList();
+            int conflicts = 0, requeued = 0, noiseMigrated = 0;
+
+            // 2. Conflict detection + majority vote
+            var canonical = new Dictionary<ushort, string>(); // sc → winning label
+            foreach (var group in grouped)
+            {
+                var labels = group.Select(e => e.Cho ?? e.Type ?? "_unknown").ToList();
+                var best = labels.GroupBy(l => l)
+                    .OrderByDescending(g => g.Count())
+                    .First();
+                double winRate = (double)best.Count() / labels.Count;
+
+                if (labels.Distinct().Count() > 1)
+                    conflicts++;
+
+                // Majority vote: ≥60% → canonical
+                if (winRate >= 0.6)
+                    canonical[group.Key] = best.Key;
+            }
+
+            // 3. Low-confidence requeue: files with avg confidence < 0.3 AND ≥3 observations
+            var requeueDir = Path.Combine(wavDir, "_requeue");
+            foreach (var group in grouped)
+            {
+                if (group.Count() < 3) continue;
+                double avgConf = group.Average(e => e.Confidence);
+                if (avgConf >= 0.3) continue;
+
+                // Find files in their current folders that match this sound code
+                foreach (var subDir in Directory.GetDirectories(wavDir))
+                {
+                    var dirName = Path.GetFileName(subDir);
+                    if (dirName.StartsWith("_")) continue; // skip system folders
+
+                    foreach (var mp3 in Directory.GetFiles(subDir, "*.mp3"))
+                    {
+                        var code = ParseFirstSoundCode(mp3);
+                        if (code != group.Key) continue;
+
+                        Directory.CreateDirectory(requeueDir);
+                        var dest = Path.Combine(requeueDir, Path.GetFileName(mp3));
+                        if (!File.Exists(dest))
+                        {
+                            try { File.Move(mp3, dest); requeued++; } catch { }
+                            // Move companion JSON too
+                            var jsonSrc = Path.ChangeExtension(mp3, ".json");
+                            var jsonDst = Path.ChangeExtension(dest, ".json");
+                            if (File.Exists(jsonSrc))
+                                try { File.Move(jsonSrc, jsonDst); } catch { }
+                        }
+                    }
+                }
+            }
+
+            // 4. Noise auto-migration: sound codes with ≥3 observations, avg confidence < 0.3,
+            //    AND no clear speech winner → move to _noise/
+            var noiseDir = Path.Combine(wavDir, "_noise");
+            foreach (var group in grouped)
+            {
+                if (group.Count() < 3) continue;
+                double avgConf = group.Average(e => e.Confidence);
+                bool allNonSpeech = group.All(e => e.Type != "speech");
+                if (avgConf < 0.3 && allNonSpeech)
+                {
+                    // Move any files with this code from non-system folders to _noise/
+                    foreach (var subDir in Directory.GetDirectories(wavDir))
+                    {
+                        var dirName = Path.GetFileName(subDir);
+                        if (dirName.StartsWith("_")) continue;
+
+                        foreach (var mp3 in Directory.GetFiles(subDir, "*.mp3"))
+                        {
+                            var code = ParseFirstSoundCode(mp3);
+                            if (code != group.Key) continue;
+
+                            Directory.CreateDirectory(noiseDir);
+                            var dest = Path.Combine(noiseDir, Path.GetFileName(mp3));
+                            if (!File.Exists(dest))
+                            {
+                                try { File.Move(mp3, dest); noiseMigrated++; } catch { }
+                                var jsonSrc = Path.ChangeExtension(mp3, ".json");
+                                var jsonDst = Path.ChangeExtension(dest, ".json");
+                                if (File.Exists(jsonSrc))
+                                    try { File.Move(jsonSrc, jsonDst); } catch { }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (conflicts > 0 || requeued > 0 || noiseMigrated > 0)
+                Console.WriteLine($"[HEAL] conflicts={conflicts} requeued={requeued} noise={noiseMigrated} canonical={canonical.Count}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[HEAL] Error: {ex.Message}");
+        }
+    }
+
+    sealed class PhonemeEntry
+    {
+        public ushort Sc { get; set; }
+        public string? Cho { get; set; }
+        public string? Type { get; set; }
+        public string Transcript { get; set; } = "";
+        public double Confidence { get; set; }
     }
 }

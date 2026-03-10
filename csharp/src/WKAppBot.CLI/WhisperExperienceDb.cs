@@ -447,6 +447,13 @@ internal sealed class WhisperExperienceDb : IDisposable
                         var scStr = string.Join("-", sampled.Select(c => FormatSoundCode(c, forFile: true)));
                         var dir = Path.GetDirectoryName(_wavPath)!;
                         var origName = Path.GetFileName(_wavPath);
+                        // MAX_PATH safety: cut scStr at last '-' boundary if path would exceed 240 chars
+                        var maxScLen = 240 - dir.Length - 1 - 1 - origName.Length; // dir/scStr_origName
+                        if (maxScLen > 0 && scStr.Length > maxScLen)
+                        {
+                            var cutAt = scStr.LastIndexOf('-', maxScLen - 1);
+                            scStr = cutAt > 0 ? scStr[..cutAt] : scStr[..maxScLen];
+                        }
                         var newName = $"{scStr}_{origName}";
                         var newPath = Path.Combine(dir, newName);
                         if (!File.Exists(newPath))

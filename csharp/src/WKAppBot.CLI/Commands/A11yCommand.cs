@@ -140,6 +140,7 @@ internal partial class Program
             Console.WriteLine("  --depth N   Tree depth for find (default: 3)");
             Console.WriteLine("  --force     close: escalate to Process.Kill");
             Console.WriteLine("  --force-close-ancestors  Include own process tree in targets");
+            Console.WriteLine("  --repeat    Repeat action on chain dialogs (max 10, 1s interval)");
             Console.WriteLine();
             Console.WriteLine("═══ Auto Pipeline (every action) ══════════════════════════");
             Console.WriteLine("  1. Window find        Pattern match with `;` OR support");
@@ -184,6 +185,7 @@ internal partial class Program
         bool force = args.Any(a => a == "--force");
         bool forceCloseAncestors = args.Any(a => a == "--force-close-ancestors");
         bool speak = args.Any(a => a == "--speak");
+        bool repeat = args.Any(a => a == "--repeat");
 
         // Parse action-specific params
         int? mx = null, my = null, mw = null, mh = null;
@@ -217,8 +219,14 @@ internal partial class Program
             return Error("move requires --x N --y N");
         if (action == "resize" && (mw == null || mh == null))
             return Error("resize requires --w N --h N");
-        if ((action == "type" || action == "set-value" || action == "eval") && text == null)
+        // keystroke/hotkey → type alias (통합)
+        if (action is "hotkey" or "keystroke") action = "type";
+        // type: allow positional arg (e.g., `a11y type "*app*" "F5"` without --text)
+        if (action == "type" && text == null && args.Length >= 3 && !args[2].StartsWith("--"))
+            text = args[2];
+        if ((action is "type" or "set-value" or "eval") && text == null)
             return Error($"{action} requires --text \"...\"");
+
         if (action == "set-range" && rangeValue == null)
             return Error("set-range requires --value N");
 
@@ -360,6 +368,31 @@ internal partial class Program
             if (action != "close" && action != "minimize")
                 EnsureWindowReady(hwnd, $"a11y-{action}", title, readiness);
 
+            // ── Readiness Probe: 돋보기 + 방해꾼 리타겟 + 포커스 양보 ──
+            // All actions: magnifier + blocker detection
+            // Interaction actions: + yield popup if user is active
+            {
+                var probeReport = readiness.Probe(new InputReadinessRequest
+                {
+                    TargetHwnd = hwnd,
+                    IntendedAction = action,
+                });
+                if (probeReport.UserYieldConfirmed)
+                    Console.WriteLine($"[A11Y] yield confirmed for {action}");
+
+                // ── Blocker retarget: 팝업이 타겟을 가리면 팝업으로 리타겟 ──
+                if (probeReport.ActiveBlocker != null)
+                {
+                    var blocker = probeReport.ActiveBlocker;
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[A11Y] ⚠ RETARGET: [{blocker.ClassName}] \"{blocker.Title}\" blocking {tag}");
+                    Console.ResetColor();
+                    hwnd = blocker.Handle;
+                    title = blocker.Title;
+                    tag = $"0x{hwnd.ToInt64():X} \"{title}\"";
+                }
+            }
+
             bool success;
 
             if (isElementAction)
@@ -422,6 +455,14 @@ internal partial class Program
 
                 // Tab activation: if target is inside an unselected tab, activate it first
                 EnsureTabActive(root);
+
+                // ── Blocker info for read-only actions (find/read/highlight) ──
+                if (action is "read" or "find" or "highlight")
+                {
+                    var blockerInfo = readiness.DetectBlocker(hwnd);
+                    if (blockerInfo != null)
+                        Console.WriteLine($"[BLOCK] Blocker detected: \"{blockerInfo.Title}\" (class={blockerInfo.ClassName}, hwnd=0x{blockerInfo.Handle.ToInt64():X8})");
+                }
 
                 // ── AAR: element-level readiness check ──
                 if (action is not ("read" or "find" or "highlight"))
@@ -565,6 +606,57 @@ internal partial class Program
             }
 
             if (success) ok++; else fail++;
+
+            // ── --repeat: 연쇄 다이얼로그 자동 dismiss 루프 ──
+            // After successful action, check for new blocker from same process → re-execute
+            if (repeat && success)
+            {
+                var origHwnd = win.Handle;
+                const int maxRepeat = 10;
+                for (int rep = 0; rep < maxRepeat; rep++)
+                {
+                    Thread.Sleep(1000);
+                    var nextBlocker = readiness.DetectBlocker(origHwnd);
+                    if (nextBlocker == null) break;
+
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[A11Y] ⚠ REPEAT {rep + 1}: [{nextBlocker.ClassName}] \"{nextBlocker.Title}\"");
+                    Console.ResetColor();
+
+                    // Re-execute same action on the new blocker
+                    var repHwnd = nextBlocker.Handle;
+                    var repTag = $"0x{repHwnd.ToInt64():X} \"{nextBlocker.Title}\"";
+                    bool repOk;
+                    if (isElementAction)
+                    {
+                        try
+                        {
+                            var repRoot = automation.FromHandle(repHwnd);
+                            if (!string.IsNullOrEmpty(uiaPath))
+                            {
+                                var scoped = GrapHelper.FindUiaScope(repRoot, uiaPath);
+                                if (scoped != null) repRoot = scoped;
+                            }
+                            repOk = action switch
+                            {
+                                "click" => A11yClick(repRoot, repHwnd),
+                                "invoke" => A11yInvoke(repRoot, repHwnd),
+                                _ => A11yClick(repRoot, repHwnd), // default to click
+                            };
+                        }
+                        catch { repOk = false; }
+                    }
+                    else
+                    {
+                        // Window-level: send WM_CLOSE to blocker
+                        NativeMethods.SendMessageTimeoutW(repHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 3000, out _);
+                        repOk = true;
+                    }
+
+                    if (repOk) ok++;
+                    else { fail++; break; }
+                }
+            }
         }
 
         Console.WriteLine($"[A11Y] Done: {ok} ok, {fail} fail (total {targets.Count})");
@@ -590,6 +682,42 @@ internal partial class Program
         NativeMethods.BringWindowToTop(hwnd);
         Console.WriteLine($"[A11Y] focus {tag} — SetForegroundWindow");
         return true;
+    }
+
+    static bool A11yHotkey(IntPtr hwnd, string tag, string keyCombo)
+    {
+        // Ensure target window has focus (SendInput requires foreground)
+        if (NativeMethods.IsIconic(hwnd))
+            NativeMethods.ShowWindow(hwnd, 9); // SW_RESTORE
+        NativeMethods.SetForegroundWindow(hwnd);
+        NativeMethods.BringWindowToTop(hwnd);
+        Thread.Sleep(100); // let focus settle
+
+        try
+        {
+            // +/- notation → SendKeys (e.g., "+Shift h e l l o -Shift")
+            // Otherwise legacy Ctrl+S notation
+            if (keyCombo.Contains(" +") || keyCombo.Contains(" -") || keyCombo.StartsWith("+") || keyCombo.StartsWith("-"))
+            {
+                WKAppBot.Win32.Input.KeyboardInput.SendKeys(keyCombo);
+            }
+            else
+            {
+                var keys = keyCombo.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (keys.Length == 1)
+                    WKAppBot.Win32.Input.KeyboardInput.PressKey(keys[0]);
+                else
+                    WKAppBot.Win32.Input.KeyboardInput.Hotkey(keys);
+            }
+
+            Console.WriteLine($"[A11Y] hotkey {tag} — \"{keyCombo}\"");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] hotkey failed: {ex.Message}");
+            return false;
+        }
     }
 
     static bool A11yClose(UIA3Automation automation, IntPtr hwnd, string tag, bool force, InputReadiness readiness)
