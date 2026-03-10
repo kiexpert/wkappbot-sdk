@@ -31,14 +31,14 @@ Usage:
       Utility:     clipboard  clipboard-read  clipboard-write (text/files/mixed)
 
       Target:  --nth 3 | 3~ | ~3 | 2~4    --all    (default: first match)
-      Options: --depth N  --force  --text ""...""  --value N  --direction  --amount
+      Options: --depth N  --force  --value N  --direction  --amount
       Grap:    ';' OR  #scope  Ex: ""*메모장*#*파일*"" → Notepad's File menu
 
       a11y find ""*app*"" --depth 5       # MUD: look (Win32 + UIA children)
       a11y highlight ""*app*#*button*""   # visualize target with zoom overlay
       a11y invoke ""*app*#*button*""      # click (UIA Invoke → BM_CLICK → SendInput)
       a11y close ""*Chrome*"" --nth 2~    # close 2nd window onwards
-      a11y type ""*app*#*edit*"" --text ""hello""
+      a11y type ""*app*#*edit*"" ""hello""
 
   find <keyword> [--deep] [--limit N] [--process <name>]
       Unified search: window titles + UIA accessibility elements.

@@ -567,11 +567,15 @@ internal partial class Program
         for (int i = 0; i < args.Length; i++)
             if (args[i] == "--text" && i + 1 < args.Length)
                 text = args[i + 1];
+        // Positional fallback: first non-flag arg
+        if (text == null)
+            for (int i = 0; i < args.Length; i++)
+                if (!args[i].StartsWith("--")) { text = args[i]; break; }
 
         if (text == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("[ADB] --text required for type action");
+            Console.WriteLine("[ADB] text required for type action (e.g., a11y type \"adb://*#target\" \"hello\")");
             Console.ResetColor();
             return 1;
         }
@@ -599,11 +603,15 @@ internal partial class Program
         for (int i = 0; i < args.Length; i++)
             if (args[i] == "--text" && i + 1 < args.Length)
                 text = args[i + 1];
+        // Positional fallback
+        if (text == null)
+            for (int i = 0; i < args.Length; i++)
+                if (!args[i].StartsWith("--")) { text = args[i]; break; }
 
         if (text == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("[ADB] --text required for set-value action");
+            Console.WriteLine("[ADB] text required for set-value action (e.g., a11y set-value \"adb://*#input\" \"value\")");
             Console.ResetColor();
             return 1;
         }
@@ -770,11 +778,15 @@ internal partial class Program
         for (int i = 0; i < args.Length; i++)
             if (args[i] == "--text" && i + 1 < args.Length)
                 cmd = args[i + 1];
+        // Positional fallback
+        if (cmd == null)
+            for (int i = 0; i < args.Length; i++)
+                if (!args[i].StartsWith("--")) { cmd = args[i]; break; }
 
         if (cmd == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("[ADB] --text \"shell command\" required for eval action");
+            Console.WriteLine("[ADB] text required for eval action (e.g., a11y eval \"adb://\" \"getprop ro.product.model\")");
             Console.ResetColor();
             return 1;
         }

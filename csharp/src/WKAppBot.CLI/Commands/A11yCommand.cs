@@ -120,13 +120,13 @@ internal partial class Program
             Console.WriteLine("  collapse    Collapse tree node / combo dropdown");
             Console.WriteLine("  select      Select list item / tab");
             Console.WriteLine("  scroll      Scroll (--direction up|down|left|right --amount small|large)");
-            Console.WriteLine("  type        Type text (--text \"...\") — focusless WM_CHAR");
-            Console.WriteLine("  set-value   Set value directly (--text \"...\")");
+            Console.WriteLine("  type        Type text \"...\" — focusless WM_CHAR / SendKeys");
+            Console.WriteLine("  set-value   Set value directly \"...\"");
             Console.WriteLine("  set-range   Set numeric range (--value N)");
             Console.WriteLine();
             Console.WriteLine("═══ Async Actions (2) ══════════════════════════════════");
             Console.WriteLine("  wait        Poll until window/element appears (--timeout --interval)");
-            Console.WriteLine("  eval        Execute JavaScript via CDP (--text \"js expr\")");
+            Console.WriteLine("  eval        Execute JavaScript via CDP \"js expr\"");
             Console.WriteLine();
             Console.WriteLine("═══ Utility ═══════════════════════════════════════════════");
             Console.WriteLine("  clipboard        Read clipboard text (Unicode + CP949 auto-detect)");
@@ -163,13 +163,13 @@ internal partial class Program
             Console.WriteLine("  a11y close 메모장                        Close Notepad");
             Console.WriteLine("  a11y find 메모장 --depth 5               Explore element tree");
             Console.WriteLine("  a11y invoke \"메모장#파일\"               Click '파일' menu");
-            Console.WriteLine("  a11y type \"영웅문#종목코드\" --text \"005930\"");
+            Console.WriteLine("  a11y type \"영웅문#종목코드\" \"005930\"");
             Console.WriteLine();
             Console.WriteLine("═══ Synthesized Full-Path (v3.0) — Unified Web+Native ═══");
             Console.WriteLine("  a11y find  \"Chrome#ChatGPT\"             Tab portal → web tree");
             Console.WriteLine("  a11y invoke \"Chrome#Gemini#기본 메뉴\"    Tab → web button click");
             Console.WriteLine("  a11y click \"Chrome#button.submit\"       CSS → CDP auto-fallback!");
-            Console.WriteLine("  a11y type  \"Chrome#input[name=q]\" --text \"hello\"  CDP type");
+            Console.WriteLine("  a11y type  \"Chrome#input[name=q]\" \"hello\"  CDP type");
             Console.WriteLine("  a11y read  \"Claude#.editor\"             Electron + CDP read");
             Console.WriteLine();
             Console.WriteLine("  grap = Win32#a11y — unified native + web path");
@@ -226,11 +226,11 @@ internal partial class Program
             return Error("resize requires --w N --h N");
         // keystroke/hotkey → type alias (통합)
         if (action is "hotkey" or "keystroke") action = "type";
-        // type: allow positional arg (e.g., `a11y type "*app*" "F5"` without --text)
-        if (action == "type" && text == null && args.Length >= 3 && !args[2].StartsWith("--"))
+        // type/set-value/eval: allow positional arg (e.g., `a11y type "*app*" "F5"` without --text)
+        if ((action is "type" or "set-value" or "eval") && text == null && args.Length >= 3 && !args[2].StartsWith("--"))
             text = args[2];
         if ((action is "type" or "set-value" or "eval") && text == null)
-            return Error($"{action} requires --text \"...\"");
+            return Error($"{action} requires text argument (e.g., a11y {action} \"target\" \"value\")");
 
         if (action == "set-range" && rangeValue == null)
             return Error("set-range requires --value N");

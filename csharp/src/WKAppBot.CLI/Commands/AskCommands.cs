@@ -692,9 +692,9 @@ Examples:
             }
 
             // ── Tier 0: Native OS file dialog via UIA (STEALS FOCUS — last resort) ──
-            // Only try this if focusless tiers all failed.
+            // Tier 1 (setFileInputFiles) and Tier 0.5 (trusted chooser intercept) both failed.
             await cdp.DisableFileChooserInterception();
-            Console.WriteLine("[ASK] Trying native file dialog (UIA) — may steal focus...");
+            Console.WriteLine("[ASK] All focusless tiers failed — falling back to native file dialog (will steal focus)...");
             var uiaOk = await TryAttachViaFileDialog(cdp, absPath);
             if (uiaOk)
             {
@@ -1468,12 +1468,13 @@ Examples:
     {
         Console.WriteLine($"[ASK] Gemini: {question}");
 
-        // UIA tab routing: switch to Gemini tab before CDP connects (focusless)
-        if (!newTab) EnsureTabViaGrap("Chrome", "Gemini");
-
         var targetTag = BuildAskTargetTag("gemini");
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+
+        // CDP tab activation (focusless) — replaces UIA EnsureTabViaGrap
+        // Target.activateTarget does Chrome-internal tab switch without OS SetForegroundWindow
+        if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult();
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -1502,6 +1503,19 @@ Examples:
                 // Diagnose tab state before editor search
                 var hiddenState = await cdp.EvalAsync("document.hidden + '|' + document.title + '|' + document.querySelectorAll('*').length");
                 Console.WriteLine($"[ASK] Tab state: {hiddenState}");
+
+                // If tab is hidden (background), dispatch visibility events to trigger deferred rendering
+                // (Gemini lazily initializes editor on hidden tabs — fake visibility = focusless fix)
+                if (hiddenState?.StartsWith("true|") == true)
+                {
+                    Console.WriteLine("[ASK] Tab hidden — dispatching visibility events (focusless)...");
+                    await cdp.EvalAsync(
+                        "try{Object.defineProperty(document,'hidden',{get:()=>false,configurable:true});" +
+                        "Object.defineProperty(document,'visibilityState',{get:()=>'visible',configurable:true});" +
+                        "document.dispatchEvent(new Event('visibilitychange'));" +
+                        "window.dispatchEvent(new Event('focus'));}catch(e){}");
+                    await Task.Delay(500);
+                }
 
                 // A11y-first: find editor via selector chain
                 var editorSel = await WaitForEditorA11y(cdp,
@@ -1953,12 +1967,11 @@ Examples:
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
 
-        // UIA tab routing: switch to ChatGPT tab before CDP connects (focusless)
-        if (!newTab) EnsureTabViaGrap("Chrome", "ChatGPT");
-
         var targetTag = BuildAskTargetTag("gpt");
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+
+        if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult();
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -2818,12 +2831,11 @@ Examples:
     {
         Console.WriteLine($"[ASK] Claude: {question}");
 
-        // UIA tab routing: switch to Claude tab before CDP connects (focusless)
-        if (!newTab) EnsureTabViaGrap("Chrome", "Claude");
-
         var targetTag = BuildAskTargetTag("claude");
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+
+        if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult();
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();

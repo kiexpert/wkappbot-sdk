@@ -265,8 +265,17 @@ public sealed class ClaudePromptHelper : IDisposable
             if (!procName.Equals("Code", StringComparison.OrdinalIgnoreCase)) continue;
             if (!title.Contains(cwdFolder, StringComparison.OrdinalIgnoreCase)) continue;
             Console.WriteLine($"  [PROMPT-CWD] VS Code title match: \"{title}\"");
+            // Try turn-form first; fallback to vscode-claudecode (native extension has no turn-form)
             var pi = FindTurnFormInWindow(hWnd, title, procName);
             if (pi != null) return pi;
+            // Native Claude Code extension: no turn-form, use window directly
+            if (title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
+            {
+                NativeMethods.GetWindowRect(hWnd, out var wr);
+                var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
+                Console.WriteLine($"  [PROMPT-CWD] VS Code native Claude Code extension found");
+                return new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode");
+            }
         }
 
         // Priority 2: Claude Desktop — search UIA for CWD text at bottom bar
