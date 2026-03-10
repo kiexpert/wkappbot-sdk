@@ -40,6 +40,7 @@ internal partial class Program
             "catch-up" or "catchup" => SlackCatchUpCommand(args),
             "prompt" => SlackPromptCommand(args),
             "schedule" => SlackScheduleCommand(args),
+            "list" or "ls" => SlackListCommand(args),
             _ => SlackUsage()
         };
     }
@@ -672,8 +673,36 @@ internal partial class Program
     {
         if (!File.Exists(SlackConfigPath))
         {
+            Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"[SLACK] Config not found: {SlackConfigPath}");
-            Console.WriteLine("[SLACK] Run Slack setup first (see CLAUDE.md)");
+            Console.ResetColor();
+            Console.WriteLine();
+            Console.WriteLine("Slack setup required — create the config file with these fields:");
+            Console.WriteLine();
+            Console.WriteLine("  IMPORTANT: The human must log into Slack admin first.");
+            Console.WriteLine("  You (AI) cannot authenticate — ask the user, then continue your work.");
+            Console.WriteLine("  Run this to notify the user via TTS while you proceed:");
+            Console.WriteLine("    wkappbot speak \"Slack setup needs your login. Please open api.slack.com and log in.\" --bg");
+            Console.WriteLine();
+            Console.WriteLine($"  File: {SlackConfigPath}");
+            Console.WriteLine("  {{");
+            Console.WriteLine("    \"bot_token\": \"xoxb-...\",       // Bot User OAuth Token");
+            Console.WriteLine("    \"app_token\": \"xapp-...\",       // App-Level Token (Socket Mode)");
+            Console.WriteLine("    \"channel\":   \"C0...\",           // Channel ID to post to");
+            Console.WriteLine("    \"socket_mode\": true");
+            Console.WriteLine("  }}");
+            Console.WriteLine();
+            Console.WriteLine("How to get tokens (human must be logged into Slack admin):");
+            Console.WriteLine("  1. Go to https://api.slack.com/apps → Create New App (From Scratch)");
+            Console.WriteLine("  2. OAuth & Permissions → Bot Token Scopes: add these scopes:");
+            Console.WriteLine("     chat:write, chat:write.customize, channels:read,");
+            Console.WriteLine("     channels:history, app_mentions:read, files:write");
+            Console.WriteLine("  3. Install to Workspace → copy Bot User OAuth Token (xoxb-...)");
+            Console.WriteLine("  4. Basic Information → App-Level Tokens → Generate (connections:write)");
+            Console.WriteLine("  5. Socket Mode → Enable Socket Mode");
+            Console.WriteLine("  6. Event Subscriptions → Enable → Subscribe: app_mention, message.channels");
+            Console.WriteLine("  7. Invite bot to your channel: /invite @YourBotName");
+            Console.WriteLine("  8. Get channel ID: right-click channel name → View channel details → ID at bottom");
             return null;
         }
 
@@ -856,6 +885,11 @@ internal partial class Program
         Console.WriteLine("  prompt [--watch]    Type inbox messages into Claude Code prompt");
         Console.WriteLine("                      --watch: continuously poll for new messages");
         Console.WriteLine("                      --interval N: poll interval seconds (default: 3)");
+        Console.WriteLine("  list [channel|msg_ts] [--limit N] [--delete-pattern \"pat\"]");
+        Console.WriteLine("                        List channel messages or thread replies");
+        Console.WriteLine("                        C0... = channel, 1234.5678 = message → auto thread");
+        Console.WriteLine("                        reply ts → parent thread auto-detected");
+        Console.WriteLine("                        --delete-pattern: delete matching r=0 messages");
         Console.WriteLine();
         Console.WriteLine($"Config: {SlackConfigPath}");
         return 1;

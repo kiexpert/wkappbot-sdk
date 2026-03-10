@@ -100,6 +100,29 @@ public static partial class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr GetPropW(IntPtr hWnd, string lpString);
 
+    public delegate bool PropEnumProcEx(IntPtr hWnd, IntPtr lpszString, IntPtr hData, UIntPtr dwData);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int EnumPropsExW(IntPtr hWnd, PropEnumProcEx lpEnumFunc, UIntPtr lParam);
+
+    /// <summary>Enumerate all Win32 properties on a window. Returns list of (name, value).</summary>
+    public static List<(string name, long value)> EnumWindowProps(IntPtr hWnd)
+    {
+        var props = new List<(string, long)>();
+        EnumPropsExW(hWnd, (hwnd, lpszString, hData, dwData) =>
+        {
+            try
+            {
+                var name = System.Runtime.InteropServices.Marshal.PtrToStringUni(lpszString);
+                if (name != null)
+                    props.Add((name, hData.ToInt64()));
+            }
+            catch { }
+            return true; // continue
+        }, UIntPtr.Zero);
+        return props;
+    }
+
     [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
@@ -227,6 +250,8 @@ public static partial class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern int GetWindowLongW(IntPtr hWnd, int nIndex);
+    [DllImport("user32.dll")]
+    public static extern int SetWindowLongW(IntPtr hWnd, int nIndex, int dwNewLong);
 
     public const int GWL_STYLE = -16;
     public const int GWL_EXSTYLE = -20;

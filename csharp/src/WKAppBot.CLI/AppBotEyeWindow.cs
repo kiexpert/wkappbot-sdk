@@ -34,19 +34,16 @@ internal sealed class AppBotEyeOverlay : Window
     private readonly TextBlock _axText; // accessibility text display (overlay on image)
     private readonly Canvas _scrollCanvas; // canvas for scroll animation
     private readonly Ellipse _dot;
+    private readonly TextBlock _titleText;
+    private readonly DateTime _startTime = DateTime.Now;
     private DateTime _lastUpdate = DateTime.MinValue;
     private DispatcherTimer? _cloakTimer;
     private DispatcherTimer? _scrollTimer; // auto-scroll timer
-    private bool _isCloaked;
     private IntPtr _chromeHwnd;
     private double _scrollOffset; // current scroll Y offset
     private bool _needsScroll; // text exceeds visible area
 
-    // Cloaking thresholds -- 50s idle = dim, 60s = 10s fade-out = ghost (10%)
     private const double ActiveOpacity = 0.85;
-    private const double DimOpacity = 0.3;
-    private const int DimAfterSeconds = 50;
-    private const int CloakAfterSeconds = 60;
 
     // Scroll settings
     private const double ScrollSpeed = 0.5; // pixels per tick
@@ -99,7 +96,7 @@ internal sealed class AppBotEyeOverlay : Window
         };
         DockPanel.SetDock(_dot, Dock.Left);
 
-        var titleText = new TextBlock
+        _titleText = new TextBlock
         {
             Text = "WK AppBot Eye",
             Foreground = new SolidColorBrush(Color.FromRgb(0x4F, 0xC3, 0xF7)),
@@ -108,7 +105,7 @@ internal sealed class AppBotEyeOverlay : Window
             FontWeight = FontWeights.Bold,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        DockPanel.SetDock(titleText, Dock.Left);
+        DockPanel.SetDock(_titleText, Dock.Left);
 
         var closeBtn = new TextBlock
         {
@@ -125,7 +122,7 @@ internal sealed class AppBotEyeOverlay : Window
         DockPanel.SetDock(closeBtn, Dock.Right);
 
         header.Children.Add(_dot);
-        header.Children.Add(titleText);
+        header.Children.Add(_titleText);
         header.Children.Add(closeBtn);
         Grid.SetRow(header, 0);
 
@@ -243,10 +240,9 @@ internal sealed class AppBotEyeOverlay : Window
     {
         if (msg == WM_APP)
         {
-            // WebBot command sent us a wake-up signal -- reset idle timer and uncloak
+            // WebBot command sent us a wake-up signal -- restore opacity
             _lastUpdate = DateTime.Now;
-            if (_isCloaked) Uncloak();
-            else if (Opacity < ActiveOpacity)
+            if (Opacity < ActiveOpacity)
             {
                 BeginAnimation(OpacityProperty, null);
                 var anim = new DoubleAnimation(Opacity, ActiveOpacity, TimeSpan.FromSeconds(0.3));
@@ -319,7 +315,6 @@ internal sealed class AppBotEyeOverlay : Window
             if (_scrollCanvas.ActualWidth > 0)
                 _axText.Width = _scrollCanvas.ActualWidth;
 
-            if (_isCloaked) Uncloak();
         }
         catch { /* best effort */ }
     }
@@ -410,30 +405,20 @@ internal sealed class AppBotEyeOverlay : Window
 
     private void OnCloakTick(object? sender, EventArgs e)
     {
-        if (_lastUpdate == DateTime.MinValue) return; // no content yet
-
-        var elapsed = (DateTime.Now - _lastUpdate).TotalSeconds;
-
-        if (elapsed >= CloakAfterSeconds && !_isCloaked)
-        {
-            // Ghost mode -- 10s fade to 10% alpha (still visible, just very faint)
-            var anim = new DoubleAnimation(Opacity, 0.1, TimeSpan.FromSeconds(10));
-            anim.Completed += (_, _) => { _isCloaked = true; };
-            BeginAnimation(OpacityProperty, anim);
-        }
-        else if (elapsed >= DimAfterSeconds && elapsed < CloakAfterSeconds && Opacity > DimOpacity + 0.05)
-        {
-            // Dim -- reduce opacity
-            var anim = new DoubleAnimation(Opacity, DimOpacity, TimeSpan.FromSeconds(2));
-            BeginAnimation(OpacityProperty, anim);
-        }
+        // Update title with live uptime
+        var elapsed = DateTime.Now - _startTime;
+        var uptime = elapsed.TotalHours >= 1
+            ? $"{(int)elapsed.TotalHours}h{elapsed.Minutes:D2}m"
+            : elapsed.TotalMinutes >= 1
+                ? $"{(int)elapsed.TotalMinutes}m{elapsed.Seconds:D2}s"
+                : $"{elapsed.Seconds}s";
+        _titleText.Text = $"WK AppBot Eye  {uptime}";
     }
 
     private void Uncloak()
     {
-        _isCloaked = false;
         Visibility = Visibility.Visible;
-        BeginAnimation(OpacityProperty, null); // stop any running animation
+        BeginAnimation(OpacityProperty, null);
         var anim = new DoubleAnimation(Opacity, ActiveOpacity, TimeSpan.FromSeconds(0.5));
         BeginAnimation(OpacityProperty, anim);
     }

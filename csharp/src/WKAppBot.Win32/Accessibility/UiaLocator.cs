@@ -1402,6 +1402,22 @@ public sealed class UiaLocator : IDisposable
                 string aidStr = !string.IsNullOrEmpty(aid) ? $" aid=\"{aid}\"" : "";
 
                 sb.AppendLine($"  {indent}{arrow}[{ctStr}] \"{displayName}\"{aidStr} {rectStr}");
+
+                // Dump Win32 Props on hwnd-bearing elements in focus chain
+                try
+                {
+                    if (el.Properties.NativeWindowHandle.IsSupported)
+                    {
+                        var elHwnd = el.Properties.NativeWindowHandle.Value;
+                        if (elHwnd != IntPtr.Zero)
+                        {
+                            var props = NativeMethods.EnumWindowProps(elHwnd);
+                            foreach (var (pName, pVal) in props)
+                                sb.AppendLine($"  {indent}  prop: {pName} = {pVal}");
+                        }
+                    }
+                }
+                catch { }
             }
             return sb.ToString();
         }

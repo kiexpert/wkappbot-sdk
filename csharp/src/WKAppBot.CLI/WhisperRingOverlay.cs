@@ -31,6 +31,8 @@ internal sealed class WhisperRingWindow : Window
     private readonly TextBlock _modeText;
     private readonly TextBlock _tokenText;
     private readonly TextBlock _recentText;
+    private readonly Canvas _recentClip;              // clip container for tween scroll
+    private readonly TranslateTransform _recentTx;    // scroll transform
     private readonly TextBlock _sttText;    // STT recognized word(s)
     private readonly WpfEllipse _coreGlow;
     private readonly WpfEllipse _coreDot;
@@ -38,9 +40,16 @@ internal sealed class WhisperRingWindow : Window
     // Sound code RLE trail string (just append + trim front)
     private string _scTrail = "";
     private ushort _scLast = ushort.MaxValue;
+
+    /// <summary>Minimum sound code count before showing codes instead of clock. Default 9.</summary>
+    public int SoundCodeMinCount { get; set; } = 9;
     private readonly Canvas _pointerLayer;                      // pointer-only layer (blur without affecting text)
-    private readonly System.Windows.Shapes.Line _pointer;      // energy centroid pointer (current)
+    private readonly System.Windows.Shapes.Line _pointer;      // energy centroid pointer (current, all sounds)
     private readonly WpfEllipse _pointerDot;                   // pointer tip dot (current)
+
+    // Voice-only pointer — green, only active during VOICE/WHSPR
+    private readonly System.Windows.Shapes.Line _voicePointer;
+    private readonly WpfEllipse _voicePointerDot;
 
     // Ghost trail — 4 afterimage lines that fade+blur like dissipating smoke
     private const int GhostCount = 4;
@@ -164,7 +173,7 @@ internal sealed class WhisperRingWindow : Window
             _ghostAge[g] = 1.0; // start fully aged (invisible)
         }
 
-        // Current pointer (on top of ghosts)
+        // Current pointer — all sounds (white, on top of ghosts)
         _pointer = new System.Windows.Shapes.Line
         {
             X1 = cx, Y1 = cy, X2 = cx, Y2 = cy,
@@ -183,6 +192,40 @@ internal sealed class WhisperRingWindow : Window
             Opacity = 0,
         };
         _pointerLayer.Children.Add(_pointerDot);
+
+        // Voice-only pointer — gold (#FFD700) with glow, only during VOICE/WHSPR
+        _voicePointer = new System.Windows.Shapes.Line
+        {
+            X1 = cx, Y1 = cy, X2 = cx, Y2 = cy,
+            Stroke = new SolidColorBrush(Color.FromArgb(0xDD, 0xFF, 0xD7, 0x00)),
+            StrokeThickness = 4,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            Opacity = 0,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                Color = Color.FromRgb(0xFF, 0xD7, 0x00),
+                BlurRadius = 12,
+                ShadowDepth = 0,
+                Opacity = 0.85,
+            },
+        };
+        _pointerLayer.Children.Add(_voicePointer);
+
+        _voicePointerDot = new WpfEllipse
+        {
+            Width = 10, Height = 10,
+            Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00)),
+            Opacity = 0,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                Color = Color.FromRgb(0xFF, 0xD7, 0x00),
+                BlurRadius = 8,
+                ShadowDepth = 0,
+                Opacity = 0.9,
+            },
+        };
+        _pointerLayer.Children.Add(_voicePointerDot);
 
         _canvas.Children.Add(_pointerLayer);
 
@@ -257,18 +300,26 @@ internal sealed class WhisperRingWindow : Window
 
         root.Children.Add(_canvas);
 
-        // Recent tokens (bottom bar)
+        // Recent tokens (bottom bar) — tween-scroll container
+        _recentTx = new TranslateTransform(0, 0);
         _recentText = new TextBlock
         {
             Text = "",
             Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x77)),
             FontFamily = new FontFamily("Consolas"),
             FontSize = 8,
-            TextAlignment = TextAlignment.Center,
+            TextAlignment = TextAlignment.Left, // left-align for scroll
+            RenderTransform = _recentTx,
+        };
+        _recentClip = new Canvas
+        {
+            Height = 14,
+            ClipToBounds = true,
             VerticalAlignment = VerticalAlignment.Bottom,
             Margin = new Thickness(4, 0, 4, 2),
         };
-        root.Children.Add(_recentText);
+        _recentClip.Children.Add(_recentText);
+        root.Children.Add(_recentClip);
 
         Content = root;
     }
@@ -312,7 +363,7 @@ internal sealed class WhisperRingWindow : Window
     /// </summary>
     public void UpdateSpectrum(int[] levels, int maxLevel, string mode, uint token, string recentTokens,
         string? sttText = null, long sttAgeTicks = long.MaxValue, string sttMode = "QUIET",
-        int segFrames = 0, ushort soundCode = 0)
+        int segFrames = 0, ushort soundCode = 0, int[]? voiceLevels = null)
     {
         double cx = _canvas.Width / 2, cy = _canvas.Height / 2;
         double arcSpan = (360.0 - BandCount * GapAngle) / BandCount;
@@ -392,12 +443,54 @@ internal sealed class WhisperRingWindow : Window
 
             _pointer.Opacity = 0.7 + magnitude * 0.3;
             _pointerDot.Opacity = 1.0;
+
+            // ── Voice-only gold pointer: independent centroid from post-DUET spectrum ──
+            // Uses voiceLevels (noise-killed) for its own direction — diverges from white when noisy
+            var vLevels = voiceLevels ?? levels; // fallback to raw if mono
+            double vTotalEnergy = 0;
+            double vVecX = 0, vVecY = 0;
+            for (int i = 0; i < BandCount && i < vLevels.Length; i++)
+            {
+                double vEnergy = maxLevel > 0 ? (double)vLevels[i] / maxLevel : 0;
+                double midAngle2 = (i * (arcSpan + GapAngle) + arcSpan / 2 - 90) * Math.PI / 180;
+                vVecX += vEnergy * Math.Cos(midAngle2);
+                vVecY += vEnergy * Math.Sin(midAngle2);
+                vTotalEnergy += vEnergy;
+            }
+
+            if (vTotalEnergy > 0.2 && (mode == "VOICE" || mode == "WHSPR"))
+            {
+                double vAngle = Math.Atan2(vVecY, vVecX);
+                double vMag = Math.Sqrt(vVecX * vVecX + vVecY * vVecY) / vTotalEnergy;
+                double vLen = 10 + vMag * (RingRadius - 16);
+                double vTipX = cx + vLen * Math.Cos(vAngle);
+                double vTipY = cy + vLen * Math.Sin(vAngle);
+
+                _voicePointer.X1 = cx; _voicePointer.Y1 = cy;
+                _voicePointer.X2 = vTipX; _voicePointer.Y2 = vTipY;
+                Canvas.SetLeft(_voicePointerDot, vTipX - 5);
+                Canvas.SetTop(_voicePointerDot, vTipY - 5);
+                _voicePointer.Opacity = 0.85 + vMag * 0.15;
+                _voicePointerDot.Opacity = 1.0;
+                // Glow intensity tracks voice purity
+                if (_voicePointer.Effect is System.Windows.Media.Effects.DropShadowEffect vg)
+                    vg.Opacity = 0.5 + vMag * 0.5;
+            }
+            else
+            {
+                // Not voice → gold fades
+                _voicePointer.Opacity = Math.Max(0, _voicePointer.Opacity - 0.06);
+                _voicePointerDot.Opacity = Math.Max(0, _voicePointerDot.Opacity - 0.06);
+            }
         }
         else
         {
             // Current pointer fades
             _pointer.Opacity = Math.Max(0, _pointer.Opacity - 0.08);
             _pointerDot.Opacity = Math.Max(0, _pointerDot.Opacity - 0.08);
+            // Voice pointer also fades
+            _voicePointer.Opacity = Math.Max(0, _voicePointer.Opacity - 0.06);
+            _voicePointerDot.Opacity = Math.Max(0, _voicePointerDot.Opacity - 0.06);
         }
 
         // ── Age all ghosts: thicken + blur + fade = smoke dissipation ──
@@ -456,49 +549,89 @@ internal sealed class WhisperRingWindow : Window
         {
             _scLast = soundCode;
             var tag = soundCode == 0 ? ".." : FormatSoundCode(soundCode);
-            _scTrail = _scTrail.Length > 80
-                ? _scTrail[(_scTrail.Length - 60)..] + " " + tag
+            _scTrail = _scTrail.Length > 200
+                ? _scTrail[(_scTrail.Length - 150)..] + " " + tag
                 : (_scTrail.Length > 0 ? _scTrail + " " + tag : tag);
         }
 
-        // Clock area: last 3~4 sound codes from trail
-        // Trim trail to last ~24 chars for clock display
-        var clockTrail = _scTrail.Length > 24 ? _scTrail[(_scTrail.Length - 24)..] : _scTrail;
-        _tokenText.Text = clockTrail;
-        _tokenText.Foreground = mode == "WHSPR"
-            ? new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0xBB))
-            : new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
+        // Clock area: show sound codes only when enough accumulated (≥20 chars), else clock
+        int scCount = _scTrail.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        if (scCount >= SoundCodeMinCount)
+        {
+            var clockTrail = _scTrail.Length > 24 ? _scTrail[(_scTrail.Length - 24)..] : _scTrail;
+            _tokenText.Text = clockTrail;
+            _tokenText.Foreground = mode == "WHSPR"
+                ? new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0xBB))
+                : new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
+        }
+        else
+        {
+            _tokenText.Text = DateTime.Now.ToString("HH:mm");
+            _tokenText.Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x66));
+        }
 
-        // Bottom bar: full trail (last ~40 chars)
-        _recentText.Text = _scTrail.Length > 40 ? _scTrail[(_scTrail.Length - 40)..] : _scTrail;
+        // Bottom bar: full trail with tween scroll — slow start, accelerate when queued
+        _recentText.Text = _scTrail;
+        _recentText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double textWidth = _recentText.DesiredSize.Width;
+        double clipWidth = _recentClip.ActualWidth > 0 ? _recentClip.ActualWidth : 172; // 180 - 8 margin
+        if (textWidth > clipWidth)
+        {
+            double targetX = -(textWidth - clipWidth);
+            // Distance-adaptive speed: calm speech=slow(8000ms), rapid queue=fast(1500ms)
+            double currentX = _recentTx.X;
+            double distance = Math.Abs(targetX - currentX);
+            double durationMs = Math.Clamp(16000 - distance * 100, 3000, 16000);
+            // 3-phase keyframe: snail crawl → zoom → gentle landing
+            var anim = new DoubleAnimationUsingKeyFrames
+            {
+                Duration = TimeSpan.FromMilliseconds(durationMs)
+            };
+            anim.KeyFrames.Add(new SplineDoubleKeyFrame(
+                currentX + (targetX - currentX) * 0.05, // barely moved (5%)
+                KeyTime.FromPercent(0.4),                // at 40% of time = snail phase
+                new KeySpline(0.9, 0.0, 1.0, 0.3)));
+            anim.KeyFrames.Add(new SplineDoubleKeyFrame(
+                currentX + (targetX - currentX) * 0.85, // 85% covered
+                KeyTime.FromPercent(0.75),               // zoom phase
+                new KeySpline(0.2, 0.8, 0.3, 1.0)));
+            anim.KeyFrames.Add(new SplineDoubleKeyFrame(
+                targetX,                                  // final position
+                KeyTime.FromPercent(1.0),                // gentle landing
+                new KeySpline(0.0, 0.0, 0.2, 1.0)));
+            _recentTx.BeginAnimation(TranslateTransform.XProperty, anim);
+        }
+        else
+        {
+            _recentTx.BeginAnimation(TranslateTransform.XProperty, null);
+            _recentTx.X = 0;
+        }
 
-        // Bottom text: STT word (always priority, any mode) / clock (fallback)
+        // ── STT line: dedicated, never overwritten by clock/frames ──
         double sttAgeSec = sttAgeTicks / (double)TimeSpan.TicksPerSecond;
         bool hasStt = !string.IsNullOrEmpty(sttText) && sttAgeSec < 5.0;
 
         if (hasStt)
         {
-            // STT word — show regardless of mode (LOUD/VOICE/WHSPR all pass through)
-            _sttText.Text = sttText!.Length > 12 ? sttText[..12] : sttText;
-            _sttText.Opacity = Math.Max(0, 1.0 - sttAgeSec / 5.0);
+            // New STT result → update + reset sound code trail (sentence boundary)
+            if (_scTrail.Length > 0) { _scTrail = ""; _scLast = ushort.MaxValue; }
+            _sttText.Text = sttText!.Length > 16 ? sttText[..16] : sttText;
             _sttText.Foreground = Brushes.White;
+            _sttText.Opacity = 1.0;
         }
-        else if (segFrames > 0 && mode != "QUIET")
+        else if (hasStt == false && sttAgeSec < 10.0 && !string.IsNullOrEmpty(sttText))
         {
-            // Recording: show frame count (voice activity counter)
-            _sttText.Text = $"♪{segFrames}";
-            _sttText.Foreground = segFrames >= 100
-                ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88))  // green = sentence ready
-                : new SolidColorBrush(Color.FromRgb(0xFF, 0xAA, 0x00)); // amber = still short
-            _sttText.Opacity = 0.9;
+            // Fade last STT word slowly (5~10s)
+            _sttText.Opacity = Math.Max(0.3, 1.0 - (sttAgeSec - 5.0) / 5.0);
         }
-        else
+        else if (string.IsNullOrEmpty(_sttText.Text) || _sttText.Opacity < 0.1)
         {
-            // No recent STT → clock
+            // No STT ever received → show clock
             _sttText.Text = DateTime.Now.ToString("HH:mm:ss");
             _sttText.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
             _sttText.Opacity = mode == "QUIET" ? 0.7 : 0.5;
         }
+        // else: keep last STT text as-is
     }
 
     /// <summary>Fade out and close.</summary>
@@ -569,6 +702,13 @@ internal sealed class WhisperRingHost : IDisposable
 
     public bool IsAlive => _uiThread?.IsAlive == true;
 
+    /// <summary>Min sound code count before showing codes instead of clock.</summary>
+    public int SoundCodeMinCount
+    {
+        get => _window?.SoundCodeMinCount ?? 20;
+        set { if (_window != null) _dispatcher?.BeginInvoke(() => _window.SoundCodeMinCount = value); }
+    }
+
     /// <summary>Start the ring overlay on a dedicated STA thread.</summary>
     public void Start(int screenX, int screenY)
     {
@@ -604,11 +744,11 @@ internal sealed class WhisperRingHost : IDisposable
     /// <summary>Push new spectrum data to the ring overlay.</summary>
     public void UpdateSpectrum(int[] levels, int maxLevel, string mode, uint token, string recentTokens,
         string? sttText = null, long sttAgeTicks = long.MaxValue, string sttMode = "QUIET",
-        int segFrames = 0, ushort soundCode = 0)
+        int segFrames = 0, ushort soundCode = 0, int[]? voiceLevels = null)
     {
         _dispatcher?.BeginInvoke(() =>
         {
-            _window?.UpdateSpectrum(levels, maxLevel, mode, token, recentTokens, sttText, sttAgeTicks, sttMode, segFrames, soundCode);
+            _window?.UpdateSpectrum(levels, maxLevel, mode, token, recentTokens, sttText, sttAgeTicks, sttMode, segFrames, soundCode, voiceLevels);
             _window?.EnsureTopmost();
         });
     }

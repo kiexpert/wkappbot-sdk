@@ -2531,11 +2531,14 @@ Examples:
             if (!liveHeaderPrinted)
                 Console.WriteLine($"[ASK] Poll: {(isThinking ? "thinking" : "streaming")}{(hasResponseText ? "+" : "")}, {sw.Elapsed.TotalSeconds:F0}s");
 
-            // Extend timeout while actively streaming/thinking (max 1 extension = 2x original timeout)
-            if (sw.Elapsed.TotalSeconds > timeoutSec * 0.8 && streamExtensions < 1)
+            // Extend timeout while actively streaming/thinking
+            // Thinking mode (o1/o3/o4): unlimited extensions — can think for minutes
+            // Streaming: max 1 extension (2x original timeout)
+            int maxExtensions = isThinking ? 99 : 1;
+            if (sw.Elapsed.TotalSeconds > timeoutSec * 0.8 && streamExtensions < maxExtensions)
             {
                 streamExtensions++;
-                Console.WriteLine("[ASK] Still streaming/thinking, extending timeout...");
+                Console.WriteLine($"[ASK] Still {(isThinking ? "thinking" : "streaming")}, extending timeout... (ext #{streamExtensions})");
                 sw.Restart();
             }
         }

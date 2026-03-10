@@ -10,6 +10,7 @@ namespace WKAppBot.CLI;
 ///
 /// Features:
 /// - Broken pipe safe: stdout IOException → suppress, file logging continues
+/// - Crash safe: UnhandledException → ForceCloseWithoutMove() flushes + keeps in logs/
 /// - Periodic flush: auto-flushes console every ~1 second (reduces output lag)
 /// - File always AutoFlush=true (real-time log)
 /// </summary>
@@ -17,9 +18,10 @@ public sealed class TeeTextWriter : TextWriter
 {
     private readonly TextWriter _console;
     private readonly StreamWriter _file;
-    private readonly bool _moveToOldOnDispose;
+    private bool _moveToOldOnDispose;
     private string _logPath;
-    private bool _pipeBroken;  // stdout broken → skip console writes, file continues
+    private bool _pipeBroken;    // stdout broken → skip console writes, file continues
+    private bool _fileClosed;    // ForceCloseWithoutMove called → skip all file writes
     private long _lastFlushTicks;  // for periodic console flush (~1s)
     private const long FlushIntervalTicks = TimeSpan.TicksPerSecond; // 1 second
 
@@ -108,33 +110,33 @@ public sealed class TeeTextWriter : TextWriter
     public override void Write(char value)
     {
         ConsoleWrite(value);
-        _file.Write(value);
+        if (!_fileClosed) try { _file.Write(value); } catch { }
     }
 
     public override void Write(string? value)
     {
         ConsoleWrite(value);
-        _file.Write(value);
+        if (!_fileClosed) try { _file.Write(value); } catch { }
         PeriodicFlush();
     }
 
     public override void Write(char[] buffer, int index, int count)
     {
         ConsoleWrite(buffer, index, count);
-        _file.Write(buffer, index, count);
+        if (!_fileClosed) try { _file.Write(buffer, index, count); } catch { }
         PeriodicFlush();
     }
 
     public override void WriteLine()
     {
         ConsoleWriteLine();
-        _file.WriteLine();
+        if (!_fileClosed) try { _file.WriteLine(); } catch { }
     }
 
     public override void WriteLine(string? value)
     {
         ConsoleWriteLine(value);
-        _file.WriteLine(value);
+        if (!_fileClosed) try { _file.WriteLine(value); } catch { }
         PeriodicFlush();
     }
 
@@ -145,20 +147,44 @@ public sealed class TeeTextWriter : TextWriter
             try { _console.Flush(); }
             catch (IOException) { _pipeBroken = true; }
         }
-        _file.Flush();
+        if (!_fileClosed) try { _file.Flush(); } catch { }
         _lastFlushTicks = Environment.TickCount64 * TimeSpan.TicksPerMillisecond;
+    }
+
+    /// <summary>Flush and close the log file WITHOUT moving to old/ — for crash dumps.
+    /// Crash log stays in logs/ as evidence (not buried in old/).
+    /// Safe to call from UnhandledException handler (abort imminent).</summary>
+    public void ForceCloseWithoutMove()
+    {
+        if (_fileClosed) return;
+        try
+        {
+            if (_pipeBroken)
+                _file.WriteLine($"\n# [PIPE] stdout broken — file logging continued normally");
+            _file.WriteLine($"\n# [CRASH] Process terminated abnormally at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            _file.Flush();
+            _file.Dispose();
+        }
+        catch { }
+        _fileClosed = true;
+        _moveToOldOnDispose = false; // prevent Dispose from moving
     }
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
+        if (disposing && !_fileClosed)
         {
-            // Log broken pipe event if it happened
-            if (_pipeBroken)
-                _file.WriteLine($"\n# [PIPE] stdout broken — file logging continued normally");
+            try
+            {
+                // Log broken pipe event if it happened
+                if (_pipeBroken)
+                    _file.WriteLine($"\n# [PIPE] stdout broken — file logging continued normally");
 
-            _file.Flush();
-            _file.Dispose();
+                _file.Flush();
+                _file.Dispose();
+            }
+            catch { }
+            _fileClosed = true;
 
             if (_moveToOldOnDispose)
             {

@@ -21,15 +21,27 @@ internal partial class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot speak \"text\" [--bg]");
+            Console.WriteLine("Usage: wkappbot speak \"text\" [--bg] [--mouse] [--target <grap>]");
             Console.WriteLine("  Windows TTS 음성 출력 + 카라오케 오버레이");
             Console.WriteLine("  --bg: 백그라운드 실행 (즉시 리턴)");
             Console.WriteLine("  --size N: 글자 크기 px (기본 32, 활성 1.5배)");
+            Console.WriteLine("  --mouse: 마우스 커서 위치에 오버레이 표시");
+            Console.WriteLine("  --target <grap>: 지정 윈도우 위에 오버레이 표시");
             return 1;
         }
 
         var argList = args.ToList();
         bool bg = argList.Remove("--bg");
+        bool atMouse = argList.Remove("--mouse");
+
+        // --target <grap> 파싱
+        string? targetGrap = null;
+        int targetIdx = argList.IndexOf("--target");
+        if (targetIdx >= 0 && targetIdx + 1 < argList.Count)
+        {
+            targetGrap = argList[targetIdx + 1];
+            argList.RemoveRange(targetIdx, 2);
+        }
 
         // --size N 파싱 (px 단위)
         double sizePx = 0;
@@ -45,7 +57,9 @@ internal partial class Program
             var exe = Environment.ProcessPath ?? "wkappbot";
             var textArgs = string.Join(" ", argList.Select(a => $"\"{a}\""));
             var sizeArg = sizePx > 0 ? $" --size {sizePx}" : "";
-            var psi = new ProcessStartInfo(exe, $"speak {textArgs}{sizeArg}")
+            var mouseArg = atMouse ? " --mouse" : "";
+            var targetArg = targetGrap != null ? $" --target \"{targetGrap}\"" : "";
+            var psi = new ProcessStartInfo(exe, $"speak {textArgs}{sizeArg}{mouseArg}{targetArg}")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -69,9 +83,30 @@ internal partial class Program
         // 2) 공유 Stopwatch — 오디오 재생 직전에 Start
         var sharedStopwatch = new Stopwatch();
 
-        // 3) 오버레이 시작 (Stopwatch는 아직 안 돌아감)
+        // 3) 오버레이 위치 결정
+        System.Drawing.Point? mousePos = null;
+        IntPtr targetHwnd = IntPtr.Zero;
+        if (atMouse)
+        {
+            if (NativeMethods.GetCursorPos(out var pt))
+                mousePos = new System.Drawing.Point(pt.X, pt.Y);
+        }
+        if (targetGrap != null)
+        {
+            try
+            {
+                var wins = WKAppBot.Win32.Window.WindowFinder.FindByTitle(targetGrap);
+                if (wins.Count > 0) targetHwnd = wins[0].Handle;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SPEAK] --target 윈도우 탐색 실패: {ex.Message}");
+            }
+        }
+
         var (myHwnd, panelRect) = FindMyWindow();
-        var overlayThread = ShowSpeakOverlay(text, markers, sharedStopwatch, sizePx, myHwnd, panelRect);
+        var overlayThread = ShowSpeakOverlay(text, markers, sharedStopwatch, sizePx,
+            targetHwnd != IntPtr.Zero ? targetHwnd : myHwnd, panelRect, mousePos);
 
         // 4) 오디오 재생 — Stopwatch 시작과 동시에
         try
@@ -194,13 +229,14 @@ internal partial class Program
     // ── 카라오케 오버레이 ──
 
     static Thread ShowSpeakOverlay(string text, List<SpeakMarker> markers,
-        Stopwatch sharedStopwatch, double sizePx = 1.0, IntPtr ownerHwnd = default, System.Drawing.Rectangle? panelRect = null)
+        Stopwatch sharedStopwatch, double sizePx = 1.0, IntPtr ownerHwnd = default,
+        System.Drawing.Rectangle? panelRect = null, System.Drawing.Point? mousePos = null)
     {
         var thread = new Thread(() =>
         {
             try
             {
-                var window = new SpeakOverlayWindow(text, markers, sharedStopwatch, sizePx, ownerHwnd, panelRect);
+                var window = new SpeakOverlayWindow(text, markers, sharedStopwatch, sizePx, ownerHwnd, panelRect, mousePos);
                 window.Show();
                 Dispatcher.Run();
             }
@@ -225,6 +261,7 @@ internal sealed class SpeakOverlayWindow : Window
 {
     private readonly IntPtr _ownerHwnd;
     private readonly System.Drawing.Rectangle? _panelRect;
+    private readonly System.Drawing.Point? _mousePos;
     private readonly List<Program.SpeakMarker> _markers;
     private readonly Stopwatch _stopwatch; // 메인 스레드와 공유
     private readonly ScrollViewer _scrollViewer;
@@ -241,10 +278,12 @@ internal sealed class SpeakOverlayWindow : Window
     private readonly double ActiveSize;
 
     public SpeakOverlayWindow(string text, List<Program.SpeakMarker> markers,
-        Stopwatch sharedStopwatch, double sizePx = 1.0, IntPtr ownerHwnd = default, System.Drawing.Rectangle? panelRect = null)
+        Stopwatch sharedStopwatch, double sizePx = 1.0, IntPtr ownerHwnd = default,
+        System.Drawing.Rectangle? panelRect = null, System.Drawing.Point? mousePos = null)
     {
         _ownerHwnd = ownerHwnd;
         _panelRect = panelRect;
+        _mousePos = mousePos;
         _markers = markers;
         _stopwatch = sharedStopwatch;
         NormalSize = sizePx > 0 ? sizePx : 32;
@@ -311,16 +350,23 @@ internal sealed class SpeakOverlayWindow : Window
             var exStyle = GetWindowLongW(hwnd, -20);
             SetWindowLongW(hwnd, -20, exStyle | 0x08000000); // WS_EX_NOACTIVATE
 
-            if (_panelRect.HasValue && _panelRect.Value.Width > 50)
+            if (_mousePos.HasValue)
+            {
+                // 마우스 커서 위치: 오버레이를 커서 바로 위에 배치
+                Left = _mousePos.Value.X - Width / 2;
+                Top = _mousePos.Value.Y - 80;
+            }
+            else if (_ownerHwnd != IntPtr.Zero && NativeMethods.GetWindowRect(_ownerHwnd, out var ownerRect))
+            {
+                // --target 또는 VS Code 윈도우 중앙
+                Left = (ownerRect.Left + ownerRect.Right) / 2.0 - Width / 2;
+                Top = (ownerRect.Top + ownerRect.Bottom) / 2.0 - 50;
+            }
+            else if (_panelRect.HasValue && _panelRect.Value.Width > 50)
             {
                 var pr = _panelRect.Value;
                 Left = pr.X + (pr.Width - Width) / 2;
                 Top = pr.Y + (pr.Height - 100) / 2;
-            }
-            else if (_ownerHwnd != IntPtr.Zero && NativeMethods.GetWindowRect(_ownerHwnd, out var rect))
-            {
-                Left = (rect.Left + rect.Right) / 2.0 - Width / 2;
-                Top = (rect.Top + rect.Bottom) / 2.0 - 50;
             }
             else
             {

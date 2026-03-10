@@ -162,6 +162,91 @@ public static class KeyboardInput
     }
 
     /// <summary>
+    /// Send a sequence of key actions with +/- modifier notation.
+    /// Tokens (space-separated):
+    ///   +Shift   → KeyDown (push to held stack)
+    ///   -Shift   → KeyUp (pop from stack)
+    ///   F5       → PressKey (down+up)
+    ///   hello    → per-char keystroke via VkKeyScanW (auto Shift wrap)
+    /// Unreleased modifiers auto-released in LIFO order at end.
+    /// BLOCKED by FocuslessGuard (SendInput).
+    /// </summary>
+    public static void SendKeys(string sequence)
+    {
+        FocuslessGuard.AssertAllowed("SendInput(keyboard SendKeys)");
+        var heldStack = new Stack<ushort>();
+        var tokens = sequence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var token in tokens)
+        {
+            if (token.StartsWith('+') && token.Length > 1)
+            {
+                // +Key → hold down
+                var vk = NameToVk(token[1..]);
+                KeyDown(vk);
+                heldStack.Push(vk);
+                Thread.Sleep(20);
+            }
+            else if (token.StartsWith('-') && token.Length > 1)
+            {
+                // -Key → release
+                var vk = NameToVk(token[1..]);
+                KeyUp(vk);
+                // Remove from stack if present
+                var temp = new Stack<ushort>();
+                while (heldStack.Count > 0)
+                {
+                    var h = heldStack.Pop();
+                    if (h != vk) temp.Push(h);
+                }
+                while (temp.Count > 0) heldStack.Push(temp.Pop());
+                Thread.Sleep(20);
+            }
+            else
+            {
+                // Try as known key name first (F5, Enter, etc.)
+                try
+                {
+                    var vk = NameToVk(token);
+                    KeyDown(vk);
+                    Thread.Sleep(30);
+                    KeyUp(vk);
+                    Thread.Sleep(20);
+                }
+                catch (ArgumentException)
+                {
+                    // Not a known key → type as character sequence via VkKeyScanW
+                    foreach (char ch in token)
+                    {
+                        short vkScan = NativeMethods.VkKeyScanW(ch);
+                        if (vkScan == -1) continue; // unmappable char
+                        byte vk = (byte)(vkScan & 0xFF);
+                        bool needShift = (vkScan >> 8 & 1) != 0;
+                        bool needCtrl = (vkScan >> 8 & 2) != 0;
+                        bool needAlt = (vkScan >> 8 & 4) != 0;
+
+                        if (needCtrl) KeyDown(0x11);
+                        if (needAlt) KeyDown(0x12);
+                        if (needShift) KeyDown(0x10);
+                        KeyDown(vk); Thread.Sleep(20); KeyUp(vk);
+                        if (needShift) KeyUp(0x10);
+                        if (needAlt) KeyUp(0x12);
+                        if (needCtrl) KeyUp(0x11);
+                        Thread.Sleep(20);
+                    }
+                }
+            }
+        }
+
+        // Release any remaining held keys (LIFO)
+        while (heldStack.Count > 0)
+        {
+            KeyUp(heldStack.Pop());
+            Thread.Sleep(20);
+        }
+    }
+
+    /// <summary>
     /// Map key name to virtual key code.
     /// </summary>
     public static ushort NameToVk(string name) => name.ToLowerInvariant() switch
