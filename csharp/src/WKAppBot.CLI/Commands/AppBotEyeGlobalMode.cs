@@ -525,12 +525,12 @@ internal partial class Program
                 replacePid = 0;
                 // Old Eye does return 0 right after Process.Start — 1s should be enough
                 Thread.Sleep(1000);
-                TryDeleteOldExe();
+                TryDeleteOldExes();
             }
 
             // ── Hot-swap cleanup: try delete .old.exe every ~10s (non-blocking fallback) ──
             if (frameCount % 100 == 50)
-                TryDeleteOldExe();
+                TryDeleteOldExes();
 
             // ── Claude Desktop status detection (~every 5 sec) ──
             if (frameCount % 50 == 0)
@@ -1021,7 +1021,8 @@ internal partial class Program
                     var exeDir = Path.GetDirectoryName(exePath) ?? "";
                     var exeName = Path.GetFileNameWithoutExtension(exePath);
                     var newExePath = Path.Combine(exeDir, $"{exeName}.new.exe");
-                    var oldExePath = Path.Combine(exeDir, $"{exeName}.old.exe");
+                    // Timestamped old name — avoids collision with locked ghost-magnifier .old.exe
+                    var oldExePath = Path.Combine(exeDir, $"{exeName}.old-{DateTime.Now:yyyyMMdd-HHmm}.exe");
 
                     if (File.Exists(newExePath))
                     {
@@ -1031,17 +1032,17 @@ internal partial class Program
                         Console.ResetColor();
                         try
                         {
-                            if (File.Exists(oldExePath)) File.Delete(oldExePath);
-                            File.Move(exePath, oldExePath);    // running exe → .old.exe (OK!)
+                            // No pre-delete needed — timestamped name is always unique
+                            File.Move(exePath, oldExePath);    // running exe → .old-YYYYMMDD-HHmm.exe
                             File.Move(newExePath, exePath);     // .new.exe → wkappbot.exe
-                            Console.WriteLine("[EYE:HOT-SWAP] swap OK (.exe→.old, .new→.exe)");
+                            Console.WriteLine($"[EYE:HOT-SWAP] swap OK (.exe→{Path.GetFileName(oldExePath)}, .new→.exe)");
                             hotReloadTriggered = true;
                             break;
                         }
                         catch (Exception swapEx)
                         {
                             Console.WriteLine($"[EYE:HOT-SWAP] swap failed ({swapEx.Message})");
-                            // Rollback if partial
+                            // Rollback if partial (exe was moved but .new rename failed)
                             if (!File.Exists(exePath) && File.Exists(oldExePath))
                                 try { File.Move(oldExePath, exePath); } catch { }
                         }
@@ -1465,21 +1466,25 @@ internal partial class Program
         }
     }
 
-    static void TryDeleteOldExe()
+    static void TryDeleteOldExes()
     {
         try
         {
             var myExe = Environment.ProcessPath ?? "";
-            var oldExe = Path.Combine(
-                Path.GetDirectoryName(myExe) ?? "",
-                Path.GetFileNameWithoutExtension(myExe) + ".old.exe");
-            if (File.Exists(oldExe))
+            var exeDir = Path.GetDirectoryName(myExe) ?? "";
+            var exeName = Path.GetFileNameWithoutExtension(myExe);
+            // Delete all timestamped old exes: wkappbot.old-*.exe
+            foreach (var oldExe in Directory.GetFiles(exeDir, $"{exeName}.old-*.exe"))
             {
-                File.Delete(oldExe);
-                Console.WriteLine($"[EYE:HOT-SWAP] Cleaned up {Path.GetFileName(oldExe)}");
+                try
+                {
+                    File.Delete(oldExe);
+                    Console.WriteLine($"[EYE:HOT-SWAP] Cleaned up {Path.GetFileName(oldExe)}");
+                }
+                catch { } // still locked — 10s polling will retry
             }
         }
-        catch { } // still locked — 10s polling will retry
+        catch { }
     }
 
     static void DisposeFileWatchers()
