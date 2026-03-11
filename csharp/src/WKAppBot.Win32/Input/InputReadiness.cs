@@ -370,7 +370,30 @@ public sealed class InputReadiness
         bool yieldConfirmed = false;
         bool yieldFocusAcquired = false;
 
-        if (!req.QuickMode && NeedsFocusForAction(methods, req.IntendedAction))
+        // ── FocusStealer prop check ──
+        // If a previous UIA action on this hwnd stole focus (nominally focusless but actually stole),
+        // ActionApi stamps "WKAppBot_FocusStealer-{action}" on the root hwnd.
+        // Force yield popup so user gets warned before the next action too.
+        bool focusStealerFlagged = false;
+        try
+        {
+            if (!req.QuickMode && mainHwnd != IntPtr.Zero && req.IntendedAction != null)
+            {
+                const string FocusStealerPrefix = "WKAppBot_FocusStealer-";
+                var propVal = NativeMethods.GetPropW(mainHwnd, $"{FocusStealerPrefix}{req.IntendedAction.ToLowerInvariant()}");
+                if (propVal != IntPtr.Zero)
+                {
+                    focusStealerFlagged = true;
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine(
+                        $"  [READINESS] ⚠ FocusStealer: '{req.IntendedAction}' previously stole focus on hwnd=0x{mainHwnd:X} → forcing yield popup");
+                    Console.ResetColor();
+                }
+            }
+        }
+        catch { }
+
+        if (!req.QuickMode && (NeedsFocusForAction(methods, req.IntendedAction) || focusStealerFlagged))
         {
             bool targetIsForeground = mainHwnd != IntPtr.Zero
                 && NativeMethods.GetForegroundWindow() == mainHwnd;

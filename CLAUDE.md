@@ -405,6 +405,15 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - claude-usage: UIA로 Claude Desktop 사용량 조회 (설정→사용량, 탭 바운스 리프레시, 풀 포커스리스)
   - suggest: 건의서 웹훅 직접 POST (#클봇-전체) + 파일첨부(bot_token API) + HQ suggestions.jsonl
   - ArgParser: ParseTextAndFiles / ParseTextAndFilesWithMarkers 공통로직 (5곳 통합: ask/slack send/reply/suggest/clipboard)
+- **v3.5.4 FocusStealer Win32 prop — 포커스 강탈 창 자동 표시 + 노하우 자동 기록**
+  - ActionApi: UIA 액션(invoke/toggle/select/expand/collapse) 후 포커스 변화 감지
+    - 포커스 강탈 시: `SetPropW(rootHwnd, "WKAppBot_FocusStealer-{action}", 1)` 스탬프
+    - `ActionApi.OnFocusStealer` 콜백 → `FocuslessWarningOverlay` 즉시 표시
+  - InputReadiness: 다음 Probe() 시 FocusStealer prop 체크 → yield 팝업 강제
+    - 포커스리스 액션도 이전에 강탈 이력 있으면 yield 팝업 표시
+  - 노하우 자동 기록: `AppendFocusStealerKnowhow` → OS 경험 DB에 자동 append
+    - 창 노드: `experience/{proc}/{class}/knowhow-{action}.md`
+    - 앱 노드: `experience/{proc}/knowhow.md`
 - **v3.5.2 file-read/write + knowhow broadcast + ask focusless + CDP tab close**
   - a11y file-read/file-write: 인코딩 변환 파일 I/O (CP949/UTF-8/etc.) — Claude CP949 한글소스 셀프힐링
     - file-write `@file` 패턴: Claude가 UTF-8 임시파일에 쓰고 wkappbot이 CP949로 재인코딩

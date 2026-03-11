@@ -2,6 +2,7 @@ using System.Drawing;
 using FlaUI.Core.AutomationElements;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Input;
+using WKAppBot.Win32.Native;
 
 namespace WKAppBot.CLI;
 
@@ -16,51 +17,73 @@ namespace WKAppBot.CLI;
 ///
 /// Modeled after FocuslessGuard: global static class, policy at API boundary.
 /// Tag: [ZOOM]
+/// Tag: [FOCUSSTEALER] — marks windows that steal focus during nominally-focusless UIA actions.
 /// </summary>
 public static class ActionApi
 {
     /// <summary>Master switch for zoom overlays. Default = true.</summary>
     public static bool ZoomEnabled { get; set; } = true;
 
+    // ── FocusStealer Win32 prop ──
+    // If a nominally-focusless UIA action (invoke/toggle/select/expand/collapse) steals focus,
+    // we stamp the root hwnd with "WKAppBot_FocusStealer-{action}" = 1.
+    // Next time InputReadiness.Probe() runs on the same hwnd, it forces the yield popup.
+    // Prop is auto-cleaned when the window closes (Win32 guarantee).
+
+    public const string FocusStealerPropPrefix = "WKAppBot_FocusStealer-";
+
+    /// <summary>Fired when a UIA action steals focus. Args: (rootHwnd, actionName).</summary>
+    public static Action<IntPtr, string>? OnFocusStealer;
+
     // ── UIA Focusless Actions ──
 
     public static bool Invoke(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "invoke", label);
+        var prevFg = NativeMethods.GetForegroundWindow();
         var ok = UiaLocator.TryInvoke(el);
         EndZoom(zoom, ok, "Invoke", label);
+        CheckFocusTheft(hwnd, "invoke", prevFg);
         return ok;
     }
 
     public static bool Select(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "select", label);
+        var prevFg = NativeMethods.GetForegroundWindow();
         var ok = UiaLocator.TrySelect(el);
         EndZoom(zoom, ok, "Select", label);
+        CheckFocusTheft(hwnd, "select", prevFg);
         return ok;
     }
 
     public static bool Toggle(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "toggle", label);
+        var prevFg = NativeMethods.GetForegroundWindow();
         var ok = UiaLocator.TryToggle(el);
         EndZoom(zoom, ok, "Toggle", label);
+        CheckFocusTheft(hwnd, "toggle", prevFg);
         return ok;
     }
 
     public static bool Expand(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "expand", label);
+        var prevFg = NativeMethods.GetForegroundWindow();
         var ok = UiaLocator.TryExpand(el);
         EndZoom(zoom, ok, "Expand", label);
+        CheckFocusTheft(hwnd, "expand", prevFg);
         return ok;
     }
 
     public static bool Collapse(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "collapse", label);
+        var prevFg = NativeMethods.GetForegroundWindow();
         var ok = UiaLocator.TryCollapse(el);
         EndZoom(zoom, ok, "Collapse", label);
+        CheckFocusTheft(hwnd, "collapse", prevFg);
         return ok;
     }
 
@@ -69,6 +92,7 @@ public static class ActionApi
         using var zoom = BeginZoomForElement(el, hwnd, "scroll", label);
         var ok = UiaLocator.TryScrollIntoView(el);
         EndZoom(zoom, ok, "ScrollIntoView", label);
+        // Scroll doesn't steal focus — skip check
         return ok;
     }
 
@@ -139,5 +163,53 @@ public static class ActionApi
             zoom.ShowPass($"{verb} {label}");
         else
             zoom.ShowFail($"{verb} failed: {label}");
+    }
+
+    // ── FocusStealer Detection ──
+
+    /// <summary>
+    /// After a nominally-focusless UIA action, check if the foreground window changed.
+    /// If it did, stamp the root hwnd with a Win32 prop and fire OnFocusStealer.
+    /// On the next Probe() call targeting the same hwnd, InputReadiness will force yield popup.
+    /// </summary>
+    private static void CheckFocusTheft(IntPtr hwnd, string action, IntPtr prevFg)
+    {
+        try
+        {
+            var curFg = NativeMethods.GetForegroundWindow();
+            if (curFg == prevFg || prevFg == IntPtr.Zero) return;
+
+            // Restore previous foreground immediately
+            NativeMethods.SetForegroundWindow(prevFg);
+
+            var rootHwnd = NativeMethods.GetAncestor(hwnd, NativeMethods.GA_ROOT);
+            if (rootHwnd == IntPtr.Zero) rootHwnd = hwnd;
+
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine(
+                $"[FOCUSSTEALER] ⚠ {action} on hwnd=0x{hwnd:X} stole focus " +
+                $"(was 0x{prevFg:X}, now 0x{curFg:X}) — marked for yield next time");
+            Console.ResetColor();
+
+            // Stamp root hwnd: prop persists until window closes (cross-process, zero file I/O)
+            NativeMethods.SetPropW(rootHwnd, $"{FocusStealerPropPrefix}{action}", (IntPtr)1);
+
+            // Notify subscribers (knowhow writer, etc.)
+            OnFocusStealer?.Invoke(rootHwnd, action);
+        }
+        catch { /* non-critical */ }
+    }
+
+    /// <summary>Check if a given hwnd has a FocusStealer stamp for the specified action.</summary>
+    public static bool HasFocusStealerProp(IntPtr hwnd, string action)
+    {
+        try
+        {
+            if (hwnd == IntPtr.Zero) return false;
+            var rootHwnd = NativeMethods.GetAncestor(hwnd, NativeMethods.GA_ROOT);
+            if (rootHwnd == IntPtr.Zero) rootHwnd = hwnd;
+            return NativeMethods.GetPropW(rootHwnd, $"{FocusStealerPropPrefix}{action}") != IntPtr.Zero;
+        }
+        catch { return false; }
     }
 }
