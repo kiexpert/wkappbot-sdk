@@ -88,6 +88,40 @@ check   "a11y windows"     bash -c "\"$WKA\" a11y windows 2>&1 | grep -q '\['"
 check_g "a11y inspect *"   bash -c "out=\$(\"$WKA\" a11y inspect \"*\" --depth 1 2>&1); echo \"\$out\" | grep -qiE 'match|notfound|error|inspect|windows|found' || [ -n \"\$out\" ]"
 check_g "windows cmd"      bash -c "\"$WKA\" windows 2>&1 | grep -q '\['"
 
+# ─── A11y Element actions (Calculator — launched & closed by test) ────────
+banner "A11y Element (Calculator)"
+# Launch calc, wait up to 3s, run element actions, then close
+CALC_LAUNCHED=0
+if timeout 4 bash -c 'start /b calc.exe 2>/dev/null; sleep 2; "'"$WKA"'" a11y windows 2>&1 | grep -qi "계산기\|Calculator"'; then
+    CALC_LAUNCHED=1
+fi
+# Alternative launch via wkappbot (focusless)
+if [ $CALC_LAUNCHED -eq 0 ]; then
+    powershell -Command "Start-Process calc.exe" 2>/dev/null
+    sleep 2
+    timeout 2 "$WKA" a11y windows 2>&1 | grep -qi "계산기\|Calculator" && CALC_LAUNCHED=1
+fi
+
+if [ $CALC_LAUNCHED -eq 1 ]; then
+    CALC="*계산기*;*Calculator*"
+    check   "calc: read"        bash -c "\"$WKA\" a11y read \"$CALC\" 2>&1 | grep -qiE 'name=|value=|pattern|ok'"
+    check   "calc: find"        bash -c "\"$WKA\" a11y find \"$CALC\" --depth 3 2>&1 | grep -qiE 'found|Button|result|CalculatorResults'"
+    check   "calc: screenshot"  bash -c "\"$WKA\" a11y screenshot \"$CALC\" 2>&1 | grep -qiE 'saved|captured'"
+    check   "calc: highlight"   bash -c "\"$WKA\" a11y highlight \"$CALC#num5Button\" 2>&1 | grep -qiE 'highlight|zoom|ok'"
+    # 5 + 3 = 8  (focusless UIA Invoke)
+    check   "calc: invoke 5"    bash -c "\"$WKA\" a11y invoke \"$CALC#num5Button\" 2>&1 | grep -qiE 'ok|invoke'"
+    check   "calc: invoke +"    bash -c "\"$WKA\" a11y invoke \"$CALC#plusButton\" 2>&1 | grep -qiE 'ok|invoke'"
+    check   "calc: invoke 3"    bash -c "\"$WKA\" a11y invoke \"$CALC#num3Button\" 2>&1 | grep -qiE 'ok|invoke'"
+    check   "calc: invoke ="    bash -c "\"$WKA\" a11y invoke \"$CALC#equalButton\" 2>&1 | grep -qiE 'ok|invoke'"
+    # Read result — CalculatorResults should show 8
+    check   "calc: result=8"    bash -c "\"$WKA\" a11y read \"$CALC#CalculatorResults\" 2>&1 | grep -q '8'"
+    # Close calculator
+    timeout 5 "$WKA" a11y close "$CALC" >/dev/null 2>&1
+    echo "  (Calculator closed)"
+else
+    skip "calc element actions (could not launch calculator)"
+fi
+
 # ─── A11y Element actions (desktop/taskbar — always present) ──────────────
 # Target: Shell_TrayWnd (taskbar) + Progman (desktop) — no app needed
 banner "A11y Element (System UI)"
