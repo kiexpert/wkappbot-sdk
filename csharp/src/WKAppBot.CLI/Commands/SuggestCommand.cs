@@ -16,16 +16,21 @@ internal partial class Program
     {
         if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
         {
-            Console.WriteLine("Usage: wkappbot suggest \"건의 내용\" [file.png] [\"추가 내용\"]");
+            Console.WriteLine("Usage: wkappbot suggest \"text\" [file.png] [\"more text\"]");
             Console.WriteLine("  Send a suggestion/feature request to #클봇-전체 via webhook.");
             Console.WriteLine("  Args = lines (like ask/slack send). Files auto-detected & attached.");
             Console.WriteLine("  Automatically tags sender's workspace (CWD shortname).");
             Console.WriteLine("  Also saves to wkappbot.hq/suggestions.jsonl for local record.");
             Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("  ⚠ Write in ENGLISH to save tokens (Korean = 2-3x token cost).");
+            Console.WriteLine("     Short & precise wins. Senior Claudes will thank you. 🙏");
+            Console.ResetColor();
+            Console.WriteLine();
             Console.WriteLine("Examples:");
-            Console.WriteLine("  wkappbot suggest \"돋보기가 폼 열 때 안 뜹니다\"");
-            Console.WriteLine("  wkappbot suggest \"MDI 자식 윈도우 UIA 지원 필요\" screenshot.png");
-            Console.WriteLine("  wkappbot suggest \"이슈 발견\" error.png \"재현 방법: ...\"");
+            Console.WriteLine("  wkappbot suggest \"Magnifier doesn't appear when form opens\"");
+            Console.WriteLine("  wkappbot suggest \"Need UIA support for MDI child windows\" screenshot.png");
+            Console.WriteLine("  wkappbot suggest \"Bug found\" error.png \"Steps to reproduce: ...\"");
             return 0;
         }
 
@@ -36,6 +41,9 @@ internal partial class Program
         if (string.IsNullOrEmpty(cwdTag)) cwdTag = "unknown";
 
         Console.WriteLine($"[SUGGEST] from [{cwdTag}]");
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("  ⚠ Tip: write suggestions in ENGLISH — Korean = 2-3x token cost.");
+        Console.ResetColor();
         Console.WriteLine($"[SUGGEST] {text}");
         if (files.Count > 0)
             Console.WriteLine($"[SUGGEST] {files.Count} file(s): {string.Join(", ", files.Select(Path.GetFileName))}");

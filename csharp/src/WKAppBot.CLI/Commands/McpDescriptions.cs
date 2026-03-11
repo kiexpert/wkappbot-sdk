@@ -33,7 +33,8 @@ internal partial class Program
         "Utility: clipboard (show help), clipboard-read (read text), clipboard-write (write text/files — mixed mode with [file:] markers)\n" +
         "File I/O: file-read (read file as Unicode — supports --encoding 949/utf-8/etc.), file-write (write Unicode content as target encoding — use @file to reference temp content)\n" +
         "AI Agents (삼두협의체): ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini) — auto image capture from responses\n" +
-        "Feedback: suggest (send feature request to Slack webhook + local suggestions.jsonl, optional file attachment)\n\n" +
+        "Feedback: suggest (send feature request to Slack webhook + local suggestions.jsonl, optional file attachment)\n" +
+        "  ⚠ suggest: ALWAYS write in English — Korean text = 2-3x token waste. Short & precise wins.\n\n" +
         "## Fallback Chain (battle-tested!)\n" +
         "CSS selector on Chrome/Electron class → CDP engine → UIA fallback.\n" +
         "UIA pattern on web view class → if UIA fails → CDP retry.\n" +
