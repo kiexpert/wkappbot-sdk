@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Management;
 using System.Text;
 using System.Text.RegularExpressions;
 using FlaUI.Core.AutomationElements;
@@ -1476,10 +1477,11 @@ internal partial class Program
         string? filterTitle = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : GetArgValue(args, "--filter");
         string? filterProcess = GetArgValue(args, "--process");
         string? filterClass = GetArgValue(args, "--class");
-        bool showAll = args.Contains("--all"); // include zero-size/invisible
+        bool showAll = args.Contains("--all"); // include zero-size/invisible (also bypasses wkappbot self-filter)
         bool deep = args.Contains("--deep");   // include child windows (EnumChildWindows)
         bool uiaDeep = args.Contains("--uia-deep"); // deep UIA search (find --deep)
         bool uiaSearch = uiaDeep || args.Contains("--uia"); // also search UIA elements
+        bool showCmd = args.Contains("--cmd"); // show process path + command line args
         int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 0; // 0=unlimited
         bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null;
 
@@ -1495,6 +1497,24 @@ internal partial class Program
             try { name = Process.GetProcessById((int)pid).ProcessName; } catch { }
             processCache[pid] = name;
             return name;
+        }
+
+        // Command line cache (WMI, lazy — only used when --cmd)
+        var cmdLineCache = new Dictionary<uint, string>();
+        string GetCommandLine(uint pid)
+        {
+            if (cmdLineCache.TryGetValue(pid, out var cached)) return cached;
+            string cmd = "";
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    $"SELECT CommandLine FROM Win32_Process WHERE ProcessId={pid}");
+                foreach (System.Management.ManagementObject mo in searcher.Get())
+                    cmd = mo["CommandLine"]?.ToString() ?? "";
+            }
+            catch { }
+            cmdLineCache[pid] = cmd;
+            return cmd;
         }
 
         // Get window info, apply filters. Returns null if filtered out or noise.
@@ -1521,8 +1541,9 @@ internal partial class Program
             if (!showAll && string.IsNullOrEmpty(title) && !visible) return null;
             if (!showAll && w == 0 && h == 0) return null;
 
-            // Skip wkappbot windows (Eye/Zoom overlays) — don't search ourselves
-            if (processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
+            // Skip wkappbot windows (Eye/Zoom overlays) — don't pollute results.
+            // --all overrides: useful to identify mcp/eye/a11y processes by args (--cmd).
+            if (!showAll && processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
 
             // Apply filters — ★ standard search key with focus flags
             if (filterTitle != null)
@@ -1561,6 +1582,29 @@ internal partial class Program
             string displayTitle = title.Length > 60 ? title[..57] + "..." : title;
             if (string.IsNullOrEmpty(displayTitle)) displayTitle = "(no title)";
 
+            // --cmd: resolve process exe path + command line args
+            string? exePath = null;
+            string? cmdArgs = null;
+            if (showCmd)
+            {
+                try { exePath = Process.GetProcessById((int)pid).MainModule?.FileName; } catch { }
+                var fullCmd = GetCommandLine(pid);
+                if (!string.IsNullOrEmpty(fullCmd))
+                {
+                    // Strip leading exe path (quoted or unquoted) to show only the args
+                    if (fullCmd.StartsWith('"'))
+                    {
+                        int end = fullCmd.IndexOf('"', 1);
+                        cmdArgs = end > 0 ? fullCmd[(end + 1)..].TrimStart() : fullCmd;
+                    }
+                    else
+                    {
+                        int sp = fullCmd.IndexOf(' ');
+                        cmdArgs = sp > 0 ? fullCmd[(sp + 1)..] : "";
+                    }
+                }
+            }
+
             // Collect style tags for automation-relevant properties
             int style = NativeMethods.GetWindowLongW(hWnd, NativeMethods.GWL_STYLE);
             int exStyle = NativeMethods.GetWindowLongW(hWnd, NativeMethods.GWL_EXSTYLE);
@@ -1591,6 +1635,17 @@ internal partial class Program
                 Console.ResetColor();
             }
             Console.WriteLine();
+
+            // --cmd: print process exe path + args
+            if (showCmd && (exePath != null || cmdArgs != null))
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                if (exePath != null)
+                    Console.WriteLine($"    📂 {exePath}");
+                if (!string.IsNullOrEmpty(cmdArgs))
+                    Console.WriteLine($"    ▶  {cmdArgs}");
+                Console.ResetColor();
+            }
 
             // Show focus child + owned popup (foreground or filtered matches)
             if (!isChild && (isForeground || hasFilter))
@@ -1763,8 +1818,9 @@ internal partial class Program
             if (!showAll && string.IsNullOrEmpty(title) && !visible) return null;
             if (!showAll && w == 0 && h == 0) return null;
 
-            // Skip wkappbot windows (Eye/Zoom overlays) — don't search ourselves
-            if (processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
+            // Skip wkappbot windows (Eye/Zoom overlays) — don't pollute results.
+            // --all overrides: useful to identify mcp/eye/a11y processes by args (--cmd).
+            if (!showAll && processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
 
             // Process/class filters still apply (not title!)
             if (filterProcess != null)
