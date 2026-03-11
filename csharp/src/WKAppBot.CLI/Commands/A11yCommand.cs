@@ -81,6 +81,9 @@ internal partial class Program
             }
         }
 
+        if (args.Length == 1 && args[0] is "file-read" or "file-write")
+            return Error($"{args[0]} requires a file path: a11y {args[0]} \"path/to/file.cpp\" [--encoding 949]");
+
         if (args.Length < 2)
         {
             var ver = typeof(Program).Assembly.GetName().Version;
@@ -132,6 +135,9 @@ internal partial class Program
             Console.WriteLine("  clipboard        Read clipboard text (Unicode + CP949 auto-detect)");
             Console.WriteLine("  clipboard-write  Write text/files to clipboard");
             Console.WriteLine("                   \"line1\" \"line2\" → text, file paths → CF_HDROP");
+            Console.WriteLine("  file-read <path> [--encoding 949]   Read file as Unicode (CP949/UTF-8/...)");
+            Console.WriteLine("  file-write <path> --text \"...\" [--encoding 949]   Write with re-encoding");
+            Console.WriteLine("                   Use --text \"@tmp.txt\" to reference a temp file (large content)");
             Console.WriteLine();
             Console.WriteLine("═══ Target Selection ══════════════════════════════════════");
             Console.WriteLine("  (default)   First match");
@@ -291,7 +297,11 @@ internal partial class Program
 
         // ═══ Special: file-read / file-write (encoding-aware, no window needed) ═══
         if (action is "file-read" or "file-write")
+        {
+            if (string.IsNullOrEmpty(grap))
+                return Error($"{action} requires a file path: a11y {action} \"path/to/file.cpp\" [--encoding 949]");
             return FileReadWrite(action, grap, text, encodingArg, args);
+        }
 
         // ═══ Special: wait action (polls for window/element, early return) ═══
         if (action == "wait")
