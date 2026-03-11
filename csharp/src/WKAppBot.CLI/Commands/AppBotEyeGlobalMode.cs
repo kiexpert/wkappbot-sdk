@@ -115,11 +115,10 @@ internal partial class Program
             posY = y;
         }
 
-        // ── Kill stale Eye processes (non-hot-swap start only) ──
-        // Only kill processes that have been running ≥30s — short-lived commands (tick, inspect, etc.)
-        // that triggered this auto-launch are spared. Stale Eyes are long-running (>>30s).
+        // ── Kill stale Eye processes ──
         if (replacePid == 0)
         {
+            // Normal start: sweep stale Eyes (running ≥30s — excludes short-lived commands)
             int myPid = Environment.ProcessId;
             var myStartTime = DateTime.UtcNow;
             var staleThreshold = myStartTime - TimeSpan.FromSeconds(30);
@@ -128,7 +127,6 @@ internal partial class Program
                 if (proc.Id == myPid) continue;
                 try
                 {
-                    // Skip recently started processes — they are short-lived commands, not stale Eyes
                     if (proc.StartTime.ToUniversalTime() > staleThreshold) continue;
                     proc.Kill();
                     proc.WaitForExit(3000);
@@ -140,9 +138,35 @@ internal partial class Program
                 finally { proc.Dispose(); }
             }
         }
+        else
+        {
+            // Hot-swap start: old Eye should self-exit (cts.Cancel), but if it goes zombie,
+            // force-kill after 1 minute. Fire-and-forget — does not block startup.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(60_000);
+                try
+                {
+                    using var old = Process.GetProcessById(replacePid);
+                    if (!old.HasExited)
+                    {
+                        old.Kill();
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"[EYE:HOT-SWAP] Force-killed zombie old Eye (PID={replacePid}) after 1min grace");
+                        Console.ResetColor();
+                    }
+                }
+                catch { /* already exited — happy path */ }
+            });
+        }
 
         // Acquire named mutex — signals to other processes that GlobalMode Eye is running
         _eyeRunMutex = new System.Threading.Mutex(true, @"Global\WKAppBotEyeGlobal", out _);
+
+        // Thread-local console routing: command threads → pipe StringWriter, Eye threads → real console
+        Console.SetOut(new ThreadRoutingWriter(Console.Out));
+        // Start command pipe server — Launcher delegates commands here (zero cold-start)
+        EyeCmdPipeServer.StartServer();
 
         using var host = new AppBotEyeHost();
         host.Start(width, height, posX, posY, ownerHwnd: IntPtr.Zero);
@@ -388,6 +412,7 @@ internal partial class Program
         InitFileWatchers();
 
         // ── Whisper Spectrum Ring (always-on mic → radial HUD overlay) ──
+        var eyeStartTime = DateTime.UtcNow; // gate: auto-study allowed only after 10 min
         WhisperEngine? whisperEngine = null;
         WhisperRingHost? whisperRing = null;
         WhisperExperienceDb? whisperExp = null;
@@ -408,9 +433,25 @@ internal partial class Program
                 bool sttOk = whisperExp.StartStt();
 
                 // Auto-study: when _unknown/ reaches 10 files, run study in background
+                // Gate: skip for first 10 min after Eye starts, then enforce 10-min minimum interval
                 var expRef = whisperExp; // capture for closure
+                DateTime lastStudyTime = DateTime.MinValue;
                 whisperExp.OnAutoStudyNeeded += (count) =>
                 {
+                    var now = DateTime.UtcNow;
+                    if ((now - eyeStartTime).TotalMinutes < 10)
+                    {
+                        Console.WriteLine($"[WHISPER] Auto-study deferred (Eye started {(now - eyeStartTime).TotalMinutes:F1} min ago, wait 10 min)");
+                        expRef.NotifyAutoStudyDone();
+                        return;
+                    }
+                    if ((now - lastStudyTime).TotalMinutes < 10)
+                    {
+                        Console.WriteLine($"[WHISPER] Auto-study deferred (last study {(now - lastStudyTime).TotalMinutes:F1} min ago, wait 10 min)");
+                        expRef.NotifyAutoStudyDone();
+                        return;
+                    }
+                    lastStudyTime = now;
                     ThreadPool.QueueUserWorkItem(_ =>
                     {
                         try
@@ -446,10 +487,12 @@ internal partial class Program
                 };
 
                 // Mic PCM → parallel MP3 recording for Gemini STT
+                // Align channel count FIRST so LameMP3FileWriter uses correct WaveFormat
+                whisperExp?.SetMicChannels(whisperEngine.Channels);
                 whisperEngine.OnMicData += (buf, len) => whisperExp?.WriteMicData(buf, len);
 
                 // Mic segment ready → move to _unknown/ for batch Gemini STT (no real-time processing)
-                whisperExp.OnMicSegmentReady += (mp3Path) =>
+                whisperExp!.OnMicSegmentReady += (mp3Path) =>
                 {
                     try
                     {

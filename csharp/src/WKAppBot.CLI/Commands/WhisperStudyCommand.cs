@@ -193,6 +193,23 @@ internal partial class Program
         // Cleanup batch file
         try { File.Delete(batchFile); } catch { }
 
+        // Delete source MP3s that were successfully processed (moved to label folder)
+        foreach (var f in mp3Files)
+        {
+            if (!File.Exists(f)) continue; // already moved
+            try { File.Delete(f); } catch { }
+        }
+
+        // Purge 0-byte mic files that failed to record
+        var micDir2 = Path.Combine(wavDir, "_mic");
+        if (Directory.Exists(micDir2))
+        {
+            int purged = 0;
+            foreach (var f in Directory.GetFiles(micDir2, "*.mp3"))
+                if (new FileInfo(f).Length == 0) { try { File.Delete(f); purged++; } catch { } }
+            if (purged > 0) Console.WriteLine($"[STUDY] Purged {purged} empty mic files");
+        }
+
         Console.WriteLine("[STUDY] Done!");
         return 0;
     }
@@ -208,10 +225,11 @@ internal partial class Program
         if (Directory.Exists(unknownDir))
             allMp3s.AddRange(Directory.GetFiles(unknownDir, "*.mp3"));
 
-        // Other subfolders
+        // Other subfolders (skip _mic — raw captures before study, skip _unknown already added)
         foreach (var subDir in Directory.GetDirectories(wavDir).OrderBy(d => d))
         {
-            if (Path.GetFileName(subDir) == "_unknown") continue;
+            var name = Path.GetFileName(subDir);
+            if (name == "_unknown" || name == "_mic") continue;
             allMp3s.AddRange(Directory.GetFiles(subDir, "*.mp3"));
         }
 
@@ -221,6 +239,7 @@ internal partial class Program
 
         // Sort by companion JSON age: no JSON = MinValue (oldest/first), then by JSON write time
         return allMp3s
+            .Where(f => new FileInfo(f).Length > 0) // skip 0-byte files (incomplete recordings)
             .OrderBy(f =>
             {
                 var jp = Path.ChangeExtension(f, ".json");

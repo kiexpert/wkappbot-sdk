@@ -1,0 +1,113 @@
+scenario:
+  name: "투혼 Focusless Pattern Test"
+  description: "Test all UIA patterns on 투혼 [1101] 현재가 - focusless operations"
+
+app:
+  process: "XingQSmartMain"
+  wait_for_window:
+    title_contains: "투혼"
+
+config:
+  continue_on_error: true
+  retry_count: 0
+  prefer_focusless: true
+  focus_check: false
+
+steps:
+  # --- 1. TabItem SelectionItem 패턴 (Focusless!) ---
+  - name: "[Tab] Select '상세' tab"
+    target:
+      automation_id: "3805"
+    action: select
+    params:
+      item_text: "상세"
+
+  - name: "[Tab] Select 'Signal' tab"
+    target:
+      automation_id: "3805"
+    action: select
+    params:
+      item_text: "Signal"
+
+  - name: "[Tab] Select '업종' tab"
+    target:
+      automation_id: "3805"
+    action: select
+    params:
+      item_text: "업종"
+
+  - name: "[Tab] Select '시세' tab (restore)"
+    target:
+      automation_id: "3805"
+    action: select
+    params:
+      item_text: "시세"
+
+  # --- 2. 하단 탭 (체결/일별/투자자/...) ---
+  - name: "[Tab2] Select '투자자' tab"
+    target:
+      automation_id: "3810"
+    action: select
+    params:
+      item_text: "투자자"
+
+  - name: "[Tab2] Select '매물' tab"
+    target:
+      automation_id: "3810"
+    action: select
+    params:
+      item_text: "매물"
+
+  - name: "[Tab2] Select '체결' tab (restore)"
+    target:
+      automation_id: "3810"
+    action: select
+    params:
+      item_text: "체결"
+
+  # --- 3. Button Invoke 패턴 (Focusless!) ---
+  - name: "[Button] Click aid=3795 (top-right button)"
+    target:
+      automation_id: "3795"
+    action: click
+
+  - name: "[Button] Click aid=3860 (small 15x15)"
+    target:
+      automation_id: "3860"
+    action: click
+
+  # --- 4. Scroll 패턴 ---
+  - name: "[Scroll] Scroll down on aid=3825"
+    target:
+      automation_id: "3825"
+    action: scroll
+    params:
+      direction: "down"
+      amount: 3
+
+  - name: "[Scroll] Scroll up on aid=3825"
+    target:
+      automation_id: "3825"
+    action: scroll
+    params:
+      direction: "up"
+      amount: 3
+
+  - name: "[Scroll] Scroll down on aid=3835 (호가)"
+    target:
+      automation_id: "3835"
+    action: scroll
+    params:
+      direction: "down"
+      amount: 3
+
+  # --- 5. Wait + Screenshot ---
+  - name: "Wait 1s"
+    action: wait
+    params:
+      seconds: 1
+
+  - name: "Screenshot result"
+    action: screenshot
+    params:
+      filename: "tuhon_focusless_test.png"

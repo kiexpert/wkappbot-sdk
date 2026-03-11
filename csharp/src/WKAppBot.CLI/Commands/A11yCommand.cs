@@ -84,6 +84,9 @@ internal partial class Program
         if (args.Length == 1 && args[0] is "file-read" or "file-write")
             return Error($"{args[0]} requires a file path: a11y {args[0]} \"path/to/file.cpp\" [--encoding 949]");
 
+        if (args.Length == 1 && args[0] is "clipboard-read" or "clipboard")
+            return ClipboardRead();
+
         if (args.Length < 2)
         {
             var ver = typeof(Program).Assembly.GetName().Version;
@@ -200,6 +203,8 @@ internal partial class Program
         bool forceCloseAncestors = args.Any(a => a == "--force-close-ancestors");
         bool speak = args.Any(a => a == "--speak");
         bool repeat = args.Any(a => a == "--repeat");
+        int countN = 1;
+        { var ci = Array.IndexOf(args, "--count"); if (ci >= 0 && ci + 1 < args.Length && int.TryParse(args[ci + 1], out var cv)) countN = Math.Max(1, cv); }
 
         // Parse action-specific params
         int? mx = null, my = null, mw = null, mh = null;
@@ -560,7 +565,7 @@ internal partial class Program
                 }
             }
 
-            bool success;
+            bool success = false;
 
             if (isElementAction)
             {
@@ -655,32 +660,52 @@ internal partial class Program
                 // Zoom: show magnifier/highlight on target element
                 var elRect = GetBoundingRect(root);
                 var elHwnd = GetElementHwnd(root);
-                ClickZoomHelper? zoom = null;
-                if (action != "highlight") // highlight manages its own zoom
+                // Pre-measure WM_NULL baseline — cached for invoke hollow detection (TTL=3s)
+                if (elHwnd != IntPtr.Zero) PreheatWindow(elHwnd);
+
+                // Zoom: fire in parallel so it doesn't block the action (WPF creation ~330ms)
+                Task<ClickZoomHelper?>? zoomTask = null;
+                if (action != "highlight")
                 {
-                    if (elHwnd != IntPtr.Zero)
-                        zoom = ClickZoomHelper.Begin(elHwnd, hwnd, $"a11y-{action}", $"{elType} \"{elName}\"");
-                    else if (elRect != null)
-                        zoom = ClickZoomHelper.BeginFromRect(elRect.Value, hwnd, $"a11y-{action}", $"{elType} \"{elName}\"");
+                    var capturedHwnd = elHwnd; var capturedRect = elRect;
+                    var capturedLabel = $"{elType} \"{elName}\"";
+                    zoomTask = Task.Run<ClickZoomHelper?>(() => capturedHwnd != IntPtr.Zero
+                        ? ClickZoomHelper.Begin(capturedHwnd, hwnd, $"a11y-{action}", capturedLabel)
+                        : capturedRect != null ? ClickZoomHelper.BeginFromRect(capturedRect.Value, hwnd, $"a11y-{action}", capturedLabel)
+                        : null);
                 }
 
-                success = action switch
+                // --count N: stress-test loop, reports per-iteration timing
+                var swTotal = System.Diagnostics.Stopwatch.StartNew();
+                for (int ci = 0; ci < countN; ci++)
                 {
-                    "highlight" => A11yHighlight(root, hwnd),
-                    "find" => A11yFind(root, hwnd, findDepth),
-                    "read" => A11yRead(root),
-                    "invoke" => A11yInvoke(root, hwnd),
-                    "click" => A11yClick(root, hwnd),
-                    "toggle" => A11yToggle(root, hwnd),
-                    "expand" => A11yExpand(root),
-                    "collapse" => A11yCollapse(root),
-                    "select" => A11ySelectItem(root),
-                    "scroll" => A11yScrollAction(root, hwnd, scrollDir, scrollAmount),
-                    "type" => A11yType(root, hwnd, text!),
-                    "set-value" => A11ySetValue(root, hwnd, text!),
-                    "set-range" => A11ySetRange(root, rangeValue!.Value),
-                    _ => A11yNotYet(action)
-                };
+                    var swIter = System.Diagnostics.Stopwatch.StartNew();
+                    success = action switch
+                    {
+                        "highlight" => A11yHighlight(root, hwnd),
+                        "find" => A11yFind(root, hwnd, findDepth),
+                        "read" => A11yRead(root),
+                        "invoke" => A11yInvoke(root, hwnd),
+                        "click" => A11yClick(root, hwnd),
+                        "toggle" => A11yToggle(root, hwnd),
+                        "expand" => A11yExpand(root),
+                        "collapse" => A11yCollapse(root),
+                        "select" => A11ySelectItem(root),
+                        "scroll" => A11yScrollAction(root, hwnd, scrollDir, scrollAmount),
+                        "type" => A11yType(root, hwnd, text!),
+                        "set-value" => A11ySetValue(root, hwnd, text!),
+                        "set-range" => A11ySetRange(root, rangeValue!.Value),
+                        _ => A11yNotYet(action)
+                    };
+                    swIter.Stop();
+                    if (countN > 1)
+                        Console.WriteLine($"[A11Y] [{ci+1}/{countN}] {(success?"ok":"FAIL")} {swIter.ElapsedMilliseconds}ms");
+                }
+                swTotal.Stop();
+                if (countN > 1)
+                    Console.WriteLine($"[A11Y] stress: {countN} iters, total={swTotal.ElapsedMilliseconds}ms, avg={swTotal.ElapsedMilliseconds/countN}ms, rate={countN*1000.0/swTotal.ElapsedMilliseconds:F1}/s");
+
+                var zoom = zoomTask?.GetAwaiter().GetResult();
 
                 // --speak: TTS 카라오케 (a11y 공통 옵션)
                 if (speak && success)

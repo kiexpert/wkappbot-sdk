@@ -495,6 +495,7 @@ Options:
 
     private static void LaunchAppBotEyeIfNeededCore(string extraArgs)
     {
+        if (Program.RunningInEye) return; // already inside Eye — skip spawn
         try
         {
             // Check for existing AppBotEye window by title "WK AppBot Eye"

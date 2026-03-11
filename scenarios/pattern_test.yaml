@@ -1,0 +1,91 @@
+# UIA Pattern Full Support Test v2
+# Tests: Invoke (existing) + Window close (new) + Toggle (via nav button)
+scenario:
+  name: "UIA Pattern Test v2"
+  description: "Test UIA patterns: Invoke + ExpandCollapse + Window"
+
+app:
+  launch: "calc.exe"
+  wait_for_window:
+    title_contains: "계산기"
+
+config:
+  continue_on_error: true
+  prefer_focusless: true
+
+steps:
+  # ── Invoke pattern: focusless 4-op calculation ──
+  - name: "[Invoke] Click 1"
+    target:
+      automation_id: "num1Button"
+    action: click
+
+  - name: "[Invoke] Click 5"
+    target:
+      automation_id: "num5Button"
+    action: click
+
+  - name: "[Invoke] Click Plus"
+    target:
+      automation_id: "plusButton"
+    action: click
+
+  - name: "[Invoke] Click 2"
+    target:
+      automation_id: "num2Button"
+    action: click
+
+  - name: "[Invoke] Click 7"
+    target:
+      automation_id: "num7Button"
+    action: click
+
+  - name: "[Invoke] Click Equals"
+    target:
+      automation_id: "equalButton"
+    action: click
+
+  - name: "[Assert] 15+27=42"
+    target:
+      automation_id: "CalculatorResults"
+    action: assert
+    params:
+      type: text_contains
+      expected: "42"
+
+  # ── ExpandCollapse pattern: open nav menu (focusless!) ──
+  - name: "[ExpandCollapse] Open navigation"
+    target:
+      automation_id: "TogglePaneButton"
+    action: click
+
+  - name: "Wait for menu animation"
+    action: wait
+    params:
+      seconds: 0.5
+
+  # Close it back
+  - name: "[ExpandCollapse] Close navigation"
+    target:
+      automation_id: "TogglePaneButton"
+    action: click
+
+  - name: "Wait"
+    action: wait
+    params:
+      seconds: 0.3
+
+  # ── Assert: result preserved after menu open/close ──
+  - name: "[Assert] Result preserved"
+    target:
+      automation_id: "CalculatorResults"
+    action: assert
+    params:
+      type: text_contains
+      expected: "42"
+
+  # ── Window close via Invoke on Close button (focusless!) ──
+  - name: "[Window] Close Calculator via Invoke"
+    target:
+      automation_id: "Close"
+    action: click

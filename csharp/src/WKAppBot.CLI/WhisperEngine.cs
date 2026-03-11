@@ -98,6 +98,9 @@ internal sealed class WhisperEngine : IDisposable
     /// <summary>Current device index (default 0).</summary>
     public int DeviceIndex { get; set; }
 
+    /// <summary>Actual capture channel count (1=mono, 2=stereo). Valid after Start().</summary>
+    public int Channels => _waveIn?.WaveFormat.Channels ?? 1;
+
     public bool IsRunning => _analysisThread?.IsAlive == true;
 
     public WhisperEngine()

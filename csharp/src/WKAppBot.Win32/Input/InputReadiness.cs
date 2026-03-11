@@ -411,16 +411,34 @@ public sealed class InputReadiness
             bool targetIsForeground = mainHwnd != IntPtr.Zero
                 && NativeMethods.GetForegroundWindow() == mainHwnd;
 
-            if (targetIsForeground && !userRecent)
+            if (targetIsForeground && !userRecent && req.AutoApproveYield)
             {
-                // ── 타겟이 이미 전경 + 장기 idle → 승인창 없이 자동승인 ──
+                // ── 자동승인 즉시 (AutoApproveYield=true: Slack 프롬프트 전달 등 완전 자동화) ──
                 yieldRequested = true;
                 yieldConfirmed = true;
-                yieldFocusAcquired = true; // 이미 전경
+                yieldFocusAcquired = true;
 
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.WriteLine($"  [READINESS] Target foreground + user idle {idleMs / 1000}s — silent auto-approve");
+                Console.WriteLine($"  [READINESS] Target foreground + user idle {idleMs / 1000}s — silent auto-approve (AutoApproveYield)");
                 Console.ResetColor();
+            }
+            else if (targetIsForeground && !userRecent && UserInputWait != null)
+            {
+                // ── 타겟 전경 + 장기 idle → 3초 팝업 (잘보이게, 졸다가 막을 수 있게) ──
+                yieldRequested = true;
+                zoom?.UpdateStatus($"유저 idle {idleMs / 1000}s — 3초 후 자동 진행...");
+
+                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                Console.WriteLine($"  [READINESS] Target foreground + user idle {idleMs / 1000}s — 3s popup (cancellable)");
+                Console.ResetColor();
+                Console.Out.Flush();
+
+                swStep.Restart();
+                var yieldResult = UserInputWait.WaitForUserYield(mainHwnd, idleMs, timeoutSeconds: 3,
+                    positionHwnd: mainHwnd);
+                Console.WriteLine($"  [READINESS] 3s popup: approved={yieldResult.Approved} [{swStep.ElapsedMilliseconds}ms]");
+                yieldConfirmed = yieldResult.Approved;
+                yieldFocusAcquired = yieldResult.FocusAcquired || targetIsForeground;
             }
             else if (req.AutoApproveYield)
             {

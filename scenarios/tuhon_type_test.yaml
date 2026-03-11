@@ -1,0 +1,38 @@
+scenario:
+  name: "투혼 종목코드 입력 4-Tier Test"
+
+app:
+  process: "XingQSmartMain"
+  wait_for_window:
+    title_contains: "투혼"
+
+config:
+  continue_on_error: true
+  prefer_focusless: true
+  focus_check: true
+  focus_timeout: 5.0
+  focus_alert_delay: 3.0
+
+steps:
+  # Step 1: 현재가 폼의 종목코드 입력 필드에 005930 입력
+  - name: "Type stock code 005930"
+    target:
+      automation_id: "3780"
+      description: "종목코드 입력 필드"
+    action: type_text
+    params:
+      text: "005930"
+
+  - name: "Wait for update"
+    action: wait
+    params:
+      seconds: 2
+
+  # Step 2: 종목코드 값 확인
+  - name: "Verify stock code"
+    target:
+      automation_id: "3780"
+    action: assert
+    params:
+      type: text_contains
+      expected: "005930"

@@ -1,0 +1,12 @@
+scenario:
+  name: "Kiwoom Installer - Click Next"
+app:
+  wait_for_window:
+    title_contains: "OpenAPI"
+config:
+  continue_on_error: false
+steps:
+  - name: "Click Next"
+    target:
+      automation_id: "1"
+    action: click

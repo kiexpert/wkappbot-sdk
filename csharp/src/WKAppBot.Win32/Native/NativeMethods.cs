@@ -597,6 +597,15 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool BringWindowToTop(IntPtr hWnd);
 
+    // ── Paint detection (hollow invoke check) ──────────────────
+    /// <summary>Returns true if update region is non-empty (pending paint = something was redrawn).</summary>
+    [DllImport("user32.dll")]
+    public static extern bool GetUpdateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
+
+    /// <summary>Validates (clears) the update region so next GetUpdateRect starts fresh.</summary>
+    [DllImport("user32.dll")]
+    public static extern bool ValidateRect(IntPtr hWnd, IntPtr lpRect);
+
     // ── Focus / Alert ──────────────────────────────────────────
     [DllImport("user32.dll")]
     public static extern bool MessageBeep(uint uType);
