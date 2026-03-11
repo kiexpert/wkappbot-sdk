@@ -40,59 +40,60 @@ public static class ActionApi
     public static bool Invoke(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "invoke", label);
-        var prevFg = NativeMethods.GetForegroundWindow();
+        var snap = SnapshotState();
         var ok = UiaLocator.TryInvoke(el);
         EndZoom(zoom, ok, "Invoke", label);
-        CheckFocusTheft(hwnd, "invoke", prevFg);
+        CheckSideEffects(hwnd, "invoke", snap);
         return ok;
     }
 
     public static bool Select(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "select", label);
-        var prevFg = NativeMethods.GetForegroundWindow();
+        var snap = SnapshotState();
         var ok = UiaLocator.TrySelect(el);
         EndZoom(zoom, ok, "Select", label);
-        CheckFocusTheft(hwnd, "select", prevFg);
+        CheckSideEffects(hwnd, "select", snap);
         return ok;
     }
 
     public static bool Toggle(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "toggle", label);
-        var prevFg = NativeMethods.GetForegroundWindow();
+        var snap = SnapshotState();
         var ok = UiaLocator.TryToggle(el);
         EndZoom(zoom, ok, "Toggle", label);
-        CheckFocusTheft(hwnd, "toggle", prevFg);
+        CheckSideEffects(hwnd, "toggle", snap);
         return ok;
     }
 
     public static bool Expand(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "expand", label);
-        var prevFg = NativeMethods.GetForegroundWindow();
+        var snap = SnapshotState();
         var ok = UiaLocator.TryExpand(el);
         EndZoom(zoom, ok, "Expand", label);
-        CheckFocusTheft(hwnd, "expand", prevFg);
+        CheckSideEffects(hwnd, "expand", snap);
         return ok;
     }
 
     public static bool Collapse(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "collapse", label);
-        var prevFg = NativeMethods.GetForegroundWindow();
+        var snap = SnapshotState();
         var ok = UiaLocator.TryCollapse(el);
         EndZoom(zoom, ok, "Collapse", label);
-        CheckFocusTheft(hwnd, "collapse", prevFg);
+        CheckSideEffects(hwnd, "collapse", snap);
         return ok;
     }
 
     public static bool ScrollIntoView(AutomationElement el, IntPtr hwnd, string label)
     {
         using var zoom = BeginZoomForElement(el, hwnd, "scroll", label);
+        var snap = SnapshotState();
         var ok = UiaLocator.TryScrollIntoView(el);
         EndZoom(zoom, ok, "ScrollIntoView", label);
-        // Scroll doesn't steal focus — skip check
+        CheckSideEffects(hwnd, "scroll", snap);
         return ok;
     }
 
@@ -165,37 +166,75 @@ public static class ActionApi
             zoom.ShowFail($"{verb} failed: {label}");
     }
 
-    // ── FocusStealer Detection ──
+    // ── FocusStealer / MouseStealer Detection ──
+    // Nominally-focusless UIA actions (invoke/toggle/select/expand/collapse) should not
+    // change foreground window OR move the mouse cursor. If they do, we:
+    //   1. Restore the stolen resource immediately (focus / cursor)
+    //   2. Stamp a Win32 prop on the root hwnd (auto-cleaned when window closes)
+    //   3. Fire OnFocusStealer callback (knowhow writer, warning overlay)
+    //   4. Next InputReadiness.Probe() detects the prop → forces yield popup
+
+    public const string MouseStealerPropPrefix  = "WKAppBot_MouseStealer-";
+    private const int   CursorMoveThresholdPx   = 4; // ignore sub-pixel jitter
 
     /// <summary>
-    /// After a nominally-focusless UIA action, check if the foreground window changed.
-    /// If it did, stamp the root hwnd with a Win32 prop and fire OnFocusStealer.
-    /// On the next Probe() call targeting the same hwnd, InputReadiness will force yield popup.
+    /// Snapshot focus + cursor before a UIA action, then call CheckSideEffects after.
+    /// Returns an opaque snapshot to pass to CheckSideEffects.
     /// </summary>
-    private static void CheckFocusTheft(IntPtr hwnd, string action, IntPtr prevFg)
+    private static (IntPtr prevFg, int px, int py) SnapshotState()
+    {
+        var fg = NativeMethods.GetForegroundWindow();
+        NativeMethods.GetCursorPos(out var pt);
+        return (fg, pt.X, pt.Y);
+    }
+
+    /// <summary>
+    /// After a nominally-focusless UIA action:
+    ///   — If foreground changed → restore, stamp prop, fire callback.
+    ///   — If cursor moved significantly → restore, stamp prop, fire callback.
+    /// </summary>
+    private static void CheckSideEffects(IntPtr hwnd, string action,
+        (IntPtr prevFg, int px, int py) snap)
     {
         try
         {
-            var curFg = NativeMethods.GetForegroundWindow();
-            if (curFg == prevFg || prevFg == IntPtr.Zero) return;
-
-            // Restore previous foreground immediately
-            NativeMethods.SetForegroundWindow(prevFg);
-
             var rootHwnd = NativeMethods.GetAncestor(hwnd, NativeMethods.GA_ROOT);
             if (rootHwnd == IntPtr.Zero) rootHwnd = hwnd;
 
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine(
-                $"[FOCUSSTEALER] ⚠ {action} on hwnd=0x{hwnd:X} stole focus " +
-                $"(was 0x{prevFg:X}, now 0x{curFg:X}) — marked for yield next time");
-            Console.ResetColor();
+            // ── Focus theft ──
+            var curFg = NativeMethods.GetForegroundWindow();
+            if (snap.prevFg != IntPtr.Zero && curFg != snap.prevFg)
+            {
+                NativeMethods.SetForegroundWindow(snap.prevFg);
+                NativeMethods.SetPropW(rootHwnd, $"{FocusStealerPropPrefix}{action}", (IntPtr)1);
 
-            // Stamp root hwnd: prop persists until window closes (cross-process, zero file I/O)
-            NativeMethods.SetPropW(rootHwnd, $"{FocusStealerPropPrefix}{action}", (IntPtr)1);
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine(
+                    $"[FOCUSSTEALER] ⚠ {action} stole focus " +
+                    $"(was 0x{snap.prevFg:X}, now 0x{curFg:X}) — restored + marked");
+                Console.ResetColor();
 
-            // Notify subscribers (knowhow writer, etc.)
-            OnFocusStealer?.Invoke(rootHwnd, action);
+                OnFocusStealer?.Invoke(rootHwnd, action);
+            }
+
+            // ── Mouse cursor theft ──
+            NativeMethods.GetCursorPos(out var curPt);
+            int dx = Math.Abs(curPt.X - snap.px);
+            int dy = Math.Abs(curPt.Y - snap.py);
+            if (dx > CursorMoveThresholdPx || dy > CursorMoveThresholdPx)
+            {
+                NativeMethods.SetCursorPos(snap.px, snap.py); // restore immediately
+                NativeMethods.SetPropW(rootHwnd, $"{MouseStealerPropPrefix}{action}", (IntPtr)1);
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine(
+                    $"[MOUSESTEALER] ⚠ {action} moved cursor " +
+                    $"({snap.px},{snap.py}) → ({curPt.X},{curPt.Y}), Δ({dx},{dy}) — restored + marked");
+                Console.ResetColor();
+
+                // Reuse same callback (args: rootHwnd, "mouse-{action}" distinguishes in knowhow)
+                OnFocusStealer?.Invoke(rootHwnd, $"mouse-{action}");
+            }
         }
         catch { /* non-critical */ }
     }
@@ -208,7 +247,8 @@ public static class ActionApi
             if (hwnd == IntPtr.Zero) return false;
             var rootHwnd = NativeMethods.GetAncestor(hwnd, NativeMethods.GA_ROOT);
             if (rootHwnd == IntPtr.Zero) rootHwnd = hwnd;
-            return NativeMethods.GetPropW(rootHwnd, $"{FocusStealerPropPrefix}{action}") != IntPtr.Zero;
+            return NativeMethods.GetPropW(rootHwnd, $"{FocusStealerPropPrefix}{action}") != IntPtr.Zero
+                || NativeMethods.GetPropW(rootHwnd, $"{MouseStealerPropPrefix}{action}") != IntPtr.Zero;
         }
         catch { return false; }
     }
