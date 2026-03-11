@@ -6,20 +6,19 @@ namespace WKAppBot.CLI;
 /// <summary>
 /// Eye command pipe server — executes delegated CLI commands in-process (zero cold-start).
 /// Protocol: client sends JSON string[] args line → server streams output lines → sends "\x00END {code}".
-/// Only one command at a time (SemaphoreSlim). Output streams directly to pipe via AsyncLocal routing.
+/// Parallel execution: AsyncLocal routing isolates each command's output. No global serialization.
+/// TeeTextWriter wraps pipeWriter per-command → real-time streaming to pipe + per-command log file.
 /// </summary>
 internal static class EyeCmdPipeServer
 {
     internal const string PipeName = "WKAppBotCmdPipe";
     internal const string EndMarker = "\x00END";
 
-    static readonly SemaphoreSlim _sem = new(1, 1);
-
     public static void StartServer() => Task.Run(ServerLoop);
 
     static async Task ServerLoop()
     {
-        Console.WriteLine("[EYE] CmdPipe server started — delegated commands run in-process");
+        Console.WriteLine("[EYE] CmdPipe server started — delegated commands run in-process (parallel)");
         while (true)
         {
             try
@@ -56,28 +55,28 @@ internal static class EyeCmdPipeServer
         }
     }
 
-    static async Task<int> RunInEyeAsync(string[] args, TextWriter pipeWriter)
+    static Task<int> RunInEyeAsync(string[] args, TextWriter pipeWriter)
     {
-        // Serialize — one command at a time
-        await _sem.WaitAsync();
+        // Build per-command log file path (same convention as Program.cs non-Eye mode)
+        var logDir = Path.Combine(Program.DataDir, "logs");
+        Directory.CreateDirectory(logDir);
+        var cmdTag = args.Length > 0 ? args[0].ToLowerInvariant() : "noargs";
+        if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow")
+            cmdTag += $"-{args[1].ToLowerInvariant()}";
+        var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.txt");
+
+        // TeeTextWriter wraps pipeWriter: output goes to pipe (real-time) AND log file.
+        // AsyncLocal routing isolates this command's output from concurrent commands.
+        var tee = new TeeTextWriter(pipeWriter, logFile);
         int code;
-        try
+        using (ThreadRoutingWriter.Route(tee))
         {
-            Program.RunningInEye = true;
-            // Route output DIRECTLY to pipeWriter (real-time streaming).
-            // AsyncLocal ensures async continuations on any thread also route to pipeWriter.
-            // Previous approach (StringWriter buffer) lost output on thread-switches + on timeout.
-            using (ThreadRoutingWriter.Route(pipeWriter))
-            {
-                try { code = Program.Main(args); }
-                catch (Exception ex) { pipeWriter.WriteLine($"[EYECMD] error: {ex.Message}"); code = 1; }
-            }
+            try { code = Program.Main(args); }
+            catch (Exception ex) { tee.WriteLine($"[EYECMD] error: {ex.Message}"); code = 1; }
         }
-        finally
-        {
-            Program.RunningInEye = false;
-            _sem.Release();
-        }
-        return code;
+        tee.Dispose(); // moves log to old/, updates tee.LogPath
+        // "Log saved:" goes through pipeWriter directly (tee already disposed)
+        pipeWriter.WriteLine($"Log saved: {tee.LogPath}");
+        return Task.FromResult(code);
     }
 }
