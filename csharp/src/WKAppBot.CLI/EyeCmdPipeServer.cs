@@ -6,7 +6,7 @@ namespace WKAppBot.CLI;
 /// <summary>
 /// Eye command pipe server — executes delegated CLI commands in-process (zero cold-start).
 /// Protocol: client sends JSON string[] args line → server streams output lines → sends "\x00END {code}".
-/// Only one command at a time (SemaphoreSlim). Console.SetOut is redirected per-command via StringWriter.
+/// Only one command at a time (SemaphoreSlim). Output streams directly to pipe via AsyncLocal routing.
 /// </summary>
 internal static class EyeCmdPipeServer
 {
@@ -58,18 +58,19 @@ internal static class EyeCmdPipeServer
 
     static async Task<int> RunInEyeAsync(string[] args, TextWriter pipeWriter)
     {
-        // Serialize for RunningInEye flag (static state safety)
+        // Serialize — one command at a time
         await _sem.WaitAsync();
-        var sw = new StringWriter();
         int code;
         try
         {
             Program.RunningInEye = true;
-            // Thread-local route: only THIS thread writes to sw, Eye tick/slack → global
-            using (ThreadRoutingWriter.Route(sw))
+            // Route output DIRECTLY to pipeWriter (real-time streaming).
+            // AsyncLocal ensures async continuations on any thread also route to pipeWriter.
+            // Previous approach (StringWriter buffer) lost output on thread-switches + on timeout.
+            using (ThreadRoutingWriter.Route(pipeWriter))
             {
                 try { code = Program.Main(args); }
-                catch (Exception ex) { sw.WriteLine($"[EYECMD] error: {ex.Message}"); code = 1; }
+                catch (Exception ex) { pipeWriter.WriteLine($"[EYECMD] error: {ex.Message}"); code = 1; }
             }
         }
         finally
@@ -77,8 +78,6 @@ internal static class EyeCmdPipeServer
             Program.RunningInEye = false;
             _sem.Release();
         }
-
-        await pipeWriter.WriteAsync(sw.ToString());
         return code;
     }
 }
