@@ -437,9 +437,10 @@ internal partial class Program
                     {
                         var tabUrl = tab.TryGetProperty("url", out var u2) ? u2.GetString() ?? "" : "";
                         var tabTitle = tab.TryGetProperty("title", out var tt2) ? tt2.GetString() ?? "" : "";
-                        // Use path portion (e.g. "chatgpt.com/share/69ae" not full URL)
-                        var uri = Uri.TryCreate(tabUrl, UriKind.Absolute, out var u3) ? u3 : null;
-                        var hint = uri != null ? (uri.Host + (uri.AbsolutePath.Length > 1 ? uri.AbsolutePath[..Math.Min(20, uri.AbsolutePath.Length)] : "")) : tabUrl[..Math.Min(40, tabUrl.Length)];
+                        // Strip scheme, keep host+path up to 40 chars (e.g. "chatgpt.com/c/69b0f4")
+                        var hint = tabUrl.StartsWith("https://") ? tabUrl[8..Math.Min(tabUrl.Length, 48)]
+                                 : tabUrl.StartsWith("http://")  ? tabUrl[7..Math.Min(tabUrl.Length, 47)]
+                                 : tabUrl[..Math.Min(tabUrl.Length, 40)];
                         Console.WriteLine($"  \"{tabTitle}\"");
                         Console.ForegroundColor = ConsoleColor.DarkCyan;
                         Console.WriteLine($"    → a11y close \"{grap}#{hint}\"");
