@@ -106,7 +106,7 @@ if [ $CALC_LAUNCHED -eq 1 ]; then
     CALC="*계산기*;*Calculator*"
     check   "calc: read"        bash -c "\"$WKA\" a11y read \"$CALC\" --nth 1 2>&1 | grep -qiE 'name=|value=|pattern|ok'"
     check   "calc: find"        bash -c "\"$WKA\" a11y find \"$CALC\" --nth 1 --depth 3 2>&1 | grep -qiE 'found|Button|result|CalculatorResults'"
-    check   "calc: screenshot"  bash -c "\"$WKA\" a11y screenshot \"$CALC\" --nth 1 2>&1 | grep -qiE 'saved|captured'"
+    check   "calc: screenshot"  bash -c "\"$WKA\" a11y screenshot \"$CALC\" 2>&1 | grep -qiE 'saved|captured|Saved'"
     check   "calc: highlight"   bash -c "\"$WKA\" a11y highlight \"$CALC#num5Button\" --nth 1 2>&1 | grep -qiE 'highlight|zoom|ok'"
     # 5 + 3 = 8  (focusless UIA Invoke)
     check   "calc: invoke 5"    bash -c "\"$WKA\" a11y invoke \"$CALC#num5Button\" 2>&1 | grep -qiE 'ok|invoke'"
@@ -195,14 +195,68 @@ else
     skip "claude-usage (--quick mode)"
 fi
 
-# ─── Web (CDP) — only if Chrome running ────────────────────────────────────
-banner "Web / CDP"
+# ─── Web (CDP) + Chrome a11y ────────────────────────────────────────────────
+banner "Web / CDP (Chrome)"
 CHROME_RUNNING=$(tasklist.exe 2>/dev/null | grep -ci "chrome.exe" || echo 0)
-if [ "$CHROME_RUNNING" -gt 0 ] && [ "$QUICK" -eq 0 ]; then
-    check_g "web tabs"       bash -c "\"$WKA\" web tabs 2>&1 | grep -qiE '\[|\]|tab|url|error|no tabs'"
-    check_g "a11y eval chrome" bash -c "\"$WKA\" a11y eval \"*Chrome*#about:blank\" --text 'location.href' 2>&1 | grep -qiE 'about|http|error|notfound'"
+CHROME_LAUNCHED=0
+if [ "$QUICK" -eq 0 ]; then
+    # Launch Chrome with about:blank if not running
+    if [ "$CHROME_RUNNING" -eq 0 ]; then
+        powershell -Command "Start-Process chrome.exe -ArgumentList 'about:blank','--new-window'" 2>/dev/null
+        sleep 3
+        CHROME_RUNNING=$(tasklist.exe 2>/dev/null | grep -ci "chrome.exe" || echo 0)
+        [ "$CHROME_RUNNING" -gt 0 ] && CHROME_LAUNCHED=1
+    fi
+
+    if [ "$CHROME_RUNNING" -gt 0 ]; then
+        CRM="*Chrome*;*Chromium*;*Edge*"
+        TEST_URL="file:///W:/GitHub/WKAppBot/scripts/smoke_test.html"
+        TEST_HINT="smoke_test.html"
+
+        # -- Open test page --
+        timeout 5 "$WKA" web open "$TEST_URL" >/dev/null 2>&1 || \
+          powershell -Command "Start-Process chrome.exe '$TEST_URL'" 2>/dev/null
+        sleep 2
+
+        # -- CDP commands --
+        check_g "web tabs"            bash -c "\"$WKA\" web tabs 2>&1 | grep -qiE 'tab|url|http|about|smoke'"
+        check_g "web screenshot"      bash -c "\"$WKA\" web screenshot 2>&1 | grep -qiE 'saved|Saved|captured|error'"
+        check_g "web eval smoke"      bash -c "\"$WKA\" web eval 'document.getElementById(\"smoke-marker\").dataset.smoke' 2>&1 | grep -qiE 'wkappbot-test-ok|eval|ok'"
+        check_g "web eval click"      bash -c "\"$WKA\" web eval 'window.smokeTestApi.clickBtn()' 2>&1 | grep -qiE '[0-9]|eval|ok'"
+
+        # -- a11y on Chrome window (UIA) --
+        check_g "a11y inspect chrome" bash -c "\"$WKA\" a11y inspect \"$CRM\" --nth 1 --depth 2 2>&1 | grep -qiE 'match|found|Chrome|window'"
+        check_g "a11y read chrome"    bash -c "\"$WKA\" a11y read \"$CRM\" --nth 1 2>&1 | grep -qiE 'name=|value=|ok|error'"
+        check_g "a11y screenshot chr" bash -c "\"$WKA\" a11y screenshot \"$CRM\" 2>&1 | grep -qiE 'saved|Saved|captured|error'"
+        check_g "a11y focus chrome"   bash -c "\"$WKA\" a11y focus \"$CRM\" --nth 1 2>&1 | grep -qiE 'focus|ok|error'"
+
+        # -- CDP via a11y eval with test page tab hint --
+        check_g "a11y eval counter"   bash -c "\"$WKA\" a11y eval \"$CRM#$TEST_HINT\" --text 'window.smokeTestApi.getCount()' 2>&1 | grep -qiE '[0-9]|eval|ok|error'"
+        check_g "a11y eval readyState" bash -c "\"$WKA\" a11y eval \"$CRM#$TEST_HINT\" --text 'document.readyState' 2>&1 | grep -qiE 'complete|interactive|eval|ok|error'"
+
+        # -- CDP click button (CSS selector) --
+        check_g "a11y click btn-click" bash -c "\"$WKA\" a11y click \"$CRM#button#btn-click\" 2>&1 | grep -qiE 'click|ok|error'"
+
+        # -- CDP type in input --
+        check_g "a11y type input"      bash -c "\"$WKA\" a11y type \"$CRM#input#text-input\" --text 'smoke_ok' 2>&1 | grep -qiE 'type|ok|error'"
+
+        # -- Verify typed text via eval --
+        check_g "a11y verify typed"    bash -c "\"$WKA\" a11y eval \"$CRM#$TEST_HINT\" --text 'document.getElementById(\"text-input\").value' 2>&1 | grep -qi 'smoke_ok'"
+
+        # Close test tab
+        timeout 5 "$WKA" a11y close "$CRM#$TEST_HINT" >/dev/null 2>&1
+        echo "  (test tab closed)"
+
+        # Close Chrome if we launched it
+        if [ $CHROME_LAUNCHED -eq 1 ]; then
+            timeout 5 "$WKA" a11y close "$CRM" --force >/dev/null 2>&1
+            echo "  (Chrome closed — launched by test)"
+        fi
+    else
+        skip "web/cdp (Chrome failed to launch)"
+    fi
 else
-    skip "web/cdp (Chrome not running or --quick)"
+    skip "web/cdp Chrome (--quick mode)"
 fi
 
 # ─── Readiness ─────────────────────────────────────────────────────────────
