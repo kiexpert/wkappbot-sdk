@@ -137,6 +137,7 @@ Utility:
       Send message via Telegram (A11Y-first).
   suggest ""text""
       Send suggestion/feature request to Slack (auto-tags CWD workspace).
+      ⚠ Write in ENGLISH — Korean = 2-3x token cost. Short & precise wins.
   claude-usage
       Probe Claude Desktop usage (session/weekly %) via UIA. Slack alerts at 85%/95%.
 
