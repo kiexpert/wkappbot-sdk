@@ -15,9 +15,12 @@
     <PublishTrimmed>true</PublishTrimmed>
   </PropertyGroup>
 
-  <!-- Post-publish: just copy launcher EXE to SDK/bin (no hot-swap needed, rarely changes) -->
+  <!-- Post-publish: copy launcher EXE to SDK/bin (no hot-swap needed, rarely changes) -->
   <Target Name="DeployLauncher" AfterTargets="Publish">
+    <!-- Try native copy first (cmd), fall back to xcopy, then robocopy — bash compat -->
     <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot;" IgnoreExitCode="true" />
+    <Exec Command="xcopy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\&quot;" IgnoreExitCode="true" Condition="!Exists('W:\SDK\bin\wkappbot.exe')" />
+    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="W:\SDK\bin\wkappbot.exe" OverwriteReadOnlyFiles="true" />
     <Message Text="[Launcher] wkappbot.exe deployed to W:\SDK\bin\" Importance="high" />
   </Target>
 
