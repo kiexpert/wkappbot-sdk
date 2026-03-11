@@ -10,10 +10,11 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal sealed class ThreadRoutingWriter : TextWriter
 {
-    [ThreadStatic] static TextWriter? _local;
+    // AsyncLocal: propagates through async continuations (unlike [ThreadStatic] which is lost on thread switch)
+    static readonly AsyncLocal<TextWriter?> _local = new();
 
     /// <summary>
-    /// Redirect the CURRENT thread's console output to <paramref name="local"/>.
+    /// Redirect the CURRENT async context's console output to <paramref name="local"/>.
     /// Dispose the returned token to restore the previous route.
     /// </summary>
     public static IDisposable Route(TextWriter local) => new Scope(local);
@@ -24,7 +25,7 @@ internal sealed class ThreadRoutingWriter : TextWriter
 
     public override Encoding Encoding => _global.Encoding;
 
-    TextWriter Active => _local ?? _global;
+    TextWriter Active => _local.Value ?? _global;
 
     public override void Write(char value)          => Active.Write(value);
     public override void Write(string? value)       => Active.Write(value);
@@ -45,7 +46,7 @@ internal sealed class ThreadRoutingWriter : TextWriter
     sealed class Scope : IDisposable
     {
         readonly TextWriter? _prev;
-        public Scope(TextWriter w) { _prev = _local; _local = w; }
-        public void Dispose() => _local = _prev;
+        public Scope(TextWriter w) { _prev = _local.Value; _local.Value = w; }
+        public void Dispose() => _local.Value = _prev;
     }
 }
