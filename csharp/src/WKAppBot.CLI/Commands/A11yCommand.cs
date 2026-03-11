@@ -783,13 +783,13 @@ internal partial class Program
     static void ShowKnowhowHint(string path, string hint)
     {
         Console.ForegroundColor = ConsoleColor.DarkYellow;
-        Console.Write("  [KNOWHOW:OS] 💌 ");
+        Console.WriteLine($"  [KNOWHOW:OS] 💌 No knowhow yet — {hint}");
         Console.ForegroundColor = ConsoleColor.Gray;
-        Console.WriteLine($"No knowhow yet — please leave a note: {hint}");
-        Console.WriteLine("     Your 5 min saves junior Claude hours. 🙏");
+        Console.WriteLine("     → Your expertise here saves future Claudes hours of trial-and-error. 🙏");
+        Console.WriteLine("     → Please write what you just learned about this app/action:");
         Console.ResetColor();
         Console.ForegroundColor = ConsoleColor.DarkCyan;
-        Console.WriteLine($"      → {path}");
+        Console.WriteLine($"        a11y file-write \"{path}\" --text \"## Knowhow\\n- your note here\"");
         Console.ResetColor();
     }
 
