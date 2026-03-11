@@ -142,28 +142,20 @@ Options:
         int.TryParse(GetArgValue(args, "--port"), out var p) ? p : 9222;
 
     /// <summary>
-    /// Compute a short session tag from the current Claude Code JSONL file path.
-    /// Same session → same hash → same Chrome tab across CLI invocations.
+    /// Compute a short session tag from the caller's CWD.
+    /// Same CWD (= same project) → same hash → same Chrome tab across CLI invocations.
+    /// In Eye mode: CWD is passed by Launcher via pipe (AsyncLocal CallerCwd).
+    /// Direct mode: falls back to Environment.CurrentDirectory.
+    /// This ensures parallel sessions from different projects get isolated tabs.
     /// </summary>
     static string? GetSessionTag()
     {
         try
         {
-            var cpDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".claude", "projects");
-            if (!Directory.Exists(cpDir)) return null;
-
-            // Find most recently modified .jsonl = active session
-            var latest = Directory.EnumerateFiles(cpDir, "*.jsonl", SearchOption.AllDirectories)
-                .Select(f => { try { return new FileInfo(f); } catch { return null; } })
-                .Where(fi => fi is { Length: > 0 })
-                .OrderByDescending(fi => fi!.LastWriteTimeUtc)
-                .FirstOrDefault();
-
-            if (latest == null) return null;
-
-            // Short hash of the full path (8 hex chars = stable per session file)
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(latest.FullName));
+            // Eye mode: use CWD passed by Launcher (AsyncLocal, per-command)
+            // Direct mode: use process CWD
+            var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(cwd.ToLowerInvariant()));
             return Convert.ToHexString(hash, 0, 4).ToLowerInvariant(); // 8 hex chars
         }
         catch { return null; }
