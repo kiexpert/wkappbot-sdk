@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>WKAppBot Smoke Test Page</title>
+  <style>
+    body { font-family: sans-serif; padding: 24px; background: #1a1a2e; color: #eee; }
+    h1 { color: #00d4ff; }
+    .section { margin: 16px 0; padding: 12px; background: #16213e; border-radius: 8px; }
+    button { margin: 4px; padding: 8px 16px; cursor: pointer; border-radius: 4px; border: none; font-size: 14px; }
+    #btn-click  { background: #0f3460; color: #fff; }
+    #btn-toggle { background: #533483; color: #fff; }
+    #btn-submit { background: #e94560; color: #fff; }
+    input, textarea { margin: 4px; padding: 6px 10px; border-radius: 4px; border: 1px solid #444; background: #0d0d1a; color: #eee; font-size: 14px; }
+    #result { margin-top: 8px; padding: 8px; background: #0d0d1a; border-radius: 4px; color: #0f0; font-family: monospace; min-height: 24px; }
+    #counter { font-size: 2em; font-weight: bold; color: #00d4ff; display: inline-block; min-width: 40px; text-align: center; }
+    select { padding: 6px; border-radius: 4px; background: #0d0d1a; color: #eee; border: 1px solid #444; }
+    .label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    a { color: #00d4ff; }
+  </style>
+</head>
+<body>
+  <h1>🤖 WKAppBot Smoke Test Page</h1>
+  <p style="color:#888">Used by <code>scripts/smoke_test.sh</code> for CDP/a11y element action tests.</p>
+
+  <div class="section">
+    <div class="label">Click test</div>
+    <button id="btn-click" onclick="increment()">Click Me</button>
+    <span>Count: </span><span id="counter">0</span>
+  </div>
+
+  <div class="section">
+    <div class="label">Input test</div>
+    <input id="text-input" type="text" placeholder="type here..." aria-label="text input">
+    <input id="num-input" type="number" value="0" aria-label="number input" style="width:80px">
+  </div>
+
+  <div class="section">
+    <div class="label">Select / Toggle</div>
+    <select id="color-select" aria-label="color select" onchange="updateResult('select: '+this.value)">
+      <option value="red">Red</option>
+      <option value="green">Green</option>
+      <option value="blue">Blue</option>
+    </select>
+    <input type="checkbox" id="toggle-check" aria-label="toggle checkbox">
+    <label for="toggle-check">Toggle me</label>
+    <button id="btn-toggle" onclick="toggleState()">Toggle</button>
+  </div>
+
+  <div class="section">
+    <div class="label">Submit / Result</div>
+    <button id="btn-submit" onclick="submitTest()">Submit</button>
+    <div id="result">— ready —</div>
+  </div>
+
+  <div class="section">
+    <div class="label">Smoke test markers (for CDP eval verification)</div>
+    <span id="smoke-marker" data-smoke="wkappbot-test-ok">smoke=ok</span>
+    |
+    <a id="smoke-link" href="#smoke">smoke-link</a>
+    | build: <span id="build-ts" data-ts="">loading...</span>
+  </div>
+
+  <script>
+    let count = 0;
+    document.getElementById('build-ts').textContent = new Date().toISOString();
+    document.getElementById('build-ts').dataset.ts = Date.now();
+
+    function increment() {
+      count++;
+      document.getElementById('counter').textContent = count;
+      updateResult('clicked: count=' + count);
+    }
+    function toggleState() {
+      const cb = document.getElementById('toggle-check');
+      cb.checked = !cb.checked;
+      updateResult('toggled: ' + (cb.checked ? 'ON' : 'OFF'));
+    }
+    function submitTest() {
+      const txt = document.getElementById('text-input').value || '(empty)';
+      const num = document.getElementById('num-input').value;
+      updateResult('submitted: text="' + txt + '" num=' + num);
+    }
+    function updateResult(msg) {
+      document.getElementById('result').textContent = msg;
+    }
+    // Expose for CDP eval
+    window.smokeTestApi = {
+      getCount: () => count,
+      getText: () => document.getElementById('text-input').value,
+      getResult: () => document.getElementById('result').textContent,
+      clickBtn: () => { increment(); return count; },
+    };
+  </script>
+</body>
+</html>
