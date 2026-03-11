@@ -335,28 +335,48 @@ internal partial class Program
         return true;
     }
 
+    // Terminal window classes that use ConPTY — WM_CHAR doesn't reach stdin, need SendInput
+    static readonly HashSet<string> TerminalClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CASCADIA_HOSTING_WINDOW_CLASS", // Windows Terminal
+        "ConsoleWindowClass",            // Classic conhost.exe
+        "PseudoConsoleWindow",           // ConPTY
+        "VirtualConsoleClass",           // misc
+    };
+
     // -- Type: UIA Value -> WM_CHAR -> LegacyIA SetValue --
     static bool A11yType(AutomationElement el, IntPtr hwnd, string text)
     {
-        try
+        // Check if target is a terminal window — WM_CHAR bypasses ConPTY stdin
+        var winClass = WindowFinder.GetClassName(hwnd);
+        bool isTerminal = TerminalClasses.Contains(winClass);
+
+        if (!isTerminal)
         {
-            var vp = el.Patterns.Value;
-            if (vp.IsSupported && !vp.Pattern.IsReadOnly.Value)
+            try
             {
-                vp.Pattern.SetValue(text);
-                Console.WriteLine($"[A11Y] type — UIA Value.SetValue ({text.Length} chars)");
+                var vp = el.Patterns.Value;
+                if (vp.IsSupported && !vp.Pattern.IsReadOnly.Value)
+                {
+                    vp.Pattern.SetValue(text);
+                    Console.WriteLine($"[A11Y] type — UIA Value.SetValue ({text.Length} chars)");
+                    return true;
+                }
+            }
+            catch { }
+
+            var elHwnd = GetElementHwnd(el);
+            if (elHwnd != IntPtr.Zero)
+            {
+                foreach (char c in text)
+                    NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_CHAR, (IntPtr)c, IntPtr.Zero);
+                Console.WriteLine($"[A11Y] type — Win32 WM_CHAR ({text.Length} chars)");
                 return true;
             }
         }
-        catch { }
-
-        var elHwnd = GetElementHwnd(el);
-        if (elHwnd != IntPtr.Zero)
+        else
         {
-            foreach (char c in text)
-                NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_CHAR, (IntPtr)c, IntPtr.Zero);
-            Console.WriteLine($"[A11Y] type — Win32 WM_CHAR ({text.Length} chars)");
-            return true;
+            Console.WriteLine($"[A11Y] type — terminal ({winClass}): skipping WM_CHAR (ConPTY), using SendInput");
         }
 
         try
