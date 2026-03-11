@@ -107,6 +107,27 @@ Guidelines
 - Reuse existing plans.
 - Prefer answers <80 words.
 
+Quick Examples (copy-paste ready)
+- List windows:        a11y windows
+- Inspect UIA tree:    a11y inspect "*App*" --depth 5
+- Screenshot:          a11y screenshot "*App*"
+- OCR text:            a11y ocr "*App*"
+- Click button:        a11y invoke "*App*#*OK*"
+- Type text:           a11y type "*App*#*Input*" --text "hello"
+- Type hotkey:         a11y type "*App*" --text "Ctrl+S"
+- Read element:        a11y read "*App*#*Label*"
+- Wait for element:    a11y wait "*App*#*Done*" --timeout 15000
+- Eval JS (tab hint!): a11y eval "*Chrome*#chatgpt.com" --text "document.title"
+- Close browser tab:   a11y close "*Chrome*#chatgpt.com/c/abc123"
+- Read CP949 file:     a11y file-read "src/legacy.cpp" --encoding 949
+- Write CP949 file:    a11y file-write "src/legacy.cpp" --text "@/tmp/edit.txt" --encoding 949
+- Suggest/bug report:  a11y suggest --text "Bug: ..."
+- Android inspect:     a11y inspect "adb://*pkg*" --depth 10
+- Android tap:         a11y click "adb://*pkg*#element"
+
+⚠ eval ALWAYS needs #tab-hint — bare "*Chrome*" hits active tab only!
+⚠ close "*Chrome*" without #hint → shows tab list (safety guard)
+
 Startup Confirmation
 After loading this policy, confirm with ONE short line only:
 "Policy loaded. Ready."
