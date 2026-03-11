@@ -88,12 +88,20 @@ check   "a11y windows"     bash -c "\"$WKA\" a11y windows 2>&1 | grep -q '\['"
 check_g "a11y inspect *"   bash -c "out=\$(\"$WKA\" a11y inspect \"*\" --depth 1 2>&1); echo \"\$out\" | grep -qiE 'match|notfound|error|inspect|windows|found' || [ -n \"\$out\" ]"
 check_g "windows cmd"      bash -c "\"$WKA\" windows 2>&1 | grep -q '\['"
 
-# ─── A11y Element actions (test on always-present windows) ─────────────────
-banner "A11y Element"
-# find action on desktop/taskbar (always exists)
-check_g "a11y find taskbar"  bash -c "\"$WKA\" a11y find \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'match|notfound|found|error'"
-# read clipboard content
-check_g "a11y screenshot"    bash -c "\"$WKA\" a11y screenshot \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'saved|captured|notfound|error'"
+# ─── A11y Element actions (desktop/taskbar — always present) ──────────────
+# Target: Shell_TrayWnd (taskbar) + Progman (desktop) — no app needed
+banner "A11y Element (System UI)"
+check_g "find taskbar"       bash -c "\"$WKA\" a11y find \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'match|notfound|found|error'"
+check_g "read taskbar"       bash -c "\"$WKA\" a11y read \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'name=|value=|pattern|notfound|error'"
+check_g "read desktop"       bash -c "\"$WKA\" a11y read \"*Progman*\" 2>&1 | grep -qiE 'name=|value=|pattern|notfound|error'"
+check_g "find desktop"       bash -c "\"$WKA\" a11y find \"*Progman*\" --depth 2 2>&1 | grep -qiE 'match|found|notfound|error'"
+check_g "highlight taskbar"  bash -c "\"$WKA\" a11y highlight \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'highlight|zoom|ok|notfound|error'"
+check_g "screenshot taskbar" bash -c "\"$WKA\" a11y screenshot \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'saved|captured|notfound|error'"
+# scroll taskbar (safe — no focus grab)
+check_g "scroll taskbar"     bash -c "\"$WKA\" a11y scroll \"*Shell_TrayWnd*\" --direction right --amount small 2>&1 | grep -qiE 'scroll|ok|notfound|error|pattern'"
+# type: send a benign key to desktop (VK_NONAME — no visible effect)
+# skip: too risky without knowing which window has focus
+# invoke/click: skip — could trigger unexpected UI actions on desktop/taskbar
 
 # ─── Eye tick ──────────────────────────────────────────────────────────────
 banner "Eye"
