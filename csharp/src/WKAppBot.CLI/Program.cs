@@ -78,6 +78,9 @@ internal partial class Program
         // Enable DPI awareness
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
 
+        // Kill ghost zoom overlays from previous invocations (keeps exe unlocked for publish)
+        try { InputZoomHost.CloseAllGhosts(); } catch { }
+
         // Screen reader mode: once enabled for Chromium/Electron, stays ON permanently.
         // No restore on exit — next run starts instantly (no broadcast delay).
 

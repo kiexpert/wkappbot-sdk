@@ -547,6 +547,33 @@ internal sealed class InputZoomHost : IDisposable
             _dispatcher?.BeginInvoke(() => _zoomWindow?.EnsureTopmost());
     }
 
+    /// <summary>
+    /// Close all InputZoom/InputHighlight overlay windows from OTHER processes.
+    /// Call at startup to kill ghost zooms left by previous invocations that died mid-fade.
+    /// Uses FindWindowExW (kernel title index, no messaging) — fast and non-blocking.
+    /// </summary>
+    public static void CloseAllGhosts()
+    {
+        int myPid = Environment.ProcessId;
+        foreach (var title in new[] { "InputZoom", "InputHighlight" })
+        {
+            var hWnd = IntPtr.Zero;
+            while (true)
+            {
+                hWnd = WKAppBot.Win32.Native.NativeMethods.FindWindowExW(IntPtr.Zero, hWnd, null, title);
+                if (hWnd == IntPtr.Zero) break;
+                try
+                {
+                    WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                    if ((int)pid != myPid)
+                        WKAppBot.Win32.Native.NativeMethods.PostMessageW(
+                            hWnd, WKAppBot.Win32.Native.NativeMethods.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                }
+                catch { }
+            }
+        }
+    }
+
     /// <summary>Begin fade-out animation, then auto-close.
     /// Promotes thread to foreground so the overlay survives after main thread exits.</summary>
     public void BeginFadeOut(int delayMs = 3000, int fadeDurationMs = 800)
