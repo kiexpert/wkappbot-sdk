@@ -8,11 +8,17 @@ namespace WKAppBot.CLI;
 /// Protocol: client sends JSON string[] args line → server streams output lines → sends "\x00END {code}".
 /// Parallel execution: AsyncLocal routing isolates each command's output. No global serialization.
 /// TeeTextWriter wraps pipeWriter per-command → real-time streaming to pipe + per-command log file.
+/// CWD: Launcher prepends "__cwd:{path}" as first arg → extracted here, stored in AsyncLocal
+///      so GetSessionTag() and tab-key builders use caller CWD (not Eye's own CWD).
 /// </summary>
 internal static class EyeCmdPipeServer
 {
     internal const string PipeName = "WKAppBotCmdPipe";
     internal const string EndMarker = "\x00END";
+    internal const string CwdPrefix = "__cwd:";
+
+    /// <summary>Per-command caller CWD (set by Launcher, read by GetSessionTag)</summary>
+    internal static readonly AsyncLocal<string?> CallerCwd = new();
 
     public static void StartServer() => Task.Run(ServerLoop);
 
@@ -57,6 +63,14 @@ internal static class EyeCmdPipeServer
 
     static Task<int> RunInEyeAsync(string[] args, TextWriter pipeWriter)
     {
+        // Extract CWD from optional first arg prepended by Launcher (backward-compatible)
+        string? callerCwd = null;
+        if (args.Length > 0 && args[0].StartsWith(CwdPrefix, StringComparison.Ordinal))
+        {
+            callerCwd = args[0].Substring(CwdPrefix.Length);
+            args = args[1..]; // strip prefix from real args
+        }
+
         // Build per-command log file path (same convention as Program.cs non-Eye mode)
         var logDir = Path.Combine(Program.DataDir, "logs");
         Directory.CreateDirectory(logDir);
@@ -69,6 +83,10 @@ internal static class EyeCmdPipeServer
         // AsyncLocal routing isolates this command's output from concurrent commands.
         var tee = new TeeTextWriter(pipeWriter, logFile);
         int code;
+        // CallerCwd stored in AsyncLocal — propagates to all async continuations of this command
+        CallerCwd.Value = callerCwd;
+        // RunningInEye=true prevents Program.cs from creating a second TeeTextWriter (duplicate log)
+        Program.RunningInEye = true;
         using (ThreadRoutingWriter.Route(tee))
         {
             try { code = Program.Main(args); }

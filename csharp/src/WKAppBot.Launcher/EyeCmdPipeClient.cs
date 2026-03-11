@@ -29,7 +29,9 @@ internal static class EyeCmdPipeClient
             var w = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
             var r = new StreamReader(pipe, leaveOpen: true);
 
-            w.WriteLine(JsonSerializer.Serialize(args, LauncherJsonContext.Default.StringArray));
+            // Prepend CWD so Eye can build session-scoped tab keys per caller
+            var payload = new[] { $"__cwd:{Environment.CurrentDirectory}" }.Concat(args).ToArray();
+            w.WriteLine(JsonSerializer.Serialize(payload, LauncherJsonContext.Default.StringArray));
 
             string? line;
             while ((line = r.ReadLine()) != null)
