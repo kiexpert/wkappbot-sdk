@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <AssemblyName>wkappbot</AssemblyName>
+    <AssemblyName>wkappbot-core</AssemblyName>
     <RootNamespace>WKAppBot.CLI</RootNamespace>
     <Version>$(WKAppBotVersion)</Version>
     <UseWPF>true</UseWPF>
@@ -44,13 +44,13 @@
     <Content Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="handlers" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
-  <!-- Post-publish: kill Eye → deploy EXE (Eye relaunch: wkappbot eye manually or via script) -->
+  <!-- Post-publish: deploy wkappbot-core.exe (Eye hot-swap via .new.exe if locked) -->
   <Target Name="DeployToSdkBin" AfterTargets="Publish">
     <!-- Step 1: Copy handlers -->
     <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
     <!-- Step 2: Try direct copy first. If locked (Eye running), stage as .new.exe for hot-swap -->
-    <!-- Direct copy success = Eye was not running → auto-launch Eye via eye tick -->
-    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot; &amp;&amp; (echo [Deploy] wkappbot.exe updated &amp; &quot;W:\SDK\bin\wkappbot.exe&quot; eye tick) || (copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.new.exe&quot; &amp;&amp; echo [Deploy] wkappbot.new.exe staged for hot-swap)" IgnoreExitCode="true" />
+    <!-- Eye FSW watches wkappbot-core.exe/.new.exe (uses Environment.ProcessPath dynamically) -->
+    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;W:\SDK\bin\wkappbot-core.exe&quot; &amp;&amp; (echo [Deploy] wkappbot-core.exe updated &amp; &quot;W:\SDK\bin\wkappbot-core.exe&quot; eye tick) || (copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;W:\SDK\bin\wkappbot-core.new.exe&quot; &amp;&amp; echo [Deploy] wkappbot-core.new.exe staged for hot-swap)" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
     <_HandlersPublish Include="$(PublishDir)handlers\**\*.*" />

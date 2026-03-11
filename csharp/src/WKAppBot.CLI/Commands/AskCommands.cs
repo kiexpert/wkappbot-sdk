@@ -610,6 +610,13 @@ Examples:
                 return true;
             }
 
+            // ── Tier 1.5: Re-check file inputs after menu click (dynamic input created by Gemini/React) ──
+            // Tier 0.5 clicked the upload menu item — the page may have dynamically created input[type=file].
+            Console.WriteLine("[ASK] Tier 1.5: re-check dynamic file inputs after menu click...");
+            await Task.Delay(800);
+            if (await TrySetFileInputFiles(cdp, absPath, fileName))
+                return true;
+
             // ── Tier 0: Native OS file dialog via UIA (STEALS FOCUS — last resort) ──
             await cdp.DisableFileChooserInterception();
             Console.WriteLine("[ASK] All focusless tiers failed — falling back to native file dialog (will steal focus)...");
@@ -819,7 +826,7 @@ Examples:
                 Console.WriteLine($"[ASK:FOCUS] pre-upload-btn-click fg={prevFg1:X8}");
                 await CdpTrustedClick(cdp, bx, by);
                 Console.WriteLine($"[ASK] UIA dialog: upload btn trusted click at ({bx},{by})");
-                await Task.Delay(600);
+                await Task.Delay(1500); // give menu time to animate open
                 LogRestoreFocus(prevFg1, "trusted-click-upload-btn");
 
                 // Now find and click the "파일 업로드" menu item with trusted gesture
@@ -837,20 +844,32 @@ Examples:
                     })()
                 """);
                 Console.WriteLine($"[ASK] UIA dialog: menu={menuRect}");
-                if (menuRect == "NO_ITEM") return false;
+                if (menuRect == "NO_ITEM")
+                {
+                    // Menu didn't appear — maybe OS dialog already opened from previous tier's menu click
+                    var existingD = FindFileOpenDialog();
+                    if (existingD != IntPtr.Zero)
+                    {
+                        Console.WriteLine($"[ASK] UIA dialog: OS dialog already open hwnd={existingD:X} (from prev tier)");
+                        existingDialog = existingD; // skip menu click, go straight to STEP 3
+                    }
+                    else return false;
+                }
+                else
+                {
+                    var menuParts = menuRect!.Split(':');
+                    var coords = menuParts[0].Split(',');
+                    var mx = int.Parse(coords[0]);
+                    var my = int.Parse(coords[1]);
 
-                var menuParts = menuRect!.Split(':');
-                var coords = menuParts[0].Split(',');
-                var mx = int.Parse(coords[0]);
-                var my = int.Parse(coords[1]);
-
-                // [STEP 2] Trusted click on menu item — capture prevFg just before CDP call
-                var prevFg2 = NativeMethods.GetForegroundWindow();
-                Console.WriteLine($"[ASK:FOCUS] pre-menu-item-click fg={prevFg2:X8}");
-                await CdpTrustedClick(cdp, mx, my);
-                Console.WriteLine($"[ASK] UIA dialog: menu item trusted click at ({mx},{my})");
-                await Task.Delay(200);
-                LogRestoreFocus(prevFg2, "trusted-click-menu-item");
+                    // [STEP 2] Trusted click on menu item — capture prevFg just before CDP call
+                    var prevFg2 = NativeMethods.GetForegroundWindow();
+                    Console.WriteLine($"[ASK:FOCUS] pre-menu-item-click fg={prevFg2:X8}");
+                    await CdpTrustedClick(cdp, mx, my);
+                    Console.WriteLine($"[ASK] UIA dialog: menu item trusted click at ({mx},{my})");
+                    await Task.Delay(200);
+                    LogRestoreFocus(prevFg2, "trusted-click-menu-item");
+                }
             }
             else
             {
@@ -1003,20 +1022,29 @@ Examples:
                     Console.WriteLine($"[ASK:FOCUS] Lock released after {waited}ms — proceeding");
             }
 
-            // ── Mid-input check 2: 실제 포커스 뺏는 액션(send/type)일 때만 유저 양보 팝업 ──
-            // "send" = 질문 전송 직전, "type" = 텍스트 입력 직전 — 그 외 준비 단계는 건드리지 않음
-            if (action is "send" or "type")
+            // ── Mid-input check 2: 포커스 양보 팝업 ──
+            // 조건 A: "send"/"type" 직전 + 유저가 3초 이내 입력 중
+            // 조건 B: Chrome에 FocusStealer-ask prop이 찍혀 있음 (이전 run에서 강탈 감지됨)
+            //          → 내 채팅이 제미나이에 섞이는 사고 방지
+            if (action is "send" or "type" or "input-cdp")
             {
                 var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
                 NativeMethods.GetLastInputInfo(ref lii);
                 var idleMs = unchecked((uint)Environment.TickCount) - lii.dwTime;
-                if (idleMs < 3000) // 유저가 3초 이내에 입력했으면 양보
+
+                var chromeHwndEarly = cdp.GetChromeWindowHandle();
+                bool focusStealerKnown = chromeHwndEarly != IntPtr.Zero
+                    && ActionApi.HasFocusStealerProp(chromeHwndEarly, "ask");
+                bool userIsActive = idleMs < 3000;
+
+                if (focusStealerKnown || userIsActive)
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine($"[ASK:FOCUS] 유저 입력 감지 (idle={idleMs}ms) — 포커스 양보 팝업");
+                    Console.WriteLine(focusStealerKnown
+                        ? $"[ASK:FOCUS] ⚠ FocusStealer-ask prop 감지 — 포커스 양보 승인 필요"
+                        : $"[ASK:FOCUS] 유저 입력 감지 (idle={idleMs}ms) — 포커스 양보 팝업");
                     Console.ResetColor();
-                    var chromeHwndEarly = cdp.GetChromeWindowHandle();
-                    var yieldResult = new UserInputWaitAdapter(noSound: true).WaitForUserYield(
+                    var yieldResult = new UserInputWaitAdapter(noSound: !focusStealerKnown).WaitForUserYield(
                         chromeHwndEarly, userIdleMs: idleMs, timeoutSeconds: 30,
                         positionHwnd: chromeHwndEarly);
                     if (!yieldResult.Approved)
@@ -1127,7 +1155,8 @@ Examples:
 
     /// <summary>
     /// Log focus state and restore to prevFg if changed (any thief, not just Chrome).
-    /// Used for tracking/fixing focus theft at each key step.
+    /// Also restores IME conversion state + mouse cursor if stolen.
+    /// Fires ActionApi.OnFocusStealer callback → knowhow recording + overlay.
     /// Returns true if focus was stolen (and restored).
     /// </summary>
     static bool LogRestoreFocus(IntPtr prevFg, string step)
@@ -1139,10 +1168,66 @@ Examples:
             Console.WriteLine($"[ASK:FOCUS] ok @ {step} fg={cur:X8}");
             return false;
         }
+
+        // ── Snapshot IME state of prevFg (per-window context, readable even when not foreground)
+        uint imeConv = 0, imeSent = 0;
+        try
+        {
+            var himc = NativeMethods.ImmGetContext(prevFg);
+            if (himc != IntPtr.Zero)
+            {
+                NativeMethods.ImmGetConversionStatus(himc, out imeConv, out imeSent);
+                NativeMethods.ImmReleaseContext(prevFg, himc);
+            }
+        }
+        catch { }
+
+        // ── Snapshot cursor position before restore (입력위치확보)
+        NativeMethods.GetCursorPos(out var cursorSnap);
+
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"[ASK:FOCUS] ⚠ STOLEN @ {step}: was={prevFg:X8} now={cur:X8} — restoring");
         Console.ResetColor();
+
+        // ── Knowhow recording on the thief (Chrome) — stamps WKAppBot_FocusStealer-ask-{step}
+        ActionApi.OnFocusStealer?.Invoke(cur, $"ask-{step}");
+        // Also stamp a generic "ask" marker → EnsureCdpReadyAsync detects it → forces yield popup next run
+        try { NativeMethods.SetPropW(cur, $"{ActionApi.FocusStealerPropPrefix}ask", (IntPtr)1); } catch { }
+
         NativeMethods.SetForegroundWindow(prevFg);
+
+        // ── Alert on MY window (prevFg) — user sees exactly when/where Gemini stole focus
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(cur, out uint thiefPid);
+            string thiefName = "unknown";
+            try { thiefName = System.Diagnostics.Process.GetProcessById((int)thiefPid).ProcessName; } catch { }
+            FocuslessWarningOverlay.Show(prevFg, $"@ {step} → {thiefName}(0x{cur:X8}) 포커스 강탈", thiefName);
+        }
+        catch { }
+
+        // ── Restore IME conversion state (Chrome resets to English; we put Korean back)
+        try
+        {
+            var himc2 = NativeMethods.ImmGetContext(prevFg);
+            if (himc2 != IntPtr.Zero)
+            {
+                NativeMethods.ImmSetConversionStatus(himc2, imeConv, imeSent);
+                NativeMethods.ImmReleaseContext(prevFg, himc2);
+                Console.WriteLine($"[ASK:FOCUS] IME restored conv=0x{imeConv:X} sent=0x{imeSent:X}");
+            }
+        }
+        catch { }
+
+        // ── Restore cursor if moved during steal (>4px threshold)
+        NativeMethods.GetCursorPos(out var cursorNow);
+        int cdx = Math.Abs(cursorNow.X - cursorSnap.X), cdy = Math.Abs(cursorNow.Y - cursorSnap.Y);
+        if (cdx > 4 || cdy > 4)
+        {
+            NativeMethods.SetCursorPos(cursorSnap.X, cursorSnap.Y);
+            Console.WriteLine($"[ASK:FOCUS] Cursor restored ({cursorSnap.X},{cursorSnap.Y}) Δ({cdx},{cdy})");
+        }
+
         return true;
     }
 
@@ -2823,7 +2908,21 @@ Examples:
 
     // Semaphore (not Mutex) — async/await can resume on different threads,
     // and Mutex.ReleaseMutex() requires the same thread. Semaphore is thread-agnostic.
-    static readonly Semaphore ChromeTabSemaphore = new(1, 1, @"Global\WKAppBot_ChromeTabLock");
+    // NOTE: No Global\ prefix — session-local is sufficient (single user session).
+    // Global\ can throw "Access to the path is denied" if a zombie held it with different ACL.
+    // Factory method falls back gracefully: named → unnamed (in-process only).
+    static readonly Semaphore ChromeTabSemaphore = CreateChromeSemaphore();
+
+    static Semaphore CreateChromeSemaphore()
+    {
+        const string name = "WKAppBot_ChromeTabLock"; // session-local (no Global\ prefix)
+        try { return new Semaphore(1, 1, name); }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ASK] ⚠ Named semaphore '{name}' unavailable ({ex.GetType().Name}) — using in-process lock");
+            return new Semaphore(1, 1); // unnamed fallback — no cross-process coordination, but safe
+        }
+    }
 
     sealed class ChromeTabLock : IDisposable
     {

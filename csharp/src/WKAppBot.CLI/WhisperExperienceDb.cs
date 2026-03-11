@@ -57,6 +57,7 @@ internal sealed class WhisperExperienceDb : IDisposable
     // Mic MP3 segment recording (parallel to loopback MP3, for Gemini STT)
     private LameMP3FileWriter? _micMp3Writer;
     private string? _micMp3Path;
+    private int _micChannels = 1; // set by SetMicChannels to match WhisperEngine capture format
     private readonly object _micWavLock = new();
 
     // Sound code accumulator for segment filename
@@ -548,6 +549,9 @@ internal sealed class WhisperExperienceDb : IDisposable
         }
     }
 
+    /// <summary>Call once after WhisperEngine.Start() to align mic MP3 channel count.</summary>
+    internal void SetMicChannels(int channels) => _micChannels = Math.Max(1, channels);
+
     private void StartMicSegment()
     {
         lock (_micWavLock)
@@ -560,7 +564,7 @@ internal sealed class WhisperExperienceDb : IDisposable
             _micMp3Path = Path.Combine(micDir, $"mic_{stamp}.mp3");
             try
             {
-                var waveFormat = new WaveFormat(16000, 16, 1); // mono mic
+                var waveFormat = new WaveFormat(16000, 16, _micChannels);
                 _micMp3Writer = new LameMP3FileWriter(_micMp3Path, waveFormat, 64);
             }
             catch { _micMp3Writer = null; _micMp3Path = null; }

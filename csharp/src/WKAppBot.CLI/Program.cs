@@ -26,6 +26,9 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal partial class Program
 {
+    /// <summary>Set by EyeCmdPipeServer before calling Main() — skips TeeWriter, crash handler, LaunchEye.</summary>
+    internal static volatile bool RunningInEye = false;
+
     /// <summary>
     /// Runtime data directory: {exe_dir}/wkappbot.hq/
     /// All logs, profiles, output go here — keeps SDK/bin clean.
@@ -59,7 +62,7 @@ internal partial class Program
         }
     }
 
-    static int Main(string[] args)
+    internal static int Main(string[] args)
     {
         // Force UTF-8 output (Windows 949 codepage breaks Korean in non-Korean terminals)
         Console.OutputEncoding = Encoding.UTF8;
@@ -92,8 +95,9 @@ internal partial class Program
         if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow")
             cmdTag += $"-{args[1].ToLowerInvariant()}";
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
-        var tee = new TeeTextWriter(Console.Out, logFile);
-        Console.SetOut(tee);
+        // RunningInEye: skip TeeWriter — Eye already has its own log, output goes to pipe
+        TeeTextWriter? tee = RunningInEye ? null : new TeeTextWriter(Console.Out, logFile);
+        if (tee != null) Console.SetOut(tee);
 
         // ── Crash handler: dump stack trace to log, DON'T move to old/ (crash evidence) ──
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -112,9 +116,9 @@ internal partial class Program
                 Console.WriteLine(crashMsg);
                 Console.ResetColor();
                 // Flush and close file WITHOUT moving to old/ — crash log stays in logs/
-                Console.SetOut(tee.OriginalConsole);
-                tee.ForceCloseWithoutMove();
-                Console.Error.WriteLine($"[CRASH] Log saved (not moved to old/): {tee.LogPath}");
+                if (tee != null) Console.SetOut(tee.OriginalConsole);
+                tee?.ForceCloseWithoutMove();
+                Console.Error.WriteLine($"[CRASH] Log saved (not moved to old/): {tee?.LogPath}");
             }
             catch { /* last resort — at least don't mask the original crash */ }
         };
@@ -195,6 +199,7 @@ internal partial class Program
 
             // Global Eye tick (for eye --global multi-parent monitor)
             try { EmitEyeTick(command, cmdTag, "start"); } catch { }
+            Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
             try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
             try
             {
@@ -210,7 +215,7 @@ internal partial class Program
             // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
             var isEyeGlobal = command == "eye" && (restArgs.Length == 0 || restArgs[0] != "tick");
             var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" || isEyeGlobal;
-            if (!isExcluded)
+            if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
             }
@@ -357,9 +362,9 @@ internal partial class Program
                 EmitEyeTick(cmd, cmdTag, $"end:{exitCode}");
             }
             catch { }
-            Console.SetOut(tee.OriginalConsole);
-            tee.Dispose(); // normal-exit atexit-style move to logs/old
-            Console.WriteLine($"Log saved: {tee.LogPath}");
+            if (tee != null) Console.SetOut(tee.OriginalConsole);
+            tee?.Dispose(); // normal-exit atexit-style move to logs/old
+            if (tee != null) Console.WriteLine($"Log saved: {tee.LogPath}");
         }
     }
 
@@ -475,7 +480,8 @@ internal partial class Program
         public string Command { get; set; } = "";
         public string Tag { get; set; } = "";
         public string Status { get; set; } = "";
-        public string Cwd { get; set; } = "";  // working directory of the CLI process
+        public string Cwd { get; set; } = "";
+        public string Args { get; set; } = "";  // command-line args (skip argv[0] exe path)
     }
 
     internal static string EyeTicksPath => Path.Combine(DataDir, "runtime", "eye_ticks.jsonl");
@@ -497,6 +503,11 @@ internal partial class Program
 
             var (hostPid, hostName, hostTitle) = FindLogicalHost(pid, ppid);
 
+            // Include args only on "start" to avoid repeating in every step/end entry
+            var args = status == "start"
+                ? string.Join(" ", Environment.GetCommandLineArgs().Skip(1))
+                : "";
+
             var tick = new EyeTick
             {
                 Pid = pid,
@@ -509,6 +520,7 @@ internal partial class Program
                 Tag = tag,
                 Status = status,
                 Cwd = Environment.CurrentDirectory,
+                Args = args,
             };
 
             File.AppendAllText(EyeTicksPath, JsonSerializer.Serialize(tick) + Environment.NewLine);

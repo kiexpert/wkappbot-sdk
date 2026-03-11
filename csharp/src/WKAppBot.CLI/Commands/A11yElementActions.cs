@@ -171,16 +171,152 @@ internal partial class Program
         return names;
     }
 
-    // -- Invoke: UIA Invoke -> LegacyIA -> BM_CLICK -> WM_LBUTTON fallback --
+    // FLUTTERVIEW child = direct Flutter input pipeline (focusless, ~0ms) — no class whitelist needed
+    static IntPtr FindFlutterViewChild(IntPtr hwnd) =>
+        NativeMethods.FindWindowExW(hwnd, IntPtr.Zero, "FLUTTERVIEW", null);
+
+    // TODO: when nullMs >= 100 (window lagging), skip verbose UIA tree/prop output in inspect/find
+    //       GetNullMs() is already available — just gate heavy output behind nullMs < 100 check
+
+    // Hollow invoke detection via Win32 SetProp/GetProp:
+    //   GetPropW(elHwnd, InvokeHollowProp) != 0  →  UIA Invoke is hollow for this hwnd
+    //   Prop is auto-cleaned when the window closes — no stale data.
+    //   On hollow confirmed: SetProp stamps the hwnd + fires ActionApi.OnInvokeHollow → knowhow
+
+    // WM_NULL baseline cache: pre-measured during read/find, reused by invoke (TTL = 3s)
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<IntPtr, (long nullMs, long ticks)> _nullCache = new();
+    static readonly long NullCacheTtlTicks = 3 * System.Diagnostics.Stopwatch.Frequency; // 3 seconds
+
+    /// <summary>Send WM_NULL to hwnd and cache the roundtrip time. Call during read/find so invoke gets it for free.</summary>
+    internal static void PreheatWindow(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        NativeMethods.SendMessageTimeoutW(hwnd, NativeMethods.WM_NULL,
+            IntPtr.Zero, IntPtr.Zero, NativeMethods.SMTO_ABORTIFHUNG, 100, out _);
+        sw.Stop();
+        _nullCache[hwnd] = (sw.ElapsedMilliseconds, System.Diagnostics.Stopwatch.GetTimestamp());
+    }
+
+    static long GetNullMs(IntPtr hwnd)
+    {
+        if (hwnd != IntPtr.Zero && _nullCache.TryGetValue(hwnd, out var entry))
+        {
+            if (System.Diagnostics.Stopwatch.GetTimestamp() - entry.ticks < NullCacheTtlTicks)
+                return entry.nullMs; // fresh cache
+        }
+        // Cache miss or stale — measure now
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var ret = NativeMethods.SendMessageTimeoutW(hwnd, NativeMethods.WM_NULL,
+            IntPtr.Zero, IntPtr.Zero, NativeMethods.SMTO_ABORTIFHUNG, 100, out _);
+        sw.Stop();
+        var ms = sw.ElapsedMilliseconds;
+        _nullCache[hwnd] = (ms, System.Diagnostics.Stopwatch.GetTimestamp());
+        return ret == IntPtr.Zero ? 100 : ms; // timeout → treat as 100ms (lagging)
+    }
+
+    // Returns true = confirmed hollow (no paint after 50ms), false = paint detected (real invoke)
+    static bool ConfirmHollow(IntPtr elHwnd)
+    {
+        if (elHwnd == IntPtr.Zero) return true;
+        NativeMethods.ValidateRect(elHwnd, IntPtr.Zero);   // clear any pre-existing dirty region
+        Thread.Sleep(50);                                   // let message pump process results
+        bool hasPaint = NativeMethods.GetUpdateRect(elHwnd, IntPtr.Zero, false);
+        return !hasPaint; // no paint = hollow confirmed
+    }
+
+    // -- Invoke: FLUTTERVIEW Tier0 -> UIA Invoke -> BM_CLICK -> WM_LBUTTON fallback --
     static bool A11yInvoke(AutomationElement el, IntPtr hwnd)
     {
-        if (UiaLocator.TryInvoke(el))
+        var elHwnd = GetElementHwnd(el);
+
+        // Tier 0: FLUTTERVIEW direct PostMessage — bypasses Win32 routing, focusless, ~0ms
+        if (elHwnd != IntPtr.Zero)
         {
-            Console.WriteLine("[A11Y] invoke — UIA Invoke");
-            return true;
+            var flutterView = FindFlutterViewChild(elHwnd);
+            if (flutterView != IntPtr.Zero)
+            {
+                Console.WriteLine("[A11Y] invoke — Tier0 FLUTTERVIEW (focusless direct)");
+                return PostClickToFlutterView(el, flutterView);
+            }
         }
 
-        var elHwnd = GetElementHwnd(el);
+        // Tier 1: UIA Invoke (focusless)
+        // Skip if hwnd was previously confirmed hollow (Win32 prop, auto-cleared on window close)
+        bool propHollow = elHwnd != IntPtr.Zero &&
+                          NativeMethods.GetPropW(elHwnd, ActionApi.InvokeHollowProp) != IntPtr.Zero;
+        if (propHollow)
+        {
+            Console.WriteLine("[A11Y] invoke — UIA Invoke skipped (prop=hollow) → next tier");
+        }
+        else
+        {
+            // WM_NULL baseline: no-op roundtrip measures system responsiveness.
+            // If invoke ≈ null_ms → hollow stub. If null_ms ≥ 100ms → window is lagging, skip invoke entirely.
+            long nullMs = 0;
+            if (elHwnd != IntPtr.Zero)
+            {
+                nullMs = GetNullMs(elHwnd); // cached from read/find, or measures now
+                if (nullMs >= 100)
+                {
+                    Console.WriteLine($"[A11Y] invoke — window lagging (WM_NULL={nullMs}ms) → skip UIA Invoke");
+                    goto tier2;
+                }
+            }
+
+            var prevFg = NativeMethods.GetForegroundWindow();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            bool invoked = UiaLocator.TryInvoke(el);
+            sw.Stop();
+            long invokeMs = sw.ElapsedMilliseconds;
+
+            if (invoked)
+            {
+                // Restore focus if stolen (even hollow stubs can activate target window)
+                var curFg = NativeMethods.GetForegroundWindow();
+                if (curFg != prevFg && prevFg != IntPtr.Zero)
+                {
+                    NativeMethods.SetForegroundWindow(prevFg);
+                    Console.WriteLine($"[A11Y] invoke — UIA Invoke focus restored ({curFg:X8}→{prevFg:X8})");
+                }
+
+                if (invokeMs > 1000)
+                {
+                    Console.WriteLine($"[A11Y] invoke — UIA Invoke ⚠ BLOCKED ({invokeMs}ms, null={nullMs}ms)");
+                    return true; // best effort
+                }
+
+                // Suspicious if invoke is no faster than a no-op WM_NULL (+2ms margin)
+                bool suspiciousTiming = invokeMs <= nullMs + 2;
+                Console.WriteLine($"[A11Y] invoke — UIA Invoke {invokeMs}ms (null={nullMs}ms){(suspiciousTiming ? " ⚠ suspicious" : "")}");
+
+                if (suspiciousTiming)
+                {
+                    // Confirm via paint detection: ValidateRect → invoke → Sleep(50) → GetUpdateRect
+                    bool hollow = elHwnd != IntPtr.Zero && ConfirmHollow(elHwnd);
+                    if (hollow)
+                    {
+                        NativeMethods.SetPropW(elHwnd, ActionApi.InvokeHollowProp, (IntPtr)1);
+                        var clsB = new System.Text.StringBuilder(64);
+                        NativeMethods.GetClassNameW(elHwnd, clsB, clsB.Capacity);
+                        ActionApi.OnInvokeHollow?.Invoke(elHwnd, clsB.ToString());
+                        Console.WriteLine($"[A11Y] invoke — UIA Invoke ✗ hollow confirmed (no paint) → prop stamped, trying next tier");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[A11Y] invoke — UIA Invoke ✓ real (paint detected)");
+                        return true;
+                    }
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Tier 2: BM_CLICK (focusless)
+        tier2:
         if (elHwnd != IntPtr.Zero)
         {
             NativeMethods.PostMessageW(elHwnd, 0x00F5 /* BM_CLICK */, IntPtr.Zero, IntPtr.Zero);
@@ -188,6 +324,7 @@ internal partial class Program
             return true;
         }
 
+        // Tier 3: WM_LBUTTON / SendInput (via A11yClick)
         return A11yClick(el, hwnd);
     }
 
@@ -223,6 +360,14 @@ internal partial class Program
         var elHwnd = GetElementHwnd(el);
         if (elHwnd != IntPtr.Zero)
         {
+            // FLUTTERVIEW child? Route directly (bypasses Win32 routing)
+            var flutterView = FindFlutterViewChild(elHwnd);
+            if (flutterView != IntPtr.Zero)
+            {
+                Console.WriteLine($"[A11Y] click — FLUTTERVIEW direct at ({cx},{cy})");
+                return PostClickToFlutterView(el, flutterView);
+            }
+
             var pt = new POINT { X = cx, Y = cy };
             NativeMethods.ScreenToClient(elHwnd, ref pt);
             var lParam = (IntPtr)(pt.X | (pt.Y << 16));
@@ -242,6 +387,60 @@ internal partial class Program
         inputs[1].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTUP;
         NativeMethods.SendInput(2, inputs, System.Runtime.InteropServices.Marshal.SizeOf<INPUT>());
         Console.WriteLine($"[A11Y] click — SendInput at ({cx},{cy})");
+        return true;
+    }
+
+    // Send WM_LBUTTON to FLUTTER_VIEW child at element's center (screen→client conversion)
+    static bool PostClickToFlutterView(AutomationElement el, IntPtr flutterView)
+    {
+        var rect = GetBoundingRect(el);
+        int cx, cy;
+        if (rect != null)
+        {
+            cx = (rect.Value.Left + rect.Value.Right) / 2;
+            cy = (rect.Value.Top + rect.Value.Bottom) / 2;
+        }
+        else
+        {
+            Console.Error.WriteLine("[A11Y] flutter-click — no BoundingRect, using FLUTTERVIEW center");
+            NativeMethods.GetClientRect(flutterView, out var fb);
+            var fp = new POINT { X = (fb.Left + fb.Right) / 2, Y = (fb.Top + fb.Bottom) / 2 };
+            NativeMethods.ClientToScreen(flutterView, ref fp);
+            cx = fp.X; cy = fp.Y;
+        }
+
+        // Clamp to largest inscribed circle of BoundingRect — handles rounded-corner buttons.
+        // Circle center = rect center, radius = min(w,h)/2 - margin.
+        // If (cx,cy) outside circle → pull toward center along same direction vector.
+        if (rect != null)
+        {
+            const int margin = 4;
+            double rcx = (rect.Value.Left + rect.Value.Right)  / 2.0;
+            double rcy = (rect.Value.Top  + rect.Value.Bottom) / 2.0;
+            double radius = Math.Min(rect.Value.Width, rect.Value.Height) / 2.0 - margin;
+            if (radius > 0)
+            {
+                double dx = cx - rcx, dy = cy - rcy;
+                double dist = Math.Sqrt(dx * dx + dy * dy);
+                if (dist > radius)
+                {
+                    int origX = cx, origY = cy;
+                    cx = (int)Math.Round(rcx + dx / dist * radius);
+                    cy = (int)Math.Round(rcy + dy / dist * radius);
+                    Console.WriteLine($"[A11Y] flutter-click — clamped to inscribed circle ({origX},{origY})→({cx},{cy}) r={radius:F0}");
+                }
+            }
+        }
+
+        // Convert screen → FLUTTERVIEW client coords
+        var pt = new POINT { X = cx, Y = cy };
+        NativeMethods.ScreenToClient(flutterView, ref pt);
+
+        var lParam = (IntPtr)(pt.X | (pt.Y << 16));
+        NativeMethods.PostMessageW(flutterView, NativeMethods.WM_LBUTTONDOWN, (IntPtr)1, lParam);
+        Thread.Sleep(50);
+        NativeMethods.PostMessageW(flutterView, NativeMethods.WM_LBUTTONUP, IntPtr.Zero, lParam);
+        Console.WriteLine($"[A11Y] flutter-click — FLUTTER_VIEW WM_LBUTTON at screen({cx},{cy}) client({pt.X},{pt.Y})");
         return true;
     }
 

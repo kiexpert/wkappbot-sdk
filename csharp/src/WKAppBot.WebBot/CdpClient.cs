@@ -942,12 +942,29 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                 var menuCoords = menuInfo!.Split(':')[0].Split(',');
                 await TrustedClickAsync(int.Parse(menuCoords[0]), int.Parse(menuCoords[1]));
 
-                using var cts2 = new CancellationTokenSource(5000);
+                using var cts2 = new CancellationTokenSource(12000); // 12s — React menu click may take time
                 cts2.Token.Register(() => _fileChooserTcs.TrySetCanceled());
                 try { await _fileChooserTcs.Task; }
                 catch (TaskCanceledException)
                 {
-                    Console.WriteLine("[CDP] FileChooser: no event after menu trusted-click");
+                    Console.WriteLine("[CDP] FileChooser: no event after menu trusted-click — trying speculative handleFileChooser...");
+                    // Chrome may still be holding the pending chooser even after our TCS timed out.
+                    // Speculatively send handleFileChooser — if Chrome accepts it, the file is set.
+                    try
+                    {
+                        var fp2 = absolutePath.Replace('\\', '/');
+                        await SendAsync("Page.handleFileChooser", new JsonObject
+                        {
+                            ["action"] = "accept",
+                            ["files"] = new JsonArray { fp2 },
+                        });
+                        Console.WriteLine("[CDP] FileChooser: speculative accept sent — file likely set");
+                        return true;
+                    }
+                    catch (Exception ex2)
+                    {
+                        Console.WriteLine($"[CDP] FileChooser: speculative accept failed: {ex2.Message}");
+                    }
                     return false;
                 }
             }

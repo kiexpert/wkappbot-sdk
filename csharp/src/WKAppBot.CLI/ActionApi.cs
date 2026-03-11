@@ -31,68 +31,76 @@ public static class ActionApi
     // Prop is auto-cleaned when the window closes (Win32 guarantee).
 
     public const string FocusStealerPropPrefix = "WKAppBot_FocusStealer-";
+    public const string InvokeHollowProp       = "WKAppBot_InvokeHollow";
 
     /// <summary>Fired when a UIA action steals focus. Args: (rootHwnd, actionName).</summary>
     public static Action<IntPtr, string>? OnFocusStealer;
 
+    /// <summary>Fired when UIA Invoke is confirmed hollow (no-op stub). Args: (elHwnd, elClassName).
+    /// Receiver should write to knowhow so future sessions know to skip UIA Invoke.</summary>
+    public static Action<IntPtr, string>? OnInvokeHollow;
+
     // ── UIA Focusless Actions ──
+    // Zoom runs in parallel with the UIA action — ~334ms → ~0ms blocking. [PROF]
+    // BoundingRect is captured on the calling thread (COM-safe), then WPF window
+    // creation runs on Task.Run so it doesn't block the UIA call.
 
     public static bool Invoke(AutomationElement el, IntPtr hwnd, string label)
     {
-        using var zoom = BeginZoomForElement(el, hwnd, "invoke", label);
+        var zoomTask = BeginZoomForElementAsync(el, hwnd, "invoke", label);
         var snap = SnapshotState();
         var ok = UiaLocator.TryInvoke(el);
-        EndZoom(zoom, ok, "Invoke", label);
+        EndZoom(zoomTask.GetAwaiter().GetResult(), ok, "Invoke", label);
         CheckSideEffects(hwnd, "invoke", snap);
         return ok;
     }
 
     public static bool Select(AutomationElement el, IntPtr hwnd, string label)
     {
-        using var zoom = BeginZoomForElement(el, hwnd, "select", label);
+        var zoomTask = BeginZoomForElementAsync(el, hwnd, "select", label);
         var snap = SnapshotState();
         var ok = UiaLocator.TrySelect(el);
-        EndZoom(zoom, ok, "Select", label);
+        EndZoom(zoomTask.GetAwaiter().GetResult(), ok, "Select", label);
         CheckSideEffects(hwnd, "select", snap);
         return ok;
     }
 
     public static bool Toggle(AutomationElement el, IntPtr hwnd, string label)
     {
-        using var zoom = BeginZoomForElement(el, hwnd, "toggle", label);
+        var zoomTask = BeginZoomForElementAsync(el, hwnd, "toggle", label);
         var snap = SnapshotState();
         var ok = UiaLocator.TryToggle(el);
-        EndZoom(zoom, ok, "Toggle", label);
+        EndZoom(zoomTask.GetAwaiter().GetResult(), ok, "Toggle", label);
         CheckSideEffects(hwnd, "toggle", snap);
         return ok;
     }
 
     public static bool Expand(AutomationElement el, IntPtr hwnd, string label)
     {
-        using var zoom = BeginZoomForElement(el, hwnd, "expand", label);
+        var zoomTask = BeginZoomForElementAsync(el, hwnd, "expand", label);
         var snap = SnapshotState();
         var ok = UiaLocator.TryExpand(el);
-        EndZoom(zoom, ok, "Expand", label);
+        EndZoom(zoomTask.GetAwaiter().GetResult(), ok, "Expand", label);
         CheckSideEffects(hwnd, "expand", snap);
         return ok;
     }
 
     public static bool Collapse(AutomationElement el, IntPtr hwnd, string label)
     {
-        using var zoom = BeginZoomForElement(el, hwnd, "collapse", label);
+        var zoomTask = BeginZoomForElementAsync(el, hwnd, "collapse", label);
         var snap = SnapshotState();
         var ok = UiaLocator.TryCollapse(el);
-        EndZoom(zoom, ok, "Collapse", label);
+        EndZoom(zoomTask.GetAwaiter().GetResult(), ok, "Collapse", label);
         CheckSideEffects(hwnd, "collapse", snap);
         return ok;
     }
 
     public static bool ScrollIntoView(AutomationElement el, IntPtr hwnd, string label)
     {
-        using var zoom = BeginZoomForElement(el, hwnd, "scroll", label);
+        var zoomTask = BeginZoomForElementAsync(el, hwnd, "scroll", label);
         var snap = SnapshotState();
         var ok = UiaLocator.TryScrollIntoView(el);
-        EndZoom(zoom, ok, "ScrollIntoView", label);
+        EndZoom(zoomTask.GetAwaiter().GetResult(), ok, "ScrollIntoView", label);
         CheckSideEffects(hwnd, "scroll", snap);
         return ok;
     }
@@ -101,59 +109,61 @@ public static class ActionApi
 
     public static void Click(int screenX, int screenY, IntPtr hwnd, string label)
     {
-        using var zoom = BeginZoomForPoint(screenX, screenY, hwnd, "click", label);
+        var zoomTask = BeginZoomForPointAsync(screenX, screenY, hwnd, "click", label);
         MouseInput.Click(screenX, screenY);
-        zoom?.ShowPass($"Click {label}");
+        zoomTask.GetAwaiter().GetResult()?.ShowPass($"Click {label}");
     }
 
     public static void DoubleClick(int screenX, int screenY, IntPtr hwnd, string label)
     {
-        using var zoom = BeginZoomForPoint(screenX, screenY, hwnd, "dblclick", label);
+        var zoomTask = BeginZoomForPointAsync(screenX, screenY, hwnd, "dblclick", label);
         MouseInput.DoubleClick(screenX, screenY);
-        zoom?.ShowPass($"DblClick {label}");
+        zoomTask.GetAwaiter().GetResult()?.ShowPass($"DblClick {label}");
     }
 
     public static void RightClick(int screenX, int screenY, IntPtr hwnd, string label)
     {
-        using var zoom = BeginZoomForPoint(screenX, screenY, hwnd, "rightclick", label);
+        var zoomTask = BeginZoomForPointAsync(screenX, screenY, hwnd, "rightclick", label);
         MouseInput.RightClick(screenX, screenY);
-        zoom?.ShowPass($"RightClick {label}");
+        zoomTask.GetAwaiter().GetResult()?.ShowPass($"RightClick {label}");
     }
 
     // ── Zoom Helpers ──
 
     /// <summary>
-    /// Begin zoom overlay centered on UIA element's BoundingRectangle.
-    /// Returns null if zoom disabled, element has no bounds, or zoom creation fails.
+    /// Begin zoom overlay for a UIA element — async so it runs in parallel with the UIA action.
+    /// BoundingRect is captured on the calling thread (COM-safe); WPF window creation is offloaded.
     /// </summary>
-    private static ClickZoomHelper? BeginZoomForElement(
+    private static Task<ClickZoomHelper?> BeginZoomForElementAsync(
         AutomationElement el, IntPtr hwnd, string source, string label)
     {
-        if (!ZoomEnabled) return null;
+        if (!ZoomEnabled) return Task.FromResult<ClickZoomHelper?>(null);
         try
         {
-            var br = el.BoundingRectangle;
-            if (br.Width <= 0 || br.Height <= 0) return null;
+            var br = el.BoundingRectangle; // COM call — must stay on calling thread
+            if (br.Width <= 0 || br.Height <= 0) return Task.FromResult<ClickZoomHelper?>(null);
             var rect = new Rectangle((int)br.X, (int)br.Y, (int)br.Width, (int)br.Height);
-            return ClickZoomHelper.BeginFromRect(rect, hwnd, source, label);
+            return Task.Run(() => ClickZoomHelper.BeginFromRect(rect, hwnd, source, label));
         }
-        catch { return null; } // zoom is non-critical
+        catch { return Task.FromResult<ClickZoomHelper?>(null); }
     }
 
     /// <summary>
-    /// Begin zoom overlay centered on a screen point (for physical clicks).
-    /// Uses a 120x40 rect around the click point.
+    /// Begin zoom overlay for a screen point — async so it runs in parallel with the physical click.
     /// </summary>
-    private static ClickZoomHelper? BeginZoomForPoint(
+    private static Task<ClickZoomHelper?> BeginZoomForPointAsync(
         int screenX, int screenY, IntPtr hwnd, string source, string label)
     {
-        if (!ZoomEnabled) return null;
-        try
+        if (!ZoomEnabled) return Task.FromResult<ClickZoomHelper?>(null);
+        return Task.Run(() =>
         {
-            var rect = new Rectangle(screenX - 60, screenY - 20, 120, 40);
-            return ClickZoomHelper.BeginFromRect(rect, hwnd, source, label);
-        }
-        catch { return null; }
+            try
+            {
+                var rect = new Rectangle(screenX - 60, screenY - 20, 120, 40);
+                return ClickZoomHelper.BeginFromRect(rect, hwnd, source, label);
+            }
+            catch { return null; }
+        });
     }
 
     /// <summary>Common zoom result handler.</summary>

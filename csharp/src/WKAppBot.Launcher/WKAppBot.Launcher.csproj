@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>wkappbot</AssemblyName>
+    <RootNamespace>WKAppBot.Launcher</RootNamespace>
+    <Version>$(WKAppBotVersion)</Version>
+    <!-- AOT: native code only, no .NET runtime startup overhead → ~50ms cold start -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishAot>true</PublishAot>
+    <PublishTrimmed>true</PublishTrimmed>
+  </PropertyGroup>
+
+  <!-- Post-publish: just copy launcher EXE to SDK/bin (no hot-swap needed, rarely changes) -->
+  <Target Name="DeployLauncher" AfterTargets="Publish">
+    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot;" IgnoreExitCode="true" />
+    <Message Text="[Launcher] wkappbot.exe deployed to W:\SDK\bin\" Importance="high" />
+  </Target>
+
+</Project>
