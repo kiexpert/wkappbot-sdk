@@ -2907,22 +2907,10 @@ Examples:
     // IDisposable — always safe, no manual release needed.
 
     // Semaphore (not Mutex) — async/await can resume on different threads,
-    // and Mutex.ReleaseMutex() requires the same thread. Semaphore is thread-agnostic.
-    // NOTE: No Global\ prefix — session-local is sufficient (single user session).
-    // Global\ can throw "Access to the path is denied" if a zombie held it with different ACL.
-    // Factory method falls back gracefully: named → unnamed (in-process only).
-    static readonly Semaphore ChromeTabSemaphore = CreateChromeSemaphore();
-
-    static Semaphore CreateChromeSemaphore()
-    {
-        const string name = "WKAppBot_ChromeTabLock"; // session-local (no Global\ prefix)
-        try { return new Semaphore(1, 1, name); }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[ASK] ⚠ Named semaphore '{name}' unavailable ({ex.GetType().Name}) — using in-process lock");
-            return new Semaphore(1, 1); // unnamed fallback — no cross-process coordination, but safe
-        }
-    }
+    // SemaphoreSlim: in-process, thread-agnostic release (timer callback on any thread is fine),
+    // and always starts fresh when Eye restarts — no named OS resource that can get stuck
+    // after a crash (unlike named Semaphore which has no AbandonedMutexException).
+    static readonly SemaphoreSlim ChromeTabSemaphore = new(1, 1);
 
     sealed class ChromeTabLock : IDisposable
     {
@@ -2940,17 +2928,9 @@ Examples:
         public static ChromeTabLock? Acquire(string aiName, int timeoutMs = 15000)
         {
             Console.WriteLine($"[ASK] Waiting for browser lock ({aiName})...");
-            try
+            if (ChromeTabSemaphore.Wait(timeoutMs))
             {
-                if (ChromeTabSemaphore.WaitOne(timeoutMs))
-                {
-                    Console.WriteLine($"[ASK] Browser lock acquired ({aiName})");
-                    return new ChromeTabLock(aiName);
-                }
-            }
-            catch (AbandonedMutexException)
-            {
-                Console.WriteLine($"[ASK] Browser lock recovered ({aiName})");
+                Console.WriteLine($"[ASK] Browser lock acquired ({aiName})");
                 return new ChromeTabLock(aiName);
             }
             Console.WriteLine($"[ASK] Browser lock timeout ({aiName})");
