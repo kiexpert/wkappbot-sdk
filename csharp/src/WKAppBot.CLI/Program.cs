@@ -150,6 +150,13 @@ internal partial class Program
                 FocuslessWarningOverlay.Show(chromeHwnd, "Chrome 복원 시 포커스 강탈 → 즉시 복구됨", "chrome");
             };
 
+            // [FOCUSSTEALER] UIA action stole focus → stamp prop + auto-record knowhow
+            ActionApi.OnFocusStealer ??= (rootHwnd, action) =>
+            {
+                AppendFocusStealerKnowhow(rootHwnd, action);
+                FocuslessWarningOverlay.Show(rootHwnd, $"UIA {action} 포커스 강탈 → 다음 실행 시 yield 팝업 자동 표시", null);
+            };
+
             // Global option: disable zoom overlay — intentionally obnoxious name to discourage use
             if (restArgs.Any(a => a == "--i-dont-want-to-see-the-zoom-magnifier-overlay"))
             {
