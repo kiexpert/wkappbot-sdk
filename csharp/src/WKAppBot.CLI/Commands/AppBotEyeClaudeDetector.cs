@@ -844,6 +844,7 @@ internal partial class Program
     //   CopyFromScreen fails when covered. PrintWindow on Electron main window captures
     //   only native chrome (title bar). But the render sub-window captures GPU web content!
 
+    // Legacy single-instance spinner state (unused when ClaudeInstanceState is passed)
     static uint _lastSpinnerHash;
     static int _consecutiveNoChange;
     static IntPtr _cachedRenderHwnd;  // cached Chrome_RenderWidgetHostHWND
@@ -855,37 +856,53 @@ internal partial class Program
     /// for 2+ consecutive calls (1s apart) → spinner stopped → Claude idle.
     /// Returns: true = idle detected, false = still animating or can't detect.
     /// </summary>
-    static bool DetectSpinnerIdle(IntPtr claudeHwnd)
+    static bool DetectSpinnerIdle(IntPtr claudeHwnd, ClaudeInstanceState? state = null)
     {
         if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd)) return false;
+
+        // Use per-instance state if provided, otherwise fall back to static fields
+        ref uint lastHash = ref (state != null ? ref state.LastSpinnerHash : ref _lastSpinnerHash);
+        ref int noChange = ref (state != null ? ref state.ConsecutiveNoChange : ref _consecutiveNoChange);
+        ref IntPtr renderHwnd = ref (state != null ? ref state.CachedRenderHwnd : ref _cachedRenderHwnd);
 
         try
         {
             // Find render sub-window (cached for performance)
-            if (_cachedRenderHwnd == IntPtr.Zero || !IsWindow(_cachedRenderHwnd))
+            if (renderHwnd == IntPtr.Zero || !IsWindow(renderHwnd))
             {
-                _cachedRenderHwnd = NativeMethods.FindWindowExW(
+                renderHwnd = NativeMethods.FindWindowExW(
                     claudeHwnd, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
-                if (_cachedRenderHwnd == IntPtr.Zero) return false;
+                if (renderHwnd == IntPtr.Zero) return false;
             }
 
             // Get render widget screen position (for coordinate conversion)
-            if (!NativeMethods.GetWindowRect(_cachedRenderHwnd, out var renderRect))
+            if (!NativeMethods.GetWindowRect(renderHwnd, out var renderRect))
                 return false;
             int renderW = renderRect.Right - renderRect.Left;
             int renderH = renderRect.Bottom - renderRect.Top;
             if (renderW <= 0 || renderH <= 0) return false;
 
-            // Find turn-form to anchor the spinner area (UIA — works even when covered)
-            using var automation = new UIA3Automation();
-            var window = automation.FromHandle(claudeHwnd);
-            if (window == null) return false;
-
-            var cf = new ConditionFactory(new UIA3PropertyLibrary());
-            var turnForm = window.FindFirstDescendant(cf.ByAutomationId("turn-form"));
-            if (turnForm == null) return false;
-
-            var tfRect = turnForm.BoundingRectangle;
+            // Use cached turn-form rect from ClaudePromptHelper (avoids re-scanning)
+            var cachedPrompt = ClaudePromptHelper.GetAllCachedPrompts()
+                .FirstOrDefault(p => p.WindowHandle == claudeHwnd);
+            System.Drawing.RectangleF tfRect;
+            if (cachedPrompt != null)
+            {
+                tfRect = new System.Drawing.RectangleF(
+                    cachedPrompt.PromptRect.X, cachedPrompt.PromptRect.Y,
+                    cachedPrompt.PromptRect.Width, cachedPrompt.PromptRect.Height);
+            }
+            else
+            {
+                // Fallback: scan via UIA
+                using var automation = new UIA3Automation();
+                var window = automation.FromHandle(claudeHwnd);
+                if (window == null) return false;
+                var cf = new ConditionFactory(new UIA3PropertyLibrary());
+                var turnForm = window.FindFirstDescendant(cf.ByAutomationId("turn-form"));
+                if (turnForm == null) return false;
+                tfRect = turnForm.BoundingRectangle;
+            }
             if (tfRect.Height < 10) return false;
 
             // Convert screen coordinates to render-widget-local coordinates
@@ -907,7 +924,7 @@ internal partial class Program
                 {
                     IntPtr hdc = g.GetHdc();
                     bool ok = NativeMethods.PrintWindow(
-                        _cachedRenderHwnd, hdc, NativeMethods.PW_RENDERFULLCONTENT);
+                        renderHwnd, hdc, NativeMethods.PW_RENDERFULLCONTENT);
                     g.ReleaseHdc(hdc);
                     if (!ok) return false;
                 }
@@ -918,16 +935,16 @@ internal partial class Program
                     hash = (hash ^ (uint)fullBmp.GetPixel(localX + px, localY).ToArgb()) * 16777619u;
             }
 
-            if (hash == _lastSpinnerHash)
+            if (hash == lastHash)
             {
-                _consecutiveNoChange++;
-                if (_consecutiveNoChange >= 2)
+                noChange++;
+                if (noChange >= 2)
                     return true; // 2+ consecutive same → no animation → idle
             }
             else
             {
-                _consecutiveNoChange = 0;
-                _lastSpinnerHash = hash;
+                noChange = 0;
+                lastHash = hash;
             }
 
             return false;
@@ -939,10 +956,19 @@ internal partial class Program
     }
 
     /// <summary>Reset spinner detection state (e.g., on active recovery).</summary>
-    static void ResetSpinnerDetection()
+    static void ResetSpinnerDetection(ClaudeInstanceState? state = null)
     {
-        _lastSpinnerHash = 0;
-        _consecutiveNoChange = 0;
-        _cachedRenderHwnd = IntPtr.Zero;
+        if (state != null)
+        {
+            state.LastSpinnerHash = 0;
+            state.ConsecutiveNoChange = 0;
+            state.CachedRenderHwnd = IntPtr.Zero;
+        }
+        else
+        {
+            _lastSpinnerHash = 0;
+            _consecutiveNoChange = 0;
+            _cachedRenderHwnd = IntPtr.Zero;
+        }
     }
 }

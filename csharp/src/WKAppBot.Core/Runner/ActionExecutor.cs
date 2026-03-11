@@ -476,7 +476,8 @@ public sealed class ActionExecutor : IDisposable
 
         // ── Tier 4: SendInput Unicode (physical input, most reliable, needs focus) ──
         EnsureFocus();
-        KeyboardInput.TypeText(text);
+        // Pass hWnd so TypeText can check focus per-character and restore on drift
+        KeyboardInput.TypeText(text, hWnd);
         result.ActionDetail = $"Type \"{text}\" (SendInput)";
         Log($"  Typed via SendInput: \"{text}\"");
     }

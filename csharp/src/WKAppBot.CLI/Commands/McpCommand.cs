@@ -140,16 +140,23 @@ internal partial class Program
                             "Element: invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range\n" +
                             "Query: find, read, highlight\n" +
                             "Discovery: inspect (UIA tree), windows (list windows), screenshot (capture), ocr (text extraction)\n" +
-                            "Async: wait (poll until element appears), eval (execute JavaScript via CDP)"),
+                            "Async: wait (poll until element appears), eval (execute JavaScript via CDP)\n" +
+                            "AI Agents: ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini) — vision-capable, auto image capture\n" +
+                            "File I/O: file-read (read file as Unicode, encoding-aware), file-write (write Unicode→target encoding, @file reference)\n" +
+                            "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ)"),
                         ["grap"] = Prop("string",
-                            "Window#element grap pattern. Required for all actions except 'windows'.\n" +
-                            "Examples: \"*Notepad*\", \"*Chrome*#button.submit\", \"*App*#*MenuBar*#*File*\""),
-                        ["text"] = Prop("string", "Text for type/set-value actions"),
+                            "Window#element grap pattern. Required for most actions.\n" +
+                            "⚠ For ask-gpt/ask-gemini: grap is an IMAGE FILE PATH (e.g. \"screenshot.png\"), NOT a window pattern.\n" +
+                            "⚠ For suggest: grap is an optional FILE ATTACHMENT path.\n" +
+                            "⚠ For file-read/file-write: grap is the TARGET FILE PATH (e.g. \"src/legacy.cpp\").\n" +
+                            "Window examples: \"*Notepad*\", \"*Chrome*#button.submit\", \"*App*#*MenuBar*#*File*\""),
+                        ["text"] = Prop("string", "Text for type/set-value/file-write actions. Use @filename to reference a temp file (e.g. \"@/tmp/edit.txt\")"),
                         ["depth"] = Prop("integer", "Tree depth for inspect/find (default: 3)"),
                         ["process"] = Prop("string", "Filter by process name (for windows action)"),
                         ["all"] = Prop("boolean", "Apply to ALL matching windows, or include hidden windows (for windows action)"),
                         ["timeout"] = Prop("integer", "Timeout in ms for wait action (default: 10000)"),
-                        ["interval"] = Prop("integer", "Polling interval in ms for wait action (default: 500)")
+                        ["interval"] = Prop("integer", "Polling interval in ms for wait action (default: 500)"),
+                        ["encoding"] = Prop("string", "File encoding for file-read/file-write: 949 (CP949/Korean), 932 (Shift-JIS/Japanese), 65001 (UTF-8, default), utf-16. Enables Claude to read/write CP949 Korean source files without encoding corruption.")
                     },
                     ["required"] = new JsonArray { "action" }
                 }),
@@ -240,6 +247,7 @@ internal partial class Program
         if (args["timeout"] is JsonNode to) { list.Add("--timeout"); list.Add(to.ToString()); }
         if (args["interval"] is JsonNode iv) { list.Add("--interval"); list.Add(iv.ToString()); }
         if (args["all"]?.GetValue<bool>() == true) list.Add("--all");
+        if (args["encoding"] is JsonNode enc) { list.Add("--encoding"); list.Add(enc.GetValue<string>()); }
         return list.ToArray();
     }
 

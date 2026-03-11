@@ -31,7 +31,9 @@ internal partial class Program
         "Discovery: inspect (UIA element tree), windows (list all windows), screenshot (capture window), ocr (extract text)\n" +
         "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, \"js expr\")\n" +
         "Utility: clipboard (show help), clipboard-read (read text), clipboard-write (write text/files — mixed mode with [file:] markers)\n" +
-        "AI Agents (삼두협의체): ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini) — auto image capture from responses\n\n" +
+        "File I/O: file-read (read file as Unicode — supports --encoding 949/utf-8/etc.), file-write (write Unicode content as target encoding — use @file to reference temp content)\n" +
+        "AI Agents (삼두협의체): ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini) — auto image capture from responses\n" +
+        "Feedback: suggest (send feature request to Slack webhook + local suggestions.jsonl, optional file attachment)\n\n" +
         "## Fallback Chain (battle-tested!)\n" +
         "CSS selector on Chrome/Electron class → CDP engine → UIA fallback.\n" +
         "UIA pattern on web view class → if UIA fails → CDP retry.\n" +
@@ -92,5 +94,11 @@ internal partial class Program
         "- Clipboard read: action=clipboard-read (Unicode + CP949 auto-detect)\n" +
         "- Clipboard write text: action=clipboard-write, text=\"hello world\"\n" +
         "- Clipboard copy files: action=clipboard-write, grap=\"report.pdf\" (CF_HDROP)\n" +
-        "- Clipboard mixed: action=clipboard-write — pass text+file args, text→.txt with [file:] markers";
+        "- Clipboard mixed: action=clipboard-write — pass text+file args, text→.txt with [file:] markers\n" +
+        "- Send feature request: action=suggest, text=\"Please add X feature because Y\"\n" +
+        "- Suggest with screenshot: action=suggest, text=\"UI bug: button misaligned\", grap=\"screenshot.png\"\n" +
+        "- Read CP949 Korean source: action=file-read, grap=\"src/legacy.cpp\", --encoding 949 → outputs Unicode\n" +
+        "- Write CP949 Korean source: action=file-write, grap=\"src/legacy.cpp\", text=\"@/tmp/edit.txt\", --encoding 949 (Claude writes UTF-8 to @file, wkappbot re-encodes)\n" +
+        "- Read UTF-8 file: action=file-read, grap=\"config.json\" (default encoding UTF-8)\n" +
+        "- Write UTF-8 file: action=file-write, grap=\"output.txt\", text=\"line1\\nline2\"";
 }

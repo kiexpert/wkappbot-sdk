@@ -219,6 +219,11 @@ internal partial class Program
             else if (a == "--interval" && i + 1 < args.Length && int.TryParse(args[i + 1], out var iv)) { intervalMs = iv; i++; }
         }
 
+        // Parse encoding param (for file-read/file-write)
+        string? encodingArg = null;
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i].ToLowerInvariant() is "--encoding" or "--enc") { encodingArg = args[i + 1]; break; }
+
         // Validate
         if (action == "move" && (mx == null || my == null))
             return Error("move requires --x N --y N");
@@ -283,6 +288,10 @@ internal partial class Program
             // Text only → CF_UNICODETEXT
             return ClipboardWrite(string.Join(Environment.NewLine, textParts));
         }
+
+        // ═══ Special: file-read / file-write (encoding-aware, no window needed) ═══
+        if (action is "file-read" or "file-write")
+            return FileReadWrite(action, grap, text, encodingArg, args);
 
         // ═══ Special: wait action (polls for window/element, early return) ═══
         if (action == "wait")
@@ -659,6 +668,9 @@ internal partial class Program
                 }
             }
 
+            // ── Knowhow broadcast: 선배 클롣의 경험을 후배 클롣에게 전달 ──
+            BroadcastActionKnowhow(hwnd, action, success);
+
             if (success) ok++; else fail++;
 
             // ── --repeat: 연쇄 다이얼로그 자동 dismiss 루프 ──
@@ -717,6 +729,70 @@ internal partial class Program
         return fail > 0 ? 1 : 0;
     }
 
+    // ── 선배 클롣 경험 노하우 자동 방송 ──
+    // 1. knowhow.md (앱 특성 개요) — 있으면 방송, 없으면 경로 안내
+    // 2. knowhow-{action}.md (액션별) — 있으면 방송, 없으면 경로 안내
+    // 3. knowhow-failed-actions.md — 실패 시 방송 or 안내
+    static void BroadcastActionKnowhow(IntPtr hwnd, string action, bool success)
+    {
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            var procName = "unknown";
+            var className = "unknown";
+            try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+            try
+            {
+                var buf = new System.Text.StringBuilder(256);
+                NativeMethods.GetClassNameW(hwnd, buf, 256);
+                className = buf.ToString();
+            }
+            catch { }
+
+            var safeProc = SanitizePathTokenForExp(procName);
+            var safeClass = SanitizePathTokenForExp(className);
+            var expDir = Path.Combine(DataDir, "experience", safeProc, safeClass);
+
+            // 1. knowhow.md (앱 일반 특성)
+            var generalPath = Path.Combine(DataDir, "experience", safeProc, "knowhow.md");
+            if (File.Exists(generalPath))
+                ShowKnowhowBroadcast(generalPath, "KNOWHOW:OS");
+            else
+                ShowKnowhowHint(generalPath, "앱 전반 자동화 특성 (MFC/WPF/Electron 등) 기록 권장");
+
+            // 2. knowhow-{action}.md (액션별)
+            var actionPath = Path.Combine(expDir, $"knowhow-{action}.md");
+            if (File.Exists(actionPath))
+                ShowKnowhowBroadcast(actionPath, "KNOWHOW:OS");
+            else
+                ShowKnowhowHint(actionPath, $"{action} 성공법·주의점·실패 패턴 기록 권장");
+
+            // 3. 실패 시 knowhow-failed-actions.md
+            if (!success)
+            {
+                var failedPath = Path.Combine(expDir, "knowhow-failed-actions.md");
+                if (File.Exists(failedPath))
+                    ShowKnowhowBroadcast(failedPath, "KNOWHOW:OS");
+                else
+                    ShowKnowhowHint(failedPath, "이번 실패 원인·우회법 기록 권장");
+            }
+        }
+        catch { /* best effort */ }
+    }
+
+    static void ShowKnowhowHint(string path, string hint)
+    {
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.Write("  [KNOWHOW:OS] 💌 ");
+        Console.ForegroundColor = ConsoleColor.Gray;
+        Console.WriteLine($"No knowhow yet — please leave a note: {hint}");
+        Console.WriteLine("     Your 5 min saves junior Claude hours. 🙏");
+        Console.ResetColor();
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.WriteLine($"      → {path}");
+        Console.ResetColor();
+    }
+
     static bool A11yNotYet(string action)
     {
         Console.Error.WriteLine($"[A11Y] ERROR: '{action}' is not a valid action");
@@ -753,7 +829,8 @@ internal partial class Program
             // Otherwise legacy Ctrl+S notation
             if (keyCombo.Contains(" +") || keyCombo.Contains(" -") || keyCombo.StartsWith("+") || keyCombo.StartsWith("-"))
             {
-                WKAppBot.Win32.Input.KeyboardInput.SendKeys(keyCombo);
+                // Pass hwnd for per-token mid-input focus check+restore
+                WKAppBot.Win32.Input.KeyboardInput.SendKeys(keyCombo, hwnd);
             }
             else
             {
@@ -1392,5 +1469,82 @@ internal partial class Program
         var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
         cdp.EvalAsync($"document.querySelector('{escaped}')?.click()").GetAwaiter().GetResult();
         return true;
+    }
+
+    // ── file-read / file-write: encoding-aware file I/O for CP949 Korean sources ──
+    // Solves the "byte offset splice nightmare" when editing CP949 files via MCP.
+    // file-read: reads file as target encoding → outputs Unicode to stdout
+    // file-write: receives Unicode text (inline or from @file) → saves as target encoding
+    //
+    // Usage:
+    //   a11y file-read "path/to/file.cpp" --encoding 949
+    //   a11y file-write "path/to/file.cpp" --text "@tmp_edit.txt" --encoding 949
+    //   a11y file-write "path/to/file.cpp" --text "inline content" --encoding 949
+    static int FileReadWrite(string action, string filePath, string? text, string? encodingArg, string[] args)
+    {
+        // Resolve encoding (default: UTF-8)
+        System.Text.Encoding enc;
+        if (encodingArg == null || encodingArg.Equals("utf-8", StringComparison.OrdinalIgnoreCase) || encodingArg == "65001")
+        {
+            enc = System.Text.Encoding.UTF8;
+        }
+        else if (encodingArg.Equals("utf-16", StringComparison.OrdinalIgnoreCase))
+        {
+            enc = System.Text.Encoding.Unicode;
+        }
+        else if (int.TryParse(encodingArg, out var cp))
+        {
+            try { enc = System.Text.Encoding.GetEncoding(cp); }
+            catch { return Error($"Unknown encoding: {encodingArg}"); }
+        }
+        else
+        {
+            try { enc = System.Text.Encoding.GetEncoding(encodingArg); }
+            catch { return Error($"Unknown encoding: {encodingArg}"); }
+        }
+
+        // ── file-read ──────────────────────────────────────────────────────────
+        if (action == "file-read")
+        {
+            if (!File.Exists(filePath))
+                return Error($"File not found: {filePath}");
+            var bytes = File.ReadAllBytes(filePath);
+            var unicode = enc.GetString(bytes);
+            Console.WriteLine($"[FILE-READ] {filePath} ({enc.WebName}, {bytes.Length} bytes → {unicode.Length} chars)");
+            Console.WriteLine(unicode);
+            return 0;
+        }
+
+        // ── file-write ─────────────────────────────────────────────────────────
+        // text: inline content OR "@filename" (curl-style reference)
+        // Also allow positional: a11y file-write "target.cpp" "@tmp.txt" --encoding 949
+        if (text == null && args.Length >= 3 && !args[2].StartsWith("--"))
+            text = args[2];
+        if (text == null)
+            return Error("file-write requires --text \"content\" or --text \"@source.txt\"");
+
+        string content;
+        if (text.StartsWith("@"))
+        {
+            // @filename: read UTF-8 source (Claude writes temp file in UTF-8)
+            var srcPath = text[1..];
+            if (!File.Exists(srcPath))
+                return Error($"Source file not found: {srcPath}");
+            content = File.ReadAllText(srcPath, System.Text.Encoding.UTF8);
+            Console.WriteLine($"[FILE-WRITE] source: {srcPath} ({content.Length} chars)");
+        }
+        else
+        {
+            content = text;
+        }
+
+        var targetDir = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
+            Directory.CreateDirectory(targetDir);
+
+        var encoded = enc.GetBytes(content);
+        File.WriteAllBytes(filePath, encoded);
+        Console.WriteLine($"[FILE-WRITE] {filePath} ({enc.WebName}, {content.Length} chars → {encoded.Length} bytes) ✓");
+        return 0;
     }
 }
