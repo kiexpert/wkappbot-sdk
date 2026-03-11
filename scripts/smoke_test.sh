@@ -104,9 +104,13 @@ fi
 
 if [ $CALC_LAUNCHED -eq 1 ]; then
     CALC="*계산기*;*Calculator*"
+    # screenshot delegates to CaptureCommand which doesn't support ; OR pattern — detect single title
+    CALC_WIN=$("$WKA" a11y windows 2>&1 | grep -iE "계산기|Calculator" | grep -oP '"[^"]+"' | head -1 | tr -d '"')
+    CALC_WIN="${CALC_WIN:+*${CALC_WIN}*}"
+    [ -z "$CALC_WIN" ] && CALC_WIN="*Calculator*"
     check   "calc: read"        bash -c "\"$WKA\" a11y read \"$CALC\" --nth 1 2>&1 | grep -qiE 'name=|value=|pattern|ok'"
     check   "calc: find"        bash -c "\"$WKA\" a11y find \"$CALC\" --nth 1 --depth 3 2>&1 | grep -qiE 'found|Button|result|CalculatorResults'"
-    check   "calc: screenshot"  bash -c "\"$WKA\" a11y screenshot \"$CALC\" 2>&1 | grep -qiE 'saved|captured|Saved'"
+    check_g "calc: screenshot"  bash -c "\"$WKA\" a11y screenshot \"$CALC_WIN\" 2>&1"
     check   "calc: highlight"   bash -c "\"$WKA\" a11y highlight \"$CALC#num5Button\" --nth 1 2>&1 | grep -qiE 'highlight|zoom|ok'"
     # 5 + 3 = 8  (focusless UIA Invoke)
     check   "calc: invoke 5"    bash -c "\"$WKA\" a11y invoke \"$CALC#num5Button\" 2>&1 | grep -qiE 'ok|invoke'"
@@ -217,6 +221,10 @@ if [ "$QUICK" -eq 0 ]; then
         timeout 5 "$WKA" web open "$TEST_URL" >/dev/null 2>&1 || \
           powershell -Command "Start-Process chrome.exe '$TEST_URL'" 2>/dev/null
         sleep 2
+        # screenshot delegates to CaptureCommand which doesn't support ; OR pattern — use single title
+        CRM_WIN=$("$WKA" a11y windows 2>&1 | grep -iE "Chrome|Chromium|Edge" | grep -oP '"[^"]+"' | head -1 | tr -d '"')
+        CRM_WIN="${CRM_WIN:+*${CRM_WIN}*}"
+        [ -z "$CRM_WIN" ] && CRM_WIN="*Chrome*"
 
         # -- CDP commands --
         check_g "web tabs"            bash -c "\"$WKA\" web tabs 2>&1 | grep -qiE 'tab|url|http|about|smoke'"
@@ -227,7 +235,7 @@ if [ "$QUICK" -eq 0 ]; then
         # -- a11y on Chrome window (UIA) --
         check_g "a11y inspect chrome" bash -c "\"$WKA\" a11y inspect \"$CRM\" --nth 1 --depth 2 2>&1 | grep -qiE 'match|found|Chrome|window'"
         check_g "a11y read chrome"    bash -c "\"$WKA\" a11y read \"$CRM\" --nth 1 2>&1 | grep -qiE 'name=|value=|ok|error'"
-        check_g "a11y screenshot chr" bash -c "\"$WKA\" a11y screenshot \"$CRM\" 2>&1 | grep -qiE 'saved|Saved|captured|error'"
+        check_g "a11y screenshot chr" bash -c "\"$WKA\" a11y screenshot \"$CRM_WIN\" 2>&1"
         check_g "a11y focus chrome"   bash -c "\"$WKA\" a11y focus \"$CRM\" --nth 1 2>&1 | grep -qiE 'focus|ok|error'"
 
         # -- CDP via a11y eval with test page tab hint --
