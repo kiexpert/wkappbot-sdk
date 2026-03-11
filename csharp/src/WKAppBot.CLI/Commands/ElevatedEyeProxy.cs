@@ -92,7 +92,7 @@ static class ElevatedEyeServer
 
     public static async Task ListenAsync(CancellationToken ct)
     {
-        Console.WriteLine($"[EYE:ADMIN] Elevated proxy listening on \\\\.\\pipe\\{PipeName}");
+        Console.WriteLine($"[EYE:PIPE] Eye pipe listening on \\\\.\\pipe\\{PipeName}");
 
         while (!ct.IsCancellationRequested)
         {
@@ -109,19 +109,19 @@ static class ElevatedEyeServer
                     PipeAccessRights.FullControl, AccessControlType.Allow));
 
                 pipe = NamedPipeServerStreamAcl.Create(
-                    PipeName, PipeDirection.InOut, 1,
+                    PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
                     inBufferSize: 0, outBufferSize: 0, pipeSecurity: pipeSec);
 
                 await pipe.WaitForConnectionAsync(ct);
-                Console.WriteLine("[EYE:ADMIN] Client connected");
-
-                await HandleClient(pipe, ct);
+                var connectedPipe = pipe;
+                pipe = null; // ownership transferred
+                _ = Task.Run(() => HandleClient(connectedPipe, ct), ct);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EYE:ADMIN] Pipe error: {ex.Message}");
+                Console.WriteLine($"[EYE:PIPE] Pipe error: {ex.Message}");
             }
             finally
             {
@@ -132,7 +132,7 @@ static class ElevatedEyeServer
                 await Task.Delay(100, ct).ConfigureAwait(false);
         }
 
-        Console.WriteLine("[EYE:ADMIN] Elevated proxy stopped");
+        Console.WriteLine("[EYE:PIPE] Eye pipe stopped");
     }
 
     static async Task HandleClient(NamedPipeServerStream pipe, CancellationToken ct)
@@ -157,11 +157,20 @@ static class ElevatedEyeServer
             }
         }
 
-        Console.WriteLine("[EYE:ADMIN] Client disconnected");
+        Console.WriteLine("[EYE:PIPE] Client disconnected");
     }
 
     static async Task<EyeProxyResponse> ExecuteCommand(EyeProxyRequest req)
     {
+        // Special: __eye_tick__ returns cached Eye loop state without spawning a subprocess
+        if (req.Command == "__eye_tick__")
+        {
+            var tickResp = Program.BuildIpcTickResponse();
+            var tickJson = System.Text.Json.JsonSerializer.Serialize(tickResp,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+            return new EyeProxyResponse { Id = req.Id, ExitCode = 0, Stdout = tickJson };
+        }
+
         try
         {
             var exePath = Environment.ProcessPath ?? "wkappbot.exe";
@@ -408,5 +417,44 @@ static class ElevationHelper
             Console.WriteLine($"[ELEVATION] Failed to launch elevated Eye: {ex.Message}");
             return false;
         }
+    }
+}
+
+// ── Eye IPC: eye tick queries running Eye loop for cached state ──
+// Pipe name: wkappbot_eye_ipc  Request: {"cmd":"tick"}  Response: EyeIpcTickResponse JSON
+
+/// <summary>Response from running Eye loop → one-shot eye tick client.</summary>
+sealed class EyeIpcTickResponse
+{
+    [JsonPropertyName("summary")]          public string Summary { get; set; } = "";
+    [JsonPropertyName("cardCount")]        public int CardCount { get; set; }
+    [JsonPropertyName("contextPct")]       public int ContextPct { get; set; }
+    [JsonPropertyName("plans")]            public string[] Plans { get; set; } = [];
+    [JsonPropertyName("promptSource")]     public string PromptSource { get; set; } = "";
+    [JsonPropertyName("prompt")]           public string Prompt { get; set; } = "";
+    [JsonPropertyName("guardArmed")]       public bool GuardArmed { get; set; }
+    [JsonPropertyName("execIdleSec")]      public double ExecIdleSec { get; set; }
+    [JsonPropertyName("aiIdleSec")]        public double AiIdleSec { get; set; }
+    [JsonPropertyName("cooldownSec")]      public double CooldownSec { get; set; }
+    [JsonPropertyName("keepAwakeAgeSec")]  public double KeepAwakeAgeSec { get; set; }
+    [JsonPropertyName("latestTickAgeSec")] public double LatestTickAgeSec { get; set; }
+    [JsonPropertyName("promptLineHint")]   public int PromptLineHint { get; set; }
+    [JsonPropertyName("tickLineHint")]     public int TickLineHint { get; set; }
+    [JsonPropertyName("cachedAgeMs")]      public long CachedAgeMs { get; set; }
+}
+
+/// <summary>Client used by one-shot eye tick to query the running Eye loop's cached state via ElevatedEyeServer.</summary>
+static class EyeIpcClient
+{
+    public static async Task<EyeIpcTickResponse?> QueryTickAsync(int timeoutMs = 2000)
+    {
+        var resp = await ElevatedEyeClient.SendCommandAsync("__eye_tick__", [], timeoutMs);
+        if (resp == null || resp.ExitCode != 0 || string.IsNullOrEmpty(resp.Stdout)) return null;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<EyeIpcTickResponse>(resp.Stdout,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        }
+        catch { return null; }
     }
 }

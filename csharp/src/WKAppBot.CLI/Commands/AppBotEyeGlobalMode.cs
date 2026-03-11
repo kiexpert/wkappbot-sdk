@@ -24,6 +24,8 @@ internal partial class Program
         public string Cwd { get; set; } = "";    // working directory for display
     }
 
+    // ClaudeInstanceState + _instanceStates → moved to AppBotEyeClaudeStatusStreamer.cs
+
     sealed class PromptDiag
     {
         public long StatMs { get; set; }
@@ -93,9 +95,16 @@ internal partial class Program
     // LaunchAppBotEyeIfNeededCore checks this to prevent duplicate Eye spawns.
     static System.Threading.Mutex? _eyeRunMutex;
 
-    // ── SupplementCardsFromPrompts cache (30s TTL) ──
+    // ── SupplementCardsFromPrompts: 1s cooldown after last scan ──
+    // Per-hwnd cache in ClaudePromptHelper makes FindAllPrompts fast for known windows (no UIA rescan).
+    // 1s cooldown avoids redundant EnumWindows calls in back-to-back ticks.
     static List<ClaudePromptHelper.PromptInfo>? _cachedAllPrompts;
-    static DateTime _cachedAllPromptsExpiry = DateTime.MinValue;
+    static DateTime _lastFindAllPromptsAt = DateTime.MinValue;
+
+    // ── Eye IPC cache: updated each tick so eye tick IPC queries get instant response ──
+    static string _cachedIpcSummary = "";
+    static string _cachedIpcPromptPreview = "";
+    static DateTime _cachedIpcUpdatedAt = DateTime.MinValue;
 
     static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs, bool elevated = false, int replacePid = 0)
     {
@@ -107,23 +116,27 @@ internal partial class Program
         }
 
         // ── Kill stale Eye processes (non-hot-swap start only) ──
+        // Only kill processes that have been running ≥30s — short-lived commands (tick, inspect, etc.)
+        // that triggered this auto-launch are spared. Stale Eyes are long-running (>>30s).
         if (replacePid == 0)
         {
             int myPid = Environment.ProcessId;
+            var myStartTime = DateTime.UtcNow;
+            var staleThreshold = myStartTime - TimeSpan.FromSeconds(30);
             foreach (var proc in Process.GetProcessesByName("wkappbot"))
             {
                 if (proc.Id == myPid) continue;
                 try
                 {
-                    // Check if it's an Eye process by its command line containing "eye"
-                    // Simple heuristic: any other wkappbot process is fair game on fresh start
+                    // Skip recently started processes — they are short-lived commands, not stale Eyes
+                    if (proc.StartTime.ToUniversalTime() > staleThreshold) continue;
                     proc.Kill();
                     proc.WaitForExit(3000);
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine($"[EYE] Killed stale Eye (PID={proc.Id})");
                     Console.ResetColor();
                 }
-                catch { /* already exited */ }
+                catch { /* already exited or access denied */ }
                 finally { proc.Dispose(); }
             }
         }
@@ -146,13 +159,9 @@ internal partial class Program
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
-        // ── Elevated proxy pipe server (runs alongside Eye when admin) ──
-        Task? elevatedProxyTask = null;
-        if (elevated)
-        {
-            elevatedProxyTask = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
-            Console.WriteLine("[EYE] Elevated proxy pipe server started");
-        }
+        // ── Eye pipe server (always: admin UIA proxy + eye tick IPC) ──
+        _ = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
+        Console.WriteLine($"[EYE] Eye pipe server started (elevated={elevated})");
 
         if (_lastTickActivityUtc == DateTime.MinValue) _lastTickActivityUtc = DateTime.UtcNow;
         if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
@@ -166,19 +175,7 @@ internal partial class Program
             Console.ResetColor();
         }
 
-        // ── Plan/Permission approval tracking ──
-        bool planApprovalSentToSlack = false;
-        string? pendingPlanApprovalSlackTs = null;
-        bool permissionPromptSentToSlack = false;
-        string? pendingPermissionSlackTs = null;
-        DateTime? permissionPromptFirstSeen = null; // debounce: 3s before Slack notification
-
-        // ── Slack status streaming ──
-        string? slackStatusTs = null;
-        string? lastSlackStatusText = null;
-        string? lastExecutingText = null; // remember last "executing" status for prompt_ready transition
-        string? idleAfterText = null; // persisted: what was the last task before going idle
-        bool idleMessageSent = false; // whether idle status message has been posted to Slack
+        // ── Slack status streaming (per-instance state → AppBotEyeClaudeStatusStreamer.cs) ──
         var statusTsFile = Path.Combine(DataDir, "runtime", "status_streaming_ts.txt");
 
         // Previous status message ts — will be deleted after Slack connects
@@ -196,12 +193,6 @@ internal partial class Program
 
         // ── Claude status tracking ──
         string? cachedClaudeStatusText = null;
-        bool wasRateLimited = false;
-        DateTime? rateLimitDetectedAt = null;
-        DateTime? rateLimitResetTime = null;
-        DateTime? lastRateLimitAlertTime = null;
-        const int RateLimitCooldownMinutes = 30;
-        const int RateLimitAlertCooldownMinutes = 30;
 
         // ── Slack Socket Mode daemon (always ON) ──
         SlackSocketClient? slackClient = null;
@@ -276,12 +267,9 @@ internal partial class Program
 
                     // Set up event handlers (Slack → Claude prompt forwarding, plan/permission approval, status streaming)
                     SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
-                        claudeHwnd, () => pendingPlanApprovalSlackTs,
-                        () => pendingPermissionSlackTs, startupTs, botUsername,
-                        () => slackStatusTs, () => {
-                            slackStatusTs = null; lastSlackStatusText = null;
-                            try { File.WriteAllText(statusTsFile, ""); } catch { }
-                        });
+                        claudeHwnd, GetAnyPlanApprovalTs,
+                        GetAnyPermissionTs, startupTs, botUsername,
+                        GetAnyInstanceSlackStatusTs, () => ResetAllInstancesSlackStatus(statusTsFile));
 
                     // Block Kit button handler (plan approve/reject, permission buttons)
                     slackClient.OnBlockAction += (action) =>
@@ -290,7 +278,7 @@ internal partial class Program
                         Console.WriteLine($"[EYE][SLACK] Button: {action.ActionId}={action.Value} by {action.UserName}");
                         Console.ResetColor();
 
-                        var thread = action.MessageTs ?? pendingPlanApprovalSlackTs;
+                        var thread = action.MessageTs ?? GetAnyPlanApprovalTs();
 
                         if (action.ActionId == "plan_approve" && claudeHwnd != IntPtr.Zero)
                         {
@@ -499,7 +487,6 @@ internal partial class Program
         // ── Context usage monitor (per-card) ──
         // Track warned sizes per CWD — only re-warn if size actually increased
         var contextWarnedSizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        const double ContextLimitMB = 40.0; // empirical: sessions hit limit ~40MB JSONL
 
         int frameCount = 0;
         while (host.IsAlive && !cts.IsCancellationRequested)
@@ -540,433 +527,9 @@ internal partial class Program
             // ── Claude Desktop status detection (~every 5 sec) ──
             if (frameCount % 50 == 0)
             {
-                // Re-find Claude window if lost
-                if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd))
-                    claudeHwnd = FindClaudeDesktopWindow();
-
-                if (claudeHwnd != IntPtr.Zero)
-                {
-                    try
-                    {
-                        var claudeStatus = DetectClaudeDesktopStatus(claudeHwnd);
-
-                        if (claudeStatus != null)
-                        {
-                            // Remember last executing text for idle display
-                            if (claudeStatus.Item1 == "executing")
-                                lastExecutingText = claudeStatus.Item2;
-
-                            cachedClaudeStatusText = $"Claude: {claudeStatus.Item2}";
-
-                            // Rate limit detection
-                            bool justHitRateLimit = false;
-                            if (claudeStatus.Item1 == "rate_limit")
-                            {
-                                justHitRateLimit = !wasRateLimited;
-                                wasRateLimited = true;
-                                if (rateLimitDetectedAt == null)
-                                    rateLimitDetectedAt = DateTime.Now;
-                                var resetDt = GetResetTimeFromDisplayText(claudeStatus.Item2);
-                                if (resetDt != null)
-                                    rateLimitResetTime = resetDt;
-                            }
-                            else if (wasRateLimited)
-                            {
-                                // ★ 다른 상태(executing/prompt_ready/permission 등) 감지 = 리밋 해제!
-                                // 시간 조건 없이 즉시 해제 (유저 요청: "다른 상태가 감지되면 리밋이 풀린 것")
-                                bool stateChanged = true; // claudeStatus is NOT rate_limit → 상태 변화
-                                var now = DateTime.Now;
-                                bool cooldownPassed = rateLimitDetectedAt != null &&
-                                    (now - rateLimitDetectedAt.Value).TotalMinutes >= RateLimitCooldownMinutes;
-                                bool resetTimePassed = rateLimitResetTime != null && now >= rateLimitResetTime.Value;
-
-                                if (stateChanged || cooldownPassed || resetTimePassed)
-                                {
-                                    wasRateLimited = false;
-                                    rateLimitDetectedAt = null;
-                                    rateLimitResetTime = null;
-                                    Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.WriteLine($"[EYE] Rate limit cleared (stateChanged={stateChanged}, newState={claudeStatus.Item1}, cooldown={cooldownPassed}, resetTime={resetTimePassed})");
-                                    Console.ResetColor();
-
-                                    // Execute on_limit_reset schedules
-                                    try
-                                    {
-                                        Console.WriteLine("[SCHEDULE] Rate limit cleared! Checking on_limit_reset schedules...");
-                                        Thread.Sleep(3000);
-                                        var resetItems = ScheduleManager.GetOnLimitResetItems();
-                                        foreach (var resetItem in resetItems)
-                                        {
-                                            ExecuteScheduleItem(resetItem, slackBotToken, slackChannel);
-                                            Thread.Sleep(2000);
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine($"[SCHEDULE] on_limit_reset error: {ex.Message}");
-                                    }
-                                }
-                            }
-
-                            // Rate limit alert to Slack (new message, not update)
-                            bool alertCooldownOk = lastRateLimitAlertTime == null ||
-                                (DateTime.Now - lastRateLimitAlertTime.Value).TotalMinutes >= RateLimitAlertCooldownMinutes;
-                            if (justHitRateLimit && alertCooldownOk && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
-                            {
-                                lastRateLimitAlertTime = DateTime.Now;
-                                Console.ForegroundColor = ConsoleColor.Red;
-                                Console.WriteLine($"[EYE] ★ Rate limit detected! {claudeStatus.Item2}");
-                                Console.ResetColor();
-                                try
-                                {
-                                    var alertMsg = $":rotating_light: *Rate Limit!* {claudeStatus.Item2}";
-                                    // Use "클롣아이" username for rate limit alerts — visually distinct,
-                                    // user won't confuse it with a regular chat message and delete it.
-                                    // (Deleted thread → participant lookup fails → broadcast bug)
-                                    Task.Run(async () =>
-                                        await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: "클롣아이"))
-                                        .Wait(5000);
-                                }
-                                catch { }
-                            }
-
-                            // ── Per-card context usage monitor ──
-                            // Iterate all known cards (tick-based + prompt-discovered), check each CWD's ctx%
-                            try
-                            {
-                                foreach (var card in _cachedCards)
-                                {
-                                    if (string.IsNullOrWhiteSpace(card.Cwd)) continue;
-                                    var (pct, _, jsonlPath, fileSize) = GetContextInfoForCwdEx(card.Cwd);
-                                    if (pct < 90 || jsonlPath == null) continue;
-
-                                    var cwdKey = card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
-                                    contextWarnedSizes.TryGetValue(cwdKey, out long prevWarnedSize);
-                                    if (fileSize <= prevWarnedSize) continue; // already warned at this size
-
-                                    var sizeMB = fileSize / (1024.0 * 1024.0);
-                                    var cwdTag = AbbreviateCwd(card.Cwd);
-                                    contextWarnedSizes[cwdKey] = fileSize;
-
-                                    if (pct >= 95 && !string.IsNullOrEmpty(slackBotToken))
-                                    {
-                                        Console.ForegroundColor = ConsoleColor.Red;
-                                        Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 즉시 인수인계하세요!");
-                                        Console.WriteLine($"[EYE] 명령: wkappbot newchat \"인수인계 프롬프트\"");
-                                        Console.ResetColor();
-                                        Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                            $":rotating_light: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣이 아직 인수인계 안 했습니다! `wkappbot newchat` 실행 필요",
-                                            username: "클롣아이")).Wait(3000);
-                                    }
-                                    else if (pct >= 90 && !string.IsNullOrEmpty(slackBotToken))
-                                    {
-                                        Console.ForegroundColor = ConsoleColor.Yellow;
-                                        Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 인수인계 준비하세요");
-                                        Console.ResetColor();
-
-                                        // Build handoff prompt
-                                        var handoff = BuildHandoffPrompt(jsonlPath, _cachedCards, sizeMB, ContextLimitMB);
-
-                                        // ① Find prompt for this CWD, then Slack result
-                                        try
-                                        {
-                                            using var ctxHelper = new ClaudePromptHelper();
-                                            var pi = ctxHelper.FindPromptForCwd(card.Cwd);
-                                            if (pi != null)
-                                            {
-                                                Console.WriteLine($"[EYE] ✅ [{cwdTag}] Found prompt: \"{pi.WindowTitle}\"");
-                                                ClaudePromptHelper.AllowFocusSteal = true;
-                                                try
-                                                {
-                                                    var nudge = $"⚠️ 컨텍스트 {pct}% 도달! ({sizeMB:F1}/{ContextLimitMB}MB)\n"
-                                                        + "준비되면 아래 명령을 실행:\n\n"
-                                                        + $"wkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
-                                                    ctxHelper.TypeAndSubmit(pi, nudge);
-                                                    Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent");
-                                                    // Slack: 실제 전달 성공 후에만 알림
-                                                    Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                                        $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 인수인계 프롬프트를 전달했습니다.",
-                                                        username: "클롣아이")).Wait(3000);
-                                                }
-                                                finally { ClaudePromptHelper.AllowFocusSteal = false; }
-                                            }
-                                            else
-                                            {
-                                                Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] No matching prompt — check Slack");
-                                                // Slack: 전달 실패 알림 (Claude 창 못 찾음)
-                                                Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                                    $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\nClaude 창을 찾지 못해 인수인계 미전달! 직접 확인해주세요.",
-                                                    username: "클롣아이")).Wait(3000);
-                                            }
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Handoff failed: {ex.Message}");
-                                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                                $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n인수인계 전달 오류: {ex.Message}",
-                                                username: "클롣아이")).Wait(3000);
-                                        }
-                                    }
-                                }
-                            }
-                            catch { /* best-effort */ }
-
-                            // Slack status streaming (edit same message)
-                            if (slackClient != null && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
-                            {
-                                try
-                                {
-                                    // Never show permission_prompt in status stream
-                                    if (claudeStatus.Item1 == "permission_prompt")
-                                        goto skipStatusStreaming;
-
-                                    // ── Build status text ──
-                                    // Note: idle detection is handled by spinner pixel check below, NOT by prompt_ready.
-                                    // prompt_ready from Claude Desktop is unreliable (KRO keeps "executing" active).
-                                    string slackText;
-                                    if (claudeStatus.Item1 == "prompt_ready")
-                                    {
-                                        // Skip — spinner detection handles idle below
-                                        goto skipStatusStreaming;
-                                    }
-                                    else
-                                    {
-                                        // Active: reset idle ONLY if spinner is animating again (proves something is working)
-                                        // Without this check: KRO keeps claudeStatus="executing" → ping-pong idle↔active
-                                        if (idleMessageSent)
-                                        {
-                                            // DetectSpinnerIdle returns true=idle. If still idle → skip active status.
-                                            // If spinner started again (not idle) → allow active status to proceed.
-                                            if (DetectSpinnerIdle(claudeHwnd)) goto skipStatusStreaming;
-                                            // Spinner is animating again → activity resumed!
-                                            ResetSpinnerDetection();
-                                            idleAfterText = null; // clear for next idle cycle
-                                        }
-                                        idleMessageSent = false;
-                                        var statusEmoji = claudeStatus.Item1 switch
-                                        {
-                                            "executing" => ":gear:",
-                                            "plan_approval_pending" => ":clipboard:",
-                                            "plan_mode" => ":memo:",
-                                            "rate_limit" => ":warning:",
-                                            _ => ":robot_face:"
-                                        };
-                                        slackText = $"{statusEmoji} Claude: {claudeStatus.Item2}";
-                                    }
-
-                                    if (slackText == lastSlackStatusText) goto skipStatusStreaming;
-
-                                    // ── Always: delete old → post new (fresh timestamp) ──
-                                    if (slackStatusTs != null)
-                                    {
-                                        var oldTs = slackStatusTs;
-                                        Task.Run(async () => await SlackDeleteMessageAsync(
-                                            slackBotToken!, slackChannel!, oldTs)).Wait(3000);
-                                        slackStatusTs = null;
-                                    }
-                                    {
-                                        var (ok, ts) = Task.Run(async () =>
-                                            await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
-                                            .GetAwaiter().GetResult();
-                                        if (ok && ts != null)
-                                        {
-                                            slackStatusTs = ts;
-                                            try { File.WriteAllText(statusTsFile, ts); } catch { }
-                                        }
-                                        lastSlackStatusText = slackText;
-                                    }
-                                }
-                                catch { /* best-effort */ }
-                                skipStatusStreaming:
-
-                                // ── Spinner pixel idle: if Claude Desktop prompt area stops animating → idle ──
-                                // Samples pixels above turn-form every tick (~1s).
-                                // 2 consecutive identical hashes = no animation = idle.
-                                if (!idleMessageSent
-                                    && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
-                                {
-                                    try
-                                    {
-                                        if (DetectSpinnerIdle(claudeHwnd))
-                                        {
-                                            // Spinner stopped → Claude idle!
-                                            if (idleAfterText == null)
-                                            {
-                                                if (lastExecutingText != null)
-                                                    idleAfterText = lastExecutingText;
-                                                lastExecutingText = null;
-                                            }
-                                            var idleSuffix = idleAfterText != null ? $" after: {idleAfterText}" : "";
-                                            var idleMsg = $":zzz: Idle{idleSuffix}";
-                                            // Delete old status → post new idle message
-                                            if (slackStatusTs != null)
-                                            {
-                                                var oldTs = slackStatusTs;
-                                                Task.Run(async () => await SlackDeleteMessageAsync(
-                                                    slackBotToken!, slackChannel!, oldTs)).Wait(3000);
-                                                slackStatusTs = null;
-                                            }
-                                            var (idleOk, idleTs) = Task.Run(async () =>
-                                                await SlackSendViaApi(slackBotToken!, slackChannel!, idleMsg, username: botUsername))
-                                                .GetAwaiter().GetResult();
-                                            if (idleOk && idleTs != null)
-                                            {
-                                                slackStatusTs = idleTs;
-                                                try { File.WriteAllText(statusTsFile, idleTs); } catch { }
-                                            }
-                                            lastSlackStatusText = idleMsg;
-                                            idleMessageSent = true;
-                                            Console.WriteLine($"[EYE] Spinner idle: {idleMsg}");
-                                        }
-                                    }
-                                    catch { }
-                                }
-
-                                // Plan approval → Slack
-                                if (claudeStatus.Item1 == "plan_approval_pending" && !planApprovalSentToSlack)
-                                {
-                                    try
-                                    {
-                                        var plan = ExtractPlanContent(claudeHwnd);
-                                        if (plan != null)
-                                        {
-                                            var planContent = plan.Value.content;
-                                            if (planContent.Length > 3500)
-                                                planContent = planContent[..3500] + "\n\n... (truncated)";
-                                            var sourceLabel = plan.Value.source == "UIA" ? "UIA" : $"`{plan.Value.source}`";
-                                            var fallbackText = $":clipboard: 플랜 승인 대기 (via {sourceLabel})\n\n{planContent}";
-                                            var blocks = BuildPlanApprovalBlocks(planContent, sourceLabel);
-                                            var (sendOk, sendTs) = Task.Run(async () =>
-                                                await SlackSendBlocksViaApi(slackBotToken!, slackChannel!, fallbackText, blocks))
-                                                .GetAwaiter().GetResult();
-                                            if (sendOk)
-                                            {
-                                                pendingPlanApprovalSlackTs = sendTs;
-                                                planApprovalSentToSlack = true;
-                                                Console.ForegroundColor = ConsoleColor.Cyan;
-                                                Console.WriteLine($"[EYE] Plan sent to Slack via {plan.Value.source} (ts={sendTs})");
-                                                Console.ResetColor();
-                                            }
-                                        }
-                                        else
-                                        {
-                                            planApprovalSentToSlack = true; // don't retry
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine($"[EYE] Plan Slack share error: {ex.Message}");
-                                    }
-                                }
-                                if (claudeStatus.Item1 != "plan_approval_pending" && planApprovalSentToSlack)
-                                {
-                                    planApprovalSentToSlack = false;
-                                    pendingPlanApprovalSlackTs = null;
-                                }
-
-                                // Permission prompt → Slack (3s debounce: auto-approved prompts vanish quickly)
-                                if (claudeStatus.Item1 == "permission_prompt" && !permissionPromptSentToSlack)
-                                {
-                                    if (permissionPromptFirstSeen == null)
-                                        permissionPromptFirstSeen = DateTime.Now;
-
-                                    if ((DateTime.Now - permissionPromptFirstSeen.Value).TotalSeconds >= 3.0)
-                                    {
-                                        try
-                                        {
-                                            var permButtons = GetPermissionButtons(claudeHwnd);
-                                            if (permButtons.Count >= 2)
-                                            {
-                                                var btnList = string.Join(" / ", permButtons);
-                                                var fallbackText = $":lock: 수락 요구: [{btnList}]";
-                                                var blocks = BuildPermissionBlocks(permButtons, claudeStatus.Item2);
-                                                var (sendOk, sendTs) = Task.Run(async () =>
-                                                    await SlackSendBlocksViaApi(slackBotToken!, slackChannel!, fallbackText, blocks))
-                                                    .GetAwaiter().GetResult();
-                                                if (sendOk)
-                                                {
-                                                    pendingPermissionSlackTs = sendTs;
-                                                    permissionPromptSentToSlack = true;
-                                                    Console.ForegroundColor = ConsoleColor.Cyan;
-                                                    Console.WriteLine($"[EYE] Permission buttons sent to Slack: [{btnList}] (ts={sendTs})");
-                                                    Console.ResetColor();
-                                                }
-                                            }
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Console.WriteLine($"[EYE] Permission Slack share error: {ex.Message}");
-                                        }
-                                    }
-                                }
-                                if (claudeStatus.Item1 != "permission_prompt")
-                                {
-                                    permissionPromptFirstSeen = null; // reset debounce
-                                    if (permissionPromptSentToSlack)
-                                    {
-                                        permissionPromptSentToSlack = false;
-                                        pendingPermissionSlackTs = null;
-                                    }
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // Claude status null — tick-file idle will handle Slack status
-                            cachedClaudeStatusText = null;
-
-                            // Claude status null (idle) — ★ 리밋 중에 idle 감지 = 리밋 해제!
-                            if (wasRateLimited)
-                            {
-                                // idle 상태 = Claude가 정상 동작 중 → 리밋 즉시 해제
-                                {
-                                    wasRateLimited = false;
-                                    rateLimitDetectedAt = null;
-                                    rateLimitResetTime = null;
-                                    cachedClaudeStatusText = null;
-                                    Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.WriteLine($"[EYE] Rate limit cleared (idle status detected — limit lifted)");
-                                    Console.ResetColor();
-
-                                    try
-                                    {
-                                        var resetItems = ScheduleManager.GetOnLimitResetItems();
-                                        foreach (var resetItem in resetItems)
-                                        {
-                                            ExecuteScheduleItem(resetItem, slackBotToken, slackChannel);
-                                            Thread.Sleep(2000);
-                                        }
-                                    }
-                                    catch { }
-                                }
-                            }
-                            else
-                            {
-                                cachedClaudeStatusText = null;
-                            }
-                        }
-                    }
-                    catch { /* best-effort */ }
-                }
-                // ★ FIX: claudeHwnd lost — still update Slack to idle if needed
-                else if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel)
-                    && slackStatusTs != null
-                    && lastSlackStatusText != null
-                    && !lastSlackStatusText.Contains("프롬프트 대기")
-                    && !lastSlackStatusText.Contains("창 없음"))
-                {
-                    try
-                    {
-                        var idleText = ":zzz: Claude 창 없음 — 프롬프트 대기";
-                        Task.Run(async () => await SlackUpdateMessageAsync(
-                            slackBotToken!, slackChannel!, slackStatusTs, idleText))
-                            .Wait(3000);
-                        lastSlackStatusText = idleText;
-                        cachedClaudeStatusText = null;
-                        Console.WriteLine($"[EYE] Claude window lost → Slack idle");
-                    }
-                    catch { }
-                }
+                cachedClaudeStatusText = RunClaudeStatusTick(
+                    ref claudeHwnd, slackBotToken, slackChannel, botUsername,
+                    slackClient, statusTsFile, contextWarnedSizes);
             }
 
             // ── Schedule executor (~every 10 seconds) ──
@@ -1187,13 +750,8 @@ internal partial class Program
             }
         }
 
-        // ── Graceful shutdown: stop proxy pipe (let in-flight requests finish) ──
-        if (elevatedProxyTask != null)
-        {
-            cts.Cancel();
-            try { elevatedProxyTask.Wait(3000); } catch { }
-            Console.WriteLine("[EYE] Elevated proxy pipe stopped");
-        }
+        // ── Graceful shutdown ──
+        cts.Cancel();
 
         Console.WriteLine("[EYE:HOT-SWAP] Old Eye shutting down");
         return 0;
@@ -1261,7 +819,12 @@ internal partial class Program
         var cards = _cachedCards;
 
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
-        host.UpdateAccessibilityText(BuildEyeSummary(cards, latest, promptPreview, promptDiag.FileWriteUtc));
+        var eyeSummary = BuildEyeSummary(cards, latest, promptPreview, promptDiag.FileWriteUtc);
+        host.UpdateAccessibilityText(eyeSummary);
+        // Update IPC cache so eye tick one-shot gets instant response
+        _cachedIpcSummary = eyeSummary;
+        _cachedIpcPromptPreview = promptPreview ?? "";
+        _cachedIpcUpdatedAt = DateTime.UtcNow;
 
         swTotal.Stop();
 
@@ -1509,6 +1072,68 @@ internal partial class Program
             if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
             var swTotal = Stopwatch.StartNew();
 
+            // ── Fast path: query running Eye loop via IPC pipe ──
+            // Eye loop maintains all caches in memory — IPC response is ~5ms vs ~600ms legacy scan.
+            // Fallback to legacy only when Eye is not running or pipe query fails.
+            var ipc = EyeIpcClient.QueryTickAsync(timeoutMs: 2000).GetAwaiter().GetResult();
+            if (ipc != null)
+            {
+                Console.WriteLine($"[EYE] one-shot tick (IPC fast-path, cache age={ipc.CachedAgeMs}ms)");
+                Console.WriteLine($"[EYE_TICK] ipc=ok total={swTotal.ElapsedMilliseconds}ms ctx={ipc.ContextPct}%");
+                Console.WriteLine($"[EYE_TICK] hint promptLine={ipc.PromptLineHint} tickLine={ipc.TickLineHint}");
+                Console.WriteLine($"[EYE_TICK] cards={ipc.CardCount} promptSource={ipc.PromptSource}");
+                if (!string.IsNullOrWhiteSpace(ipc.Prompt))
+                    Console.WriteLine($"[EYE_TICK] recent={ipc.Prompt}");
+                foreach (var plan in ipc.Plans)
+                    Console.WriteLine($"[EYE_PLAN] —:— {plan}");
+                if (ipc.Plans.Length > 3) Console.WriteLine($"[EYE_PLAN] —:— 그 외 {ipc.Plans.Length - 3}건...");
+                Console.WriteLine($"[EYE_GUARD] armed={(ipc.GuardArmed ? 1 : 0)} execIdle={ipc.ExecIdleSec:F0}s aiIdle={ipc.AiIdleSec:F0}s cooldown={ipc.CooldownSec:F0}s");
+                Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipc.KeepAwakeAgeSec < 0 ? "n/a" : ipc.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipc.PromptSource} latestTickAge={(ipc.LatestTickAgeSec < 0 ? "n/a" : ipc.LatestTickAgeSec.ToString("F0") + "s")}");
+                Console.WriteLine($"[EYE_TICK] ── card display ──");
+                foreach (var line in ipc.Summary.Split('\n'))
+                    Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
+                Console.Out.Flush();
+                // Slack inbox still checked by one-shot (Eye loop Slack polling is separate)
+                var swSlack = Stopwatch.StartNew();
+                EyeTickForwardSlackInbox();
+                Console.WriteLine($"[PROF] SlackInbox={swSlack.ElapsedMilliseconds}ms");
+                Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
+                Console.Out.Flush();
+                return 0;
+            }
+
+            // ── Eye not running: auto-launch + wait for pipe ──
+            Console.WriteLine("[EYE] IPC query failed — launching Eye and waiting for pipe...");
+            LaunchAppBotEyeIfNeeded();
+
+            // Wait ~3s for Eye pipe to be ready (Eye startup ~1-2s), then fall back
+            Thread.Sleep(3000);
+            var ipcRetry = EyeIpcClient.QueryTickAsync(timeoutMs: 1000).GetAwaiter().GetResult();
+
+            if (ipcRetry != null)
+            {
+                Console.WriteLine($"[EYE] one-shot tick (IPC after launch, cache age={ipcRetry.CachedAgeMs}ms)");
+                Console.WriteLine($"[EYE_TICK] ipc=ok total={swTotal.ElapsedMilliseconds}ms ctx={ipcRetry.ContextPct}%");
+                Console.WriteLine($"[EYE_TICK] hint promptLine={ipcRetry.PromptLineHint} tickLine={ipcRetry.TickLineHint}");
+                Console.WriteLine($"[EYE_TICK] cards={ipcRetry.CardCount} promptSource={ipcRetry.PromptSource}");
+                if (!string.IsNullOrWhiteSpace(ipcRetry.Prompt))
+                    Console.WriteLine($"[EYE_TICK] recent={ipcRetry.Prompt}");
+                foreach (var plan in ipcRetry.Plans)
+                    Console.WriteLine($"[EYE_PLAN] —:— {plan}");
+                Console.WriteLine($"[EYE_GUARD] armed={(ipcRetry.GuardArmed ? 1 : 0)} execIdle={ipcRetry.ExecIdleSec:F0}s aiIdle={ipcRetry.AiIdleSec:F0}s cooldown={ipcRetry.CooldownSec:F0}s");
+                Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipcRetry.KeepAwakeAgeSec < 0 ? "n/a" : ipcRetry.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipcRetry.PromptSource} latestTickAge={(ipcRetry.LatestTickAgeSec < 0 ? "n/a" : ipcRetry.LatestTickAgeSec.ToString("F0") + "s")}");
+                Console.WriteLine($"[EYE_TICK] ── card display ──");
+                foreach (var line in ipcRetry.Summary.Split('\n'))
+                    Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
+                Console.Out.Flush();
+                EyeTickForwardSlackInbox();
+                Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
+                Console.Out.Flush();
+                return 0;
+            }
+
+            Console.WriteLine("[EYE] Eye launch or pipe timeout — falling back to legacy scan");
+
             // ── Phase 1: ReadLatestTick ──
             var swPhase = Stopwatch.StartNew();
             long tickRead = 0, tickParse = 0;
@@ -1629,6 +1254,43 @@ internal partial class Program
             Console.Out.Flush();
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Build IPC response from cached state — called by EyeIpcServer on pipe connection.
+    /// All fields read from static cache updated by RunOneGlobalTick; no UIA/file scan needed.
+    /// </summary>
+    public static EyeIpcTickResponse BuildIpcTickResponse()
+    {
+        var now = DateTime.UtcNow;
+        var execIdle = (now - _lastTickActivityUtc).TotalSeconds;
+        var aiIdle = (now - _lastAiActivityUtc).TotalSeconds;
+        var cooldown = _lastAutoGogoUtc == DateTime.MinValue ? 9999 : (now - _lastAutoGogoUtc).TotalSeconds;
+        var armed = execIdle >= 60 && aiIdle >= 60 && cooldown >= 600;
+        var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (now - _lastKeepAwakeUtc).TotalSeconds;
+        var latestTickAge = -1.0;
+        if (_cachedLatestTick != null && DateTime.TryParse(_cachedLatestTick.Ts, out var ts))
+            latestTickAge = (now - ts.ToUniversalTime()).TotalSeconds;
+
+        return new EyeIpcTickResponse
+        {
+            Summary = _cachedIpcSummary,
+            CardCount = _cachedCards.Count,
+            ContextPct = _lastContextPct,
+            Plans = _lastPlanItemsCache.Take(3).ToArray(),
+            PromptSource = _lastPromptSource ?? "unknown",
+            Prompt = _cachedIpcPromptPreview,
+            GuardArmed = armed,
+            ExecIdleSec = execIdle,
+            AiIdleSec = aiIdle,
+            CooldownSec = cooldown,
+            KeepAwakeAgeSec = keepAge,
+            LatestTickAgeSec = latestTickAge,
+            PromptLineHint = _lastPromptLineIndex,
+            TickLineHint = _lastEyeTickLineIndex,
+            CachedAgeMs = _cachedIpcUpdatedAt == DateTime.MinValue ? -1
+                : (long)(now - _cachedIpcUpdatedAt).TotalMilliseconds,
+        };
     }
 
     /// <summary>
@@ -2961,10 +2623,11 @@ internal partial class Program
             var cardCwds = new HashSet<string>(cards.Select(c => c.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/')),
                 StringComparer.OrdinalIgnoreCase);
 
-            // 30s TTL cache — FindAllPrompts does UIA tree scan per window (slow for large sessions)
+            // 1s cooldown after last scan — FindAllPrompts is fast now (per-hwnd UIA cache in ClaudePromptHelper),
+            // but EnumWindows + process name lookup still costs ~5-20ms per tick; limit to once/second.
             List<ClaudePromptHelper.PromptInfo> allPrompts;
             var now = DateTime.UtcNow;
-            if (_cachedAllPrompts != null && now < _cachedAllPromptsExpiry)
+            if (_cachedAllPrompts != null && (now - _lastFindAllPromptsAt).TotalMilliseconds < 1000)
             {
                 allPrompts = _cachedAllPrompts;
             }
@@ -2975,8 +2638,9 @@ internal partial class Program
                 allPrompts = discHelper.FindAllPrompts();
                 sw.Stop();
                 _cachedAllPrompts = allPrompts;
-                _cachedAllPromptsExpiry = now.AddSeconds(30);
-                Console.WriteLine($"[EYE] FindAllPrompts scan: {sw.ElapsedMilliseconds}ms ({allPrompts.Count} prompts) — next cache expires in 30s");
+                _lastFindAllPromptsAt = DateTime.UtcNow; // cooldown starts after scan completes
+                if (sw.ElapsedMilliseconds > 50)
+                    Console.WriteLine($"[EYE] FindAllPrompts scan: {sw.ElapsedMilliseconds}ms ({allPrompts.Count} prompts)");
             }
             foreach (var p in allPrompts)
             {

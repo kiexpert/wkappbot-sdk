@@ -41,6 +41,7 @@ internal sealed class UserInputWaitWindow : Window
     public event Action? Confirmed;
 
     public bool UseChime { get; set; } // true = 차임벨, false(기본) = 카라오케
+    public bool NoSound  { get; set; } // true = 음성 완전 생략 (ask 등 백그라운드 용도)
 
     public UserInputWaitWindow(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds, int resetSeconds = 30)
     {
@@ -150,8 +151,8 @@ internal sealed class UserInputWaitWindow : Window
         _countdownTimer.Tick += OnCountdownTick;
         _countdownTimer.Start();
 
-        // 음성 안내: 카라오케(기본) or 차임벨(UseChime)
-        Loaded += (_, _) => { if (UseChime) PlayChime(); else PlaySpeakAnnounce(); };
+        // 음성 안내: 카라오케(기본) or 차임벨(UseChime), NoSound=true면 TTS speak만 생략(차임은 유지)
+        Loaded += (_, _) => { if (UseChime) PlayChime(); else if (!NoSound) PlaySpeakAnnounce(); };
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -379,7 +380,7 @@ internal static class UserInputWaitOverlay
     /// - Safety timeout (5min hard cap): approved=false, focusAcquired=false
     /// </summary>
     public static (bool approved, bool focusAcquired) Show(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds,
-                                                            IntPtr positionHwnd = default)
+                                                            IntPtr positionHwnd = default, bool noSound = false)
     {
         bool approved = false;
         bool focusAcquired = false;
@@ -391,6 +392,7 @@ internal static class UserInputWaitOverlay
         var thread = new Thread(() =>
         {
             var window = new UserInputWaitWindow(ownerHwnd, userIdleMs, timeoutSeconds);
+            if (noSound) window.NoSound = true;
 
             // Position: centered inside target window (multi-monitor safe)
             if (posHwnd != IntPtr.Zero && GetWindowRect(posHwnd, out var posRect)

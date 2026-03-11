@@ -59,11 +59,14 @@ internal sealed class KnowhowBroadcasterAdapter : IKnowhowBroadcaster
 /// </summary>
 internal sealed class UserInputWaitAdapter : IUserInputWait
 {
+    private readonly bool _noSound;
+    public UserInputWaitAdapter(bool noSound = false) => _noSound = noSound;
+
     public UserYieldResult WaitForUserYield(IntPtr targetMainHwnd, uint userIdleMs, int timeoutSeconds,
                                              IntPtr positionHwnd = default)
     {
         var (approved, focusAcquired) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
-            positionHwnd: positionHwnd);
+            positionHwnd: positionHwnd, noSound: _noSound);
         return new UserYieldResult(approved, focusAcquired);
     }
 }

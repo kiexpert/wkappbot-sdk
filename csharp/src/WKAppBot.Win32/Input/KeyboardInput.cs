@@ -10,15 +10,292 @@ namespace WKAppBot.Win32.Input;
 public static class KeyboardInput
 {
     /// <summary>
+    /// Full focus state snapshot: OS foreground window + keyboard focus control within it.
+    /// Captured via GetForegroundWindow + GetGUIThreadInfo(hwndFocus).
+    /// Use Capture() before an operation, Restore() after to undo any focus theft.
+    /// </summary>
+    public readonly struct FocusSnapshot
+    {
+        public IntPtr  Foreground    { get; init; }  // OS foreground window (SetForegroundWindow target)
+        public IntPtr  FocusedCtl   { get; init; }  // keyboard-focused control inside Foreground
+        public uint    FgThreadId   { get; init; }  // thread owning Foreground (for AttachThreadInput)
+        public uint    ImeConversion { get; init; } // IME conversion mode (0=English, 1=Korean/Hangul …)
+        public uint    ImeSentence  { get; init; }  // IME sentence mode
+        public bool    ImeValid     { get; init; }  // true if IME state was captured
+        public string? ImeComposing { get; init; }  // 조합중 문자열 (e.g. "하" mid-automata), null=없음
+
+        private const uint GCS_COMPSTR = 0x0008;
+        private const uint SCS_SETSTR  = 0x0002;
+
+        public bool IsEmpty => Foreground == IntPtr.Zero;
+
+        /// <summary>Capture current focus state (foreground + focused control + IME mode + 조합중).</summary>
+        public static FocusSnapshot Capture()
+        {
+            var fg = NativeMethods.GetForegroundWindow();
+            if (fg == IntPtr.Zero) return default;
+            uint tid = NativeMethods.GetWindowThreadProcessId(fg, out _);
+            var gti = new NativeMethods.GUITHREADINFO { cbSize = Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+            NativeMethods.GetGUIThreadInfo(tid, ref gti);
+
+            var imeWnd = gti.hwndFocus != IntPtr.Zero ? gti.hwndFocus : fg;
+            var hIMC = NativeMethods.ImmGetContext(imeWnd);
+            bool imeValid = false;
+            uint imeConv = 0, imeSent = 0;
+            string? imeComposing = null;
+            if (hIMC != IntPtr.Zero)
+            {
+                imeValid = NativeMethods.ImmGetConversionStatus(hIMC, out imeConv, out imeSent);
+                // 조합중 문자열 캡처 (GCS_COMPSTR)
+                var compLen = NativeMethods.ImmGetCompositionStringW(hIMC, GCS_COMPSTR, null, 0);
+                if (compLen > 0)
+                {
+                    var buf = new char[compLen / 2];
+                    NativeMethods.ImmGetCompositionStringW(hIMC, GCS_COMPSTR, buf, (uint)compLen);
+                    imeComposing = new string(buf);
+                }
+                NativeMethods.ImmReleaseContext(imeWnd, hIMC);
+            }
+
+            return new FocusSnapshot
+            {
+                Foreground = fg, FocusedCtl = gti.hwndFocus, FgThreadId = tid,
+                ImeConversion = imeConv, ImeSentence = imeSent, ImeValid = imeValid,
+                ImeComposing = imeComposing
+            };
+        }
+
+        /// <summary>
+        /// Restore OS foreground AND keyboard focus control AND IME mode AND 조합중 상태.
+        /// 1) SetForegroundWindow — activates the window
+        /// 2) AttachThreadInput + SetFocus — restores the focused control inside it
+        /// 3) ImmSetConversionStatus — restores Korean/CJK input mode (한/영)
+        /// 4) ImmSetCompositionString — re-injects mid-automata composition string
+        /// Returns true if foreground was actually different (= focus had drifted).
+        /// </summary>
+        public bool Restore()
+        {
+            if (IsEmpty) return false;
+            bool drifted = NativeMethods.GetForegroundWindow() != Foreground;
+
+            // Step 1: restore foreground window
+            NativeMethods.SetForegroundWindow(Foreground);
+
+            // Step 2: restore keyboard focus control via AttachThreadInput
+            if (FocusedCtl != IntPtr.Zero)
+            {
+                uint ourTid = NativeMethods.GetCurrentThreadId();
+                NativeMethods.AttachThreadInput(ourTid, FgThreadId, true);
+                try { NativeMethods.SetFocus(FocusedCtl); }
+                finally { NativeMethods.AttachThreadInput(ourTid, FgThreadId, false); }
+            }
+
+            // Step 3+4: restore IME state (한/영 모드 + 조합중 문자열)
+            if (ImeValid)
+            {
+                var imeWnd = FocusedCtl != IntPtr.Zero ? FocusedCtl : Foreground;
+                var hIMC = NativeMethods.ImmGetContext(imeWnd);
+                if (hIMC != IntPtr.Zero)
+                {
+                    NativeMethods.ImmSetConversionStatus(hIMC, ImeConversion, ImeSentence);
+                    // 조합중이던 글자를 composition 버퍼에 다시 밀어넣기
+                    if (!string.IsNullOrEmpty(ImeComposing))
+                        NativeMethods.ImmSetCompositionStringW(hIMC, SCS_SETSTR,
+                            ImeComposing, (uint)(ImeComposing.Length * 2), IntPtr.Zero, 0);
+                    NativeMethods.ImmReleaseContext(imeWnd, hIMC);
+                }
+            }
+
+            return drifted;
+        }
+    }
+
+    // ── Global keyboard input lock ────────────────────────────────────────────
+    // Cross-process named Mutex: "먼저 잡은 넘이 우선권" (first grabber wins).
+    // While any wkappbot session is sending keystrokes, others skip SmartSetForegroundWindow.
+    private const string InputLockName = "Global\\WKAppBot_KeyboardInputLock";
+    [ThreadStatic] private static Mutex? _inputLock; // per-thread: each typing thread holds its own
+
+    /// <summary>
+    /// Acquire the global keyboard input lock (cross-process named Mutex).
+    /// Returns true if acquired (this session now owns typing priority).
+    /// Other sessions will detect the lock via IsInputLockedByOther() and yield focus.
+    /// timeoutMs=0 → immediate try only (non-blocking).
+    /// </summary>
+    public static bool AcquireInputLock(int timeoutMs = 0)
+    {
+        try
+        {
+            var m = new Mutex(false, InputLockName);
+            if (m.WaitOne(timeoutMs))
+            {
+                _inputLock = m;
+                return true;
+            }
+            m.Dispose();
+            return false;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Release the global keyboard input lock held by this thread.</summary>
+    public static void ReleaseInputLock()
+    {
+        try { _inputLock?.ReleaseMutex(); _inputLock?.Dispose(); }
+        catch { }
+        finally { _inputLock = null; }
+    }
+
+    /// <summary>
+    /// Returns true if ANOTHER process currently holds the keyboard input lock.
+    /// Fast (~0.1ms): tries WaitOne(0) to probe mutex state.
+    /// If this thread holds the lock (_inputLock != null), returns false (own session).
+    /// </summary>
+    public static bool IsInputLockedByOther()
+    {
+        if (_inputLock != null) return false; // we hold it — not "other"
+        try
+        {
+            using var probe = new Mutex(false, InputLockName);
+            if (probe.WaitOne(0))
+            {
+                probe.ReleaseMutex();
+                return false; // no one holds it
+            }
+            return true; // someone else holds it
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Context bag passed to TypeText/SendKeys for mid-input focus check + user yield.
+    /// intendedHwnd: the window that should hold focus during input.
+    /// UserInputWait: when set, pauses input and shows yield overlay on user activity.
+    /// </summary>
+    public sealed class TypeInputContext
+    {
+        public IntPtr IntendedHwnd { get; init; }
+        public IUserInputWait? UserInputWait { get; init; }  // null = no yield popup
+    }
+
+    /// <summary>
+    /// Mid-input focus check: verifies the OS foreground window matches the intended target,
+    /// then fully restores both the foreground window AND the keyboard focus control inside it.
+    /// Called per-keystroke during SendInput-based typing.
+    /// intendedHwnd=Zero → skip check.
+    /// snapshot: pre-captured state for keyboard-focus control restoration.
+    /// </summary>
+    public static bool MidInputFocusCheck(IntPtr intendedHwnd, string context,
+        FocusSnapshot snapshot = default, Action<string>? onWarning = null)
+    {
+        if (intendedHwnd == IntPtr.Zero) return false;
+        var cur = NativeMethods.GetForegroundWindow();
+        if (cur == intendedHwnd) return false;
+
+        var msg = $"[FOCUS] ⚠ mid-input drift @ {context}: intended={intendedHwnd:X8} now={cur:X8} — restoring";
+        onWarning?.Invoke(msg);
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(msg);
+        Console.ResetColor();
+
+        if (!snapshot.IsEmpty)
+        {
+            // Full restore: foreground + keyboard focus control
+            snapshot.Restore();
+            Console.WriteLine($"[FOCUS] keyboard focus restored → ctl={snapshot.FocusedCtl:X8}");
+        }
+        else
+        {
+            NativeMethods.SetForegroundWindow(intendedHwnd);
+        }
+        Thread.Sleep(30); // brief delay for focus to settle before next key
+        return true;
+    }
+
+    /// <summary>
+    /// Check for user input activity during keystroke sending.
+    /// Compares current GetLastInputInfo tick against baseline.
+    /// If activity detected AND UserInputWait provided: shows yield overlay and blocks until approved.
+    /// Returns true if input can continue (approved or no yield configured).
+    /// Returns false if user cancelled (abort typing).
+    /// </summary>
+    public static bool CheckUserActivity(ref uint lastInputBaseline, TypeInputContext? ctx)
+    {
+        if (ctx?.UserInputWait == null) return true; // no yield configured — always continue
+
+        var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
+        if (!NativeMethods.GetLastInputInfo(ref lii)) return true;
+
+        if (lii.dwTime == lastInputBaseline) return true; // no new input — continue
+
+        // User activity detected during input!
+        lastInputBaseline = lii.dwTime; // update baseline so we don't re-trigger immediately
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"[FOCUS] 유저 입력 감지 — 포커스 양보 팝업");
+        Console.ResetColor();
+
+        var yieldResult = ctx.UserInputWait.WaitForUserYield(
+            ctx.IntendedHwnd, userIdleMs: 0, timeoutSeconds: 30);
+
+        if (!yieldResult.Approved)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[FOCUS] 유저 취소 — 키스트로크 중단");
+            Console.ResetColor();
+            return false;
+        }
+
+        // After approval: restore focus + keyboard focus control
+        Console.WriteLine($"[FOCUS] 승인됨 — 포커스 복원 후 재개");
+        var snapshot = FocusSnapshot.Capture();
+        if (ctx.IntendedHwnd != IntPtr.Zero)
+        {
+            snapshot = new FocusSnapshot
+            {
+                Foreground = ctx.IntendedHwnd,
+                FocusedCtl = snapshot.FocusedCtl,
+                FgThreadId = NativeMethods.GetWindowThreadProcessId(ctx.IntendedHwnd, out _)
+            };
+            snapshot.Restore();
+        }
+        Thread.Sleep(50); // let focus settle before resuming keys
+        return true;
+    }
+
+    /// <summary>
     /// Type a text string using Unicode input events.
     /// Works with any language (Korean, etc.) without VK mapping.
     /// BLOCKED by FocuslessGuard (SendInput).
+    /// intendedHwnd: when non-zero, checks focus per-character and restores on drift.
     /// </summary>
-    public static void TypeText(string text)
+    public static void TypeText(string text, IntPtr intendedHwnd = default, TypeInputContext? ctx = null)
     {
         FocuslessGuard.AssertAllowed("SendInput(keyboard TypeText)");
+        var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
+        // Acquire global input lock — first grabber wins, others yield SmartSetForegroundWindow
+        bool lockAcquired = AcquireInputLock();
+        try
+        {
+        // Capture full focus snapshot (foreground + keyboard focus control) once before loop
+        var snapshot = effectiveHwnd != IntPtr.Zero ? FocusSnapshot.Capture() : default;
+        // Capture last-input baseline for user activity detection
+        var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
+        NativeMethods.GetLastInputInfo(ref lii);
+        uint lastInputBaseline = lii.dwTime;
+
+        int charsSinceCheck = 0;
         foreach (char ch in text)
         {
+            // Per-char: check user activity (yield popup if needed)
+            if (!CheckUserActivity(ref lastInputBaseline, ctx)) return; // user cancelled
+
+            // Mid-input focus check every 5 chars — full restore including keyboard focus control
+            if (++charsSinceCheck >= 5)
+            {
+                MidInputFocusCheck(effectiveHwnd, "TypeText", snapshot);
+                charsSinceCheck = 0;
+            }
+
             var inputs = new INPUT[2];
 
             // Key down
@@ -36,6 +313,7 @@ public static class KeyboardInput
             NativeMethods.SendInput(2, inputs, Marshal.SizeOf<INPUT>());
             Thread.Sleep(10); // small delay for stability
         }
+        } finally { if (lockAcquired) ReleaseInputLock(); }
     }
 
     /// <summary>
@@ -171,14 +449,30 @@ public static class KeyboardInput
     /// Unreleased modifiers auto-released in LIFO order at end.
     /// BLOCKED by FocuslessGuard (SendInput).
     /// </summary>
-    public static void SendKeys(string sequence)
+    public static void SendKeys(string sequence, IntPtr intendedHwnd = default, TypeInputContext? ctx = null)
     {
         FocuslessGuard.AssertAllowed("SendInput(keyboard SendKeys)");
+        var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
+        // Acquire global input lock — first grabber wins, others yield SmartSetForegroundWindow
+        bool lockAcquired = AcquireInputLock();
+        try
+        {
+        // Capture full focus snapshot once — restored per-token if focus drifts
+        var snapshot = effectiveHwnd != IntPtr.Zero ? FocusSnapshot.Capture() : default;
+        // Capture last-input baseline for user activity detection
+        var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
+        NativeMethods.GetLastInputInfo(ref lii);
+        uint lastInputBaseline = lii.dwTime;
+
         var heldStack = new Stack<ushort>();
         var tokens = sequence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         foreach (var token in tokens)
         {
+            // Per-token: check user activity (yield popup if needed) + focus check
+            if (!CheckUserActivity(ref lastInputBaseline, ctx)) return; // user cancelled
+            MidInputFocusCheck(effectiveHwnd, $"SendKeys:{token}", snapshot);
+
             if (token.StartsWith('+') && token.Length > 1)
             {
                 // +Key → hold down
@@ -244,6 +538,7 @@ public static class KeyboardInput
             KeyUp(heldStack.Pop());
             Thread.Sleep(20);
         }
+        } finally { if (lockAcquired) ReleaseInputLock(); }
     }
 
     /// <summary>

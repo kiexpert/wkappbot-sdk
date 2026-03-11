@@ -49,7 +49,8 @@
     <!-- Step 1: Copy handlers -->
     <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
     <!-- Step 2: Try direct copy first. If locked (Eye running), stage as .new.exe for hot-swap -->
-    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot; &amp;&amp; echo [Deploy] wkappbot.exe updated || (copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.new.exe&quot; &amp;&amp; echo [Deploy] wkappbot.new.exe staged for hot-swap)" IgnoreExitCode="true" />
+    <!-- Direct copy success = Eye was not running → auto-launch Eye via eye tick -->
+    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot; &amp;&amp; (echo [Deploy] wkappbot.exe updated &amp; &quot;W:\SDK\bin\wkappbot.exe&quot; eye tick) || (copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.new.exe&quot; &amp;&amp; echo [Deploy] wkappbot.new.exe staged for hot-swap)" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
     <_HandlersPublish Include="$(PublishDir)handlers\**\*.*" />

@@ -8,6 +8,7 @@ using System.Text.Json.Nodes;
 using FlaUI.UIA3;
 using WKAppBot.WebBot;
 using WKAppBot.Win32.Accessibility;
+using WKAppBot.Win32.Input;
 using NativeMethods = WKAppBot.Win32.Native.NativeMethods;
 
 namespace WKAppBot.CLI;
@@ -196,11 +197,13 @@ Examples:
                 var cdp = new CdpClient();
                 await cdp.ConnectAsync(port, timeoutMs: 5000);
 
-                // ── Cleanup: close all about:blank tabs ──
-                await CloseBlankTabs(port);
-
                 // Look up saved target from registry (survives across CLI invocations)
                 var savedTargetId = !string.IsNullOrWhiteSpace(targetTag) ? AskTargetRegistry.GetTargetId(targetTag) : null;
+
+                // ── Cleanup: close about:blank tabs + stale duplicate AI tabs ──
+                await CloseBlankTabs(port);
+                if (!string.IsNullOrWhiteSpace(preferredHost))
+                    await CloseStaleDuplicateTabs(port, preferredHost, savedTargetId);
                 if (savedTargetId != null)
                     Console.WriteLine($"[ASK] Registry hit: {targetTag} → {savedTargetId[..Math.Min(8, savedTargetId.Length)]}");
 
@@ -273,6 +276,15 @@ Examples:
                         await Task.Delay(300);
                     }
                 }
+
+                // ── Focus theft monitoring: check after every CDP SendAsync ──
+                cdp.EnableFocusTheftMonitoring = true;
+                cdp.OnFocusTheft = (method, prevFg, curFg) =>
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[ASK:FOCUS] ⚠ STOLEN @ CDP:{method}: was={prevFg:X8} now={curFg:X8} — restoring");
+                    Console.ResetColor();
+                };
 
                 return (CdpClient?)cdp;
             }
@@ -543,7 +555,7 @@ Examples:
         { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp" };
 
     /// <summary>Attach multiple files: images via clipboard paste, other files via hidden file input.</summary>
-    static async Task AttachFilesViaCdp(CdpClient cdp, List<string> files, string editorSelector)
+    static async Task AttachFilesViaCdp(CdpClient cdp, List<string> files, string editorSelector, IntPtr originalUserFg = default)
     {
         foreach (var filePath in files)
         {
@@ -558,7 +570,7 @@ Examples:
             else
             {
                 // Non-image file: use hidden file input element
-                var fileOk = await AttachFileViaFileInput(cdp, filePath);
+                var fileOk = await AttachFileViaFileInput(cdp, filePath, originalUserFg);
                 if (fileOk) await WaitForImageUpload(cdp); // reuse upload wait
                 else Console.WriteLine($"[ASK] File attach failed: {Path.GetFileName(filePath)}");
             }
@@ -572,7 +584,7 @@ Examples:
     /// Tier 1: DOM.setFileInputFiles + change event
     /// Tier 2: Synthetic drop event with DataTransfer (for React apps that ignore file input)
     /// </summary>
-    static async Task<bool> AttachFileViaFileInput(CdpClient cdp, string filePath)
+    static async Task<bool> AttachFileViaFileInput(CdpClient cdp, string filePath, IntPtr originalUserFg = default)
     {
         var fileName = Path.GetFileName(filePath);
         var absPath = Path.GetFullPath(filePath);
@@ -581,109 +593,16 @@ Examples:
 
         try
         {
-            // ── Tier 1 FIRST: DOM.setFileInputFiles (fully focusless!) ──
-            // Try CDP DOM approach before native dialog — no focus theft at all.
-            Console.WriteLine("[ASK] Trying focusless DOM file attach...");
-            // Click upload button via JS eval (focusless) → input[type=file] appears
-            await cdp.EvalAsync("""
-                (() => {
-                    var btn = document.querySelector('button[aria-label*="Attach"]')
-                           || document.querySelector('button[aria-label*="첨부"]')
-                           || document.querySelector('button[aria-label*="Upload"]')
-                           || document.querySelector('button[aria-label*="파일 업로드"]')
-                           || document.querySelector('button[data-testid*="attach"]')
-                           || document.querySelector('button[data-testid*="upload"]');
-                    if (btn) btn.click();
-                })()
-                """);
-            await Task.Delay(800);
+            // ── Tier 1: DOM.setFileInputFiles on pre-existing hidden input (no click needed) ──
+            // Some pages have input[type=file] in DOM already — try before triggering any click.
+            Console.WriteLine("[ASK] Tier 1: trying pre-existing hidden file input...");
+            if (await TrySetFileInputFiles(cdp, absPath, fileName))
+                return true;
 
-            // If a menu opened, click the "파일 업로드" / "Upload file" menu item
-            await cdp.EvalAsync("""
-                (() => {
-                    var items = document.querySelectorAll('[role=menuitem], [role=option]');
-                    for (var item of items) {
-                        var t = (item.textContent || '').trim();
-                        if (t === '파일 업로드' || t === 'Upload file' || t === 'Upload'
-                            || t.includes('컴퓨터') || t.includes('Computer')) {
-                            item.click();
-                            return 'CLICKED:' + t;
-                        }
-                    }
-                    return 'NO_MENU';
-                })()
-                """);
-            await Task.Delay(800);
-
-            // Get all file inputs (some pages have multiple)
-            var docResult = await cdp.SendAsync("DOM.getDocument", new JsonObject());
-            var rootNodeId = docResult?["root"]?["nodeId"]?.GetValue<int>() ?? 0;
-
-            if (rootNodeId > 0)
-            {
-                // Try querySelectorAll for multiple file inputs
-                var queryResult = await cdp.SendAsync("DOM.querySelectorAll", new JsonObject
-                {
-                    ["nodeId"] = rootNodeId,
-                    ["selector"] = "input[type=\"file\"]"
-                });
-
-                var nodeIds = queryResult?["nodeIds"]?.AsArray();
-                Console.WriteLine($"[ASK] Found {nodeIds?.Count ?? 0} file input(s)");
-                if (nodeIds != null && nodeIds.Count > 0)
-                {
-                    // Try each file input until one works
-                    foreach (var nodeIdVal in nodeIds)
-                    {
-                        var nodeId = nodeIdVal?.GetValue<int>() ?? 0;
-                        if (nodeId == 0) continue;
-
-                        try
-                        {
-                            await cdp.SendAsync("DOM.setFileInputFiles", new JsonObject
-                            {
-                                ["nodeId"] = nodeId,
-                                ["files"] = new JsonArray { absPath.Replace('\\', '/') }
-                            });
-                            Console.WriteLine($"[ASK] File input set (nodeId={nodeId})");
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[ASK] File input set failed (nodeId={nodeId}): {ex.Message}");
-                            continue;
-                        }
-
-                        // Fire change event (Angular/React needs this to detect the file)
-                        var fireResult = await cdp.EvalAsync("""
-                            (() => {
-                                var inputs = document.querySelectorAll('input[type="file"]');
-                                for (var inp of inputs) {
-                                    if (inp.files && inp.files.length > 0) {
-                                        inp.dispatchEvent(new Event('change', {bubbles: true}));
-                                        inp.dispatchEvent(new Event('input', {bubbles: true}));
-                                        return 'FIRED:' + inp.files[0].name;
-                                    }
-                                }
-                                return 'NO_FILES';
-                            })()
-                            """);
-                        Console.WriteLine($"[ASK] Change event: {fireResult}");
-                        await Task.Delay(2000);
-
-                        // Check if attachment appeared
-                        if (await CheckFileAttached(cdp))
-                        {
-                            Console.WriteLine($"[ASK] File attached via input: {fileName}");
-                            return true;
-                        }
-                        Console.WriteLine("[ASK] File input: attachment not detected in UI");
-                    }
-                }
-            }
-
-            // ── Tier 0.5: CDP File Chooser Interception (focusless) ──
-            Console.WriteLine("[ASK] DOM failed, trying CDP file chooser...");
-            var chooserOk = await cdp.SetFileViaChooserAsync(absPath, timeoutMs: 5000);
+            // ── Tier 0.5: CDP File Chooser Interception + click (fully focusless) ──
+            // IMPORTANT: Enable interception FIRST, then click — otherwise OS dialog opens before we can intercept.
+            Console.WriteLine("[ASK] Tier 0.5: CDP chooser intercept (intercept ON → click → intercept file)...");
+            var chooserOk = await cdp.SetFileViaChooserAsync(absPath, timeoutMs: 6000);
             if (chooserOk)
             {
                 Console.WriteLine($"[ASK] File attached via chooser: {fileName}");
@@ -692,10 +611,9 @@ Examples:
             }
 
             // ── Tier 0: Native OS file dialog via UIA (STEALS FOCUS — last resort) ──
-            // Tier 1 (setFileInputFiles) and Tier 0.5 (trusted chooser intercept) both failed.
             await cdp.DisableFileChooserInterception();
             Console.WriteLine("[ASK] All focusless tiers failed — falling back to native file dialog (will steal focus)...");
-            var uiaOk = await TryAttachViaFileDialog(cdp, absPath);
+            var uiaOk = await TryAttachViaFileDialog(cdp, absPath, originalUserFg);
             if (uiaOk)
             {
                 Console.WriteLine($"[ASK] File attached via UIA dialog: {fileName}");
@@ -777,6 +695,62 @@ Examples:
     }
 
     /// <summary>Check if any file attachment indicator is visible in the page.</summary>
+    // Tier 1 helper: set file on any pre-existing input[type=file] without triggering a click
+    static async Task<bool> TrySetFileInputFiles(CdpClient cdp, string absPath, string fileName)
+    {
+        try
+        {
+            var docResult = await cdp.SendAsync("DOM.getDocument", new JsonObject());
+            var rootNodeId = docResult?["root"]?["nodeId"]?.GetValue<int>() ?? 0;
+            if (rootNodeId == 0) return false;
+
+            var queryResult = await cdp.SendAsync("DOM.querySelectorAll", new JsonObject
+            {
+                ["nodeId"] = rootNodeId,
+                ["selector"] = "input[type=\"file\"]"
+            });
+            var nodeIds = queryResult?["nodeIds"]?.AsArray();
+            if (nodeIds == null || nodeIds.Count == 0) return false;
+
+            Console.WriteLine($"[ASK] Tier 1: {nodeIds.Count} hidden file input(s) found");
+            foreach (var nodeIdVal in nodeIds)
+            {
+                var nodeId = nodeIdVal?.GetValue<int>() ?? 0;
+                if (nodeId == 0) continue;
+                try
+                {
+                    await cdp.SendAsync("DOM.setFileInputFiles", new JsonObject
+                    {
+                        ["nodeId"] = nodeId,
+                        ["files"] = new JsonArray { absPath.Replace('\\', '/') }
+                    });
+                    // Fire React/Angular change events
+                    await cdp.EvalAsync("""
+                        (() => {
+                            var inputs = document.querySelectorAll('input[type="file"]');
+                            for (var inp of inputs) {
+                                if (inp.files && inp.files.length > 0) {
+                                    inp.dispatchEvent(new Event('change', {bubbles:true}));
+                                    inp.dispatchEvent(new Event('input', {bubbles:true}));
+                                    return 'FIRED:' + inp.files[0].name;
+                                }
+                            }
+                        })()
+                        """);
+                    await Task.Delay(2000);
+                    if (await CheckFileAttached(cdp))
+                    {
+                        Console.WriteLine($"[ASK] Tier 1: file attached via hidden input: {fileName}");
+                        return true;
+                    }
+                }
+                catch { /* try next */ }
+            }
+        }
+        catch { }
+        return false;
+    }
+
     static async Task<bool> CheckFileAttached(CdpClient cdp)
     {
         var attached = await cdp.EvalAsync("""
@@ -810,8 +784,9 @@ Examples:
     /// <summary>
     /// Open Gemini upload menu → click "파일 업로드" → OS file dialog appears → UIA type path + click Open.
     /// Returns true if file was successfully attached via the native dialog.
+    /// originalUserFg: the user's foreground window BEFORE the ask command started — restored after dialog closes.
     /// </summary>
-    static async Task<bool> TryAttachViaFileDialog(CdpClient cdp, string absPath)
+    static async Task<bool> TryAttachViaFileDialog(CdpClient cdp, string absPath, IntPtr originalUserFg = default)
     {
         try
         {
@@ -839,10 +814,13 @@ Examples:
                 var bx = int.Parse(parts[0]);
                 var by = int.Parse(parts[1]);
 
-                // Trusted click on upload button
+                // [STEP 1] Trusted click on upload button — capture prevFg just before CDP call
+                var prevFg1 = NativeMethods.GetForegroundWindow();
+                Console.WriteLine($"[ASK:FOCUS] pre-upload-btn-click fg={prevFg1:X8}");
                 await CdpTrustedClick(cdp, bx, by);
                 Console.WriteLine($"[ASK] UIA dialog: upload btn trusted click at ({bx},{by})");
                 await Task.Delay(600);
+                LogRestoreFocus(prevFg1, "trusted-click-upload-btn");
 
                 // Now find and click the "파일 업로드" menu item with trusted gesture
                 var menuRect = await cdp.EvalAsync("""
@@ -866,14 +844,22 @@ Examples:
                 var mx = int.Parse(coords[0]);
                 var my = int.Parse(coords[1]);
 
-                // Trusted click on menu item → triggers <input type="file">.click() with user gesture
+                // [STEP 2] Trusted click on menu item — capture prevFg just before CDP call
+                var prevFg2 = NativeMethods.GetForegroundWindow();
+                Console.WriteLine($"[ASK:FOCUS] pre-menu-item-click fg={prevFg2:X8}");
                 await CdpTrustedClick(cdp, mx, my);
                 Console.WriteLine($"[ASK] UIA dialog: menu item trusted click at ({mx},{my})");
+                await Task.Delay(200);
+                LogRestoreFocus(prevFg2, "trusted-click-menu-item");
             }
             else
             {
                 Console.WriteLine($"[ASK] UIA dialog: reusing existing dialog hwnd={existingDialog:X}");
             }
+
+            // [STEP 3] Capture prevFg before dialog wait — OS file dialog may steal focus when it appears
+            var prevFg3 = NativeMethods.GetForegroundWindow();
+            Console.WriteLine($"[ASK:FOCUS] pre-dialog-wait fg={prevFg3:X8}");
 
             // Wait for OS file dialog to appear (#32770 with title "열기"/"Open" or ComboBoxEx32 child)
             IntPtr dialogHwnd = IntPtr.Zero;
@@ -890,6 +876,7 @@ Examples:
                 return false;
             }
             Console.WriteLine($"[ASK] UIA dialog: found hwnd={dialogHwnd:X}");
+            LogRestoreFocus(prevFg3, "file-dialog-appeared");
 
             // Step 4: Find the filename edit via Win32 (ComboBoxEx32 → ComboBox → Edit chain)
             // Standard Windows file dialog structure: Dialog → ComboBoxEx32(cid=1148) → ComboBox → Edit
@@ -934,6 +921,9 @@ Examples:
 
             // Step 5: Click "열기" button — find by control ID 1 (standard Open button)
             // GetDlgItem equivalent: find the button with control ID 1
+            // [STEP 4] Before clicking Open button — capture prevFg fresh
+            var prevFg4 = NativeMethods.GetForegroundWindow();
+            Console.WriteLine($"[ASK:FOCUS] pre-open-btn-click fg={prevFg4:X8}");
             var openBtnHwnd = NativeMethods.FindWindowExW(dialogHwnd, IntPtr.Zero, "Button", null);
             // The first Button child is usually "열기(O)" / "Open". Click via BM_CLICK.
             if (openBtnHwnd != IntPtr.Zero)
@@ -947,6 +937,7 @@ Examples:
                 Console.WriteLine("[ASK] UIA dialog: Open button not found, posting Enter");
                 NativeMethods.PostMessageW(dialogHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x0D, IntPtr.Zero);
             }
+            LogRestoreFocus(prevFg4, "open-btn-click");
 
             // Step 6: Wait for dialog to close and file to appear in Gemini
             for (int i = 0; i < 15; i++)
@@ -955,7 +946,13 @@ Examples:
                 if (!NativeMethods.IsWindow(dialogHwnd))
                 {
                     Console.WriteLine("[ASK] UIA dialog: dialog closed OK");
-                    await Task.Delay(1500);
+                    await Task.Delay(500);
+                    // [STEP 5] Restore to the ORIGINAL user foreground (before entire ask command)
+                    // — not prevFg4 (which was the file dialog hwnd, now dead)
+                    var restoreFg = originalUserFg != IntPtr.Zero ? originalUserFg : prevFg4;
+                    Console.WriteLine($"[ASK:FOCUS] post-dialog: restoring to original fg={restoreFg:X8}");
+                    NativeMethods.SmartSetForegroundWindow(restoreFg);
+                    await Task.Delay(1000);
                     return true;
                 }
             }
@@ -988,6 +985,51 @@ Examples:
         ClickZoomHelper? zoom = null;
         try
         {
+            // ── Mid-input check 1: 다른 세션이 Win32 키보드 입력 중이면 잠깐 양보 ──
+            if (KeyboardInput.IsInputLockedByOther())
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($"[ASK:FOCUS] ⚠ Another session is typing — waiting up to 5s before {action}...");
+                Console.ResetColor();
+                var waited = 0;
+                while (waited < 5000 && KeyboardInput.IsInputLockedByOther())
+                {
+                    await Task.Delay(200);
+                    waited += 200;
+                }
+                if (KeyboardInput.IsInputLockedByOther())
+                    Console.WriteLine($"[ASK:FOCUS] Still locked after wait — proceeding anyway");
+                else
+                    Console.WriteLine($"[ASK:FOCUS] Lock released after {waited}ms — proceeding");
+            }
+
+            // ── Mid-input check 2: 실제 포커스 뺏는 액션(send/type)일 때만 유저 양보 팝업 ──
+            // "send" = 질문 전송 직전, "type" = 텍스트 입력 직전 — 그 외 준비 단계는 건드리지 않음
+            if (action is "send" or "type")
+            {
+                var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
+                NativeMethods.GetLastInputInfo(ref lii);
+                var idleMs = unchecked((uint)Environment.TickCount) - lii.dwTime;
+                if (idleMs < 3000) // 유저가 3초 이내에 입력했으면 양보
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"[ASK:FOCUS] 유저 입력 감지 (idle={idleMs}ms) — 포커스 양보 팝업");
+                    Console.ResetColor();
+                    var chromeHwndEarly = cdp.GetChromeWindowHandle();
+                    var yieldResult = new UserInputWaitAdapter(noSound: true).WaitForUserYield(
+                        chromeHwndEarly, userIdleMs: idleMs, timeoutSeconds: 30,
+                        positionHwnd: chromeHwndEarly);
+                    if (!yieldResult.Approved)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"[ASK:FOCUS] 유저 취소 — {action} 중단");
+                        Console.ResetColor();
+                        return (false, prevFg, null);
+                    }
+                    Console.WriteLine($"[ASK:FOCUS] 승인됨 — {action} 진행");
+                }
+            }
+
             var chromeHwnd = cdp.GetChromeWindowHandle();
             if (chromeHwnd == IntPtr.Zero)
             {
@@ -1081,6 +1123,27 @@ Examples:
             Console.ResetColor();
             NativeMethods.SetForegroundWindow(prevFg);
         }
+    }
+
+    /// <summary>
+    /// Log focus state and restore to prevFg if changed (any thief, not just Chrome).
+    /// Used for tracking/fixing focus theft at each key step.
+    /// Returns true if focus was stolen (and restored).
+    /// </summary>
+    static bool LogRestoreFocus(IntPtr prevFg, string step)
+    {
+        if (prevFg == IntPtr.Zero) return false;
+        var cur = NativeMethods.GetForegroundWindow();
+        if (cur == prevFg)
+        {
+            Console.WriteLine($"[ASK:FOCUS] ok @ {step} fg={cur:X8}");
+            return false;
+        }
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[ASK:FOCUS] ⚠ STOLEN @ {step}: was={prevFg:X8} now={cur:X8} — restoring");
+        Console.ResetColor();
+        NativeMethods.SetForegroundWindow(prevFg);
+        return true;
     }
 
     // ── CDP Zoom: show magnifier on CDP target element ──
@@ -1474,7 +1537,10 @@ Examples:
 
         // CDP tab activation (focusless) — replaces UIA EnsureTabViaGrap
         // Target.activateTarget does Chrome-internal tab switch without OS SetForegroundWindow
+        var prevFgGemini = NativeMethods.GetForegroundWindow();
+        Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgGemini:X8}");
         if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult();
+        LogRestoreFocus(prevFgGemini, "ActivateTab");
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -1642,8 +1708,9 @@ Examples:
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Gemini");
 
                 // ── File attachments (before text) ──
+                // Pass prevFgGemini so native file dialog tier can restore original user focus after close
                 if (attachFiles?.Count > 0)
-                    await AttachFilesViaCdp(cdp, attachFiles, editorSel);
+                    await AttachFilesViaCdp(cdp, attachFiles, editorSel, prevFgGemini);
 
                 // Tier 1: focusless insert (a11y-first)
                 await ClearContentEditable(cdp, editorSel);
@@ -1755,6 +1822,7 @@ Examples:
                 // Zoom feedback: sent successfully
                 zoom?.ShowPass($"sent ({sendResult})");
                 zoom?.Dispose();
+                LogRestoreFocus(prevFg, "after-send-Gemini");
 
                 Console.WriteLine($"[ASK] Sent! Waiting for response... (send={sendResult})");
                 questionLock.Release("sent");
@@ -1971,7 +2039,7 @@ Examples:
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
-        if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult();
+        { var prevFgGpt = NativeMethods.GetForegroundWindow(); Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgGpt:X8}"); if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult(); LogRestoreFocus(prevFgGpt, "ActivateTab-GPT"); }
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -2107,6 +2175,51 @@ Examples:
             }
             if (closed > 0)
                 Console.WriteLine($"[ASK] Closed {closed} about:blank tab(s)");
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Close stale duplicate tabs for the same AI host (gemini/chatgpt/claude).
+    /// Keeps only the saved (registry) tab, or if none saved, the most recently created one.
+    /// Silently ignores errors.
+    /// </summary>
+    static async Task CloseStaleDuplicateTabs(int port, string host, string? keepTargetId)
+    {
+        try
+        {
+            using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            var json = await http.GetStringAsync($"http://127.0.0.1:{port}/json");
+            var targets = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsArray();
+            if (targets == null) return;
+
+            // Collect all tabs matching this host
+            var matching = targets
+                .Where(t => (t?["url"]?.GetValue<string>() ?? "").Contains(host, StringComparison.OrdinalIgnoreCase)
+                         && (t?["type"]?.GetValue<string>() ?? "") == "page")
+                .ToList();
+
+            if (matching.Count <= 1) return; // 하나면 문제없음
+
+            // registry에 저장된 탭이 없으면 건드리지 않음 (남의 세션 탭 보호)
+            if (string.IsNullOrEmpty(keepTargetId)) return;
+
+            var keepId = keepTargetId;
+
+            int closed = 0;
+            foreach (var t in matching)
+            {
+                var id = t?["id"]?.GetValue<string>() ?? "";
+                if (id == keepId || string.IsNullOrEmpty(id)) continue;
+                var url = t?["url"]?.GetValue<string>() ?? "";
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"[ASK] Closing stale {host} tab: {url[..Math.Min(60, url.Length)]}");
+                Console.ResetColor();
+                await http.GetAsync($"http://127.0.0.1:{port}/json/close/{id}");
+                closed++;
+            }
+            if (closed > 0)
+                Console.WriteLine($"[ASK] Closed {closed} stale {host} tab(s) — keeping active session");
         }
         catch { }
     }
@@ -2328,6 +2441,7 @@ Examples:
         zoom?.ShowPass($"sent ({sendResult})");
         zoom?.Dispose();
         GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
+        LogRestoreFocus(prevFg, "after-send-GPT");
 
         // Check editor after send — should be empty if sent successfully
         var afterSend = await cdp.EvalAsync(
@@ -2835,7 +2949,7 @@ Examples:
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
-        if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult();
+        { var prevFgClaude = NativeMethods.GetForegroundWindow(); Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgClaude:X8}"); if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult(); LogRestoreFocus(prevFgClaude, "ActivateTab-Claude"); }
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -2947,6 +3061,7 @@ Examples:
                 zoom?.ShowPass($"sent ({sendResult})");
                 zoom?.Dispose();
                 GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
+                LogRestoreFocus(prevFg, "after-send-Claude");
 
                 var afterSend = await cdp.EvalAsync(
                     $"document.querySelector('{editorSel}')?.textContent?.length ?? -1") ?? "-1";

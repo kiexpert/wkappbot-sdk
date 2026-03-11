@@ -42,6 +42,14 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     public int ChromePid { get; private set; }
 
     /// <summary>
+    /// Focus theft monitoring for every CDP SendAsync call.
+    /// When enabled, detects if Chrome steals OS foreground after each CDP command.
+    /// OnFocusTheft(method, prevFg, curFg) is called when focus stolen — caller can log/restore.
+    /// </summary>
+    public bool EnableFocusTheftMonitoring { get; set; }
+    public Action<string, nint, nint>? OnFocusTheft { get; set; }
+
+    /// <summary>
     /// Connect to Chrome's DevTools WebSocket.
     /// Chrome must be running with --remote-debugging-port=PORT.
     /// </summary>
@@ -168,6 +176,11 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         if (_ws == null || _ws.State != WebSocketState.Open)
             throw new InvalidOperationException("Not connected");
 
+        // Focus theft monitoring: capture prevFg just before send
+        nint prevFg = 0;
+        if (EnableFocusTheftMonitoring && OnFocusTheft != null)
+            prevFg = (nint)GetForegroundWindow();
+
         var id = Interlocked.Increment(ref _messageId);
         var tcs = new TaskCompletionSource<JsonNode?>();
         _pending[id] = tcs;
@@ -185,16 +198,30 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
 
         // Wait for response with timeout
         using var cts = new CancellationTokenSource(timeoutMs);
+        JsonNode? result;
         try
         {
             cts.Token.Register(() => tcs.TrySetCanceled());
-            return await tcs.Task;
+            result = await tcs.Task;
         }
         catch (TaskCanceledException)
         {
             _pending.TryRemove(id, out _);
             throw new TimeoutException($"CDP command '{method}' timed out after {timeoutMs}ms");
         }
+
+        // Focus theft check after response received
+        if (prevFg != 0 && OnFocusTheft != null)
+        {
+            var curFg = (nint)GetForegroundWindow();
+            if (curFg != prevFg)
+            {
+                OnFocusTheft(method, prevFg, curFg);
+                SetForegroundWindow((IntPtr)prevFg);
+            }
+        }
+
+        return result;
     }
 
     /// <summary>

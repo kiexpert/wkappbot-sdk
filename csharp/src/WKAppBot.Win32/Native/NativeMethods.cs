@@ -177,6 +177,22 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
 
+    // ── IME (Korean/CJK input mode + composition) ────────────────────────────
+    [DllImport("imm32.dll")]
+    public static extern IntPtr ImmGetContext(IntPtr hWnd);
+    [DllImport("imm32.dll")]
+    public static extern bool ImmGetConversionStatus(IntPtr hIMC, out uint lpConversion, out uint lpSentence);
+    [DllImport("imm32.dll")]
+    public static extern bool ImmSetConversionStatus(IntPtr hIMC, uint dwConversion, uint dwSentence);
+    [DllImport("imm32.dll")]
+    public static extern bool ImmReleaseContext(IntPtr hWnd, IntPtr hIMC);
+    // GCS_COMPSTR=0x0008: get current composition (조합중) string length/content
+    [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
+    public static extern int ImmGetCompositionStringW(IntPtr hIMC, uint dwIndex, char[]? lpBuf, uint dwBufLen);
+    // SCS_SETSTR=0x0002: re-inject composition string into IME buffer
+    [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool ImmSetCompositionStringW(IntPtr hIMC, uint dwIndex, string lpComp, uint dwCompLen, IntPtr lpRead, uint dwReadLen);
+
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
 
@@ -621,6 +637,16 @@ public static partial class NativeMethods
 
         // FocuslessGuard: block if enabled (only when we actually NEED to steal focus)
         Input.FocuslessGuard.AssertAllowed("SetForegroundWindow");
+
+        // Keyboard input lock: if another session is currently sending keystrokes, yield focus.
+        // "먼저 잡은 넘이 우선권" — don't interrupt ongoing typing in another process.
+        if (Input.KeyboardInput.IsInputLockedByOther())
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"[FOCUS] ⚠ SmartSetForegroundWindow skipped — another session is typing (hwnd={hWnd:X8})");
+            Console.ResetColor();
+            return false;
+        }
 
         // Simple attempt first
         BringWindowToTop(hWnd);

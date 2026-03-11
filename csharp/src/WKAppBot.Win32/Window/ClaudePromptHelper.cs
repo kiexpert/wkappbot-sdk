@@ -44,6 +44,19 @@ public sealed class ClaudePromptHelper : IDisposable
     /// </summary>
     public static bool AllowFocusSteal { get; set; }
 
+    // Per-hwnd turn-form cache: once found, reuse until window is gone.
+    // UIA tree scan (FindFirstDescendant) reads all conversation content — very slow for long sessions.
+    // Cache key = hwnd, invalidated when IsWindow() returns false or hwnd disappears from EnumWindows.
+    // Only positive finds are cached (null = "not found yet, retry next time").
+    private static readonly Dictionary<IntPtr, PromptInfo> _turnFormCache = new();
+
+    /// <summary>
+    /// Return all currently cached prompt infos (windows already confirmed to have turn-form).
+    /// Instant — no UIA scan. Used by Eye loop for per-instance status streaming.
+    /// </summary>
+    public static IReadOnlyList<PromptInfo> GetAllCachedPrompts()
+        => _turnFormCache.Values.ToList();
+
     public ClaudePromptHelper()
     {
         _automation = new UIA3Automation();
@@ -173,6 +186,10 @@ public sealed class ClaudePromptHelper : IDisposable
     {
         var results = new List<PromptInfo>();
         var seen = new HashSet<IntPtr>();
+
+        // Purge dead windows from cache (window closed/crashed since last scan)
+        var deadHwnds = _turnFormCache.Keys.Where(h => !NativeMethods.IsWindow(h)).ToList();
+        foreach (var h in deadHwnds) _turnFormCache.Remove(h);
 
         // Scan all Chrome_WidgetWin_1 windows (covers Electron + VS Code)
         var allWindows = new List<(IntPtr hWnd, string title, string procName, uint pid)>();
@@ -324,37 +341,41 @@ public sealed class ClaudePromptHelper : IDisposable
     /// <summary>
     /// Find turn-form prompt input in a specific window handle.
     /// Shared helper for FindPrompt and FindPromptForCwd.
+    /// Results are cached per hwnd — UIA scan only on first encounter.
     /// </summary>
     private PromptInfo? FindTurnFormInWindow(IntPtr hWnd, string title, string procName)
     {
+        // Cache hit: skip UIA scan entirely (conversation content can be thousands of nodes).
+        // Only positive finds are cached; null means "not found yet" and will retry.
+        if (_turnFormCache.TryGetValue(hWnd, out var cached))
+        {
+            // Update title in case it changed (cosmetic only — hwnd is the key for operations)
+            return cached.WindowTitle == title ? cached : cached with { WindowTitle = title };
+        }
+
         try
         {
             var root = _automation.FromHandle(hWnd);
             if (root == null) return null;
 
-            // Optimization: turn-form is always at the bottom of the chat document.
-            // Instead of FindFirstDescendant (full tree scan), find Document first (shallow),
-            // then scan its direct children for turn-form (the input area is the last child).
+            // Fast path: Document/RootWebArea is 1-2 levels deep in Electron.
+            // turn-form is a direct child of the document — no need to descend into conversation content.
             AutomationElement? turnForm = null;
             try
             {
-                // Fast path: find Document/RootWebArea (1-2 levels deep in Electron)
                 var doc = root.FindFirstDescendant(
                     new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Document));
                 if (doc != null)
-                {
-                    // turn-form is a direct child of the document root — scan children only (no deep descent)
                     turnForm = doc.FindFirstChild(
                         new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
-                }
             }
             catch { }
 
-            // Fallback: full tree scan (slower but safe)
+            // Fallback: full tree scan (slower but safe — only runs once per hwnd due to cache)
             if (turnForm == null)
                 turnForm = root.FindFirstDescendant(
                     new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
-            if (turnForm == null) return null;
+            if (turnForm == null) return null; // don't cache null — allow retry on next tick
 
             var inputGroup = turnForm.FindFirstChild(
                 new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Group));
@@ -368,9 +389,11 @@ public sealed class ClaudePromptHelper : IDisposable
 
             var rect = inputGroup.BoundingRectangle;
             var hostType = procName.Equals("claude", StringComparison.OrdinalIgnoreCase) ? "claude-desktop" : "vscode";
-            Console.WriteLine($"  [PROMPT-CWD] turn-form found in \"{title}\" ({hostType})");
-            return new PromptInfo(hWnd, title, procName,
+            var result = new PromptInfo(hWnd, title, procName,
                 new Rectangle(rect.X, rect.Y, rect.Width, rect.Height), hostType);
+            _turnFormCache[hWnd] = result; // cache for all future ticks
+            Console.WriteLine($"  [PROMPT-CWD] turn-form found+cached in \"{title}\" ({hostType}) hwnd=0x{hWnd:X}");
+            return result;
         }
         catch { return null; }
     }
