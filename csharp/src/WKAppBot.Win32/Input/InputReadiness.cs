@@ -370,23 +370,36 @@ public sealed class InputReadiness
         bool yieldConfirmed = false;
         bool yieldFocusAcquired = false;
 
-        // ── FocusStealer prop check ──
-        // If a previous UIA action on this hwnd stole focus (nominally focusless but actually stole),
-        // ActionApi stamps "WKAppBot_FocusStealer-{action}" on the root hwnd.
-        // Force yield popup so user gets warned before the next action too.
+        // ── FocusStealer / MouseStealer prop check ──
+        // ActionApi stamps these props when a nominally-focusless UIA action
+        // steals keyboard focus OR moves the mouse cursor without user input.
+        // Two separate props → both can coexist on same hwnd+action:
+        //   "WKAppBot_FocusStealer-{action}" — foreground window stolen
+        //   "WKAppBot_MouseStealer-{action}"  — cursor moved
+        // Force yield popup on next Probe() so user gets warned.
         bool focusStealerFlagged = false;
         try
         {
             if (!req.QuickMode && mainHwnd != IntPtr.Zero && req.IntendedAction != null)
             {
                 const string FocusStealerPrefix = "WKAppBot_FocusStealer-";
-                var propVal = NativeMethods.GetPropW(mainHwnd, $"{FocusStealerPrefix}{req.IntendedAction.ToLowerInvariant()}");
-                if (propVal != IntPtr.Zero)
+                const string MouseStealerPrefix  = "WKAppBot_MouseStealer-";
+                var act = req.IntendedAction.ToLowerInvariant();
+
+                bool focusStolen = NativeMethods.GetPropW(mainHwnd, $"{FocusStealerPrefix}{act}") != IntPtr.Zero;
+                // Mouse prop stored as "mouse-{action}" by ActionApi
+                bool mouseStolen = NativeMethods.GetPropW(mainHwnd, $"{MouseStealerPrefix}mouse-{act}") != IntPtr.Zero;
+
+                if (focusStolen || mouseStolen)
                 {
                     focusStealerFlagged = true;
+                    var kinds = string.Join("+",
+                        new[] { focusStolen ? "focus" : null, mouseStolen ? "mouse" : null }
+                        .Where(s => s != null));
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine(
-                        $"  [READINESS] ⚠ FocusStealer: '{req.IntendedAction}' previously stole focus on hwnd=0x{mainHwnd:X} → forcing yield popup");
+                        $"  [READINESS] ⚠ {kinds.ToUpperInvariant()} STEALER: '{req.IntendedAction}' " +
+                        $"previously grabbed {kinds} on hwnd=0x{mainHwnd:X} → forcing yield popup");
                     Console.ResetColor();
                 }
             }
