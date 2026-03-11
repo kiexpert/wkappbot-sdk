@@ -81,8 +81,10 @@ internal partial class Program
         "- Toggle checkbox: action=toggle, grap=\"*Settings*#*DarkMode*\"\n" +
         "- Wait for dialog: action=wait, grap=\"*SaveAs*\", timeout=15000\n" +
         "- Wait for element: action=wait, grap=\"*App*#*ProgressDone*\", timeout=30000\n" +
-        "- Eval JS in Chrome: action=eval, grap=\"*Chrome*\", text=\"document.title\"\n" +
-        "- Eval with tab hint: action=eval, grap=\"*Chrome*#ChatGPT\", text=\"document.querySelectorAll('article').length\"\n" +
+        "- Eval JS in Chrome: action=eval, grap=\"*Chrome*#domain.com\", text=\"document.title\" ⚠ ALWAYS specify tab hint!\n" +
+        "- Eval with URL hint: action=eval, grap=\"*Chrome*#share/69ae513a\", text=\"document.body.innerText\" (URL substring match)\n" +
+        "- Eval with title hint: action=eval, grap=\"*Chrome*#ChatGPT\", text=\"document.querySelectorAll('article').length\"\n" +
+        "- ⚠ BAD: action=eval, grap=\"*Chrome*\", text=\"...\" — hits active tab only, unreliable! Always use #tab-hint\n" +
         "- Ask GPT: action=ask-gpt, text=\"How to get text from owner-drawn MFC button?\"\n" +
         "- Ask Gemini: action=ask-gemini, text=\"Analyze this UI screenshot\", grap=\"screenshot.png\"\n" +
         "- Ask with image: action=ask-gpt, text=\"What buttons are in this dialog?\", grap=\"dialog.png\"\n" +
