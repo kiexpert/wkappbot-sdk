@@ -1,4 +1,4 @@
-﻿# WKAppBot v3.3 - Windows + Android App Automation Test Framework
+﻿# WKAppBot v3.5.5 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -405,6 +405,12 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - claude-usage: UIA로 Claude Desktop 사용량 조회 (설정→사용량, 탭 바운스 리프레시, 풀 포커스리스)
   - suggest: 건의서 웹훅 직접 POST (#클봇-전체) + 파일첨부(bot_token API) + HQ suggestions.jsonl
   - ArgParser: ParseTextAndFiles / ParseTextAndFilesWithMarkers 공통로직 (5곳 통합: ask/slack send/reply/suggest/clipboard)
+- **v3.5.5 pipe streaming fix + browser lock fix + per-command log**
+  - EyeCmdPipeServer: StringWriter 버퍼링 제거 → pipeWriter 직접 스트리밍 (타임아웃 시에도 출력 보존)
+  - ThreadRoutingWriter: `[ThreadStatic]` → `AsyncLocal<TextWriter?>` (async/await 스레드 전환 후에도 라우팅 유지)
+  - AskCommands: ChromeTabSemaphore named `Semaphore` → `SemaphoreSlim` (크래시 후 고착 방지, Eye 재시작 시 항상 초기화)
+  - Program: Eye 파이프 모드에서도 TeeTextWriter 생성 → 명령별 로그 파일 + "Log saved:" 안내
+  - InputZoomHost.CloseAllGhosts(): 유령 InputZoom/InputHighlight 창 일괄 WM_CLOSE (wkappbot 시작 시 자동 실행)
 - **v3.5.4 FocusStealer Win32 prop — 포커스 강탈 창 자동 표시 + 노하우 자동 기록**
   - ActionApi: UIA 액션(invoke/toggle/select/expand/collapse) 후 포커스 변화 감지
     - 포커스 강탈 시: `SetPropW(rootHwnd, "WKAppBot_FocusStealer-{action}", 1)` 스탬프
