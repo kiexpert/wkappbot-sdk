@@ -98,8 +98,8 @@ internal partial class Program
         if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow")
             cmdTag += $"-{args[1].ToLowerInvariant()}";
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
-        // RunningInEye: skip TeeWriter — Eye already has its own log, output goes to pipe
-        TeeTextWriter? tee = RunningInEye ? null : new TeeTextWriter(Console.Out, logFile);
+        // Always tee to log file — even in Eye (pipe) mode, per-command logs are useful for debugging
+        TeeTextWriter? tee = new TeeTextWriter(Console.Out, logFile);
         if (tee != null) Console.SetOut(tee);
 
         // ── Crash handler: dump stack trace to log, DON'T move to old/ (crash evidence) ──
