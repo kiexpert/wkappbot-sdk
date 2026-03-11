@@ -405,6 +405,19 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - claude-usage: UIA로 Claude Desktop 사용량 조회 (설정→사용량, 탭 바운스 리프레시, 풀 포커스리스)
   - suggest: 건의서 웹훅 직접 POST (#클봇-전체) + 파일첨부(bot_token API) + HQ suggestions.jsonl
   - ArgParser: ParseTextAndFiles / ParseTextAndFilesWithMarkers 공통로직 (5곳 통합: ask/slack send/reply/suggest/clipboard)
+- **v3.5.2 file-read/write + knowhow broadcast + ask focusless + CDP tab close**
+  - a11y file-read/file-write: 인코딩 변환 파일 I/O (CP949/UTF-8/etc.) — Claude CP949 한글소스 셀프힐링
+    - file-write `@file` 패턴: Claude가 UTF-8 임시파일에 쓰고 wkappbot이 CP949로 재인코딩
+  - BroadcastActionKnowhow: 모든 a11y 액션 후 OS 경험 노하우 자동 방송
+    - 노하우 없으면 `file-write` 명령 포함 힌트 출력 ("Your 5 min saves junior Claude hours. 🙏")
+  - ask focusless 강화: TrySetFileInputFiles(클릭없이 DOM 파일첨부), CloseStaleDuplicateTabs, IsInputLockedByOther wait
+  - FocusSnapshot IME: 한/영 모드 + 조합중 오토마타 캡처/복구 (imm32.dll)
+  - a11y close + #tabHint → CDP 탭 닫기 (창 전체 닫기 아님!)
+    - `a11y close "*Chrome*#chatgpt.com/c/69b0f4"` → 해당 탭만 닫힘
+    - #hint 없이 브라우저 close → 탭 목록 + copy-ready 힌트 출력 (안전 가드)
+    - `--force` → 브라우저 창 전체 강제 종료 (WM_CLOSE → Process.Kill)
+  - eval 탭힌트 best practice: `*Chrome*` 단독 사용 경고 → MCP/헬프에 명시
+  - MCP schema: file-read/write/encoding 파라미터 추가, grap ⚠ 안내 강화
 ### v2.2 Android ADB Integration (Phase A+B+C 완료)
 - **WKAppBot.Android 프로젝트**: AdbClient, AdbDeviceRegistry, AdbGrapRouter, AndroidA11yTree, AdbExperienceDb
 - **adb:// URI 스키마**: `adb://device/package#scope` — Windows grap과 동일한 `#` scope 문법
