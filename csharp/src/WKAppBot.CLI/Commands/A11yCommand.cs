@@ -408,6 +408,52 @@ internal partial class Program
             targets[0].Handle, "a11y", args);
         if (delegated) return delegateExit;
 
+        // ═══ STEP 4.95: close + #tabHint → CDP tab close (not window close!) ═══
+        // When grap has a #tabHint (e.g. "*Chrome*#share/69ae"), close matching browser tab
+        // instead of the whole window. Searches ALL matched windows for a CDP port.
+        if (action == "close" && !string.IsNullOrEmpty(uiaPath))
+        {
+            var tabHint = uiaPath;
+            var http = new System.Net.Http.HttpClient();
+            int totalClosed = 0;
+            var portsChecked = new HashSet<int>();
+            // Search ALL matched windows (not just first) for a browser with CDP
+            foreach (var w in allWindows)
+            {
+                NativeMethods.GetWindowThreadProcessId(w.Handle, out uint wPid);
+                var cdpPort = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)wPid);
+                if (cdpPort <= 0 || !portsChecked.Add(cdpPort)) continue;
+                try
+                {
+                    var json = http.GetStringAsync($"http://127.0.0.1:{cdpPort}/json").GetAwaiter().GetResult();
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    foreach (var tab in doc.RootElement.EnumerateArray())
+                    {
+                        if (tab.TryGetProperty("type", out var tp) && tp.GetString() != "page") continue;
+                        var tabUrl = tab.TryGetProperty("url", out var u) ? u.GetString() ?? "" : "";
+                        var tabTitle = tab.TryGetProperty("title", out var tt) ? tt.GetString() ?? "" : "";
+                        if (!tabUrl.Contains(tabHint, StringComparison.OrdinalIgnoreCase) &&
+                            !tabTitle.Contains(tabHint, StringComparison.OrdinalIgnoreCase)) continue;
+                        var tabId = tab.TryGetProperty("id", out var id) ? id.GetString() : null;
+                        if (tabId == null) continue;
+                        http.GetStringAsync($"http://127.0.0.1:{cdpPort}/json/close/{tabId}").GetAwaiter().GetResult();
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"[A11Y] tab closed [{cdpPort}]: \"{tabTitle}\" ({tabUrl[..Math.Min(70, tabUrl.Length)]})");
+                        Console.ResetColor();
+                        totalClosed++;
+                    }
+                }
+                catch { /* port not responsive, skip */ }
+            }
+            if (totalClosed > 0)
+            {
+                Console.WriteLine($"[A11Y] Done: {totalClosed} tab(s) closed");
+                return 0;
+            }
+            // No CDP tab found — error, do NOT fall through to window close!
+            return Error($"No browser tab matching \"{tabHint}\" found.\n  Tip: use a11y close \"*App*\" (no #tabHint) to close the whole window.");
+        }
+
         // ═══ STEP 5: Execute on each target ═══
         int ok = 0, fail = 0;
         using var automation = new UIA3Automation();
