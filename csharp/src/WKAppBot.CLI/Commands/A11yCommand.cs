@@ -408,9 +408,52 @@ internal partial class Program
             targets[0].Handle, "a11y", args);
         if (delegated) return delegateExit;
 
-        // ═══ STEP 4.95: close + #tabHint → CDP tab close (not window close!) ═══
-        // When grap has a #tabHint (e.g. "*Chrome*#share/69ae"), close matching browser tab
-        // instead of the whole window. Searches ALL matched windows for a CDP port.
+        // ═══ STEP 4.95: close on browser window ═══
+        // Rule: browser windows (CDP port detected) REQUIRE a #tabHint to close a tab.
+        //       Without #tabHint → error (prevents accidental whole-browser close).
+        //       Use --force to override and close the whole window anyway.
+        if (action == "close" && string.IsNullOrEmpty(uiaPath) && !force)
+        {
+            // Check if any matched window is a browser (has CDP port) → show tab list
+            var portsChecked2 = new HashSet<int>();
+            foreach (var w in allWindows)
+            {
+                NativeMethods.GetWindowThreadProcessId(w.Handle, out uint wPid2);
+                var cdpPort2 = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)wPid2);
+                if (cdpPort2 <= 0 || !portsChecked2.Add(cdpPort2)) continue;
+                try
+                {
+                    var http2 = new System.Net.Http.HttpClient();
+                    var json2 = http2.GetStringAsync($"http://127.0.0.1:{cdpPort2}/json").GetAwaiter().GetResult();
+                    var doc2 = System.Text.Json.JsonDocument.Parse(json2);
+                    var pages = doc2.RootElement.EnumerateArray()
+                        .Where(t => !t.TryGetProperty("type", out var tp2) || tp2.GetString() == "page")
+                        .ToList();
+                    if (pages.Count == 0) continue;
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[A11Y] Browser has {pages.Count} tab(s) — specify which to close with #hint:");
+                    Console.ResetColor();
+                    foreach (var tab in pages)
+                    {
+                        var tabUrl = tab.TryGetProperty("url", out var u2) ? u2.GetString() ?? "" : "";
+                        var tabTitle = tab.TryGetProperty("title", out var tt2) ? tt2.GetString() ?? "" : "";
+                        // Use path portion (e.g. "chatgpt.com/share/69ae" not full URL)
+                        var uri = Uri.TryCreate(tabUrl, UriKind.Absolute, out var u3) ? u3 : null;
+                        var hint = uri != null ? (uri.Host + (uri.AbsolutePath.Length > 1 ? uri.AbsolutePath[..Math.Min(20, uri.AbsolutePath.Length)] : "")) : tabUrl[..Math.Min(40, tabUrl.Length)];
+                        Console.WriteLine($"  \"{tabTitle}\"");
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
+                        Console.WriteLine($"    → a11y close \"{grap}#{hint}\"");
+                        Console.ResetColor();
+                    }
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"  (or use --force to close the whole browser window)");
+                    Console.ResetColor();
+                    return 1;
+                }
+                catch { }
+            }
+        }
+
         if (action == "close" && !string.IsNullOrEmpty(uiaPath))
         {
             var tabHint = uiaPath;
