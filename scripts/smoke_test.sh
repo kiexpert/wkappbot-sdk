@@ -104,10 +104,10 @@ fi
 
 if [ $CALC_LAUNCHED -eq 1 ]; then
     CALC="*계산기*;*Calculator*"
-    check   "calc: read"        bash -c "\"$WKA\" a11y read \"$CALC\" 2>&1 | grep -qiE 'name=|value=|pattern|ok'"
-    check   "calc: find"        bash -c "\"$WKA\" a11y find \"$CALC\" --depth 3 2>&1 | grep -qiE 'found|Button|result|CalculatorResults'"
-    check   "calc: screenshot"  bash -c "\"$WKA\" a11y screenshot \"$CALC\" 2>&1 | grep -qiE 'saved|captured'"
-    check   "calc: highlight"   bash -c "\"$WKA\" a11y highlight \"$CALC#num5Button\" 2>&1 | grep -qiE 'highlight|zoom|ok'"
+    check   "calc: read"        bash -c "\"$WKA\" a11y read \"$CALC\" --nth 1 2>&1 | grep -qiE 'name=|value=|pattern|ok'"
+    check   "calc: find"        bash -c "\"$WKA\" a11y find \"$CALC\" --nth 1 --depth 3 2>&1 | grep -qiE 'found|Button|result|CalculatorResults'"
+    check   "calc: screenshot"  bash -c "\"$WKA\" a11y screenshot \"$CALC\" --nth 1 2>&1 | grep -qiE 'saved|captured'"
+    check   "calc: highlight"   bash -c "\"$WKA\" a11y highlight \"$CALC#num5Button\" --nth 1 2>&1 | grep -qiE 'highlight|zoom|ok'"
     # 5 + 3 = 8  (focusless UIA Invoke)
     check   "calc: invoke 5"    bash -c "\"$WKA\" a11y invoke \"$CALC#num5Button\" 2>&1 | grep -qiE 'ok|invoke'"
     check   "calc: invoke +"    bash -c "\"$WKA\" a11y invoke \"$CALC#plusButton\" 2>&1 | grep -qiE 'ok|invoke'"
@@ -125,14 +125,14 @@ fi
 # ─── A11y Element actions (desktop/taskbar — always present) ──────────────
 # Target: Shell_TrayWnd (taskbar) + Progman (desktop) — no app needed
 banner "A11y Element (System UI)"
-check_g "find taskbar"       bash -c "\"$WKA\" a11y find \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'match|notfound|found|error'"
-check_g "read taskbar"       bash -c "\"$WKA\" a11y read \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'name=|value=|pattern|notfound|error'"
-check_g "read desktop"       bash -c "\"$WKA\" a11y read \"*Progman*\" 2>&1 | grep -qiE 'name=|value=|pattern|notfound|error'"
-check_g "find desktop"       bash -c "\"$WKA\" a11y find \"*Progman*\" --depth 2 2>&1 | grep -qiE 'match|found|notfound|error'"
-check_g "highlight taskbar"  bash -c "\"$WKA\" a11y highlight \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'highlight|zoom|ok|notfound|error'"
-check_g "screenshot taskbar" bash -c "\"$WKA\" a11y screenshot \"*Shell_TrayWnd*\" 2>&1 | grep -qiE 'saved|captured|notfound|error'"
+check_g "find taskbar"       bash -c "\"$WKA\" a11y find \"*Shell_TrayWnd*\" --nth 1 2>&1 | grep -qiE 'match|notfound|found|error'"
+check_g "read taskbar"       bash -c "\"$WKA\" a11y read \"*Shell_TrayWnd*\" --nth 1 2>&1 | grep -qiE 'name=|value=|pattern|notfound|error'"
+check_g "read desktop"       bash -c "\"$WKA\" a11y read \"*Progman*\" --nth 1 2>&1 | grep -qiE 'name=|value=|pattern|notfound|error'"
+check_g "find desktop"       bash -c "\"$WKA\" a11y find \"*Progman*\" --nth 1 --depth 2 2>&1 | grep -qiE 'match|found|notfound|error'"
+check_g "highlight taskbar"  bash -c "\"$WKA\" a11y highlight \"*Shell_TrayWnd*\" --nth 1 2>&1 | grep -qiE 'highlight|zoom|ok|notfound|error'"
+check_g "screenshot taskbar" bash -c "\"$WKA\" a11y screenshot \"*Shell_TrayWnd*\" --nth 1 2>&1 | grep -qiE 'saved|captured|notfound|error'"
 # scroll taskbar (safe — no focus grab)
-check_g "scroll taskbar"     bash -c "\"$WKA\" a11y scroll \"*Shell_TrayWnd*\" --direction right --amount small 2>&1 | grep -qiE 'scroll|ok|notfound|error|pattern'"
+check_g "scroll taskbar"     bash -c "\"$WKA\" a11y scroll \"*Shell_TrayWnd*\" --nth 1 --direction right --amount small 2>&1 | grep -qiE 'scroll|ok|notfound|error|pattern'"
 # type: send a benign key to desktop (VK_NONAME — no visible effect)
 # skip: too risky without knowing which window has focus
 # invoke/click: skip — could trigger unexpected UI actions on desktop/taskbar
