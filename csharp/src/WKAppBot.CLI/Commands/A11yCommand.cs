@@ -447,7 +447,8 @@ internal partial class Program
                         Console.ResetColor();
                     }
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"  (or use --force to close the whole browser window)");
+                    Console.WriteLine($"  ⚠ Browser main window cannot be closed without #tab-hint (safety guard).");
+                    Console.WriteLine($"  ⚠ Use --force to kill the whole browser (WM_CLOSE → Process.Kill).");
                     Console.ResetColor();
                     return 1;
                 }
