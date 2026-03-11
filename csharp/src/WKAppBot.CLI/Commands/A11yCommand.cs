@@ -177,6 +177,9 @@ internal partial class Program
             Console.WriteLine("  a11y click \"Chrome#button.submit\"       CSS → CDP auto-fallback!");
             Console.WriteLine("  a11y type  \"Chrome#input[name=q]\" \"hello\"  CDP type");
             Console.WriteLine("  a11y read  \"Claude#.editor\"             Electron + CDP read");
+            Console.WriteLine("  ⚠ eval: ALWAYS use #tab-hint — grap=\"*Chrome*\" alone hits active tab only!");
+            Console.WriteLine("  a11y eval \"Chrome#share/69ae513a\" \"document.body.innerText\"  URL substring");
+            Console.WriteLine("  a11y eval \"Chrome#chatgpt.com\"   \"document.title\"             domain hint");
             Console.WriteLine();
             Console.WriteLine("  grap = Win32#a11y — unified native + web path");
             Console.WriteLine("    메모장                 plain text = UIA Name match");
