@@ -10,12 +10,15 @@ namespace WKAppBot.CLI;
 /// TeeTextWriter wraps pipeWriter per-command → real-time streaming to pipe + per-command log file.
 /// CWD: Launcher prepends "__cwd:{path}" as first arg → extracted here, stored in AsyncLocal
 ///      so GetSessionTag() and tab-key builders use caller CWD (not Eye's own CWD).
+/// Background: "__bg" anywhere in args → immediate EndMarker response + fire-and-forget task.
+///      For ask commands, "--slack" is auto-added so result reaches the user via Slack.
 /// </summary>
 internal static class EyeCmdPipeServer
 {
     internal const string PipeName = "WKAppBotCmdPipe";
     internal const string EndMarker = "\x00END";
     internal const string CwdPrefix = "__cwd:";
+    internal const string BgFlag = "__bg";
 
     /// <summary>Per-command caller CWD (set by Launcher, read by GetSessionTag)</summary>
     internal static readonly AsyncLocal<string?> CallerCwd = new();
@@ -50,8 +53,33 @@ internal static class EyeCmdPipeServer
                 var line = await new StreamReader(pipe, leaveOpen: true).ReadLineAsync();
                 var args = JsonSerializer.Deserialize<string[]>(line ?? "[]") ?? [];
                 pw = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
-                int code = await RunInEyeAsync(args, pw);
-                await pw.WriteLineAsync($"{EndMarker} {code}");
+
+                // Extract CWD prefix (prepended by Launcher, backward-compatible)
+                string? callerCwd = null;
+                if (args.Length > 0 && args[0].StartsWith(CwdPrefix, StringComparison.Ordinal))
+                {
+                    callerCwd = args[0].Substring(CwdPrefix.Length);
+                    args = args[1..];
+                }
+
+                // Check __bg flag — fire-and-forget: return immediately, run in background
+                bool isBg = args.Contains(BgFlag, StringComparer.Ordinal);
+                if (isBg)
+                {
+                    args = args.Where(a => a != BgFlag).ToArray();
+                    // Auto-add --slack for ask commands so the result reaches the user
+                    if (args.Length > 0 && args[0] == "ask" && !args.Contains("--slack"))
+                        args = [..args, "--slack"];
+                    await pw.WriteLineAsync("[BG] Running in background (result → Slack)");
+                    await pw.WriteLineAsync($"{EndMarker} 0");
+                    var bgArgs = args; var bgCwd = callerCwd;
+                    _ = Task.Run(() => RunInEye(bgArgs, TextWriter.Null, bgCwd));
+                }
+                else
+                {
+                    int code = RunInEye(args, pw, callerCwd);
+                    await pw.WriteLineAsync($"{EndMarker} {code}");
+                }
             }
             catch (Exception ex)
             {
@@ -61,21 +89,13 @@ internal static class EyeCmdPipeServer
         }
     }
 
-    static Task<int> RunInEyeAsync(string[] args, TextWriter pipeWriter)
+    static int RunInEye(string[] args, TextWriter pipeWriter, string? callerCwd)
     {
-        // Extract CWD from optional first arg prepended by Launcher (backward-compatible)
-        string? callerCwd = null;
-        if (args.Length > 0 && args[0].StartsWith(CwdPrefix, StringComparison.Ordinal))
-        {
-            callerCwd = args[0].Substring(CwdPrefix.Length);
-            args = args[1..]; // strip prefix from real args
-        }
-
         // Build per-command log file path (same convention as Program.cs non-Eye mode)
         var logDir = Path.Combine(Program.DataDir, "logs");
         Directory.CreateDirectory(logDir);
         var cmdTag = args.Length > 0 ? args[0].ToLowerInvariant() : "noargs";
-        if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow")
+        if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow" or "ask")
             cmdTag += $"-{args[1].ToLowerInvariant()}";
         var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.txt");
 
@@ -95,6 +115,6 @@ internal static class EyeCmdPipeServer
         tee.Dispose(); // moves log to old/, updates tee.LogPath
         // "Log saved:" goes through pipeWriter directly (tee already disposed)
         pipeWriter.WriteLine($"Log saved: {tee.LogPath}");
-        return Task.FromResult(code);
+        return code;
     }
 }
