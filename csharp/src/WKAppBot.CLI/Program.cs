@@ -100,7 +100,9 @@ internal partial class Program
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
         // RunningInEye: skip Console.SetOut — log tee is handled by EyeCmdPipeServer (per-command, parallel-safe)
         TeeTextWriter? tee = RunningInEye ? null : new TeeTextWriter(Console.Out, logFile);
-        if (tee != null) Console.SetOut(tee);
+        // Wrap tee in ThreadRoutingWriter so EyeCmdPipeServer.Route() can redirect per-command output.
+        // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
+        if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
 
         // ── Crash handler: dump stack trace to log, DON'T move to old/ (crash evidence) ──
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
