@@ -271,6 +271,7 @@ public static class KeyboardInput
     public static void TypeText(string text, IntPtr intendedHwnd = default, TypeInputContext? ctx = null)
     {
         FocuslessGuard.AssertAllowed("SendInput(keyboard TypeText)");
+        InputReadiness.AssertReadiness("KeyboardInput.TypeText");
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
         // Acquire global input lock — first grabber wins, others yield SmartSetForegroundWindow
         bool lockAcquired = AcquireInputLock();
@@ -452,6 +453,7 @@ public static class KeyboardInput
     public static void SendKeys(string sequence, IntPtr intendedHwnd = default, TypeInputContext? ctx = null)
     {
         FocuslessGuard.AssertAllowed("SendInput(keyboard SendKeys)");
+        InputReadiness.AssertReadiness("KeyboardInput.SendKeys");
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
         // Acquire global input lock — first grabber wins, others yield SmartSetForegroundWindow
         bool lockAcquired = AcquireInputLock();

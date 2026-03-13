@@ -27,6 +27,7 @@ public static class MouseInput
     public static void Click(int x, int y)
     {
         FocuslessGuard.AssertAllowed("SendInput(mouse click)");
+        InputReadiness.AssertReadiness("MouseInput.Click");
         MoveTo(x, y);
         Thread.Sleep(30);
 
@@ -62,6 +63,7 @@ public static class MouseInput
     public static void RightClick(int x, int y)
     {
         FocuslessGuard.AssertAllowed("SendInput(mouse right-click)");
+        InputReadiness.AssertReadiness("MouseInput.RightClick");
         MoveTo(x, y);
         Thread.Sleep(30);
 
