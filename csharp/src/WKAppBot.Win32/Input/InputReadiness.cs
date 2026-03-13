@@ -236,10 +236,24 @@ public sealed class InputReadiness
 
     /// <summary>
     /// Set to true when Probe() or ProbeAtPoint() is called for this invocation.
-    /// SmartSetForegroundWindow checks this to detect unguarded focus steals.
-    /// Reset at process start; commands that skip readiness will trigger [IDLE⚠] warning.
+    /// SmartSetForegroundWindow and physical input entry points check this flag.
+    /// Commands that skip readiness trigger [IDLE⚠] warning — "no-readiness detected".
     /// </summary>
     [ThreadStatic] public static bool ReadinessCalled;
+
+    /// <summary>
+    /// Call from physical input entry points (SendInput, SetCursorPos).
+    /// Logs [IDLE⚠] if readiness was not set up; always proceeds (warn-only, never blocks).
+    /// </summary>
+    public static void AssertReadiness(string caller)
+    {
+        if (ReadinessCalled) return;
+        var idleMs = NativeMethods.GetUserIdleMs();
+        var idleStr = idleMs >= 60000 ? $"{idleMs / 60000}m {idleMs / 1000 % 60}s"
+                    : idleMs >= 1000  ? $"{idleMs / 1000.0:F1}s"
+                    :                   $"{idleMs}ms";
+        Console.WriteLine($"[IDLE⚠ NO-READINESS:{caller}] user input {idleStr} ago — physical input without readiness check!");
+    }
 
     // ── Probe: 전수조사 ──────────────────────────────────────────
 
