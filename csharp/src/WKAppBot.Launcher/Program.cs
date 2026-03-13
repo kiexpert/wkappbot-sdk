@@ -49,6 +49,14 @@ class Program
                 return 1;
             }
 
+            // Parse --timeout N (seconds) — Launcher-level watchdog.
+            // Works for ALL commands, including ones that don't implement their own timeout.
+            // stdout/stderr inherited (no piping overhead); Launcher simply kills Core if exceeded.
+            int timeoutSec = 0;
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == "--timeout" && int.TryParse(args[i + 1], out var t) && t > 0)
+                    { timeoutSec = t; break; }
+
             using var proc = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -71,7 +79,21 @@ class Program
                 proc.StartInfo.EnvironmentVariables["DOTNET_ROOT"] = dotnetRoot;
 
             proc.Start();
-            proc.WaitForExit();
+
+            if (timeoutSec > 0)
+            {
+                if (!proc.WaitForExit(timeoutSec * 1000))
+                {
+                    Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s exceeded — killing core (pid={proc.Id})");
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    return 2; // distinct exit code: timeout
+                }
+            }
+            else
+            {
+                proc.WaitForExit();
+            }
+
             return proc.ExitCode;
         }
         catch (Exception ex)
