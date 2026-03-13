@@ -9,7 +9,8 @@ internal partial class Program
     const string A11yDesc =
         "WKAppBot unified accessibility — ONE command to control ANY window or web element on Windows. " +
         "Combines UIA (UI Automation), Win32, and CDP (Chrome DevTools Protocol) with automatic fallback. " +
-        "Designed for focusless-first automation: controls apps WITHOUT stealing your keyboard focus.\n\n" +
+        "Designed for focusless-first automation: controls apps WITHOUT stealing your keyboard focus.\n" +
+        "MCP config: add to ~/.claude/mcp.json → { \"mcpServers\": { \"wkappbot\": { \"command\": \"wkappbot\", \"args\": [\"mcp\"] } } }\n\n" +
         "## Grap Pattern (window targeting)\n" +
         "All tools use 'grap' (GRab Accessibility Pattern) to find windows:\n" +
         "- Wildcard: \"*Notepad*\", \"*계산기*\" (glob-style * and ?)\n" +
@@ -32,9 +33,14 @@ internal partial class Program
         "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, \"js expr\")\n" +
         "Utility: clipboard (show help), clipboard-read (read text), clipboard-write (write text/files — mixed mode with [file:] markers)\n" +
         "File I/O: file-read (read file as Unicode — supports --encoding 949/utf-8/etc.), file-write (write Unicode content as target encoding — use @file to reference temp content)\n" +
-        "AI Agents (삼두협의체): ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini) — auto image capture from responses\n" +
+        "AI Agents (삼두협의체): ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini), ask-claude (ask Claude Desktop) — vision-capable, auto image capture from responses\n" +
+        "  ⚠ Vision input: use image_path param for clarity (e.g. image_path=\"screenshot.png\"). grap also works (backward-compat).\n" +
+        "Messaging: slack (send Slack message — text goes to configured channel)\n" +
+        "  Example: action=slack, text=\"Build completed successfully!\"\n" +
         "Feedback: suggest (send feature request to Slack webhook + local suggestions.jsonl, optional file attachment)\n" +
-        "  ⚠ suggest: ALWAYS write in English — Korean text = 2-3x token waste. Short & precise wins.\n\n" +
+        "  ⚠ suggest: ALWAYS write in English — Korean text = 2-3x token waste. Short & precise wins.\n" +
+        "Diagnostics: eye (one-shot eye tick — returns status of all Claude/Kro cards + Slack inbox)\n" +
+        "  Example: action=eye — returns card summary with process health, context %, recent thoughts\n\n" +
         "## Fallback Chain (battle-tested!)\n" +
         "CSS selector on Chrome/Electron class → CDP engine → UIA fallback.\n" +
         "UIA pattern on web view class → if UIA fails → CDP retry.\n" +
@@ -87,8 +93,11 @@ internal partial class Program
         "- Eval with title hint: action=eval, grap=\"*Chrome*#ChatGPT\", text=\"document.querySelectorAll('article').length\"\n" +
         "- ⚠ BAD: action=eval, grap=\"*Chrome*\", text=\"...\" — hits active tab only, unreliable! Always use #tab-hint\n" +
         "- Ask GPT: action=ask-gpt, text=\"How to get text from owner-drawn MFC button?\"\n" +
-        "- Ask Gemini: action=ask-gemini, text=\"Analyze this UI screenshot\", grap=\"screenshot.png\"\n" +
-        "- Ask with image: action=ask-gpt, text=\"What buttons are in this dialog?\", grap=\"dialog.png\"\n" +
+        "- Ask Gemini (with image): action=ask-gemini, text=\"Analyze this UI\", image_path=\"screenshot.png\"\n" +
+        "- Ask Claude Desktop: action=ask-claude, text=\"Review this code\", image_path=\"capture.png\"\n" +
+        "- Ask with image (legacy): action=ask-gpt, text=\"What buttons?\", grap=\"dialog.png\" (grap=image works too)\n" +
+        "- Send Slack message: action=slack, text=\"Automation done! ✅\"\n" +
+        "- Eye tick (status): action=eye — shows all Claude/Kro card states + Slack inbox\n" +
         "- Android devices: action=windows, grap=\"adb://\"\n" +
         "- Android inspect: action=inspect, grap=\"adb://Fold5/*heromts*\", depth=10\n" +
         "- Android click tab: action=click, grap=\"adb://*heromts*#미체결\"\n" +
