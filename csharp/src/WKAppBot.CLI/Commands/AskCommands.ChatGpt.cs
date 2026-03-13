@@ -167,6 +167,11 @@ internal partial class Program
             Console.WriteLine(answer.Length > 2000 ? answer[..2000] + "\n... (truncated)" : answer);
             Console.WriteLine("[ASK_ANSWER_END]");
 
+            // Full answer marker (for programmatic capture by whisper study etc.)
+            Console.WriteLine("[ASK_FULL_ANSWER_BEGIN]");
+            Console.WriteLine(answer);
+            Console.WriteLine("[ASK_FULL_ANSWER_END]");
+
             if (slackReport)
                 ReportToSlack("ChatGPT", question, answer);
         }
@@ -277,16 +282,20 @@ internal partial class Program
     /// <summary>Wait for ChatGPT editor to be ready. Returns the working CSS selector.</summary>
     static async Task<string?> WaitForChatGptEditorA11y(CdpClient cdp)
     {
+        Console.Write("[ASK][에디터대기]");
+        var sw = Stopwatch.StartNew();
         for (int attempt = 0; attempt < 20; attempt++)
         {
             foreach (var sel in ChatGptEditorSelectors)
             {
                 var found = await cdp.EvalAsync(
                     $"document.querySelector('{sel}') ? 'yes' : 'no'");
-                if (found == "yes") return sel;
+                if (found == "yes") { Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s → {sel}"); return sel; }
             }
+            if (attempt % 2 == 0) { Console.Write("."); Console.Out.Flush(); }
             await Task.Delay(500);
         }
+        Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
         Console.WriteLine("[ASK] Editor not found (a11y selector chain exhausted)");
         return null;
     }
@@ -398,6 +407,11 @@ internal partial class Program
             }
         }
         await Task.Delay(500);
+
+        // Stop button visible = previous response still streaming → wait before sending
+        if (!await WaitWhileStopButtonVisible(cdp, maxWaitMs: 60000))
+            return (false, null);
+
         var sendResult = "PENDING";
 
         // Use turn count for send verification when image is attached
@@ -492,14 +506,17 @@ internal partial class Program
         // Uses querySelectorAll + textContent (works in background tabs without layout)
         var sw = Stopwatch.StartNew();
         bool responseStarted = false;
+        Console.Write("[ASK][서버응답대기]");
         while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
         {
             await Task.Delay(1000);
+            Console.Write("."); Console.Out.Flush();
 
             // URL change detection (new conversation resets turn count)
             var newUrl = await cdp.EvalAsync("location.href") ?? "";
             if (newUrl != currentUrl && newUrl.Contains("/c/"))
             {
+                Console.WriteLine();
                 Console.WriteLine("[ASK] New conversation detected");
                 prevTurns = 0;
                 currentUrl = newUrl;
@@ -522,6 +539,7 @@ internal partial class Program
             if (detectResult.StartsWith("TURN_") || detectResult == "STREAMING" || detectResult == "THINKING")
             {
                 responseStarted = true;
+                Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
                 Console.WriteLine($"[ASK] Response detected: {detectResult}");
                 chatLock.Release("first-byte");
                 RegisterWaitingTab("chatgpt", cdp);
@@ -534,6 +552,7 @@ internal partial class Program
         }
         if (!responseStarted)
         {
+            Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
             Console.WriteLine("[ASK] No response detected");
             return (false, null);
         }
@@ -653,14 +672,16 @@ internal partial class Program
                 break;
             }
 
-            // Blank/broken page detection ??bail out early
+            // Blank/broken page detection — ChatGPT navigates to /c/UUID after first message,
+            // causing brief BLANK during page load. Tolerate more blanks early on (navigation window).
             if (state == "BLANK" || string.IsNullOrEmpty(state))
             {
                 blankPageCount++;
-                Console.WriteLine($"[ASK] Page blank/broken ({blankPageCount}/3), {sw.Elapsed.TotalSeconds:F0}s");
-                if (blankPageCount >= 3)
+                int blankLimit = sw.Elapsed.TotalSeconds < 20 ? 8 : 3; // generous early on (navigation)
+                Console.WriteLine($"[ASK] Page blank/navigating ({blankPageCount}/{blankLimit}), {sw.Elapsed.TotalSeconds:F0}s");
+                if (blankPageCount >= blankLimit)
                 {
-                    Console.WriteLine("[ASK] Page unresponsive ??aborting poll");
+                    Console.WriteLine("[ASK] Page unresponsive — aborting poll");
                     break;
                 }
                 continue;
@@ -797,6 +818,7 @@ internal partial class Program
     static async Task<bool> WaitWhileStopButtonVisible(CdpClient cdp, int maxWaitMs = 12000)
     {
         var sw = Stopwatch.StartNew();
+        bool headerPrinted = false;
         while (sw.ElapsedMilliseconds < maxWaitMs)
         {
             var stopVisible = await cdp.EvalAsync("""
@@ -808,12 +830,17 @@ internal partial class Program
                 })()
                 """) ?? "0";
             if (stopVisible != "1")
+            {
+                if (headerPrinted) Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
                 return true;
+            }
 
-            Console.WriteLine($"[ASK] Stop button visible; waiting before send... ({sw.ElapsedMilliseconds}ms)");
+            if (!headerPrinted) { Console.Write("[ASK][중단버튼대기]"); headerPrinted = true; }
+            Console.Write("."); Console.Out.Flush();
             await Task.Delay(700);
         }
 
+        Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
         Console.WriteLine("[ASK] Stop button still visible after wait; aborting fallback send.");
         return false;
     }

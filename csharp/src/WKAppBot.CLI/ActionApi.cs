@@ -215,8 +215,9 @@ public static class ActionApi
             var curFg = NativeMethods.GetForegroundWindow();
             if (snap.prevFg != IntPtr.Zero && curFg != snap.prevFg)
             {
-                NativeMethods.SetForegroundWindow(snap.prevFg);
+                NativeMethods.SetForegroundWindowRaw(snap.prevFg); // restore stolen fg
                 NativeMethods.SetPropW(rootHwnd, $"{FocusStealerPropPrefix}{action}", (IntPtr)1);
+                NativeMethods.SetPropW(rootHwnd, "WKAppBot_FocusStealer", (IntPtr)1); // generic: cross-action detection
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine(

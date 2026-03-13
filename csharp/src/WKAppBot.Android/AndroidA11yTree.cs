@@ -257,6 +257,28 @@ public class AndroidA11yTree
 
             sb.AppendLine($"  {indent}{arrow}[{node.ClassName}]{flags}{labelStr}{ridStr} {node.BoundsString}");
         }
+
+        // ── Siblings of focused element ──
+        var focusedNode = chain[0];
+        var parentNode = focusedNode.Parent;
+        if (parentNode != null && parentNode.Children.Count > 1)
+        {
+            sb.AppendLine("── siblings ──");
+            foreach (var sib in parentNode.Children)
+            {
+                var isSelf = ReferenceEquals(sib, focusedNode);
+                var sLabel = sib.DisplayName;
+                var sDisp = string.IsNullOrEmpty(sLabel) ? "" : (sLabel.Length > 50 ? $"\"{sLabel[..47]}...\"" : $"\"{sLabel}\"");
+                if (isSelf && !string.IsNullOrEmpty(sDisp))
+                    sDisp = $"\"{(sLabel.Length > 50 ? sLabel[..47] + "..." : sLabel)}(포커스드)\"";
+                else if (isSelf)
+                    sDisp = "\"(포커스드)\"";
+                var sRid = sib.ShortResourceId;
+                var sRidStr = !string.IsNullOrEmpty(sRid) ? $" ({sRid})" : "";
+                sb.AppendLine($"  [{sib.ClassName}] {sDisp}{sRidStr}");
+            }
+        }
+
         return sb.ToString();
     }
 

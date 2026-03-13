@@ -40,13 +40,14 @@ internal partial class Program
                 };
             }
             // ═══ Ask AI agents (삼두협의체) ═══
-            if (maybeAction is "ask-gpt" or "ask-gemini" or "ask")
+            if (maybeAction is "ask-gpt" or "ask-gemini" or "ask-claude" or "ask")
             {
                 var aiArgs = new List<string>();
                 string aiName;
                 if (maybeAction == "ask-gpt") aiName = "gpt";
                 else if (maybeAction == "ask-gemini") aiName = "gemini";
-                else if (args.Length >= 2 && args[1].ToLowerInvariant() is "gpt" or "gemini")
+                else if (maybeAction == "ask-claude") aiName = "claude";
+                else if (args.Length >= 2 && args[1].ToLowerInvariant() is "gpt" or "gemini" or "claude")
                 {
                     aiName = args[1].ToLowerInvariant();
                     aiArgs.Add(aiName);
@@ -55,7 +56,7 @@ internal partial class Program
                 }
                 else
                 {
-                    Console.WriteLine("Usage: a11y ask-gpt \"question\" [file.png] | a11y ask-gemini \"question\" | a11y ask gpt|gemini \"question\"");
+                    Console.WriteLine("Usage: a11y ask-gpt \"question\" [file.png] | a11y ask-gemini \"question\" | a11y ask-claude \"question\" | a11y ask gpt|gemini|claude \"question\"");
                     return 1;
                 }
                 aiArgs.Add(aiName);
@@ -108,6 +109,9 @@ internal partial class Program
             Console.WriteLine();
             Console.WriteLine("═══ Window Actions (7) ════════════════════════════════════");
             Console.WriteLine("  close       Close window (UIA → WM_CLOSE → Process.Kill)");
+            Console.WriteLine("  kill        Kill processes by name pattern (no window needed)");
+            Console.WriteLine("              WM_CLOSE first if window exists, else force kill");
+            Console.WriteLine("              parent/child chain, ** wildcard, #exeFilter");
             Console.WriteLine("  minimize    Minimize window");
             Console.WriteLine("  maximize    Maximize window");
             Console.WriteLine("  restore     Restore minimized/maximized window");
@@ -321,6 +325,10 @@ internal partial class Program
         if (action == "wait")
             return A11yWaitAction(grap, timeoutMs, intervalMs);
 
+        // ═══ Special: kill (process kill by name/cmdline pattern, no window needed) ═══
+        if (action == "kill")
+            return A11yKillByPattern(grap, allowAncestors);
+
         var elementActions = new HashSet<string> {
             "invoke", "click", "toggle", "expand", "collapse", "select",
             "scroll", "type", "set-value", "set-range", "read",
@@ -352,13 +360,14 @@ internal partial class Program
             "minimize" or "maximize" or "restore" or "focus" or "move" or "resize";
         if (isInteractiveAction && !allowAncestors)
         {
-            var selfPids = GetSelfAndAncestorPids();
+            // All interactive actions: window-hierarchy ancestors only
+            // (kill has its own handler using process ancestors instead)
+            var windowAncs = GetWindowHierarchyAncestors();
             allWindows.RemoveAll(w =>
             {
-                NativeMethods.GetWindowThreadProcessId(w.Handle, out var pid);
-                if (selfPids.Contains((int)pid))
+                if (windowAncs.Contains(w.Handle))
                 {
-                    Console.WriteLine($"[GUARD] ancestor-protected (pid={pid}): \"{w.Title}\" — use --allow-ancestors to override");
+                    Console.WriteLine($"[GUARD] window-ancestor-protected (hwnd=0x{w.Handle:X}): \"{w.Title}\" — use --allow-ancestors to override");
                     return true;
                 }
                 return false;
@@ -647,6 +656,7 @@ internal partial class Program
                 try { elType = root.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                 var elAid = root.Properties.AutomationId.ValueOrDefault ?? "";
                 Console.WriteLine($"[A11Y] element: {elType} \"{elName}\" (aid=\"{elAid}\") in {tag}");
+                var _nodeBefore = default(NodeState); // 입력위치확보 진입 시 캡처 (elHwnd 계산 후)
 
                 // Tab activation: if target is inside an unselected tab, activate it first
                 EnsureTabActive(root);
@@ -686,6 +696,29 @@ internal partial class Program
                 // Pre-measure WM_NULL baseline — cached for invoke hollow detection (TTL=3s)
                 if (elHwnd != IntPtr.Zero) PreheatWindow(elHwnd);
 
+                // ── 입력위치확보 진입: 대상 노드 풀 덤프 (BEFORE) ──
+                if (countN == 1)
+                    _nodeBefore = PrintNodeBefore(root, elHwnd, action);
+
+                // 중간체크 abort 시 UIA 포커스 노드 덤프 콜백 등록
+                // 클로저로 root + elHwnd 캡처 → abort 시 UIA 재스캔 없이 액션 타겟 재현
+                var _abortRoot = root;
+                var _abortElHwnd = elHwnd;
+                Win32.Input.KeyboardInput.OnMidInputAbort = (reason, ctx, intended) =>
+                {
+                    PrintMidInputAbortNode(reason, ctx, intended, automation, _abortRoot, _abortElHwnd);
+                    // FOCUS-DRIFT: show yield popup immediately and wait for user approval
+                    // before the action fails and caller retries (so next Probe() auto-approves)
+                    if (reason == "FOCUS-DRIFT" && readiness?.UserInputWait != null && intended != IntPtr.Zero)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"  [READINESS] FOCUS-DRIFT mid-input → showing yield popup (blocking until approved)");
+                        Console.ResetColor();
+                        Console.Out.Flush();
+                        readiness.UserInputWait.WaitForUserYield(intended, 0u, timeoutSeconds: 30, positionHwnd: intended);
+                    }
+                };
+
                 // Zoom: fire in parallel so it doesn't block the action (WPF creation ~330ms)
                 Task<ClickZoomHelper?>? zoomTask = null;
                 if (action != "highlight")
@@ -718,6 +751,7 @@ internal partial class Program
                         "type" => A11yType(root, hwnd, text!),
                         "set-value" => A11ySetValue(root, hwnd, text!),
                         "set-range" => A11ySetRange(root, rangeValue!.Value),
+                        "focus" => A11yFocusElement(root, hwnd),
                         _ => A11yNotYet(action)
                     };
                     swIter.Stop();
@@ -727,6 +761,11 @@ internal partial class Program
                 swTotal.Stop();
                 if (countN > 1)
                     Console.WriteLine($"[A11Y] stress: {countN} iters, total={swTotal.ElapsedMilliseconds}ms, avg={swTotal.ElapsedMilliseconds/countN}ms, rate={countN*1000.0/swTotal.ElapsedMilliseconds:F1}/s");
+
+                // ── 입력위치확보 해제: 상태 diff 출력 (AFTER) + callback 해제 ──
+                Win32.Input.KeyboardInput.OnMidInputAbort = null;
+                if (countN == 1)
+                    PrintNodeAfter(root, _nodeBefore, action, success, swTotal.ElapsedMilliseconds);
 
                 var zoom = zoomTask?.GetAwaiter().GetResult();
 
@@ -1372,7 +1411,46 @@ internal partial class Program
         return null;
     }
 
-    static HashSet<int> GetSelfAndAncestorPids()
+    // Window hierarchy ancestors: root windows that own/parent our process's windows.
+    // Catches hosts like VS Code that aren't in the process tree but contain our window.
+    static readonly HashSet<IntPtr> _cachedWindowAncestors = BuildWindowHierarchyAncestors();
+
+    static HashSet<IntPtr> BuildWindowHierarchyAncestors()
+    {
+        var ancestors = new HashSet<IntPtr>();
+        try
+        {
+            uint myPid = (uint)Environment.ProcessId;
+            NativeMethods.EnumWindows((hWnd, _) =>
+            {
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                if (pid != myPid) return true;
+                // Walk owner + parent chain from our window up to root
+                var cur = hWnd;
+                for (int i = 0; i < 20 && cur != IntPtr.Zero; i++)
+                {
+                    var owner = NativeMethods.GetWindow(cur, 4u); // GW_OWNER = 4
+                    var parent = NativeMethods.GetParent(cur);
+                    var next = owner != IntPtr.Zero ? owner : parent;
+                    if (next == IntPtr.Zero) break;
+                    NativeMethods.GetWindowThreadProcessId(next, out uint nextPid);
+                    if (nextPid != myPid) ancestors.Add(NativeMethods.GetAncestor(next, NativeMethods.GA_ROOT));
+                    cur = next;
+                }
+                return true;
+            }, IntPtr.Zero);
+        }
+        catch { }
+        return ancestors;
+    }
+
+    static HashSet<IntPtr> GetWindowHierarchyAncestors() => _cachedWindowAncestors;
+
+    // Cached at startup — parent processes may exit mid-run, breaking GetParentPid chain.
+    // Capture the full chain NOW while all ancestors are still alive.
+    static readonly HashSet<int> _cachedAncestorPids = BuildAncestorPids();
+
+    static HashSet<int> BuildAncestorPids()
     {
         var pids = new HashSet<int>();
         try
@@ -1380,7 +1458,7 @@ internal partial class Program
             var proc = System.Diagnostics.Process.GetCurrentProcess();
             pids.Add(proc.Id);
             int pid = proc.Id;
-            for (int i = 0; i < 10 && pid > 0; i++)
+            for (int i = 0; i < 20 && pid > 0; i++) // 20 levels: covers Code.exe → shell → wkappbot
             {
                 int ppid = GetParentPid(pid);
                 if (ppid <= 0 || !pids.Add(ppid)) break;
@@ -1389,6 +1467,163 @@ internal partial class Program
         }
         catch { }
         return pids;
+    }
+
+    static HashSet<int> GetSelfAndAncestorPids() => _cachedAncestorPids;
+
+    // ═══ Kill-by-Pattern: close --kill ═══
+    // Kills processes matching grap pattern. No window needed.
+    // Search key per process: "[pid]processName.exe" — substring match by default (no * needed).
+    // Supports:
+    //   "wkappbot-core"            → any process named wkappbot-core (substring)
+    //   "node/wkappbot-core"       → wkappbot-core whose direct parent is node
+    //   "flutter/node/wkappbot-core" → chain: flutter→node→wkappbot-core
+    //   "**/wkappbot-core"         → wkappbot-core with any ancestor (any depth)
+    //   "wkappbot-core#regex:lucy" → '#' splits name#exePathFilter
+    // If process has a window → WM_CLOSE first then Kill; else → Kill directly.
+    static int A11yKillByPattern(string grap, bool allowAncestors)
+    {
+        // Split '#' for optional exe-path sub-filter
+        string namePattern = grap;
+        string? exeFilter = null;
+        var hashIdx = grap.IndexOf('#');
+        if (hashIdx >= 0)
+        {
+            namePattern = grap[..hashIdx].Trim();
+            exeFilter = grap[(hashIdx + 1)..].Trim();
+            if (string.IsNullOrEmpty(exeFilter)) exeFilter = null;
+        }
+
+        // Split '/' for parent/child chain: last segment = target, rest = ancestors (outermost first)
+        var segments = namePattern.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        string targetPattern = segments.Length > 0 ? segments[^1] : namePattern;
+        string[] ancestorPatterns = segments.Length > 1 ? segments[..^1] : Array.Empty<string>();
+
+        var targetMatcher = PatternMatcher.Create(targetPattern);
+        var exeMatcher = exeFilter != null ? PatternMatcher.Create(exeFilter) : null;
+
+        var allProcs = System.Diagnostics.Process.GetProcesses();
+        // PID→processName lookup for ancestor chain resolution
+        var pidToName = allProcs.GroupBy(p => p.Id)
+            .ToDictionary(g => g.Key, g => g.First().ProcessName);
+
+        var selfPids = allowAncestors ? new HashSet<int>() : GetSelfAndAncestorPids();
+        var killed = new List<string>();
+        var skipped = new List<string>();
+
+        foreach (var p in allProcs)
+        {
+            try
+            {
+                var procName = p.ProcessName;
+                string exePath = "";
+                try { exePath = p.MainModule?.FileName ?? ""; } catch { }
+
+                // Search key: "[pid]processName.exe" — substring by default
+                var nodeKey = $"[{p.Id}]{procName}.exe";
+
+                if (!targetMatcher.IsMatch(nodeKey) && !targetMatcher.IsMatch(procName))
+                    continue;
+
+                if (exeMatcher != null && !exeMatcher.IsMatch(string.IsNullOrEmpty(exePath) ? nodeKey : exePath))
+                    continue;
+
+                if (ancestorPatterns.Length > 0 && !KillMatchesAncestorChain(p.Id, ancestorPatterns, pidToName))
+                    continue;
+
+                if (selfPids.Contains(p.Id))
+                {
+                    skipped.Add($"{nodeKey} (ancestor-protected)");
+                    continue;
+                }
+
+                var mainHwnd = p.MainWindowHandle;
+                bool hasWindow = mainHwnd != IntPtr.Zero && NativeMethods.IsWindow(mainHwnd);
+                if (hasWindow)
+                {
+                    Console.WriteLine($"[KILL] {nodeKey} — window found, sending WM_CLOSE");
+                    NativeMethods.SendMessageTimeoutW(mainHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 2000, out _);
+                    Thread.Sleep(800);
+                    try { p.Refresh(); } catch { }
+                    if (p.HasExited)
+                    {
+                        Console.WriteLine($"[KILL] {nodeKey} — exited gracefully");
+                        killed.Add(nodeKey);
+                        continue;
+                    }
+                    Console.WriteLine($"[KILL] {nodeKey} — still alive, force kill");
+                }
+                else
+                {
+                    Console.WriteLine($"[KILL] {nodeKey} — no window, force kill");
+                }
+                p.Kill(entireProcessTree: false);
+                killed.Add(nodeKey);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[KILL] pid={p.Id} failed: {ex.Message}");
+            }
+        }
+
+        if (skipped.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            foreach (var s in skipped)
+                Console.WriteLine($"[GUARD] skipped {s} — use --allow-ancestors to override");
+            Console.ResetColor();
+        }
+
+        if (killed.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[KILL] no matching processes for \"{grap}\"");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[KILL] killed {killed.Count}: {string.Join(", ", killed)}");
+        Console.ResetColor();
+        return 0;
+    }
+
+    // Ancestor chain matching for --kill.
+    // ancestorPatterns: outermost first, e.g. ["flutter","node"] for flutter/node/target
+    // Builds actual ancestor list innermost-first and matches reversed patterns.
+    // "**" in patterns = skip any number of ancestor levels (multi-level wildcard).
+    static bool KillMatchesAncestorChain(int childPid, string[] ancestorPatterns, Dictionary<int, string> pidToName)
+    {
+        var ancestors = new List<string>();
+        int pid = childPid;
+        for (int i = 0; i < 20; i++)
+        {
+            int ppid = GetParentPid(pid);
+            if (ppid <= 0 || ppid == pid) break;
+            if (!pidToName.TryGetValue(ppid, out var name)) break;
+            ancestors.Add(name);
+            pid = ppid;
+        }
+        // Reverse patterns so innermost = first to match
+        return KillMatchChainRec(ancestorPatterns.Reverse().ToArray(), 0, ancestors, 0);
+    }
+
+    static bool KillMatchChainRec(string[] patterns, int pi, List<string> ancestors, int ai)
+    {
+        if (pi >= patterns.Length) return true;
+        if (ai > ancestors.Count) return false;
+        var pat = patterns[pi];
+        if (pat == "**")
+        {
+            // Try matching remaining patterns at every ancestor depth
+            for (int skip = 0; skip + ai <= ancestors.Count; skip++)
+                if (KillMatchChainRec(patterns, pi + 1, ancestors, ai + skip)) return true;
+            return false;
+        }
+        if (ai >= ancestors.Count) return false;
+        var m = PatternMatcher.Create(pat);
+        if (!m.IsMatch(ancestors[ai]) && !m.IsMatch($"[0]{ancestors[ai]}.exe")) return false;
+        return KillMatchChainRec(patterns, pi + 1, ancestors, ai + 1);
     }
 
     // ═══ Wait Action: poll for window/element appearance ═══

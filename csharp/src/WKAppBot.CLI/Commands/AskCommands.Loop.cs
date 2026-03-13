@@ -710,6 +710,30 @@ internal partial class Program
     {
         const int max = 8000;
         if (string.IsNullOrEmpty(s)) return "";
+
+        // Strip verbose full-answer marker blocks (noisy in TOOL_RESULT context)
+        s = StripFullAnswerBlocks(s);
+
         return s.Length <= max ? s : s[..max] + "\n... (truncated)";
+    }
+
+    static string StripFullAnswerBlocks(string s)
+    {
+        const string begin = "[ASK_FULL_ANSWER_BEGIN]";
+        const string end   = "[ASK_FULL_ANSWER_END]";
+        var sb = new StringBuilder();
+        int pos = 0;
+        while (pos < s.Length)
+        {
+            var b = s.IndexOf(begin, pos, StringComparison.Ordinal);
+            if (b < 0) { sb.Append(s[pos..]); break; }
+            sb.Append(s[pos..b]);
+            var e = s.IndexOf(end, b + begin.Length, StringComparison.Ordinal);
+            if (e < 0) { sb.Append(s[b..]); break; } // no closing — keep as-is
+            int contentLen = e - (b + begin.Length);
+            sb.Append($"[ASK_ANSWER: {contentLen}bytes]");
+            pos = e + end.Length;
+        }
+        return sb.ToString();
     }
 }
