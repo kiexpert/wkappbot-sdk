@@ -488,6 +488,9 @@ Options:
     private static void LaunchAppBotEyeIfNeededCore(string extraArgs)
     {
         if (Program.RunningInEye) return; // already inside Eye — skip spawn
+        // Skip Eye spawn in loop subprocess mode: Eye inherits the stdout pipe handle,
+        // keeping it open and blocking the parent's ReadToEndAsync forever.
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WKAPPBOT_LOOP_CALLER"))) return;
         try
         {
             // Check for existing AppBotEye window by title "WK AppBot Eye"
