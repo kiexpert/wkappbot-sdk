@@ -153,7 +153,8 @@ internal partial class Program
             Console.WriteLine("═══ Options ═══════════════════════════════════════════════");
             Console.WriteLine("  --depth N   Tree depth for find (default: 3)");
             Console.WriteLine("  --force     close: escalate to Process.Kill");
-            Console.WriteLine("  --force-close-ancestors  Include own process tree in targets");
+            Console.WriteLine("  --allow-ancestors  ⚠ Bypass ancestor process guard (all interactive actions)");
+            Console.WriteLine("                     Always prints warning. --force-close-ancestors is a deprecated alias.");
             Console.WriteLine("  --repeat    Repeat action on chain dialogs (max 10, 1s interval)");
             Console.WriteLine();
             Console.WriteLine("═══ Auto Pipeline (every action) ══════════════════════════");
@@ -200,7 +201,12 @@ internal partial class Program
         var grap = args[1];
         bool all = args.Any(a => a == "--all");
         bool force = args.Any(a => a == "--force");
-        bool forceCloseAncestors = args.Any(a => a == "--force-close-ancestors");
+        // --allow-ancestors: bypass ancestor process guard for ALL interactive actions.
+        // ⚠ ALWAYS prints warning — so junior AIs learn this is dangerous.
+        // --force-close-ancestors kept as deprecated alias.
+        bool allowAncestors = args.Any(a => a == "--allow-ancestors" || a == "--force-close-ancestors");
+        if (allowAncestors)
+            Console.WriteLine("[⚠ ALLOW-ANCESTORS] Ancestor process guard disabled — you may interact with your own parent process tree. Be careful not to interfere with other active sessions!");
         bool speak = args.Any(a => a == "--speak");
         bool repeat = args.Any(a => a == "--repeat");
         int countN = 1;
@@ -337,7 +343,14 @@ internal partial class Program
                 if (seen.Add(w.Handle))
                     allWindows.Add(w);
 
-        if (action == "close" && !forceCloseAncestors)
+        // ── Ancestor process guard: skip windows owned by own process tree ──
+        // Applied to ALL interactive actions (not just close) unless --allow-ancestors is set.
+        // Read-only actions (inspect/find/windows/screenshot/ocr/read/highlight/wait) are exempt.
+        bool isInteractiveAction = action is
+            "close" or "invoke" or "click" or "toggle" or "expand" or "collapse" or
+            "select" or "scroll" or "type" or "set-value" or "set-range" or
+            "minimize" or "maximize" or "restore" or "focus" or "move" or "resize";
+        if (isInteractiveAction && !allowAncestors)
         {
             var selfPids = GetSelfAndAncestorPids();
             allWindows.RemoveAll(w =>
@@ -345,7 +358,7 @@ internal partial class Program
                 NativeMethods.GetWindowThreadProcessId(w.Handle, out var pid);
                 if (selfPids.Contains((int)pid))
                 {
-                    Console.WriteLine($"[A11Y] skip (ancestor pid={pid}): \"{w.Title}\" (hwnd={w.Handle:X8})");
+                    Console.WriteLine($"[GUARD] ancestor-protected (pid={pid}): \"{w.Title}\" — use --allow-ancestors to override");
                     return true;
                 }
                 return false;
