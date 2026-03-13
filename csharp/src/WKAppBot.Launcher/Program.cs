@@ -8,15 +8,14 @@ namespace WKAppBot.Launcher;
 /// Happy path: delegates to Eye via named pipe (~200ms total, no cold-start).
 /// Fallback: spawns wkappbot-core.exe directly (~3s, rare — Eye not running).
 ///
-/// Routing control flags (parsed here, stripped before forwarding):
+/// Routing control flags (parsed here, stripped before forwarding to Eye/Core):
 ///   --only-eye   Eye pipe required — fail with exit 3 if Eye unavailable (no Core fallback)
 ///   --only-core  Skip Eye pipe — run Core directly regardless of Eye state
+///   --timeout N  Kill Core after N seconds (Launcher-level watchdog, exit 2 on timeout)
 ///
-/// MCP mode (wkappbot mcp):
-///   Launcher owns the stdio pipe to Claude Code and manages Core lifecycle.
-///   Core can be hot-swapped without disconnecting Claude Code.
-///   wkappbot mcp --reload  →  signal running MCP proxy to restart Core
-///   Core exit code 42      →  self-requested reload (e.g. after self-update)
+/// Fixed routing (flag-independent):
+///   mcp  → Launcher owns stdio pipe permanently; Core runs behind proxy (restartable)
+///   eye  → Core directly (eye IS the daemon)
 /// </summary>
 class Program
 {
@@ -49,20 +48,9 @@ class Program
             ? args.Where(a => a != "--only-eye" && a != "--only-core").ToArray()
             : args;
 
-        // mcp: Launcher owns stdio + Core lifecycle (hot-reload support)
+        // mcp: Launcher holds the stdio pipe to Claude Code and manages Core lifecycle
         if (cmd == "mcp")
-        {
-            if (forwardArgs.Any(a => a == "--reload"))
-            {
-                // Touch reload signal file → running MCP proxy restarts Core
-                var d = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-                try { File.WriteAllText(Path.Combine(d, "wkappbot.mcp-reload"), ""); }
-                catch (Exception ex) { Console.Error.WriteLine($"[LAUNCHER] reload signal failed: {ex.Message}"); return 1; }
-                Console.WriteLine("[LAUNCHER:MCP] reload signal sent");
-                return 0;
-            }
             return RunMcpProxy(forwardArgs);
-        }
 
         // eye: IS the daemon, must run core directly
         if (!onlyCore && cmd != "eye")
@@ -83,16 +71,13 @@ class Program
     /// <summary>
     /// MCP stdio proxy loop.
     /// Launcher holds the stdio pipe to Claude Code permanently.
-    /// Core is (re)started behind the proxy and can be hot-swapped at any time.
-    /// Reload triggers:
-    ///   1. wkappbot.mcp-reload file appears in SDK/bin/
-    ///   2. Core exits with code 42 (self-requested reload)
-    ///</summary>
+    /// Core runs behind the proxy — if it exits with code 42, it is restarted automatically.
+    /// stdin broadcaster routes bytes to whichever Core instance is current.
+    /// </summary>
     static int RunMcpProxy(string[] args)
     {
-        var dir    = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-        var core   = Path.Combine(dir, "wkappbot-core.exe");
-        var signal = Path.Combine(dir, "wkappbot.mcp-reload");
+        var dir  = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
+        var core = Path.Combine(dir, "wkappbot-core.exe");
 
         if (!File.Exists(core))
         {
@@ -135,9 +120,9 @@ class Program
                 {
                     FileName        = core,
                     UseShellExecute = false,
-                    RedirectStandardInput  = true,  // fed by stdin broadcaster
-                    RedirectStandardOutput = false,  // inherited → flows to Claude Code
-                    RedirectStandardError  = false,  // inherited → flows to Claude Code
+                    RedirectStandardInput  = true,   // fed by stdin broadcaster
+                    RedirectStandardOutput = false,   // inherited → flows to Claude Code
+                    RedirectStandardError  = false,   // inherited → flows to Claude Code
                     CreateNoWindow  = false,
                 }
             };
@@ -149,26 +134,11 @@ class Program
             Volatile.Write(ref _current, proc);
             Console.Error.WriteLine($"[LAUNCHER:MCP] core started (pid={proc.Id})");
 
-            // Poll: wait for exit or reload signal (200ms tick)
-            bool reload = false;
-            while (!proc.WaitForExit(200))
-            {
-                if (!File.Exists(signal)) continue;
-                try { File.Delete(signal); } catch { }
-                Console.Error.WriteLine("[LAUNCHER:MCP] reload signal — restarting core...");
-                Volatile.Write(ref _current, null);
-                try { proc.Kill(entireProcessTree: true); } catch { }
-                proc.WaitForExit();
-                reload = true;
-                break;
-            }
+            proc.WaitForExit();
 
-            if (reload) { Thread.Sleep(50); continue; }
-
-            // Core exited on its own
             var exit = proc.ExitCode;
             Console.Error.WriteLine($"[LAUNCHER:MCP] core exited (code={exit})");
-            if (exit == 42) continue; // Core self-requested reload
+            if (exit == 42) { Thread.Sleep(50); continue; } // Core self-requested reload
             return exit;
         }
     }
