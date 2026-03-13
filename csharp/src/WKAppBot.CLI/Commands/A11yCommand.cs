@@ -368,6 +368,16 @@ internal partial class Program
         if (allWindows.Count == 0)
             return Error($"No window found: \"{win32Segments[0]}\"");
 
+        // ── User idle time (input readiness hint) ──
+        if (isInteractiveAction)
+        {
+            var idleMs = NativeMethods.GetUserIdleMs();
+            var idleStr = idleMs >= 60000 ? $"{idleMs / 60000}m {idleMs / 1000 % 60}s"
+                        : idleMs >= 1000  ? $"{idleMs / 1000.0:F1}s"
+                        :                   $"{idleMs}ms";
+            Console.WriteLine($"[IDLE] user input {idleStr} ago");
+        }
+
         // ═══ STEP 3: Select targets ═══
         List<WindowInfo> targets;
         if (all)
