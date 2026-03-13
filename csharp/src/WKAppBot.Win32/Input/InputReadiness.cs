@@ -242,8 +242,9 @@ public sealed class InputReadiness
     [ThreadStatic] public static bool ReadinessCalled;
 
     /// <summary>
-    /// Call from physical input entry points (SendInput, SetCursorPos).
-    /// Logs [IDLE⚠] if readiness was not set up; always proceeds (warn-only, never blocks).
+    /// Call from physical input entry points (SendInput, SetCursorPos, SmartSetForegroundWindow).
+    /// Throws if Probe()/ProbeAtPoint() was not called first — forces all callers to set up readiness.
+    /// "정식 입력확보 셋업절차 강제" — no warn-only, no exceptions.
     /// </summary>
     public static void AssertReadiness(string caller)
     {
@@ -252,7 +253,9 @@ public sealed class InputReadiness
         var idleStr = idleMs >= 60000 ? $"{idleMs / 60000}m {idleMs / 1000 % 60}s"
                     : idleMs >= 1000  ? $"{idleMs / 1000.0:F1}s"
                     :                   $"{idleMs}ms";
-        Console.WriteLine($"[IDLE⚠ NO-READINESS:{caller}] user input {idleStr} ago — physical input without readiness check!");
+        var msg = $"[NO-READINESS:{caller}] user input {idleStr} ago — call InputReadiness.Probe() before {caller}!";
+        Console.Error.WriteLine(msg);
+        throw new InvalidOperationException(msg);
     }
 
     // ── Probe: 전수조사 ──────────────────────────────────────────
