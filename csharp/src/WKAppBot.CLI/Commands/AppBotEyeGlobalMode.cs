@@ -66,6 +66,12 @@ internal partial class Program
     static string _cachedPromptPreview = "";
     static DateTime _cachedPromptFileWriteUtc = DateTime.MinValue;
     static List<EyeParentCard> _cachedCards = new();
+
+    // ── Dead card + health check ──
+    static readonly HashSet<int> _reportedDeadPids = new();          // pids we've already alerted for
+    static readonly Dictionary<int, string> _cardHealthCache = new(); // pid → "ok"/"slow"/"dead"
+    static string? _eyeBotToken;    // set once Slack creds are loaded
+    static string? _eyeChannel;
     static DateTime _lastForceFullLoadUtc = DateTime.MinValue;
     // Card cache: content + changedUtc per card, persisted to disk
     static string _cardCacheDir = "";
@@ -233,6 +239,8 @@ internal partial class Program
                 var appToken = json?["app_token"]?.GetValue<string>();
                 slackBotToken = json?["bot_token"]?.GetValue<string>();
                 slackChannel = json?["channel"]?.GetValue<string>();
+                _eyeBotToken = slackBotToken;
+                _eyeChannel = slackChannel;
 
                 if (!string.IsNullOrEmpty(appToken) && !string.IsNullOrEmpty(slackBotToken))
                 {
@@ -823,6 +831,7 @@ internal partial class Program
             _cachedLatestTick = latest;
             _cachedCards = ReadEyeCards(staleSeconds: 86400); // 24 hours
             SupplementCardsFromPrompts(_cachedCards);
+            CheckAndReportDeadCards(_cachedCards);
         }
         swTick.Stop();
 
@@ -1214,6 +1223,7 @@ internal partial class Program
             swPhase.Restart();
             var cards = ReadEyeCards(staleSeconds: 86400); // 24 hours
             SupplementCardsFromPrompts(cards);
+            CheckAndReportDeadCards(cards);
             swPhase.Stop();
             var msCards = swPhase.ElapsedMilliseconds;
             Console.WriteLine($"[PROF] ReadEyeCards={msCards}ms (count={cards.Count})");
@@ -2676,6 +2686,104 @@ internal partial class Program
 
     static bool IsMetaTag(string? tag) =>
         !string.IsNullOrWhiteSpace(tag) && _metaTags.Contains(tag!);
+
+    /// <summary>
+    /// Dead-card detector + WM_NULL health check.
+    /// For each card:
+    ///   1. If PID/HWND is gone → [DEAD_CARD] Slack alert + zombie kill attempt.
+    ///   2. If PID exists but WM_NULL > 100ms → [SLOW_CARD] Slack alert + card marked "불량".
+    /// Results cached in _cardHealthCache; dead pids cached in _reportedDeadPids to suppress repeats.
+    /// </summary>
+    static void CheckAndReportDeadCards(List<EyeParentCard> cards)
+    {
+        if (string.IsNullOrEmpty(_eyeBotToken) || string.IsNullOrEmpty(_eyeChannel)) return;
+        foreach (var card in cards.ToList())
+        {
+            var pid = card.ParentPid;
+            if (pid <= 0) continue;
+
+            // ── Step 1: is the process/window still alive? ──
+            bool isPromptDiscovered = card.LastTag == "prompt-discovered";
+            bool alive;
+            IntPtr hwnd = IntPtr.Zero;
+            if (isPromptDiscovered)
+            {
+                // ParentPid = HWND for prompt-discovered cards
+                hwnd = (IntPtr)pid;
+                alive = WKAppBot.Win32.Native.NativeMethods.IsWindow(hwnd);
+            }
+            else
+            {
+                try
+                {
+                    using var p = Process.GetProcessById(pid);
+                    alive = !p.HasExited;
+                    // Find any top-level HWND for this PID (for WM_NULL health check)
+                    WKAppBot.Win32.Native.NativeMethods.EnumWindows((h, _) =>
+                    {
+                        WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(h, out uint wpid);
+                        if (wpid == (uint)pid && hwnd == IntPtr.Zero) hwnd = h;
+                        return hwnd == IntPtr.Zero; // stop once found
+                    }, IntPtr.Zero);
+                }
+                catch { alive = false; }
+            }
+
+            if (!alive)
+            {
+                if (_reportedDeadPids.Add(pid))
+                {
+                    var cwdTag = AbbreviateCwd(card.Cwd);
+                    var label = string.IsNullOrEmpty(cwdTag) ? $"{card.ParentName}:{pid}" : $"[{cwdTag}] {card.ParentName}:{pid}";
+                    Console.WriteLine($"[DEAD_CARD] {label} — process gone, alerting Slack");
+                    _cardHealthCache[pid] = "dead";
+                    var msg = $":skull: 클롣 프로세스 종료됨: {label}\n재시작이 필요합니다!";
+                    Task.Run(async () => await SlackSendViaApi(_eyeBotToken!, _eyeChannel!, msg, username: "앱봇아이"));
+                    // Zombie cleanup attempt (no-op if already gone)
+                    try { Process.GetProcessById(pid).Kill(); } catch { }
+                }
+                cards.Remove(card);
+                continue;
+            }
+
+            // ── Step 2: WM_NULL health check (0 = skip if no HWND found) ──
+            if (hwnd == IntPtr.Zero) continue;
+            if (_reportedDeadPids.Contains(pid)) continue;
+
+            var sw = Stopwatch.StartNew();
+            WKAppBot.Win32.Native.NativeMethods.SendMessageTimeoutW(
+                hwnd, WKAppBot.Win32.Native.NativeMethods.WM_NULL,
+                IntPtr.Zero, IntPtr.Zero,
+                WKAppBot.Win32.Native.NativeMethods.SMTO_ABORTIFHUNG,
+                100, out _);
+            sw.Stop();
+
+            // health% = max(0, 100 - responseMs): 1ms→99%, 99ms→1%, 100ms+→0%(불량)
+            var responseMs = (int)sw.ElapsedMilliseconds;
+            var healthPct = Math.Max(0, 100 - responseMs);
+            var health = healthPct == 0 ? "불량" : (healthPct < 50 ? "느림" : "ok");
+
+            var prevHealth = _cardHealthCache.GetValueOrDefault(pid, "ok");
+            _cardHealthCache[pid] = health;
+
+            if (health == "불량" && prevHealth != "불량")
+            {
+                var cwdTag = AbbreviateCwd(card.Cwd);
+                var label = string.IsNullOrEmpty(cwdTag) ? $"{card.ParentName}:{pid}" : $"[{cwdTag}] {card.ParentName}:{pid}";
+                Console.WriteLine($"[SLOW_CARD] {label} — WM_NULL={responseMs}ms (건강{healthPct}%)");
+                var msg = $":warning: 클롣 응답없음(hung): {label}\nWM_NULL {responseMs}ms (건강0%)";
+                Task.Run(async () => await SlackSendViaApi(_eyeBotToken!, _eyeChannel!, msg, username: "앱봇아이"));
+            }
+            else if (health != "불량" && prevHealth == "불량")
+            {
+                Console.WriteLine($"[HEALTH] {card.ParentName}:{pid} recovered → {responseMs}ms (건강{healthPct}%)");
+            }
+
+            // Annotate card for display (show health% if not perfect)
+            if (healthPct < 100)
+                card.LastStatus = $"{card.LastStatus} [건강{healthPct}%]".Trim();
+        }
+    }
 
     /// <summary>Supplement tick-based cards with VS Code windows that have no tick (idle Claude Code sessions).</summary>
     static void SupplementCardsFromPrompts(List<EyeParentCard> cards)
