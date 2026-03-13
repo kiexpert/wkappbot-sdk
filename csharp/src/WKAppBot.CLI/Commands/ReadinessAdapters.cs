@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using System.Diagnostics;
 using System.Drawing;
 using WKAppBot.Core.Runner;
@@ -74,9 +75,40 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
             return new UserYieldResult(true, focusOk);
         }
 
-        var (approved, focusAcquired) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
-            positionHwnd: positionHwnd, noSound: _noSound);
-        return new UserYieldResult(approved, focusAcquired);
+        // Dot animation: "[승인팝업]" immediately on popup start, then one ' .' per second
+        using var dotCts = new CancellationTokenSource();
+        var dotThread = new Thread(() =>
+        {
+            Console.Write("  [승인팝업]");
+            Console.Out.Flush();
+            while (!dotCts.Token.WaitHandle.WaitOne(1000))
+            {
+                Console.Write(" .");
+                Console.Out.Flush();
+            }
+        }) { IsBackground = true, Name = "YieldDotAnim" };
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        dotThread.Start();
+
+        var result = new UserYieldResult(false, false);
+        try
+        {
+            var actionArgs = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
+            var (approved, focusAcquired) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
+                positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs);
+            result = new UserYieldResult(approved, focusAcquired);
+            return result;
+        }
+        finally
+        {
+            sw.Stop();
+            dotCts.Cancel();
+            dotThread.Join(200);
+            var label = result.Approved ? "확인" : "취소";
+            Console.WriteLine($" → {label} ({sw.Elapsed.TotalSeconds:F1}s)");
+            Console.Out.Flush();
+        }
     }
 
     static bool ShouldAutoApproveAll()

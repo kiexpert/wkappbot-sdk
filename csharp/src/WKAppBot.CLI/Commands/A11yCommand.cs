@@ -1066,6 +1066,10 @@ internal partial class Program
 
         try
         {
+            // Windows menu label: "새 탭\tCtrl+T" or "Save\tCtrl+S" → strip prefix before \t
+            var tab = keyCombo.LastIndexOf('\t');
+            if (tab >= 0) keyCombo = keyCombo[(tab + 1)..].Trim();
+
             // +/- notation → SendKeys (e.g., "+Shift h e l l o -Shift")
             // Otherwise legacy Ctrl+S notation
             if (keyCombo.Contains(" +") || keyCombo.Contains(" -") || keyCombo.StartsWith("+") || keyCombo.StartsWith("-"))

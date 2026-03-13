@@ -88,7 +88,7 @@ internal partial class Program
         return int.TryParse(result, out var v) ? v : 0;
     }
 
-    static int AskClaude(string question, bool slackReport, int timeoutSec, bool newTab, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, bool triadMode = false, string? modelHint = null, bool noWait = false)
+    static int AskClaude(string question, bool slackReport, int timeoutSec, bool newTab, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false)
     {
         Console.WriteLine($"[ASK] Claude: {question}");
         if (!string.IsNullOrWhiteSpace(modelHint))
@@ -165,12 +165,24 @@ internal partial class Program
                         }
                         if (effectiveLoopPersona)
                             await SetLoopPersonaStateAsync(cdp, "claude");
+                        // Persona continuation may already contain a tool call — skip question send
+                        // Verify there is at least one parseable tool call (not just marker text in explanation)
+                        if (effectiveLoopPersona && (personaResp ?? "").Contains("[APPBOT_TOOL_CALL_BEGIN]")
+                            && ParseAllLoopToolCalls(personaResp!).Count > 0)
+                        {
+                            Console.WriteLine($"[ASK] Persona continuation has tool call ({personaResp!.Length} chars) — skipping question send");
+                            return (true, personaResp);
+                        }
                     }
 
                     // Re-acquire editor after persona exchange.
                     editorSel = await WaitForClaudeEditorA11y(cdp);
                     if (editorSel == null)
                         return (false, (string?)null);
+
+                    // Prepend host handshake proof for fresh loop sessions so Claude trusts the host is live
+                    if (effectiveLoopPersona)
+                        question = BuildHostHandshake() + question;
                 }
 
                 // ── Phase 4: Insert text + send ──
@@ -392,7 +404,7 @@ internal partial class Program
 
         var (ok, answer) = task.GetAwaiter().GetResult();
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-            (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry)).GetAwaiter().GetResult();
+            (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel)).GetAwaiter().GetResult();
         if (IsClaudeLimitResponse(answer))
             ok = false;
 

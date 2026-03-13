@@ -100,6 +100,7 @@ public static class MouseInput
     public static void Scroll(int clicks)
     {
         FocuslessGuard.AssertAllowed("SendInput(mouse scroll)");
+        InputReadiness.AssertReadiness("MouseInput.Scroll");
         var inputs = new INPUT[1];
         inputs[0].type = INPUT.INPUT_MOUSE;
         inputs[0].u.mi.mouseData = (uint)(clicks * 120); // WHEEL_DELTA = 120

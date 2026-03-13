@@ -100,6 +100,9 @@ public static partial class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr GetPropW(IntPtr hWnd, string lpString);
 
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr RemovePropW(IntPtr hWnd, string lpString);
+
     public delegate bool PropEnumProcEx(IntPtr hWnd, IntPtr lpszString, IntPtr hData, UIntPtr dwData);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -174,8 +177,13 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern IntPtr SetFocus(IntPtr hWnd);
 
-    [DllImport("user32.dll")]
-    public static extern bool SetForegroundWindow(IntPtr hWnd);
+    /// <summary>
+    /// Raw SetForegroundWindow P/Invoke — NO guards, NO focusless check.
+    /// Use ONLY for focus-restore patterns (undoing a previous steal).
+    /// For all other uses: SetForegroundWindow (proxy) or SmartSetForegroundWindow (full gate).
+    /// </summary>
+    [DllImport("user32.dll", EntryPoint = "SetForegroundWindow")]
+    public static extern bool SetForegroundWindowRaw(IntPtr hWnd);
 
     // ── IME (Korean/CJK input mode + composition) ────────────────────────────
     [DllImport("imm32.dll")]
@@ -634,10 +642,56 @@ public static partial class NativeMethods
     }
 
     /// <summary>
-    /// Smart SetForegroundWindow using AttachThreadInput trick.
+    /// Core SetForegroundWindow with AttachThreadInput trick.
+    /// No guards — guards are applied by callers (SetForegroundWindow / SmartSetForegroundWindow).
+    /// </summary>
+    private static bool SetForegroundWindowCore(IntPtr hWnd)
+    {
+        BringWindowToTop(hWnd);
+        SetForegroundWindowRaw(hWnd);
+        if (GetForegroundWindow() == hWnd) return true;
+
+        // AttachThreadInput trick — Z-order + keyboard focus 동시 확보
+        var fgHwnd = GetForegroundWindow();
+        uint fgThread = GetWindowThreadProcessId(fgHwnd, out _);
+        uint ourThread = GetCurrentThreadId();
+
+        if (fgThread != ourThread)
+        {
+            AttachThreadInput(ourThread, fgThread, true);
+            try
+            {
+                BringWindowToTop(hWnd);
+                SetForegroundWindowRaw(hWnd);
+            }
+            finally
+            {
+                AttachThreadInput(ourThread, fgThread, false);
+            }
+        }
+
+        return GetForegroundWindow() == hWnd;
+    }
+
+    /// <summary>
+    /// Public SetForegroundWindow proxy — routes through FocuslessGuard + AttachThreadInput trick.
+    /// Use for any focus action (window activation, bring-to-front).
+    /// BLOCKED by FocuslessGuard in focusless mode.
+    /// Does NOT require Probe() (no AssertReadiness) — safe for dialog/restore-adjacent contexts.
+    /// For full input acquisition (SendInput path): use SmartSetForegroundWindow.
+    /// </summary>
+    public static bool SetForegroundWindow(IntPtr hWnd)
+    {
+        if (GetForegroundWindow() == hWnd) return true;
+        Input.FocuslessGuard.AssertAllowed("SetForegroundWindow");
+        return SetForegroundWindowCore(hWnd);
+    }
+
+    /// <summary>
+    /// Smart SetForegroundWindow — full input acquisition gate.
     /// Windows normally blocks SetForegroundWindow from non-foreground threads.
     /// By attaching our input queue to the foreground thread, we gain permission.
-    /// BLOCKED by FocuslessGuard (steals foreground focus).
+    /// BLOCKED by FocuslessGuard + AssertReadiness (requires Probe() before call).
     /// </summary>
     public static bool SmartSetForegroundWindow(IntPtr hWnd)
     {
@@ -666,31 +720,7 @@ public static partial class NativeMethods
             return false;
         }
 
-        // Simple attempt first
-        BringWindowToTop(hWnd);
-        SetForegroundWindow(hWnd);
-        if (GetForegroundWindow() == hWnd) return true;
-
-        // AttachThreadInput trick — Z-order + keyboard focus 동시 확보
-        var fgHwnd = GetForegroundWindow();
-        uint fgThread = GetWindowThreadProcessId(fgHwnd, out _);
-        uint ourThread = GetCurrentThreadId();
-
-        if (fgThread != ourThread)
-        {
-            AttachThreadInput(ourThread, fgThread, true);
-            try
-            {
-                BringWindowToTop(hWnd);
-                SetForegroundWindow(hWnd);
-            }
-            finally
-            {
-                AttachThreadInput(ourThread, fgThread, false);
-            }
-        }
-
-        return GetForegroundWindow() == hWnd;
+        return SetForegroundWindowCore(hWnd);
     }
 
     /// <summary>Get window text as string (convenience wrapper).</summary>

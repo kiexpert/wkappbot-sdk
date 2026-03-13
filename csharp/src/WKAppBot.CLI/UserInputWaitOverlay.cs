@@ -43,7 +43,8 @@ internal sealed class UserInputWaitWindow : Window
     public bool UseChime { get; set; } // true = 차임벨, false(기본) = 카라오케
     public bool NoSound  { get; set; } // true = 음성 완전 생략 (ask 등 백그라운드 용도)
 
-    public UserInputWaitWindow(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds, int resetSeconds = 30)
+    public UserInputWaitWindow(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds, int resetSeconds = 30,
+                               string? actionInfo = null)
     {
         _ownerHwnd = ownerHwnd;
         _remainingSeconds = timeoutSeconds;
@@ -52,7 +53,7 @@ internal sealed class UserInputWaitWindow : Window
 
         Title = "UserInputWait";
         Width = 400;
-        Height = 210;
+        Height = actionInfo != null ? 270 : 210;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -116,6 +117,29 @@ internal sealed class UserInputWaitWindow : Window
             Margin = new Thickness(0, 0, 0, 12),
         };
         stack.Children.Add(_idleText);
+
+        // Action info (readonly scrollable textbox — shows what automation was doing)
+        if (actionInfo != null)
+        {
+            var infoBox = new TextBox
+            {
+                Text = actionInfo,
+                IsReadOnly = true,
+                Background = new SolidColorBrush(Color.FromArgb(0x80, 0x00, 0x00, 0x00)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0xFF, 0x80)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+                BorderThickness = new Thickness(1),
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 10,
+                MaxHeight = 52,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Padding = new Thickness(4, 2, 4, 2),
+                Margin = new Thickness(0, 0, 0, 8),
+            };
+            stack.Children.Add(infoBox);
+        }
 
         // Confirm button (Border + TextBlock for clean look, no ugly chrome)
         _buttonBorder = new Border
@@ -380,7 +404,8 @@ internal static class UserInputWaitOverlay
     /// - Safety timeout (5min hard cap): approved=false, focusAcquired=false
     /// </summary>
     public static (bool approved, bool focusAcquired) Show(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds,
-                                                            IntPtr positionHwnd = default, bool noSound = false)
+                                                            IntPtr positionHwnd = default, bool noSound = false,
+                                                            string? actionInfo = null)
     {
         bool approved = false;
         bool focusAcquired = false;
@@ -391,7 +416,7 @@ internal static class UserInputWaitOverlay
 
         var thread = new Thread(() =>
         {
-            var window = new UserInputWaitWindow(ownerHwnd, userIdleMs, timeoutSeconds);
+            var window = new UserInputWaitWindow(ownerHwnd, userIdleMs, timeoutSeconds, actionInfo: actionInfo);
             if (noSound) window.NoSound = true;
 
             // Position: centered inside target window (multi-monitor safe)

@@ -276,7 +276,7 @@ internal partial class Program
                 var curFg = NativeMethods.GetForegroundWindow();
                 if (curFg != prevFg && prevFg != IntPtr.Zero)
                 {
-                    NativeMethods.SetForegroundWindow(prevFg);
+                    NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg after UIA Invoke
                     Console.WriteLine($"[A11Y] invoke — UIA Invoke focus restored ({curFg:X8}→{prevFg:X8})");
                 }
 
@@ -482,6 +482,37 @@ internal partial class Program
             return true;
         }
         Console.Error.WriteLine("[A11Y] collapse — not supported on this element");
+        return false;
+    }
+
+    // -- Focus: UIA SetFocus -> Win32 SetFocus fallback --
+    static bool A11yFocusElement(AutomationElement el, IntPtr hwnd)
+    {
+        // Tier 1: UIA IUIAutomationElement::SetFocus (focusless — no SetForegroundWindow needed)
+        try
+        {
+            el.Focus();
+            var name = el.Properties.Name.ValueOrDefault ?? "";
+            var type = "?";
+            try { type = el.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+            Console.WriteLine($"[A11Y] focus — UIA SetFocus → [{type}] \"{name}\"");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[A11Y] focus — UIA SetFocus failed: {ex.Message}, trying Win32");
+        }
+
+        // Tier 2: Win32 SetFocus on element hwnd
+        var elHwnd = GetElementHwnd(el);
+        if (elHwnd != IntPtr.Zero)
+        {
+            NativeMethods.SetFocus(elHwnd);
+            Console.WriteLine($"[A11Y] focus — Win32 SetFocus 0x{elHwnd:X8}");
+            return true;
+        }
+
+        Console.Error.WriteLine("[A11Y] focus — no element hwnd, cannot set focus");
         return false;
     }
 

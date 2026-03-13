@@ -23,7 +23,7 @@ internal partial class Program
     static string SlackReplySuffix(string user, string replyTs, string? label = null)
     {
         var tag = string.IsNullOrEmpty(label) ? $"Slack @{user}" : $"Slack {label} @{user}";
-        return $"({tag} - MUST REPLY VIA SLACK ONLY: \"{ExePath}\" slack reply \"MUST PUT FINAL ANSWER HERE\" --msg {replyTs})";
+        return $"({tag} → \"{ExePath}\" slack reply \"MUST reply your answer here\" --msg {replyTs})";
     }
 
     /// <summary>채널 브로드캐스트용 suffix — reply 대신 send (채널에 답장).</summary>
@@ -35,18 +35,25 @@ internal partial class Program
     /// <summary>Per-target delivery result for ack message.</summary>
     record DeliveryResult(string ShortName, bool Sent);
 
-    /// <summary>Extract short project name from VS Code window title (e.g., "채팅제목 - WKAppBot - Visual Studio Code" → "WKAppBot").</summary>
+    /// <summary>Extract short display name for a Claude instance (used in ack delivery lines).</summary>
     static string ExtractProjectName(ClaudePromptHelper.PromptInfo pi)
     {
+        // Prefer CwdLabel already computed by status streamer (e.g. "WG-WKAppBot")
+        var cwdLabel = GetCwdLabel(pi.WindowHandle);
+        if (!string.IsNullOrEmpty(cwdLabel)) return cwdLabel!;
+
         var title = pi.WindowTitle;
-        // VS Code: "... - ProjectName - Visual Studio Code"
+        // VS Code: "ProjectName - Visual Studio Code" OR "Chat - ProjectName - Visual Studio Code"
         if (title.Contains(" - Visual Studio Code", StringComparison.OrdinalIgnoreCase))
         {
             var parts = title.Split(" - ");
-            if (parts.Length >= 3) return parts[^2].Trim();
+            // parts[^2] is always the project folder name regardless of how many " - " separators
+            if (parts.Length >= 2) return parts[^2].Trim();
         }
-        // Claude Desktop: just "Claude"
-        if (pi.HostType == "claude-desktop") return "Claude Desktop";
+        // Claude Desktop
+        if (pi.HostType == "claude-desktop") return "클롣";
+        // Codex Desktop
+        if (pi.HostType == "codex-desktop") return "코뎃";
         // Fallback: first 20 chars of title
         return title.Length > 20 ? title[..20] + "…" : title;
     }
@@ -86,9 +93,9 @@ internal partial class Program
 
         // CWD 매칭 실패 → 첫 번째 반환
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[EYE][SLACK] ResolveWorkspaceScopedPrompt: no CWD match for \"{cwdFolder}\" in {allPrompts.Count} prompts, skip routing");
+        Console.WriteLine($"[EYE][SLACK] FindMyPrompt: no CWD match for \"{cwdFolder}\" in {allPrompts.Count} prompts, using first");
         Console.ResetColor();
-        return null;
+        return allPrompts[0];
     }
 
     static bool EnableOwnerRecentAuthorRouting() => true;
@@ -103,12 +110,9 @@ internal partial class Program
     {
         var (owner, recentAuthors, allAuthors) = LoadThreadAuthors(botToken, channel, threadTs);
 
-        if (!string.IsNullOrWhiteSpace(ownBotUsername) && !string.IsNullOrWhiteSpace(owner) &&
-            !string.Equals(owner, ownBotUsername, StringComparison.OrdinalIgnoreCase))
-        {
-            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: skip thread {threadTs} (owner mismatch: expected \"{ownBotUsername}\", owner \"{owner}\")");
-            return new List<ClaudePromptHelper.PromptInfo>();
-        }
+        // NOTE: do NOT gate on owner == ownBotUsername here.
+        // Normal user pings have owner = user, not the bot.
+        // Thread-based bot routing uses participant presence, not ownership.
 
         if (allAuthors.Count == 0)
         {
@@ -497,9 +501,11 @@ internal partial class Program
         report.Zoom?.Dispose();
 
         var isCodexPrompt = string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
-        if (isCodexPrompt)
+        var isVsCodePrompt = string.Equals(prompt.HostType, "vscode-claudecode", StringComparison.OrdinalIgnoreCase);
+        if (isCodexPrompt || isVsCodePrompt)
         {
-            Console.WriteLine("  [WARN] codex-desktop: stage-check is limited, using legacy submit path");
+            if (isCodexPrompt)
+                Console.WriteLine("  [WARN] codex-desktop: stage-check is limited, using legacy submit path");
             result = promptHelper.TypeAndSubmit(prompt, text);
         }
         else for (int attempt = 1; attempt <= 3; attempt++)
@@ -663,9 +669,9 @@ internal partial class Program
             if (totalAttempted > 0 && promptCount < totalAttempted)
                 ackText = $":warning: 전달 {promptCount}/{totalAttempted} (partial failure)";
             else if (promptCount > 1)
-                ackText = $"전달했습니다 ({promptCount} targets)";
+                ackText = $"Claude {promptCount}곳에 전달했습니다!";
             else
-                ackText = "전달했습니다!";
+                ackText = "Claude에 전달했습니다!";
 
             // Append per-target status if available
             if (results != null && results.Count > 0)

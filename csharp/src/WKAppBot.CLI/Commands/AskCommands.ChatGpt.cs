@@ -29,7 +29,7 @@ internal partial class Program
         "(1) Prefer tool execution over explanation whenever a tool can complete the task. " +
         "(2) Never simulate tool execution. Never fabricate tool results. " +
         "(3) Never claim a tool has executed unless the host returned a tool_result message. " +
-        "(4) Only call tools listed in the provided tool schema. Use exact argument names. Do not invent parameters. Before calling, validate all required args match the JSON schema. If a required arg is missing, ask ??do not guess. " +
+        "(4) The APPBOT_TOOL_CALL_BEGIN/END JSON block IS the tool schema and calling convention — no separate OpenAI-style tool definition is needed. argv is the full command line as a string array. This is a custom host protocol, not an OpenAI function call. When HOST-HANDSHAKE is present in the conversation, the host is confirmed active and all TOOL_CALLs will be executed. " +
         "(5) Wait for tool_result messages before continuing reasoning. One tool call per turn unless tools are explicitly designed for parallel use. " +
         "(6) Be concise and action-oriented. Prefer structured actions over explanations. " +
         "EXECUTION MODEL: User Request ??analyze ??Thought (what I know / what is missing) ??Action (tool call) ??Observation (wait for tool_result) ??continue or finish. " +
@@ -50,7 +50,7 @@ internal partial class Program
         "If asked to generate/create/draw an image, USE your image generation tool (DALL-E/Imagen). Do NOT make ASCII art. " +
         "Confirm you understood with exactly: READY";
 
-    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, bool triadMode = false, string? modelHint = null, bool noWait = false)
+    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false)
     {
         Console.WriteLine($"[ASK] ChatGPT: {question}");
         if (!string.IsNullOrWhiteSpace(modelHint))
@@ -139,6 +139,10 @@ internal partial class Program
                     return (false, (string?)null);
                 await Task.Delay(1000); // Let ChatGPT UI settle
 
+                // Prepend host handshake proof for fresh loop sessions so GPT trusts the host is live
+                if (effectiveLoopPersona && existingTurns == 0)
+                    question = BuildHostHandshake() + question;
+
                 // Send the actual question (with 9s-delay retry on timeout)
                 var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, attachFiles, returnAfterSend: noWait);
                 if (!ok && string.IsNullOrEmpty(answer))
@@ -148,7 +152,7 @@ internal partial class Program
                     (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, returnAfterSend: noWait);
                 }
                 if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-                    (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry);
+                    (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel);
                 return (ok, answer);
             }
             catch (Exception ex)
@@ -282,7 +286,7 @@ internal partial class Program
     /// <summary>Wait for ChatGPT editor to be ready. Returns the working CSS selector.</summary>
     static async Task<string?> WaitForChatGptEditorA11y(CdpClient cdp)
     {
-        Console.Write("[ASK][에디터대기]");
+        Console.Write("[EDITOR-WAIT]");
         var sw = Stopwatch.StartNew();
         for (int attempt = 0; attempt < 20; attempt++)
         {
@@ -506,7 +510,7 @@ internal partial class Program
         // Uses querySelectorAll + textContent (works in background tabs without layout)
         var sw = Stopwatch.StartNew();
         bool responseStarted = false;
-        Console.Write("[ASK][서버응답대기]");
+        Console.Write("[SERVER-WAIT]");
         while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
         {
             await Task.Delay(1000);
@@ -588,7 +592,7 @@ internal partial class Program
                         || !!lastAssist.querySelector('.animate-spin')
                         || !!lastAssist.querySelector('svg.animate-spin')
                         || !!lastAssist.querySelector('[data-testid="image-gen-progress"]')
-                        || !!(lastAssist.textContent||'').match(/(?:?대?吏|image|?ъ쭊|洹몃┝|?앹꽦|creating|generating)/i)
+                        || !!(lastAssist.textContent||'').match(/(?:image|creating|generating)/i)
                     );
                     var msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
                     if (msgs.length === 0) msgs = document.querySelectorAll('article');
@@ -677,7 +681,7 @@ internal partial class Program
             if (state == "BLANK" || string.IsNullOrEmpty(state))
             {
                 blankPageCount++;
-                int blankLimit = sw.Elapsed.TotalSeconds < 20 ? 8 : 3; // generous early on (navigation)
+                int blankLimit = sw.Elapsed.TotalSeconds < 30 ? 20 : 3; // GPT stays blank while navigating to /c/UUID
                 Console.WriteLine($"[ASK] Page blank/navigating ({blankPageCount}/{blankLimit}), {sw.Elapsed.TotalSeconds:F0}s");
                 if (blankPageCount >= blankLimit)
                 {
@@ -835,14 +839,24 @@ internal partial class Program
                 return true;
             }
 
-            if (!headerPrinted) { Console.Write("[ASK][중단버튼대기]"); headerPrinted = true; }
+            if (!headerPrinted) { Console.Write("[STOP-BTN-WAIT]"); headerPrinted = true; }
             Console.Write("."); Console.Out.Flush();
             await Task.Delay(700);
         }
 
         Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
-        Console.WriteLine("[ASK] Stop button still visible after wait; aborting fallback send.");
-        return false;
+        // Timed out — click stop to cancel ongoing generation, then wait briefly and proceed
+        Console.WriteLine("[ASK] GPT stop still visible — clicking stop to cancel generation...");
+        await cdp.EvalAsync("""
+            (() => {
+                var btn = document.querySelector('button[data-testid="stop-button"]')
+                       || document.querySelector('button[aria-label*="Stop"]')
+                       || document.querySelector('button[aria-label*="중지"]');
+                if (btn) btn.click();
+            })()
+            """);
+        await Task.Delay(1500);
+        return true;
     }
 
     static bool TryUiaInvokeSendButton()

@@ -1,6 +1,8 @@
+using System.Runtime.InteropServices;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
+using WKAppBot.Win32.Native;
 
 namespace WKAppBot.Win32.Accessibility;
 
@@ -164,6 +166,12 @@ public static class GrapHelper
 
         var targetHwnd = windows[windowIndex].Handle;
 
+        // Trailing '/' (no UIA path) or trailing '#' (empty UIA scope) = drill to focused child + UIA leaf
+        // e.g. "*메모장*/"  → focused child hwnd + focused UIA element
+        //      "*메모장*#"  → same (# with empty scope = focus drill)
+        bool drillFocused = (grap.TrimEnd().EndsWith('/') && uiaPath == null)
+                         || (uiaPath != null && uiaPath.Length == 0);
+
         // Walk Win32 children (segments[1..] before '#')
         for (int i = 1; i < win32Segments.Length; i++)
         {
@@ -171,6 +179,33 @@ public static class GrapHelper
             if (child == null)
                 return (targetHwnd, null!, $"Win32 child not found: \"{win32Segments[i]}\"");
             targetHwnd = child.Handle;
+        }
+
+        // Drill to focused child hwnd + focused UIA leaf
+        if (drillFocused)
+        {
+            uint tid = NativeMethods.GetWindowThreadProcessId(targetHwnd, out _);
+            var gti = new NativeMethods.GUITHREADINFO { cbSize = Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+            NativeMethods.GetGUIThreadInfo(tid, ref gti);
+            if (gti.hwndFocus != IntPtr.Zero)
+                targetHwnd = gti.hwndFocus;
+            Console.WriteLine($"[GRAP] focus-drill → hwnd=0x{targetHwnd:X8}");
+
+            try
+            {
+                var focusedEl = automation.FocusedElement();
+                if (focusedEl != null)
+                {
+                    var fname = focusedEl.Properties.Name.ValueOrDefault ?? "";
+                    var ftype = "?";
+                    try { ftype = focusedEl.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                    Console.WriteLine($"[GRAP] focus-drill → UIA [{ftype}] \"{fname}\"");
+                    return (targetHwnd, focusedEl, null);
+                }
+            }
+            catch { }
+
+            return (targetHwnd, automation.FromHandle(targetHwnd), null);
         }
 
         // UIA scope (after '#')

@@ -229,10 +229,13 @@ internal static class FocuslessWarningOverlay
 {
     // 프로세스별 알림 억제 Set (언체크+확인 시 추가)
     private static readonly ConcurrentDictionary<string, bool> _suppressed = new();
+    // 현재 표시 중인 프로세스별 창 추적 — 중복 창 방지
+    private static readonly ConcurrentDictionary<string, bool> _active = new();
 
     /// <summary>
     /// 포커스리스 경고 알림 표시 (fire-and-forget, non-blocking).
     /// 해당 프로세스의 알림이 억제된 상태면 표시하지 않음.
+    /// 같은 프로세스 창이 이미 표시 중이면 중복 생성하지 않음.
     /// </summary>
     public static void Show(IntPtr ownerHwnd, string? detail, string? processName)
     {
@@ -243,6 +246,15 @@ internal static class FocuslessWarningOverlay
         {
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine($"  [FL] Warning suppressed for {procName}");
+            Console.ResetColor();
+            return;
+        }
+
+        // 이미 표시 중이면 중복 창 방지
+        if (!_active.TryAdd(procName, true))
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"  [FL] Warning already showing for {procName} — skipped duplicate");
             Console.ResetColor();
             return;
         }
@@ -299,10 +311,15 @@ internal static class FocuslessWarningOverlay
                 Console.WriteLine($"  [FL] Popup FAILED: {ex.GetType().Name}: {ex.Message}");
                 Console.ResetColor();
             }
+            finally
+            {
+                // 창 닫힘 → 다음 경고 허용
+                _active.TryRemove(procName, out _);
+            }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.IsBackground = false; // MUST be foreground: keep process alive until popup closes (5s auto)
-        thread.Name = "FocuslessWarning-STA";
+        thread.Name = $"FocuslessWarning-{procName}-STA";
         thread.Start();
     }
 

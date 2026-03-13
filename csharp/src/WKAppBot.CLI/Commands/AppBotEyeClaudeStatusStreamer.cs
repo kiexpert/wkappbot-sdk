@@ -164,7 +164,7 @@ internal partial class Program
                     Console.ResetColor();
                     Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                         $":rotating_light: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣이 아직 인수인계 안 했습니다! `wkappbot newchat` 실행 필요",
-                        username: SlackBroadcastUsername)).Wait(3000);
+                        username: BuildSlackBotUsername(SlackClaudePrefix, cwdTag))).Wait(3000);
                 }
                 else if (pct >= 90 && !string.IsNullOrEmpty(slackBotToken))
                 {
@@ -189,7 +189,7 @@ internal partial class Program
                                 Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent");
                                 Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                                     $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 인수인계 프롬프트를 전달했습니다.",
-                                    username: SlackBroadcastUsername)).Wait(3000);
+                                    username: BuildSlackBotUsername(SlackClaudePrefix, cwdTag))).Wait(3000);
                             }
                             finally { ClaudePromptHelper.AllowFocusSteal = false; }
                         }
@@ -313,8 +313,9 @@ internal partial class Program
                         try
                         {
                             var alertMsg = $":rotating_light: *{label}Rate Limit!* {claudeStatus.Item2}";
+                            var rateLimitUsername = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
                             Task.Run(async () =>
-                                await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: SlackBroadcastUsername))
+                                await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: rateLimitUsername))
                                 .Wait(5000);
                         }
                         catch { }
@@ -367,8 +368,9 @@ internal partial class Program
                                 state.SlackStatusTs = null;
                             }
                             {
+                                var instanceUsername = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
                                 var (ok, ts) = Task.Run(async () =>
-                                    await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: botUsername))
+                                    await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: instanceUsername))
                                     .GetAwaiter().GetResult();
                                 if (ok && ts != null)
                                 {
@@ -406,8 +408,9 @@ internal partial class Program
                                             slackBotToken!, slackChannel!, oldTs)).Wait(3000);
                                         state.SlackStatusTs = null;
                                     }
+                                    var instanceUsername2 = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
                                     var (idleOk, idleTs) = Task.Run(async () =>
-                                        await SlackSendViaApi(slackBotToken!, slackChannel!, idleMsg, username: botUsername))
+                                        await SlackSendViaApi(slackBotToken!, slackChannel!, idleMsg, username: instanceUsername2))
                                         .GetAwaiter().GetResult();
                                     if (idleOk && idleTs != null)
                                     {
@@ -541,6 +544,10 @@ internal partial class Program
 
         return combinedStatusText;
     }
+
+    /// <summary>Get the CwdLabel for a specific Claude instance hwnd (e.g. "WG-WKAppBot").</summary>
+    internal static string? GetCwdLabel(IntPtr hwnd)
+        => _instanceStates.TryGetValue(hwnd, out var s) ? s.CwdLabel : null;
 
     /// <summary>Get the Slack status ts for any instance (for ack detection).</summary>
     static string? GetAnyInstanceSlackStatusTs()
