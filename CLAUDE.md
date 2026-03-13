@@ -73,6 +73,10 @@
 - 방해꾼 창, 프롬프트 유실 → **스냅샷 + Slack 공유** (조용히 실패 금지!)
 - 상태 변화는 `chat.update`로 동일 메시지 수정 (채널 스팸 방지)
 
+### TODO / 운영 꿀팁
+- Claude 사용량은 웹에서도 조회 가능: `https://claude.ai/settings/usage`
+- TODO: `ask claude` 제한 감지 시, 앱 경로 외에 위 웹 경로 안내도 함께 노출 검토
+
 ### Source File Size Policy
 - **Recommend ~400 lines per WKAppBot source file** — split by logical unit when it grows beyond
 - Reason: on token overflow, smaller models (GPT mini) may edit — smaller files are safer
@@ -411,6 +415,10 @@ click, double_click, right_click, type_text, press_key, hotkey, wait, assert, sc
   - AskCommands: ChromeTabSemaphore named `Semaphore` → `SemaphoreSlim` (크래시 후 고착 방지, Eye 재시작 시 항상 초기화)
   - Program: Eye 파이프 모드에서도 TeeTextWriter 생성 → 명령별 로그 파일 + "Log saved:" 안내
   - InputZoomHost.CloseAllGhosts(): 유령 InputZoom/InputHighlight 창 일괄 WM_CLOSE (wkappbot 시작 시 자동 실행)
+- **v3.5.6 prompt-probe diagnostics + routing guardrails (English handoff)**
+  - See detailed handoff note (English): `docs/handoff_codex_2026-03-13_prompt_probe.md`
+- **v3.5.6 build/deploy reliability updates (English handoff)**
+  - See detailed handoff note (English): `docs/handoff_codex_2026-03-13_prompt_probe.md`
 - **v3.5.4 FocusStealer Win32 prop — 포커스 강탈 창 자동 표시 + 노하우 자동 기록**
   - ActionApi: UIA 액션(invoke/toggle/select/expand/collapse) 후 포커스 변화 감지
     - 포커스 강탈 시: `SetPropW(rootHwnd, "WKAppBot_FocusStealer-{action}", 1)` 스탬프
@@ -516,4 +524,3 @@ W:/SDK/bin/wkappbot.hq/          # 본부 (handlers, profiles, runtime, logs, ou
 - **memory/condition_search.md**: 조건검색 자동화 전략
 - **knowhow.md** (각 컨트롤 폴더): 컨트롤별 자동화 노하우
 - Windows 전용 (.NET 8.0 `net8.0-windows10.0.22621.0`), 한국어 UI 지원
-

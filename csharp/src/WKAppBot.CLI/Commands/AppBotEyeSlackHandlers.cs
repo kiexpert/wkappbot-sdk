@@ -23,7 +23,7 @@ internal partial class Program
     static string SlackReplySuffix(string user, string replyTs, string? label = null)
     {
         var tag = string.IsNullOrEmpty(label) ? $"Slack @{user}" : $"Slack {label} @{user}";
-        return $"({tag} → \"{ExePath}\" slack reply \"MUST reply your answer here\" --msg {replyTs})";
+        return $"({tag} - MUST REPLY VIA SLACK ONLY: \"{ExePath}\" slack reply \"MUST PUT FINAL ANSWER HERE\" --msg {replyTs})";
     }
 
     /// <summary>채널 브로드캐스트용 suffix — reply 대신 send (채널에 답장).</summary>
@@ -56,14 +56,16 @@ internal partial class Program
     /// FindAllPrompts → CWD 폴더명이 윈도우 타이틀에 포함된 창 우선 → fallback: FindPrompt.
     /// 동료 창이 전경에 있어도 정확한 창을 찾아 전달.
     /// </summary>
-    static ClaudePromptHelper.PromptInfo? FindMyPrompt(ClaudePromptHelper promptHelper)
+    // Ownership boundary: this resolver picks the Eye instance's own target prompt.
+    // Keep workspace-scoped selection in one function to avoid split logic edits.
+    static ClaudePromptHelper.PromptInfo? ResolveWorkspaceScopedPrompt(ClaudePromptHelper promptHelper)
     {
         var cwdFolder = Path.GetFileName(Environment.CurrentDirectory); // "WKAppBot"
         var allPrompts = promptHelper.FindAllPrompts();
 
         if (allPrompts.Count == 0)
         {
-            Console.WriteLine("[EYE][SLACK] FindMyPrompt: no prompts found at all");
+            Console.WriteLine("[EYE][SLACK] ResolveWorkspaceScopedPrompt: no prompts found at all");
             return promptHelper.FindPrompt(); // last resort
         }
 
@@ -84,22 +86,200 @@ internal partial class Program
 
         // CWD 매칭 실패 → 첫 번째 반환
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[EYE][SLACK] FindMyPrompt: no CWD match for \"{cwdFolder}\" in {allPrompts.Count} prompts, using first");
+        Console.WriteLine($"[EYE][SLACK] ResolveWorkspaceScopedPrompt: no CWD match for \"{cwdFolder}\" in {allPrompts.Count} prompts, skip routing");
         Console.ResetColor();
-        return allPrompts[0];
+        return null;
     }
+
+    static bool EnableOwnerRecentAuthorRouting() => true;
+
+    static List<ClaudePromptHelper.PromptInfo> ResolveThreadScopedPromptsByOwnerAndRecent(
+        ClaudePromptHelper promptHelper,
+        string botToken,
+        string channel,
+        string threadTs,
+        string? ownBotUsername,
+        List<ClaudePromptHelper.PromptInfo> allPrompts)
+    {
+        var (owner, recentAuthors, allAuthors) = LoadThreadAuthors(botToken, channel, threadTs);
+
+        if (!string.IsNullOrWhiteSpace(ownBotUsername) && !string.IsNullOrWhiteSpace(owner) &&
+            !string.Equals(owner, ownBotUsername, StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: skip thread {threadTs} (owner mismatch: expected \"{ownBotUsername}\", owner \"{owner}\")");
+            return new List<ClaudePromptHelper.PromptInfo>();
+        }
+
+        if (allAuthors.Count == 0)
+        {
+            var own = ResolveWorkspaceScopedPrompt(promptHelper);
+            if (own != null)
+            {
+                Console.WriteLine("[EYE][SLACK] FindPromptsForThread: no authors found, deliver to own CWD only");
+                return new List<ClaudePromptHelper.PromptInfo> { own };
+            }
+            Console.WriteLine("[EYE][SLACK] FindPromptsForThread: no authors found, fallback to all prompts");
+            return allPrompts;
+        }
+
+        var hostTarget = ResolveAuthorHostTarget(allAuthors);
+        var cwdTags = ExtractAuthorWorkspaceTags(allAuthors);
+
+        Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: owner=\"{owner ?? "(none)"}\" recent={recentAuthors.Count} hostTarget={hostTarget} tags=[{string.Join(", ", cwdTags)}]");
+
+        Console.WriteLine($"[EYE][SLACK] PromptCandidates: total={allPrompts.Count}");
+        foreach (var p in allPrompts)
+        {
+            var hostMatch = MatchesHostTarget(p, hostTarget);
+            var cwdMatch = cwdTags.Count == 0 || cwdTags.Any(tag => p.WindowTitle.Contains(tag, StringComparison.OrdinalIgnoreCase));
+            var selected = hostMatch && cwdMatch;
+            var st = promptHelper.ProbeSubmitState(p);
+            var shortTitle = p.WindowTitle.Length > 72 ? p.WindowTitle[..69] + "..." : p.WindowTitle;
+            Console.WriteLine(
+                $"  [CAND] hwnd=0x{p.WindowHandle:X} host={p.HostType} selected={selected} " +
+                $"hostMatch={hostMatch} cwdMatch={cwdMatch} turnForm={st.TurnFormFound} submit={st.SubmitFound}/{st.SubmitEnabled}");
+            Console.WriteLine($"         title=\"{shortTitle}\"");
+        }
+
+        var matched = allPrompts
+            .Where(p => MatchesHostTarget(p, hostTarget))
+            .Where(p => cwdTags.Count == 0 || cwdTags.Any(tag => p.WindowTitle.Contains(tag, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        if (matched.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: {matched.Count}/{allPrompts.Count} prompts matched (authors: {string.Join(", ", allAuthors)})");
+            Console.ResetColor();
+            return matched;
+        }
+
+        var myFallback = ResolveWorkspaceScopedPrompt(promptHelper);
+        if (myFallback != null)
+        {
+            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no match for [{string.Join(", ", allAuthors)}], delivering to own CWD window only");
+            return new List<ClaudePromptHelper.PromptInfo> { myFallback };
+        }
+        Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no prompt match for authors [{string.Join(", ", allAuthors)}], skip routing");
+        return new List<ClaudePromptHelper.PromptInfo>();
+    }
+
+    static (string? owner, List<string> recentAuthors, List<string> allAuthors) LoadThreadAuthors(string botToken, string channel, string threadTs)
+    {
+        string? owner = null;
+        var recent = new List<string>();
+        var all = new List<string>();
+
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {botToken}");
+            var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=40&inclusive=true";
+            var resp = http.GetAsync(url).GetAwaiter().GetResult();
+            var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var json = System.Text.Json.Nodes.JsonNode.Parse(body);
+            if (json?["ok"]?.GetValue<bool>() != true)
+                return (owner, recent, all);
+
+            var msgs = json["messages"]?.AsArray() ?? new System.Text.Json.Nodes.JsonArray();
+            if (msgs.Count == 0) return (owner, recent, all);
+
+            string? ReadAuthor(System.Text.Json.Nodes.JsonNode? m)
+            {
+                var username = m?["username"]?.GetValue<string>();
+                if (!string.IsNullOrWhiteSpace(username)) return username.Trim();
+                var user = m?["user"]?.GetValue<string>();
+                if (!string.IsNullOrWhiteSpace(user)) return user.Trim();
+                return null;
+            }
+
+            var starter = msgs.FirstOrDefault(m => string.Equals(m?["ts"]?.GetValue<string>(), threadTs, StringComparison.Ordinal))
+                          ?? msgs[0];
+
+            owner = ReadAuthor(starter);
+            if (!string.IsNullOrWhiteSpace(owner))
+                all.Add(owner);
+
+            foreach (var m in msgs.Where(m => !ReferenceEquals(m, starter)).TakeLast(7))
+            {
+                var a = ReadAuthor(m);
+                if (string.IsNullOrWhiteSpace(a)) continue;
+                recent.Add(a);
+                all.Add(a);
+            }
+
+            all = all
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch { }
+
+        return (owner, recent, all);
+    }
+
+    static string ResolveAuthorHostTarget(IEnumerable<string> authors)
+    {
+        var hasCodex = authors.Any(a =>
+            a.Contains("codex", StringComparison.OrdinalIgnoreCase) ||
+            a.Contains("코뎃", StringComparison.OrdinalIgnoreCase) ||
+            a.Contains("코덱", StringComparison.OrdinalIgnoreCase));
+        var hasClaude = authors.Any(a =>
+            a.Contains("claude", StringComparison.OrdinalIgnoreCase) ||
+            a.Contains("클롣", StringComparison.OrdinalIgnoreCase) ||
+            a.Contains("클봇", StringComparison.OrdinalIgnoreCase));
+
+        if (hasCodex && !hasClaude) return "codex";
+        if (!hasCodex && hasClaude) return "claude";
+        return "any";
+    }
+
+    static HashSet<string> ExtractAuthorWorkspaceTags(IEnumerable<string> authors)
+    {
+        var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var a in authors)
+        {
+            if (string.IsNullOrWhiteSpace(a)) continue;
+            var start = a.IndexOf('[');
+            var end = a.IndexOf(']');
+            if (start < 0 || end <= start) continue;
+            var tag = a[(start + 1)..end].Trim();
+            if (string.IsNullOrWhiteSpace(tag)) continue;
+            tags.Add(tag);
+            var lastDash = tag.LastIndexOf('-');
+            if (lastDash >= 0 && lastDash < tag.Length - 1)
+                tags.Add(tag[(lastDash + 1)..]);
+        }
+        return tags;
+    }
+
+    static bool MatchesHostTarget(ClaudePromptHelper.PromptInfo prompt, string hostTarget)
+    {
+        if (hostTarget == "codex")
+            return string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
+        if (hostTarget == "claude")
+            return !string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
+        return true;
+    }
+
+    // Legacy alias kept for merge compatibility with older branches.
+    static ClaudePromptHelper.PromptInfo? FindMyPrompt(ClaudePromptHelper promptHelper) =>
+        ResolveWorkspaceScopedPrompt(promptHelper);
 
     /// <summary>
     /// 쓰레드에 응답한 클롣 대화명을 조회 → 해당 프롬프트들만 반환.
     /// 쓰레드 메시지의 bot username ("클롣 [WKAppBot]") → 대괄호 안 폴더명 추출 → 프롬프트 매칭.
     /// 매칭 결과가 없으면 전체 프롬프트 반환 (fallback).
     /// </summary>
-    static List<ClaudePromptHelper.PromptInfo> FindPromptsForThread(
-        ClaudePromptHelper promptHelper, string botToken, string channel, string threadTs)
+    // Ownership boundary: this resolver maps one Slack thread to target prompt windows.
+    static List<ClaudePromptHelper.PromptInfo> ResolveThreadScopedPrompts(
+        ClaudePromptHelper promptHelper, string botToken, string channel, string threadTs, string? ownBotUsername = null)
     {
         var allPrompts = promptHelper.FindAllPrompts();
         if (allPrompts.Count <= 1)
             return allPrompts;
+        if (EnableOwnerRecentAuthorRouting())
+            return ResolveThreadScopedPromptsByOwnerAndRecent(promptHelper, botToken, channel, threadTs, ownBotUsername, allPrompts);
 
         // 쓰레드 전체 조회 → 봇 대화명(username) 수집
         var botUsernames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -108,7 +288,7 @@ internal partial class Program
             using var http = new HttpClient();
             http.DefaultRequestHeaders.Add("Authorization", $"Bearer {botToken}");
             // 시작 메시지(1) + 최근 7개 = 충분히 참가 클롣 파악
-            var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=8&inclusive=true";
+            var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=40&inclusive=true";
             var resp = http.GetAsync(url).GetAwaiter().GetResult();
             var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             var json = System.Text.Json.Nodes.JsonNode.Parse(body);
@@ -124,18 +304,30 @@ internal partial class Program
         }
         catch { }
 
+        // Strict guard: if this Eye instance has a bot username, only route threads
+        // that explicitly include the same username. Prevents cross-bot misrouting.
+        if (!string.IsNullOrWhiteSpace(ownBotUsername) && botUsernames.Count > 0)
+        {
+            if (!botUsernames.Contains(ownBotUsername))
+            {
+                Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: skip thread {threadTs} (owner mismatch: expected \"{ownBotUsername}\", found [{string.Join(", ", botUsernames)}])");
+                return new List<ClaudePromptHelper.PromptInfo>();
+            }
+            botUsernames = new HashSet<string>(new[] { ownBotUsername }, StringComparer.OrdinalIgnoreCase);
+        }
+
         if (botUsernames.Count == 0)
         {
             // 참가 봇 없음 (원본 메시지 삭제됐거나 처음 도착한 쓰레드)
             // → 전체 브로드캐스트 대신 Eye 본인 CWD 창에만 전달
-            var myPrompt = FindMyPrompt(promptHelper);
+            var myPrompt = ResolveWorkspaceScopedPrompt(promptHelper);
             if (myPrompt != null)
             {
                 Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no bot usernames — delivering to own CWD window only");
                 return new List<ClaudePromptHelper.PromptInfo> { myPrompt };
             }
             Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no bot usernames, own CWD not found — sending to all");
-            return allPrompts;
+            return new List<ClaudePromptHelper.PromptInfo>();
         }
 
         // "클롣 [WG-WKAppBot]" → "WG-WKAppBot" 추출 + leaf name도 추가
@@ -180,15 +372,20 @@ internal partial class Program
         }
 
         // 봇 username은 있는데 프롬프트 매칭 안 됨 → Eye 본인 CWD 창에만 전달
-        var myFallback = FindMyPrompt(promptHelper);
+        var myFallback = ResolveWorkspaceScopedPrompt(promptHelper);
         if (myFallback != null)
         {
             Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no match for [{string.Join(", ", botUsernames)}] — delivering to own CWD window only");
             return new List<ClaudePromptHelper.PromptInfo> { myFallback };
         }
-        Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no prompt match for usernames [{string.Join(", ", botUsernames)}], sending to all");
-        return allPrompts;
+        Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no prompt match for usernames [{string.Join(", ", botUsernames)}], skip routing");
+        return new List<ClaudePromptHelper.PromptInfo>();
     }
+
+    // Legacy alias kept for merge compatibility with older branches.
+    static List<ClaudePromptHelper.PromptInfo> FindPromptsForThread(
+        ClaudePromptHelper promptHelper, string botToken, string channel, string threadTs) =>
+        ResolveThreadScopedPrompts(promptHelper, botToken, channel, threadTs);
 
     /// <summary>
     /// 위치확보 후 프롬프트 입력. 모든 자동입력 전에 Probe 호출.
@@ -296,8 +493,61 @@ internal partial class Program
         Console.WriteLine($"  [SLACK→PROMPT] 위치확보 OK — 입력 시작");
         Console.ResetColor();
 
-        var result = promptHelper.TypeAndSubmit(prompt, text);
+        bool result = false;
         report.Zoom?.Dispose();
+
+        var isCodexPrompt = string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
+        if (isCodexPrompt)
+        {
+            Console.WriteLine("  [WARN] codex-desktop: stage-check is limited, using legacy submit path");
+            result = promptHelper.TypeAndSubmit(prompt, text);
+        }
+        else for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            Console.WriteLine($"  [SLACK->PROMPT] stage attempt {attempt}/3");
+
+            var typed = promptHelper.TypeWithoutSubmit(prompt, text);
+            if (!typed)
+            {
+                Console.WriteLine("  [WARN] stage=type result=failed");
+                continue;
+            }
+
+            var before = promptHelper.ProbeSubmitState(prompt);
+            Console.WriteLine($"  [SLACK->PROMPT] before turnForm={before.TurnFormFound} submit={before.SubmitFound} enabled={before.SubmitEnabled} name=\"{before.SubmitName}\"");
+            if (!before.TurnFormFound || !before.SubmitFound || !before.SubmitEnabled)
+            {
+                Console.WriteLine("  [WARN] stage=pre-submit-check result=failed");
+                continue;
+            }
+
+            var prevAllowFocusSteal = ClaudePromptHelper.AllowFocusSteal;
+            try
+            {
+                ClaudePromptHelper.AllowFocusSteal = attempt > 1;
+                var submitted = promptHelper.SubmitExistingInput(prompt);
+                if (!submitted)
+                {
+                    Console.WriteLine("  [WARN] stage=submit result=failed");
+                    continue;
+                }
+
+                var accepted = promptHelper.VerifySubmitAccepted(prompt, 2200);
+                var after = promptHelper.ProbeSubmitState(prompt);
+                Console.WriteLine($"  [SLACK->PROMPT] after turnForm={after.TurnFormFound} submit={after.SubmitFound} enabled={after.SubmitEnabled} name=\"{after.SubmitName}\" accepted={accepted}");
+                if (accepted)
+                {
+                    result = true;
+                    break;
+                }
+
+                Console.WriteLine("  [WARN] stage=post-submit-check result=failed");
+            }
+            finally
+            {
+                ClaudePromptHelper.AllowFocusSteal = prevAllowFocusSteal;
+            }
+        }
 
         // ── Store forwarded ts on prompt window (survives Eye restart) ──
         if (result && slackMsgTs != null && prompt.WindowHandle != IntPtr.Zero)
@@ -343,10 +593,52 @@ internal partial class Program
         // Track "전달했습니다" ack messages per thread → delete when Claude responds via this bot
         // Key: threadTs, Value: (channel, ackMessageTs)
         var pendingAcks = new Dictionary<string, (string channel, string ackTs)>();
+        foreach (var kv in savedAcks)
+            pendingAcks[kv.Key] = (kv.Value.Channel, kv.Value.AckTs);
 
         // Local helper: send with bot username (multi-instance identification)
         async Task<(bool ok, string? ts)> Send(string ch, string text, string? threadTs = null)
             => await SlackSendViaApi(botToken, ch, text, threadTs, username: botUsername);
+
+        static bool IsTruthy(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            var v = value.Trim().ToLowerInvariant();
+            return v is "1" or "true" or "yes" or "on";
+        }
+
+        var envPromptNotFoundToChannel = Environment.GetEnvironmentVariable("WKAPPBOT_PROMPT_NOT_FOUND_TO_CHANNEL");
+        bool promptNotFoundAlsoToChannel = string.IsNullOrWhiteSpace(envPromptNotFoundToChannel)
+            ? true
+            : IsTruthy(envPromptNotFoundToChannel);
+        if (string.IsNullOrWhiteSpace(envPromptNotFoundToChannel))
+        {
+            try
+            {
+                var cfgPath = Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
+                if (File.Exists(cfgPath))
+                {
+                    var node = JsonNode.Parse(File.ReadAllText(cfgPath));
+                    var opt = node?["prompt_not_found_to_channel"];
+                    if (opt != null)
+                    {
+                        try { promptNotFoundAlsoToChannel = opt.GetValue<bool>(); }
+                        catch { promptNotFoundAlsoToChannel = IsTruthy(opt.ToString()); }
+                    }
+                }
+            }
+            catch { }
+        }
+        Console.WriteLine($"[EYE][SLACK] prompt_not_found_to_channel={(promptNotFoundAlsoToChannel ? "ON" : "OFF")}");
+
+        void SendPromptNotFound(string ch, string text, string? threadTs, string originTs)
+        {
+            Task.Run(async () => await Send(ch, text, threadTs)).Wait(5000);
+            if (!promptNotFoundAlsoToChannel) return;
+
+            var brief = $":warning: AI prompt not found! (origin ts={originTs})";
+            Task.Run(async () => await Send(ch, brief, null)).Wait(5000);
+        }
 
         // Local helper: delete previous "전달했습니다" ack in a thread (file-based IPC)
         void DeletePendingAck(string threadKey)
@@ -363,17 +655,17 @@ internal partial class Program
 
         // Local helper: send ack "전달했습니다" and track it for later deletion
         // Deleted when slack reply is sent (not auto-deleted — stays visible until response)
-        const string AckUsername = "클롣아이";
+        const string AckUsername = "앱봇아이";
         void SendAndTrackAck(string ch, string threadKey, int promptCount = 1, int totalAttempted = 0,
             List<DeliveryResult>? results = null)
         {
             string ackText;
             if (totalAttempted > 0 && promptCount < totalAttempted)
-                ackText = $":warning: Claude {promptCount}/{totalAttempted}곳에 전달 (일부 실패)";
+                ackText = $":warning: 전달 {promptCount}/{totalAttempted} (partial failure)";
             else if (promptCount > 1)
-                ackText = $"Claude {promptCount}곳에 전달했습니다!";
+                ackText = $"전달했습니다 ({promptCount} targets)";
             else
-                ackText = "Claude에 전달했습니다!";
+                ackText = "전달했습니다!";
 
             // Append per-target status if available
             if (results != null && results.Count > 0)
@@ -383,15 +675,30 @@ internal partial class Program
                 ackText += "\n" + string.Join("\n", lines);
             }
 
+            // Keep old ack visible until the new ack is confirmed.
+            // If posting fails, do not delete the previous ack.
             var (ackOk, ackTs) = Task.Run(async () =>
-                await SlackSendViaApi(botToken, ch, ackText, threadKey, username: AckUsername))
-                .GetAwaiter().GetResult();
+            {
+                var first = await SlackSendViaApi(botToken, ch, ackText, threadKey, username: AckUsername);
+                if (first.ok) return first;
+
+                // Keep sender identity deterministic for ACK messages.
+                Console.WriteLine("[EYE][SLACK] Ack send failed with fixed ack username");
+                return first;
+            }).GetAwaiter().GetResult();
             if (ackOk && ackTs != null)
             {
+                if (pendingAcks.TryGetValue(threadKey, out var oldAck))
+                    Task.Run(async () => await SlackDeleteMessageAsync(botToken, oldAck.channel, oldAck.ackTs)).Wait(3000);
+
                 pendingAcks[threadKey] = (ch, ackTs);
                 activeThreads.Add(ackTs);
                 // Persist to file for cross-process access (CLI can delete when replying)
                 SavePendingAck(threadKey, ch, ackTs);
+            }
+            else
+            {
+                Console.WriteLine($"[EYE][SLACK] Ack send failed, preserving previous ack (thread={threadKey})");
             }
         }
 
@@ -517,7 +824,6 @@ internal partial class Program
                 handledByMention.Add(msg.Timestamp); // dedup: OnMessage won't re-forward
                 Console.WriteLine($"[EYE][SLACK] >> Mention broadcast: {mentionSent}/{allMentionPrompts.Count} prompts");
 
-                DeletePendingAck(ackThread);
                 SendAndTrackAck(msg.Channel, ackThread, mentionSent, allMentionPrompts.Count, mentionResults);
             }
             else
@@ -544,7 +850,6 @@ internal partial class Program
                     {
                         Console.WriteLine("[EYE][SLACK] >> New-chat fallback SUCCESS!");
                         handledByMention.Add(msg.Timestamp);
-                        DeletePendingAck(ackThread);
                         SendAndTrackAck(msg.Channel, ackThread);
                         return; // skip diagnosis
                     }
@@ -556,8 +861,8 @@ internal partial class Program
                     // Comprehensive diagnosis
                     var claudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
                     var statusInfo = claudeStatus != null
-                        ? $"Claude 상태: {claudeStatus.Item2}"
-                        : "Claude 상태: 감지 불가";
+                        ? $"AI status: {claudeStatus.Item2}"
+                        : "AI status: unavailable";
 
                     string diagDetail;
                     try { diagDetail = promptHelper.DiagnosePromptSearch(); }
@@ -572,11 +877,11 @@ internal partial class Program
                     }
                     catch { }
 
-                    var slackMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
+                    var slackMsg = $":warning: AI prompt not found!\n" +
                         $"{statusInfo}\n" +
                         $"받은 메시지: {cleanText}\n" +
                         $"```\n{(diagDetail.Length > 800 ? diagDetail.Substring(0, 800) + "\n...(truncated)" : diagDetail)}\n```";
-                    Task.Run(async () => await Send(msg.Channel, slackMsg, ackThread)).Wait(5000);
+                    SendPromptNotFound(msg.Channel, slackMsg, ackThread, msg.Timestamp);
                 }
                 catch
                 {
@@ -735,7 +1040,7 @@ internal partial class Program
 
                 ClaudePromptHelper.AllowFocusSteal = true; // fallback path용
                 var trPromptHelper = new ClaudePromptHelper();
-                var allTrPrompts = FindPromptsForThread(trPromptHelper, botToken, msg.Channel, msg.ThreadTs!);
+                var allTrPrompts = ResolveThreadScopedPrompts(trPromptHelper, botToken, msg.Channel, msg.ThreadTs!, botUsername);
                 if (allTrPrompts.Count > 0)
                 {
                     // Build thread context (starter + previous message) for Claude
@@ -766,7 +1071,6 @@ internal partial class Program
                     }
                     Console.WriteLine($"[EYE][SLACK] >> Thread broadcast: {trSent}/{allTrPrompts.Count} prompts");
 
-                    DeletePendingAck(msg.ThreadTs!);
                     SendAndTrackAck(msg.Channel, msg.ThreadTs!, trSent, allTrPrompts.Count, trResults);
                 }
                 else
@@ -788,7 +1092,6 @@ internal partial class Program
                         if (trPromptHelper.TryNewChatInput(claudeHwnd, fallbackText))
                         {
                             Console.WriteLine("[EYE][SLACK] >> Thread reply: New-chat fallback SUCCESS!");
-                            DeletePendingAck(msg.ThreadTs!);
                             SendAndTrackAck(msg.Channel, msg.ThreadTs!);
                             return;
                         }
@@ -799,8 +1102,8 @@ internal partial class Program
                     {
                         var trClaudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
                         var trStatusInfo = trClaudeStatus != null
-                            ? $"Claude 상태: {trClaudeStatus.Item2}"
-                            : "Claude 상태: 감지 불가";
+                            ? $"AI status: {trClaudeStatus.Item2}"
+                            : "AI status: unavailable";
 
                         string trDiagDetail;
                         try { trDiagDetail = trPromptHelper.DiagnosePromptSearch(); }
@@ -815,11 +1118,11 @@ internal partial class Program
                         }
                         catch { }
 
-                        var diagMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
+                        var diagMsg = $":warning: AI prompt not found!\n" +
                             $"{trStatusInfo}\n" +
                             $"스레드 답장: {cleanText}\n" +
                             $"```\n{(trDiagDetail.Length > 800 ? trDiagDetail.Substring(0, 800) + "\n...(truncated)" : trDiagDetail)}\n```";
-                        Task.Run(async () => await Send(msg.Channel, diagMsg, msg.ThreadTs)).Wait(5000);
+                        SendPromptNotFound(msg.Channel, diagMsg, msg.ThreadTs, msg.Timestamp);
                     }
                     catch
                     {
@@ -881,7 +1184,6 @@ internal partial class Program
                     }
                     Console.WriteLine($"[EYE][SLACK] >> Keyword broadcast: {kwSent}/{allKwPrompts.Count} prompts");
 
-                    DeletePendingAck(kwThreadKey);
                     SendAndTrackAck(msg.Channel, kwThreadKey, kwSent, allKwPrompts.Count, kwResults);
                 }
                 else
@@ -904,7 +1206,6 @@ internal partial class Program
                         if (kwPromptHelper.TryNewChatInput(claudeHwnd, kwFallbackText))
                         {
                             Console.WriteLine("[EYE][SLACK] >> Keyword match: New-chat fallback SUCCESS!");
-                            DeletePendingAck(kwThreadKey);
                             SendAndTrackAck(msg.Channel, kwThreadKey);
                             return;
                         }
@@ -915,8 +1216,8 @@ internal partial class Program
                     {
                         var kwClaudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
                         var kwStatusInfo = kwClaudeStatus != null
-                            ? $"Claude 상태: {kwClaudeStatus.Item2}"
-                            : "Claude 상태: 감지 불가";
+                            ? $"AI status: {kwClaudeStatus.Item2}"
+                            : "AI status: unavailable";
 
                         string kwDiagDetail;
                         try { kwDiagDetail = kwPromptHelper.DiagnosePromptSearch(); }
@@ -931,11 +1232,11 @@ internal partial class Program
                         }
                         catch { }
 
-                        var diagMsg = $":warning: Claude 프롬프트를 찾을 수 없습니다!\n" +
+                        var diagMsg = $":warning: AI prompt not found!\n" +
                             $"{kwStatusInfo}\n" +
                             $"키워드 \"{matchedKw}\" 감지: {cleanKwText}\n" +
                             $"```\n{(kwDiagDetail.Length > 800 ? kwDiagDetail.Substring(0, 800) + "\n...(truncated)" : kwDiagDetail)}\n```";
-                        Task.Run(async () => await Send(msg.Channel, diagMsg, kwThreadKey)).Wait(5000);
+                        SendPromptNotFound(msg.Channel, diagMsg, kwThreadKey, msg.Timestamp);
                     }
                     catch
                     {
@@ -1007,7 +1308,6 @@ internal partial class Program
 
                     if (sent > 0)
                     {
-                        DeletePendingAck(allThreadKey);
                         SendAndTrackAck(msg.Channel, allThreadKey, sent, allPrompts.Count, broadcastResults);
                         Console.WriteLine($"[EYE][SLACK] >> Broadcast complete: {sent}/{allPrompts.Count} prompts");
                     }
@@ -1018,8 +1318,8 @@ internal partial class Program
                     Console.WriteLine("[EYE][SLACK] >> Catch-all: No prompts found!");
                     Console.ResetColor();
 
-                    Task.Run(async () => await Send(msg.Channel,
-                        $":warning: Claude 프롬프트를 찾을 수 없습니다 (메시지: {cleanAll})", allThreadKey)).Wait(5000);
+                    SendPromptNotFound(msg.Channel,
+                        $":warning: AI prompt not found (message: {cleanAll})", allThreadKey, msg.Timestamp);
                 }
             }
         };
@@ -1065,12 +1365,12 @@ internal partial class Program
 
             // 3. Find Claude prompt and type
             var promptHelper = new ClaudePromptHelper();
-            var promptInfo = FindMyPrompt(promptHelper);
+            var promptInfo = ResolveWorkspaceScopedPrompt(promptHelper);
             if (promptInfo == null)
             {
                 // Retry once after 3 seconds (Claude may still be loading)
                 Thread.Sleep(3000);
-                promptInfo = FindMyPrompt(promptHelper);
+                promptInfo = ResolveWorkspaceScopedPrompt(promptHelper);
             }
 
             if (promptInfo == null)

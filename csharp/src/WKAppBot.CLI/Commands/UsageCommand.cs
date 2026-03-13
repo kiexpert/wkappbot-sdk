@@ -140,6 +140,8 @@ Utility:
       ⚠ Write in ENGLISH — Korean = 2-3x token cost. Short & precise wins.
   claude-usage
       Probe Claude Desktop usage (session/weekly %) via UIA. Slack alerts at 85%/95%.
+  prompt-probe [names...] [--names a,b,c] [--depth N] [--limit N] [--all]
+      Probe prompt candidates with thread-author names + dump UIA hits/submit state.
 
 General Options:
   -v, --verbose   Verbose output
@@ -249,4 +251,3 @@ Data Directory:
         return null;
     }
 }
-

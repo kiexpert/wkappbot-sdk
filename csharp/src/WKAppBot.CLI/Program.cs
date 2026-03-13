@@ -129,6 +129,7 @@ internal partial class Program
         };
 
         int exitCode = 1;
+        System.Threading.Timer? timeoutTimer = null;
         try
         {
             // Policy broadcast only on Eye spawn (not every CLI command)
@@ -194,7 +195,7 @@ internal partial class Program
             if (globalTimeoutSec > 0)
             {
                 var timeoutMs = (int)(globalTimeoutSec * 1000);
-                var timer = new System.Threading.Timer(_ =>
+                timeoutTimer = new System.Threading.Timer(_ =>
                 {
                     Console.Error.WriteLine($"[TIMEOUT] {globalTimeoutSec}s elapsed — exiting (code 124)");
                     try { Console.Out.Flush(); Console.Error.Flush(); } catch { }
@@ -290,6 +291,7 @@ internal partial class Program
                 "stock-scan" => StockScanCommand(restArgs),
                 "tree-select" => TreeSelectCommand(restArgs),
                 "prompt-test" => PromptTestCommand(restArgs),
+                "prompt-probe" => PromptProbeCommand(restArgs),
                 "msaa-probe" => MsaaProbeCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),
@@ -370,6 +372,7 @@ internal partial class Program
             if (tee != null) Console.SetOut(tee.OriginalConsole);
             tee?.Dispose(); // normal-exit atexit-style move to logs/old
             if (tee != null) Console.WriteLine($"Log saved: {tee.LogPath}");
+            timeoutTimer?.Dispose();
         }
     }
 
