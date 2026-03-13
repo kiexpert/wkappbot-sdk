@@ -164,7 +164,7 @@ internal partial class Program
                     Console.ResetColor();
                     Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                         $":rotating_light: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣이 아직 인수인계 안 했습니다! `wkappbot newchat` 실행 필요",
-                        username: "클롣아이")).Wait(3000);
+                        username: SlackBroadcastUsername)).Wait(3000);
                 }
                 else if (pct >= 90 && !string.IsNullOrEmpty(slackBotToken))
                 {
@@ -189,7 +189,7 @@ internal partial class Program
                                 Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent");
                                 Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                                     $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 인수인계 프롬프트를 전달했습니다.",
-                                    username: "클롣아이")).Wait(3000);
+                                    username: SlackBroadcastUsername)).Wait(3000);
                             }
                             finally { ClaudePromptHelper.AllowFocusSteal = false; }
                         }
@@ -198,7 +198,7 @@ internal partial class Program
                             Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] No matching prompt — check Slack");
                             Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                                 $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\nClaude 창을 찾지 못해 인수인계 미전달! 직접 확인해주세요.",
-                                username: "클롣아이")).Wait(3000);
+                                username: SlackBroadcastUsername)).Wait(3000);
                         }
                     }
                     catch (Exception ex)
@@ -206,7 +206,7 @@ internal partial class Program
                         Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Handoff failed: {ex.Message}");
                         Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                             $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n인수인계 전달 오류: {ex.Message}",
-                            username: "클롣아이")).Wait(3000);
+                            username: SlackBroadcastUsername)).Wait(3000);
                     }
                 }
             }
@@ -314,7 +314,7 @@ internal partial class Program
                         {
                             var alertMsg = $":rotating_light: *{label}Rate Limit!* {claudeStatus.Item2}";
                             Task.Run(async () =>
-                                await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: "클롣아이"))
+                                await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: SlackBroadcastUsername))
                                 .Wait(5000);
                         }
                         catch { }

@@ -21,6 +21,12 @@ set "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1"
 set "DOTNET_CLI_TELEMETRY_OPTOUT=1"
 set "MSBuildEnableWorkloadResolver=false"
 
+rem AOT (Launcher) requires vswhere.exe so MSVC linker can be located.
+rem Unconditionally prepend VS Installer dir — harmless if already present.
+if exist "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" (
+  set "PATH=C:\Program Files (x86)\Microsoft Visual Studio\Installer;%PATH%"
+)
+
 if not exist "%DOTNET_EXE%" set "DOTNET_EXE=C:\Program Files\dotnet\dotnet.exe"
 if exist "%DOTNET_EXE%" if not exist "%WORKLOAD_LOCATOR%" set "DOTNET_EXE=C:\Program Files\dotnet\dotnet.exe"
 if exist "%DOTNET_EXE%" if not exist "%MANIFEST_LOCATOR%" set "DOTNET_EXE=C:\Program Files\dotnet\dotnet.exe"
@@ -147,10 +153,11 @@ echo [BUILD] done
 exit /b 0
 
 :publish_launcher
-"%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore -m:1 -v minimal /p:PublishSingleFile=true /p:PublishTrimmed=false
+rem AOT: PublishSingleFile must NOT be passed (AOT is already single-file; combining them errors)
+"%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore -m:1 -v minimal
 if not errorlevel 1 exit /b 0
 echo [BUILD] launcher no-restore failed -> retry with restore
-"%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true -m:1 -v minimal /p:PublishSingleFile=true /p:PublishTrimmed=false
+"%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true -m:1 -v minimal
 if errorlevel 1 (
   echo [BUILD] launcher publish failed
   exit /b 1

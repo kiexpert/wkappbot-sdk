@@ -1109,6 +1109,21 @@ internal partial class Program
 
     static int EyeTickCommand(string[] args)
     {
+        // ── Hard timeout: --timeout N kills the process if tick takes too long ──
+        var timeoutSec = 0;
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i] == "--timeout") int.TryParse(args[i + 1], out timeoutSec);
+        System.Threading.Timer? killTimer = null;
+        if (timeoutSec > 0)
+        {
+            killTimer = new System.Threading.Timer(_ =>
+            {
+                Console.WriteLine($"[EYE_TICK] hard timeout {timeoutSec}s exceeded — exiting");
+                Console.Out.Flush();
+                Environment.Exit(2);
+            }, null, timeoutSec * 1000, System.Threading.Timeout.Infinite);
+        }
+
         try
         {
             if (_lastTickActivityUtc == DateTime.MinValue) _lastTickActivityUtc = DateTime.UtcNow;
@@ -1297,6 +1312,10 @@ internal partial class Program
             Console.Out.Flush();
             return 1;
         }
+        finally
+        {
+            killTimer?.Dispose();
+        }
     }
 
     /// <summary>
@@ -1463,18 +1482,18 @@ internal partial class Program
             }
 
             newMsgs.Reverse();
-            Console.WriteLine($"[EYE_TICK] slack={newMsgs.Count} new message(s) — forwarding to Claude prompt...");
+            Console.WriteLine($"[EYE_TICK] slack={newMsgs.Count} new message(s) — forwarding to AI prompt...");
             Console.Out.Flush();
 
             // ── Slack Step 7: FindPrompt (UIA tree walk) ──
             swStep.Restart();
-            var promptInfo = helper.FindPrompt();
+            var promptInfo = FindSlackPreferredPrompt(helper);
             swStep.Stop();
             Console.WriteLine($"[PROF:SLACK] FindPrompt={swStep.ElapsedMilliseconds}ms (found={promptInfo != null}, host={promptInfo?.HostType ?? "n/a"})");
             Console.Out.Flush();
             if (promptInfo == null)
             {
-                Console.WriteLine("[EYE_TICK] WARNING: Claude prompt not found — will retry next tick");
+                Console.WriteLine("[EYE_TICK] WARNING: AI prompt not found — will retry next tick");
                 Console.Out.Flush();
                 return;
             }
@@ -1491,7 +1510,7 @@ internal partial class Program
                 var promptText = $"{contextPrefix}{cleanText}\n\n{SlackReplySuffix(user, msgTs)}";
 
                 swStep.Restart();
-                var fresh = helper.FindPrompt();
+                var fresh = FindSlackPreferredPrompt(helper);
                 swStep.Stop();
                 Console.WriteLine($"[PROF:SLACK] Re-FindPrompt={swStep.ElapsedMilliseconds}ms");
                 Console.Out.Flush();
@@ -1502,7 +1521,7 @@ internal partial class Program
                     break;
                 }
 
-                Console.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → Claude prompt ({fresh.HostType})");
+                Console.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → {fresh.HostType} prompt");
                 Console.Out.Flush();
                 swStep.Restart();
                 var ok = helper.TypeAndSubmit(fresh, promptText);
@@ -1518,8 +1537,8 @@ internal partial class Program
                     try
                     {
                         swStep.Restart();
-                        var ackText = $"Claude에 전달했습니다! (thread={msgTs})";
-                        var (ackOk, ackTs) = SlackSendViaApi(botToken, channel, ackText, msgTs, username: BotUsername)
+                        var ackText = $"전달했습니다! (thread={msgTs})";
+                        var (ackOk, ackTs) = SlackSendViaApi(botToken, channel, ackText, msgTs, username: "앱봇아이")
                             .GetAwaiter().GetResult();
                         swStep.Stop();
                         Console.WriteLine($"[PROF:SLACK] AckSend={swStep.ElapsedMilliseconds}ms (ok={ackOk})");
@@ -1661,14 +1680,14 @@ internal partial class Program
 
                     var promptText = $"[쓰레드 시작] {cleanParent}\n\n{cleanReply}\n\n{SlackReplySuffix(rUser, threadTs, "thread reply")}";
 
-                    var fresh = helper.FindPrompt();
+                    var fresh = FindSlackPreferredPrompt(helper);
                     if (fresh == null)
                     {
                         Console.WriteLine("[EYE_TICK] WARNING: Lost prompt — stopping thread reply forward");
                         return;
                     }
 
-                    Console.WriteLine($"[EYE_TICK] [FORWARD] Thread @{rUser} → Claude prompt");
+                    Console.WriteLine($"[EYE_TICK] [FORWARD] Thread @{rUser} → {fresh.HostType} prompt");
                     var ok = helper.TypeAndSubmit(fresh, promptText);
                     if (ok)
                     {
@@ -1679,8 +1698,8 @@ internal partial class Program
                         // Send "전달했습니다" ack — deleted when slack reply is sent
                         try
                         {
-                            var ackText = $"Claude에 전달했습니다! (thread={threadTs})";
-                            var (ackOk, ackTs) = SlackSendViaApi(botToken, channel, ackText, threadTs, username: BotUsername)
+                            var ackText = $"전달했습니다! (thread={threadTs})";
+                            var (ackOk, ackTs) = SlackSendViaApi(botToken, channel, ackText, threadTs, username: "앱봇아이")
                                 .GetAwaiter().GetResult();
                             if (ackOk && ackTs != null)
                                 SavePendingAck(threadTs, channel, ackTs);

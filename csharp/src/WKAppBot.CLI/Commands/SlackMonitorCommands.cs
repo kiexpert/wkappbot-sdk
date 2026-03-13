@@ -15,6 +15,191 @@ namespace WKAppBot.CLI;
 // partial class: Slack WebBot monitor, Claude busy detection, prompt lost handler
 internal partial class Program
 {
+    static bool IsRunningFromHostApp(string hostToken, string? forceEnvVar = null)
+    {
+        try
+        {
+            // Explicit override for edge cases.
+            var forced = string.IsNullOrWhiteSpace(forceEnvVar) ? null : Environment.GetEnvironmentVariable(forceEnvVar);
+            if (!string.IsNullOrWhiteSpace(forced))
+            {
+                var v = forced.Trim().ToLowerInvariant();
+                if (v is "1" or "true" or "yes" or "on") return true;
+                if (v is "0" or "false" or "no" or "off") return false;
+            }
+
+            // Strict condition: parent/ancestor process must be Codex app.
+            // Do not treat CODEX_HOME alone as sufficient.
+            using var cur = Process.GetCurrentProcess();
+            int pid = cur.Id;
+            for (int depth = 0; depth < 6; depth++)
+            {
+                var ppid = GetParentPidForCodexCheck(pid);
+                if (ppid <= 0) break;
+                using var p = Process.GetProcessById(ppid);
+                var name = (p.ProcessName ?? string.Empty).ToLowerInvariant();
+                if (name == hostToken || name.Contains(hostToken))
+                    return true;
+                pid = ppid;
+            }
+
+            // Heuristic fallback:
+            // some launch paths (MCP/agent wrappers) hide original parent chain.
+            // In that case, use host-specific runtime signals.
+            if (hostToken == "codex")
+            {
+                // Codex app environment + alive process is a strong hint.
+                if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")) &&
+                    IsProcessAlive("codex"))
+                    return true;
+
+                // Hidden windows included: do not rely on foreground/focus.
+                if (HasTopLevelWindowForProcess("codex", "Chrome_WidgetWin_1"))
+                    return true;
+            }
+            else if (hostToken == "claude")
+            {
+                // Hidden windows included: do not rely on foreground/focus.
+                if (HasTopLevelWindowForProcess("claude", "Chrome_WidgetWin_1"))
+                    return true;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static bool IsRunningFromCodexApp() =>
+        IsRunningFromHostApp("codex", "WKAPPBOT_ASSUME_CODEX_APP");
+
+    static bool IsRunningFromClaudeApp() =>
+        IsRunningFromHostApp("claude", "WKAPPBOT_ASSUME_CLAUDE_APP");
+
+    static string? GetSendReplyUsername(bool printDecision = false)
+    {
+        // Limit for now: only override when Codex host is certain.
+        var username = IsRunningFromCodexAppCertain()
+            ? BuildSlackBotUsername(SlackCodexPrefix, null, spaceBeforeBracket: false)
+            : null;
+
+        if (printDecision)
+        {
+            Console.WriteLine($"[SLACK] bot-name: {(string.IsNullOrEmpty(username) ? "(default-bot)" : username)}");
+        }
+
+        return username;
+    }
+
+    static bool IsRunningFromCodexAppCertain()
+    {
+        try
+        {
+            // Explicit override first.
+            var forced = Environment.GetEnvironmentVariable("WKAPPBOT_ASSUME_CODEX_APP")?.Trim().ToLowerInvariant();
+            if (forced is "1" or "true" or "yes" or "on") return true;
+            if (forced is "0" or "false" or "no" or "off") return false;
+
+            // Certainty rule: parent/ancestor process chain contains codex.
+            using var cur = Process.GetCurrentProcess();
+            int pid = cur.Id;
+            for (int depth = 0; depth < 6; depth++)
+            {
+                var ppid = GetParentPidForCodexCheck(pid);
+                if (ppid <= 0) break;
+                using var p = Process.GetProcessById(ppid);
+                var name = (p.ProcessName ?? string.Empty).ToLowerInvariant();
+                if (name == "codex" || name.Contains("codex"))
+                    return true;
+                pid = ppid;
+            }
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static int GetParentPidForCodexCheck(int pid)
+    {
+        try
+        {
+            using var searcher = new System.Management.ManagementObjectSearcher(
+                $"SELECT ParentProcessId FROM Win32_Process WHERE ProcessId = {pid}");
+            foreach (var o in searcher.Get())
+            {
+                var mo = (System.Management.ManagementObject)o;
+                return Convert.ToInt32(mo["ParentProcessId"]);
+            }
+        }
+        catch { }
+        return -1;
+    }
+
+    static bool IsProcessAlive(string processToken)
+    {
+        try
+        {
+            var token = processToken.ToLowerInvariant();
+            return Process.GetProcesses()
+                .Any(p =>
+                {
+                    try
+                    {
+                        var n = (p.ProcessName ?? string.Empty).ToLowerInvariant();
+                        return n == token || n.Contains(token);
+                    }
+                    catch { return false; }
+                });
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static bool HasTopLevelWindowForProcess(string processToken, string windowClass)
+    {
+        try
+        {
+            var token = processToken.ToLowerInvariant();
+            var found = false;
+            var sb = new System.Text.StringBuilder(256);
+
+            NativeMethods.EnumWindows((hwnd, _) =>
+            {
+                try
+                {
+                    NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                    if (pid == 0) return true;
+                    using var p = Process.GetProcessById((int)pid);
+                    var name = (p.ProcessName ?? string.Empty).ToLowerInvariant();
+                    if (!(name == token || name.Contains(token))) return true;
+
+                    sb.Clear();
+                    NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
+                    var cls = sb.ToString();
+                    if (string.Equals(cls, windowClass, StringComparison.OrdinalIgnoreCase))
+                    {
+                        found = true;
+                        return false; // stop enum
+                    }
+                }
+                catch { }
+                return true;
+            }, IntPtr.Zero);
+
+            return found;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// When Claude prompt is lost (FindPrompt returns null), capture foreground window screenshot
     /// and send it to Slack so the user can see what's blocking the prompt (e.g. permission dialog).
@@ -283,14 +468,67 @@ internal partial class Program
         _ => "Claude"
     };
 
-    /// <summary>Bot username for Slack messages — computed once at startup from CWD folder name.
-    /// Requires chat:write.customize scope — Slack silently ignores if scope missing.
-    /// Multiple bot instances identify themselves by folder name: "클봇 [WKAppBot]", "클봇 [HTS]", etc.</summary>
-    static readonly string BotUsername = $"클롣 [{Path.GetFileName(Environment.CurrentDirectory) ?? Environment.MachineName}]";
+    static readonly string SlackCodexPrefix =
+        string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_CODEX_PREFIX"))
+            ? "코뎃"
+            : Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_CODEX_PREFIX")!.Trim();
+    static readonly string SlackClaudePrefix =
+        string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_CLAUDE_PREFIX"))
+            ? "클롣"
+            : Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_CLAUDE_PREFIX")!.Trim();
+    static readonly string SlackGenericPrefix =
+        string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_GENERIC_PREFIX"))
+            ? "앱봇"
+            : Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_GENERIC_PREFIX")!.Trim();
+    static readonly string SlackBroadcastUsername =
+        string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_BROADCAST_NAME"))
+            ? "앱봇아이"
+            : Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_BROADCAST_NAME")!.Trim();
 
-    /// <summary>Build Slack username override from instance name. null = use default bot name.</summary>
+    static string GetSlackFolderTag()
+    {
+        var cwd = Environment.CurrentDirectory;
+        if (string.IsNullOrWhiteSpace(cwd))
+            return Environment.MachineName;
+
+        var trimmed = cwd.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var name = Path.GetFileName(trimmed);
+        return string.IsNullOrWhiteSpace(name) ? Environment.MachineName : name;
+    }
+
+    static string BuildSlackBotUsername(string prefix, string? instanceName = null, bool spaceBeforeBracket = false)
+    {
+        var tag = string.IsNullOrWhiteSpace(instanceName) ? GetSlackFolderTag() : instanceName!.Trim();
+        var sep = spaceBeforeBracket ? " " : string.Empty;
+        return $"{prefix}{sep}[{tag}]";
+    }
+
+    static string GetGeneralBotUsername(string? instanceName = null)
+    {
+        // Explicit override precedence.
+        var forceCodex = Environment.GetEnvironmentVariable("WKAPPBOT_ASSUME_CODEX_APP")?.Trim().ToLowerInvariant();
+        var forceClaude = Environment.GetEnvironmentVariable("WKAPPBOT_ASSUME_CLAUDE_APP")?.Trim().ToLowerInvariant();
+        if (forceCodex is "1" or "true" or "yes" or "on")
+            return BuildSlackBotUsername(SlackCodexPrefix, instanceName, spaceBeforeBracket: false);
+        if (forceClaude is "1" or "true" or "yes" or "on")
+            return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
+
+        // Auto detect host app.
+        if (IsRunningFromCodexApp())
+            return BuildSlackBotUsername(SlackCodexPrefix, instanceName, spaceBeforeBracket: false);
+        if (IsRunningFromClaudeApp())
+            return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
+
+        // Fallback: generic appbot identity.
+        return BuildSlackBotUsername(SlackGenericPrefix, instanceName, spaceBeforeBracket: false);
+    }
+
+    /// <summary>Default Slack bot username from unified policy.</summary>
+    static readonly string BotUsername = GetGeneralBotUsername();
+
+    /// <summary>Build Slack username override from instance name.</summary>
     static string? GetBotUsername(string? instanceName) =>
-        instanceName != null ? $"클롣 [{instanceName}]" : null;
+        GetGeneralBotUsername(instanceName);
 
     /// <summary>Find Chrome main window handle by PID.</summary>
     static IntPtr FindChromeHwndByPid(int pid)

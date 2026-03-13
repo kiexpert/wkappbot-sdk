@@ -200,9 +200,10 @@ internal partial class Program
 
         // Send text message (get thread_ts for file uploads)
         string? threadTs = null;
+        var senderName = GetSendReplyUsername(printDecision: true);
         if (!string.IsNullOrWhiteSpace(message))
         {
-            var (ok, ts) = SlackSendViaApi(botToken, channel, message, username: BotUsername).GetAwaiter().GetResult();
+            var (ok, ts) = SlackSendViaApi(botToken, channel, message, username: senderName).GetAwaiter().GetResult();
             if (ok)
             {
                 Console.WriteLine($"[SLACK] Sent: {message.Split('\n')[0]}{(textParts.Count > 1 ? $" (+{textParts.Count - 1} lines)" : "")}");
@@ -835,7 +836,7 @@ internal partial class Program
     /// <summary>Get bot user ID via auth.test (sync helper).</summary>
     static string? SlackGetBotUserId(string botToken)
     {
-        using var http = new HttpClient();
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
         using var req = new HttpRequestMessage(HttpMethod.Post, "https://slack.com/api/auth.test");
         req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
         req.Content = new StringContent("", System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
