@@ -12,7 +12,7 @@ namespace WKAppBot.Win32.Window;
 
 /// <summary>
 /// Find and interact with the Claude Code prompt input field.
-/// Supports: Claude Desktop (Electron), VS Code Claude Code Extension.
+/// Supports: Claude Desktop (Electron), VS Code Claude Code Extension, Codex Desktop.
 ///
 /// Strategy:
 ///   1. Find the parent process of wkappbot.exe (claude.exe or code.exe)
@@ -34,6 +34,9 @@ namespace WKAppBot.Win32.Window;
 public sealed class ClaudePromptHelper : IDisposable
 {
     private readonly UIA3Automation _automation;
+    private const string HostClaudeDesktop = "claude-desktop";
+    private const string HostVsCodeClaudeCode = "vscode-claudecode";
+    private const string HostCodexDesktop = "codex-desktop";
 
     /// <summary>
     /// Global toggle: when true, only focusless strategies are allowed.
@@ -73,6 +76,13 @@ public sealed class ClaudePromptHelper : IDisposable
         string HostType // "claude-desktop" | "vscode" | "unknown"
     );
 
+    public record SubmitState(
+        bool TurnFormFound,
+        bool SubmitFound,
+        bool SubmitEnabled,
+        string SubmitName
+    );
+
     /// <summary>
     /// Find the Claude Code prompt input by walking the process tree.
     /// Strategy: current process → parent → grandparent ... → find Electron/VSCode main window → UIA search.
@@ -98,6 +108,12 @@ public sealed class ClaudePromptHelper : IDisposable
                 var result = FindVSCodePrompt(pid);
                 if (result != null) return result;
             }
+            else if (name.Equals("codex", StringComparison.OrdinalIgnoreCase))
+            {
+                // Codex desktop app (marker based prompt detection).
+                var result = FindCodexDesktopPromptByMarker(pid);
+                if (result != null) return result;
+            }
         }
 
         // Strategy 2: Enumerate all visible windows from claude.exe processes
@@ -108,6 +124,16 @@ public sealed class ClaudePromptHelper : IDisposable
         {
             Console.WriteLine($"  [PROMPT]   claude PID={proc.Id}");
             var result = FindClaudeDesktopPrompt(proc.Id);
+            if (result != null) return result;
+        }
+
+        // Prefer Codex before VS Code when both are open.
+        Console.WriteLine("  [PROMPT] Scanning Codex windows...");
+        var codexProcs = Process.GetProcessesByName("codex");
+        Console.WriteLine($"  [PROMPT] Process.GetProcessesByName(\"codex\"): {codexProcs.Length} process(es)");
+        foreach (var proc in codexProcs)
+        {
+            var result = FindCodexDesktopPromptByMarker(proc.Id);
             if (result != null) return result;
         }
 
@@ -186,6 +212,7 @@ public sealed class ClaudePromptHelper : IDisposable
     {
         var results = new List<PromptInfo>();
         var seen = new HashSet<IntPtr>();
+        var scannedCodexPids = new HashSet<uint>();
 
         // Purge dead windows from cache (window closed/crashed since last scan)
         var deadHwnds = _turnFormCache.Keys.Where(h => !NativeMethods.IsWindow(h)).ToList();
@@ -217,6 +244,17 @@ public sealed class ClaudePromptHelper : IDisposable
             {
                 var pi = FindTurnFormInWindow(hWnd, title, procName);
                 if (pi != null) { results.Add(pi); seen.Add(hWnd); }
+                continue;
+            }
+
+            // Codex desktop: prompt marker based detection
+            if (procName.Equals("codex", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!scannedCodexPids.Add(pid))
+                    continue;
+
+                var pi = FindCodexDesktopPromptByMarker((int)pid);
+                if (pi != null) { results.Add(pi); seen.Add(pi.WindowHandle); }
                 continue;
             }
 
@@ -635,8 +673,10 @@ public sealed class ClaudePromptHelper : IDisposable
     public bool TypeAndSubmit(PromptInfo prompt, string text)
     {
         // === VS Code Claude Code (native extension): focus-steal + Escape + paste ===
-        if (prompt.HostType == "vscode-claudecode")
+        if (prompt.HostType == HostVsCodeClaudeCode)
             return TypeAndSubmitVSCodeClaudeCode(prompt, text);
+        if (prompt.HostType == HostCodexDesktop)
+            return SubmitCodexDesktopPrompt(prompt, text);
 
         // === Strategy 1: Try fully focusless input ===
         if (TryFocuslessInput(prompt, text))
@@ -728,6 +768,101 @@ public sealed class ClaudePromptHelper : IDisposable
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Codex desktop: prefer focusless WM_CHAR injection into Chromium renderer.
+    /// Fallback to focus-steal paste+Enter only when explicitly allowed.
+    /// </summary>
+    // Ownership boundary: Codex-specific send logic stays in CodexDesktop-prefixed methods.
+    // Claude-specific probing/submission should not be mixed into this path.
+    private bool SubmitCodexDesktopPrompt(PromptInfo prompt, string text)
+    {
+        if (TryPostMessageTextToChromiumRenderer(prompt, text, submit: true))
+            return true;
+
+        if (!AllowFocusSteal)
+        {
+            Console.WriteLine("  [PROMPT:CODEX] Focusless-only mode: WM_CHAR path failed, focus steal not allowed");
+            return false;
+        }
+
+        var prevForeground = NativeMethods.GetForegroundWindow();
+        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+        Thread.Sleep(120);
+
+        var centerX = prompt.PromptRect.X + prompt.PromptRect.Width / 2;
+        var centerY = prompt.PromptRect.Y + prompt.PromptRect.Height / 2;
+        MouseInput.Click(centerX, centerY);
+        Thread.Sleep(80);
+
+        SetClipboardText(text);
+        Thread.Sleep(50);
+        KeyboardInput.Hotkey(new[] { "ctrl", "v" });
+        Thread.Sleep(120);
+        KeyboardInput.PressKey("enter");
+        Console.WriteLine("  [PROMPT:CODEX] Fallback submit via focus-steal paste+Enter");
+
+        if (prevForeground != IntPtr.Zero && prevForeground != prompt.WindowHandle)
+        {
+            Thread.Sleep(180);
+            NativeMethods.SmartSetForegroundWindow(prevForeground);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Focusless text input for Chromium hosts using WM_CHAR + optional Enter.
+    /// </summary>
+    private bool TryPostMessageTextToChromiumRenderer(PromptInfo prompt, string text, bool submit)
+    {
+        try
+        {
+            var rendererHwnd = GetRendererHwnd(prompt.WindowHandle);
+            if (rendererHwnd == IntPtr.Zero)
+            {
+                Console.WriteLine("  [PROMPT] WM_CHAR: renderer hwnd not found");
+                return false;
+            }
+
+            const int WM_CHAR = 0x0102;
+            var ok = true;
+            var normalized = text.Replace("\r\n", "\n");
+            foreach (var ch in normalized)
+            {
+                if (!NativeMethods.PostMessageW(rendererHwnd, WM_CHAR, (IntPtr)ch, (IntPtr)1))
+                    ok = false;
+            }
+
+            if (!ok)
+            {
+                Console.WriteLine("  [PROMPT] WM_CHAR: one or more character posts failed");
+                return false;
+            }
+
+            Console.WriteLine($"  [PROMPT] WM_CHAR posted ({normalized.Length} chars)");
+
+            if (!submit) return true;
+
+            // Submit with Enter key events.
+            const int WM_KEYDOWN = 0x0100;
+            const int WM_KEYUP = 0x0101;
+            const int VK_RETURN = 0x0D;
+            uint scanCode = NativeMethods.MapVirtualKeyW((uint)VK_RETURN, 0);
+            IntPtr lParamDown = (IntPtr)((scanCode << 16) | 1);
+            IntPtr lParamUp = (IntPtr)((scanCode << 16) | 1 | (1 << 30) | (1 << 31));
+            var down = NativeMethods.PostMessageW(rendererHwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, lParamDown);
+            Thread.Sleep(20);
+            var up = NativeMethods.PostMessageW(rendererHwnd, WM_KEYUP, (IntPtr)VK_RETURN, lParamUp);
+            Console.WriteLine($"  [PROMPT] WM_CHAR submit enter down={down} up={up}");
+            return down && up;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] WM_CHAR error: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>
@@ -1029,6 +1164,33 @@ public sealed class ClaudePromptHelper : IDisposable
     /// <summary>
     /// Verify submit success: wait up to 2s for button to disappear or "중단" to appear.
     /// </summary>
+    public bool VerifySubmitAccepted(PromptInfo prompt, int timeoutMs = 1500)
+    {
+        try
+        {
+            var root = _automation.FromHandle(prompt.WindowHandle);
+            if (root == null) return false;
+
+            var turnForm = root.FindFirstDescendant(
+                new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+            if (turnForm == null) return false;
+
+            var checks = Math.Max(1, timeoutMs / 250);
+            for (int i = 0; i < checks; i++)
+            {
+                Thread.Sleep(250);
+                var state = CheckSubmitButton(turnForm);
+                if (state == SubmitButtonState.Gone || state == SubmitButtonState.StopAppeared)
+                    return true;
+            }
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private bool VerifySubmitSuccess(AutomationElement turnForm)
     {
         for (int i = 0; i < 4; i++)
@@ -1194,24 +1356,7 @@ public sealed class ClaudePromptHelper : IDisposable
     {
         try
         {
-            // Find Chrome_RenderWidgetHostHWND child window
-            var rendererHwnd = NativeMethods.FindWindowExW(
-                prompt.WindowHandle, IntPtr.Zero,
-                "Chrome_RenderWidgetHostHWND", null);
-
-            if (rendererHwnd == IntPtr.Zero)
-            {
-                // Try intermediate child: Chrome_WidgetWin_1 → Chrome_RenderWidgetHostHWND
-                var widgetWin = NativeMethods.FindWindowExW(
-                    prompt.WindowHandle, IntPtr.Zero,
-                    "Chrome_WidgetWin_1", null);
-                if (widgetWin != IntPtr.Zero)
-                {
-                    rendererHwnd = NativeMethods.FindWindowExW(
-                        widgetWin, IntPtr.Zero,
-                        "Chrome_RenderWidgetHostHWND", null);
-                }
-            }
+            var rendererHwnd = GetRendererHwnd(prompt.WindowHandle);
 
             if (rendererHwnd == IntPtr.Zero)
             {
@@ -1252,12 +1397,79 @@ public sealed class ClaudePromptHelper : IDisposable
         }
     }
 
+    private static IntPtr GetRendererHwnd(IntPtr topWindow)
+    {
+        var rendererHwnd = NativeMethods.FindWindowExW(
+            topWindow, IntPtr.Zero,
+            "Chrome_RenderWidgetHostHWND", null);
+
+        if (rendererHwnd != IntPtr.Zero)
+            return rendererHwnd;
+
+        // Try intermediate Chromium container: Chrome_WidgetWin_1 -> Chrome_RenderWidgetHostHWND
+        var widgetWin = NativeMethods.FindWindowExW(
+            topWindow, IntPtr.Zero,
+            "Chrome_WidgetWin_1", null);
+        if (widgetWin != IntPtr.Zero)
+        {
+            rendererHwnd = NativeMethods.FindWindowExW(
+                widgetWin, IntPtr.Zero,
+                "Chrome_RenderWidgetHostHWND", null);
+        }
+        return rendererHwnd;
+    }
+
     /// <summary>
     /// Type text into the prompt WITHOUT submitting (no Enter).
     /// For testing/dry-run: verify text insertion works.
     /// Tries focusless first, then focus-stealing with restore.
     /// </summary>
     public bool TypeWithoutSubmit(PromptInfo prompt, string text)
+    {
+        if (TryTypeWithoutSubmitFocusless(prompt, text))
+            return true;
+
+        // Fallback: focus-steal to paste text, but no Enter
+        Console.WriteLine("  [PROMPT] Falling back to focus-steal paste (no submit)...");
+        var prevForeground = NativeMethods.GetForegroundWindow();
+        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+        Thread.Sleep(200);
+
+        var centerX = prompt.PromptRect.X + prompt.PromptRect.Width / 2;
+        var centerY = prompt.PromptRect.Y + prompt.PromptRect.Height / 2;
+        MouseInput.Click(centerX, centerY);
+        Thread.Sleep(150);
+
+        KeyboardInput.Hotkey(new[] { "ctrl", "a" });
+        Thread.Sleep(30);
+        KeyboardInput.PressKey("delete");
+        Thread.Sleep(30);
+
+        Console.WriteLine($"  [PROMPT] Pasting ({text.Length} chars, no submit)");
+        SetClipboardText(text);
+        Thread.Sleep(50);
+        KeyboardInput.Hotkey(new[] { "ctrl", "v" });
+        Thread.Sleep(200);
+
+        // NO Enter key — dry run!
+        Console.WriteLine("  [PROMPT] Text pasted (no Enter, dry-run)");
+
+        // Restore previous foreground
+        if (prevForeground != IntPtr.Zero && prevForeground != prompt.WindowHandle)
+        {
+            Thread.Sleep(200);
+            NativeMethods.SmartSetForegroundWindow(prevForeground);
+            Console.WriteLine("  [PROMPT] Focus restored");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Focusless-only text insert (NO focus-steal fallback).
+    /// Returns false if IA2/LegacyIA focusless paths fail.
+    /// </summary>
+    public bool TryTypeWithoutSubmitFocusless(PromptInfo prompt, string text)
     {
         // Try IA2 focusless text insertion first
         if (TryIA2InsertText(prompt, text))
@@ -1320,40 +1532,60 @@ public sealed class ClaudePromptHelper : IDisposable
             Console.WriteLine($"  [PROMPT] Focusless probe error: {ex.Message}");
         }
 
-        // Fallback: focus-steal to paste text, but no Enter
-        Console.WriteLine("  [PROMPT] Falling back to focus-steal paste (no submit)...");
-        var prevForeground = NativeMethods.GetForegroundWindow();
-        NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
-        Thread.Sleep(200);
+        return false;
+    }
 
-        var centerX = prompt.PromptRect.X + prompt.PromptRect.Width / 2;
-        var centerY = prompt.PromptRect.Y + prompt.PromptRect.Height / 2;
-        MouseInput.Click(centerX, centerY);
-        Thread.Sleep(150);
-
-        KeyboardInput.Hotkey(new[] { "ctrl", "a" });
-        Thread.Sleep(30);
-        KeyboardInput.PressKey("delete");
-        Thread.Sleep(30);
-
-        Console.WriteLine($"  [PROMPT] Pasting ({text.Length} chars, no submit)");
-        SetClipboardText(text);
-        Thread.Sleep(50);
-        KeyboardInput.Hotkey(new[] { "ctrl", "v" });
-        Thread.Sleep(200);
-
-        // NO Enter key — dry run!
-        Console.WriteLine("  [PROMPT] Text pasted (no Enter, dry-run)");
-
-        // Restore previous foreground
-        if (prevForeground != IntPtr.Zero && prevForeground != prompt.WindowHandle)
+    public SubmitState ProbeSubmitState(PromptInfo prompt)
+    {
+        try
         {
-            Thread.Sleep(200);
-            NativeMethods.SmartSetForegroundWindow(prevForeground);
-            Console.WriteLine("  [PROMPT] Focus restored");
-        }
+            var root = _automation.FromHandle(prompt.WindowHandle);
+            if (root == null) return new SubmitState(false, false, false, "");
 
-        return true;
+            var turnForm = root.FindFirstDescendant(
+                new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+            if (turnForm == null) return new SubmitState(false, false, false, "");
+
+            var btn = FindSubmitButton(turnForm);
+            if (btn == null) return new SubmitState(true, false, false, "");
+
+            return new SubmitState(true, true, btn.IsEnabled, btn.Name ?? "");
+        }
+        catch
+        {
+            return new SubmitState(false, false, false, "");
+        }
+    }
+
+    public bool SubmitExistingInput(PromptInfo prompt)
+    {
+        try
+        {
+            var root = _automation.FromHandle(prompt.WindowHandle);
+            var turnForm = root?.FindFirstDescendant(
+                new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+
+            if (turnForm != null)
+                return TryFocuslessSubmit(prompt, turnForm);
+
+            if (!AllowFocusSteal) return false;
+
+            var prevForeground = NativeMethods.GetForegroundWindow();
+            NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+            Thread.Sleep(120);
+            KeyboardInput.PressKey("enter");
+            Thread.Sleep(250);
+            if (prevForeground != IntPtr.Zero && prevForeground != prompt.WindowHandle)
+            {
+                Thread.Sleep(120);
+                NativeMethods.SmartSetForegroundWindow(prevForeground);
+            }
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -1548,6 +1780,194 @@ public sealed class ClaudePromptHelper : IDisposable
     /// Get ancestor process chain: current → parent → grandparent → ...
     /// Stops when parent is not accessible or reaches PID 0/1.
     /// </summary>
+    /// <summary>
+    /// Find prompt in Codex desktop app window.
+    /// Codex composer is not exposed as a writable Edit control in UIA, so we detect
+    /// stable placeholder/marker text and use window-level focusless WM_CHAR injection.
+    /// </summary>
+    private PromptInfo? FindCodexDesktopPromptByMarker(int processId)
+    {
+        var windows = GetCodexCandidateWindows(processId);
+        foreach (var hWnd in windows)
+        {
+            try
+            {
+                var title = WindowFinder.GetWindowText(hWnd);
+                if (string.IsNullOrWhiteSpace(title) ||
+                    !title.Contains("Codex", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var root = _automation.FromHandle(hWnd);
+                if (root == null) continue;
+
+                // If Codex permission/approval dialog is open, accept it first so
+                // prompt routing does not get stuck on the blocker UI.
+                if (TryDismissCodexApprovalDialog(root))
+                {
+                    Thread.Sleep(250);
+                    root = _automation.FromHandle(hWnd);
+                    if (root == null) continue;
+                }
+
+                // Primary markers seen in Codex composer.
+                var markers = root.FindAllDescendants()
+                    .Where(e =>
+                    {
+                        try
+                        {
+                            var n = e.Name ?? string.Empty;
+                            if (string.IsNullOrWhiteSpace(n)) return false;
+                            if (n.Length > 120 || n.Contains('\n') || n.Contains('\r')) return false;
+                            var ct = e.ControlType;
+                            if (ct != ControlType.Button && ct != ControlType.Text && ct != ControlType.Edit)
+                                return false;
+                            if (n.Contains("Ask follow-up changes", StringComparison.OrdinalIgnoreCase) ||
+                                n.Contains("follow-up", StringComparison.OrdinalIgnoreCase) ||
+                                n.Contains("message Codex", StringComparison.OrdinalIgnoreCase) ||
+                                n.Contains("What are we coding next", StringComparison.OrdinalIgnoreCase) ||
+                                n.Contains("Terminal input", StringComparison.OrdinalIgnoreCase))
+                                return true;
+                            return n.Contains("후속 변경 사항을 부탁하세요", StringComparison.OrdinalIgnoreCase) ||
+                                   n.Contains("여기가 프롬프트", StringComparison.OrdinalIgnoreCase);
+                        }
+                        catch { return false; }
+                    })
+                    .ToList();
+
+                if (markers.Count == 0)
+                    continue;
+
+                // Prefer marker closest to bottom (actual composer placeholder zone).
+                var marker = markers
+                    .OrderByDescending(m => m.BoundingRectangle.Bottom)
+                    .First();
+                var mr = marker.BoundingRectangle;
+
+                NativeMethods.GetWindowRect(hWnd, out var wr);
+                var windowRect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
+
+                // Expand marker rect to a practical input target band.
+                var x = Math.Max(windowRect.Left + 4, mr.X - 16);
+                var y = Math.Max(windowRect.Top + 4, mr.Y - 6);
+                var w = Math.Max(360, Math.Min(windowRect.Right - x - 4, mr.Width + 32));
+                var h = Math.Max(28, mr.Height + 12);
+                var promptRect = new Rectangle(x, y, w, h);
+
+                Console.WriteLine($"  [PROMPT] Found Codex prompt marker: \"{marker.Name}\" at ({promptRect.X},{promptRect.Y} {promptRect.Width}x{promptRect.Height})");
+                return new PromptInfo(hWnd, title, "codex", promptRect, HostCodexDesktop);
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    private bool TryDismissCodexApprovalDialog(AutomationElement root)
+    {
+        try
+        {
+            var all = root.FindAllDescendants();
+            if (all.Length == 0) return false;
+
+            bool hasApprovalContext = all.Any(e =>
+            {
+                try
+                {
+                    var n = (e.Name ?? string.Empty).ToLowerInvariant();
+                    if (string.IsNullOrWhiteSpace(n)) return false;
+                    return n.Contains("file edit approval") ||
+                           n.Contains("retry without sandbox") ||
+                           n.Contains("approval") ||
+                           n.Contains("permission") ||
+                           n.Contains("approve") ||
+                           n.Contains("수락") ||
+                           n.Contains("허용");
+                }
+                catch { return false; }
+            });
+            if (!hasApprovalContext) return false;
+
+            var buttons = all
+                .Where(e =>
+                {
+                    try
+                    {
+                        if (e.ControlType != ControlType.Button) return false;
+                        if (!e.IsEnabled) return false;
+                        var n = (e.Name ?? string.Empty).ToLowerInvariant();
+                        if (string.IsNullOrWhiteSpace(n)) return false;
+                        return n.Contains("approve") ||
+                               n.Equals("accept") ||
+                               n.Contains("allow") ||
+                               n.Equals("yes") ||
+                               n.Contains("수락") ||
+                               n.Contains("허용");
+                    }
+                    catch { return false; }
+                })
+                .OrderByDescending(b => b.BoundingRectangle.Bottom)
+                .ToList();
+
+            foreach (var btn in buttons)
+            {
+                try
+                {
+                    if (!btn.Patterns.Invoke.IsSupported) continue;
+                    btn.Patterns.Invoke.Pattern.Invoke();
+                    Console.WriteLine($"  [PROMPT:CODEX] approval dialog accepted via \"{btn.Name}\"");
+                    return true;
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        return false;
+    }
+
+    private static List<IntPtr> GetCodexCandidateWindows(int processId)
+    {
+        var ordered = new List<IntPtr>();
+        var seen = new HashSet<IntPtr>();
+
+        try
+        {
+            var proc = Process.GetProcessById(processId);
+            var main = proc.MainWindowHandle;
+            if (main != IntPtr.Zero &&
+                NativeMethods.IsWindow(main) &&
+                NativeMethods.IsWindowVisible(main) &&
+                WindowFinder.GetClassName(main).Equals("Chrome_WidgetWin_1", StringComparison.OrdinalIgnoreCase))
+            {
+                ordered.Add(main);
+                seen.Add(main);
+            }
+        }
+        catch { }
+
+        foreach (var hWnd in FindWindowsByProcessId(processId))
+        {
+            if (!seen.Add(hWnd)) continue;
+            if (!NativeMethods.IsWindowVisible(hWnd)) continue;
+            var cls = WindowFinder.GetClassName(hWnd);
+            if (!cls.Equals("Chrome_WidgetWin_1", StringComparison.OrdinalIgnoreCase)) continue;
+            var title = WindowFinder.GetWindowText(hWnd);
+            if (title.Contains("DevTools", StringComparison.OrdinalIgnoreCase)) continue;
+            ordered.Add(hWnd);
+        }
+
+        return ordered;
+    }
+
+    // Legacy private alias kept for merge safety with older branches.
+    private bool TypeAndSubmitCodexDesktop(PromptInfo prompt, string text) => SubmitCodexDesktopPrompt(prompt, text);
+
+    // Legacy private alias kept for merge safety with older branches.
+    private bool TryPostMessageText(PromptInfo prompt, string text, bool submit) =>
+        TryPostMessageTextToChromiumRenderer(prompt, text, submit);
+
+    // Legacy private alias kept for merge safety with older branches.
+    private PromptInfo? FindCodexPrompt(int processId) => FindCodexDesktopPromptByMarker(processId);
+
     private static List<(int Pid, string Name)> GetAncestorProcesses()
     {
         var result = new List<(int, string)>();
