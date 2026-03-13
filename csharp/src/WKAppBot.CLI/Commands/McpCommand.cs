@@ -171,16 +171,20 @@ internal partial class Program
                             "Query: find, read, highlight\n" +
                             "Discovery: inspect (UIA tree), windows (list windows), screenshot (capture), ocr (text extraction)\n" +
                             "Async: wait (poll until element appears), eval (execute JavaScript via CDP)\n" +
-                            "AI Agents: ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini) — vision-capable, auto image capture\n" +
+                            "AI Agents: ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini), ask-claude (ask Claude Desktop) — vision-capable, auto image capture\n" +
                             "File I/O: file-read (read file as Unicode, encoding-aware), file-write (write Unicode→target encoding, @file reference)\n" +
-                            "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ)"),
+                            "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ), slack (send Slack message), eye (eye tick — status snapshot)"),
                         ["grap"] = Prop("string",
-                            "Window#element grap pattern. Required for most actions.\n" +
-                            "⚠ For ask-gpt/ask-gemini: grap is an IMAGE FILE PATH (e.g. \"screenshot.png\"), NOT a window pattern.\n" +
-                            "⚠ For suggest: grap is an optional FILE ATTACHMENT path.\n" +
+                            "Window#element grap pattern. Required for window/element actions.\n" +
                             "⚠ For file-read/file-write: grap is the TARGET FILE PATH (e.g. \"src/legacy.cpp\").\n" +
+                            "⚠ For suggest: grap is an optional FILE ATTACHMENT path.\n" +
                             "Window examples: \"*Notepad*\", \"*Chrome*#button.submit\", \"*App*#*MenuBar*#*File*\""),
-                        ["text"] = Prop("string", "Text for type/set-value/file-write actions. Use @filename to reference a temp file (e.g. \"@/tmp/edit.txt\")"),
+                        ["image_path"] = Prop("string",
+                            "Image file path for vision AI actions (ask-gpt, ask-gemini, ask-claude).\n" +
+                            "Pass a screenshot or image file to attach it as visual context.\n" +
+                            "Example: image_path=\"W:/SDK/bin/wkappbot.hq/output/capture_001.png\"\n" +
+                            "Note: 'grap' also works for backward compatibility, but image_path is preferred for clarity."),
+                        ["text"] = Prop("string", "Text for type/set-value/file-write/ask-*/slack actions. Use @filename to reference a temp file (e.g. \"@/tmp/edit.txt\")"),
                         ["depth"] = Prop("integer", "Tree depth for inspect/find (default: 3)"),
                         ["process"] = Prop("string", "Filter by process name (for windows action)"),
                         ["all"] = Prop("boolean", "Apply to ALL matching windows, or include hidden windows (for windows action)"),
@@ -278,8 +282,12 @@ internal partial class Program
         var list = new List<string>();
         var action = args["action"]?.GetValue<string>() ?? "inspect";
         list.Add(action);
-        // grap is required for all except "windows" (optional)
-        if (args["grap"] is JsonNode g) list.Add(g.GetValue<string>());
+        // image_path is the preferred param for ask-* vision actions; grap is backward-compat alias
+        var isAskAction = action.StartsWith("ask-", StringComparison.OrdinalIgnoreCase);
+        if (isAskAction && args["image_path"] is JsonNode ip)
+            list.Add(ip.GetValue<string>());
+        else if (args["grap"] is JsonNode g)
+            list.Add(g.GetValue<string>());
         // Action-specific params
         if (args["text"] is JsonNode t) { list.Add("--text"); list.Add(t.GetValue<string>()); }
         if (args["depth"] is JsonNode d) { list.Add("--depth"); list.Add(d.ToString()); }
