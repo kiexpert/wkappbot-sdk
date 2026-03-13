@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using WKAppBot.Core.Runner;
 using WKAppBot.Win32.Input;
+using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
@@ -65,9 +66,32 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
     public UserYieldResult WaitForUserYield(IntPtr targetMainHwnd, uint userIdleMs, int timeoutSeconds,
                                              IntPtr positionHwnd = default)
     {
+        if (ShouldAutoApproveAll())
+        {
+            var focusOk = targetMainHwnd == IntPtr.Zero ||
+                NativeMethods.SmartSetForegroundWindow(targetMainHwnd);
+            Console.WriteLine("  [READINESS] auto-approve-all: yield popup skipped");
+            return new UserYieldResult(true, focusOk);
+        }
+
         var (approved, focusAcquired) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
             positionHwnd: positionHwnd, noSound: _noSound);
         return new UserYieldResult(approved, focusAcquired);
+    }
+
+    static bool ShouldAutoApproveAll()
+    {
+        var env = Environment.GetEnvironmentVariable("WKAPPBOT_AUTO_APPROVE_ALL");
+        if (!string.IsNullOrWhiteSpace(env))
+        {
+            var v = env.Trim().ToLowerInvariant();
+            if (v is "0" or "false" or "no" or "off")
+                return false;
+            return true;
+        }
+
+        var exe = Path.GetFileName(Environment.ProcessPath ?? "");
+        return string.Equals(exe, "wkappbot-core.exe", StringComparison.OrdinalIgnoreCase);
     }
 }
 

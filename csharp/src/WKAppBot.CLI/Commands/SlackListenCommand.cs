@@ -15,6 +15,53 @@ namespace WKAppBot.CLI;
 // partial class: Slack listen command + background launcher
 internal partial class Program
 {
+    // Routing ownership: decide target host first, then pick prompt only from that host.
+    // This prevents cross-agent misdelivery when multiple AI apps are open.
+    static string GetStrictSlackTargetHost()
+    {
+        if (IsRunningFromCodexAppCertain()) return "codex";
+        if (IsRunningFromClaudeApp()) return "claude";
+        return "any";
+    }
+
+    static bool IsPromptForHost(ClaudePromptHelper.PromptInfo prompt, string host)
+    {
+        if (host == "codex")
+            return string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
+        if (host == "claude")
+            return !string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
+        return true;
+    }
+
+    // Routing policy for Slack listener:
+    // 1) Try cwd-scoped prompt for this workspace
+    // 2) Enforce host filter when host is certain (codex/claude)
+    // 3) For "any", prefer codex then fallback
+    static ClaudePromptHelper.PromptInfo? FindSlackPreferredPrompt(ClaudePromptHelper helper)
+    {
+        var targetHost = GetStrictSlackTargetHost();
+        var codexAlive = Process.GetProcessesByName("codex").Length > 0;
+        var effectiveHost = (targetHost == "any" && codexAlive) ? "codex" : targetHost;
+        var cwd = Environment.CurrentDirectory;
+        var cwdPrompt = helper.FindPromptForCwd(cwd);
+        if (cwdPrompt != null && IsPromptForHost(cwdPrompt, effectiveHost))
+            return cwdPrompt;
+
+        var all = helper.FindAllPrompts();
+        if (effectiveHost == "codex")
+            return all.FirstOrDefault(p => string.Equals(p.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase));
+        if (effectiveHost == "claude")
+            return all.FirstOrDefault(p => !string.Equals(p.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase));
+
+        // Safety rule: when Codex app is running, never fallback delivery to Claude.
+        // If Codex prompt is not discoverable right now, return null and skip delivery.
+        var codex = all.FirstOrDefault(p => p.HostType == "codex-desktop");
+        if (codex != null) return codex;
+        if (codexAlive) return null;
+
+        return helper.FindPrompt();
+    }
+
     /// <summary>Socket Mode: listen for events and respond to @mentions.</summary>
     static int SlackListenCommand(string[] args)
     {
@@ -78,9 +125,76 @@ internal partial class Program
 
         // Always initialize Claude prompt helper (always forward to Claude)
         var promptHelper = new ClaudePromptHelper();
-        var promptInfo = promptHelper.FindPrompt();
-        if (promptInfo != null)
+        var promptMissStreak = 0;
+        var promptLostNotifyCooldown = TimeSpan.FromSeconds(20);
+        var lastPromptLostNotifyUtc = DateTime.MinValue;
+
+        List<ClaudePromptHelper.PromptInfo> ResolvePromptsWithRecovery()
         {
+            var targetHost = GetStrictSlackTargetHost();
+            var codexAlive = Process.GetProcessesByName("codex").Length > 0;
+            var effectiveHost = (targetHost == "any" && codexAlive) ? "codex" : targetHost;
+
+            var prompts = promptHelper.FindAllPrompts()
+                .Where(p => IsPromptForHost(p, effectiveHost))
+                .GroupBy(p => p.WindowHandle)
+                .Select(g => g.First())
+                .ToList();
+            if (prompts.Count > 0)
+            {
+                if (promptMissStreak >= 3)
+                    Console.WriteLine($"[SLACK] Prompt recovered after {promptMissStreak} miss(es): {prompts.Count} target(s)");
+                promptMissStreak = 0;
+                return prompts;
+            }
+
+            promptMissStreak++;
+            Console.WriteLine($"[SLACK] Prompt miss streak={promptMissStreak}");
+            if (promptMissStreak < 3) return new List<ClaudePromptHelper.PromptInfo>();
+
+            try
+            {
+                var cwdPrompt = promptHelper.FindPromptForCwd(Environment.CurrentDirectory);
+                if (cwdPrompt != null)
+                {
+                    promptMissStreak = 0;
+                    Console.WriteLine($"[SLACK] Prompt recovery succeeded (cwd): {cwdPrompt.HostType}");
+                    return new List<ClaudePromptHelper.PromptInfo> { cwdPrompt };
+                }
+
+                var codexCandidate = promptHelper.FindAllPrompts()
+                    .FirstOrDefault(p => string.Equals(p.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase));
+                if (codexCandidate != null)
+                {
+                    promptMissStreak = 0;
+                    Console.WriteLine("[SLACK] Prompt recovery succeeded (codex re-scan)");
+                    return new List<ClaudePromptHelper.PromptInfo> { codexCandidate };
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SLACK] Prompt recovery error: {ex.Message}");
+            }
+
+            return new List<ClaudePromptHelper.PromptInfo>();
+        }
+
+        void ReportPromptLostThrottled(string channelId, string threadKey, string user, string cleanText, string msgTs)
+        {
+            var now = DateTime.UtcNow;
+            if (now - lastPromptLostNotifyUtc < promptLostNotifyCooldown)
+            {
+                Console.WriteLine("[SLACK] Prompt-lost notice suppressed by cooldown");
+                return;
+            }
+            lastPromptLostNotifyUtc = now;
+            HandlePromptLost(botToken!, channelId, threadKey, user, cleanText, msgTs, username: BotUsername);
+        }
+
+        var startupPrompts = ResolvePromptsWithRecovery();
+        if (startupPrompts.Count > 0)
+        {
+            var promptInfo = startupPrompts[0];
             Console.WriteLine($"[SLACK] Prompt: {promptInfo.HostType} — {promptInfo.WindowTitle}");
             Console.WriteLine($"[SLACK]   Rect: ({promptInfo.PromptRect.X},{promptInfo.PromptRect.Y} {promptInfo.PromptRect.Width}x{promptInfo.PromptRect.Height})");
         }
@@ -181,18 +295,25 @@ internal partial class Program
             // Always forward to Claude Code prompt
             {
                 var promptText = $"{cleanText}\n\n(Slack @{msg.User} #{msg.Channel} — reply: wkappbot slack reply \"...\")";
+                var replyHint = SlackReplySuffix(msg.User, threadKey, $"#{msg.Channel}");
+                if (!promptText.Contains("--msg", StringComparison.OrdinalIgnoreCase))
+                    promptText = $"{cleanText}\n\n{replyHint}";
                 Console.WriteLine($"[SLACK] >> Typing into Claude prompt...");
 
-                var fresh = promptHelper.FindPrompt();
-                if (fresh != null)
+                var targets = ResolvePromptsWithRecovery();
+                if (targets.Count > 0)
                 {
-                    promptHelper.TypeAndSubmit(fresh, promptText);
-                    Console.WriteLine("[SLACK] >> Sent to Claude prompt");
+                    var sent = 0;
+                    foreach (var target in targets)
+                    {
+                        promptHelper.TypeAndSubmit(target, promptText);
+                        sent++;
+                    }
+                    Console.WriteLine($"[SLACK] >> Sent to {sent}/{targets.Count} prompt(s)");
                 }
                 else
                 {
-                    HandlePromptLost(botToken!, msg.Channel, threadKey,
-                        msg.User, cleanText, msg.Timestamp, username: BotUsername);
+                    ReportPromptLostThrottled(msg.Channel, threadKey, msg.User, cleanText, msg.Timestamp);
                 }
                 return;
             }
@@ -318,18 +439,26 @@ internal partial class Program
                             threadContext = $"\n\n{ctx}\n";
                     }
                     var promptText = $"{cleanText}{threadContext}\n\n(Slack @{msg.User} #{msg.Channel} thread — reply: wkappbot slack reply \"...\")";
+                    var replyThread = msg.ThreadTs ?? msg.Timestamp;
+                    var replyHint = SlackReplySuffix(msg.User, replyThread, $"#{msg.Channel} thread");
+                    if (!promptText.Contains("--msg", StringComparison.OrdinalIgnoreCase))
+                        promptText = $"{cleanText}{threadContext}\n\n{replyHint}";
                     Console.WriteLine($"[SLACK] >> Typing thread reply into Claude prompt...");
 
-                    var fresh = promptHelper.FindPrompt();
-                    if (fresh != null)
+                    var targets = ResolvePromptsWithRecovery();
+                    if (targets.Count > 0)
                     {
-                        promptHelper.TypeAndSubmit(fresh, promptText);
-                        Console.WriteLine("[SLACK] >> Sent to Claude prompt");
+                        var sent = 0;
+                        foreach (var target in targets)
+                        {
+                            promptHelper.TypeAndSubmit(target, promptText);
+                            sent++;
+                        }
+                        Console.WriteLine($"[SLACK] >> Sent thread reply to {sent}/{targets.Count} prompt(s)");
                     }
                     else
                     {
-                        HandlePromptLost(botToken!, msg.Channel, msg.ThreadTs!,
-                            msg.User, cleanText, msg.Timestamp, username: BotUsername);
+                        ReportPromptLostThrottled(msg.Channel, msg.ThreadTs!, msg.User, cleanText, msg.Timestamp);
                     }
                     return;
                 }
@@ -360,18 +489,25 @@ internal partial class Program
                     // Always forward keyword matches to Claude Code prompt
                     {
                         var promptText = $"{cleanText}\n\n(Slack keyword:\"{matchedKeyword}\" @{msg.User} #{msg.Channel} — reply: wkappbot slack reply \"...\")";
+                        var replyHint = SlackReplySuffix(msg.User, threadKey, $"keyword:{matchedKeyword} #{msg.Channel}");
+                        if (!promptText.Contains("--msg", StringComparison.OrdinalIgnoreCase))
+                            promptText = $"{cleanText}\n\n{replyHint}";
                         Console.WriteLine($"[SLACK] >> Typing keyword match into Claude prompt...");
 
-                        var fresh = promptHelper.FindPrompt();
-                        if (fresh != null)
+                        var targets = ResolvePromptsWithRecovery();
+                        if (targets.Count > 0)
                         {
-                            promptHelper.TypeAndSubmit(fresh, promptText);
-                            Console.WriteLine("[SLACK] >> Sent to Claude prompt");
+                            var sent = 0;
+                            foreach (var target in targets)
+                            {
+                                promptHelper.TypeAndSubmit(target, promptText);
+                                sent++;
+                            }
+                            Console.WriteLine($"[SLACK] >> Sent keyword match to {sent}/{targets.Count} prompt(s)");
                         }
                         else
                         {
-                            HandlePromptLost(botToken!, msg.Channel, threadKey,
-                                msg.User, cleanText, msg.Timestamp, username: BotUsername);
+                            ReportPromptLostThrottled(msg.Channel, threadKey, msg.User, cleanText, msg.Timestamp);
                         }
                         return;
                     }

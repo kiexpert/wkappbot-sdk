@@ -12,21 +12,15 @@ internal static class EyeCmdPipeClient
 {
     internal const string PipeName = "WKAppBotCmdPipe";
     internal const string EndMarker = "\x00END";
-    // Slow commands: bypass Eye entirely, run core directly (avoids pipe blocking callers for minutes).
-    // These commands take >1s and block the pipe for other sessions.
-    static readonly string[] DirectToCore = ["ask", "whisper-study", "chart-analyze", "hts-stress"];
 
     /// <summary>
     /// Try to delegate args to the running Eye process.
     /// Returns true + sets exitCode if delegation succeeded.
-    /// Returns false if Eye is not running OR command is slow (caller should fall through to RunCore).
+    /// Returns false only if Eye is not running/busy (caller should fall through to RunCore).
     /// </summary>
     public static bool TryDelegate(string[] args, out int exitCode)
     {
         exitCode = 0;
-        // Slow commands bypass Eye — run core directly as subprocess (no pipe blocking)
-        if (args.Length > 0 && DirectToCore.Contains(args[0], StringComparer.OrdinalIgnoreCase))
-            return false;
         try
         {
             using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut);
@@ -47,10 +41,15 @@ internal static class EyeCmdPipeClient
                     int.TryParse(line.AsSpan(EndMarker.Length).Trim(), out exitCode);
                     break;
                 }
+
                 Console.WriteLine(line);
             }
+
             return true;
         }
-        catch { return false; } // Eye not running or busy → caller falls through
+        catch
+        {
+            return false; // Eye not running or busy -> caller falls through
+        }
     }
 }

@@ -129,7 +129,8 @@ internal partial class Program
         if (!string.IsNullOrEmpty(threadTs))
             DeletePendingAckFromFile(botToken, threadTs);
 
-        var (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: BotUsername).GetAwaiter().GetResult();
+        var senderName = GetSendReplyUsername(printDecision: true);
+        var (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName).GetAwaiter().GetResult();
 
         var threadNote = !string.IsNullOrEmpty(threadTs) ? " (in-thread)" : "";
         if (ok)
@@ -250,7 +251,7 @@ internal partial class Program
 
                 // Format: message first, then source attribution + reply hint (with thread_ts)
                 var ts = msg?["ts"]?.GetValue<string>() ?? "";
-                var replyCmd = $"wkappbot slack reply \"MUST reply your answer here\" --msg {ts}";
+                    var replyCmd = $"MUST REPLY VIA SLACK ONLY: wkappbot slack reply \"MUST PUT FINAL ANSWER HERE\" --msg {ts}";
                 var promptText = $"{text}\n\n(Slack @{user} → {replyCmd})";
 
                 Console.ForegroundColor = ConsoleColor.Cyan;
@@ -386,7 +387,7 @@ internal partial class Program
                 var replyThread = threadTs ?? ts;
                 if (toPrompt && promptHelper != null)
                 {
-                    var replyHint = $"wkappbot slack reply \"MUST reply your answer here\" --msg {replyThread}";
+            var replyHint = $"MUST REPLY VIA SLACK ONLY: wkappbot slack reply \"MUST PUT FINAL ANSWER HERE\" --msg {replyThread}";
                     var promptText = $"{cleanText}\n\n(Slack @{user} → {replyHint})";
 
                     var fresh = promptHelper.FindPrompt();
@@ -427,7 +428,7 @@ internal partial class Program
     static async Task<List<JsonNode>> SlackFetchHistoryAsync(string botToken, string channel,
         string? oldest = null, int limit = 20, bool inclusive = false)
     {
-        using var http = new HttpClient();
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
         var url = $"https://slack.com/api/conversations.history?channel={channel}&limit={limit}";
         if (!string.IsNullOrEmpty(oldest))
             url += $"&oldest={oldest}";

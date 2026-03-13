@@ -2,6 +2,10 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace WKAppBot.CLI;
 
@@ -9,6 +13,9 @@ namespace WKAppBot.CLI;
 // JSON-RPC 2.0 over stdin/stdout — all logs go to stderr
 internal partial class Program
 {
+    static readonly object McpWriteGate = new();
+    static readonly ConcurrentDictionary<string, SemaphoreSlim> McpActionGates = new();
+
     static int McpCommand(string[] args)
     {
         // Redirect Console.Out to stderr so stdout is pure JSON-RPC
@@ -37,18 +44,42 @@ internal partial class Program
 
                     Console.Error.WriteLine($"[MCP] << {method} (id={id})");
 
-                    JsonNode? result = method switch
+                    JsonNode? result = null;
+                    var dispatchedAsync = false;
+
+                    switch (method)
                     {
-                        "initialize" => HandleInitialize(@params),
-                        "notifications/initialized" => null, // notification, no response
-                        "tools/list" => HandleToolsList(),
-                        "tools/call" => HandleToolsCall(@params),
-                        "ping" => new JsonObject { ["pong"] = true },
-                        _ => null
-                    };
+                        case "initialize":
+                            result = HandleInitialize(@params);
+                            break;
+                        case "notifications/initialized":
+                            result = null; // notification, no response
+                            break;
+                        case "tools/list":
+                            result = HandleToolsList();
+                            break;
+                        case "tools/call":
+                            if (ShouldDispatchToolsCallAsync(@params))
+                            {
+                                dispatchedAsync = true;
+                                _ = Task.Run(() => HandleToolsCallAsync(@params, writer, id));
+                            }
+                            else
+                            {
+                                result = HandleToolsCall(@params, writer, id);
+                            }
+                            break;
+                        case "ping":
+                            result = new JsonObject { ["pong"] = true };
+                            break;
+                        default:
+                            result = null;
+                            break;
+                    }
 
                     // Notifications (no id) don't get responses
                     if (id == null) continue;
+                    if (dispatchedAsync) continue;
 
                     if (result != null)
                     {
@@ -58,9 +89,8 @@ internal partial class Program
                             ["id"] = id?.DeepClone(),
                             ["result"] = result
                         };
-                        var json = response.ToJsonString(McpJsonOptions);
-                        writer.WriteLine(json);
-                        Console.Error.WriteLine($"[MCP] >> {method} OK ({json.Length} bytes)");
+                        WriteJsonRpc(writer, response);
+                        Console.Error.WriteLine($"[MCP] >> {method} OK");
                     }
                     else if (method.StartsWith("notifications/"))
                     {
@@ -79,7 +109,7 @@ internal partial class Program
                                 ["message"] = $"Method not found: {method}"
                             }
                         };
-                        writer.WriteLine(error.ToJsonString(McpJsonOptions));
+                        WriteJsonRpc(writer, error);
                         Console.Error.WriteLine($"[MCP] >> ERROR: unknown method {method}");
                     }
                 }
@@ -156,6 +186,7 @@ internal partial class Program
                         ["all"] = Prop("boolean", "Apply to ALL matching windows, or include hidden windows (for windows action)"),
                         ["timeout"] = Prop("integer", "Timeout in ms for wait action (default: 10000)"),
                         ["interval"] = Prop("integer", "Polling interval in ms for wait action (default: 500)"),
+                        ["parallel"] = Prop("boolean", "If true, run tools/call asynchronously so MCP loop stays responsive. Unsafe actions are internally queued with 100ms gate polling."),
                         ["encoding"] = Prop("string", "File encoding for file-read/file-write: 949 (CP949/Korean), 932 (Shift-JIS/Japanese), 65001 (UTF-8, default), utf-16. Enables Claude to read/write CP949 Korean source files without encoding corruption.")
                     },
                     ["required"] = new JsonArray { "action" }
@@ -182,10 +213,11 @@ internal partial class Program
 
     // ── tools/call ──────────────────────────────────────────────
 
-    static JsonNode HandleToolsCall(JsonObject? @params)
+    static JsonNode HandleToolsCall(JsonObject? @params, StreamWriter writer, JsonNode? requestId)
     {
         var toolName = @params?["name"]?.GetValue<string>() ?? "";
         var arguments = @params?["arguments"] as JsonObject ?? new JsonObject();
+        var action = arguments["action"]?.GetValue<string>() ?? "";
 
         Console.Error.WriteLine($"[MCP] Tool: {toolName} args={arguments.ToJsonString()}");
 
@@ -195,7 +227,15 @@ internal partial class Program
             // a11y handles: inspect, windows, screenshot, ocr as delegate actions
             var (output, exitCode) = toolName switch
             {
-                "wkappbot" => RunCliCaptureWithCode("a11y", BuildUnifiedArgs(arguments)),
+                "wkappbot" => ShouldRunOutOfProc(action)
+                    ? RunCliCaptureWithCodeExternal(
+                        "a11y",
+                        BuildUnifiedArgs(arguments),
+                        line => EmitToolProgress(writer, requestId, line))
+                    : RunCliCaptureWithCode(
+                        "a11y",
+                        BuildUnifiedArgs(arguments),
+                        line => EmitToolProgress(writer, requestId, line)),
                 _ => ($"Unknown tool: {toolName}", 1)
             };
 
@@ -371,6 +411,195 @@ internal partial class Program
         return list.ToArray();
     }
 
+    static bool ShouldDispatchToolsCallAsync(JsonObject? @params)
+    {
+        var arguments = @params?["arguments"] as JsonObject;
+        if (arguments == null) return false;
+
+        // Caller-selected parallel mode.
+        // parallel=true means "don't block MCP request loop"; execution still
+        // respects action gates for unsafe interactive actions.
+        return arguments["parallel"]?.GetValue<bool>() == true;
+    }
+
+    static async Task HandleToolsCallAsync(JsonObject? @params, StreamWriter writer, JsonNode? requestId)
+    {
+        JsonObject? response = null;
+        try
+        {
+            var args = @params?["arguments"] as JsonObject ?? new JsonObject();
+            var action = args["action"]?.GetValue<string>() ?? "";
+            var grap = args["grap"]?.GetValue<string>() ?? "";
+            var gateKey = GetActionGateKey(action, grap);
+            var gate = McpActionGates.GetOrAdd(gateKey, _ => new SemaphoreSlim(1, 1));
+
+            var queued = false;
+            var waitSince = Stopwatch.StartNew();
+            while (!await gate.WaitAsync(100).ConfigureAwait(false))
+            {
+                if (!queued)
+                {
+                    queued = true;
+                    EmitToolProgress(writer, requestId, $"[queued] waiting gate={gateKey}");
+                }
+                else
+                {
+                    EmitToolProgress(writer, requestId, $"[queued] {waitSince.ElapsedMilliseconds}ms gate={gateKey}");
+                }
+            }
+
+            try
+            {
+                if (queued)
+                    EmitToolProgress(writer, requestId, $"[start] gate acquired after {waitSince.ElapsedMilliseconds}ms");
+
+                var result = HandleToolsCall(@params, writer, requestId) as JsonObject ?? new JsonObject
+                {
+                    ["content"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["type"] = "text",
+                            ["text"] = "Error: empty MCP result"
+                        }
+                    },
+                    ["isError"] = true
+                };
+
+                response = new JsonObject
+                {
+                    ["jsonrpc"] = "2.0",
+                    ["id"] = requestId?.DeepClone(),
+                    ["result"] = result
+                };
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            response = new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = requestId?.DeepClone(),
+                ["result"] = new JsonObject
+                {
+                    ["content"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["type"] = "text",
+                            ["text"] = $"Error: {ex.Message}"
+                        }
+                    },
+                    ["isError"] = true
+                }
+            };
+        }
+
+        if (response != null)
+            WriteJsonRpc(writer, response);
+    }
+
+    static string GetActionGateKey(string action, string grap)
+    {
+        if (string.IsNullOrWhiteSpace(action))
+            return "action:default";
+
+        var a = action.ToLowerInvariant();
+
+        // Read-only-ish actions can run in parallel without shared input lock.
+        if (IsParallelSafeAction(a))
+            return $"read:{NormalizeGateToken(grap)}:{a}";
+
+        // Input/interactive actions are kept globally serialized to avoid
+        // focus theft and keystroke interleaving across sessions.
+        if (RequiresGlobalInteractiveGate(a))
+            return "interactive:global";
+
+        // Window/target scoped actions can run concurrently on different targets.
+        if (RequiresTargetScopedGate(a))
+            return $"target:{NormalizeGateToken(grap)}:{a}";
+
+        // Conservative default.
+        return $"target:{NormalizeGateToken(grap)}:{a}";
+    }
+
+    static bool IsParallelSafeAction(string action)
+    {
+        return action is
+            "inspect" or "windows" or "screenshot" or "ocr" or
+            "read" or "find" or "eval" or "highlight";
+    }
+
+    static bool RequiresGlobalInteractiveGate(string action)
+    {
+        return action.StartsWith("ask-", StringComparison.OrdinalIgnoreCase) ||
+               action is
+                   "type" or "set-value" or "set-range" or
+                   "click" or "invoke" or "toggle" or
+                   "expand" or "collapse" or "select" or "scroll" or
+                   "clipboard-write" or "file-write";
+    }
+
+    static bool RequiresTargetScopedGate(string action)
+    {
+        return action is
+            "wait" or "focus" or "move" or "resize" or
+            "close" or "minimize" or "maximize" or "restore" or
+            "clipboard-read" or "file-read";
+    }
+
+    static string NormalizeGateToken(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "_";
+        var trimmed = s.Trim();
+        if (trimmed.Length > 64) trimmed = trimmed[..64];
+        return trimmed.Replace('\\', '/').Replace(' ', '_');
+    }
+
+    static void WriteJsonRpc(StreamWriter writer, JsonObject payload)
+    {
+        var json = payload.ToJsonString(McpJsonOptions);
+        lock (McpWriteGate)
+        {
+            writer.WriteLine(json);
+        }
+    }
+
+    static bool ShouldRunOutOfProc(string action)
+    {
+        if (string.IsNullOrWhiteSpace(action)) return false;
+        // Slow/interactive actions benefit most from process isolation + streaming.
+        if (action.StartsWith("ask-", StringComparison.OrdinalIgnoreCase)) return true;
+        if (action.Equals("wait", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    static void EmitToolProgress(StreamWriter writer, JsonNode? requestId, string line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return;
+
+        // Keep notification payload small and line-framed.
+        const int max = 800;
+        var text = line.Length > max ? line[..max] + "..." : line;
+        var idText = requestId?.ToJsonString() ?? "null";
+
+        var note = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["method"] = "notifications/message",
+            ["params"] = new JsonObject
+            {
+                ["level"] = "info",
+                ["data"] = $"[tools/call:{idText}] {text}"
+            }
+        };
+        WriteJsonRpc(writer, note);
+    }
+
     // ── CLI execution with output capture ───────────────────────
 
     /// <summary>
@@ -378,14 +607,56 @@ internal partial class Program
     /// Temporarily redirects Console.Out to a StringWriter.
     /// Returns (output, exitCode) for error structuring.
     /// </summary>
-    static (string output, int exitCode) RunCliCaptureWithCode(string command, string[] args)
+    sealed class LineCaptureWriter : TextWriter
     {
-        var sw = new StringWriter();
-        var errSw = new StringWriter();
+        readonly StringBuilder _all = new();
+        readonly StringBuilder _line = new();
+        readonly Action<string>? _onLine;
+
+        public LineCaptureWriter(Action<string>? onLine) => _onLine = onLine;
+        public override Encoding Encoding => Encoding.UTF8;
+
+        public override void Write(char value)
+        {
+            _all.Append(value);
+            if (value == '\n')
+            {
+                EmitLine();
+                return;
+            }
+            if (value != '\r') _line.Append(value);
+        }
+
+        public override void Write(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return;
+            foreach (var ch in value) Write(ch);
+        }
+
+        void EmitLine()
+        {
+            if (_line.Length == 0) return;
+            _onLine?.Invoke(_line.ToString());
+            _line.Clear();
+        }
+
+        public void FlushPartialLine()
+        {
+            if (_line.Length == 0) return;
+            _onLine?.Invoke(_line.ToString());
+            _line.Clear();
+        }
+
+        public string GetAllText() => _all.ToString();
+    }
+
+    static (string output, int exitCode) RunCliCaptureWithCode(string command, string[] args, Action<string>? onOutputLine = null)
+    {
+        var capture = new LineCaptureWriter(onOutputLine);
         var prevOut = Console.Out;
         var prevErr = Console.Error;
-        Console.SetOut(sw);
-        Console.SetError(errSw);
+        Console.SetOut(capture);
+        Console.SetError(capture);
 
         int exitCode = 0;
         try
@@ -402,22 +673,77 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            sw.WriteLine($"Error: {ex.Message}");
+            capture.WriteLine($"Error: {ex.Message}");
             exitCode = 1;
         }
         finally
         {
+            capture.FlushPartialLine();
             Console.SetOut(prevOut);
             Console.SetError(prevErr);
         }
 
-        // Merge stdout + stderr (stderr contains error details)
-        var output = sw.ToString().Trim();
-        var errOutput = errSw.ToString().Trim();
-        if (!string.IsNullOrEmpty(errOutput))
-            output = string.IsNullOrEmpty(output) ? errOutput : $"{output}\n{errOutput}";
+        return (capture.GetAllText().Trim(), exitCode);
+    }
 
-        return (output, exitCode);
+    static (string output, int exitCode) RunCliCaptureWithCodeExternal(string command, string[] args, Action<string>? onOutputLine = null)
+    {
+        var exe = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe))
+            return ($"Error: process path unavailable for out-of-proc run ({exe})", 1);
+
+        var psi = new ProcessStartInfo(exe)
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
+        };
+        psi.ArgumentList.Add(command);
+        foreach (var arg in args) psi.ArgumentList.Add(arg);
+
+        var sb = new StringBuilder();
+        object gate = new();
+
+        void PushLine(string line)
+        {
+            if (line == null) return;
+            lock (gate)
+            {
+                sb.AppendLine(line);
+            }
+            onOutputLine?.Invoke(line);
+        }
+
+        async Task PumpAsync(StreamReader reader)
+        {
+            while (true)
+            {
+                var line = await reader.ReadLineAsync().ConfigureAwait(false);
+                if (line == null) break;
+                PushLine(line);
+            }
+        }
+
+        try
+        {
+            using var proc = Process.Start(psi);
+            if (proc == null) return ("Error: failed to start child process", 1);
+
+            var outTask = PumpAsync(proc.StandardOutput);
+            var errTask = PumpAsync(proc.StandardError);
+
+            proc.WaitForExit();
+            Task.WaitAll(outTask, errTask);
+
+            return (sb.ToString().Trim(), proc.ExitCode);
+        }
+        catch (Exception ex)
+        {
+            return ($"Error: out-of-proc execution failed: {ex.Message}", 1);
+        }
     }
 
     static string RunCliCapture(string command, string[] args)
