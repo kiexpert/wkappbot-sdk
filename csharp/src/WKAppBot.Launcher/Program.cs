@@ -87,14 +87,12 @@ class Program
     /// Reload triggers:
     ///   1. wkappbot.mcp-reload file appears in SDK/bin/
     ///   2. Core exits with code 42 (self-requested reload)
-    /// On reload: if wkappbot-core.new.exe exists, it is renamed to wkappbot-core.exe first.
-    /// </summary>
+    ///</summary>
     static int RunMcpProxy(string[] args)
     {
         var dir    = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
         var core   = Path.Combine(dir, "wkappbot-core.exe");
         var signal = Path.Combine(dir, "wkappbot.mcp-reload");
-        var staged = Path.Combine(dir, "wkappbot-core.new.exe");
 
         if (!File.Exists(core))
         {
@@ -131,13 +129,6 @@ class Program
 
         while (true)
         {
-            // Hot-swap binary if staged
-            if (File.Exists(staged))
-            {
-                try { File.Move(staged, core, overwrite: true); Console.Error.WriteLine("[LAUNCHER:MCP] binary hot-swapped"); }
-                catch (Exception ex) { Console.Error.WriteLine($"[LAUNCHER:MCP] hot-swap failed: {ex.Message}"); }
-            }
-
             using var proc = new Process
             {
                 StartInfo = new ProcessStartInfo
