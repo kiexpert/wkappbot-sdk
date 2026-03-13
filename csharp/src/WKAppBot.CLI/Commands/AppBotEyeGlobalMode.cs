@@ -2696,7 +2696,6 @@ internal partial class Program
     /// </summary>
     static void CheckAndReportDeadCards(List<EyeParentCard> cards)
     {
-        if (string.IsNullOrEmpty(_eyeBotToken) || string.IsNullOrEmpty(_eyeChannel)) return;
         foreach (var card in cards.ToList())
         {
             var pid = card.ParentPid;
@@ -2735,10 +2734,8 @@ internal partial class Program
                 {
                     var cwdTag = AbbreviateCwd(card.Cwd);
                     var label = string.IsNullOrEmpty(cwdTag) ? $"{card.ParentName}:{pid}" : $"[{cwdTag}] {card.ParentName}:{pid}";
-                    Console.WriteLine($"[DEAD_CARD] {label} — process gone, alerting Slack");
+                    Console.WriteLine($"[DEAD_CARD] {label} — process gone");
                     _cardHealthCache[pid] = "dead";
-                    var msg = $":skull: 클롣 프로세스 종료됨: {label}\n재시작이 필요합니다!";
-                    Task.Run(async () => await SlackSendViaApi(_eyeBotToken!, _eyeChannel!, msg, username: "앱봇아이"));
                     // Zombie cleanup attempt (no-op if already gone)
                     try { Process.GetProcessById(pid).Kill(); } catch { }
                 }
@@ -2771,8 +2768,6 @@ internal partial class Program
                 var cwdTag = AbbreviateCwd(card.Cwd);
                 var label = string.IsNullOrEmpty(cwdTag) ? $"{card.ParentName}:{pid}" : $"[{cwdTag}] {card.ParentName}:{pid}";
                 Console.WriteLine($"[SLOW_CARD] {label} — WM_NULL={responseMs}ms (건강{healthPct}%)");
-                var msg = $":warning: 클롣 응답없음(hung): {label}\nWM_NULL {responseMs}ms (건강0%)";
-                Task.Run(async () => await SlackSendViaApi(_eyeBotToken!, _eyeChannel!, msg, username: "앱봇아이"));
             }
             else if (health != "불량" && prevHealth == "불량")
             {
