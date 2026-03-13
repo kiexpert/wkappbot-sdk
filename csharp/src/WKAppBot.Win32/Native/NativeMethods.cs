@@ -647,17 +647,14 @@ public static partial class NativeMethods
         // FocuslessGuard: block if enabled (only when we actually NEED to steal focus)
         Input.FocuslessGuard.AssertAllowed("SetForegroundWindow");
 
-        // Early detection: log user idle time at every focus-steal point.
-        // If InputReadiness.Probe() was not called → [IDLE⚠] warning (unguarded focus steal).
+        // Readiness gate: delegates to AssertReadiness which throws if Probe() was not called.
+        // Also logs [IDLE] idle time on success.
+        WKAppBot.Win32.Input.InputReadiness.AssertReadiness("SmartSetForegroundWindow");
         var _idleMs = GetUserIdleMs();
         var _idleStr = _idleMs >= 60000 ? $"{_idleMs / 60000}m {_idleMs / 1000 % 60}s"
                      : _idleMs >= 1000  ? $"{_idleMs / 1000.0:F1}s"
                      :                    $"{_idleMs}ms";
-        bool _guarded = WKAppBot.Win32.Input.InputReadiness.ReadinessCalled;
-        if (_guarded)
-            Console.WriteLine($"[IDLE] user input {_idleStr} ago");
-        else
-            Console.WriteLine($"[IDLE⚠ NO-READINESS] user input {_idleStr} ago — focus stolen without readiness check!");
+        Console.WriteLine($"[IDLE] user input {_idleStr} ago");
 
         // Keyboard input lock: if another session is currently sending keystrokes, yield focus.
         // "먼저 잡은 넘이 우선권" — don't interrupt ongoing typing in another process.
