@@ -234,10 +234,18 @@ public sealed class InputReadiness
     public IUserInputWait? UserInputWait { get; set; }
     public IElevationRequester? ElevationRequester { get; set; }
 
+    /// <summary>
+    /// Set to true when Probe() or ProbeAtPoint() is called for this invocation.
+    /// SmartSetForegroundWindow checks this to detect unguarded focus steals.
+    /// Reset at process start; commands that skip readiness will trigger [IDLE⚠] warning.
+    /// </summary>
+    [ThreadStatic] public static bool ReadinessCalled;
+
     // ── Probe: 전수조사 ──────────────────────────────────────────
 
     public InputReadinessReport Probe(InputReadinessRequest req)
     {
+        ReadinessCalled = true;
         var swProbe = Stopwatch.StartNew();
         long msInit = 0, msElevation = 0, msZoom = 0, msUia = 0, msWin32 = 0, msSendInput = 0;
         long msBlocker = 0, msKnowhow = 0, msYield = 0;
@@ -935,6 +943,7 @@ public sealed class InputReadiness
     /// </summary>
     public PointReadinessReport ProbeAtPoint(PointReadinessRequest req)
     {
+        ReadinessCalled = true;
         var sw = Stopwatch.StartNew();
 
         // ── Step 0: 자동 유도 ──

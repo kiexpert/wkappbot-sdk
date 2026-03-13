@@ -184,13 +184,7 @@ internal partial class Program
         }
 
         // ── Fallback: Foreground + Physical Click ──
-        // Show idle time + run input readiness (yield popup if user active)
-        var idleMs = NativeMethods.GetUserIdleMs();
-        var idleStr = idleMs >= 60000 ? $"{idleMs / 60000}m {idleMs / 1000 % 60}s"
-                    : idleMs >= 1000  ? $"{idleMs / 1000.0:F1}s"
-                    :                   $"{idleMs}ms";
-        Console.WriteLine($"[IDLE] user input {idleStr} ago — physical click will steal focus");
-
+        // Run input readiness (yield popup if user active; [IDLE] printed by SmartSetForegroundWindow)
         var physReadiness = CreateInputReadiness();
         var physReport = physReadiness.Probe(new InputReadinessRequest
         {
