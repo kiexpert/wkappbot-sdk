@@ -239,7 +239,14 @@ public sealed class InputReadiness
     /// SmartSetForegroundWindow and physical input entry points check this flag.
     /// Commands that skip readiness trigger [IDLE⚠] warning — "no-readiness detected".
     /// </summary>
-    [ThreadStatic] public static bool ReadinessCalled;
+    // AsyncLocal: flows through async/await continuations even on thread-pool thread switches.
+    // [ThreadStatic] would lose the flag after any 'await' that resumes on a different thread.
+    private static readonly AsyncLocal<bool> _readinessCalled = new();
+    public static bool ReadinessCalled
+    {
+        get => _readinessCalled.Value;
+        set => _readinessCalled.Value = value;
+    }
 
     /// <summary>
     /// Call from physical input entry points (SendInput, SetCursorPos, SmartSetForegroundWindow).
@@ -405,25 +412,33 @@ public sealed class InputReadiness
         bool focusStealerFlagged = false;
         try
         {
-            if (!req.QuickMode && mainHwnd != IntPtr.Zero && req.IntendedAction != null)
+            if (!req.QuickMode && mainHwnd != IntPtr.Zero)
             {
                 const string FocusStealerPrefix = "WKAppBot_FocusStealer-";
                 const string MouseStealerPrefix  = "WKAppBot_MouseStealer-";
-                var act = req.IntendedAction.ToLowerInvariant();
+                var act = req.IntendedAction?.ToLowerInvariant() ?? "";
 
                 bool focusStolen = NativeMethods.GetPropW(mainHwnd, $"{FocusStealerPrefix}{act}") != IntPtr.Zero;
+                // midInput: stamped when mid-keystroke focus drift aborted a type/set-value action
+                // → force yield on ANY subsequent action on this hwnd until cleared
+                bool midInputStealer = NativeMethods.GetPropW(mainHwnd, $"{FocusStealerPrefix}midInput") != IntPtr.Zero;
+                // Generic stamp (action-agnostic): set whenever ANY action stole focus
+                // Catches cross-action mismatches (e.g., click stole → next probe is type)
+                bool anyFocusStealer = NativeMethods.GetPropW(mainHwnd, "WKAppBot_FocusStealer") != IntPtr.Zero;
                 // Mouse prop stored as "mouse-{action}" by ActionApi
                 bool mouseStolen = NativeMethods.GetPropW(mainHwnd, $"{MouseStealerPrefix}mouse-{act}") != IntPtr.Zero;
 
-                if (focusStolen || mouseStolen)
+                if (focusStolen || midInputStealer || anyFocusStealer || mouseStolen)
                 {
                     focusStealerFlagged = true;
                     var kinds = string.Join("+",
-                        new[] { focusStolen ? "focus" : null, mouseStolen ? "mouse" : null }
+                        new[] { (focusStolen || midInputStealer || anyFocusStealer) ? "focus" : null, mouseStolen ? "mouse" : null }
                         .Where(s => s != null));
+                    if (string.IsNullOrEmpty(kinds)) kinds = "focus";
+                    var midTag = midInputStealer ? " (mid-input drift)" : anyFocusStealer ? " (generic)" : "";
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine(
-                        $"  [READINESS] ⚠ {kinds.ToUpperInvariant()} STEALER: '{req.IntendedAction}' " +
+                        $"  [READINESS] ⚠ {kinds.ToUpperInvariant()} STEALER{midTag}: '{req.IntendedAction}' " +
                         $"previously grabbed {kinds} on hwnd=0x{mainHwnd:X} → forcing yield popup");
                     Console.ResetColor();
                 }
@@ -436,9 +451,10 @@ public sealed class InputReadiness
             bool targetIsForeground = mainHwnd != IntPtr.Zero
                 && NativeMethods.GetForegroundWindow() == mainHwnd;
 
-            if (targetIsForeground && !userRecent && req.AutoApproveYield)
+            if (targetIsForeground && !userRecent && req.AutoApproveYield && !focusStealerFlagged)
             {
                 // ── 자동승인 즉시 (AutoApproveYield=true: Slack 프롬프트 전달 등 완전 자동화) ──
+                // focusStealerFlagged=true 시 절대 묵살 금지 → 팝업 강제 표시
                 yieldRequested = true;
                 yieldConfirmed = true;
                 yieldFocusAcquired = true;
@@ -519,6 +535,13 @@ public sealed class InputReadiness
                     Console.WriteLine("  [READINESS] Yield safety timeout — proceeding anyway");
                     Console.ResetColor();
                 }
+            }
+
+            // ── FocusStealer props 클리어 (유저 승인 후 재시도에서 반복 팝업 방지) ──
+            if (yieldConfirmed && mainHwnd != IntPtr.Zero)
+            {
+                try { NativeMethods.RemovePropW(mainHwnd, "WKAppBot_FocusStealer-midInput"); } catch { }
+                try { NativeMethods.RemovePropW(mainHwnd, "WKAppBot_FocusStealer"); } catch { }
             }
         }
 
@@ -1315,8 +1338,8 @@ public sealed class InputReadiness
                     Console.WriteLine($"  [FL] ⚠ Foreground stolen! 0x{prevFg:X} → 0x{nowFg:X}");
 
                     // 즉시 복원: 원래 전경(prevFg)을 다시 전경으로! → 도둑(nowFg)은 자동으로 2등
-                    // SetForegroundWindow가 전경 상태 + Z-order 둘 다 처리
-                    NativeMethods.SetForegroundWindow(prevFg);
+                    // Raw restore (no guard) — we're undoing a steal, not acquiring focus
+                    NativeMethods.SetForegroundWindowRaw(prevFg);
                     Console.WriteLine($"  [FL] ⚠ Restored: 0x{prevFg:X}→fg, 0x{nowFg:X}→#2");
                     Console.ResetColor();
                 }
@@ -1442,7 +1465,7 @@ public sealed class InputReadiness
 
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"  [FL] ⚠ Foreground stolen! 0x{expectedFg:X} → 0x{nowFg:X}");
-        NativeMethods.SetForegroundWindow(expectedFg);
+        NativeMethods.SetForegroundWindowRaw(expectedFg); // raw restore — undoing steal
         Console.WriteLine($"  [FL] ⚠ Restored: 0x{expectedFg:X}→fg, 0x{nowFg:X}→#2");
         Console.ResetColor();
         return (true, nowFg, true);

@@ -1419,6 +1419,41 @@ public sealed class UiaLocator : IDisposable
                 }
                 catch { }
             }
+
+            // ── Siblings of focused element ──
+            try
+            {
+                var focusedEl = trimmed[0];
+                var walker = _automation.TreeWalkerFactory.GetRawViewWalker();
+                var siblings = new List<(AutomationElement el, bool isFocused)>();
+
+                // collect prev siblings (walk backwards, then reverse)
+                var prev = new List<AutomationElement>();
+                try { var p = walker.GetPreviousSibling(focusedEl); while (p != null) { prev.Add(p); try { p = walker.GetPreviousSibling(p); } catch { break; } } } catch { }
+                prev.Reverse();
+                foreach (var s in prev) siblings.Add((s, false));
+                siblings.Add((focusedEl, true));
+                // collect next siblings
+                try { var n = walker.GetNextSibling(focused); while (n != null) { siblings.Add((n, false)); try { n = walker.GetNextSibling(n); } catch { break; } } } catch { }
+
+                if (siblings.Count > 1) // only show if there are actual siblings
+                {
+                    sb.AppendLine("── siblings ──");
+                    foreach (var (sib, isSelf) in siblings)
+                    {
+                        string sName, sAid, sCt;
+                        try { sName = sib.Name ?? ""; } catch { sName = ""; }
+                        try { sAid = sib.AutomationId ?? ""; } catch { sAid = ""; }
+                        try { sCt = sib.ControlType.ToString(); } catch { sCt = "?"; }
+                        string disp = sName.Length > 50 ? sName[..47] + "..." : sName;
+                        if (isSelf) disp += "(포커스드)";
+                        string aidPart = !string.IsNullOrEmpty(sAid) ? $" aid=\"{sAid}\"" : "";
+                        sb.AppendLine($"  [{sCt}] \"{disp}\"{aidPart}");
+                    }
+                }
+            }
+            catch { }
+
             return sb.ToString();
         }
         catch { return ""; }
