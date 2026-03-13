@@ -80,17 +80,42 @@ internal partial class Program
 
     static string? GetSendReplyUsername(bool printDecision = false)
     {
-        // Limit for now: only override when Codex host is certain.
-        var username = IsRunningFromCodexAppCertain()
-            ? BuildSlackBotUsername(SlackCodexPrefix, null, spaceBeforeBracket: false)
-            : null;
+        string? username = null;
+        if (IsRunningFromCodexAppCertain())
+            username = BuildSlackBotUsername(SlackCodexPrefix, null, spaceBeforeBracket: false);
+        else if (IsRunningFromClaudeAppCertain())
+            username = BuildSlackBotUsername(SlackClaudePrefix, null, spaceBeforeBracket: false);
 
         if (printDecision)
-        {
             Console.WriteLine($"[SLACK] bot-name: {(string.IsNullOrEmpty(username) ? "(default-bot)" : username)}");
-        }
 
         return username;
+    }
+
+    static bool IsRunningFromClaudeAppCertain()
+    {
+        try
+        {
+            var forced = Environment.GetEnvironmentVariable("WKAPPBOT_ASSUME_CLAUDE_APP")?.Trim().ToLowerInvariant();
+            if (forced is "1" or "true" or "yes" or "on") return true;
+            if (forced is "0" or "false" or "no" or "off") return false;
+
+            // Certainty: parent/ancestor chain contains claude process.
+            using var cur = Process.GetCurrentProcess();
+            int pid = cur.Id;
+            for (int depth = 0; depth < 6; depth++)
+            {
+                var ppid = GetParentPidForCodexCheck(pid);
+                if (ppid <= 0) break;
+                using var p = Process.GetProcessById(ppid);
+                var name = (p.ProcessName ?? string.Empty).ToLowerInvariant();
+                if (name == "claude" || name.StartsWith("claude"))
+                    return true;
+                pid = ppid;
+            }
+            return false;
+        }
+        catch { return false; }
     }
 
     static bool IsRunningFromCodexAppCertain()

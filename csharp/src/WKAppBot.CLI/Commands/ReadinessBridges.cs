@@ -58,7 +58,7 @@ internal partial class Program
             var prevFg = NativeMethods.GetForegroundWindow();
             NativeMethods.ShowWindow(hwnd, 9); // SW_RESTORE
             if (prevFg != IntPtr.Zero && prevFg != hwnd)
-                NativeMethods.SetForegroundWindow(prevFg);
+                NativeMethods.SetForegroundWindowRaw(prevFg); // restore prev fg after SW_RESTORE
             Thread.Sleep(300);
             iconicZoom?.UpdateImage();
             iconicZoom?.ShowPass("restored");

@@ -510,6 +510,17 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             result = await SendAsync("Runtime.evaluate", parameters);
         }
 
+        // Log JS exceptions to console (previously silent — returned null with no trace)
+        var exDetails = result?["exceptionDetails"];
+        if (exDetails != null)
+        {
+            var msg = exDetails["exception"]?["description"]?.GetValue<string>()
+                   ?? exDetails["text"]?.GetValue<string>()
+                   ?? "unknown JS error";
+            var line = exDetails["lineNumber"]?.GetValue<int>() ?? -1;
+            Console.WriteLine($"[CDP:JS-ERR] {msg}{(line >= 0 ? $" (line {line})" : "")}");
+        }
+
         var valueNode = result?["result"]?["value"];
         if (valueNode == null) return null;
 
@@ -1189,6 +1200,13 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
             ["returnByValue"] = false
         });
 
+        var exDetailsFile = evalResult?["exceptionDetails"];
+        if (exDetailsFile != null)
+        {
+            var msg = exDetailsFile["exception"]?["description"]?.GetValue<string>()
+                   ?? exDetailsFile["text"]?.GetValue<string>() ?? "unknown JS error";
+            Console.WriteLine($"[CDP:JS-ERR] SetFileInput: {msg}");
+        }
         var objectId = evalResult?["result"]?["objectId"]?.GetValue<string>();
         if (string.IsNullOrEmpty(objectId))
             return false;

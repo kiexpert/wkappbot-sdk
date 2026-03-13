@@ -582,6 +582,16 @@ internal sealed class InputZoomHost : IDisposable
         // Without this, IsBackground=true kills the overlay when main thread exits.
         if (_uiThread != null) try { _uiThread.IsBackground = false; } catch { }
 
+        // Safety kill-timer: force shutdown if animation gets stuck (ghost magnifier guard).
+        // Budget = (delayMs + fadeDurationMs) * 3 — plenty of margin for normal fade.
+        int safetyMs = (delayMs + fadeDurationMs) * 3;
+        var killTimer = new System.Threading.Timer(_ =>
+        {
+            try { _dispatcher?.InvokeShutdown(); } catch { }
+        }, null, safetyMs, System.Threading.Timeout.Infinite);
+        // Suppress CA2000: timer is intentionally fire-and-forget (auto-GC after firing)
+        GC.KeepAlive(killTimer);
+
         if (Mode == ZoomMode.HighlightBox)
             _dispatcher?.BeginInvoke(() => _highlightWindow?.BeginFadeOut(
                 Math.Min(delayMs, 2000), Math.Min(fadeDurationMs, 600)));

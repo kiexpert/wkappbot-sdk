@@ -28,8 +28,9 @@ internal partial class Program
         bool noWait = false;
         bool loopMode = false;
         bool triadMode = false;
-        int loopMaxSteps = 3;
+        int loopMaxSteps = 7;
         int loopRetry = 1;
+        int loopMaxParallel = 7;
         int timeoutSec = 30;
         var remaining = new List<string>();
         for (int i = 1; i < args.Length; i++)
@@ -60,6 +61,11 @@ internal partial class Program
             {
                 if (int.TryParse(args[++i], out var retryN))
                     loopRetry = Math.Max(0, retryN);
+            }
+            else if (args[i] == "--max-parallel" && i + 1 < args.Length)
+            {
+                if (int.TryParse(args[++i], out var mpN))
+                    loopMaxParallel = Math.Max(1, mpN);
             }
             else if (args[i] == "--model" && i + 1 < args.Length)
                 modelHint = args[++i];
@@ -96,9 +102,9 @@ internal partial class Program
 
         return ai switch
         {
-            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, triadMode, modelHint, noWait),
-            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, triadMode, modelHint, noWait),
-            "claude" => AskClaude(question, slackReport, timeoutSec, newTab, newSession, loopMode, loopMaxSteps, loopRetry, triadMode, modelHint, noWait),
+            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait),
+            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait),
+            "claude" => AskClaude(question, slackReport, timeoutSec, newTab, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait),
             _ => Error($"Unknown AI: {ai} (use gemini, gpt, or claude)")
         };
     }

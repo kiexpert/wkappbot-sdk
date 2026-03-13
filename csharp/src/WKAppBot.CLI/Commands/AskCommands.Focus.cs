@@ -59,8 +59,8 @@ internal partial class Program
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;
                     Console.WriteLine(focusStealerKnown
-                        ? $"[ASK:FOCUS] ??FocusStealer-ask prop 媛먯? ???ъ빱???묐낫 ?뱀씤 ?꾩슂"
-                        : $"[ASK:FOCUS] ?좎? ?낅젰 媛먯? (idle={idleMs}ms) ???ъ빱???묐낫 ?앹뾽");
+                        ? $"[ASK:FOCUS] FocusStealer-ask prop detected -- yield confirmation required"
+                        : $"[ASK:FOCUS] foreground detected (idle={idleMs}ms) -- yield approval needed");
                     Console.ResetColor();
                     var yieldResult = new UserInputWaitAdapter(noSound: !focusStealerKnown).WaitForUserYield(
                         chromeHwndEarly, userIdleMs: idleMs, timeoutSeconds: 30,
@@ -68,11 +68,11 @@ internal partial class Program
                     if (!yieldResult.Approved)
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"[ASK:FOCUS] ?좎? 痍⑥냼 ??{action} 以묐떒");
+                        Console.WriteLine($"[ASK:FOCUS] yield denied -- {action} aborted");
                         Console.ResetColor();
                         return (false, prevFg, null);
                     }
-                    Console.WriteLine($"[ASK:FOCUS] ?뱀씤????{action} 吏꾪뻾");
+                    Console.WriteLine($"[ASK:FOCUS] yield approved -- {action} running");
                 }
             }
 
@@ -167,7 +167,7 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"[AAR:CDP:FOCUS] Chrome stole focus during {action}! Restoring...");
             Console.ResetColor();
-            NativeMethods.SetForegroundWindow(prevFg);
+            NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg
         }
     }
 
@@ -212,7 +212,7 @@ internal partial class Program
         // Also stamp a generic "ask" marker ??EnsureCdpReadyAsync detects it ??forces yield popup next run
         try { NativeMethods.SetPropW(cur, $"{ActionApi.FocusStealerPropPrefix}ask", (IntPtr)1); } catch { }
 
-        NativeMethods.SetForegroundWindow(prevFg);
+        NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg
 
         // ?? Alert on MY window (prevFg) ??user sees exactly when/where Gemini stole focus
         try

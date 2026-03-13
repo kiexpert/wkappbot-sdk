@@ -81,6 +81,32 @@ internal partial class Program
         // Kill ghost zoom overlays from previous invocations (keeps exe unlocked for publish)
         try { InputZoomHost.CloseAllGhosts(); } catch { }
 
+        // Orphan guard: if parent dies, exit too (prevents ghost processes like stuck win-click).
+        // Eye mode is intentionally long-running/detached → skip.
+        bool isEyeCmd = args.Length > 0 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
+        if (!RunningInEye && !isEyeCmd)
+        {
+            int parentPid = GetParentPid(Environment.ProcessId);
+            if (parentPid > 0)
+            {
+                var monitor = new Thread(() =>
+                {
+                    while (true)
+                    {
+                        Thread.Sleep(2000);
+                        try
+                        {
+                            using var ph = System.Diagnostics.Process.GetProcessById(parentPid);
+                            if (ph.HasExited) { Environment.Exit(0); return; }
+                        }
+                        catch (ArgumentException) { Environment.Exit(0); return; } // parent gone
+                        catch { } // access denied etc. — keep watching
+                    }
+                }) { IsBackground = true, Name = "OrphanGuard" };
+                monitor.Start();
+            }
+        }
+
         // Screen reader mode: once enabled for Chromium/Electron, stays ON permanently.
         // No restore on exit — next run starts instantly (no broadcast delay).
 
