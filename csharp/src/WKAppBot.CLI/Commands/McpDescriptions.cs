@@ -66,6 +66,15 @@ internal partial class Program
         "### Dialog/Popup Auto-Dismissal\n" +
         "Unexpected popup blocking your automation? WKAppBot detects blocker windows (~5ms) " +
         "and auto-dismisses known dialog patterns. Experience DB learns which buttons work for each popup.\n\n" +
+        "### Flutter Windows Apps\n" +
+        "Flutter renders via its own engine — UIA tree is nearly empty (no button elements). " +
+        "UIA invoke/click succeeds (result=ok) but Flutter widget callbacks never fire. " +
+        "Workaround: use coordinate-based click targeting the FLUTTERVIEW child window directly.\n" +
+        "Step 1 — find FLUTTERVIEW child: action=inspect, grap=\"*flutter_app*\", depth=2 (look for FLUTTERVIEW class in children)\n" +
+        "Step 2 — screenshot to find button coords: action=screenshot, grap=\"*flutter_app*\"\n" +
+        "Step 3 — click with coords: action=click, grap=\"*flutter_app*\", text=\"--x 320 --y 480\" (window-relative coords)\n" +
+        "Note: FLUTTERVIEW child is typically offset ~8px left, ~31px top from outer window client area (title bar). " +
+        "If click misses, inspect outer vs inner offsets and adjust coords accordingly.\n\n" +
         "## Android ADB (adb:// scheme)\n" +
         "Prefix grap with adb:// to target Android devices via USB:\n" +
         "- Format: adb://device/package#scope (same #scope logic as Windows UIA)\n" +
