@@ -11,6 +11,58 @@ internal partial class Program
 {
     static int AgentCommand(string[] args)
     {
+        // wkappbot agent checkpoint [--label "text"]
+        if (args.Length > 0 && args[0] == "checkpoint")
+        {
+            var label = args.Length > 2 && args[1] == "--label" ? args[2]
+                      : args.Length > 1 && !args[1].StartsWith("--") ? args[1]
+                      : "";
+            var id = AgentFileTracker.Checkpoint(label);
+            Console.WriteLine($"[AGENT] Checkpoint {id} saved ({AgentFileTracker.TrackedCount} files tracked)");
+            return 0;
+        }
+
+        // wkappbot agent dump-patch [--out file.patch] [--apply]
+        if (args.Length > 0 && args[0] == "dump-patch")
+        {
+            string? outPath  = null;
+            bool    doApply  = false;
+            for (int i = 1; i < args.Length; i++)
+            {
+                if (args[i] == "--out"   && i + 1 < args.Length) outPath = args[++i];
+                else if (args[i] == "--apply") doApply = true;
+            }
+            var workspace = DataDir; // use HQ dir as fallback; ideally workspace root
+            // Try to find git root
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo("git", "rev-parse --show-toplevel")
+                    { RedirectStandardOutput = true, UseShellExecute = false };
+                using var p = System.Diagnostics.Process.Start(psi)!;
+                var root = p.StandardOutput.ReadToEnd().Trim();
+                p.WaitForExit();
+                if (p.ExitCode == 0 && Directory.Exists(root)) workspace = root;
+            }
+            catch { }
+
+            var patch = AgentFileTracker.DumpPatch(workspace, outPath);
+            if (patch == null)
+            {
+                Console.WriteLine("[AGENT] No files tracked — nothing to dump.");
+                return 0;
+            }
+            if (doApply)
+            {
+                Console.WriteLine($"[AGENT] Applying patch: {patch}");
+                var psi2 = new System.Diagnostics.ProcessStartInfo("git", $"apply \"{patch}\"")
+                    { UseShellExecute = false, WorkingDirectory = workspace };
+                using var p2 = System.Diagnostics.Process.Start(psi2)!;
+                p2.WaitForExit();
+                Console.WriteLine(p2.ExitCode == 0 ? "[AGENT] Patch applied." : $"[AGENT] git apply failed (exit {p2.ExitCode})");
+            }
+            return 0;
+        }
+
         if (args.Length < 2)
             return AgentUsage();
 
