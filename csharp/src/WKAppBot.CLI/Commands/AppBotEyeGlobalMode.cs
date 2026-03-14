@@ -121,23 +121,41 @@ internal partial class Program
             posY = y;
         }
 
-        // ── Kill stale Eye processes ──
+        // ── Kill duplicate Eye processes ──
+        // Sweep all wkappbot/wkappbot-core processes that have an Eye window or hold the Eye mutex.
+        // This ensures only one Eye runs at a time regardless of how many were spawned.
         if (replacePid == 0)
         {
-            // Normal start: sweep stale Eyes (running ≥30s — excludes short-lived commands)
             int myPid = Environment.ProcessId;
-            var myStartTime = DateTime.UtcNow;
-            var staleThreshold = myStartTime - TimeSpan.FromSeconds(30);
-            foreach (var proc in Process.GetProcessesByName("wkappbot"))
+            var names = new[] { "wkappbot", "wkappbot-core" };
+            foreach (var name in names)
+            foreach (var proc in Process.GetProcessesByName(name))
             {
                 if (proc.Id == myPid) continue;
+                bool isEye = false;
                 try
                 {
-                    if (proc.StartTime.ToUniversalTime() > staleThreshold) continue;
+                    // Detect Eye: has "WK AppBot Eye" window owned by this PID
+                    var sb2 = new System.Text.StringBuilder(256);
+                    NativeMethods.EnumWindows((hwnd, _) =>
+                    {
+                        NativeMethods.GetWindowTextW(hwnd, sb2, sb2.Capacity);
+                        if (sb2.ToString() == "WK AppBot Eye")
+                        {
+                            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                            if ((int)pid == proc.Id) isEye = true;
+                        }
+                        return !isEye;
+                    }, IntPtr.Zero);
+                }
+                catch { }
+                if (!isEye) continue;
+                try
+                {
                     proc.Kill();
                     proc.WaitForExit(3000);
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[EYE] Killed stale Eye (PID={proc.Id})");
+                    Console.WriteLine($"[EYE] Killed duplicate Eye (PID={proc.Id})");
                     Console.ResetColor();
                 }
                 catch { /* already exited or access denied */ }
@@ -197,12 +215,29 @@ internal partial class Program
         if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
 
         // ── Find Claude Desktop window (for plan approval UIA clicks) ──
+        // Stored in a field so the getter closure below always returns the current value.
+        // Re-fetched automatically when stale (Electron restart / window recreation).
         IntPtr claudeHwnd = FindClaudeDesktopWindow();
         if (claudeHwnd != IntPtr.Zero)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine($"[EYE] Found Claude Desktop (hwnd=0x{claudeHwnd:X8})");
             Console.ResetColor();
+        }
+        // Getter: re-detects if hwnd gone (Claude Desktop restarted or Electron recreated window).
+        IntPtr GetCurrentClaudeHwnd()
+        {
+            if (claudeHwnd != IntPtr.Zero && !WKAppBot.Win32.Native.NativeMethods.IsWindow(claudeHwnd))
+            {
+                var fresh = FindClaudeDesktopWindow();
+                if (fresh != claudeHwnd)
+                {
+                    claudeHwnd = fresh;
+                    if (claudeHwnd != IntPtr.Zero)
+                        Console.WriteLine($"[EYE] Claude Desktop re-detected (hwnd=0x{claudeHwnd:X8})");
+                }
+            }
+            return claudeHwnd;
         }
 
         // ── Slack status streaming (per-instance state → AppBotEyeClaudeStatusStreamer.cs) ──
@@ -299,7 +334,7 @@ internal partial class Program
 
                     // Set up event handlers (Slack → Claude prompt forwarding, plan/permission approval, status streaming)
                     SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
-                        claudeHwnd, GetAnyPlanApprovalTs,
+                        GetCurrentClaudeHwnd, GetAnyPlanApprovalTs,
                         GetAnyPermissionTs, startupTs, botUsername,
                         GetAnyInstanceSlackStatusTs, () => ResetAllInstancesSlackStatus(statusTsFile));
 
@@ -312,9 +347,10 @@ internal partial class Program
 
                         var thread = action.MessageTs ?? GetAnyPlanApprovalTs();
 
-                        if (action.ActionId == "plan_approve" && claudeHwnd != IntPtr.Zero)
+                        var cwHwnd = GetCurrentClaudeHwnd(); // re-detect if stale
+                        if (action.ActionId == "plan_approve" && cwHwnd != IntPtr.Zero)
                         {
-                            var approved = ClickApproveButton(claudeHwnd);
+                            var approved = ClickApproveButton(cwHwnd);
                             var reply = approved
                                 ? ":white_check_mark: 플랜 승인 완료! Claude가 코딩을 시작합니다."
                                 : ":x: 승인 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
@@ -330,10 +366,10 @@ internal partial class Program
                                     .Wait(3000);
                             }
                         }
-                        else if (action.ActionId.StartsWith("perm_") && claudeHwnd != IntPtr.Zero)
+                        else if (action.ActionId.StartsWith("perm_") && cwHwnd != IntPtr.Zero)
                         {
                             var buttonText = action.Value;
-                            var clicked = ClickPermissionButton(claudeHwnd, buttonText);
+                            var clicked = ClickPermissionButton(cwHwnd, buttonText);
                             var reply = clicked
                                 ? $":white_check_mark: \"{buttonText}\" 클릭 완료!"
                                 : $":x: \"{buttonText}\" 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
@@ -349,9 +385,9 @@ internal partial class Program
                                     .Wait(3000);
                             }
                         }
-                        else if (action.ActionId == "plan_reject" && claudeHwnd != IntPtr.Zero)
+                        else if (action.ActionId == "plan_reject" && cwHwnd != IntPtr.Zero)
                         {
-                            var feedbackOk = TypePlanFeedback(claudeHwnd, "이 플랜을 거절합니다. 다시 검토해주세요.");
+                            var feedbackOk = TypePlanFeedback(cwHwnd, "이 플랜을 거절합니다. 다시 검토해주세요.");
                             var reply = feedbackOk
                                 ? ":no_entry_sign: 플랜 거절 피드백을 Claude에 전달했습니다."
                                 : ":x: 피드백 입력란을 찾을 수 없습니다";
@@ -539,9 +575,46 @@ internal partial class Program
         // Track warned sizes per CWD — only re-warn if size actually increased
         var contextWarnedSizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
+        // ── Duplicate Eye self-close: Z-order check every ~10s ──
+        // EnumWindows enumerates top-level windows top-to-bottom (Z-order).
+        // First "WK AppBot Eye" window found = topmost. If that's not me → I'm behind → self-close.
+        IntPtr myEyeHwnd = IntPtr.Zero;
+        int duplicateCheckFrame = 0;
+
         int frameCount = 0;
         while (host.IsAlive && !cts.IsCancellationRequested)
         {
+            // ── Duplicate Eye check (every 100 frames ≈ 10s) ──
+            if (++duplicateCheckFrame >= 100)
+            {
+                duplicateCheckFrame = 0;
+                if (myEyeHwnd == IntPtr.Zero) myEyeHwnd = host.GetWindowHandle();
+                if (myEyeHwnd != IntPtr.Zero)
+                {
+                    IntPtr firstEyeHwnd = IntPtr.Zero;
+                    var sbDup = new System.Text.StringBuilder(256);
+                    NativeMethods.EnumWindows((hwnd, _) =>
+                    {
+                        NativeMethods.GetWindowTextW(hwnd, sbDup, sbDup.Capacity);
+                        if (sbDup.ToString() == "WK AppBot Eye")
+                        {
+                            firstEyeHwnd = hwnd; // first hit = topmost Eye in Z-order
+                            return false; // stop enumeration
+                        }
+                        return true;
+                    }, IntPtr.Zero);
+
+                    if (firstEyeHwnd != IntPtr.Zero && firstEyeHwnd != myEyeHwnd)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"[EYE] Not topmost Eye (top=0x{firstEyeHwnd:X} me=0x{myEyeHwnd:X}) — self-closing");
+                        Console.ResetColor();
+                        cts.Cancel();
+                        break;
+                    }
+                }
+            }
+
             // ── Core tick: read ticks + sessions ──
             var forceFull = ShouldForceFullLoad();
             var (tickDirty, promptDirty) = CheckGlobalDirtyFlags(forceFull);
@@ -1160,10 +1233,7 @@ internal partial class Program
                 foreach (var line in ipc.Summary.Split('\n'))
                     Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
                 Console.Out.Flush();
-                // Slack inbox still checked by one-shot (Eye loop Slack polling is separate)
-                var swSlack = Stopwatch.StartNew();
-                EyeTickForwardSlackInbox();
-                Console.WriteLine($"[PROF] SlackInbox={swSlack.ElapsedMilliseconds}ms");
+                // Slack forwarding handled by OnMessage → slack route worker (no HTTP poll on tick)
                 Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
                 Console.Out.Flush();
                 return 0;
@@ -1193,7 +1263,6 @@ internal partial class Program
                 foreach (var line in ipcRetry.Summary.Split('\n'))
                     Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
                 Console.Out.Flush();
-                EyeTickForwardSlackInbox();
                 Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
                 Console.Out.Flush();
                 return 0;
@@ -1306,11 +1375,7 @@ internal partial class Program
                 Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
             Console.Out.Flush();
 
-            // ── Phase 7: Slack inbox check + forward to Claude prompt ──
-            swPhase.Restart();
-            EyeTickForwardSlackInbox();
-            swPhase.Stop();
-            Console.WriteLine($"[PROF] SlackInbox={swPhase.ElapsedMilliseconds}ms");
+            // Phase 7: Slack forwarding handled by OnMessage → slack route worker (no HTTP poll)
             Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 

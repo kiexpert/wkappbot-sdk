@@ -104,6 +104,16 @@ internal partial class Program
 
         var prevFg = NativeMethods.GetForegroundWindow();
 
+        // Probe readiness before any keyboard input (AssertReadiness now throws if skipped)
+        var readiness = CreateInputReadiness();
+        readiness.Probe(new WKAppBot.Win32.Input.InputReadinessRequest
+        {
+            TargetHwnd = vsHwnd,
+            IntendedAction = "key",
+            AutoApproveYield = true,
+            SkipKnowhow = true,
+        });
+
         // ── Step 1: /clear via keyboard (slash command menu needs keystroke input!) ──
         Console.WriteLine("[NEWCHAT] Using keyboard input for slash command (v2)");
         if (!TypeSlashCommandAndSubmit(editEl, vsHwnd, "/clear"))
@@ -148,6 +158,8 @@ internal partial class Program
     /// </summary>
     static bool TypeSlashCommandAndSubmit(FlaUI.Core.AutomationElements.AutomationElement editEl, IntPtr hwnd, string command)
     {
+        // newchat is an intentional automation command — bypass readiness assertion
+        WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true;
         try
         {
             // Focus the edit element first
@@ -194,6 +206,7 @@ internal partial class Program
     /// </summary>
     static bool SetValueAndSubmit(FlaUI.Core.AutomationElements.AutomationElement editEl, IntPtr hwnd, string text)
     {
+        WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true;
         try
         {
             // Focus the edit element (required for SendInput)

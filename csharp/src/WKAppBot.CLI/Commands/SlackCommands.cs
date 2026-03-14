@@ -37,6 +37,7 @@ internal partial class Program
             "reply" => SlackReplyCommand(args),
             "upload" => SlackUploadCommand(args),
             "screenshot" => SlackScreenshotCommand(args),
+            "route" => SlackRouteCommand(args[1..]),
             "catch-up" or "catchup" => SlackCatchUpCommand(args),
             "prompt" => SlackPromptCommand(args),
             "schedule" => SlackScheduleCommand(args),
@@ -831,6 +832,97 @@ internal partial class Program
         }
         catch { }
         return (channel, threadTs);
+    }
+
+    // ── Display name resolution ─────────────────────────────────────
+    // Slack user IDs (e.g. U0A21P4RK29) are resolved to display names via users.info API.
+    // Token is set once when a listener/eye session starts (single-process, static is safe).
+    // Fallback: webhook.json["known_users"] = { "U0A21P4RK29": "Will" } static mapping.
+    static string? _displayNameBotToken;
+    static readonly Dictionary<string, string> _displayNameCache = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Load known_users mapping from webhook.json into the display name cache.
+    /// Call once at session start to pre-populate cache before any API calls.
+    /// </summary>
+    static void LoadKnownUsersFromConfig()
+    {
+        try
+        {
+            var cfgPath = SlackConfigPath;
+            if (!File.Exists(cfgPath)) return;
+            var node = JsonNode.Parse(File.ReadAllText(cfgPath));
+            var knownUsers = node?["known_users"];
+            if (knownUsers == null) return;
+            foreach (var kv in knownUsers.AsObject())
+            {
+                if (!string.IsNullOrWhiteSpace(kv.Key) && kv.Value != null)
+                {
+                    var displayName = kv.Value.GetValue<string>();
+                    if (!string.IsNullOrWhiteSpace(displayName))
+                        _displayNameCache[kv.Key] = displayName;
+                }
+            }
+            Console.WriteLine($"[SLACK] Loaded {_displayNameCache.Count} known_users from config");
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Resolve a Slack user ID to a human-readable display name.
+    /// Falls back to the raw user ID on API error or if no token is set.
+    /// Results are cached per session to avoid repeated API calls.
+    /// </summary>
+    static string ResolveSlackDisplayName(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId)) return userId;
+        if (_displayNameCache.TryGetValue(userId, out var cached)) return cached;
+        if (string.IsNullOrWhiteSpace(_displayNameBotToken))
+        {
+            _displayNameCache[userId] = userId;
+            return userId;
+        }
+
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            using var req = new HttpRequestMessage(HttpMethod.Get,
+                $"https://slack.com/api/users.info?user={Uri.EscapeDataString(userId)}");
+            req.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _displayNameBotToken);
+            var resp = http.Send(req);
+            using var reader = new StreamReader(resp.Content.ReadAsStream());
+            var rawJson = reader.ReadToEnd();
+            var json = JsonSerializer.Deserialize<JsonNode>(rawJson);
+
+            if (json?["ok"]?.GetValue<bool>() == true)
+            {
+                var profile = json["user"]?["profile"];
+                var name = profile?["display_name"]?.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(name))
+                    name = profile?["real_name"]?.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(name))
+                    name = json["user"]?["name"]?.GetValue<string>();
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    _displayNameCache[userId] = name!;
+                    return name!;
+                }
+                Console.Error.WriteLine($"[SLACK] users.info ok=true but no name found for {userId}");
+            }
+            else
+            {
+                var err = json?["error"]?.GetValue<string>() ?? "unknown";
+                Console.Error.WriteLine($"[SLACK] users.info failed for {userId}: error={err}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SLACK] users.info exception for {userId}: {ex.Message}");
+        }
+
+        _displayNameCache[userId] = userId; // cache failure to prevent hammering API
+        return userId;
     }
 
     /// <summary>Get bot user ID via auth.test (sync helper).</summary>

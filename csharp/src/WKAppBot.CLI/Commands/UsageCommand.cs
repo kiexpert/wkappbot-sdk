@@ -214,6 +214,23 @@ Data Directory:
         return 1;
     }
 
+    /// <summary>
+    /// Parse human-friendly duration: "30"=30s, "5m"=5min, "500ms"=500ms, "2h"=2h.
+    /// Bare number = seconds. Returns TimeSpan.Zero on parse failure.
+    /// </summary>
+    internal static TimeSpan ParseDuration(string s)
+    {
+        s = s.Trim().ToLowerInvariant();
+        var ic = System.Globalization.CultureInfo.InvariantCulture;
+        var ns = System.Globalization.NumberStyles.Float;
+        if (s.EndsWith("ms") && double.TryParse(s[..^2], ns, ic, out var ms))  return TimeSpan.FromMilliseconds(ms);
+        if (s.EndsWith("h")  && double.TryParse(s[..^1], ns, ic, out var h))   return TimeSpan.FromHours(h);
+        if (s.EndsWith("m")  && double.TryParse(s[..^1], ns, ic, out var m))   return TimeSpan.FromMinutes(m);
+        if (s.EndsWith("s")  && double.TryParse(s[..^1], ns, ic, out var sec)) return TimeSpan.FromSeconds(sec);
+        if (double.TryParse(s, ns, ic, out var plain))                          return TimeSpan.FromSeconds(plain);
+        return TimeSpan.Zero;
+    }
+
     static string? GetArgValue(string[] args, string flag)
     {
         for (int i = 0; i < args.Length - 1; i++)

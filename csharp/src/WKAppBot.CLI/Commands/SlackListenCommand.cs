@@ -92,6 +92,8 @@ internal partial class Program
             Console.WriteLine("[SLACK] ERROR: app_token or bot_token not found in config");
             return 1;
         }
+        _displayNameBotToken = botToken; // enable display name resolution for suffix builders
+        LoadKnownUsersFromConfig();      // pre-populate cache from webhook.json known_users
 
         // Initialize Claude AI if --ai flag
         ClaudeChat? ai = null;

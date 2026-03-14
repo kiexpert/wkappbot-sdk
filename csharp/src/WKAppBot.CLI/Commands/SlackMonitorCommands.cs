@@ -78,16 +78,77 @@ internal partial class Program
     static bool IsRunningFromClaudeApp() =>
         IsRunningFromHostApp("claude", "WKAPPBOT_ASSUME_CLAUDE_APP");
 
+    /// <summary>
+    /// Build Slack bot username from the active prompt window cards (Eye-cached).
+    /// Priority: callerCwd match → most-recent card → null (no cards).
+    /// ParentName mapping: "claude"/"code"/"Code" → 클롣, "codex" → 코뎃, else → 앱봇.
+    /// </summary>
+    static string? GetBotUsernameFromCachedCards(string? callerCwd = null)
+    {
+        var cards = _cachedCards;
+        // If no cards yet (Eye just started, first tick not done), build inline from tick files + prompts
+        if (cards == null || cards.Count == 0)
+        {
+            var fresh = ReadEyeCards(staleSeconds: 86400);   // Codex/Claude tick-based cards
+            SupplementCardsFromPrompts(fresh);               // VS Code idle cards
+            if (fresh.Count > 0) cards = fresh;
+        }
+        if (cards == null || cards.Count == 0) return null;
+
+        EyeParentCard? best = null;
+
+        // 1. Exact CWD match (caller CWD from pipe)
+        if (!string.IsNullOrWhiteSpace(callerCwd))
+        {
+            best = cards.FirstOrDefault(c =>
+                !string.IsNullOrEmpty(c.Cwd) &&
+                string.Equals(c.Cwd.TrimEnd('\\', '/'), callerCwd.TrimEnd('\\', '/'),
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        // 2. Most-recently-updated card
+        if (best == null)
+            best = cards.OrderByDescending(c => c.LastTsUtc).FirstOrDefault();
+
+        if (best == null) return null;
+
+        var pname = (best.ParentName ?? "").ToLowerInvariant();
+        // Skip cards from wkappbot itself (shouldn't drive username detection)
+        if (pname == "wkappbot" || pname.Contains("wkappbot") || pname == "a11y" || pname.Contains("a11y"))
+            return null;
+        string prefix;
+        if (pname == "claude" || pname.StartsWith("claude") || pname == "code" || pname.StartsWith("code"))
+            prefix = SlackClaudePrefix;
+        else if (pname == "codex" || pname.Contains("codex"))
+            prefix = SlackCodexPrefix;
+        else
+            return null; // unknown ParentName — let caller fall through to other detection
+
+        var cwdTag = string.IsNullOrWhiteSpace(best.Cwd) ? GetSlackFolderTag() : AbbreviateCwd(best.Cwd);
+        return $"{prefix}[{cwdTag}]";
+    }
+
     static string? GetSendReplyUsername(bool printDecision = false)
     {
-        string? username = null;
-        if (IsRunningFromCodexAppCertain())
+        string username;
+
+        // Priority 1: prompt window cards (app type + CWD from actual Claude/Codex instances)
+        var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+        var cardUsername = GetBotUsernameFromCachedCards(callerCwd);
+        if (!string.IsNullOrEmpty(cardUsername))
+            username = cardUsername;
+        // Priority 2: certain process-ancestry detection
+        else if (IsRunningFromCodexAppCertain())
             username = BuildSlackBotUsername(SlackCodexPrefix, null, spaceBeforeBracket: false);
         else if (IsRunningFromClaudeAppCertain())
             username = BuildSlackBotUsername(SlackClaudePrefix, null, spaceBeforeBracket: false);
+        else
+        {
+            username = GetGeneralBotUsername();
+        }
 
         if (printDecision)
-            Console.WriteLine($"[SLACK] bot-name: {(string.IsNullOrEmpty(username) ? "(default-bot)" : username)}");
+            Console.WriteLine($"[SLACK] bot-name: {username}");
 
         return username;
     }
@@ -516,9 +577,8 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(cwd))
             return Environment.MachineName;
 
-        var trimmed = cwd.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var name = Path.GetFileName(trimmed);
-        return string.IsNullOrWhiteSpace(name) ? Environment.MachineName : name;
+        var abbreviated = AbbreviateCwd(cwd);
+        return string.IsNullOrWhiteSpace(abbreviated) ? Environment.MachineName : abbreviated;
     }
 
     static string BuildSlackBotUsername(string prefix, string? instanceName = null, bool spaceBeforeBracket = false)
@@ -543,6 +603,9 @@ internal partial class Program
             return BuildSlackBotUsername(SlackCodexPrefix, instanceName, spaceBeforeBracket: false);
         if (IsRunningFromClaudeApp())
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
+        // Heuristic: if claude.exe process is alive, likely running from Claude Code context
+        if (IsProcessAlive("claude"))
+            return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
 
         // Fallback: generic appbot identity.
         return BuildSlackBotUsername(SlackGenericPrefix, instanceName, spaceBeforeBracket: false);
@@ -554,6 +617,42 @@ internal partial class Program
     /// <summary>Build Slack username override from instance name.</summary>
     static string? GetBotUsername(string? instanceName) =>
         GetGeneralBotUsername(instanceName);
+
+    /// <summary>
+    /// Given any PID, instantly return the Slack display name.
+    /// Process name → host type → SlackPrefix + [cwdTag].
+    /// Single source of truth for all ack/status/probe display names.
+    /// </summary>
+    internal static string ResolveDisplayNameByPid(int pid)
+    {
+        string procName = "";
+        try { procName = System.Diagnostics.Process.GetProcessById(pid).ProcessName; } catch { }
+
+        var cwd = WKAppBot.Win32.Native.NativeMethods.GetProcessCurrentDirectory(pid);
+        if (!string.IsNullOrEmpty(cwd) && IsSystemOrInstallDirectory(cwd))
+            cwd = null;  // reject system/install dirs — no CWD tag
+        var cwdTag = string.IsNullOrEmpty(cwd) ? null : AbbreviateCwd(cwd);
+
+        if (procName.Equals("claude", StringComparison.OrdinalIgnoreCase))
+            // Claude Desktop: single global instance, no CWD tag
+            return SlackClaudePrefix;
+
+        if (procName.Equals("codex", StringComparison.OrdinalIgnoreCase))
+            return cwdTag != null ? $"{SlackCodexPrefix}[{cwdTag}]" : SlackCodexPrefix;
+
+        if (procName.Equals("Code", StringComparison.OrdinalIgnoreCase))
+            return cwdTag != null ? $"{SlackClaudePrefix}[{cwdTag}]" : SlackClaudePrefix;
+
+        // Fallback: treat as Claude Code with cwd if available
+        return cwdTag != null ? $"{SlackClaudePrefix}[{cwdTag}]" : SlackClaudePrefix;
+    }
+
+    /// <summary>Given any HWND, instantly return the Slack display name.</summary>
+    internal static string ResolveDisplayNameByHwnd(IntPtr hwnd)
+    {
+        WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+        return pid > 0 ? ResolveDisplayNameByPid((int)pid) : SlackClaudePrefix;
+    }
 
     /// <summary>Find Chrome main window handle by PID.</summary>
     static IntPtr FindChromeHwndByPid(int pid)

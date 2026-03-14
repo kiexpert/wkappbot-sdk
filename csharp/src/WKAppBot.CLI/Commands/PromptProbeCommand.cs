@@ -47,10 +47,11 @@ internal partial class Program
             Console.WriteLine("  --depth: UIA tree depth per candidate (default: 3)");
             Console.WriteLine("  --limit: candidate window count (default: 12)");
             Console.WriteLine("  --all: include hidden windows");
-            Console.WriteLine("  input round-trip probe is always ON (1-char add/remove, non-submit)");
+            Console.WriteLine("  input round-trip probe is DISABLED (use --input to enable)");
             return 0;
         }
 
+        var enableInputProbe = args.Contains("--input");
         var includeHidden = args.Contains("--all");
         var depth = ParseIntFlag(args, "--depth", 3, 1, 8);
         var limit = ParseIntFlag(args, "--limit", 12, 1, 100);
@@ -87,7 +88,7 @@ internal partial class Program
             Console.WriteLine($"  author=\"{h.Raw}\" -> host={h.HostHint} workspace={h.WorkspaceTag ?? "(none)"}");
 
         using var helper = new ClaudePromptHelper();
-        var allPrompts = helper.FindAllPrompts();
+        var allPrompts = helper.FindAllPrompts(includeHidden);
 
         Console.WriteLine();
         Console.WriteLine("[PROMPT-PROBE] === FindAllPrompts() ===");
@@ -160,7 +161,11 @@ internal partial class Program
                 {
                     var certainty = EvaluateInputProbeCertainty(helper, root, knownPrompt);
                     Console.WriteLine($"    stage.input-roundtrip certainty={certainty.IsCertain} reason=\"{TrimForLog(certainty.Reason, 140)}\"");
-                    if (certainty.IsCertain)
+                    if (!enableInputProbe)
+                    {
+                        Console.WriteLine("    stage.input-roundtrip disabled=true (use --input to enable)");
+                    }
+                    else if (certainty.IsCertain)
                     {
                         Console.WriteLine("    stage.input-roundtrip begin");
                         var okRoundTrip = RunPromptInputRoundTripProbe(
@@ -174,7 +179,7 @@ internal partial class Program
                     }
                     else
                     {
-                        Console.WriteLine("    stage.input-roundtrip skipped=true");
+                        Console.WriteLine("    stage.input-roundtrip skipped=true (certainty=false)");
                     }
                 }
 
@@ -185,6 +190,24 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.WriteLine($"    uia-error={TrimForLog(ex.Message, 120)}");
+            }
+        }
+
+        // Compute Slack display names for all found prompt windows
+        Console.WriteLine();
+        Console.WriteLine("[PROMPT-PROBE] === Slack Display Names ===");
+        if (allPrompts.Count == 0)
+        {
+            Console.WriteLine("  (no prompts found)");
+        }
+        else
+        {
+            foreach (var p in allPrompts)
+            {
+                var (displayName, cwdSource) = ComputeProbeDisplayName(p, null);
+                Console.WriteLine($"  [{p.HostType}] 0x{p.WindowHandle:X} → {displayName}");
+                Console.WriteLine($"    title=\"{TrimForLog(p.WindowTitle, 80)}\"");
+                Console.WriteLine($"    cwd-source={cwdSource}");
             }
         }
 
@@ -547,34 +570,44 @@ internal partial class Program
             var st = helper.ProbeSubmitState(prompt);
             var host = (prompt.HostType ?? "").ToLowerInvariant();
             var draft = ExtractCurrentPromptDraft(root, prompt.PromptRect);
-            var rectOk = prompt.PromptRect.Width >= 120 && prompt.PromptRect.Height >= 20;
+            var r = prompt.PromptRect;
+            var rectOk = r.Width >= 120 && r.Height >= 20;
+
+            // Off-screen check: window at extreme negative coords = disconnected monitor or virtual desktop.
+            // Sending input to off-screen windows silently fails or targets the wrong surface.
+            var onScreen = r.X > -9000 && r.Y > -9000 && r.Right < 30000 && r.Bottom < 30000;
 
             if (host == "claude-desktop")
             {
-                // Respect legacy Claude path: turn-form + submit detection is authoritative.
-                var ok = st.TurnFormFound && st.SubmitFound;
+                // turn-form presence is sufficient — submit button is absent when input is empty,
+                // but the window is still fully controllable via TryTypeWithoutSubmitFocusless.
+                var ok = st.TurnFormFound && onScreen;
                 return new InputProbeCertainty(ok, ok
-                    ? "claude turn-form+submit detected"
-                    : $"claude prompt uncertain (turnForm={st.TurnFormFound}, submit={st.SubmitFound})");
+                    ? $"claude turn-form detected (submit={st.SubmitFound})"
+                    : !onScreen ? $"claude off-screen ({r.X},{r.Y}) — disconnected monitor?"
+                    : "claude prompt uncertain (no turn-form)");
             }
 
             if (host == "codex-desktop")
             {
-                // Codex currently relies on marker-style prompt detection.
-                var markerHit =
-                    draft.Contains("Terminal input", StringComparison.OrdinalIgnoreCase) ||
-                    draft.Contains("prompt", StringComparison.OrdinalIgnoreCase) ||
-                    draft.Contains("input", StringComparison.OrdinalIgnoreCase);
-                var ok = rectOk && markerHit;
-                return new InputProbeCertainty(ok, ok
-                    ? "codex marker prompt detected"
-                    : $"codex prompt uncertain (rectOk={rectOk}, markerHit={markerHit})");
+                // Codex: rect height >= 40 required — height=28 is Terminal input line, not the multi-line prompt.
+                var codexRectOk = rectOk && r.Height >= 40 && onScreen;
+                return new InputProbeCertainty(codexRectOk, codexRectOk
+                    ? $"codex rect={r.Width}x{r.Height} confirmed"
+                    : !onScreen ? $"codex off-screen ({r.X},{r.Y})"
+                    : r.Height < 40 ? $"codex rect too short ({r.Height}px) — terminal line, not prompt"
+                    : $"codex prompt uncertain (rectOk={rectOk})");
             }
 
             if (host == "vscode-claudecode")
             {
-                // Avoid accidental typing in normal editor panes.
-                return new InputProbeCertainty(false, "vscode-claudecode skipped for safety (possible normal editor)");
+                // VS Code with Claude Code native extension: FindAllPrompts already confirmed this is
+                // a Chrome_WidgetWin_1 "Visual Studio Code" window — treat as fully controllable.
+                var vsOk = rectOk && onScreen;
+                return new InputProbeCertainty(vsOk, vsOk
+                    ? $"vscode-claudecode rect={r.Width}x{r.Height} confirmed"
+                    : !onScreen ? $"vscode off-screen ({r.X},{r.Y}) — virtual desktop?"
+                    : "vscode-claudecode rect too small (minimized?)");
             }
 
             return new InputProbeCertainty(false, $"unsupported hostType={prompt.HostType}");
@@ -649,6 +682,82 @@ internal partial class Program
             Console.WriteLine($"    uia.summary error={TrimForLog(ex.Message, 120)}");
             return false;
         }
+    }
+
+    /// <summary>
+    /// Compute the Slack display name for a detected prompt window.
+    /// Uses per-type CWD detection without relying on eye cards:
+    ///   vscode-claudecode → ExtractCwdFromVsCodeTitle (window title parse)
+    ///   codex-desktop     → GetProcessCurrentDirectory (PEB read)
+    ///   claude-desktop    → GetProcessCurrentDirectory (PEB read)
+    /// Falls back to current process CWD when detection fails.
+    /// Returns (displayName, cwdSource) for diagnostic output.
+    /// </summary>
+    static (string displayName, string cwdSource) ComputeProbeDisplayName(
+        ClaudePromptHelper.PromptInfo prompt,
+        List<EyeParentCard>? _unusedCards)
+    {
+        var host = (prompt.HostType ?? "").ToLowerInvariant();
+        string prefix = host.Contains("codex") ? SlackCodexPrefix : SlackClaudePrefix;
+
+        string? cwd = null;
+        string cwdSource;
+
+        NativeMethods.GetWindowThreadProcessId(prompt.WindowHandle, out uint pidRaw);
+        var pid = (int)pidRaw;
+
+        if (host == "vscode-claudecode")
+        {
+            // VS Code: all windows share one PID, so use window title (reliable per-window)
+            cwd = ExtractCwdFromVsCodeTitle(prompt.WindowTitle);
+            cwdSource = cwd != null ? $"vscode-title:{cwd}" : "vscode-title:failed";
+        }
+        else
+        {
+            // Codex / Claude Desktop: read process CWD via PEB
+            cwd = NativeMethods.GetProcessCurrentDirectory(pid);
+            cwdSource = cwd != null ? $"proc-cwd:{cwd}" : "proc-cwd:failed";
+        }
+
+        // Reject system/install directories — they are not useful workspace identifiers
+        if (!string.IsNullOrWhiteSpace(cwd) && IsSystemOrInstallDirectory(cwd))
+        {
+            cwdSource += $"+rejected-system-dir:{cwd}";
+            cwd = null;
+        }
+
+        if (string.IsNullOrWhiteSpace(cwd))
+        {
+            if (host == "vscode-claudecode")
+            {
+                // VS Code: window title always has CWD → fallback to process CWD only
+                cwd = Environment.CurrentDirectory;
+                cwdSource += "+fallback:current-cwd";
+            }
+            else
+            {
+                // claude-desktop / codex-desktop: no reliable per-instance CWD → no tag
+                return ($"{prefix}", cwdSource + "+no-cwd-tag");
+            }
+        }
+
+        var cwdTag = AbbreviateCwd(cwd);
+        if (string.IsNullOrWhiteSpace(cwdTag))
+            cwdTag = Path.GetFileName(cwd.TrimEnd('\\', '/')) ?? Environment.MachineName;
+
+        return ($"{prefix}[{cwdTag}]", cwdSource);
+    }
+
+    static bool IsSystemOrInstallDirectory(string path)
+    {
+        // Returns true if the path is a system or app-install directory, not a user workspace
+        var norm = path.Replace('/', '\\').ToLowerInvariant();
+        return norm.Contains(@"\windows\") ||
+               norm.Contains(@"\windows\system32") ||
+               norm.Contains(@"\program files") ||
+               norm.Contains(@"\appdata\local\") ||
+               norm.Contains(@"\appdata\roaming\") ||
+               norm.StartsWith(@"c:\windows", StringComparison.OrdinalIgnoreCase);
     }
 
     static bool IsPromptishNode(string name, string aid, List<string> names)

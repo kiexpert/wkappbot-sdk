@@ -25,7 +25,8 @@ internal partial class Program
 
         // Auto-launch AppBotEye for all CDP commands (not just "open")
         // "open" handles it internally, help/status don't need it
-        if (sub != "open" && sub != "--help" && sub != "-h" && sub != "help" && sub != "status")
+        if (sub != "open" && sub != "--help" && sub != "-h" && sub != "help" && sub != "status"
+            && sub != "fetch" && sub != "search" && sub != "read")
         {
             // Parse port from args (--port N pattern)
             int mvPort = 9222;
@@ -57,7 +58,10 @@ internal partial class Program
             "status" => WebStatusCommand(restArgs),
             "restore" or "show" => WebRestoreCommand(restArgs),
             "run" => WebRunCommand(restArgs),
-            "file" => WebFileInputCommand(restArgs),
+            "file"   => WebFileInputCommand(restArgs),
+            "fetch"  => WebFetchCommand(restArgs),
+            "search" => WebSearchCommand(restArgs),
+            "read"   => WebReadCommand(restArgs),
             "--help" or "-h" or "help" => WebUsage(),
             _ => Error($"Unknown web subcommand: {sub}")
         };
@@ -493,37 +497,16 @@ Options:
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WKAPPBOT_LOOP_CALLER"))) return;
         try
         {
-            // Check for existing AppBotEye window by title "WK AppBot Eye"
-            IntPtr eyeHwnd = IntPtr.Zero;
-            var sb = new System.Text.StringBuilder(256);
-            WKAppBot.Win32.Native.NativeMethods.EnumWindows((hwnd, _) =>
-            {
-                NativeMethods.GetWindowTextW(hwnd, sb, sb.Capacity);
-                if (sb.ToString() == "WK AppBot Eye")
-                {
-                    eyeHwnd = hwnd;
-                    return false; // stop enumeration
-                }
-                return true;
-            }, IntPtr.Zero);
-
-            if (eyeHwnd != IntPtr.Zero)
-            {
-                // Send WM_APP to wake up AppBotEye (uncloak + reset idle timer)
-                const uint WM_APP = 0x8000;
-                NativeMethods.SendMessageW(eyeHwnd, WM_APP, IntPtr.Zero, IntPtr.Zero);
-                return; // silently wake up — no log needed for non-web commands
-            }
-
-            // Fallback: check named mutex — GlobalMode Eye creates "Global\WKAppBotEyeGlobal" on startup
-            // This is reliable unlike WPF window detection (GlobalMode has no WPF window)
+            // Primary check: try to connect to Eye's CmdPipe server.
+            // Most reliable — works for both WPF and GlobalMode Eye, no race condition.
             try
             {
-                using var m = System.Threading.Mutex.OpenExisting(@"Global\WKAppBotEyeGlobal");
-                return; // GlobalMode Eye is running — skip launch
+                using var testPipe = new System.IO.Pipes.NamedPipeClientStream(".", EyeCmdPipeServer.PipeName,
+                    System.IO.Pipes.PipeDirection.InOut, System.IO.Pipes.PipeOptions.None);
+                testPipe.Connect(150); // 150ms timeout — Eye is running if this succeeds
+                return; // Eye is alive — skip spawn
             }
-            catch (System.Threading.WaitHandleCannotBeOpenedException) { } // mutex not found → Eye not running
-            catch { } // access denied or other error → assume Eye not running
+            catch { } // timeout or not found → Eye not running, fall through to spawn
 
             // Launch AppBotEye as detached background process
             var exePath = Environment.ProcessPath;

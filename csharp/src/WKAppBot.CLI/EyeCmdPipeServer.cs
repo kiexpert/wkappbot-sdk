@@ -25,6 +25,31 @@ internal static class EyeCmdPipeServer
 
     public static void StartServer() => Task.Run(ServerLoop);
 
+    /// <summary>
+    /// Fire-and-forget: run args in background via the same in-process routing as __bg pipe commands.
+    /// Output is isolated to a per-invocation log file (not mixed into Eye console).
+    /// </summary>
+    internal static void DispatchBg(string[] args)
+    {
+        var logDir = Path.Combine(Program.DataDir, "logs");
+        Directory.CreateDirectory(logDir);
+        var cmdTag = args.Length > 0 ? args[0] : "bg";
+        if (args.Length > 1 && cmdTag is "slack" or "ask") cmdTag += $"-{args[1]}";
+        var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.txt");
+        var tee = new TeeTextWriter(TextWriter.Null, logFile);
+        _ = Task.Run(() =>
+        {
+            CallerCwd.Value = null;
+            Program.RunningInEye = true;
+            using (ThreadRoutingWriter.Route(tee))
+            {
+                try { Program.Main(args); }
+                catch (Exception ex) { tee.WriteLine($"[DISPATCHBG] error: {ex.Message}"); }
+            }
+            tee.Dispose();
+        });
+    }
+
     static async Task ServerLoop()
     {
         Console.WriteLine("[EYE] CmdPipe server started — delegated commands run in-process (parallel)");

@@ -523,6 +523,23 @@ internal sealed class AppBotEyeHost : IDisposable
         _ready.Wait(5000);
     }
 
+    /// <summary>Returns the Win32 HWND of the Eye overlay window (0 if not ready).</summary>
+    public IntPtr GetWindowHandle()
+    {
+        if (_window == null || _dispatcher == null) return IntPtr.Zero;
+        try
+        {
+            IntPtr hwnd = IntPtr.Zero;
+            _dispatcher.Invoke(() =>
+            {
+                var helper = new WindowInteropHelper(_window);
+                hwnd = helper.Handle;
+            });
+            return hwnd;
+        }
+        catch { return IntPtr.Zero; }
+    }
+
     /// <summary>Push a new CDP screenshot to the overlay.</summary>
     public void UpdateScreenshot(byte[] pngData)
     {

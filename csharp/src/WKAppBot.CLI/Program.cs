@@ -64,9 +64,11 @@ internal partial class Program
 
     internal static int Main(string[] args)
     {
-        // Force UTF-8 output (Windows 949 codepage breaks Korean in non-Korean terminals)
+        // Force UTF-8 globally — console + child processes inherit codepage 65001
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
+        try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
+        try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
 
         // MCP stdio server — must run BEFORE TeeTextWriter (stdout = JSON-RPC only)
         if (args.Length > 0 && args[0] == "mcp")
@@ -200,33 +202,27 @@ internal partial class Program
                 restArgs = restArgs.Where(a => a != "--i-dont-want-to-see-the-zoom-magnifier-overlay").ToArray();
             }
 
-            // Global option: --timeout N (seconds, supports decimal like 1.5)
-            // After timeout, exit with code 124 (GNU timeout convention) to return shell control.
-            // The process terminates — use this when you need a time-bounded command.
-            double globalTimeoutSec = 0;
+            // Global option: --timeout <duration> (hard kill after N time, exit code 124)
+            // Supports: 30=30s, 1.5s=1.5s, 2m=2min, 500ms=500ms, 1h=1h
+            // Use --for in subcommands (e.g. whisper study --for 20m) for clean loop shutdown.
             for (int ti = 0; ti < restArgs.Length; ti++)
             {
                 if (restArgs[ti] == "--timeout" && ti + 1 < restArgs.Length)
                 {
-                    var raw = restArgs[ti + 1].TrimEnd('s', 'S'); // allow "1.5s"
-                    if (double.TryParse(raw, System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out var tv) && tv > 0)
-                    {
-                        globalTimeoutSec = tv;
-                    }
+                    var dur = ParseDuration(restArgs[ti + 1]);
                     restArgs = restArgs.Take(ti).Concat(restArgs.Skip(ti + 2)).ToArray();
+                    if (dur > TimeSpan.Zero)
+                    {
+                        var timeoutMs = (long)dur.TotalMilliseconds;
+                        timeoutTimer = new System.Threading.Timer(_ =>
+                        {
+                            Console.Error.WriteLine($"[TIMEOUT] {dur} elapsed — exiting (code 124)");
+                            try { Console.Out.Flush(); Console.Error.Flush(); } catch { }
+                            Environment.Exit(124);
+                        }, null, timeoutMs, Timeout.Infinite);
+                    }
                     break;
                 }
-            }
-            if (globalTimeoutSec > 0)
-            {
-                var timeoutMs = (int)(globalTimeoutSec * 1000);
-                timeoutTimer = new System.Threading.Timer(_ =>
-                {
-                    Console.Error.WriteLine($"[TIMEOUT] {globalTimeoutSec}s elapsed — exiting (code 124)");
-                    try { Console.Out.Flush(); Console.Error.Flush(); } catch { }
-                    Environment.Exit(124);
-                }, null, timeoutMs, Timeout.Infinite);
             }
 
             // Global Eye tick (for eye --global multi-parent monitor)
@@ -246,7 +242,7 @@ internal partial class Program
             // GlobalMode Eye 중복감지: Named mutex "Global\WKAppBotEyeGlobal" 사용 (LaunchAppBotEyeIfNeededCore)
             // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
             var isEyeGlobal = command == "eye" && (restArgs.Length == 0 || restArgs[0] != "tick");
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" || isEyeGlobal;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" || isEyeGlobal;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
@@ -268,10 +264,12 @@ internal partial class Program
                 "capture" => CaptureCommand(restArgs),
                 "scan" => ScanCommand(restArgs),
                 "ask" => AskCommand(restArgs),
+                "agent" => AgentCommand(restArgs),
                 "logcat" => LogcatCommand(restArgs),
                 "eye" => AppBotEyeCommand(restArgs),
                 "slack" => SlackCommand(restArgs),
                 "web" => WebCommand(restArgs),
+                "file" => FileCommand(restArgs),
                 "mcp" => McpCommand(restArgs), // fallback (normally caught in Main early path)
                 // Web: use "web <subcommand>" or unified a11y for web views
                 // Automation
@@ -486,7 +484,7 @@ internal partial class Program
 
         // Only surface raw prompt-like commands to reduce noise.
         var c = (command ?? "").ToLowerInvariant();
-        if (c is not ("ask" or "web" or "kiwoom" or "com" or "telegram" or "schedule" or "knowhow"))
+        if (c is not ("ask" or "agent" or "web" or "kiwoom" or "com" or "telegram" or "schedule" or "knowhow"))
             return string.Empty;
 
         var raw = string.Join(" ", restArgs).Trim();

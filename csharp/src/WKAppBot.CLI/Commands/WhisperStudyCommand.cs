@@ -30,187 +30,225 @@ internal partial class Program
             return WhisperStatsCommand();
 
         // Parse options
-        int batchSize = 10;
-        bool dryRun = false;
-        string engine = "gemini"; // gemini (default) or gpt
+        int      batchSize = 10;
+        TimeSpan timeout   = TimeSpan.Zero; // zero = single-shot; use --for for loop duration
+        bool     dryRun    = false;
+        string   engine    = "gemini";
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--batch" && i + 1 < args.Length)
-                int.TryParse(args[++i], out batchSize);
-            else if (args[i] == "--dry-run")
-                dryRun = true;
-            else if (args[i] == "--engine" && i + 1 < args.Length)
-                engine = args[++i].ToLowerInvariant();
+            if      (args[i] == "--batch"  && i + 1 < args.Length) int.TryParse(args[++i], out batchSize);
+            else if (args[i] == "--for"    && i + 1 < args.Length) timeout = ParseDuration(args[++i]);
+            else if (args[i] == "--dry-run")  dryRun  = true;
+            else if (args[i] == "--engine" && i + 1 < args.Length) engine = args[++i].ToLowerInvariant();
         }
         batchSize = Math.Clamp(batchSize, 1, 50);
 
-        var basePath = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq", "profiles", "whisper_exp");
-        var wavDir = Path.Combine(basePath, "wav");
+        var basePath = Path.Combine(DataDir, "profiles", "whisper_exp");
+        var wavDir   = Path.Combine(basePath, "wav");
         if (!Directory.Exists(wavDir))
         {
             Console.WriteLine("[STUDY] No wav/ directory found. Run whisper first to record audio segments.");
             return 1;
         }
 
-        // Collect MP3 files: prioritize _unknown/, then other folders
-        var mp3Files = CollectMp3Files(wavDir, batchSize);
-        if (mp3Files.Count == 0)
+        // ── Ctrl+C → smooth shutdown after current batch ──
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) =>
         {
-            Console.WriteLine("[STUDY] No MP3 files to study.");
-            return 0;
-        }
+            e.Cancel = true; // don't kill process immediately
+            cts.Cancel();
+            Console.WriteLine("\n[STUDY] Ctrl+C — finishing current batch then exiting...");
+        };
 
-        Console.WriteLine($"[STUDY] Found {mp3Files.Count} MP3 files for batch analysis");
-        foreach (var f in mp3Files)
-            Console.WriteLine($"  {Path.GetRelativePath(wavDir, f)}");
+        var deadline   = timeout > TimeSpan.Zero ? DateTime.UtcNow.Add(timeout) : DateTime.MaxValue;
+        int totalBatch = 0, totalMoved = 0;
+        if (timeout > TimeSpan.Zero)
+            Console.WriteLine($"[STUDY] Loop mode — timeout={timeout}, batch={batchSize}, engine={engine}");
 
-        // ── STT re-labeling pass: Windows Speech Recognition on each file (offline, no YouTube noise) ──
-        Console.WriteLine($"[STUDY] STT re-labeling {mp3Files.Count} files...");
-        var sttLabels = SttRelabelFiles(mp3Files);
-        int sttOk = sttLabels.Values.Count(v => !string.IsNullOrEmpty(v.Text));
-        Console.WriteLine($"[STUDY] STT recognized {sttOk}/{mp3Files.Count} files");
-
-        // Concat MP3s into a single batch file with silence separators
-        var batchFile = Path.Combine(basePath, $"study_batch_{DateTime.Now:yyyyMMdd_HHmmss}.mp3");
-        var segmentMap = ConcatMp3Files(mp3Files, batchFile);
-        if (segmentMap == null || segmentMap.Count == 0)
+        while (!cts.IsCancellationRequested)
         {
-            Console.WriteLine("[STUDY] Failed to concat MP3 files.");
-            return 1;
-        }
-
-        Console.WriteLine($"[STUDY] Batch file: {batchFile} ({new FileInfo(batchFile).Length / 1024}KB, {segmentMap.Count} segments)");
-
-        // Build the karaoke prompt
-        var prompt = BuildKaraokePrompt(segmentMap);
-        Console.WriteLine($"[STUDY] Prompt length: {prompt.Length} chars");
-
-        if (dryRun)
-        {
-            Console.WriteLine("[STUDY] Dry run — prompt:");
-            Console.WriteLine(prompt);
-            try { File.Delete(batchFile); } catch { }
-            return 0;
-        }
-
-        // Send to AI via existing ask infrastructure (Gemini primary, GPT fallback)
-        Console.WriteLine($"[STUDY] Sending to {engine}...");
-        var (success, response) = AskAiForStudy(batchFile, prompt, engine);
-        if (!success || string.IsNullOrWhiteSpace(response))
-        {
-            // Fallback: if Gemini failed, try GPT
-            if (engine == "gemini")
+            // ── Timeout check ──
+            var remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero)
             {
-                Console.WriteLine("[STUDY] Gemini failed — trying GPT fallback...");
-                (success, response) = AskAiForStudy(batchFile, prompt, "gpt");
+                Console.WriteLine("[STUDY] Timeout reached.");
+                break;
             }
-            if (!success || string.IsNullOrWhiteSpace(response))
+            if (timeout > TimeSpan.Zero)
+                Console.WriteLine($"[STUDY] Remaining: {(int)remaining.TotalMinutes}m{remaining.Seconds:D2}s");
+
+            // ── Collect files ──
+            var mp3Files = CollectMp3Files(wavDir, batchSize);
+            if (mp3Files.Count == 0)
             {
-                Console.WriteLine("[STUDY] AI query failed or empty response.");
-                // Keep batch file for manual retry
-                return 1;
-            }
-        }
-
-        Console.WriteLine($"[STUDY] Response length: {response.Length} chars");
-
-        // Parse JSON response
-        var studyResults = ParseStudyResponse(response, segmentMap);
-        if (studyResults == null || studyResults.Count == 0)
-        {
-            Console.WriteLine("[STUDY] Failed to parse response. Raw:");
-            Console.WriteLine(response.Length > 2000 ? response[..2000] + "..." : response);
-            SaveRawResponse(basePath, response, segmentMap);
-            return 1;
-        }
-
-        Console.WriteLine($"[STUDY] Parsed {studyResults.Count} segments");
-
-        // Move files to correct label folders (Gemini transcript preferred, STT fallback)
-        int moved = 0;
-        foreach (var result in studyResults)
-        {
-            if (result.SourceFile == null || !File.Exists(result.SourceFile)) continue;
-
-            // Gemini transcript is primary; STT is fallback if Gemini returned empty
-            var transcript = result.Transcript;
-            if (string.IsNullOrWhiteSpace(transcript) && sttLabels.TryGetValue(result.SourceFile, out var sttFb))
-                transcript = sttFb.Text;
-
-            // Non-speech audio types → dedicated folders (noise/music/instrument DB)
-            string label;
-            if (result.AudioType != "speech" && result.AudioType != "mixed")
-                label = $"_{result.AudioType}"; // _noise, _music, _instrument
-            else
-            {
-                label = SanitizeFolderName(transcript ?? "_unknown");
-                if (string.IsNullOrWhiteSpace(label)) label = "_unknown";
-            }
-
-            var currentFolder = Path.GetFileName(Path.GetDirectoryName(result.SourceFile)) ?? "";
-            string destPath;
-            if (currentFolder == label)
-            {
-                destPath = result.SourceFile;
-                Console.WriteLine($"  [=] {Path.GetFileName(result.SourceFile)} already in [{label}]");
-            }
-            else
-            {
-                var targetDir = Path.Combine(wavDir, label);
-                Directory.CreateDirectory(targetDir);
-                destPath = Path.Combine(targetDir, Path.GetFileName(result.SourceFile));
-                if (File.Exists(destPath))
-                    continue; // duplicate
-                try
+                if (timeout > TimeSpan.Zero && !cts.IsCancellationRequested)
                 {
-                    File.Move(result.SourceFile, destPath);
-                    moved++;
-                    Console.WriteLine($"  [→] {Path.GetFileName(result.SourceFile)} → [{label}]");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"  [!] Move failed: {ex.Message}");
+                    Console.WriteLine("[STUDY] No files — waiting 30s for new recordings...");
+                    for (int w = 0; w < 30 && !cts.IsCancellationRequested && DateTime.UtcNow < deadline; w++)
+                        Thread.Sleep(1000);
                     continue;
                 }
+                Console.WriteLine("[STUDY] No MP3 files to study.");
+                break;
             }
 
-            // Drop companion JSON (always — update even for already-in-place files)
-            DropCompanionJson(destPath, result, sttLabels);
+            Console.WriteLine($"[STUDY] Batch #{totalBatch + 1}: {mp3Files.Count} files");
+            foreach (var f in mp3Files)
+                Console.WriteLine($"  {Path.GetRelativePath(wavDir, f)}");
+
+            // ── STT re-labeling (offline) ──
+            Console.WriteLine($"[STUDY] STT re-labeling...");
+            var sttLabels = SttRelabelFiles(mp3Files);
+            int sttOk = sttLabels.Values.Count(v => !string.IsNullOrEmpty(v.Text));
+            Console.WriteLine($"[STUDY] STT recognized {sttOk}/{mp3Files.Count}");
+
+            // ── Concat → batch MP3 ──
+            var batchFile  = Path.Combine(basePath, $"study_batch_{DateTime.Now:yyyyMMdd_HHmmss}.mp3");
+            var segmentMap = ConcatMp3Files(mp3Files, batchFile);
+            if (segmentMap == null || segmentMap.Count == 0)
+            {
+                Console.WriteLine("[STUDY] Failed to concat MP3 files — skipping batch.");
+                break;
+            }
+            Console.WriteLine($"[STUDY] Batch file: {new FileInfo(batchFile).Length / 1024}KB, {segmentMap.Count} segments");
+
+            // ── Prompt ──
+            var prompt = BuildKaraokePrompt(segmentMap);
+            Console.WriteLine($"[STUDY] Prompt: {prompt.Length} chars");
+
+            if (dryRun)
+            {
+                Console.WriteLine("[STUDY] Dry run — prompt:");
+                Console.WriteLine(prompt);
+                try { File.Delete(batchFile); } catch { }
+                break; // dry-run always single-shot
+            }
+
+            // ── AI query ──
+            Console.WriteLine($"[STUDY] Sending to {engine}...");
+            var (success, response) = AskAiForStudy(batchFile, prompt, engine);
+            if (!success || string.IsNullOrWhiteSpace(response))
+            {
+                if (engine == "gemini")
+                {
+                    Console.WriteLine("[STUDY] Gemini failed — trying GPT fallback...");
+                    (success, response) = AskAiForStudy(batchFile, prompt, "gpt");
+                }
+                if (!success || string.IsNullOrWhiteSpace(response))
+                {
+                    Console.WriteLine("[STUDY] AI query failed — keeping batch file for retry.");
+                    break;
+                }
+            }
+            Console.WriteLine($"[STUDY] Response: {response.Length} chars");
+
+            // ── Parse ──
+            var studyResults = ParseStudyResponse(response, segmentMap);
+            if (studyResults == null || studyResults.Count == 0)
+            {
+                Console.WriteLine("[STUDY] Failed to parse response. Raw:");
+                Console.WriteLine(response.Length > 2000 ? response[..2000] + "..." : response);
+                SaveRawResponse(basePath, response, segmentMap);
+                break;
+            }
+            Console.WriteLine($"[STUDY] Parsed {studyResults.Count} segments");
+
+            // ── Move to label folders ──
+            int moved = 0;
+            foreach (var result in studyResults)
+            {
+                if (result.SourceFile == null || !File.Exists(result.SourceFile)) continue;
+
+                var transcript = result.Transcript;
+                if (string.IsNullOrWhiteSpace(transcript) && sttLabels.TryGetValue(result.SourceFile, out var sttFb))
+                    transcript = sttFb.Text;
+
+                string label;
+                if (result.AudioType != "speech" && result.AudioType != "mixed")
+                    label = $"_{result.AudioType}";
+                else
+                {
+                    label = SanitizeFolderName(transcript ?? "_unknown");
+                    if (string.IsNullOrWhiteSpace(label)) label = "_unknown";
+                }
+
+                var currentFolder = Path.GetFileName(Path.GetDirectoryName(result.SourceFile)) ?? "";
+                string destPath;
+                // ── Sound code display ──
+                string scTag = "";
+                try
+                {
+                    var (sc, _) = ExtractFirstSyllableCodeEx(result.SourceFile);
+                    if (sc != 0) scTag = $" [{FormatIndexCode(sc)}]";
+                }
+                catch { }
+
+                if (currentFolder == label)
+                {
+                    destPath = result.SourceFile;
+                    Console.WriteLine($"  [=] {label}{scTag}  {Path.GetFileName(result.SourceFile)}");
+                }
+                else
+                {
+                    var targetDir = Path.Combine(wavDir, label);
+                    Directory.CreateDirectory(targetDir);
+                    destPath = Path.Combine(targetDir, Path.GetFileName(result.SourceFile));
+                    if (File.Exists(destPath)) continue;
+                    try
+                    {
+                        File.Move(result.SourceFile, destPath);
+                        moved++;
+                        Console.WriteLine($"  [→] [{label}]{scTag}  {Path.GetFileName(result.SourceFile)}");
+                    }
+                    catch (Exception ex) { Console.WriteLine($"  [!] Move failed: {ex.Message}"); continue; }
+                }
+                DropCompanionJson(destPath, result, sttLabels);
+            }
+            Console.WriteLine($"[STUDY] Moved {moved}/{studyResults.Count}");
+            totalMoved += moved;
+
+            // ── Phoneme map + self-heal ──
+            int mapped = BuildPhonemeMap(basePath, studyResults);
+            if (mapped > 0) Console.WriteLine($"[STUDY] Phoneme map: {mapped} new entries");
+            SaveStudyResults(basePath, studyResults);
+            SelfHeal(basePath, wavDir);
+
+            // ── Cleanup ──
+            try { File.Delete(batchFile); } catch { }
+            foreach (var f in mp3Files)
+                if (!File.Exists(f)) continue; else try { File.Delete(f); } catch { }
+
+            var micDir2 = Path.Combine(wavDir, "_mic");
+            if (Directory.Exists(micDir2))
+            {
+                int purged = 0;
+                foreach (var f in Directory.GetFiles(micDir2, "*.mp3"))
+                    if (new FileInfo(f).Length == 0) { try { File.Delete(f); purged++; } catch { } }
+                if (purged > 0) Console.WriteLine($"[STUDY] Purged {purged} empty mic files");
+            }
+
+            // ── Delete empty subdirectories ──
+            int emptyDirs = 0;
+            foreach (var dir in Directory.GetDirectories(wavDir, "*", SearchOption.AllDirectories)
+                         .OrderByDescending(d => d.Length)) // deepest first
+            {
+                try
+                {
+                    if (!Directory.EnumerateFileSystemEntries(dir).Any())
+                    {
+                        Directory.Delete(dir);
+                        emptyDirs++;
+                    }
+                }
+                catch { }
+            }
+            if (emptyDirs > 0) Console.WriteLine($"[STUDY] Removed {emptyDirs} empty folder(s)");
+
+            totalBatch++;
+            if (timeout == TimeSpan.Zero) break; // single-shot mode — done after one batch
         }
-        Console.WriteLine($"[STUDY] Moved {moved}/{studyResults.Count} files");
 
-        // ── Sound code → 초성 phoneme mapping ──
-        int mapped = BuildPhonemeMap(basePath, studyResults);
-        if (mapped > 0)
-            Console.WriteLine($"[STUDY] Phoneme map: {mapped} new entries");
-
-        // Save study results to JSONL
-        SaveStudyResults(basePath, studyResults);
-
-        // ── Self-healing: reconcile phoneme_map conflicts + requeue low-confidence ──
-        SelfHeal(basePath, wavDir);
-
-        // Cleanup batch file
-        try { File.Delete(batchFile); } catch { }
-
-        // Delete source MP3s that were successfully processed (moved to label folder)
-        foreach (var f in mp3Files)
-        {
-            if (!File.Exists(f)) continue; // already moved
-            try { File.Delete(f); } catch { }
-        }
-
-        // Purge 0-byte mic files that failed to record
-        var micDir2 = Path.Combine(wavDir, "_mic");
-        if (Directory.Exists(micDir2))
-        {
-            int purged = 0;
-            foreach (var f in Directory.GetFiles(micDir2, "*.mp3"))
-                if (new FileInfo(f).Length == 0) { try { File.Delete(f); purged++; } catch { } }
-            if (purged > 0) Console.WriteLine($"[STUDY] Purged {purged} empty mic files");
-        }
-
-        Console.WriteLine("[STUDY] Done!");
+        Console.WriteLine($"[STUDY] Done — {totalBatch} batch(es), {totalMoved} files moved total");
         return 0;
     }
 
@@ -409,8 +447,10 @@ internal partial class Program
 
                 askArgs.Add("--timeout");
                 askArgs.Add("120");
+                askArgs.Add("--target-tag");
+                askArgs.Add($"{engine}-whisper"); // dedicated tab: never shares with triad/normal ask tabs
 
-                Console.WriteLine($"[STUDY] Calling: ask {engine} <{askArgs.Count - 2} lines> {Path.GetFileName(audioFile)} --timeout 120");
+                Console.WriteLine($"[STUDY] Calling: ask {engine} <{askArgs.Count - 2} lines> {Path.GetFileName(audioFile)} --timeout 120 --target-tag {engine}-whisper");
                 AskCommand(askArgs.ToArray());
             }
             finally
@@ -746,7 +786,7 @@ internal partial class Program
 
     static int WhisperStatsCommand()
     {
-        var basePath = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq", "profiles", "whisper_exp");
+        var basePath = Path.Combine(DataDir, "profiles", "whisper_exp");
         var wavDir = Path.Combine(basePath, "wav");
         if (!Directory.Exists(wavDir))
         {

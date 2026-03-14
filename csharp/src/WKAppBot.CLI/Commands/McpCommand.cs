@@ -16,12 +16,20 @@ internal partial class Program
     static readonly object McpWriteGate = new();
     static readonly ConcurrentDictionary<string, SemaphoreSlim> McpActionGates = new();
 
+    /// <summary>
+    /// Launcher mode: all tool calls spawn fresh subprocess (wkappbot.exe on disk).
+    /// Enabled by --launcher flag. MCP connection survives hot-swap of core binary.
+    /// </summary>
+    static bool McpLauncherMode = false;
+
     static int McpCommand(string[] args)
     {
+        McpLauncherMode = args.Contains("--launcher");
+
         // Redirect Console.Out to stderr so stdout is pure JSON-RPC
         var jsonOut = Console.OpenStandardOutput();
         Console.SetOut(new StreamWriter(Console.OpenStandardError(), Encoding.UTF8) { AutoFlush = true });
-        Console.Error.WriteLine("[MCP] Server starting...");
+        Console.Error.WriteLine($"[MCP] Server starting... (launcher={McpLauncherMode})");
 
         var writer = new StreamWriter(jsonOut, new UTF8Encoding(false)) { AutoFlush = true };
 
@@ -144,17 +152,36 @@ internal partial class Program
             ["protocolVersion"] = "2024-11-05",
             ["capabilities"] = new JsonObject
             {
-                ["tools"] = new JsonObject { }
+                ["tools"] = new JsonObject { },
+                // APSP v1: streaming progress via notifications/progress
+                ["experimental"] = new JsonObject
+                {
+                    ["apsp"] = "v1"  // AppBot Parallel Streaming Protocol
+                }
             },
             ["serverInfo"] = new JsonObject
             {
                 ["name"] = "wkappbot",
-                ["version"] = "3.0.0"
+                ["version"] = "3.0.0",
+                ["protocol"] = "MCP+APSP-v1"
             }
         };
     }
 
     // ── tools/list ──────────────────────────────────────────────
+
+    // Shared between MCP tools/list and loop persona — keep in sync
+    internal const string McpActionDesc =
+        "Action to perform.\n" +
+        "Control: close, minimize, maximize, restore, focus, move, resize\n" +
+        "Element: invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range\n" +
+        "Query: find, read, highlight\n" +
+        "Discovery: inspect (UIA tree), windows (list windows), screenshot (capture), ocr (text extraction)\n" +
+        "Async: wait (poll until element appears), eval (execute JavaScript via CDP)\n" +
+        "AI Agents: ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini), ask-claude (ask Claude Desktop) — vision-capable, auto image capture\n" +
+        "File I/O: file-read (read file as Unicode, encoding-aware), file-write (write Unicode→target encoding, @file reference)\n" +
+        "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ), slack (send Slack message), eye (eye tick — status snapshot)\n" +
+        "Diagnostics: prompt-probe (scan all AI prompt windows — Claude Desktop, VS Code Claude Code, Codex — and report certainty, Slack display names, CWD; use all=true to include hidden/minimized windows)";
 
     static JsonNode HandleToolsList()
     {
@@ -164,16 +191,7 @@ internal partial class Program
                 new JsonObject {
                     ["type"] = "object",
                     ["properties"] = new JsonObject {
-                        ["action"] = Prop("string",
-                            "Action to perform.\n" +
-                            "Control: close, minimize, maximize, restore, focus, move, resize\n" +
-                            "Element: invoke, click, toggle, expand, collapse, select, scroll, type, set-value, set-range\n" +
-                            "Query: find, read, highlight\n" +
-                            "Discovery: inspect (UIA tree), windows (list windows), screenshot (capture), ocr (text extraction)\n" +
-                            "Async: wait (poll until element appears), eval (execute JavaScript via CDP)\n" +
-                            "AI Agents: ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini), ask-claude (ask Claude Desktop) — vision-capable, auto image capture\n" +
-                            "File I/O: file-read (read file as Unicode, encoding-aware), file-write (write Unicode→target encoding, @file reference)\n" +
-                            "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ), slack (send Slack message), eye (eye tick — status snapshot)"),
+                        ["action"] = Prop("string", McpActionDesc),
                         ["grap"] = Prop("string",
                             "Window#element grap pattern. Required for window/element actions.\n" +
                             "⚠ For file-read/file-write: grap is the TARGET FILE PATH (e.g. \"src/legacy.cpp\").\n" +
@@ -194,6 +212,24 @@ internal partial class Program
                         ["encoding"] = Prop("string", "File encoding for file-read/file-write: 949 (CP949/Korean), 932 (Shift-JIS/Japanese), 65001 (UTF-8, default), utf-16. Enables Claude to read/write CP949 Korean source files without encoding corruption.")
                     },
                     ["required"] = new JsonArray { "action" }
+                }),
+            McpTool("wkappbot_cli",
+                "Run any wkappbot CLI command directly — equivalent to running wkappbot.exe from the command line.\n" +
+                "Pass the full command as argv array. argv[0] is the wkappbot command.\n" +
+                "Examples: [\"windows\"], [\"windows\",\"--deep\"], [\"inspect\",\"*계산기*\"], [\"a11y\",\"click\",\"*OK*\"],\n" +
+                "          [\"prompt-probe\",\"--all\"], [\"ocr\",\"*메모장*\"], [\"capture\",\"*App*\"], [\"scan\"], [\"slack\",\"send\",\"hello\"]\n" +
+                "See: wkappbot --help for full command list.",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["argv"] = new JsonObject {
+                            ["type"] = "array",
+                            ["items"] = new JsonObject { ["type"] = "string" },
+                            ["description"] = "Command + arguments. argv[0] = wkappbot command name."
+                        },
+                        ["parallel"] = Prop("boolean", "Run asynchronously (non-blocking MCP loop). Unsafe interactive commands are queued.")
+                    },
+                    ["required"] = new JsonArray { "argv" }
                 }),
         };
 
@@ -225,33 +261,57 @@ internal partial class Program
 
         Console.Error.WriteLine($"[MCP] Tool: {toolName} args={arguments.ToJsonString()}");
 
+        // Extract APSP progressToken from _meta
+        var progressToken = @params?["_meta"]?["progressToken"];
+        var progressCounter = new int[1];
+        var progressSw = Stopwatch.StartNew();
+        Action<string> emitProgress = line =>
+            EmitToolProgress(writer, progressToken, line, progressCounter, progressSw);
+
+        return RunToolCore(@params, emitProgress) ?? new JsonObject
+        {
+            ["content"] = new JsonArray { new JsonObject { ["type"] = "text", ["text"] = "Error: unknown tool" } },
+            ["isError"] = true
+        };
+    }
+
+    static JsonObject? RunToolCore(JsonObject? @params, Action<string> emitProgress)
+    {
+        var toolName = @params?["name"]?.GetValue<string>() ?? "";
+        var arguments = @params?["arguments"] as JsonObject ?? new JsonObject();
+        var action = arguments["action"]?.GetValue<string>() ?? "";
+
         try
         {
             // All MCP calls route through unified "a11y" command
-            // a11y handles: inspect, windows, screenshot, ocr as delegate actions
-            var (output, exitCode) = toolName switch
-            {
-                "wkappbot" => ShouldRunOutOfProc(action)
-                    ? RunCliCaptureWithCodeExternal(
-                        "a11y",
-                        BuildUnifiedArgs(arguments),
-                        line => EmitToolProgress(writer, requestId, line))
-                    : RunCliCaptureWithCode(
-                        "a11y",
-                        BuildUnifiedArgs(arguments),
-                        line => EmitToolProgress(writer, requestId, line)),
-                _ => ($"Unknown tool: {toolName}", 1)
-            };
+            // Launcher mode: always external subprocess so core hot-swap applies immediately
+            var (output, exitCode) = McpLauncherMode
+                ? toolName switch
+                {
+                    "wkappbot" when action == "prompt-probe"
+                        => RunCliCaptureWithCodeExternal("prompt-probe", BuildPromptProbeArgs(arguments), emitProgress),
+                    "wkappbot"
+                        => RunCliCaptureWithCodeExternal("a11y", BuildUnifiedArgs(arguments), emitProgress),
+                    "wkappbot_cli"
+                        => RunWkappbotCliExternal(arguments, emitProgress),
+                    _ => ($"Unknown tool: {toolName}", 1)
+                }
+                : toolName switch
+                {
+                    "wkappbot" when action == "prompt-probe"
+                        => RunCliCaptureWithCode("prompt-probe", BuildPromptProbeArgs(arguments), emitProgress),
+                    "wkappbot" => ShouldRunOutOfProc(action)
+                        ? RunCliCaptureWithCodeExternal("a11y", BuildUnifiedArgs(arguments), emitProgress)
+                        : RunCliCaptureWithCode("a11y", BuildUnifiedArgs(arguments), emitProgress),
+                    "wkappbot_cli" => RunWkappbotCli(arguments, emitProgress),
+                    _ => ($"Unknown tool: {toolName}", 1)
+                };
 
             var result = new JsonObject
             {
                 ["content"] = new JsonArray
                 {
-                    new JsonObject
-                    {
-                        ["type"] = "text",
-                        ["text"] = output
-                    }
+                    new JsonObject { ["type"] = "text", ["text"] = output }
                 }
             };
             if (exitCode != 0)
@@ -264,11 +324,7 @@ internal partial class Program
             {
                 ["content"] = new JsonArray
                 {
-                    new JsonObject
-                    {
-                        ["type"] = "text",
-                        ["text"] = $"Error: {ex.Message}"
-                    }
+                    new JsonObject { ["type"] = "text", ["text"] = $"Error: {ex.Message}" }
                 },
                 ["isError"] = true
             };
@@ -297,6 +353,49 @@ internal partial class Program
         if (args["all"]?.GetValue<bool>() == true) list.Add("--all");
         if (args["encoding"] is JsonNode enc) { list.Add("--encoding"); list.Add(enc.GetValue<string>()); }
         return list.ToArray();
+    }
+
+    static string[] BuildPromptProbeArgs(JsonObject args)
+    {
+        var list = new List<string>();
+        if (args["all"]?.GetValue<bool>() == true) list.Add("--all");
+        if (args["text"] is JsonNode t) list.Add(t.GetValue<string>()); // optional name filter
+        return list.ToArray();
+    }
+
+    static string[] GetArgvFromArgs(JsonObject args)
+    {
+        if (args["argv"] is not JsonArray arr) return [];
+        return [.. arr.Select(n => n?.GetValue<string>() ?? "").Where(s => s.Length > 0)];
+    }
+
+    // Launcher mode: always external, no in-proc routing
+    static (string output, int exitCode) RunWkappbotCliExternal(JsonObject args, Action<string>? emitProgress)
+    {
+        var argv = GetArgvFromArgs(args);
+        if (argv.Length == 0) return ("Error: argv is required and must not be empty", 1);
+        return RunCliCaptureWithCodeExternal(argv[0], argv[1..], emitProgress);
+    }
+
+    static (string output, int exitCode) RunWkappbotCli(JsonObject args, Action<string>? emitProgress)
+    {
+        var argv = GetArgvFromArgs(args);
+        if (argv.Length == 0) return ("Error: argv is required and must not be empty", 1);
+        var cmd = argv[0];
+        var rest = argv[1..];
+        // Fast in-proc path for known safe commands; external for everything else
+        return cmd switch
+        {
+            "a11y" => ShouldRunOutOfProc(rest.Length > 0 ? rest[0] : "")
+                ? RunCliCaptureWithCodeExternal("a11y", rest, emitProgress)
+                : RunCliCaptureWithCode("a11y", rest, emitProgress),
+            "inspect" => RunCliCaptureWithCode("inspect", rest, emitProgress),
+            "windows" => RunCliCaptureWithCode("windows", rest, emitProgress),
+            "ocr" => RunCliCaptureWithCode("ocr", rest, emitProgress),
+            "prompt-probe" => RunCliCaptureWithCode("prompt-probe", rest, emitProgress),
+            // All other commands: spawn external process (safest, no in-proc side-effects)
+            _ => RunCliCaptureWithCodeExternal(cmd, rest, emitProgress)
+        };
     }
 
     static string[] BuildWebEvalArgs(JsonObject args)
@@ -433,11 +532,38 @@ internal partial class Program
     static async Task HandleToolsCallAsync(JsonObject? @params, StreamWriter writer, JsonNode? requestId)
     {
         JsonObject? response = null;
+        // Extract APSP progressToken from _meta
+        var progressToken = @params?["_meta"]?["progressToken"];
+        var progressCounter = new int[1];
+        var progressSw = Stopwatch.StartNew();
+        Action<string> emitProgress = line =>
+            EmitToolProgress(writer, progressToken, line, progressCounter, progressSw);
+
         try
         {
+            var toolName = @params?["name"]?.GetValue<string>() ?? "";
             var args = @params?["arguments"] as JsonObject ?? new JsonObject();
-            var action = args["action"]?.GetValue<string>() ?? "";
-            var grap = args["grap"]?.GetValue<string>() ?? "";
+            string action, grap;
+            if (toolName == "wkappbot_cli")
+            {
+                var argv = GetArgvFromArgs(args);
+                action = argv.Length > 0 ? argv[0] : "";
+                // For "a11y <action> <grap>", extract inner action and grap
+                if (action.Equals("a11y", StringComparison.OrdinalIgnoreCase))
+                {
+                    action = argv.Length > 1 ? argv[1] : "";
+                    grap = argv.Length > 2 ? argv[2] : "";
+                }
+                else
+                {
+                    grap = argv.Length > 1 ? argv[1] : "";
+                }
+            }
+            else
+            {
+                action = args["action"]?.GetValue<string>() ?? "";
+                grap = args["grap"]?.GetValue<string>() ?? "";
+            }
             var gateKey = GetActionGateKey(action, grap);
             var gate = McpActionGates.GetOrAdd(gateKey, _ => new SemaphoreSlim(1, 1));
 
@@ -448,20 +574,20 @@ internal partial class Program
                 if (!queued)
                 {
                     queued = true;
-                    EmitToolProgress(writer, requestId, $"[queued] waiting gate={gateKey}");
+                    emitProgress($"[queued] waiting gate={gateKey}");
                 }
                 else
                 {
-                    EmitToolProgress(writer, requestId, $"[queued] {waitSince.ElapsedMilliseconds}ms gate={gateKey}");
+                    emitProgress($"[queued] {waitSince.ElapsedMilliseconds}ms gate={gateKey}");
                 }
             }
 
             try
             {
                 if (queued)
-                    EmitToolProgress(writer, requestId, $"[start] gate acquired after {waitSince.ElapsedMilliseconds}ms");
+                    emitProgress($"[start] gate acquired after {waitSince.ElapsedMilliseconds}ms");
 
-                var result = HandleToolsCall(@params, writer, requestId) as JsonObject ?? new JsonObject
+                var result = RunToolCore(@params, emitProgress) ?? new JsonObject
                 {
                     ["content"] = new JsonArray
                     {
@@ -539,7 +665,7 @@ internal partial class Program
     {
         return action is
             "inspect" or "windows" or "screenshot" or "ocr" or
-            "read" or "find" or "eval" or "highlight";
+            "read" or "find" or "eval" or "highlight" or "prompt-probe";
     }
 
     static bool RequiresGlobalInteractiveGate(string action)
@@ -586,26 +712,53 @@ internal partial class Program
         return false;
     }
 
-    static void EmitToolProgress(StreamWriter writer, JsonNode? requestId, string line)
+    // APSP v1: emit standard MCP notifications/progress with APSP extended fields.
+    // progressToken: from _meta.progressToken in tools/call request (null → fallback to notifications/message)
+    // progressCounter: shared int[1] incremented per notification (progress field)
+    // sw: elapsed time since tool start
+    static void EmitToolProgress(StreamWriter writer, JsonNode? progressToken, string line, int[] progressCounter, Stopwatch sw)
     {
         if (string.IsNullOrWhiteSpace(line)) return;
 
-        // Keep notification payload small and line-framed.
         const int max = 800;
         var text = line.Length > max ? line[..max] + "..." : line;
-        var idText = requestId?.ToJsonString() ?? "null";
+        var n = System.Threading.Interlocked.Increment(ref progressCounter[0]);
+        var elapsed = sw.Elapsed.TotalSeconds;
 
-        var note = new JsonObject
+        if (progressToken != null)
         {
-            ["jsonrpc"] = "2.0",
-            ["method"] = "notifications/message",
-            ["params"] = new JsonObject
+            // Standard MCP notifications/progress with APSP extended fields
+            var note = new JsonObject
             {
-                ["level"] = "info",
-                ["data"] = $"[tools/call:{idText}] {text}"
-            }
-        };
-        WriteJsonRpc(writer, note);
+                ["jsonrpc"] = "2.0",
+                ["method"] = "notifications/progress",
+                ["params"] = new JsonObject
+                {
+                    ["progressToken"] = progressToken.DeepClone(),
+                    ["progress"] = n,
+                    // APSP v1 extensions
+                    ["status"] = "running",
+                    ["elapsed"] = Math.Round(elapsed, 2),
+                    ["data"] = text
+                }
+            };
+            WriteJsonRpc(writer, note);
+        }
+        else
+        {
+            // Fallback: notifications/message (no progressToken supplied)
+            var note = new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["method"] = "notifications/message",
+                ["params"] = new JsonObject
+                {
+                    ["level"] = "info",
+                    ["data"] = text
+                }
+            };
+            WriteJsonRpc(writer, note);
+        }
     }
 
     // ── CLI execution with output capture ───────────────────────
@@ -676,6 +829,7 @@ internal partial class Program
                 "windows" => WindowsCommand(args),
                 "web" => WebCommand(args),
                 "ocr" => OcrCommand(args),
+                "prompt-probe" => PromptProbeCommand(args),
                 _ => -1
             };
         }

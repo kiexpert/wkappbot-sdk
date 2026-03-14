@@ -576,11 +576,14 @@ internal partial class Program
     /// RULE: User replies to bot messages are ALWAYS forwarded to Claude prompt.
     /// </summary>
     private static void SetupSlackEventHandlers(SlackSocketClient slack, string botToken, string? channel,
-        IntPtr claudeHwnd = default, Func<string?>? getPlanApprovalTs = null,
+        Func<IntPtr>? getClaudeHwnd = null, Func<string?>? getPlanApprovalTs = null,
         Func<string?>? getPermissionApprovalTs = null,
         string? startupTs = null, string? botUsername = null,
         Func<string?>? getStatusStreamingTs = null, Action? resetStatusStreaming = null)
     {
+        // Re-detect Claude Desktop window on every event call (handles Electron restart)
+        IntPtr GetClaudeHwnd() => getClaudeHwnd?.Invoke() ?? IntPtr.Zero;
+
         // Track threads where bot is engaged (for thread reply forwarding)
         // RULE: User replies to bot messages are ALWAYS forwarded to Claude prompt.
         var activeThreads = new HashSet<string>();
@@ -731,7 +734,7 @@ internal partial class Program
 
             // ── Plan approval via Slack @mention ──
             var planTs = getPlanApprovalTs?.Invoke();
-            if (!string.IsNullOrEmpty(planTs) && msg.ThreadTs == planTs && claudeHwnd != IntPtr.Zero)
+            if (!string.IsNullOrEmpty(planTs) && msg.ThreadTs == planTs && GetClaudeHwnd() != IntPtr.Zero)
             {
                 if (IsPlanApprovalKeyword(cleanText))
                 {
@@ -739,7 +742,7 @@ internal partial class Program
                     Console.WriteLine($"[EYE] Plan APPROVED via Slack by {msg.User}");
                     Console.ResetColor();
 
-                    var approved = ClickApproveButton(claudeHwnd);
+                    var approved = ClickApproveButton(GetClaudeHwnd());
                     var reply = approved
                         ? ":white_check_mark: 플랜 승인 완료! Claude가 코딩을 시작합니다."
                         : ":x: 승인 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
@@ -753,7 +756,7 @@ internal partial class Program
                     Console.WriteLine($"[EYE] Plan feedback via Slack: {cleanText}");
                     Console.ResetColor();
 
-                    var feedbackOk = TypePlanFeedback(claudeHwnd, cleanText);
+                    var feedbackOk = TypePlanFeedback(GetClaudeHwnd(), cleanText);
                     var reply = feedbackOk
                         ? $":pencil2: 피드백 전달 완료: \"{cleanText}\""
                         : ":x: 피드백 입력란을 찾을 수 없습니다";
@@ -765,7 +768,7 @@ internal partial class Program
 
             // ── Permission approval via Slack @mention or thread reply ──
             var permTs = getPermissionApprovalTs?.Invoke();
-            if (!string.IsNullOrEmpty(permTs) && msg.ThreadTs == permTs && claudeHwnd != IntPtr.Zero)
+            if (!string.IsNullOrEmpty(permTs) && msg.ThreadTs == permTs && GetClaudeHwnd() != IntPtr.Zero)
             {
                 if (IsPlanApprovalKeyword(cleanText)) // "승인", "ㄱㄱ", "ㅇㅇ" etc
                 {
@@ -773,7 +776,7 @@ internal partial class Program
                     Console.WriteLine($"[EYE] Permission APPROVED via Slack by {msg.User}");
                     Console.ResetColor();
 
-                    var permButtons = GetPermissionButtons(claudeHwnd);
+                    var permButtons = GetPermissionButtons(GetClaudeHwnd());
                     var allowBtn = permButtons.FirstOrDefault(b =>
                         b.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
                         b.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
@@ -782,7 +785,7 @@ internal partial class Program
 
                     bool clicked = false;
                     if (allowBtn != null)
-                        clicked = ClickPermissionButton(claudeHwnd, allowBtn);
+                        clicked = ClickPermissionButton(GetClaudeHwnd(), allowBtn);
 
                     var reply = clicked
                         ? $":white_check_mark: 권한 승인 완료! (\"{allowBtn}\")"
@@ -841,7 +844,7 @@ internal partial class Program
                 var ackThread = msg.ThreadTs ?? msg.Timestamp;
 
                 // ★ New-chat fallback: if Claude Desktop window exists, try click+paste
-                if (claudeHwnd != IntPtr.Zero)
+                if (GetClaudeHwnd() != IntPtr.Zero)
                 {
                     var replyThread = msg.ThreadTs ?? msg.Timestamp;
                     var threadContext = "";
@@ -852,7 +855,7 @@ internal partial class Program
                     }
                     var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, replyThread)}";
 
-                    if (promptHelper.TryNewChatInput(claudeHwnd, promptText))
+                    if (promptHelper.TryNewChatInput(GetClaudeHwnd(), promptText))
                     {
                         Console.WriteLine("[EYE][SLACK] >> New-chat fallback SUCCESS!");
                         handledByMention.Add(msg.Timestamp);
@@ -865,7 +868,7 @@ internal partial class Program
                 try
                 {
                     // Comprehensive diagnosis
-                    var claudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
+                    var claudeStatus = GetClaudeHwnd() != IntPtr.Zero ? DetectClaudeDesktopStatus(GetClaudeHwnd()) : null;
                     var statusInfo = claudeStatus != null
                         ? $"AI status: {claudeStatus.Item2}"
                         : "AI status: unavailable";
@@ -937,7 +940,7 @@ internal partial class Program
 
             // ── Plan approval via thread reply (no @mention needed) ──
             var planTs = getPlanApprovalTs?.Invoke();
-            if (!string.IsNullOrEmpty(planTs) && msg.ThreadTs == planTs && claudeHwnd != IntPtr.Zero)
+            if (!string.IsNullOrEmpty(planTs) && msg.ThreadTs == planTs && GetClaudeHwnd() != IntPtr.Zero)
             {
                 var cleanText = System.Text.RegularExpressions.Regex.Replace(
                     msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
@@ -948,7 +951,7 @@ internal partial class Program
                     Console.WriteLine($"[EYE] Plan APPROVED via Slack thread by {msg.User}");
                     Console.ResetColor();
 
-                    var approved = ClickApproveButton(claudeHwnd);
+                    var approved = ClickApproveButton(GetClaudeHwnd());
                     var reply = approved
                         ? ":white_check_mark: 플랜 승인 완료! Claude가 코딩을 시작합니다."
                         : ":x: 승인 버튼을 찾을 수 없습니다 (이미 처리되었거나 화면이 변경됨)";
@@ -962,7 +965,7 @@ internal partial class Program
                     Console.WriteLine($"[EYE] Plan feedback via Slack thread: {cleanText}");
                     Console.ResetColor();
 
-                    var feedbackOk = TypePlanFeedback(claudeHwnd, cleanText);
+                    var feedbackOk = TypePlanFeedback(GetClaudeHwnd(), cleanText);
                     var reply = feedbackOk
                         ? $":pencil2: 피드백 전달 완료: \"{cleanText}\""
                         : ":x: 피드백 입력란을 찾을 수 없습니다";
@@ -974,7 +977,7 @@ internal partial class Program
 
             // ── Permission approval via thread reply (no @mention needed) ──
             var permTs2 = getPermissionApprovalTs?.Invoke();
-            if (!string.IsNullOrEmpty(permTs2) && msg.ThreadTs == permTs2 && claudeHwnd != IntPtr.Zero)
+            if (!string.IsNullOrEmpty(permTs2) && msg.ThreadTs == permTs2 && GetClaudeHwnd() != IntPtr.Zero)
             {
                 var cleanPerm = System.Text.RegularExpressions.Regex.Replace(
                     msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
@@ -985,7 +988,7 @@ internal partial class Program
                     Console.WriteLine($"[EYE] Permission APPROVED via Slack thread by {msg.User}");
                     Console.ResetColor();
 
-                    var permBtns = GetPermissionButtons(claudeHwnd);
+                    var permBtns = GetPermissionButtons(GetClaudeHwnd());
                     var allowBtn = permBtns.FirstOrDefault(b =>
                         b.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
                         b.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
@@ -994,7 +997,7 @@ internal partial class Program
 
                     bool clicked = false;
                     if (allowBtn != null)
-                        clicked = ClickPermissionButton(claudeHwnd, allowBtn);
+                        clicked = ClickPermissionButton(GetClaudeHwnd(), allowBtn);
 
                     var reply = clicked
                         ? $":white_check_mark: 권한 승인 완료! (\"{allowBtn}\")"
@@ -1005,329 +1008,17 @@ internal partial class Program
                 }
             }
 
-            // ── Auto-track threads on bot's own messages (API check) ──
-            if (msg.ThreadTs != null && !activeThreads.Contains(msg.ThreadTs))
+            // ── Dedup: already forwarded by OnMention → skip ──
+            if (handledByMention.Remove(msg.Timestamp)) return;
+
+            // ── Dispatch to route worker (fire-and-forget) ──
+            // slack route handles: thread reply / keyword / catch-all → inject + ack
+            var routeJson = System.Text.Json.JsonSerializer.Serialize(new
             {
-                if (IsOwnThread(botToken, msg.Channel, msg.ThreadTs))
-                {
-                    activeThreads.Add(msg.ThreadTs);
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine($"[EYE][SLACK] Auto-tracking thread on bot's message (ts={msg.ThreadTs})");
-                    Console.ResetColor();
-                }
-            }
-
-            // ── Thread reply to bot's message → ALWAYS forward to Claude prompt ──
-            if (msg.ThreadTs != null && activeThreads.Contains(msg.ThreadTs))
-            {
-                // Dedup: already forwarded by OnMention handler → skip
-                if (handledByMention.Remove(msg.Timestamp)) return;
-
-                var cleanText = System.Text.RegularExpressions.Regex.Replace(
-                    msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
-                if (string.IsNullOrEmpty(cleanText)) return;
-
-                // "그만" / "stop" → stop tracking this thread
-                var trimmedLower = cleanText.Trim().ToLowerInvariant();
-                if (trimmedLower == "그만" || trimmedLower == "stop" || trimmedLower == "ㄱㅁ")
-                {
-                    activeThreads.Remove(msg.ThreadTs);
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"[EYE][SLACK] << thread stopped by {msg.User} (ts={msg.ThreadTs})");
-                    Console.ResetColor();
-                    Task.Run(async () => await Send(msg.Channel,
-                        "알겠습니다~ 이 쓰레드에서 물러납니다!", msg.ThreadTs)).Wait(5000);
-                    return;
-                }
-
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[EYE][SLACK] << thread reply from {msg.User}: {cleanText}");
-                Console.ResetColor();
-
-                ClaudePromptHelper.AllowFocusSteal = true; // fallback path용
-                var trPromptHelper = new ClaudePromptHelper();
-                var allTrPrompts = ResolveThreadScopedPrompts(trPromptHelper, botToken, msg.Channel, msg.ThreadTs!, botUsername);
-                if (allTrPrompts.Count > 0)
-                {
-                    // Build thread context (starter + previous message) for Claude
-                    var threadContext = "";
-                    if (msg.ThreadTs != null)
-                    {
-                        var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
-                        if (!string.IsNullOrEmpty(ctx))
-                            threadContext = $"\n{ctx}\n";
-                    }
-
-                    int trSent = 0;
-                    var trResults = new List<DeliveryResult>();
-                    foreach (var pi in allTrPrompts)
-                    {
-                        try
-                        {
-                            var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, msg.ThreadTs!, "thread reply")}";
-                            var ok = ProbeAndSubmit(trPromptHelper, pi, promptText, msg.Timestamp);
-                            trResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
-                            if (ok) trSent++;
-                        }
-                        catch (Exception ex)
-                        {
-                            trResults.Add(new DeliveryResult(ExtractProjectName(pi), false));
-                            Console.WriteLine($"[EYE][SLACK] Thread broadcast error: {ex.Message}");
-                        }
-                    }
-                    Console.WriteLine($"[EYE][SLACK] >> Thread broadcast: {trSent}/{allTrPrompts.Count} prompts");
-
-                    SendAndTrackAck(msg.Channel, msg.ThreadTs!, trSent, allTrPrompts.Count, trResults);
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("[EYE][SLACK] >> Thread reply: Prompt not found! 새 채팅 폴백 시도...");
-                    Console.ResetColor();
-
-                    // ★ New-chat fallback
-                    if (claudeHwnd != IntPtr.Zero)
-                    {
-                        var threadContext = "";
-                        if (msg.ThreadTs != null)
-                        {
-                            var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
-                            if (!string.IsNullOrEmpty(ctx)) threadContext = $"\n{ctx}\n";
-                        }
-                        var fallbackText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, msg.ThreadTs!, "thread reply")}";
-                        if (trPromptHelper.TryNewChatInput(claudeHwnd, fallbackText))
-                        {
-                            Console.WriteLine("[EYE][SLACK] >> Thread reply: New-chat fallback SUCCESS!");
-                            SendAndTrackAck(msg.Channel, msg.ThreadTs!);
-                            return;
-                        }
-                        Console.WriteLine("[EYE][SLACK] New-chat fallback FAILED, running diagnosis...");
-                    }
-
-                    try
-                    {
-                        var trClaudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
-                        var trStatusInfo = trClaudeStatus != null
-                            ? $"AI status: {trClaudeStatus.Item2}"
-                            : "AI status: unavailable";
-
-                        string trDiagDetail;
-                        try { trDiagDetail = trPromptHelper.DiagnosePromptSearch(); }
-                        catch (Exception dex) { trDiagDetail = $"(진단 실패: {dex.Message})"; }
-
-                        Console.WriteLine(trDiagDetail);
-                        try
-                        {
-                            var diagPath = Path.Combine(DataDir, "logs", $"prompt_diag_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-                            File.WriteAllText(diagPath, $"{trStatusInfo}\n{trDiagDetail}\n스레드 답장: {cleanText}");
-                            Console.WriteLine($"[EYE] Diagnosis saved: {diagPath}");
-                        }
-                        catch { }
-
-                        var diagMsg = $":warning: AI prompt not found!\n" +
-                            $"{trStatusInfo}\n" +
-                            $"스레드 답장: {cleanText}\n" +
-                            $"```\n{(trDiagDetail.Length > 800 ? trDiagDetail.Substring(0, 800) + "\n...(truncated)" : trDiagDetail)}\n```";
-                        SendPromptNotFound(msg.Channel, diagMsg, msg.ThreadTs, msg.Timestamp);
-                    }
-                    catch
-                    {
-                        Task.Run(async () => await Send(msg.Channel,
-                            $"(Claude 프롬프트 없음) 스레드 답장: {cleanText}", msg.ThreadTs)).Wait(5000);
-                    }
-                }
-                return;
-            }
-
-            // ── Keyword monitoring → forward to Claude prompt ──
-            var textLower = msg.Text.ToLowerInvariant();
-            var matchedKw = keywords.FirstOrDefault(kw => textLower.Contains(kw.ToLowerInvariant()));
-            if (matchedKw != null)
-            {
-                Console.ForegroundColor = ConsoleColor.Magenta;
-                Console.WriteLine($"[EYE][SLACK] keyword \"{matchedKw}\" from {msg.User}: {msg.Text}");
-                Console.ResetColor();
-
-                // Start tracking this thread so follow-up messages also come through
-                var kwThreadKey = msg.ThreadTs ?? msg.Timestamp;
-                activeThreads.Add(kwThreadKey);
-
-                var cleanKwText = System.Text.RegularExpressions.Regex.Replace(
-                    msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
-                if (string.IsNullOrEmpty(cleanKwText)) return;
-
-                ClaudePromptHelper.AllowFocusSteal = true; // fallback path용
-                var kwPromptHelper = new ClaudePromptHelper();
-                var allKwPrompts = kwPromptHelper.FindAllPrompts();
-                if (allKwPrompts.Count > 0)
-                {
-                    // Build thread context (starter + previous message) for Claude
-                    var threadContext = "";
-                    if (msg.ThreadTs != null)
-                    {
-                        var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
-                        if (!string.IsNullOrEmpty(ctx))
-                            threadContext = $"\n{ctx}\n";
-                    }
-
-                    var kwReplyThread = msg.ThreadTs ?? msg.Timestamp;
-                    int kwSent = 0;
-                    var kwResults = new List<DeliveryResult>();
-                    foreach (var pi in allKwPrompts)
-                    {
-                        try
-                        {
-                            var promptText = $"{cleanKwText}{threadContext}\n{SlackReplySuffix(msg.User, kwReplyThread, $"keyword:\"{matchedKw}\"")}";
-                            var ok = ProbeAndSubmit(kwPromptHelper, pi, promptText, msg.Timestamp);
-                            kwResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
-                            if (ok) kwSent++;
-                        }
-                        catch (Exception ex)
-                        {
-                            kwResults.Add(new DeliveryResult(ExtractProjectName(pi), false));
-                            Console.WriteLine($"[EYE][SLACK] Keyword broadcast error: {ex.Message}");
-                        }
-                    }
-                    Console.WriteLine($"[EYE][SLACK] >> Keyword broadcast: {kwSent}/{allKwPrompts.Count} prompts");
-
-                    SendAndTrackAck(msg.Channel, kwThreadKey, kwSent, allKwPrompts.Count, kwResults);
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("[EYE][SLACK] >> Keyword match: Prompt not found! 새 채팅 폴백 시도...");
-                    Console.ResetColor();
-
-                    // ★ New-chat fallback
-                    if (claudeHwnd != IntPtr.Zero)
-                    {
-                        var kwFbThread = msg.ThreadTs ?? msg.Timestamp;
-                        var kwFbContext = "";
-                        if (msg.ThreadTs != null)
-                        {
-                            var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
-                            if (!string.IsNullOrEmpty(ctx)) kwFbContext = $"\n{ctx}\n";
-                        }
-                        var kwFallbackText = $"{cleanKwText}{kwFbContext}\n{SlackReplySuffix(msg.User, kwFbThread, $"keyword:\"{matchedKw}\"")}";
-                        if (kwPromptHelper.TryNewChatInput(claudeHwnd, kwFallbackText))
-                        {
-                            Console.WriteLine("[EYE][SLACK] >> Keyword match: New-chat fallback SUCCESS!");
-                            SendAndTrackAck(msg.Channel, kwThreadKey);
-                            return;
-                        }
-                        Console.WriteLine("[EYE][SLACK] New-chat fallback FAILED, running diagnosis...");
-                    }
-
-                    try
-                    {
-                        var kwClaudeStatus = claudeHwnd != IntPtr.Zero ? DetectClaudeDesktopStatus(claudeHwnd) : null;
-                        var kwStatusInfo = kwClaudeStatus != null
-                            ? $"AI status: {kwClaudeStatus.Item2}"
-                            : "AI status: unavailable";
-
-                        string kwDiagDetail;
-                        try { kwDiagDetail = kwPromptHelper.DiagnosePromptSearch(); }
-                        catch (Exception dex) { kwDiagDetail = $"(진단 실패: {dex.Message})"; }
-
-                        Console.WriteLine(kwDiagDetail);
-                        try
-                        {
-                            var diagPath = Path.Combine(DataDir, "logs", $"prompt_diag_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-                            File.WriteAllText(diagPath, $"{kwStatusInfo}\n{kwDiagDetail}\n키워드 \"{matchedKw}\" 감지: {cleanKwText}");
-                            Console.WriteLine($"[EYE] Diagnosis saved: {diagPath}");
-                        }
-                        catch { }
-
-                        var diagMsg = $":warning: AI prompt not found!\n" +
-                            $"{kwStatusInfo}\n" +
-                            $"키워드 \"{matchedKw}\" 감지: {cleanKwText}\n" +
-                            $"```\n{(kwDiagDetail.Length > 800 ? kwDiagDetail.Substring(0, 800) + "\n...(truncated)" : kwDiagDetail)}\n```";
-                        SendPromptNotFound(msg.Channel, diagMsg, kwThreadKey, msg.Timestamp);
-                    }
-                    catch
-                    {
-                        Task.Run(async () => await Send(msg.Channel,
-                            $"(Claude 프롬프트 없음) 키워드 \"{matchedKw}\" 감지: {cleanKwText}", kwThreadKey)).Wait(5000);
-                    }
-                }
-                return;
-            }
-
-            // ── Catch-all: ALL remaining messages → BROADCAST to ALL Claude prompts ──
-            // CLAUDE.md: "Slack 수신 메시지는 항상 Claude 프롬프트에 전달 (옵션 없음)"
-            // 핑 같은 브로드캐스트: 모든 클롣에게 전달 → 각자 퐁 응답
-            {
-                var cleanAll = System.Text.RegularExpressions.Regex.Replace(
-                    msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
-                if (string.IsNullOrEmpty(cleanAll)) return;
-
-                // Noise filter: very short noise tokens
-                var noise = new[] { "NO_REPLY", "ㄱㄱ" };
-                if (noise.Any(n => cleanAll.Equals(n, StringComparison.OrdinalIgnoreCase))) return;
-
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.WriteLine($"[EYE][SLACK] << catch-all BROADCAST from {msg.User}: {cleanAll}");
-                Console.ResetColor();
-
-                // Track thread for follow-up
-                var allThreadKey = msg.ThreadTs ?? msg.Timestamp;
-                activeThreads.Add(allThreadKey);
-
-                ClaudePromptHelper.AllowFocusSteal = true; // fallback path용
-                using var allPromptHelper = new ClaudePromptHelper();
-                // 브로드캐스트 전 전경 기억 — 핑 전달 후 원래 창으로 복구
-                var prevFgBeforeBroadcast = NativeMethods.GetForegroundWindow();
-                var allPrompts = allPromptHelper.FindAllPrompts();
-
-                if (allPrompts.Count > 0)
-                {
-                    int sent = 0;
-                    var broadcastResults = new List<DeliveryResult>();
-                    foreach (var pi in allPrompts)
-                    {
-                        try
-                        {
-                            var promptText = $"{cleanAll}\n{SlackSendSuffix(msg.User)}";
-                            var ok = ProbeAndSubmit(allPromptHelper, pi, promptText, msg.Timestamp);
-                            broadcastResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
-                            if (ok)
-                            {
-                                sent++;
-                                Console.WriteLine($"[EYE][SLACK] >> Broadcast [{sent}/{allPrompts.Count}]: sent to \"{(pi.WindowTitle.Length > 40 ? pi.WindowTitle[..37] + "..." : pi.WindowTitle)}\"");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            broadcastResults.Add(new DeliveryResult(ExtractProjectName(pi), false));
-                            Console.WriteLine($"[EYE][SLACK] >> Broadcast error: {ex.Message}");
-                        }
-                    }
-
-                    // 브로드캐스트 완료 → 직전 전경 복구
-                    if (prevFgBeforeBroadcast != IntPtr.Zero
-                        && NativeMethods.GetForegroundWindow() != prevFgBeforeBroadcast)
-                    {
-                        Thread.Sleep(200);
-                        NativeMethods.SmartSetForegroundWindow(prevFgBeforeBroadcast);
-                        Console.WriteLine($"[EYE][SLACK] >> 직전 전경 복구: 0x{prevFgBeforeBroadcast:X}");
-                    }
-
-                    if (sent > 0)
-                    {
-                        SendAndTrackAck(msg.Channel, allThreadKey, sent, allPrompts.Count, broadcastResults);
-                        Console.WriteLine($"[EYE][SLACK] >> Broadcast complete: {sent}/{allPrompts.Count} prompts");
-                    }
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("[EYE][SLACK] >> Catch-all: No prompts found!");
-                    Console.ResetColor();
-
-                    SendPromptNotFound(msg.Channel,
-                        $":warning: AI prompt not found (message: {cleanAll})", allThreadKey, msg.Timestamp);
-                }
-            }
+                text = msg.Text, user = msg.User, ts = msg.Timestamp,
+                threadTs = msg.ThreadTs, channel = msg.Channel
+            });
+            EyeCmdPipeServer.DispatchBg(["slack", "route", routeJson]);
         };
     }
 

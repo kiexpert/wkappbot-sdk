@@ -348,6 +348,12 @@ public static partial class NativeMethods
         return false;
     }
 
+    // ── Console codepage ──────────────────────────────────────────
+    [DllImport("kernel32.dll")]
+    public static extern bool SetConsoleCP(uint wCodePageID);
+    [DllImport("kernel32.dll")]
+    public static extern bool SetConsoleOutputCP(uint wCodePageID);
+
     // ── DPI ──────────────────────────────────────────────────────
     [DllImport("shcore.dll")]
     public static extern int SetProcessDpiAwareness(int awareness);
@@ -729,6 +735,134 @@ public static partial class NativeMethods
         var sb = new System.Text.StringBuilder(1024);
         GetWindowTextW(hWnd, sb, sb.Capacity);
         return sb.ToString();
+    }
+
+    // ── Process CWD reading via NtQueryInformationProcess → PEB ──────
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
+        [Out] byte[] lpBuffer, int nSize, out int lpNumberOfBytesRead);
+
+    [DllImport("ntdll.dll")]
+    public static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass,
+        ref ProcessBasicInformation processInformation, int processInformationLength, out int returnLength);
+
+    public const uint PROCESS_QUERY_INFORMATION = 0x0400;
+    public const uint PROCESS_VM_READ           = 0x0010;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct ProcessBasicInformation
+    {
+        public IntPtr Reserved1;
+        public IntPtr PebBaseAddress;
+        public IntPtr Reserved2_0;
+        public IntPtr Reserved2_1;
+        public IntPtr UniqueProcessId;
+        public IntPtr Reserved3;
+    }
+
+    /// <summary>
+    /// Read the current working directory of any process via NtQueryInformationProcess → PEB.
+    /// Returns null on failure (access denied, 32/64-bit mismatch, etc.).
+    /// </summary>
+    public static string? GetProcessCurrentDirectory(int pid)
+    {
+        IntPtr hProcess = IntPtr.Zero;
+        try
+        {
+            hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, (uint)pid);
+            if (hProcess == IntPtr.Zero) return null;
+
+            var pbi = new ProcessBasicInformation();
+            if (NtQueryInformationProcess(hProcess, 0, ref pbi,
+                Marshal.SizeOf<ProcessBasicInformation>(), out _) != 0)
+                return null;
+
+            // PEB: ProcessParameters pointer at offset 0x20 (64-bit) or 0x10 (32-bit)
+            int ppOffset = IntPtr.Size == 8 ? 0x20 : 0x10;
+            var pebBuf = new byte[ppOffset + IntPtr.Size];
+            if (!ReadProcessMemory(hProcess, pbi.PebBaseAddress, pebBuf, pebBuf.Length, out _))
+                return null;
+
+            var ppAddr = IntPtr.Size == 8
+                ? new IntPtr(BitConverter.ToInt64(pebBuf, ppOffset))
+                : new IntPtr(BitConverter.ToInt32(pebBuf, ppOffset));
+
+            // RTL_USER_PROCESS_PARAMETERS: CurrentDirectory.DosPath UNICODE_STRING
+            // 64-bit offset 0x38: Length(2) MaxLen(2) pad(4) Buffer*(8)
+            // 32-bit offset 0x24: Length(2) MaxLen(2) Buffer*(4)
+            int cdOffset = IntPtr.Size == 8 ? 0x38 : 0x24;
+            int cdSize   = 2 + 2 + (IntPtr.Size == 8 ? 4 : 0) + IntPtr.Size;
+            var ppBuf = new byte[cdOffset + cdSize];
+            if (!ReadProcessMemory(hProcess, ppAddr, ppBuf, ppBuf.Length, out _))
+                return null;
+
+            ushort pathLen = BitConverter.ToUInt16(ppBuf, cdOffset);
+            var bufPtr = IntPtr.Size == 8
+                ? new IntPtr(BitConverter.ToInt64(ppBuf, cdOffset + 8))
+                : new IntPtr(BitConverter.ToInt32(ppBuf, cdOffset + 4));
+
+            if (pathLen == 0 || bufPtr == IntPtr.Zero) return null;
+
+            var pathBuf = new byte[pathLen];
+            if (!ReadProcessMemory(hProcess, bufPtr, pathBuf, pathLen, out _)) return null;
+
+            var result = System.Text.Encoding.Unicode.GetString(pathBuf).TrimEnd('\\', '/');
+            return string.IsNullOrWhiteSpace(result) ? null : result;
+        }
+        catch { return null; }
+        finally { if (hProcess != IntPtr.Zero) CloseHandle(hProcess); }
+    }
+
+    /// <summary>
+    /// Read the command line of any process via NtQueryInformationProcess → PEB.
+    /// Returns null on failure.
+    /// </summary>
+    public static string? GetProcessCommandLine(int pid)
+    {
+        IntPtr hProcess = IntPtr.Zero;
+        try
+        {
+            hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, (uint)pid);
+            if (hProcess == IntPtr.Zero) return null;
+
+            var pbi = new ProcessBasicInformation();
+            if (NtQueryInformationProcess(hProcess, 0, ref pbi,
+                Marshal.SizeOf<ProcessBasicInformation>(), out _) != 0)
+                return null;
+
+            int ppOffset = IntPtr.Size == 8 ? 0x20 : 0x10;
+            var pebBuf = new byte[ppOffset + IntPtr.Size];
+            if (!ReadProcessMemory(hProcess, pbi.PebBaseAddress, pebBuf, pebBuf.Length, out _))
+                return null;
+
+            var ppAddr = IntPtr.Size == 8
+                ? new IntPtr(BitConverter.ToInt64(pebBuf, ppOffset))
+                : new IntPtr(BitConverter.ToInt32(pebBuf, ppOffset));
+
+            // RTL_USER_PROCESS_PARAMETERS: CommandLine UNICODE_STRING
+            // 64-bit offset 0x70: Length(2) MaxLen(2) pad(4) Buffer*(8)
+            // 32-bit offset 0x40: Length(2) MaxLen(2) Buffer*(4)
+            int clOffset = IntPtr.Size == 8 ? 0x70 : 0x40;
+            int clSize   = 2 + 2 + (IntPtr.Size == 8 ? 4 : 0) + IntPtr.Size;
+            var ppBuf = new byte[clOffset + clSize];
+            if (!ReadProcessMemory(hProcess, ppAddr, ppBuf, ppBuf.Length, out _))
+                return null;
+
+            ushort pathLen = BitConverter.ToUInt16(ppBuf, clOffset);
+            var bufPtr = IntPtr.Size == 8
+                ? new IntPtr(BitConverter.ToInt64(ppBuf, clOffset + 8))
+                : new IntPtr(BitConverter.ToInt32(ppBuf, clOffset + 4));
+
+            if (pathLen == 0 || bufPtr == IntPtr.Zero) return null;
+
+            var pathBuf = new byte[pathLen];
+            if (!ReadProcessMemory(hProcess, bufPtr, pathBuf, pathLen, out _)) return null;
+
+            var result = System.Text.Encoding.Unicode.GetString(pathBuf);
+            return string.IsNullOrWhiteSpace(result) ? null : result;
+        }
+        catch { return null; }
+        finally { if (hProcess != IntPtr.Zero) CloseHandle(hProcess); }
     }
 }
 

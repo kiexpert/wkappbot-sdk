@@ -324,10 +324,28 @@ internal sealed class WhisperRingWindow : Window
         Content = root;
     }
 
-    /// <summary>Format 15-bit sound code as octal (no leading zeros). Each octal digit = band index 0-7.</summary>
+    /// <summary>Format sound code as octal (no leading zeros).
+    /// Band 0 (VxLip/성대음) rank 1 → encode ranks 2,3,4; otherwise ranks 1,2,3.</summary>
     private static string FormatSoundCode(ushort sc)
     {
-        return Convert.ToString(sc, 8);
+        if (sc == 0) return "..";
+        bool vocalFirst = ((sc >> 12) & 7) == 0;
+        int val = vocalFirst ? sc >> 3 : sc >> 6;
+        return Convert.ToString(val, 8);
+    }
+
+    /// <summary>
+    /// Normalize trail for display: spaces between tokens → '-', ".." → ' ', collapse spaces.
+    /// e.g. "1 176 137 .. 362 160" → "1-176-137 362-160"
+    /// </summary>
+    private static string FormatTrailDisplay(string trail)
+    {
+        // Split on ".." boundaries → each segment has space-separated tokens → join with '-'
+        var parts = trail.Split(new[] { " .. ", ".." }, StringSplitOptions.None);
+        var joined = string.Join(" ", parts.Select(p =>
+            string.Join("-", p.Split(' ', StringSplitOptions.RemoveEmptyEntries))));
+        // Collapse any remaining multiple spaces
+        return System.Text.RegularExpressions.Regex.Replace(joined, " +", " ").Trim();
     }
 
     /// <summary>Update a single arc segment geometry.</summary>
@@ -544,7 +562,7 @@ internal sealed class WhisperRingWindow : Window
             _coreGlow.Fill = rg;
         }
 
-        // Recent sound codes — RLE string append (skip consecutive duplicates)
+        // Recent sound codes — RLE trail (stored as "1 176 .. 362", display-normalized to "1-176 362")
         if (soundCode != _scLast)
         {
             _scLast = soundCode;
@@ -554,11 +572,14 @@ internal sealed class WhisperRingWindow : Window
                 : (_scTrail.Length > 0 ? _scTrail + " " + tag : tag);
         }
 
-        // Clock area: show sound codes only when enough accumulated (≥20 chars), else clock
-        int scCount = _scTrail.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        // Display: spaces between tokens → '-', ".." → ' ', collapse multiple spaces
+        var display = FormatTrailDisplay(_scTrail);
+
+        // Clock area: show sound codes only when enough accumulated, else clock
+        int scCount = display.Split(new[] { ' ', '-' }, StringSplitOptions.RemoveEmptyEntries).Length;
         if (scCount >= SoundCodeMinCount)
         {
-            var clockTrail = _scTrail.Length > 24 ? _scTrail[(_scTrail.Length - 24)..] : _scTrail;
+            var clockTrail = display.Length > 24 ? display[(display.Length - 24)..] : display;
             _tokenText.Text = clockTrail;
             _tokenText.Foreground = mode == "WHSPR"
                 ? new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0xBB))
@@ -571,7 +592,7 @@ internal sealed class WhisperRingWindow : Window
         }
 
         // Bottom bar: full trail with tween scroll — slow start, accelerate when queued
-        _recentText.Text = _scTrail;
+        _recentText.Text = display;
         _recentText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         double textWidth = _recentText.DesiredSize.Width;
         double clipWidth = _recentClip.ActualWidth > 0 ? _recentClip.ActualWidth : 172; // 180 - 8 margin
