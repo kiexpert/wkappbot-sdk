@@ -154,14 +154,46 @@ internal partial class Program
             Console.WriteLine($"[STUDY] Parsed {studyResults.Count} segments");
 
             // ── Move to label folders ──
-            int moved = 0;
+            int moved = 0, quarantined = 0;
+            var quarantineDir = Path.Combine(wavDir, "_quarantine");
             foreach (var result in studyResults)
             {
                 if (result.SourceFile == null || !File.Exists(result.SourceFile)) continue;
 
                 var transcript = result.Transcript;
-                if (string.IsNullOrWhiteSpace(transcript) && sttLabels.TryGetValue(result.SourceFile, out var sttFb))
-                    transcript = sttFb.Text;
+                sttLabels.TryGetValue(result.SourceFile, out var sttFb);
+                if (string.IsNullOrWhiteSpace(transcript))
+                    transcript = sttFb?.Text;
+
+                // ── Cross-model agreement gate ────────────────────────────────
+                // If Gemini confidence low OR Gemini/STT disagree significantly → quarantine
+                string? quarantineReason = null;
+                if (result.AudioType == "speech" || result.AudioType == "mixed")
+                {
+                    if (result.Confidence < 0.35 && !string.IsNullOrWhiteSpace(result.Transcript))
+                        quarantineReason = $"low_conf={result.Confidence:F2}";
+                    else if (!string.IsNullOrWhiteSpace(result.Transcript)
+                          && !string.IsNullOrWhiteSpace(sttFb?.Text)
+                          && sttFb.Confidence >= 0.3f)
+                    {
+                        var agree = WordJaccard(result.Transcript, sttFb.Text);
+                        if (agree < 0.25)
+                            quarantineReason = $"disagree={agree:F2}(gemini=\"{result.Transcript[..Math.Min(20,result.Transcript.Length)]}\" stt=\"{sttFb.Text[..Math.Min(20,sttFb.Text.Length)]}\")";
+                    }
+                }
+
+                if (quarantineReason != null)
+                {
+                    Directory.CreateDirectory(quarantineDir);
+                    var qDest = Path.Combine(quarantineDir, Path.GetFileName(result.SourceFile));
+                    if (!File.Exists(qDest))
+                    {
+                        try { File.Move(result.SourceFile, qDest); quarantined++; } catch { continue; }
+                        Console.WriteLine($"  [Q] _quarantine  {Path.GetFileName(result.SourceFile)}  ({quarantineReason})");
+                        DropCompanionJson(qDest, result, sttLabels);
+                    }
+                    continue;
+                }
 
                 string label;
                 if (result.AudioType != "speech" && result.AudioType != "mixed")
@@ -204,7 +236,7 @@ internal partial class Program
                 }
                 DropCompanionJson(destPath, result, sttLabels);
             }
-            Console.WriteLine($"[STUDY] Moved {moved}/{studyResults.Count}");
+            Console.WriteLine($"[STUDY] Moved {moved}/{studyResults.Count}  quarantined={quarantined}");
             totalMoved += moved;
 
             // ── Phoneme map + self-heal ──
@@ -263,11 +295,11 @@ internal partial class Program
         if (Directory.Exists(unknownDir))
             allMp3s.AddRange(Directory.GetFiles(unknownDir, "*.mp3"));
 
-        // Other subfolders (skip _mic — raw captures before study, skip _unknown already added)
+        // Other subfolders (skip system folders: _mic, _quarantine, _noise already excluded)
         foreach (var subDir in Directory.GetDirectories(wavDir).OrderBy(d => d))
         {
             var name = Path.GetFileName(subDir);
-            if (name == "_unknown" || name == "_mic") continue;
+            if (name == "_unknown" || name == "_mic" || name == "_quarantine" || name == "_noise") continue;
             allMp3s.AddRange(Directory.GetFiles(subDir, "*.mp3"));
         }
 
@@ -767,6 +799,21 @@ internal partial class Program
         return result;
     }
 
+    /// <summary>
+    /// Jaccard similarity between word sets of two transcripts (case-insensitive).
+    /// Returns 0.0 (no overlap) to 1.0 (identical). Handles short/empty strings gracefully.
+    /// </summary>
+    static double WordJaccard(string a, string b)
+    {
+        var wa = new HashSet<string>(a.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        var wb = new HashSet<string>(b.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        if (wa.Count == 0 && wb.Count == 0) return 1.0;
+        if (wa.Count == 0 || wb.Count == 0) return 0.0;
+        int intersection = wa.Count(w => wb.Contains(w));
+        int union = wa.Union(wb).Count();
+        return union == 0 ? 0.0 : (double)intersection / union;
+    }
+
     static string SanitizeFolderName(string text)
     {
         // Use first meaningful phrase as folder name (max 60 chars)
@@ -1093,8 +1140,34 @@ internal partial class Program
                 }
             }
 
-            if (conflicts > 0 || requeued > 0 || noiseMigrated > 0)
-                Console.WriteLine($"[HEAL] conflicts={conflicts} requeued={requeued} noise={noiseMigrated} canonical={canonical.Count}");
+            // 5. Quarantine re-promotion: files quarantined >2 batches ago (companion JSON age)
+            //    → move back to _unknown/ for re-study (second chance with fresh context)
+            var quarantineDir2 = Path.Combine(wavDir, "_quarantine");
+            int rePromoted = 0;
+            if (Directory.Exists(quarantineDir2))
+            {
+                var unknownDir2 = Path.Combine(wavDir, "_unknown");
+                var cutoff = DateTime.Now - TimeSpan.FromHours(1); // re-study after 1h
+                foreach (var mp3 in Directory.GetFiles(quarantineDir2, "*.mp3"))
+                {
+                    var jsonPath = Path.ChangeExtension(mp3, ".json");
+                    var refTime = File.Exists(jsonPath) ? File.GetLastWriteTime(jsonPath) : File.GetLastWriteTime(mp3);
+                    if (refTime > cutoff) continue; // too recent — skip
+
+                    Directory.CreateDirectory(unknownDir2);
+                    var dest = Path.Combine(unknownDir2, Path.GetFileName(mp3));
+                    if (File.Exists(dest)) continue;
+                    try
+                    {
+                        File.Move(mp3, dest); rePromoted++;
+                        if (File.Exists(jsonPath)) try { File.Delete(jsonPath); } catch { }
+                    }
+                    catch { }
+                }
+            }
+
+            if (conflicts > 0 || requeued > 0 || noiseMigrated > 0 || rePromoted > 0)
+                Console.WriteLine($"[HEAL] conflicts={conflicts} requeued={requeued} noise={noiseMigrated} canonical={canonical.Count} quarantine_requeue={rePromoted}");
         }
         catch (Exception ex)
         {

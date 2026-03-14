@@ -48,10 +48,12 @@ internal sealed class WhisperExperienceDb : IDisposable
     private volatile bool _isRecording;
     private int _quietFrames;
     private int _segmentFrames; // voice frames in current segment (for min-length gate)
+    private float _segmentEnergy; // accumulated MaxEnergy for RMS gate
     private const int PauseFrames = 33;      // ~330ms silence = ".." (comma, short breath)
     private const int SentenceEndFrames = 99; // ~1s silence = "." (period, sentence end → cut)
     private const int MinSegmentFrames  = 100; // ~3 seconds — skip tiny bursts for Gemini
     private const int MinVoicedFrames   = 9;   // ~90ms  — fewer → discard file entirely
+    private const float MinAvgEnergy    = 0.008f; // RMS gate: avg energy below this → _noise/
     private readonly object _wavLock = new();
     private volatile string? _segmentSttLabel; // STT draft label for current segment
 
@@ -303,6 +305,7 @@ internal sealed class WhisperExperienceDb : IDisposable
             if (!_isRecording)
                 StartWavSegment(frame.Mode);
             _segmentFrames++;
+            _segmentEnergy += (float)frame.MaxEnergy;
             _segmentSoundCodes.Add(frame.SoundCode);
 
             // Long sentence warning: 9s (~300 frames) → debug dump (once per sentence)
@@ -398,6 +401,7 @@ internal sealed class WhisperExperienceDb : IDisposable
             _wavPath = Path.Combine(_wavDir, $"{tag}.mp3");
             _segmentSttLabel = null; // reset label for new segment
             _segmentFrames = 0; // reset frame counter
+            _segmentEnergy = 0f;
             _segmentSoundCodes.Clear();
             try
             {
@@ -430,6 +434,23 @@ internal sealed class WhisperExperienceDb : IDisposable
             if (frames < MinVoicedFrames && _wavPath != null)
             {
                 try { File.Delete(_wavPath); } catch { }
+                _wavPath = null;
+            }
+
+            // RMS energy gate: avg energy too low → background noise, move to _noise/
+            float avgEnergy = frames > 0 ? _segmentEnergy / frames : 0f;
+            if (_wavPath != null && avgEnergy < MinAvgEnergy)
+            {
+                try
+                {
+                    var noiseDir = Path.Combine(Path.GetDirectoryName(_wavPath)!, "_noise");
+                    Directory.CreateDirectory(noiseDir);
+                    var noiseDest = Path.Combine(noiseDir, Path.GetFileName(_wavPath));
+                    if (!File.Exists(noiseDest)) File.Move(_wavPath, noiseDest);
+                    else File.Delete(_wavPath);
+                    Console.WriteLine($"[WHISPER:NOISE] avg_energy={avgEnergy:F4} < {MinAvgEnergy} → _noise/");
+                }
+                catch { }
                 _wavPath = null;
             }
 

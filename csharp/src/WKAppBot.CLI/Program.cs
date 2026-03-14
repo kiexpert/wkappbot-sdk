@@ -132,29 +132,6 @@ internal partial class Program
         // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
 
-        // ── Auto-dump patch on clean exit if any files were tracked ──────────────
-        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-        {
-            if (AgentFileTracker.TrackedCount > 0)
-            {
-                try
-                {
-                    // Resolve git root as workspace
-                    var workspace = Directory.GetCurrentDirectory();
-                    var psi = new System.Diagnostics.ProcessStartInfo("git", "rev-parse --show-toplevel")
-                        { RedirectStandardOutput = true, UseShellExecute = false };
-                    using var p = System.Diagnostics.Process.Start(psi)!;
-                    var root = p.StandardOutput.ReadToEnd().Trim();
-                    p.WaitForExit();
-                    if (p.ExitCode == 0 && Directory.Exists(root)) workspace = root;
-
-                    AgentFileTracker.DumpPatch(workspace);
-                }
-                catch { }
-                AgentFileTracker.Cleanup();
-            }
-        };
-
         // ── Crash handler: dump stack trace to log, DON'T move to old/ (crash evidence) ──
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
