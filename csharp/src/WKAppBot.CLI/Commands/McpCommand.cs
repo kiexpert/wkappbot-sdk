@@ -162,7 +162,7 @@ internal partial class Program
             ["serverInfo"] = new JsonObject
             {
                 ["name"] = "wkappbot",
-                ["version"] = "3.0.0",
+                ["version"] = "4.0.0",
                 ["protocol"] = "MCP+APSP-v1"
             }
         };
@@ -181,7 +181,11 @@ internal partial class Program
         "AI Agents: ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini), ask-claude (ask Claude Desktop) — vision-capable, auto image capture\n" +
         "File I/O: file-read (read file as Unicode, encoding-aware), file-write (write Unicode→target encoding, @file reference)\n" +
         "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ), slack (send Slack message), eye (eye tick — status snapshot)\n" +
-        "Diagnostics: prompt-probe (scan all AI prompt windows — Claude Desktop, VS Code Claude Code, Codex — and report certainty, Slack display names, CWD; use all=true to include hidden/minimized windows)";
+        "Diagnostics: prompt-probe (scan all AI prompt windows — Claude Desktop, VS Code Claude Code, Codex — and report certainty, Slack display names, CWD; use all=true to include hidden/minimized windows)\n" +
+        "Filesystem (read-only): file-read (encoding-aware read), file-write (write with encoding; auto-tracks original for patch restore)\n" +
+        "Agent session: agent-checkpoint (snapshot before risky change), agent-dump-patch (write unified patch + restore hints to repo root)\n" +
+        "Web: web-fetch (HTTP GET), web-search (Google via CDP), web-read (navigate+extract text)\n" +
+        "⚠ Build/publish (dotnet publish) is handled by Claude Code only — do NOT call build tools via wkappbot";
 
     static JsonNode HandleToolsList()
     {
@@ -214,11 +218,12 @@ internal partial class Program
                     ["required"] = new JsonArray { "action" }
                 }),
             McpTool("wkappbot_cli",
-                "Run any wkappbot CLI command directly — equivalent to running wkappbot.exe from the command line.\n" +
-                "Pass the full command as argv array. argv[0] is the wkappbot command.\n" +
-                "Examples: [\"windows\"], [\"windows\",\"--deep\"], [\"inspect\",\"*계산기*\"], [\"a11y\",\"click\",\"*OK*\"],\n" +
-                "          [\"prompt-probe\",\"--all\"], [\"ocr\",\"*메모장*\"], [\"capture\",\"*App*\"], [\"scan\"], [\"slack\",\"send\",\"hello\"]\n" +
-                "See: wkappbot --help for full command list.",
+                // Auto-generated from GetUsageText() — stays in sync with CLI help automatically
+                "Run any wkappbot CLI command via argv array. argv[0] = wkappbot command name.\n" +
+                "Examples: [\"a11y\",\"invoke\",\"*OK*\"], [\"file\",\"read\",\"src/foo.cs\"], [\"web\",\"search\",\"query\"],\n" +
+                "          [\"agent\",\"checkpoint\",\"--label\",\"before compile\"], [\"slack\",\"send\",\"hello\"]\n" +
+                "⚠ Build/publish is handled by Claude Code only — do NOT call dotnet/msbuild via this tool.\n\n" +
+                GetUsageText(),
                 new JsonObject {
                     ["type"] = "object",
                     ["properties"] = new JsonObject {

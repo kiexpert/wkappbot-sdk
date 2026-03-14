@@ -3,11 +3,12 @@
 // partial class: PrintUsage + Error + GetArgValue (shared utilities)
 internal partial class Program
 {
-    static int PrintUsage()
+    /// <summary>Full help text — single source of truth for CLI help AND MCP tool description.</summary>
+    internal static string GetUsageText()
     {
         var ver = typeof(Program).Assembly.GetName().Version;
         var verStr = ver != null ? $" v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
-        Console.WriteLine($@"
+        return $@"
 WKAppBot{verStr} - Windows App Automation Test Framework
 Building the Eyes of Claude to realize WilKim's vision of autonomous secretarial ops.
 All AI agents welcome — Claude, GPT, Gemini, Copilot, and beyond.
@@ -157,6 +158,12 @@ Utility:
       Parallel GPT + Gemini + Claude — three answers at once.
   agent gemini|gpt|claude|triad ""task"" [--max-steps N] [--fresh]
       Autonomous sub-agent loop with filesystem + web tools.
+  agent checkpoint [--label ""text""]
+      Save mid-session file snapshot (e.g. before compile/risky change).
+      Auto-tracked: every file-write is captured; patch auto-dumped on exit.
+  agent dump-patch [--out file.patch] [--apply]
+      Write unified patch + per-checkpoint diffs to repo root.
+      Patch header includes: apply / reverse / checkpoint copy / original restore hints.
   win-move <window-title> [--right-top] [--x N --y N]
       Move a window to a specific position.
   screen off [--no-check]
@@ -190,7 +197,12 @@ Rules (for fellow Claude Code agents):
 Data Directory:
   Runtime data (profiles, logs, handlers, output) stored in:
   {{exe_dir}}/wkappbot.hq/
-");
+";
+    }
+
+    static int PrintUsage()
+    {
+        Console.WriteLine(GetUsageText());
         return 0;
     }
 
