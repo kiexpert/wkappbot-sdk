@@ -36,3 +36,6 @@ nul
 tmp/
 tmp*
 agent-policy*.txt
+agent-session.json
+agent-checkpoints/
+agent-patch-*.patch

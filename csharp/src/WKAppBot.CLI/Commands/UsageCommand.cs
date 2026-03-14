@@ -159,11 +159,15 @@ Utility:
   agent gemini|gpt|claude|triad ""task"" [--max-steps N] [--fresh]
       Autonomous sub-agent loop with filesystem + web tools.
   agent checkpoint [--label ""text""]
-      Save mid-session file snapshot (e.g. before compile/risky change).
-      Auto-tracked: every file-write is captured; patch auto-dumped on exit.
+      Save mid-session snapshot of all tracked files (before compile / risky change).
+      Tracked: every a11y file-write is registered in agent-session.json (persistent).
   agent dump-patch [--out file.patch] [--apply]
-      Write unified patch + per-checkpoint diffs to repo root.
-      Patch header includes: apply / reverse / checkpoint copy / original restore hints.
+      git diff HEAD → unified patch + per-checkpoint diffs saved to repo root.
+      Patch header includes: apply / reverse / checkpoint-restore / original-restore hints.
+  agent session-status
+      Show tracked files + checkpoints in current agent session.
+  agent session-clear
+      Delete agent-session.json + agent-checkpoints/ (start fresh).
   win-move <window-title> [--right-top] [--x N --y N]
       Move a window to a specific position.
   screen off [--no-check]
