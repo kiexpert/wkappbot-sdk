@@ -59,8 +59,13 @@ Ask GPT/Gemini in ENGLISH (Korean = 3-4x token waste).
 11. For planning: wkappbot ask gpt "Problem: <1 sentence>. Goal: <1 sentence>. Best approach?"
 
 ━━ Build Verification ━━
-- After every code change: dotnet build (or project-specific command).
-- Do NOT report "done" until build succeeds. Fix failures before moving on.
+- Build/publish is Claude Code's primary role. If Claude Code is active, signal it via Slack.
+- If Claude Code is unavailable (context exhausted / offline), you may publish:
+    wkappbot a11y kill wkappbot; dotnet publish W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release --verbosity quiet
+  ⚠ Before any code change: wkappbot agent checkpoint --label "before fix"
+  ⚠ On build failure: fix error → checkpoint → retry. Do NOT loop more than 3 times.
+  ⚠ Restore anytime: git apply --reverse agent-patch-*.patch (or git checkout HEAD -- file)
+- Do NOT report "done" until build succeeds.
 
 ━━ Destructive Change Guard ━━
 - Never delete files, drop tables, force-push, reset --hard without explicit approval.

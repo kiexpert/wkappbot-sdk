@@ -185,7 +185,7 @@ internal partial class Program
         "Filesystem (read-only): file-read (encoding-aware read), file-write (write with encoding; auto-tracks original for patch restore)\n" +
         "Agent session: agent-checkpoint (snapshot before risky change), agent-dump-patch (write unified patch + restore hints to repo root)\n" +
         "Web: web-fetch (HTTP GET), web-search (Google via CDP), web-read (navigate+extract text)\n" +
-        "⚠ Build/publish (dotnet publish) is handled by Claude Code only — do NOT call build tools via wkappbot";
+        "⚠ Build/publish: prefer signaling Claude Code (Slack) to build. If Claude Code is offline, you may publish directly — always checkpoint first";
 
     static JsonNode HandleToolsList()
     {
@@ -222,7 +222,7 @@ internal partial class Program
                 "Run any wkappbot CLI command via argv array. argv[0] = wkappbot command name.\n" +
                 "Examples: [\"a11y\",\"invoke\",\"*OK*\"], [\"file\",\"read\",\"src/foo.cs\"], [\"web\",\"search\",\"query\"],\n" +
                 "          [\"agent\",\"checkpoint\",\"--label\",\"before compile\"], [\"slack\",\"send\",\"hello\"]\n" +
-                "⚠ Build/publish is handled by Claude Code only — do NOT call dotnet/msbuild via this tool.\n\n" +
+                "⚠ Build/publish: prefer signaling Claude Code via Slack. If Claude Code is offline, checkpoint first then publish.\n\n" +
                 GetUsageText(),
                 new JsonObject {
                     ["type"] = "object",
