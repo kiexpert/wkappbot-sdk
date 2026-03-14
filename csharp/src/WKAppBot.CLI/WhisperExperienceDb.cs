@@ -50,7 +50,8 @@ internal sealed class WhisperExperienceDb : IDisposable
     private int _segmentFrames; // voice frames in current segment (for min-length gate)
     private const int PauseFrames = 33;      // ~330ms silence = ".." (comma, short breath)
     private const int SentenceEndFrames = 99; // ~1s silence = "." (period, sentence end → cut)
-    private const int MinSegmentFrames = 100; // ~3 seconds — skip tiny bursts for Gemini
+    private const int MinSegmentFrames  = 100; // ~3 seconds — skip tiny bursts for Gemini
+    private const int MinVoicedFrames   = 9;   // ~90ms  — fewer → discard file entirely
     private readonly object _wavLock = new();
     private volatile string? _segmentSttLabel; // STT draft label for current segment
 
@@ -393,9 +394,8 @@ internal sealed class WhisperExperienceDb : IDisposable
             _wavDir ??= Path.Combine(_basePath, "wav");
             Directory.CreateDirectory(_wavDir);
 
-            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
             var tag = mode == "WHSPR" ? "W" : "V";
-            _wavPath = Path.Combine(_wavDir, $"{stamp}_{tag}.mp3");
+            _wavPath = Path.Combine(_wavDir, $"{tag}.mp3");
             _segmentSttLabel = null; // reset label for new segment
             _segmentFrames = 0; // reset frame counter
             _segmentSoundCodes.Clear();
@@ -426,8 +426,15 @@ internal sealed class WhisperExperienceDb : IDisposable
             try { _mp3Writer?.Dispose(); } catch { }
             _mp3Writer = null;
 
-            // Rename with sound code sequence: 3A1F-5C2E-7D04_20260309_1443_V.mp3
-            // Sound code first (for sorting/matching), timestamp second
+            // Too short: < MinVoicedFrames → discard file entirely (incomplete phoneme)
+            if (frames < MinVoicedFrames && _wavPath != null)
+            {
+                try { File.Delete(_wavPath); } catch { }
+                _wavPath = null;
+            }
+
+            // Rename with sound code sequence: 3A1F-5C2E 7D04_20260309_1443_V.mp3
+            // '-' between token transitions, ' ' for pause (code=0)
             if (_wavPath != null)
             {
                 try
@@ -445,24 +452,37 @@ internal sealed class WhisperExperienceDb : IDisposable
                         int step = Math.Max(1, deduped.Count / 8);
                         for (int i = 0; i < deduped.Count && sampled.Count < 8; i += step)
                             sampled.Add(deduped[i]);
-                        var scStr = string.Join("-", sampled.Select(c => FormatSoundCode(c, forFile: true)));
+
+                        // Build code string: '-' between non-zero tokens, ' ' for pause (0)
+                        var sbCode = new System.Text.StringBuilder();
+                        bool lastCode = false;
+                        foreach (var c in sampled)
+                        {
+                            if (c == 0) { sbCode.Append(' '); lastCode = false; }
+                            else { if (lastCode) sbCode.Append('-'); sbCode.Append(FormatSoundCode(c, forFile: true)); lastCode = true; }
+                        }
+                        var scStr = sbCode.ToString().Trim();
+
                         var dir = Path.GetDirectoryName(_wavPath)!;
                         var origName = Path.GetFileName(_wavPath);
-                        // MAX_PATH safety: cut scStr at last '-' boundary if path would exceed 240 chars
-                        var maxScLen = 240 - dir.Length - 1 - 1 - origName.Length; // dir/scStr_origName
+                        // MAX_PATH safety: trim if path would exceed 240 chars
+                        var maxScLen = 240 - dir.Length - 1 - 1 - origName.Length;
                         if (maxScLen > 0 && scStr.Length > maxScLen)
-                        {
-                            var cutAt = scStr.LastIndexOf('-', maxScLen - 1);
-                            scStr = cutAt > 0 ? scStr[..cutAt] : scStr[..maxScLen];
-                        }
+                            scStr = scStr[..maxScLen].TrimEnd('-').TrimEnd();
                         var newName = $"{scStr}_{origName}";
                         var newPath = Path.Combine(dir, newName);
                         if (!File.Exists(newPath))
                             File.Move(_wavPath, newPath);
-                        // Human-readable: decode each sound code to band abbreviations
-                        var readable = string.Join(" ", sampled.Select(c => FormatSoundCode(c)));
+                        // Human-readable scroll: same format (- / space)
+                        var sbRead = new System.Text.StringBuilder();
+                        bool lastR = false;
+                        foreach (var c in sampled)
+                        {
+                            if (c == 0) { sbRead.Append(' '); lastR = false; }
+                            else { if (lastR) sbRead.Append('-'); sbRead.Append(FormatSoundCode(c)); lastR = true; }
+                        }
                         Console.WriteLine($"[WHISPER] {newName}  ({deduped.Count} codes, {_segmentSoundCodes.Count} frames)");
-                        Console.WriteLine($"[WHISPER] {readable}");
+                        Console.WriteLine($"[WHISPER] {sbRead}");
                     }
                 }
                 catch { /* rename is best-effort */ }
@@ -509,11 +529,15 @@ internal sealed class WhisperExperienceDb : IDisposable
     /// <summary>Call when auto-study batch completes (success or fail).</summary>
     public void NotifyAutoStudyDone() => _autoStudyRunning = false;
 
-    /// <summary>Format sound code as octal digits (no leading zeros). 0 = pause marker.</summary>
+    /// <summary>Format sound code as octal digits (no leading zeros). 0 = pause marker.
+    /// If band 0 (VxLip/성대음) is rank 1 → encode ranks 2,3,4 (>>3, leading "0" strips naturally).
+    /// Otherwise → encode ranks 1,2,3 (>>6).</summary>
     private static string FormatSoundCode(ushort sc, bool forFile = false)
     {
         if (sc == 0) return forFile ? "0" : "..";
-        return Convert.ToString(sc, 8);
+        bool vocalFirst = ((sc >> 12) & 7) == 0; // band 0 is rank 1?
+        int val = vocalFirst ? sc >> 3 : sc >> 6;
+        return Convert.ToString(val, 8);
     }
 
     private static string SanitizeFileName(string text)

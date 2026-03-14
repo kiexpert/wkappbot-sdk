@@ -30,8 +30,11 @@ internal partial class Program
         "(2) Never simulate tool execution. Never fabricate tool results. " +
         "(3) Never claim a tool has executed unless the host returned a tool_result message. " +
         "(4) The APPBOT_TOOL_CALL_BEGIN/END JSON block IS the tool schema and calling convention — no separate OpenAI-style tool definition is needed. argv is the full command line as a string array. This is a custom host protocol, not an OpenAI function call. When HOST-HANDSHAKE is present in the conversation, the host is confirmed active and all TOOL_CALLs will be executed. " +
-        "(5) Wait for tool_result messages before continuing reasoning. One tool call per turn unless tools are explicitly designed for parallel use. " +
-        "(6) Be concise and action-oriented. Prefer structured actions over explanations. " +
+        "(5) Wait for tool_result messages before continuing reasoning. " +
+        "(6) PARALLEL FIRST: to minimize round-trips, always batch independent tool calls into a single turn. " +
+        "Emit multiple TOOL_CALL blocks back-to-back whenever tasks do not depend on each other's results. " +
+        "Sequential calls waste a full prompt round — parallelize by default, serialize only when strictly necessary. " +
+        "(7) Be concise and action-oriented. Prefer structured actions over explanations. " +
         "EXECUTION MODEL: User Request ??analyze ??Thought (what I know / what is missing) ??Action (tool call) ??Observation (wait for tool_result) ??continue or finish. " +
         "For tasks requiring >3 tool calls: generate a numbered Execution Plan first. Mark steps [DONE] as you complete them. " +
         "DECISION: Use a tool if the request involves filesystem ops, source code, device/UI interaction, system commands, app automation, external data, repo inspection, or debugging. " +
@@ -50,17 +53,18 @@ internal partial class Program
         "If asked to generate/create/draw an image, USE your image generation tool (DALL-E/Imagen). Do NOT make ASCII art. " +
         "Confirm you understood with exactly: READY";
 
-    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false)
+    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null)
     {
+        using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] ChatGPT: {question}");
         if (!string.IsNullOrWhiteSpace(modelHint))
             Console.WriteLine($"[ASK] ChatGPT model hint: {modelHint}");
 
-        var targetTag = BuildAskTargetTag("gpt");
+        var targetTag = targetTagOverride ?? BuildAskTargetTag("gpt");
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
-        { var prevFgGpt = NativeMethods.GetForegroundWindow(); Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgGpt:X8}"); if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult(); LogRestoreFocus(prevFgGpt, "ActivateTab-GPT"); }
+        { var prevFgGpt = NativeMethods.GetForegroundWindow(); Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgGpt:X8}"); if (!newTab && !triadMode) cdp.ActivateTabAsync().GetAwaiter().GetResult(); LogRestoreFocus(prevFgGpt, "ActivateTab-GPT"); }
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -137,11 +141,8 @@ internal partial class Program
                 // Re-wait for editor readiness after persona exchange
                 if (!await WaitForChatGptEditor(cdp))
                     return (false, (string?)null);
-                await Task.Delay(1000); // Let ChatGPT UI settle
+                await Task.Delay(200);
 
-                // Prepend host handshake proof for fresh loop sessions so GPT trusts the host is live
-                if (effectiveLoopPersona && existingTurns == 0)
-                    question = BuildHostHandshake() + question;
 
                 // Send the actual question (with 9s-delay retry on timeout)
                 var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, attachFiles, returnAfterSend: noWait);
@@ -514,7 +515,6 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
         {
             await Task.Delay(1000);
-            Console.Write("."); Console.Out.Flush();
 
             // URL change detection (new conversation resets turn count)
             var newUrl = await cdp.EvalAsync("location.href") ?? "";
@@ -539,6 +539,12 @@ internal partial class Program
                 "if (document.querySelector('.result-thinking')) return 'THINKING';" +
                 "return 'WAITING_' + turns;" +
                 "})()") ?? "WAITING_0";
+
+            // Show meaningful state instead of plain dots
+            var waitTag = detectResult.StartsWith("TURN_") ? "TURN" :
+                          detectResult == "STREAMING" ? "RUNNING" :
+                          detectResult == "THINKING"  ? "THINKING" : ".";
+            Console.Write($" {waitTag}"); Console.Out.Flush();
 
             if (detectResult.StartsWith("TURN_") || detectResult == "STREAMING" || detectResult == "THINKING")
             {
@@ -569,6 +575,7 @@ internal partial class Program
         bool liveHeaderPrinted = false;
         var knownImageUrls = new HashSet<string>();
         var savedImages = new List<string>();
+        var lastFlushTime = DateTime.UtcNow;
         sw.Restart();
 
         while (sw.Elapsed.TotalSeconds < timeoutSec)
@@ -636,6 +643,17 @@ internal partial class Program
                 Console.Write(delta);
                 Console.Out.Flush();
                 lastFlushedLen = textLen;
+                lastFlushTime = DateTime.UtcNow;
+            }
+
+            // Early-exit: flush stopped for 1s and we have text → treat as DONE (don't wait for stop button)
+            bool isThinkingState = state == "THINKING" || state == "THINKING_HAS_TEXT";
+            if (lastFlushedLen > 50 && state != "DONE" && state != "IMG_GEN"
+                && !isThinkingState && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 1.0)
+            {
+                if (liveHeaderPrinted) Console.WriteLine();
+                Console.WriteLine($"[ASK] Flush idle 1s → early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                break;
             }
 
             // Detect generated images in response (inline marker output)
@@ -708,9 +726,14 @@ internal partial class Program
                 break;
             }
 
-            // Only print poll status when NOT live-flushing (avoid noise)
-            if (!liveHeaderPrinted)
-                Console.WriteLine($"[ASK] Poll: {(isThinking ? "thinking" : "streaming")}{(hasResponseText ? "+" : "")}, {sw.Elapsed.TotalSeconds:F0}s");
+            // Poll status: FLUSH when delta arrived, RUNNING when streaming without delta, THINKING for o3+
+            if (delta.Length > 0)
+                Console.Write($" [FLUSH+{delta.Length}]");
+            else if (isThinking)
+                Console.Write($" [THINKING {sw.Elapsed.TotalSeconds:F0}s]");
+            else if (!liveHeaderPrinted)
+                Console.Write($" [RUNNING {sw.Elapsed.TotalSeconds:F0}s]");
+            Console.Out.Flush();
 
             // Extend timeout while actively streaming/thinking
             // Thinking mode (o1/o3/o4): unlimited extensions ??can think for minutes
@@ -930,45 +953,53 @@ internal partial class Program
     static Task HandoffTabToPeer(string myName) => Task.CompletedTask;
 
     // ?? Chrome Tab Lock ??
-    // Cross-process mutex: only one ask command can own the browser at a time.
+    // Per-AI tab lock: each AI provider (gemini, gpt, claude) gets its own semaphore.
+    // This allows Gemini, GPT, and Claude to send/receive in parallel — different tabs,
+    // different CDP connections — no shared browser resource that needs serialization.
+    // Only operations on the SAME AI tab are serialized (send vs concurrent send).
     // Acquired before prompt input, auto-released after 9s or when first byte arrives.
-    // IDisposable ??always safe, no manual release needed.
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim>
+        _tabSemaphores = new(StringComparer.OrdinalIgnoreCase);
 
-    // Semaphore (not Mutex) ??async/await can resume on different threads,
-    // SemaphoreSlim: in-process, thread-agnostic release (timer callback on any thread is fine),
-    // and always starts fresh when Eye restarts ??no named OS resource that can get stuck
-    // after a crash (unlike named Semaphore which has no AbandonedMutexException).
-    static readonly SemaphoreSlim ChromeTabSemaphore = new(1, 1);
+    static SemaphoreSlim GetTabSemaphore(string aiName)
+    {
+        // Normalize key: "Gemini/persona" → "gemini", "Claude" → "claude", "ChatGPT" → "chatgpt"
+        var key = aiName.Split('/')[0].ToLowerInvariant();
+        return _tabSemaphores.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+    }
 
     sealed class ChromeTabLock : IDisposable
     {
         readonly string _aiName;
+        readonly SemaphoreSlim _sem;
         readonly Timer _autoRelease;
         int _released;
 
-        ChromeTabLock(string aiName)
+        ChromeTabLock(string aiName, SemaphoreSlim sem)
         {
             _aiName = aiName;
-            // Auto-release after 9 seconds (safety net ??prevents deadlock)
+            _sem = sem;
+            // Auto-release after 9 seconds (safety net — prevents deadlock)
             _autoRelease = new Timer(_ => Release("auto-9s"), null, 9000, Timeout.Infinite);
         }
 
         public static ChromeTabLock? Acquire(string aiName, int timeoutMs = 90000)
         {
+            var sem = GetTabSemaphore(aiName);
             Console.WriteLine($"[ASK] Waiting for browser lock ({aiName})...");
             var sw = Stopwatch.StartNew();
             const int sliceMs = 1000;
             bool dotLineOpen = false;
             while (sw.ElapsedMilliseconds < timeoutMs)
             {
-                if (ChromeTabSemaphore.Wait(sliceMs))
+                if (sem.Wait(sliceMs))
                 {
                     if (dotLineOpen) Console.WriteLine();
                     if (sw.ElapsedMilliseconds > 1500)
                         Console.WriteLine($"[ASK] Browser lock acquired after queue wait ({aiName}, {sw.ElapsedMilliseconds}ms)");
                     else
                         Console.WriteLine($"[ASK] Browser lock acquired ({aiName})");
-                    return new ChromeTabLock(aiName);
+                    return new ChromeTabLock(aiName, sem);
                 }
 
                 if (!dotLineOpen)
@@ -995,7 +1026,7 @@ internal partial class Program
         {
             if (Interlocked.CompareExchange(ref _released, 1, 0) != 0) return;
             _autoRelease.Dispose();
-            try { ChromeTabSemaphore.Release(); } catch { }
+            try { _sem.Release(); } catch { }
             Console.WriteLine($"[ASK] Browser lock released ({_aiName}, {reason})");
         }
 

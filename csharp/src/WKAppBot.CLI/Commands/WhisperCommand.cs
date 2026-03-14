@@ -83,6 +83,12 @@ internal partial class Program
             return WhisperStudyCommand(args[1..]);
         if (args.Length > 0 && args[0] == "stats")
             return WhisperStudyCommand(args); // forward "stats" as-is
+        if (args.Length > 0 && args[0] == "slice")
+            return WhisperSliceCommand(args[1..]);
+        if (args.Length > 0 && args[0] == "clean")
+            return WhisperCleanCommand(args[1..]);
+        if (args.Length > 0 && args[0] == "index")
+            return WhisperIndexCommand(args[1..]);
 
         // Parse options
         bool use8Band = args.Any(a => a == "--8band");

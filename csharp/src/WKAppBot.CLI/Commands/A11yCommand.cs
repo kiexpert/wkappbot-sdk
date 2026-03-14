@@ -1541,6 +1541,13 @@ internal partial class Program
                     continue;
                 }
 
+                // Protect MCP launcher processes (long-lived stdio relay, survives hot-swap)
+                if (IsMcpLauncherProcess(p.Id))
+                {
+                    skipped.Add($"{nodeKey} (mcp-launcher-protected)");
+                    continue;
+                }
+
                 var mainHwnd = p.MainWindowHandle;
                 bool hasWindow = mainHwnd != IntPtr.Zero && NativeMethods.IsWindow(mainHwnd);
                 if (hasWindow)
@@ -1590,6 +1597,21 @@ internal partial class Program
         Console.WriteLine($"[KILL] killed {killed.Count}: {string.Join(", ", killed)}");
         Console.ResetColor();
         return 0;
+    }
+
+    // Returns true if the process is an MCP launcher (wkappbot.exe mcp --launcher).
+    // These are long-lived stdio relays that must survive hot-swap.
+    static bool IsMcpLauncherProcess(int pid)
+    {
+        try
+        {
+            var cmdLine = WKAppBot.Win32.Native.NativeMethods.GetProcessCommandLine(pid);
+            if (string.IsNullOrEmpty(cmdLine)) return false;
+            return cmdLine.Contains(" mcp ", StringComparison.OrdinalIgnoreCase) ||
+                   cmdLine.EndsWith(" mcp", StringComparison.OrdinalIgnoreCase) ||
+                   cmdLine.Contains("--launcher", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
     }
 
     // Ancestor chain matching for --kill.

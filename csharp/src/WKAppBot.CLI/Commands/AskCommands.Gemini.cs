@@ -166,13 +166,14 @@ internal partial class Program
         return (false, retryText);
     }
 
-    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false)
+    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null)
     {
+        using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] Gemini: {question}");
         if (!string.IsNullOrWhiteSpace(modelHint))
             Console.WriteLine($"[ASK] Gemini model hint: {modelHint}");
 
-        var targetTag = BuildAskTargetTag("gemini");
+        var targetTag = targetTagOverride ?? BuildAskTargetTag("gemini");
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
@@ -180,7 +181,7 @@ internal partial class Program
         // Target.activateTarget does Chrome-internal tab switch without OS SetForegroundWindow
         var prevFgGemini = NativeMethods.GetForegroundWindow();
         Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgGemini:X8}");
-        if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult();
+        if (!newTab && !triadMode) cdp.ActivateTabAsync().GetAwaiter().GetResult();
         LogRestoreFocus(prevFgGemini, "ActivateTab");
 
         LaunchAppBotEyeIfNeeded(9222);
@@ -347,7 +348,8 @@ internal partial class Program
                         {
                             bool ready = stablePersonaResp.Contains("READY", StringComparison.OrdinalIgnoreCase);
                             Console.WriteLine($"[ASK] Persona stable ({stablePersonaResp.Length}): {(ready ? "READY" : stablePersonaResp.Substring(0, Math.Min(80, stablePersonaResp.Length)).Replace('\n', ' '))}");
-                            if (effectiveLoopPersona && stablePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]"))
+                            if (effectiveLoopPersona && stablePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
+                                && ParseAllLoopToolCalls(stablePersonaResp).Count > 0)
                             {
                                 Console.WriteLine($"[ASK] Persona continuation has tool call ({stablePersonaResp.Length} chars) — skipping question send");
                                 personaEarlyToolCall = stablePersonaResp;
@@ -388,7 +390,8 @@ internal partial class Program
                     var latePersonaResp = await GetGeminiLastResponseAsync(cdp);
                     if (latePersonaResp.Length > 0)
                         Console.WriteLine($"[ASK] Post-persona resp ({latePersonaResp.Length}): {latePersonaResp.Replace('\n', ' ').Substring(0, Math.Min(80, latePersonaResp.Length))}");
-                    if (latePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]"))
+                    if (latePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
+                        && ParseAllLoopToolCalls(latePersonaResp).Count > 0)
                     {
                         Console.WriteLine("[ASK] Post-persona tool call captured -- skipping question send");
                         return (true, latePersonaResp);
@@ -474,7 +477,8 @@ internal partial class Program
                                 })()
                                 """) ?? "";
                             Console.WriteLine($"[ASK] Post-wait resp ({lateResp.Length}): {lateResp.Substring(0, Math.Min(80, lateResp.Length)).Replace('\n', ' ')}");
-                            if (lateResp.Contains("[APPBOT_TOOL_CALL_BEGIN]"))
+                            if (lateResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
+                                && ParseAllLoopToolCalls(lateResp).Count > 0)
                             {
                                 Console.WriteLine("[ASK] Late persona tool call captured — skipping question send");
                                 zoom?.ShowPass("tool call");
@@ -633,6 +637,7 @@ internal partial class Program
                 bool liveHeaderPrinted = false;
                 var geminiKnownImages = new HashSet<string>();
                 var geminiSavedImages = new List<string>();
+                var lastFlushTime = DateTime.UtcNow;
                 var sw = Stopwatch.StartNew();
 
                 int geminiBlankCount = 0;
@@ -687,6 +692,7 @@ internal partial class Program
                         Console.Write(text.Substring(lastFlushedLen));
                         Console.Out.Flush();
                         lastFlushedLen = text.Length;
+                        lastFlushTime = DateTime.UtcNow;
 
                         // Stream-time tool call detection: complete block visible → fire immediately
                         // No need to wait for 4s stability — [TOOL_CALL_END] = call is ready now
@@ -703,16 +709,33 @@ internal partial class Program
                     var gemNewImages = await DetectAndDownloadImages(cdp, geminiKnownImages, "gemini");
                     geminiSavedImages.AddRange(gemNewImages);
 
-                    // Streaming handoff: text growing ??this tab is alive, give active tab to peer
+                    // Poll status indicator
+                    int delta = text.Length - lastFlushedLen;
+                    if (delta > 0)
+                    { Console.Write($" [FLUSH+{delta}]"); Console.Out.Flush(); }
+                    else if (text.Length > 0)
+                    { Console.Write($" [RUNNING {sw.Elapsed.TotalSeconds:F0}s]"); Console.Out.Flush(); }
+
+                    // Streaming handoff: text growing → this tab is alive, give active tab to peer
                     if (text.Length > lastTextLen && lastTextLen > 0)
                         await HandoffTabToPeer("gemini");
                     lastTextLen = text.Length;
 
                     // Check if response is still generating
+                    // Early-exit: flush idle 1s and enough text → don't wait for full stability
+                    if (lastFlushedLen > 50 && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 1.0)
+                    {
+                        var gemEarlyImages = await DetectAndDownloadImages(cdp, geminiKnownImages, "gemini");
+                        geminiSavedImages.AddRange(gemEarlyImages);
+                        if (liveHeaderPrinted) Console.WriteLine();
+                        Console.WriteLine($"[ASK] Flush idle 1s → early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                        return (true, text!);
+                    }
+
                     if (text == lastText)
                     {
                         stableCount++;
-                        if (stableCount >= 3) // stable for 3+ seconds
+                        if (stableCount >= 3) // stable for 3+ seconds (fallback if no flush)
                         {
                             // Final image check
                             var gemFinalImages = await DetectAndDownloadImages(cdp, geminiKnownImages, "gemini");

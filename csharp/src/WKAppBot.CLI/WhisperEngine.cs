@@ -66,7 +66,8 @@ internal sealed class WhisperEngine : IDisposable
     private const double NoiseGateMultiplier = 2.0; // frames > noise×2 = signal
 
     // State
-    private readonly List<uint> _recentTokens = new();
+    private readonly List<ushort> _recentTokens = new(); // soundCode; 0xFFFF = syllable boundary
+    private bool _pendingSyllableBoundary; // set when OnSyllableToken fires → insert space on next frame
     private int _frameCount;
     private bool _inWhisper; // hysteresis state for WHSPR detection
     private double[] _prevBandEnergies = new double[BandCount]; // for spectral flux
@@ -590,7 +591,10 @@ internal sealed class WhisperEngine : IDisposable
                 {
                     // Code transition: emit completed token, start new one
                     if (_syllableCode != 0)
+                    {
                         OnSyllableToken?.Invoke(new SyllableToken { Code = _syllableCode, Frames = _syllableFrames });
+                        _pendingSyllableBoundary = true;
+                    }
                     _syllableCode = _confirmedSc;
                     _syllableFrames = 1;
                 }
@@ -607,6 +611,7 @@ internal sealed class WhisperEngine : IDisposable
                 if (_syllableSilenceFrames >= SyllableSilenceGate)
                 {
                     OnSyllableToken?.Invoke(new SyllableToken { Code = _syllableCode, Frames = _syllableFrames });
+                    _pendingSyllableBoundary = true;
                     _syllableCode = 0;
                     _syllableFrames = 0;
                     _syllableSilenceFrames = 0;
@@ -615,8 +620,14 @@ internal sealed class WhisperEngine : IDisposable
 
             if (!isSilence)
             {
-                _recentTokens.Add(token);
-                if (_recentTokens.Count > 100) _recentTokens.RemoveAt(0);
+                if (_pendingSyllableBoundary)
+                {
+                    _recentTokens.Add(0xFFFF); // syllable boundary marker → space in display
+                    _pendingSyllableBoundary = false;
+                }
+                if (soundCode != 0)
+                    _recentTokens.Add(soundCode);
+                while (_recentTokens.Count > 120) _recentTokens.RemoveAt(0);
             }
 
             _frameCount++;
@@ -624,9 +635,16 @@ internal sealed class WhisperEngine : IDisposable
             // Save current magnitudes for next frame's DUET kill gate
             Array.Copy(origMag, _prevOrigMag, HalfFft);
 
-            // Build recent tokens string
-            int start = Math.Max(0, _recentTokens.Count - 6);
-            var recent = string.Join(" ", _recentTokens.Skip(start).Select(t => $"{t:X8}"));
+            // Build recent tokens string: top-3 code (3 hex chars) concatenated, space at syllable boundary
+            // Format: "ABC1FFDEF GHI" — no separator between tokens, space = syllable boundary
+            int start = Math.Max(0, _recentTokens.Count - 48); // ~48 entries ≈ ~12 syllables
+            var sb = new System.Text.StringBuilder();
+            foreach (var t in _recentTokens.Skip(start))
+            {
+                if (t == 0xFFFF) sb.Append(' ');
+                else { bool vf = ((t >> 12) & 7) == 0; sb.Append(Convert.ToString(vf ? t >> 3 : t >> 6, 8)); }
+            }
+            var recent = sb.ToString();
 
             // Fire event
             OnFrame?.Invoke(new WhisperFrame
@@ -981,7 +999,7 @@ internal sealed class WhisperEngine : IDisposable
     }
 
     // ── Cooley-Tukey radix-2 FFT ──
-    private static void Fft(Complex[] data)
+    internal static void Fft(Complex[] data)
     {
         int n = data.Length;
         for (int i = 1, j = 0; i < n; i++)

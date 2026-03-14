@@ -46,4 +46,35 @@ internal partial class Program
         }
         return (textParts, filePaths);
     }
+
+    /// <summary>
+    /// Inline small .txt/.md files as question text instead of as attachments.
+    /// Called after ParseTextAndFilesWithMarkers. Mutates attachFiles in place.
+    /// Example: ask gpt /tmp/question.txt → file content used as question, not attached.
+    /// </summary>
+    static string InlineTextFiles(List<string> questionParts, List<string> attachFiles)
+    {
+        var parts = new List<string>(questionParts.Count);
+        foreach (var part in questionParts)
+        {
+            if (part.StartsWith("[file:") && part.EndsWith("]"))
+            {
+                var fname = part[6..^1];
+                var ext = Path.GetExtension(fname).ToLowerInvariant();
+                if (ext is ".txt" or ".md")
+                {
+                    var fpath = attachFiles.Find(f =>
+                        string.Equals(Path.GetFileName(f), fname, StringComparison.OrdinalIgnoreCase));
+                    if (fpath != null && new FileInfo(fpath).Length < 100_000)
+                    {
+                        parts.Add(File.ReadAllText(fpath, System.Text.Encoding.UTF8).Trim());
+                        attachFiles.Remove(fpath); // remove from attachments — inlined instead
+                        continue;
+                    }
+                }
+            }
+            parts.Add(part);
+        }
+        return string.Join("\n", parts);
+    }
 }

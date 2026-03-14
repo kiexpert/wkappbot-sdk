@@ -53,6 +53,11 @@ public sealed class ClaudePromptHelper : IDisposable
     // Only positive finds are cached (null = "not found yet, retry next time").
     private static readonly Dictionary<IntPtr, PromptInfo> _turnFormCache = new();
 
+    // Negative cache: hwnd → expiry. Suppresses repeated UIA scans for windows confirmed to have no turn-form.
+    // TTL = 1s (asymmetric: negative shorter than positive to recover quickly if prompt appears).
+    private static readonly Dictionary<IntPtr, DateTime> _negativeCache = new();
+    private static readonly TimeSpan NegativeCacheTtl = TimeSpan.FromSeconds(1);
+
     /// <summary>
     /// Return all currently cached prompt infos (windows already confirmed to have turn-form).
     /// Instant — no UIA scan. Used by Eye loop for per-instance status streaming.
@@ -208,7 +213,7 @@ public sealed class ClaudePromptHelper : IDisposable
     /// Unlike FindPrompt (which returns first match), this returns every available prompt.
     /// Used for broadcast messages (e.g., ping → all Claude instances respond).
     /// </summary>
-    public List<PromptInfo> FindAllPrompts()
+    public List<PromptInfo> FindAllPrompts(bool includeHidden = false)
     {
         var results = new List<PromptInfo>();
         var seen = new HashSet<IntPtr>();
@@ -219,18 +224,24 @@ public sealed class ClaudePromptHelper : IDisposable
         foreach (var h in deadHwnds) _turnFormCache.Remove(h);
 
         // Scan all Chrome_WidgetWin_1 windows (covers Electron + VS Code)
+        // Cache pid→procName: each Electron/VS Code process has many Chrome_WidgetWin_1 windows,
+        // so Process.GetProcessById() would be called N times for the same pid without caching.
+        var procNameCache = new Dictionary<uint, string>();
         var allWindows = new List<(IntPtr hWnd, string title, string procName, uint pid)>();
         NativeMethods.EnumWindows((hWnd, _) =>
         {
-            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            if (!includeHidden && !NativeMethods.IsWindowVisible(hWnd)) return true;
             var cls = WindowFinder.GetClassName(hWnd);
             if (cls == "Chrome_WidgetWin_1")
             {
                 var title = WindowFinder.GetWindowText(hWnd);
                 NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
-                string procName = "?";
-                try { procName = Process.GetProcessById((int)pid).ProcessName; } catch { }
-                allWindows.Add((hWnd, title, procName, pid));
+                if (!procNameCache.TryGetValue(pid, out var procName))
+                {
+                    try { procName = Process.GetProcessById((int)pid).ProcessName; } catch { procName = "?"; }
+                    procNameCache[pid] = procName!;
+                }
+                allWindows.Add((hWnd, title, procName!, pid));
             }
             return true;
         }, IntPtr.Zero);
@@ -258,9 +269,14 @@ public sealed class ClaudePromptHelper : IDisposable
                 continue;
             }
 
-            // VS Code: try turn-form first, then native extension
+            // VS Code: title check first to skip background/helper windows (they have no "Visual Studio Code" suffix).
+            // Only main editor windows carry the " - Visual Studio Code" suffix — saves UIA traversal on dozens of helper hwnd's.
             if (procName.Equals("Code", StringComparison.OrdinalIgnoreCase))
             {
+                if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
+                    continue; // skip Code.exe utility/helper windows quickly
+
+                // Try turn-form first (Claude.ai loaded in VS Code webview)
                 var pi = FindTurnFormInWindow(hWnd, title, procName);
                 if (pi != null) { results.Add(pi); seen.Add(hWnd); continue; }
 
@@ -268,13 +284,10 @@ public sealed class ClaudePromptHelper : IDisposable
                 // Each VS Code window gets its own entry — SmartSetForegroundWindow(hwnd) targets
                 // the specific window, and foreground verification in TypeAndSubmit prevents
                 // wrong-window delivery. No per-process dedup needed.
-                if (title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
-                {
-                    NativeMethods.GetWindowRect(hWnd, out var wr);
-                    var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
-                    results.Add(new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode"));
-                    seen.Add(hWnd);
-                }
+                NativeMethods.GetWindowRect(hWnd, out var wr);
+                var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
+                results.Add(new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode"));
+                seen.Add(hWnd);
             }
         }
 
@@ -383,37 +396,69 @@ public sealed class ClaudePromptHelper : IDisposable
     /// </summary>
     private PromptInfo? FindTurnFormInWindow(IntPtr hWnd, string title, string procName)
     {
-        // Cache hit: skip UIA scan entirely (conversation content can be thousands of nodes).
-        // Only positive finds are cached; null means "not found yet" and will retry.
+        // Positive cache hit: validate hwnd still alive (Electron can recreate windows during updates/navigation).
         if (_turnFormCache.TryGetValue(hWnd, out var cached))
         {
-            // Update title in case it changed (cosmetic only — hwnd is the key for operations)
-            return cached.WindowTitle == title ? cached : cached with { WindowTitle = title };
+            if (!NativeMethods.IsWindow(hWnd)) { _turnFormCache.Remove(hWnd); } // stale → fall through to rescan
+            else return cached.WindowTitle == title ? cached : cached with { WindowTitle = title };
         }
+
+        // Negative cache hit: skip scan for TTL window (avoids re-scanning non-AI windows repeatedly).
+        if (_negativeCache.TryGetValue(hWnd, out var expiry) && DateTime.UtcNow < expiry)
+            return null;
 
         try
         {
             var root = _automation.FromHandle(hWnd);
             if (root == null) return null;
 
-            // Fast path: Document/RootWebArea is 1-2 levels deep in Electron.
-            // turn-form is a direct child of the document — no need to descend into conversation content.
             AutomationElement? turnForm = null;
+
+            // Fast-path A: GetFocusedElement — if user is typing in this window's prompt,
+            // walk up the focus chain (≤6 levels) to find turn-form. O(depth) not O(tree).
             try
             {
-                var doc = root.FindFirstDescendant(
-                    new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Document));
-                if (doc != null)
-                    turnForm = doc.FindFirstChild(
-                        new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint targetPid);
+                var focused = _automation.FocusedElement();
+                if (focused != null && focused.Properties.ProcessId.ValueOrDefault == (int)targetPid)
+                {
+                    var walker = _automation.TreeWalkerFactory.GetRawViewWalker();
+                    var el = focused;
+                    for (int i = 0; i < 6 && el != null; i++)
+                    {
+                        if ((el.Properties.AutomationId.ValueOrDefault ?? "") == "turn-form")
+                        { turnForm = el; break; }
+                        el = walker.GetParent(el);
+                    }
+                }
             }
             catch { }
 
-            // Fallback: full tree scan (slower but safe — only runs once per hwnd due to cache)
+            // Fast-path B: Document → direct child search (1-2 levels, avoids deep conversation tree).
+            if (turnForm == null)
+            {
+                try
+                {
+                    var doc = root.FindFirstDescendant(
+                        new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Document));
+                    if (doc != null)
+                        turnForm = doc.FindFirstChild(
+                            new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+                }
+                catch { }
+            }
+
+            // Fallback: full tree scan (only runs once per hwnd due to positive cache on success).
             if (turnForm == null)
                 turnForm = root.FindFirstDescendant(
                     new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
-            if (turnForm == null) return null; // don't cache null — allow retry on next tick
+
+            if (turnForm == null)
+            {
+                // Cache negative result — suppress re-scan for 2s.
+                _negativeCache[hWnd] = DateTime.UtcNow + NegativeCacheTtl;
+                return null;
+            }
 
             var inputGroup = turnForm.FindFirstChild(
                 new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Group));
@@ -1809,7 +1854,57 @@ public sealed class ClaudePromptHelper : IDisposable
                     if (root == null) continue;
                 }
 
-                // Primary markers seen in Codex composer.
+                // Fast-path: ElementFromPoint probes at bottom of window — prompt bar is always near bottom.
+                // O(1) vs O(N) for FindAllDescendants. Walk parent chain ≤4 levels to validate.
+                AutomationElement? fastMarker = null;
+                try
+                {
+                    NativeMethods.GetWindowRect(hWnd, out var fastWr);
+                    var midX = (fastWr.Left + fastWr.Right) / 2;
+                    // Probe 3 anchor points: bottom-center, bottom-left quarter, bottom-right quarter
+                    var probes = new[] {
+                        new System.Drawing.Point(midX, fastWr.Bottom - 60),
+                        new System.Drawing.Point(fastWr.Left + (fastWr.Right - fastWr.Left) / 4, fastWr.Bottom - 60),
+                        new System.Drawing.Point(fastWr.Right - (fastWr.Right - fastWr.Left) / 4, fastWr.Bottom - 60),
+                    };
+                    foreach (var pt in probes)
+                    {
+                        var el = _automation.FromPoint(pt);
+                        if (el == null) continue;
+                        // Walk up ≤4 levels looking for Codex marker
+                        var walker = _automation.TreeWalkerFactory.GetRawViewWalker();
+                        var cur = el;
+                        for (int i = 0; i < 4 && cur != null; i++)
+                        {
+                            var n = cur.Properties.Name.ValueOrDefault ?? "";
+                            if (!string.IsNullOrWhiteSpace(n) && n.Length <= 120 &&
+                                (n.Contains("follow-up", StringComparison.OrdinalIgnoreCase) ||
+                                 n.Contains("message Codex", StringComparison.OrdinalIgnoreCase) ||
+                                 n.Contains("What are we coding next", StringComparison.OrdinalIgnoreCase) ||
+                                 n.Contains("Terminal input", StringComparison.OrdinalIgnoreCase) ||
+                                 n.Contains("후속 변경", StringComparison.OrdinalIgnoreCase)))
+                            { fastMarker = cur; break; }
+                            cur = walker.GetParent(cur);
+                        }
+                        if (fastMarker != null) break;
+                    }
+                }
+                catch { }
+
+                if (fastMarker != null)
+                {
+                    var fastMr = fastMarker.BoundingRectangle;
+                    NativeMethods.GetWindowRect(hWnd, out var fastWr2);
+                    var fastWinRect = new Rectangle(fastWr2.Left, fastWr2.Top, fastWr2.Width, fastWr2.Height);
+                    var fastX = Math.Max(fastWinRect.Left + 4, fastMr.X - 16);
+                    var fastY = Math.Max(fastWinRect.Top + 4, fastMr.Y - 6);
+                    var fastW = Math.Max(360, Math.Min(fastWinRect.Right - fastX - 4, fastMr.Width + 32));
+                    var fastH = Math.Max(28, fastMr.Height + 12);
+                    Console.WriteLine($"  [PROMPT] Codex fast-probe hit: \"{fastMarker.Properties.Name.ValueOrDefault}\" ({fastW}x{fastH})");
+                    return new PromptInfo(hWnd, title, "codex", new Rectangle(fastX, fastY, fastW, fastH), HostCodexDesktop);
+                }
+
+                // Fallback: full tree scan (slow — FindAllDescendants on entire Codex tree).
                 var markers = root.FindAllDescendants()
                     .Where(e =>
                     {

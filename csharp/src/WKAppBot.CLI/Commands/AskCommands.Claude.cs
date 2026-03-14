@@ -88,17 +88,18 @@ internal partial class Program
         return int.TryParse(result, out var v) ? v : 0;
     }
 
-    static int AskClaude(string question, bool slackReport, int timeoutSec, bool newTab, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false)
+    static int AskClaude(string question, bool slackReport, int timeoutSec, bool newTab, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null)
     {
+        using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] Claude: {question}");
         if (!string.IsNullOrWhiteSpace(modelHint))
             Console.WriteLine($"[ASK] Claude model hint: {modelHint}");
 
-        var targetTag = BuildAskTargetTag("claude");
+        var targetTag = targetTagOverride ?? BuildAskTargetTag("claude");
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
-        { var prevFgClaude = NativeMethods.GetForegroundWindow(); Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgClaude:X8}"); if (!newTab) cdp.ActivateTabAsync().GetAwaiter().GetResult(); LogRestoreFocus(prevFgClaude, "ActivateTab-Claude"); }
+        { var prevFgClaude = NativeMethods.GetForegroundWindow(); Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgClaude:X8}"); if (!newTab && !triadMode) cdp.ActivateTabAsync().GetAwaiter().GetResult(); LogRestoreFocus(prevFgClaude, "ActivateTab-Claude"); }
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -326,6 +327,7 @@ internal partial class Program
                 // ── Phase 6: Poll for completion ──
                 int lastFlushedLen = 0;
                 bool liveHeaderPrinted = false;
+                var lastFlushTime = DateTime.UtcNow;
                 sw.Restart();
                 while (sw.Elapsed.TotalSeconds < timeoutSec)
                 {
@@ -367,7 +369,23 @@ internal partial class Program
                                 Console.Write(newText);
                                 Console.ResetColor();
                             }
+                            int flushDelta = len - lastFlushedLen;
                             lastFlushedLen = len;
+                            lastFlushTime = DateTime.UtcNow;
+                            Console.Write($" [FLUSH+{flushDelta}]"); Console.Out.Flush();
+                        }
+                        else if (state == "STREAMING" && lastFlushedLen > 0)
+                        {
+                            Console.Write($" [RUNNING {sw.Elapsed.TotalSeconds:F0}s]"); Console.Out.Flush();
+                        }
+
+                        // Early-exit: flush idle 1s → don't wait for DONE attribute
+                        if (lastFlushedLen > 50 && state == "STREAMING"
+                            && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 1.0)
+                        {
+                            if (liveHeaderPrinted) Console.WriteLine();
+                            Console.WriteLine($"[ASK] Flush idle 1s → early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                            return (true, text);
                         }
 
                         if (state == "DONE")

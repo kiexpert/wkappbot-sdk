@@ -32,6 +32,7 @@ internal partial class Program
         int loopRetry = 1;
         int loopMaxParallel = 7;
         int timeoutSec = 30;
+        string? targetTagOverride = null;
         var remaining = new List<string>();
         for (int i = 1; i < args.Length; i++)
         {
@@ -71,6 +72,8 @@ internal partial class Program
                 modelHint = args[++i];
             else if (args[i] == "--triad")
                 triadMode = true;
+            else if (args[i] == "--target-tag" && i + 1 < args.Length)
+                targetTagOverride = args[++i];
             else if (args[i] == "--timeout" && i + 1 < args.Length)
                 int.TryParse(args[++i], out timeoutSec);
             else if (args[i] == "--image" && i + 1 < args.Length)
@@ -80,7 +83,7 @@ internal partial class Program
         }
 
         var (questionParts, attachFiles) = ParseTextAndFilesWithMarkers(remaining.ToArray());
-        var question = string.Join("\n", questionParts);
+        var question = InlineTextFiles(questionParts, attachFiles);
         if (string.IsNullOrWhiteSpace(question))
             return AskUsage();
 
@@ -102,10 +105,11 @@ internal partial class Program
 
         return ai switch
         {
-            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait),
-            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait),
-            "claude" => AskClaude(question, slackReport, timeoutSec, newTab, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait),
-            _ => Error($"Unknown AI: {ai} (use gemini, gpt, or claude)")
+            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
+            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
+            "claude" => AskClaude(question, slackReport, timeoutSec, newTab, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
+            "triad" or "all" => AskTriadParallel(question, slackReport, timeoutSec, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait),
+            _ => Error($"Unknown AI: {ai} (use gemini, gpt, claude, or triad)")
         };
     }
 
@@ -150,6 +154,30 @@ Examples:
   wkappbot ask gemini ""???몄뀡?쇰줈 吏덈Ц"" --new-session
 ");
         return 1;
+    }
+
+    /// <summary>
+    /// Run Gemini, GPT, Claude in parallel with per-AI output prefixes ([gemini], [gpt], [claude]).
+    /// Each AI gets its own thread and PrefixWriter → lines interleave but are clearly labeled.
+    /// </summary>
+    static int AskTriadParallel(string question, bool slackReport, int timeoutSec, List<string>? attachFiles,
+        bool newSession, bool loopMode, int loopMaxSteps, int loopRetry, int loopMaxParallel,
+        string? modelHint, bool noWait)
+    {
+        // Triad always starts fresh per-AI — prevents stale session cross-contamination.
+        // Use --new-session explicitly if you want to force even without triad.
+        var freshSession = true;
+        Console.WriteLine($"[TRIAD] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
+        var tasks = new[]
+        {
+            Task.Run(() => AskGemini(question, slackReport, timeoutSec, newTab: false, attachFiles, freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait, targetTagOverride: null, linePrefix: "[gemini] ")),
+            Task.Run(() => AskChatGpt(question, slackReport, timeoutSec, newTab: false, attachFiles, freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait, targetTagOverride: null, linePrefix: "[gpt] ")),
+            Task.Run(() => AskClaude(question, slackReport, timeoutSec, newTab: false, freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait, targetTagOverride: null, linePrefix: "[claude] ")),
+        };
+        Task.WaitAll(tasks);
+        var results = tasks.Select(t => t.Result).ToArray();
+        Console.WriteLine($"[TRIAD] Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+        return results.Any(r => r == 0) ? 0 : 1; // success if at least one AI answered
     }
 
     static bool EnsureTabViaGrap(string browserGrap, string tabPattern)
@@ -208,6 +236,76 @@ Examples:
     }
 
     sealed record CdpPageTarget(string Id, string Url, string Title, string WebSocketDebuggerUrl);
+
+    // AsyncLocal prefix: each async execution context (Task.Run lambda) has its own prefix.
+    // A single AsyncPrefixWriter is installed globally on first use and reads this per-context value.
+    static readonly System.Threading.AsyncLocal<string?> _asyncLinePrefix = new();
+    static volatile bool _asyncPrefixWriterInstalled;
+    static readonly object _prefixInstallLock = new();
+
+    /// <summary>
+    /// Set the output line prefix for the current async execution context (e.g. "[gpt] ").
+    /// Installs a single AsyncPrefixWriter on Console.Out the first time it is called.
+    /// Each parallel Task.Run context gets its own AsyncLocal value → correct per-AI prefix
+    /// even when multiple AIs stream output concurrently.
+    /// </summary>
+    static IDisposable? ApplyOutputPrefix(string? prefix)
+    {
+        if (string.IsNullOrEmpty(prefix)) return null;
+        if (!_asyncPrefixWriterInstalled)
+        {
+            lock (_prefixInstallLock)
+            {
+                if (!_asyncPrefixWriterInstalled)
+                {
+                    Console.SetOut(new AsyncPrefixWriter(Console.Out));
+                    _asyncPrefixWriterInstalled = true;
+                }
+            }
+        }
+        var prev = _asyncLinePrefix.Value;
+        _asyncLinePrefix.Value = prefix;
+        return new RestoreAsyncPrefix(prev);
+    }
+
+    sealed class RestoreAsyncPrefix(string? prev) : IDisposable
+    {
+        public void Dispose() => _asyncLinePrefix.Value = prev;
+    }
+
+    /// <summary>
+    /// Single global Console.Out replacement. Reads AsyncLocal prefix per async execution context.
+    /// Buffers per-context line, flushes with prefix atomically when '\n' is seen.
+    /// Parallel Task.Run tasks each have their own AsyncLocal → correct AI label per output line.
+    /// </summary>
+    sealed class AsyncPrefixWriter(TextWriter sink) : TextWriter
+    {
+        static readonly object _writeLock = new();
+        // Per-async-context line buffer (AsyncLocal isolates per Task.Run execution context)
+        static readonly System.Threading.AsyncLocal<System.Text.StringBuilder?> _buf = new();
+        static System.Text.StringBuilder Buf => _buf.Value ??= new();
+
+        public override System.Text.Encoding Encoding => sink.Encoding;
+        public override void Write(char value) { Buf.Append(value); if (value == '\n') FlushLine(); }
+        public override void Write(string? value) { if (value != null) foreach (var c in value) Write(c); }
+        public override void WriteLine(string? value) { Write(value ?? ""); Write('\n'); }
+        public override void WriteLine() => Write('\n');
+        public override void Flush() { if (Buf.Length > 0) FlushLine(); sink.Flush(); }
+
+        void FlushLine()
+        {
+            var line = Buf.ToString();
+            Buf.Clear();
+            var prefix = _asyncLinePrefix.Value;
+            lock (_writeLock)
+            {
+                if (!string.IsNullOrEmpty(prefix)) sink.Write(prefix);
+                sink.Write(line);
+                sink.Flush();
+            }
+        }
+        protected override void Dispose(bool disposing) { if (disposing) Flush(); }
+    }
 
     static string BuildAskTargetTag(string provider)
     {
