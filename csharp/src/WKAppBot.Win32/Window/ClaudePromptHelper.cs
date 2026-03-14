@@ -265,7 +265,12 @@ public sealed class ClaudePromptHelper : IDisposable
                     continue;
 
                 var pi = FindCodexDesktopPromptByMarker((int)pid);
-                if (pi != null) { results.Add(pi); seen.Add(pi.WindowHandle); }
+                if (pi != null)
+                {
+                    results.Add(pi);
+                    _turnFormCache[pi.WindowHandle] = pi; // expose to GetAllCachedPrompts() for status streaming
+                    seen.Add(pi.WindowHandle);
+                }
                 continue;
             }
 
@@ -286,7 +291,9 @@ public sealed class ClaudePromptHelper : IDisposable
                 // wrong-window delivery. No per-process dedup needed.
                 NativeMethods.GetWindowRect(hWnd, out var wr);
                 var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
-                results.Add(new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode"));
+                var vsCodeEntry = new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode");
+                results.Add(vsCodeEntry);
+                _turnFormCache[hWnd] = vsCodeEntry; // expose to GetAllCachedPrompts() for status streaming
                 seen.Add(hWnd);
             }
         }

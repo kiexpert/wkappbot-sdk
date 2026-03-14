@@ -211,9 +211,59 @@ internal partial class Program
             }
         }
 
+        // Last AI output per prompt window (JSONL-based, for VS Code/Codex streaming verification)
+        Console.WriteLine();
+        Console.WriteLine("[PROMPT-PROBE] === Last AI Output per Prompt ===");
+        if (allPrompts.Count == 0)
+        {
+            Console.WriteLine("  (no prompts found)");
+        }
+        else
+        {
+            foreach (var p in allPrompts)
+            {
+                NativeMethods.GetWindowThreadProcessId(p.WindowHandle, out uint pidRaw2);
+                var pid2 = (int)pidRaw2;
+
+                // Match card by PID (VS Code: all windows share one PID — use title CWD)
+                string? probeCwd = null;
+                if (p.HostType == "vscode-claudecode")
+                    probeCwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
+                if (string.IsNullOrEmpty(probeCwd))
+                {
+                    var matchCard = _cachedCards.FirstOrDefault(c => c.ParentPid == pid2);
+                    probeCwd = matchCard?.Cwd;
+                }
+
+                var ageS = -1;
+                if (!string.IsNullOrEmpty(probeCwd))
+                {
+                    var matchCard2 = _cachedCards.FirstOrDefault(c =>
+                        string.Equals(c.Cwd, probeCwd, StringComparison.OrdinalIgnoreCase));
+                    if (matchCard2 != null)
+                        ageS = (int)(DateTime.UtcNow - matchCard2.LastTsUtc).TotalSeconds;
+                }
+
+                var lastText = ReadClotThoughtForCwd(probeCwd);
+                var lastLine = GetLastOutputLine(lastText);
+
+                Console.WriteLine($"  [{p.HostType}] 0x{p.WindowHandle:X} pid={pid2}");
+                Console.WriteLine($"    cwd={probeCwd ?? "(none)"} age={ageS}s");
+                Console.WriteLine($"    last={TrimForLog(lastLine, 160)}");
+            }
+        }
+
         Console.WriteLine();
         Console.WriteLine("[PROMPT-PROBE] Done.");
         return 0;
+    }
+
+    static string GetLastOutputLine(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "(empty)";
+        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var last = lines.LastOrDefault(l => l.Length >= 4) ?? text.Trim();
+        return last.Length > 120 ? last[..120] + "…" : last;
     }
 
     static bool DumpWindowRuntimeState(IntPtr hWnd)
