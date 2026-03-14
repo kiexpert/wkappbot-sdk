@@ -2005,6 +2005,7 @@ internal partial class Program
         if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
             Directory.CreateDirectory(targetDir);
 
+        AgentFileTracker.Track(filePath); // capture original before overwrite
         var encoded = enc.GetBytes(content);
         File.WriteAllBytes(filePath, encoded);
         Console.WriteLine($"[FILE-WRITE] {filePath} ({enc.WebName}, {content.Length} chars → {encoded.Length} bytes) ✓");
