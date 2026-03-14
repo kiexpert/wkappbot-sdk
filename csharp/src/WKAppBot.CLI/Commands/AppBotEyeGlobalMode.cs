@@ -1150,6 +1150,13 @@ internal partial class Program
                 };
                 _fswExeNew.Changed += (_, _) => _fswExeDirty = true;
                 _fswExeNew.Created += (_, _) => _fswExeDirty = true;
+                // Startup: .new.exe may already exist (pre-dated swap from before restart)
+                var newExeOnStart = Path.Combine(exeDir, Path.GetFileNameWithoutExtension(exeFile) + ".new.exe");
+                if (File.Exists(newExeOnStart))
+                {
+                    Console.WriteLine("[EYE][FSW] .new.exe already present at startup — triggering hot-swap");
+                    _fswExeDirty = true;
+                }
                 Console.WriteLine($"[EYE][FSW] Hot-swap watcher: {exeDir}/{exeFile}");
             }
         }

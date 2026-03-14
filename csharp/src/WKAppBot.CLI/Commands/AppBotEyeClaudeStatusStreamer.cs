@@ -44,6 +44,9 @@ internal partial class Program
 
         // ── Display label (CWD short name for Slack messages) ──
         public string CwdLabel = "";
+
+        // ── Last status type (executing/idle/etc.) for edit-vs-delete decision ──
+        public string? LastStatusType;
     }
 
     // Per-hwnd instance state dictionary. Entries added on first encounter, purged when window gone.
@@ -56,6 +59,9 @@ internal partial class Program
             state = new ClaudeInstanceState();
             // Try to find a CWD label from cached cards matching this hwnd's PID
             state.CwdLabel = ResolveInstanceCwdLabel(hwnd);
+            // Restore Slack TS + last text from window props (persisted across Eye restart)
+            state.SlackStatusTs = GetWindowStringProp(hwnd, PropSlackTs);
+            state.LastSlackStatusText = GetWindowStringProp(hwnd, PropAiOut);
             _instanceStates[hwnd] = state;
         }
         else if (string.IsNullOrEmpty(state.CwdLabel))
@@ -71,13 +77,26 @@ internal partial class Program
     /// </summary>
     static string ResolveInstanceCwdLabel(IntPtr hwnd)
     {
-        // Try to find matching EyeParentCard via PID
+        // Priority 1: VS Code — use window title (each window has unique title with folder name)
+        // Multiple VS Code windows share the same PID, so title-based CWD is the only reliable source.
+        try
+        {
+            var pi = ClaudePromptHelper.GetAllCachedPrompts().FirstOrDefault(p => p.WindowHandle == hwnd);
+            if (pi?.HostType == "vscode-claudecode" && !string.IsNullOrEmpty(pi.WindowTitle))
+            {
+                var titleCwd = ExtractCwdFromVsCodeTitle(pi.WindowTitle);
+                if (!string.IsNullOrEmpty(titleCwd) && !IsSystemOrInstallDirectory(titleCwd))
+                    return AbbreviateCwd(titleCwd);
+            }
+        }
+        catch { }
+
+        // Priority 2: _cachedCards PID match (claude-desktop / codex — single window per process)
         try
         {
             GetWindowThreadProcessId(hwnd, out var pid);
             if (pid > 0)
             {
-                // Check _cachedCards for a card whose ParentPid matches
                 var card = _cachedCards.FirstOrDefault(c => c.ParentPid == (int)pid);
                 if (card != null && !string.IsNullOrEmpty(card.Cwd))
                     return AbbreviateCwd(card.Cwd);
@@ -91,7 +110,6 @@ internal partial class Program
             var pi = ClaudePromptHelper.GetAllCachedPrompts().FirstOrDefault(p => p.WindowHandle == hwnd);
             if (pi != null && !string.IsNullOrEmpty(pi.WindowTitle))
             {
-                // Window title is usually "Claude" or a project name — take up to 15 chars
                 var t = pi.WindowTitle.Replace("— Claude", "").Trim();
                 if (t.Length > 15) t = t[..15] + "…";
                 if (!string.IsNullOrEmpty(t)) return t;
@@ -99,7 +117,7 @@ internal partial class Program
         }
         catch { }
 
-        return $"0x{hwnd:X8}";
+        return "";  // no label — claude-desktop is single global instance
     }
 
     // ── Main per-tick entry point ───────────────────────────────────────────
@@ -119,22 +137,28 @@ internal partial class Program
         const int RateLimitCooldownMinutes = 30;
         const int RateLimitAlertCooldownMinutes = 30;
 
-        // ── Purge dead hwnds ──
+        // ── Purge dead hwnds (clean up window prop atoms before removing) ──
         var deadHwnds = _instanceStates.Keys.Where(h => !IsWindow(h)).ToList();
-        foreach (var h in deadHwnds) _instanceStates.Remove(h);
+        foreach (var h in deadHwnds)
+        {
+            // Clear atoms stored in the props (prevents global atom table leak across restarts)
+            SetWindowStringProp(h, PropSlackTs, null);
+            SetWindowStringProp(h, PropAiOut, null);
+            _instanceStates.Remove(h);
+        }
 
         // ── Re-find primary Claude window if lost ──
         if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd))
             claudeHwnd = FindClaudeDesktopWindow();
 
-        // ── Collect all Claude Desktop instances from prompt cache ──
-        var claudeInstances = ClaudePromptHelper.GetAllCachedPrompts()
-            .Where(p => p.HostType == "claude-desktop" && IsWindow(p.WindowHandle))
-            .Select(p => p.WindowHandle)
-            .Distinct()
-            .ToList();
+        // ── Collect all AI instances (Desktop + VS Code + Codex) from prompt cache ──
+        var allClaudePrompts = ClaudePromptHelper.GetAllCachedPrompts()
+            .Where(p => (p.HostType == "claude-desktop" || p.HostType == "vscode-claudecode" || p.HostType == "codex-desktop") && IsWindow(p.WindowHandle))
+            .GroupBy(p => p.WindowHandle).Select(g => g.First()).ToList();
+        var claudeInstances = allClaudePrompts.Select(p => p.WindowHandle).ToList();
+        var instanceHostTypes = allClaudePrompts.ToDictionary(p => p.WindowHandle, p => p.HostType);
 
-        // Include primary window if not already in list
+        // Include primary window if not already in list (claude-desktop may not be in prompt cache yet)
         if (claudeHwnd != IntPtr.Zero && !claudeInstances.Contains(claudeHwnd))
             claudeInstances.Add(claudeHwnd);
 
@@ -242,14 +266,58 @@ internal partial class Program
             return null;
         }
 
+        var primaryHwnd = claudeHwnd; // local copy — ref params cannot be captured in lambdas
+
         foreach (var hwnd in claudeInstances)
         {
             var state = GetOrCreateInstanceState(hwnd);
+            instanceHostTypes.TryGetValue(hwnd, out var hostType);
+            // UIA-idle mode: no pixel spinner — use turn-form prompt_ready as idle signal (VS Code + Codex)
+            bool isVsCode = hostType == "vscode-claudecode" || hostType == "codex-desktop";
             var label = string.IsNullOrEmpty(state.CwdLabel) ? "" : $"[{state.CwdLabel}] ";
 
+            Tuple<string, string>? claudeStatus = null;
             try
             {
-                var claudeStatus = DetectClaudeDesktopStatus(hwnd);
+                claudeStatus = DetectClaudeDesktopStatus(hwnd);
+
+                // VS Code / Codex: no turn-form in UIA → DetectClaudeDesktopStatus always null.
+                // Use JSONL card-based detection instead.
+                if (claudeStatus == null && isVsCode)
+                {
+                    GetWindowThreadProcessId(hwnd, out var vsPid);
+                    string? vsCwd = null;
+                    if (hostType == "vscode-claudecode")
+                    {
+                        var pi = ClaudePromptHelper.GetAllCachedPrompts().FirstOrDefault(p => p.WindowHandle == hwnd);
+                        if (pi != null) vsCwd = ExtractCwdFromVsCodeTitle(pi.WindowTitle);
+                    }
+                    if (string.IsNullOrEmpty(vsCwd))
+                    {
+                        var vsCard = _cachedCards.FirstOrDefault(c => c.ParentPid == (int)vsPid);
+                        vsCwd = vsCard?.Cwd;
+                    }
+                    if (!string.IsNullOrEmpty(vsCwd))
+                    {
+                        var vsMatchCard = _cachedCards.FirstOrDefault(c =>
+                            string.Equals(c.Cwd, vsCwd, StringComparison.OrdinalIgnoreCase));
+                        var ageSec = vsMatchCard != null
+                            ? (DateTime.UtcNow - vsMatchCard.LastTsUtc).TotalSeconds
+                            : double.MaxValue;
+                        var lastText = ReadClotThoughtForCwd(vsCwd);
+                        var lastLine = GetLastOutputLine(lastText);
+                        if (ageSec < 30 && !string.IsNullOrEmpty(lastLine))
+                        {
+                            // Recent JSONL activity → executing
+                            claudeStatus = Tuple.Create("executing", lastLine);
+                        }
+                        else if (!string.IsNullOrEmpty(lastLine))
+                        {
+                            // Stale → idle (prompt_ready equivalent)
+                            claudeStatus = Tuple.Create("prompt_ready", lastLine);
+                        }
+                    }
+                }
 
                 if (claudeStatus != null)
                 {
@@ -332,17 +400,31 @@ internal partial class Program
                             string slackText;
                             if (claudeStatus.Item1 == "prompt_ready")
                             {
-                                // Skip — spinner detection handles idle below
-                                goto skipStatusStreaming;
+                                // VS Code: UIA-confirmed idle → post :zzz: message directly (no spinner)
+                                if (isVsCode && !state.IdleMessageSent
+                                    && state.LastSlackStatusText?.Contains(":zzz:") != true)
+                                {
+                                    var idleSuffix = state.LastExecutingText != null ? $" after: {state.LastExecutingText}" : "";
+                                    var idleMsg = $":zzz: {label}Idle{idleSuffix}";
+                                    var instUser2 = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
+                                    Task.Run(async () => await PostOrUpdateAiStatusAsync(
+                                        hwnd, state, idleMsg, "idle",
+                                        slackBotToken!, slackChannel!, instUser2, statusTsFile, primaryHwnd))
+                                        .Wait(5000);
+                                    state.IdleMessageSent = true;
+                                    state.LastExecutingText = null;
+                                    Console.WriteLine($"[EYE] {label}VS Code → idle: {idleMsg}");
+                                }
+                                goto skipStatusStreaming; // Skip — spinner handles idle for claude-desktop
                             }
                             else
                             {
-                                // Active: only reset idle if spinner is animating again
+                                // Active: only reset idle if spinner is animating again (VS Code: UIA-confirmed)
                                 if (state.IdleMessageSent)
                                 {
-                                    if (DetectSpinnerIdle(hwnd, state)) goto skipStatusStreaming;
-                                    // Spinner animating again → activity resumed
-                                    ResetSpinnerDetection(state);
+                                    if (!isVsCode && DetectSpinnerIdle(hwnd, state)) goto skipStatusStreaming;
+                                    // Spinner animating again (or VS Code executing) → activity resumed
+                                    if (!isVsCode) ResetSpinnerDetection(state);
                                     state.IdleAfterText = null;
                                 }
                                 state.IdleMessageSent = false;
@@ -359,39 +441,26 @@ internal partial class Program
 
                             if (slackText == state.LastSlackStatusText) goto skipStatusStreaming;
 
-                            // Delete old → post new (fresh timestamp)
-                            if (state.SlackStatusTs != null)
-                            {
-                                var oldTs = state.SlackStatusTs;
-                                Task.Run(async () => await SlackDeleteMessageAsync(
-                                    slackBotToken!, slackChannel!, oldTs)).Wait(3000);
-                                state.SlackStatusTs = null;
-                            }
                             {
                                 var instanceUsername = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
-                                var (ok, ts) = Task.Run(async () =>
-                                    await SlackSendViaApi(slackBotToken!, slackChannel!, slackText, username: instanceUsername))
-                                    .GetAwaiter().GetResult();
-                                if (ok && ts != null)
-                                {
-                                    state.SlackStatusTs = ts;
-                                    if (hwnd == claudeHwnd) // persist primary instance ts to file
-                                        try { File.WriteAllText(statusTsFile, ts); } catch { }
-                                }
-                                state.LastSlackStatusText = slackText;
+                                Task.Run(async () => await PostOrUpdateAiStatusAsync(
+                                    hwnd, state, slackText, claudeStatus.Item1,
+                                    slackBotToken!, slackChannel!, instanceUsername, statusTsFile, primaryHwnd))
+                                    .Wait(5000);
                             }
                         }
                         catch { /* best-effort */ }
 
                         skipStatusStreaming:
-                        // ── Spinner pixel idle ──
-                        if (!state.IdleMessageSent
-                            && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                        // ── Spinner pixel idle / active transition (Claude Desktop only) ──
+                        if (!isVsCode && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
                         {
                             try
                             {
-                                if (DetectSpinnerIdle(hwnd, state))
+                                bool spinnerIdle = DetectSpinnerIdle(hwnd, state);
+                                if (!state.IdleMessageSent && spinnerIdle)
                                 {
+                                    // Spinner settled → Claude is idle → post idle message
                                     if (state.IdleAfterText == null)
                                     {
                                         if (state.LastExecutingText != null)
@@ -401,26 +470,21 @@ internal partial class Program
                                     var idleSuffix = state.IdleAfterText != null ? $" after: {state.IdleAfterText}" : "";
                                     var idleMsg = $":zzz: {label}Idle{idleSuffix}";
 
-                                    if (state.SlackStatusTs != null)
-                                    {
-                                        var oldTs = state.SlackStatusTs;
-                                        Task.Run(async () => await SlackDeleteMessageAsync(
-                                            slackBotToken!, slackChannel!, oldTs)).Wait(3000);
-                                        state.SlackStatusTs = null;
-                                    }
                                     var instanceUsername2 = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
-                                    var (idleOk, idleTs) = Task.Run(async () =>
-                                        await SlackSendViaApi(slackBotToken!, slackChannel!, idleMsg, username: instanceUsername2))
-                                        .GetAwaiter().GetResult();
-                                    if (idleOk && idleTs != null)
-                                    {
-                                        state.SlackStatusTs = idleTs;
-                                        if (hwnd == claudeHwnd)
-                                            try { File.WriteAllText(statusTsFile, idleTs); } catch { }
-                                    }
-                                    state.LastSlackStatusText = idleMsg;
+                                    Task.Run(async () => await PostOrUpdateAiStatusAsync(
+                                        hwnd, state, idleMsg, "idle",
+                                        slackBotToken!, slackChannel!, instanceUsername2, statusTsFile, primaryHwnd))
+                                        .Wait(5000);
                                     state.IdleMessageSent = true;
                                     Console.WriteLine($"[EYE] {label}Spinner idle: {idleMsg}");
+                                }
+                                else if (state.IdleMessageSent && !spinnerIdle)
+                                {
+                                    // Spinner active again → Claude resumed → clear idle so next tick posts executing
+                                    state.IdleMessageSent = false;
+                                    state.LastSlackStatusText = null;
+                                    ResetSpinnerDetection(state);
+                                    Console.WriteLine($"[EYE] {label}Activity resumed — idle cleared");
                                 }
                             }
                             catch { }
@@ -540,6 +604,23 @@ internal partial class Program
                 }
             }
             catch { /* best-effort per-instance */ }
+
+            // ── Fallback: when claudeStatus==null (UIA failed), still track spinner state (Claude Desktop only) ──
+            if (!isVsCode && claudeStatus == null && state.IdleMessageSent && state.SlackStatusTs != null
+                && slackClient != null && !string.IsNullOrEmpty(slackBotToken))
+            {
+                try
+                {
+                    if (!DetectSpinnerIdle(hwnd, state))
+                    {
+                        state.IdleMessageSent = false;
+                        state.LastSlackStatusText = null;
+                        ResetSpinnerDetection(state);
+                        Console.WriteLine($"[EYE] {label}UIA null but spinner active — idle cleared");
+                    }
+                }
+                catch { }
+            }
         } // end foreach claudeInstances
 
         return combinedStatusText;
@@ -570,5 +651,118 @@ internal partial class Program
             s.LastSlackStatusText = null;
         }
         try { File.WriteAllText(statusTsFile, ""); } catch { }
+    }
+
+    // ── Window prop string helpers (GlobalAtom-based, survives Eye restart) ──────────
+    // Prop names written to the AI app window (VS Code / Codex / Claude Desktop)
+    private const string PropAiOut  = "WKAppBot.AiOut";  // last AI output line
+    private const string PropSlackTs = "WKAppBot.SlTs";  // last Slack status message TS
+
+    /// <summary>Store a short string (≤240 chars) in a window property via GlobalAtom.</summary>
+    static void SetWindowStringProp(IntPtr hwnd, string propName, string? value)
+    {
+        try
+        {
+            var old = NativeMethods.GetPropW(hwnd, propName);
+            if (old != IntPtr.Zero)
+            {
+                NativeMethods.GlobalDeleteAtom((ushort)(old.ToInt32() & 0xFFFF));
+                NativeMethods.RemovePropW(hwnd, propName);
+            }
+            if (value == null) return;
+            if (value.Length > 240) value = value[..240];
+            var atom = NativeMethods.GlobalAddAtomW(value);
+            if (atom != 0) NativeMethods.SetPropW(hwnd, propName, (IntPtr)atom);
+        }
+        catch { }
+    }
+
+    /// <summary>Read a string from a window property (GlobalAtom).</summary>
+    static string? GetWindowStringProp(IntPtr hwnd, string propName)
+    {
+        try
+        {
+            var handle = NativeMethods.GetPropW(hwnd, propName);
+            if (handle == IntPtr.Zero) return null;
+            var atom = (ushort)(handle.ToInt32() & 0xFFFF);
+            var sb = new System.Text.StringBuilder(256);
+            var len = NativeMethods.GlobalGetAtomNameW(atom, sb, sb.Capacity);
+            return len > 0 ? sb.ToString() : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Post or update a Slack status message for an AI instance.
+    /// Same state type → edit in place (no channel spam).
+    /// State type changed → delete old + post new (moves to bottom = "latest message").
+    /// Also persists SlackTs and text to window props for restart resilience.
+    /// </summary>
+    static async Task PostOrUpdateAiStatusAsync(
+        IntPtr hwnd, ClaudeInstanceState state,
+        string slackText, string statusType,
+        string slackBotToken, string slackChannel, string instanceUsername,
+        string statusTsFile, IntPtr claudeHwnd)
+    {
+        bool sameType = state.LastStatusType == statusType && state.SlackStatusTs != null;
+
+        // Check if current status message has replies (user is engaging → never edit or delete it)
+        bool hasReplies = false;
+        if (state.SlackStatusTs != null)
+        {
+            try { hasReplies = await SlackMessageHasRepliesAsync(slackBotToken, slackChannel, state.SlackStatusTs); }
+            catch { }
+        }
+
+        // Check if our message is still the latest in the channel (someone else may have posted since)
+        bool isLatest = false;
+        if (state.SlackStatusTs != null)
+        {
+            try { isLatest = (await GetChannelLatestMessageTs(slackBotToken, slackChannel)) == state.SlackStatusTs; }
+            catch { }
+        }
+
+        bool canEdit = sameType && !hasReplies && isLatest;
+        if (canEdit)
+        {
+            // Edit in place — no channel reorder spam (executing→executing text update, no user thread)
+            var (ok, _) = await SlackUpdateMessageAsync(slackBotToken, slackChannel, state.SlackStatusTs!, slackText);
+            if (ok)
+            {
+                state.LastSlackStatusText = slackText;
+                SetWindowStringProp(hwnd, PropAiOut, slackText);
+                Console.WriteLine($"[EYE] Edit [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
+            }
+        }
+        else
+        {
+            // Not editable (type changed, has replies, or no longer latest) → post new message
+            if (!hasReplies && state.SlackStatusTs != null)
+            {
+                // No replies → delete old so new message appears at bottom (latest)
+                var oldTs = state.SlackStatusTs;
+                state.SlackStatusTs = null;
+                SetWindowStringProp(hwnd, PropSlackTs, null);
+                await SlackDeleteMessageAsync(slackBotToken, slackChannel, oldTs);
+            }
+            // has replies → leave old message intact, post fresh stream below it
+
+            var (ok, ts) = await SlackSendViaApi(slackBotToken, slackChannel, slackText, username: instanceUsername);
+            if (ok && ts != null)
+            {
+                state.SlackStatusTs = ts;
+                state.LastStatusType = statusType;
+                if (hwnd == claudeHwnd)
+                    try { File.WriteAllText(statusTsFile, ts); } catch { }
+                SetWindowStringProp(hwnd, PropSlackTs, ts);
+                SetWindowStringProp(hwnd, PropAiOut, slackText);
+                Console.WriteLine($"[EYE] Post [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
+            }
+            else if (!ok)
+            {
+                Console.WriteLine($"[EYE] Post FAILED [{statusType}]: {slackText[..Math.Min(slackText.Length, 60)]}");
+            }
+            state.LastSlackStatusText = slackText;
+        }
     }
 }

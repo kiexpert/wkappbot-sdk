@@ -103,6 +103,16 @@ public static partial class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr RemovePropW(IntPtr hWnd, string lpString);
 
+    // Global atom table — used to cache strings in window props (survives Eye restart)
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    public static extern ushort GlobalAddAtomW(string lpString);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    public static extern uint GlobalGetAtomNameW(ushort nAtom, System.Text.StringBuilder lpBuffer, int nSize);
+
+    [DllImport("kernel32.dll")]
+    public static extern ushort GlobalDeleteAtom(ushort nAtom);
+
     public delegate bool PropEnumProcEx(IntPtr hWnd, IntPtr lpszString, IntPtr hData, UIntPtr dwData);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
