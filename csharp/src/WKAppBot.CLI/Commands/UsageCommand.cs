@@ -57,9 +57,36 @@ Usage:
       Auto-dismiss notice/popup windows (OCR importance check).
   input <window-title> <text>
       Type text into a window (focusless PostMessage preferred).
+  whisper [options]
+      Real-time speech recognition + sound tokenization overlay.
+  whisper study [--batch N] [--for <duration>] [--engine gemini|gpt]
+      Batch-transcribe MP3 segments via AI. --for loops until timeout.
+      Duration: 30=30s, 2m, 500ms, 1.1s, 2h
+  whisper slice [--in <dir>] [--min-ms N] [--max-ms N]
+      Slice long audio into word-level MP3 segments.
+  whisper clean [--wav-dir <dir>] [--dry-run]
+      Sort wav/ root: voice→_unknown, noise→Recycle Bin.
+  whisper index [--in <slices-dir>] [--out <db-dir>] [--move] [--dry-run]
+      Extract first-syllable soundCode → phoneme_db/<octal>/word.mp3.
+      Files with <9 voiced frames (~90ms) → Recycle Bin automatically.
+  mcp
+      Start MCP stdio server (wkappbot_cli tool for JSON-RPC clients).
+      Add to .mcp.json: {{ ""wkappbot"": {{ ""command"": ""wkappbot"", ""args"": [""mcp""] }} }}
   web <subcommand> [options]
       Chrome DevTools Protocol web automation (open/click/type/eval).
       Type 'wkappbot web help' for all subcommands.
+  web fetch <url> [--max-chars N]
+      HTTP GET — returns response body (no browser needed).
+  web search <query> [--limit N]
+      Google search via Chrome CDP (no API key required).
+  web read <url> [--max-chars N]
+      Navigate URL + extract rendered text content.
+  file read <path> [--offset N] [--limit N]
+      Read any file with line numbers (encoding-aware: --encoding 949/utf-16).
+  file grep <regex> [--path <dir>] [--type <ext>] [-i] [-C N] [--max N]
+      Regex search across files. -i=case-insensitive, -C=context lines.
+  file glob <pattern> [--path <dir>]
+      Find files by ** glob pattern. ⚠ ALWAYS use **/ prefix (e.g. **/*.cs).
   eye [--interval N] [--size WxH] [--pos X,Y]
       WK AppBot Eye — live overlay + Slack daemon (always on).
       ctx=N% in tick output, auto-deletes stale idle messages on restart.
@@ -124,9 +151,12 @@ Utility:
   logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]
       Stream logs in real-time. Default: CWD only. -r unlimited, -r=3 depth 3. --hq adds HQ+openclaw.
       File filter supports grap patterns: wildcards, regex: prefix, ';' OR.
-  ask gpt|gemini ""question"" [--slack] [--timeout N] [--new-tab]
-      Ask ChatGPT or Gemini via CDP. Focusless text insert (a11y-first).
-      Auto-closes about:blank tabs, validates tab URL before insert.
+  ask gpt|gemini|claude ""question"" [file.png] [--slack] [--new-tab]
+      Ask AI via CDP (focusless). Auto-closes blank tabs, validates URL.
+  ask triad ""question""
+      Parallel GPT + Gemini + Claude — three answers at once.
+  agent gemini|gpt|claude|triad ""task"" [--max-steps N] [--fresh]
+      Autonomous sub-agent loop with filesystem + web tools.
   win-move <window-title> [--right-top] [--x N --y N]
       Move a window to a specific position.
   screen off [--no-check]
@@ -144,9 +174,10 @@ Utility:
       Probe prompt candidates with thread-author names + dump UIA hits/submit state.
 
 General Options:
-  -v, --verbose   Verbose output
-  --report <dir>  Generate HTML report in directory
-  -h, --help      Show this help message
+  -v, --verbose         Verbose output
+  --report <dir>        Generate HTML report in directory
+  --timeout <duration>  Hard kill after N time (exit 124). e.g. 30, 2m, 500ms
+  -h, --help            Show this help message
 
 Rules (for fellow Claude Code agents):
   * Questions to user: ALWAYS send via BOTH Slack AND here simultaneously.
