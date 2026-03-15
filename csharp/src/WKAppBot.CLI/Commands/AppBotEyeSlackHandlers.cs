@@ -127,19 +127,20 @@ internal partial class Program
         foreach (var p in allPrompts)
         {
             var hostMatch = MatchesHostTarget(p, hostTarget);
-            var cwdMatch = cwdTags.Count == 0 || cwdTags.Any(tag => p.WindowTitle.Contains(tag, StringComparison.OrdinalIgnoreCase));
+            var searchTitle = GetPromptSearchableTitle(p);
+            var cwdMatch = cwdTags.Count == 0 || cwdTags.Any(tag => searchTitle.Contains(tag, StringComparison.OrdinalIgnoreCase));
             var selected = hostMatch && cwdMatch;
             var st = promptHelper.ProbeSubmitState(p);
             var shortTitle = p.WindowTitle.Length > 72 ? p.WindowTitle[..69] + "..." : p.WindowTitle;
             Console.WriteLine(
                 $"  [CAND] hwnd=0x{p.WindowHandle:X} host={p.HostType} selected={selected} " +
-                $"hostMatch={hostMatch} cwdMatch={cwdMatch} turnForm={st.TurnFormFound} submit={st.SubmitFound}/{st.SubmitEnabled}");
+                $"hostMatch={hostMatch} cwdMatch={cwdMatch} folder=\"{searchTitle}\" turnForm={st.TurnFormFound} submit={st.SubmitFound}/{st.SubmitEnabled}");
             Console.WriteLine($"         title=\"{shortTitle}\"");
         }
 
         var matched = allPrompts
             .Where(p => MatchesHostTarget(p, hostTarget))
-            .Where(p => cwdTags.Count == 0 || cwdTags.Any(tag => p.WindowTitle.Contains(tag, StringComparison.OrdinalIgnoreCase)))
+            .Where(p => cwdTags.Count == 0 || cwdTags.Any(tag => GetPromptSearchableTitle(p).Contains(tag, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
         if (matched.Count > 0)
@@ -247,6 +248,26 @@ internal partial class Program
                 tags.Add(tag[(lastDash + 1)..]);
         }
         return tags;
+    }
+
+    /// <summary>
+    /// VS Code 타이틀에서 작업 폴더명만 추출.
+    /// "채팅제목 - 작업폴더 - Visual Studio Code" → "작업폴더"
+    /// 다른 호스트는 전체 타이틀 그대로 반환.
+    /// </summary>
+    static string GetPromptSearchableTitle(ClaudePromptHelper.PromptInfo p)
+    {
+        if (p.HostType == "vscode-claudecode")
+        {
+            var vscIdx = p.WindowTitle.IndexOf(" - Visual Studio Code", StringComparison.OrdinalIgnoreCase);
+            if (vscIdx > 0)
+            {
+                var withoutSuffix = p.WindowTitle[..vscIdx];
+                var lastDash = withoutSuffix.LastIndexOf(" - ", StringComparison.Ordinal);
+                return lastDash >= 0 ? withoutSuffix[(lastDash + 3)..].Trim() : withoutSuffix.Trim();
+            }
+        }
+        return p.WindowTitle;
     }
 
     static bool MatchesHostTarget(ClaudePromptHelper.PromptInfo prompt, string hostTarget)
@@ -373,35 +394,12 @@ internal partial class Program
         }
 
         // 프롬프트 윈도우 타이틀에서 매칭
-        // VS Code 타이틀: "chatTitle - FolderName - Visual Studio Code"
-        // chatTitle에 다른 프로젝트명이 포함될 수 있으므로 FolderName 부분만 비교해야 함.
-        // 예: "이전 세션 인수인계 — WKAppBot v4… - lucy_securepad - Visual Studio Code"
-        //   → chatTitle "WKAppBot" 때문에 전체 Contains → SecurePad 창도 오매칭!
-        //   → FolderName 추출 "lucy_securepad" → "WKAppBot" 불매칭 → 수정됨
+        // GetPromptSearchableTitle: VS Code "채팅제목 - 작업폴더 - Visual Studio Code" → "작업폴더"
+        // 채팅 제목에 다른 프로젝트명이 포함돼도 오매칭 안 됨 (GetPromptSearchableTitle로 통일)
         var matched = new List<ClaudePromptHelper.PromptInfo>();
         foreach (var p in allPrompts)
         {
-            // VS Code: 타이틀에서 프로젝트 폴더명만 추출해 비교
-            string titleToSearch;
-            if (p.HostType == "vscode-claudecode")
-            {
-                var vscIdx = p.WindowTitle.IndexOf(" - Visual Studio Code", StringComparison.OrdinalIgnoreCase);
-                if (vscIdx > 0)
-                {
-                    var withoutSuffix = p.WindowTitle[..vscIdx];
-                    var lastDash = withoutSuffix.LastIndexOf(" - ", StringComparison.Ordinal);
-                    titleToSearch = lastDash >= 0 ? withoutSuffix[(lastDash + 3)..].Trim() : withoutSuffix.Trim();
-                }
-                else
-                {
-                    titleToSearch = p.WindowTitle;
-                }
-            }
-            else
-            {
-                titleToSearch = p.WindowTitle;
-            }
-
+            var titleToSearch = GetPromptSearchableTitle(p);
             Console.WriteLine($"[EYE][SLACK] title-match: 0x{p.WindowHandle:X} host={p.HostType} folder=\"{titleToSearch}\" cwds=[{string.Join(", ", cwdNames)}]");
             foreach (var cwd in cwdNames)
             {
