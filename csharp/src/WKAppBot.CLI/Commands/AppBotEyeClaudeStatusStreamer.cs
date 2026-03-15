@@ -59,9 +59,10 @@ internal partial class Program
             state = new ClaudeInstanceState();
             // Try to find a CWD label from cached cards matching this hwnd's PID
             state.CwdLabel = ResolveInstanceCwdLabel(hwnd);
-            // Restore Slack TS + last text from window props (persisted across Eye restart)
+            // Restore Slack TS + last text + status type from window props (persisted across Eye restart)
             state.SlackStatusTs = GetWindowStringProp(hwnd, PropSlackTs);
             state.LastSlackStatusText = GetWindowStringProp(hwnd, PropAiOut);
+            state.LastStatusType = GetWindowStringProp(hwnd, PropStatusType);
             _instanceStates[hwnd] = state;
         }
         else if (string.IsNullOrEmpty(state.CwdLabel))
@@ -132,7 +133,7 @@ internal partial class Program
         string? slackBotToken, string? slackChannel, string botUsername,
         SlackSocketClient? slackClient,
         string statusTsFile,
-        Dictionary<string, long> contextWarnedSizes)
+        Dictionary<string, int> contextWarnedPcts)
     {
         const int RateLimitCooldownMinutes = 30;
         const int RateLimitAlertCooldownMinutes = 30;
@@ -169,31 +170,54 @@ internal partial class Program
             {
                 if (string.IsNullOrWhiteSpace(card.Cwd)) continue;
                 var (pct, _, jsonlPath, fileSize) = GetContextInfoForCwdEx(card.Cwd);
-                if (pct < 90 || jsonlPath == null) continue;
-
-                var cwdKey = card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
-                contextWarnedSizes.TryGetValue(cwdKey, out long prevWarnedSize);
-                if (fileSize <= prevWarnedSize) continue; // already warned at this size
-
                 var sizeMB = fileSize / (1024.0 * 1024.0);
                 const double ContextLimitMB = 40.0;
-                var cwdTag = AbbreviateCwd(card.Cwd);
-                contextWarnedSizes[cwdKey] = fileSize;
+                const double WarnStartMB = 20.0;   // 경고 시작 (토큰 절약 여유)
+                const double UrgentMB = 30.0;       // 긴급 (75% 이상)
+                if (sizeMB < WarnStartMB || jsonlPath == null) continue;
 
-                if (pct >= 95 && !string.IsNullOrEmpty(slackBotToken))
+                var cwdKey = card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
+                contextWarnedPcts.TryGetValue(cwdKey, out int prevWarnedMB);
+                var curMB = (int)sizeMB; // 1MB 단위 dedup
+                if (curMB <= prevWarnedMB) continue;
+
+                var cwdTag = AbbreviateCwd(card.Cwd);
+                contextWarnedPcts[cwdKey] = curMB;
+
+                if (sizeMB >= UrgentMB && !string.IsNullOrEmpty(slackBotToken))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 즉시 인수인계하세요!");
-                    Console.WriteLine($"[EYE] 명령: wkappbot newchat \"인수인계 프롬프트\"");
                     Console.ResetColor();
+
+                    // 프창에도 긴급 경고 전송
+                    try
+                    {
+                        using var ctxHelper = new ClaudePromptHelper();
+                        var pi = ctxHelper.FindPromptForCwd(card.Cwd);
+                        if (pi != null)
+                        {
+                            ClaudePromptHelper.AllowFocusSteal = true;
+                            try
+                            {
+                                var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요!\n"
+                                    + "wkappbot newchat 실행 필요";
+                                ctxHelper.TypeAndSubmit(pi, urgentNudge);
+                                Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Urgent nudge sent to prompt");
+                            }
+                            finally { ClaudePromptHelper.AllowFocusSteal = false; }
+                        }
+                    }
+                    catch { /* best-effort */ }
+
                     Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                         $":rotating_light: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣이 아직 인수인계 안 했습니다! `wkappbot newchat` 실행 필요",
                         username: BuildSlackBotUsername(SlackClaudePrefix, cwdTag))).Wait(3000);
                 }
-                else if (pct >= 90 && !string.IsNullOrEmpty(slackBotToken))
+                else if (!string.IsNullOrEmpty(slackBotToken))
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 인수인계 준비하세요");
+                    Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Context {sizeMB:F1}MB/{ContextLimitMB}MB — 인수인계 준비하세요");
                     Console.ResetColor();
 
                     var handoff = BuildHandoffPrompt(jsonlPath, _cachedCards, sizeMB, ContextLimitMB);
@@ -206,13 +230,13 @@ internal partial class Program
                             ClaudePromptHelper.AllowFocusSteal = true;
                             try
                             {
-                                var nudge = $"⚠️ 컨텍스트 {pct}% 도달! ({sizeMB:F1}/{ContextLimitMB}MB)\n"
+                                var nudge = $"⚠️ 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!\n"
                                     + "준비되면 아래 명령을 실행:\n\n"
                                     + $"wkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
                                 ctxHelper.TypeAndSubmit(pi, nudge);
                                 Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent");
                                 Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                    $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣에게 인수인계 프롬프트를 전달했습니다.",
+                                    $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n클롣에게 인수인계 프롬프트를 전달했습니다.",
                                     username: BuildSlackBotUsername(SlackClaudePrefix, cwdTag))).Wait(3000);
                             }
                             finally { ClaudePromptHelper.AllowFocusSteal = false; }
@@ -221,7 +245,7 @@ internal partial class Program
                         {
                             Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] No matching prompt — check Slack");
                             Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\nClaude 창을 찾지 못해 인수인계 미전달! 직접 확인해주세요.",
+                                $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\nClaude 창을 찾지 못해 인수인계 미전달! 직접 확인해주세요.",
                                 username: SlackBroadcastUsername)).Wait(3000);
                         }
                     }
@@ -229,7 +253,7 @@ internal partial class Program
                     {
                         Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Handoff failed: {ex.Message}");
                         Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                            $":warning: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n인수인계 전달 오류: {ex.Message}",
+                            $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n인수인계 전달 오류: {ex.Message}",
                             username: SlackBroadcastUsername)).Wait(3000);
                     }
                 }
@@ -655,8 +679,9 @@ internal partial class Program
 
     // ── Window prop string helpers (GlobalAtom-based, survives Eye restart) ──────────
     // Prop names written to the AI app window (VS Code / Codex / Claude Desktop)
-    private const string PropAiOut  = "WKAppBot.AiOut";  // last AI output line
-    private const string PropSlackTs = "WKAppBot.SlTs";  // last Slack status message TS
+    private const string PropAiOut    = "WKAppBot.AiOut";  // last AI output line
+    private const string PropSlackTs  = "WKAppBot.SlTs";  // last Slack status message TS
+    private const string PropStatusType = "WKAppBot.StType"; // last status type (executing/idle/etc.)
 
     /// <summary>Store a short string (≤240 chars) in a window property via GlobalAtom.</summary>
     static void SetWindowStringProp(IntPtr hwnd, string propName, string? value)
@@ -714,17 +739,15 @@ internal partial class Program
             catch { }
         }
 
-        // Check if our message is still the latest in the channel (someone else may have posted since)
-        bool isLatest = false;
-        if (state.SlackStatusTs != null)
-        {
-            try { isLatest = (await GetChannelLatestMessageTs(slackBotToken, slackChannel)) == state.SlackStatusTs; }
-            catch { }
-        }
-
-        bool canEdit = sameType && !hasReplies && isLatest;
+        // Same type + no replies → edit in place regardless of position.
+        // (Removed isLatest requirement: multiple instances would leapfrog each other
+        //  because each "post new" bumps the other off latest, causing infinite re-posting.)
+        bool canEdit = sameType && !hasReplies;
         if (canEdit)
         {
+            // If text unchanged, skip API call entirely (no-op)
+            if (slackText == state.LastSlackStatusText) return;
+
             // Edit in place — no channel reorder spam (executing→executing text update, no user thread)
             var (ok, _) = await SlackUpdateMessageAsync(slackBotToken, slackChannel, state.SlackStatusTs!, slackText);
             if (ok)
@@ -743,7 +766,7 @@ internal partial class Program
                 var oldTs = state.SlackStatusTs;
                 state.SlackStatusTs = null;
                 SetWindowStringProp(hwnd, PropSlackTs, null);
-                await SlackDeleteMessageAsync(slackBotToken, slackChannel, oldTs);
+                await SlackDeleteMessageAsync(slackBotToken, slackChannel, oldTs); // guardThreadStarter=true (default)
             }
             // has replies → leave old message intact, post fresh stream below it
 
@@ -756,6 +779,7 @@ internal partial class Program
                     try { File.WriteAllText(statusTsFile, ts); } catch { }
                 SetWindowStringProp(hwnd, PropSlackTs, ts);
                 SetWindowStringProp(hwnd, PropAiOut, slackText);
+                SetWindowStringProp(hwnd, PropStatusType, statusType);
                 Console.WriteLine($"[EYE] Post [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
             }
             else if (!ok)

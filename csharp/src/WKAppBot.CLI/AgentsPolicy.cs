@@ -146,6 +146,22 @@ Review policy if unsure:
 agent-policy.txt
 """;
 
+    /// <summary>
+    /// Write (or overwrite) the policy file in the workspace without broadcasting to stdout.
+    /// Called by newchat: policy is injected into the prompt instead.
+    /// Resets the 24h TTL so StartPolicyBroadcast won't re-broadcast in the same window.
+    /// </summary>
+    public static void RegeneratePolicyFile()
+    {
+        try
+        {
+            File.WriteAllText(PolicyFilePath, EmbeddedInitialPrompt);
+            // Reset creation time so the 24h TTL countdown restarts from now
+            File.SetCreationTimeUtc(PolicyFilePath, DateTime.UtcNow);
+        }
+        catch { }
+    }
+
     public static void StartPolicyBroadcast()
     {
         DateTime now = DateTime.UtcNow;

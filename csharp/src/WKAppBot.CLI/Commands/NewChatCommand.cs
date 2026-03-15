@@ -62,7 +62,38 @@ internal partial class Program
         {
             Console.WriteLine("Usage: wkappbot newchat \"prompt text\"");
             Console.WriteLine("       wkappbot newchat --file prompt.txt");
+            Console.WriteLine("       wkappbot newchat ... --no-policy   (skip EmbeddedInitialPrompt)");
             return 1;
+        }
+
+        // ── Append EmbeddedInitialPrompt + regenerate policy file ──
+        // Handoff prompt goes first (인수인계 우선), policy appended after.
+        // Strip "Startup Confirmation" section — newchat expects handoff response, not "Policy loaded. Ready."
+        if (!args.Contains("--no-policy"))
+        {
+            var policy = AgentPolicy.EmbeddedInitialPrompt;
+            const string startupSection = "━━ Startup Confirmation ━━";
+            var cutIdx = policy.IndexOf(startupSection, StringComparison.Ordinal);
+            if (cutIdx >= 0)
+                policy = policy[..cutIdx].TrimEnd();
+            policy += """
+
+━━ Session Start (Handoff Mode) ━━
+You are receiving a relay handoff from the previous session.
+
+Begin your response with EXACTLY this line (Korean, no changes):
+"바통을 이어받았습니다. 이전 작업과 운영 규칙을 숙지하고 중단 없이 달려가겠습니다. 🔄"
+
+Then immediately:
+1. Read CLAUDE.md + memory/MEMORY.md
+2. Send Slack: wkappbot slack send "바통 인수 완료! 이전 작업 이어갑니다 🔄"
+3. Summarize what you understand is pending (Korean, bullet points)
+4. Continue work without waiting for confirmation
+""";
+
+            text = text + "\n\n---\n" + policy;
+            AgentPolicy.RegeneratePolicyFile();
+            Console.WriteLine($"[NEWCHAT] Policy injected ({policy.Length} chars) + file regenerated");
         }
 
         Console.WriteLine($"[NEWCHAT] Prompt: {(text.Length > 80 ? text[..77] + "..." : text)} ({text.Length} chars)");
@@ -247,49 +278,110 @@ internal partial class Program
     // ═══════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Find VS Code window suitable for new chat.
-    /// Priority: window with current CWD folder in title, then any VS Code.
+    /// Find VS Code window for new chat.
+    /// Priority 1: ancestor VS Code process (wkappbot was spawned from its terminal → exact match).
+    /// Priority 2: CWD folder match in title — only if exactly ONE window matches (ambiguous = error).
+    /// Never falls back to "any VS Code" — wrong window is worse than no window.
     /// </summary>
     static IntPtr FindVSCodeWindowForNewChat()
     {
-        var cwd = Environment.CurrentDirectory;
-        var cwdFolder = Path.GetFileName(cwd) ?? "";
-        var candidates = new List<(IntPtr hWnd, string title, bool cwdMatch)>();
-
+        // ── Collect all VS Code main windows ──
+        var candidates = new List<(IntPtr hWnd, uint pid, string title)>();
         NativeMethods.EnumWindows((hWnd, _) =>
         {
             if (!NativeMethods.IsWindowVisible(hWnd)) return true;
-            var cls = WindowFinder.GetClassName(hWnd);
-            if (cls != "Chrome_WidgetWin_1") return true;
+            if (WindowFinder.GetClassName(hWnd) != "Chrome_WidgetWin_1") return true;
             NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
             string procName = "?";
             try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
             if (!procName.Equals("Code", StringComparison.OrdinalIgnoreCase)) return true;
-
             var title = WindowFinder.GetWindowText(hWnd);
             if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)) return true;
-
-            bool cwdMatch = !string.IsNullOrEmpty(cwdFolder) &&
-                title.Contains(cwdFolder, StringComparison.OrdinalIgnoreCase);
-            candidates.Add((hWnd, title, cwdMatch));
+            candidates.Add((hWnd, pid, title));
             return true;
         }, IntPtr.Zero);
 
-        // Prefer CWD match
-        var match = candidates.FirstOrDefault(c => c.cwdMatch);
-        if (match.hWnd != IntPtr.Zero)
+        if (candidates.Count == 0) return IntPtr.Zero;
+
+        // ── Priority 1: ancestor VS Code PID ──
+        // Walk parent process chain: wkappbot → shell → ... → Code.exe
+        var ancestorCodePids = new HashSet<uint>();
+        try
         {
-            Console.WriteLine($"[NEWCHAT] CWD match: \"{match.title}\"");
-            return match.hWnd;
+            int checkPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+            for (int depth = 0; depth < 10 && checkPid > 0; depth++)
+            {
+                int parentPid = 0;
+                string parentName = "";
+                try
+                {
+                    using var searcher = new System.Management.ManagementObjectSearcher(
+                        $"SELECT ParentProcessId, Name FROM Win32_Process WHERE ProcessId={checkPid}");
+                    foreach (System.Management.ManagementObject mo in searcher.Get())
+                    {
+                        parentPid = Convert.ToInt32(mo["ParentProcessId"]);
+                        parentName = mo["Name"]?.ToString() ?? "";
+                        break;
+                    }
+                }
+                catch { break; }
+                if (parentPid == 0) break;
+                if (parentName.Equals("Code.exe", StringComparison.OrdinalIgnoreCase))
+                    ancestorCodePids.Add((uint)parentPid);
+                checkPid = parentPid;
+            }
+        }
+        catch { }
+
+        if (ancestorCodePids.Count > 0)
+        {
+            var ancestorMatch = candidates.Where(c => ancestorCodePids.Contains(c.pid)).ToList();
+            if (ancestorMatch.Count == 1)
+            {
+                Console.WriteLine($"[NEWCHAT] Ancestor match (PID={ancestorMatch[0].pid}): \"{ancestorMatch[0].title}\"");
+                return ancestorMatch[0].hWnd;
+            }
+            if (ancestorMatch.Count > 1)
+            {
+                // Multiple windows for same Code process (split editors) — use CWD to disambiguate
+                Console.WriteLine($"[NEWCHAT] {ancestorMatch.Count} ancestor windows — disambiguating by CWD...");
+                candidates = ancestorMatch; // narrow scope for CWD check below
+            }
         }
 
-        // Any VS Code
-        if (candidates.Count > 0)
+        // ── Priority 2: CWD folder match — exact one match required ──
+        var cwd = Environment.CurrentDirectory;
+        var cwdFolder = Path.GetFileName(cwd.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        if (!string.IsNullOrEmpty(cwdFolder))
         {
-            Console.WriteLine($"[NEWCHAT] No CWD match, using: \"{candidates[0].title}\"");
-            return candidates[0].hWnd;
+            // Match " - {folder} - " pattern (VS Code title format) — avoids partial substring hits
+            var cwdPattern = $" - {cwdFolder} - ";
+            var cwdMatches = candidates
+                .Where(c => c.title.Contains(cwdPattern, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (cwdMatches.Count == 1)
+            {
+                Console.WriteLine($"[NEWCHAT] CWD match \"{cwdFolder}\": \"{cwdMatches[0].title}\"");
+                return cwdMatches[0].hWnd;
+            }
+            if (cwdMatches.Count > 1)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[NEWCHAT] ERROR: {cwdMatches.Count} VS Code windows match CWD \"{cwdFolder}\" — ambiguous, aborting.");
+                Console.WriteLine("  Use a more specific title or close duplicate windows.");
+                foreach (var m in cwdMatches) Console.WriteLine($"    hwnd=0x{m.hWnd:X} \"{m.title}\"");
+                Console.ResetColor();
+                return IntPtr.Zero;
+            }
         }
 
+        // ── No match → error (never guess) ──
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"[NEWCHAT] ERROR: No VS Code window matches CWD \"{cwdFolder}\" (ancestor PID lookup also failed).");
+        Console.WriteLine("  Available VS Code windows:");
+        foreach (var c in candidates) Console.WriteLine($"    hwnd=0x{c.hWnd:X} pid={c.pid} \"{c.title}\"");
+        Console.ResetColor();
         return IntPtr.Zero;
     }
 }

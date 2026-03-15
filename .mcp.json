@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "wkappbot": {
+      "type": "stdio",
+      "command": "W:\\SDK\\bin\\wkappbot.exe",
+      "args": ["mcp"]
+    }
+  }
+}

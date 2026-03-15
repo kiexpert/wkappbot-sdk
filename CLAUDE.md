@@ -1,4 +1,4 @@
-# WKAppBot v4.0.0 - Windows + Android App Automation Test Framework
+# WKAppBot v4.1.0 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 

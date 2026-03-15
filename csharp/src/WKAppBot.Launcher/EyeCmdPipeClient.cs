@@ -1,4 +1,5 @@
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -29,8 +30,12 @@ internal static class EyeCmdPipeClient
             var w = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
             var r = new StreamReader(pipe, leaveOpen: true);
 
-            // Prepend CWD so Eye can build session-scoped tab keys per caller
-            var payload = new[] { $"__cwd:{Environment.CurrentDirectory}" }.Concat(args).ToArray();
+            // Prepend CWD + foreground HWND hint so Eye can resolve caller window directly
+            var fgHwnd = GetForegroundWindow();
+            var hwndPrefix = fgHwnd != IntPtr.Zero ? $"__hwnd:0x{fgHwnd.ToInt64():X8}" : null;
+            var prefixes = new[] { $"__cwd:{Environment.CurrentDirectory}" }
+                .Concat(hwndPrefix != null ? new[] { hwndPrefix } : Array.Empty<string>());
+            var payload = prefixes.Concat(args).ToArray();
             w.WriteLine(JsonSerializer.Serialize(payload, LauncherJsonContext.Default.StringArray));
 
             string? line;
@@ -52,4 +57,6 @@ internal static class EyeCmdPipeClient
             return false; // Eye not running or busy -> caller falls through
         }
     }
+
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
 }

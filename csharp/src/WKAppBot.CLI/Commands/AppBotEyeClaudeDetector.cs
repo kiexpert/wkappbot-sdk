@@ -470,8 +470,9 @@ internal partial class Program
                 cf.ByControlType(ControlType.Button).And(cf.ByName("중단")));
             if (stopButton != null)
             {
-                // Get latest status text from StatusBar
-                var statusText = GetLatestStatusBarText(window, cf);
+                // Live response text → StatusBar fallback → generic "실행 중"
+                var liveText = GetLiveResponseText(window, cf);
+                var statusText = liveText ?? GetLatestStatusBarText(window, cf);
                 return Tuple.Create("executing", statusText ?? "실행 중");
             }
 
@@ -623,7 +624,8 @@ internal partial class Program
                             {
                                 return Tuple.Create("permission_prompt", "권한 요청 대기 (실행 중)");
                             }
-                            var statusText = GetLatestStatusBarText(window, cf);
+                            var liveText = GetLiveResponseText(window, cf);
+                            var statusText = liveText ?? GetLatestStatusBarText(window, cf);
                             return Tuple.Create("executing", statusText ?? "실행 중");
                         }
 
@@ -715,6 +717,55 @@ internal partial class Program
             }
 
             return latestText;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Read the live response text from an AI conversation window (Claude Desktop / VS Code / Codex).
+    /// Returns the last non-empty line of the bottommost text above the turn-form (= current response tail).
+    /// This changes in real-time as AI generates — used for streaming to Slack.
+    /// </summary>
+    private static string? GetLiveResponseText(
+        FlaUI.Core.AutomationElements.AutomationElement window, ConditionFactory cf)
+    {
+        try
+        {
+            var turnForm = window.FindFirstDescendant(cf.ByAutomationId("turn-form"));
+            if (turnForm == null) return null;
+            var tfRect = turnForm.BoundingRectangle;
+            if (tfRect.Height < 10) return null;
+
+            // Walk up to the scroll container, then search immediate children above turn-form
+            var parent = turnForm.Parent;
+            if (parent == null) return null;
+            var children = parent.FindAllChildren();
+            if (children == null || children.Length == 0) return null;
+
+            string? lastText = null;
+            float bestY = float.MinValue;
+            foreach (var child in children)
+            {
+                try
+                {
+                    var r = child.BoundingRectangle;
+                    if (r.Bottom > tfRect.Top + 10) continue; // skip turn-form and below
+                    if (r.Y <= bestY) continue;
+                    var name = child.Name;
+                    if (string.IsNullOrWhiteSpace(name) || name.Length < 4) continue;
+                    bestY = r.Y;
+                    lastText = name;
+                }
+                catch { }
+            }
+
+            if (lastText == null) return null;
+
+            // Extract the last non-empty line — "방송" view should show the most recent output tail
+            var lines = lastText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var lastLine = lines.LastOrDefault(l => l.Length >= 4) ?? lastText.Trim();
+            if (string.IsNullOrWhiteSpace(lastLine)) return null;
+            return lastLine.Length > 120 ? lastLine[..120] + "…" : lastLine;
         }
         catch { return null; }
     }
