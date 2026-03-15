@@ -92,6 +92,8 @@ internal partial class Program
     static FileSystemWatcher? _fswPrompt;
     static FileSystemWatcher? _fswExe;
     static FileSystemWatcher? _fswExeNew; // hot-swap: .new.exe staged file
+    static FileSystemWatcher? _fswMcp;
+    static readonly HashSet<string> _mcpTabsOpened = new(StringComparer.OrdinalIgnoreCase);
 
     // ── Memory tracking ──
     static long _prevWorkingSetMB;
@@ -186,6 +188,11 @@ internal partial class Program
 
         // Acquire named mutex — signals to other processes that GlobalMode Eye is running
         _eyeRunMutex = new System.Threading.Mutex(true, @"Global\WKAppBotEyeGlobal", out _);
+
+        // Tee Eye console output to temp log file → Eye FSW가 apbot-mcp WT 탭으로 표시
+        // 파일 기반이므로 WT 탭 닫아도 Eye 동작에 무영향 (브로큰파이프 없음)
+        var eyeLogFile = Path.Combine(Path.GetTempPath(), $"wkappbot-eye-{Environment.ProcessId}.log");
+        Console.SetOut(new TeeTextWriter(Console.Out, eyeLogFile, moveToOldOnDispose: false));
 
         // Thread-local console routing: command threads → pipe StringWriter, Eye threads → real console
         Console.SetOut(new ThreadRoutingWriter(Console.Out));
@@ -456,6 +463,8 @@ internal partial class Program
 
         // ── FSW hybrid: event-driven file change detection ──
         InitFileWatchers();
+        // Eye 자체 콘솔 탭 오픈 (apbot-mcp 창 최초 생성 + 위치 고정)
+        EyeOpenConsoleWtTab(eyeLogFile);
 
         // ── Whisper Spectrum Ring (always-on mic → radial HUD overlay) ──
         var eyeStartTime = DateTime.UtcNow; // gate: auto-study allowed only after 10 min
@@ -1166,6 +1175,94 @@ internal partial class Program
         {
             Console.WriteLine($"[EYE][FSW] Hot-swap watcher init failed: {ex.Message}");
         }
+
+        // ── 4. 앱봇관리 log file watcher (temp dir) ──
+        // Eye/MCP가 wkappbot-*.log 생성 → Eye가 감지해서 apbot-mcp WT 탭 자동 오픈
+        try
+        {
+            var tempDir = Path.GetTempPath();
+            // Eye 재시작 시 기존 로그 파일 처리:
+            // - PID 살아있는 것 → 탭 오픈
+            // - 죽은 세션 로그 → 삭제 (탭 폭발 방지)
+            foreach (var f in Directory.GetFiles(tempDir, "wkappbot-*.log"))
+            {
+                var stem  = Path.GetFileNameWithoutExtension(f);
+                var parts = stem.Split('-');
+                // wkappbot-eye-{pid} or wkappbot-mcp-{pid} → 마지막 파트가 숫자이면 PID
+                if (int.TryParse(parts[^1], out var logPid))
+                {
+                    bool alive = false;
+                    try { using var p = Process.GetProcessById(logPid); alive = !p.HasExited; } catch { }
+                    if (!alive) { try { File.Delete(f); } catch { } continue; }
+                }
+                EyeOpenConsoleWtTab(f);
+            }
+
+            _fswMcp = new FileSystemWatcher(tempDir)
+            {
+                Filter                = "wkappbot-*.log",
+                IncludeSubdirectories = false,
+                NotifyFilter          = NotifyFilters.FileName | NotifyFilters.CreationTime,
+                EnableRaisingEvents   = true
+            };
+            _fswMcp.Created += (_, e) =>
+            {
+                if (e.FullPath != null)
+                    Task.Run(() => EyeOpenConsoleWtTab(e.FullPath));
+            };
+            Console.WriteLine($"[EYE][FSW] Console watcher: {tempDir}wkappbot-*.log");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE][FSW] Console watcher init failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 앱봇관리 로그 파일 생성 감지 시 apbot-mcp WT 탭 오픈.
+    /// 파일명 규칙:
+    ///   wkappbot-eye-{pid}.log              → [앱봇관리] Eye
+    ///   wkappbot-mcp-{session}.log          → [앱봇관리] MCP
+    ///   wkappbot-mcp-tool-{name}-{id}.log   → [앱봇관리] {name} #{id}
+    /// </summary>
+    static void EyeOpenConsoleWtTab(string logFilePath)
+    {
+        try
+        {
+            var fileName = Path.GetFileNameWithoutExtension(logFilePath);
+            lock (_mcpTabsOpened)
+            {
+                if (!_mcpTabsOpened.Add(fileName)) return; // 이미 탭 열었음
+            }
+
+            string wtTitle;
+            if (fileName.StartsWith("wkappbot-eye-", StringComparison.Ordinal))
+                wtTitle = "앱봇아이";
+            else
+            {
+                // wkappbot-mcp-{sessionPid}.log → 대화명 조회
+                var sessionPart = fileName["wkappbot-mcp-".Length..];
+                wtTitle = int.TryParse(sessionPart, out var sessionPid)
+                    ? ResolveDisplayNameByPid(sessionPid)
+                    : "MCP";
+            }
+
+            var logEsc = logFilePath.Replace("'", "''");
+            var psCmd  = $"Get-Content -Wait -Path '{logEsc}'";
+            var wtProc = Process.Start(new ProcessStartInfo
+            {
+                FileName        = "wt.exe",
+                Arguments       = $"-w {McpWtWindowName} new-tab --title \"{wtTitle}\" -- powershell -NoProfile -NonInteractive -NoExit -Command \"{psCmd}\"",
+                UseShellExecute = true,
+            });
+            // 첫 탭 or apbot-mcp 창 없을 때만 위치 고정
+            ScheduleWtWindowPosition(900, wtProc?.Id ?? 0);
+            Console.WriteLine($"[EYE][CONSOLE] WT 탭 오픈: {wtTitle}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE][CONSOLE] WT 탭 오픈 실패: {ex.Message}");
+        }
     }
 
     static void TryDeleteOldExes()
@@ -1191,10 +1288,11 @@ internal partial class Program
 
     static void DisposeFileWatchers()
     {
-        try { if (_fswTick != null) { _fswTick.EnableRaisingEvents = false; _fswTick.Dispose(); _fswTick = null; } } catch { }
+        try { if (_fswTick != null)   { _fswTick.EnableRaisingEvents   = false; _fswTick.Dispose();   _fswTick   = null; } } catch { }
         try { if (_fswPrompt != null) { _fswPrompt.EnableRaisingEvents = false; _fswPrompt.Dispose(); _fswPrompt = null; } } catch { }
-        try { if (_fswExe != null) { _fswExe.EnableRaisingEvents = false; _fswExe.Dispose(); _fswExe = null; } } catch { }
+        try { if (_fswExe != null)    { _fswExe.EnableRaisingEvents    = false; _fswExe.Dispose();    _fswExe    = null; } } catch { }
         try { if (_fswExeNew != null) { _fswExeNew.EnableRaisingEvents = false; _fswExeNew.Dispose(); _fswExeNew = null; } } catch { }
+        try { if (_fswMcp != null)    { _fswMcp.EnableRaisingEvents    = false; _fswMcp.Dispose();    _fswMcp    = null; } } catch { }
         Console.WriteLine("[EYE][FSW] Watchers disposed");
     }
 
