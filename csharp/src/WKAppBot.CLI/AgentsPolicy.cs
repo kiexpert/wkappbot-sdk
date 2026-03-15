@@ -11,7 +11,7 @@ using System.Threading;
 
 static class AgentPolicy
 {
-    public const string PolicyVersion = "2026.03.14";
+    public const string PolicyVersion = "2026.03.15";
     public const int ReminderMinutes = 10;
 
     static readonly string WorkspacePath = ResolveWorkspace();
@@ -38,6 +38,13 @@ WKAppBot exposes itself as an MCP server. To install:
   Example: { "argv": ["a11y","invoke","*Notepad*#*OK*"] }
   Note: Use "wkappbot_cli" as the MCP tool name only in JSON-RPC calls.
         In CLI, always use the command directly: wkappbot a11y ...
+
+━━ APSP v1 — Progress Notifications ━━
+Tool calls stream notifications/progress with extended fields:
+  status: "running"|"wait_input"|"wait_lock"|"wait_ipc"|"sleeping"
+  data: "N> output" (N = line number), elapsed, mem_mb, cpu_pct, threads, handles
+⚠ status="wait_input" = tool blocked on stdin. Kill or send ONE specific input — never loop.
+⚠ parallel=true = non-blocking call, each has its own N> counter from 1.
 
 ━━ Primary Objective ━━
 Execute tasks efficiently while minimizing token usage.
@@ -113,7 +120,6 @@ WEB TOOLS:
 AI DELEGATION:
   wkappbot ask gpt|gemini|claude "<question>" [file.png]
   wkappbot ask triad "<question>"                       — parallel GPT+Gemini+Claude
-  wkappbot agent gemini|gpt|claude "<task>"             — autonomous sub-agent loop
 
 SLACK:
   wkappbot slack send "<msg>" [file.png]
