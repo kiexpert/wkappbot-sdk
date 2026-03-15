@@ -373,12 +373,39 @@ internal partial class Program
         }
 
         // 프롬프트 윈도우 타이틀에서 매칭
+        // VS Code 타이틀: "chatTitle - FolderName - Visual Studio Code"
+        // chatTitle에 다른 프로젝트명이 포함될 수 있으므로 FolderName 부분만 비교해야 함.
+        // 예: "이전 세션 인수인계 — WKAppBot v4… - lucy_securepad - Visual Studio Code"
+        //   → chatTitle "WKAppBot" 때문에 전체 Contains → SecurePad 창도 오매칭!
+        //   → FolderName 추출 "lucy_securepad" → "WKAppBot" 불매칭 → 수정됨
         var matched = new List<ClaudePromptHelper.PromptInfo>();
         foreach (var p in allPrompts)
         {
+            // VS Code: 타이틀에서 프로젝트 폴더명만 추출해 비교
+            string titleToSearch;
+            if (p.HostType == "vscode-claudecode")
+            {
+                var vscIdx = p.WindowTitle.IndexOf(" - Visual Studio Code", StringComparison.OrdinalIgnoreCase);
+                if (vscIdx > 0)
+                {
+                    var withoutSuffix = p.WindowTitle[..vscIdx];
+                    var lastDash = withoutSuffix.LastIndexOf(" - ", StringComparison.Ordinal);
+                    titleToSearch = lastDash >= 0 ? withoutSuffix[(lastDash + 3)..].Trim() : withoutSuffix.Trim();
+                }
+                else
+                {
+                    titleToSearch = p.WindowTitle;
+                }
+            }
+            else
+            {
+                titleToSearch = p.WindowTitle;
+            }
+
+            Console.WriteLine($"[EYE][SLACK] title-match: 0x{p.WindowHandle:X} host={p.HostType} folder=\"{titleToSearch}\" cwds=[{string.Join(", ", cwdNames)}]");
             foreach (var cwd in cwdNames)
             {
-                if (p.WindowTitle.Contains(cwd, StringComparison.OrdinalIgnoreCase))
+                if (titleToSearch.Contains(cwd, StringComparison.OrdinalIgnoreCase))
                 {
                     matched.Add(p);
                     break;

@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace WKAppBot.CLI;
 
@@ -28,7 +29,17 @@ internal partial class Program
 
         // Redirect Console.Out to stderr so stdout is pure JSON-RPC
         var jsonOut = Console.OpenStandardOutput();
-        Console.SetOut(new StreamWriter(Console.OpenStandardError(), Encoding.UTF8) { AutoFlush = true });
+
+        // ── 앱봇관리 콘솔 호스트 설정 ──
+        // stderr → TeeTextWriter(stderr, mainLogFile) → WT 탭 (no-focus)
+        // Console.Out → ThreadRoutingWriter(Console.Error)
+        //   → 도구별 탭: HandleToolsCallAsync 내에서 Route(toolTee) 로 분기
+        TrySetupMcpConsoleHost(args);
+
+        // Console.Out → ThreadRoutingWriter(stderr) so all logging goes through stderr
+        // Tool invocations will use ThreadRoutingWriter.Route() for per-tab output
+        Console.SetOut(new ThreadRoutingWriter(Console.Error));
+
         Console.Error.WriteLine($"[MCP] Server starting... (launcher={McpLauncherMode})");
 
         var writer = new StreamWriter(jsonOut, new UTF8Encoding(false)) { AutoFlush = true };
@@ -592,15 +603,12 @@ internal partial class Program
                 if (queued)
                     emitProgress($"[start] gate acquired after {waitSince.ElapsedMilliseconds}ms");
 
+                // 툴 출력 → MCP 세션 탭에 믹스 (별도 탭 없음)
                 var result = RunToolCore(@params, emitProgress) ?? new JsonObject
                 {
                     ["content"] = new JsonArray
                     {
-                        new JsonObject
-                        {
-                            ["type"] = "text",
-                            ["text"] = "Error: empty MCP result"
-                        }
+                        new JsonObject { ["type"] = "text", ["text"] = "Error: empty MCP result" }
                     },
                     ["isError"] = true
                 };
@@ -949,4 +957,190 @@ internal partial class Program
             try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
         }
     }
+
+    // ────────────────────────────────────────────────────────────────
+    // MCP 앱봇관리 콘솔 호스트
+    // ────────────────────────────────────────────────────────────────
+
+    // 콘솔 호스트 고정 위치: 맨오른쪽 모니터 우측경계 - 1610, 모니터 상측 + 10, 800x600
+    const int McpWtOffsetFromRight = 1610;
+    const int McpWtOffsetFromTop   = 10;
+    const int McpWtWidth           = 800;
+    const int McpWtHeight          = 600;
+
+    // ── P/Invoke: 모니터 위치 + WT 창 찾기 ──────────────────────────
+    [DllImport("ntdll.dll")]
+    static extern int NtQueryInformationProcess(
+        IntPtr hProcess, int processInfoClass,
+        ref McpProcessBasicInfo pbi, int size, out int returnLen);
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct McpProcessBasicInfo
+    {
+        IntPtr ExitStatus, PebBase, AffinityMask, BasePriority, UniqueProcessId;
+        public IntPtr InheritedFromUniqueProcessId;
+    }
+
+    [DllImport("user32.dll")]
+    static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip,
+        McpMonitorEnumProc lpfnEnum, IntPtr dwData);
+    delegate bool McpMonitorEnumProc(IntPtr hMon, IntPtr hdcMon, ref McpRect lprcMon, IntPtr dwData);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern bool GetMonitorInfoW(IntPtr hMon, ref McpMonitorInfo lpmi);
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct McpRect { public int left, top, right, bottom; }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct McpMonitorInfo
+    {
+        public uint  cbSize;
+        public McpRect rcMonitor;
+        public McpRect rcWork;
+        public uint  dwFlags;
+    }
+
+    [DllImport("user32.dll")]
+    static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int x, int y, int cx, int cy, uint uFlags);
+    const uint SWP_NOACTIVATE = 0x0010;
+    const uint SWP_NOZORDER   = 0x0004;
+
+    // WT 메인 창 클래스 (GetClassNameW는 AppBotEyeCommands.cs에 이미 선언됨)
+    const string WtWindowClass    = "CASCADIA_HOSTING_WINDOW_CLASS";
+    // MCP 전용 WT 창 이름 (Eye 창과 완전 분리)
+    const string McpWtWindowName  = "apbot-mcp";
+
+    static int McpGetParentProcessId()
+    {
+        try
+        {
+            var pbi = new McpProcessBasicInfo();
+            var status = NtQueryInformationProcess(
+                Process.GetCurrentProcess().Handle, 0,
+                ref pbi, Marshal.SizeOf<McpProcessBasicInfo>(), out _);
+            return status == 0 ? (int)pbi.InheritedFromUniqueProcessId : -1;
+        }
+        catch { return -1; }
+    }
+
+    // EnumDisplayMonitors callback — delegate with ref parameter can't be a lambda
+    static McpRect? _monitorEnumBest;
+    static bool MonitorEnumCallback(IntPtr hMon, IntPtr hdcMon, ref McpRect lprc, IntPtr dwData)
+    {
+        var mi = new McpMonitorInfo { cbSize = (uint)Marshal.SizeOf<McpMonitorInfo>() };
+        if (GetMonitorInfoW(hMon, ref mi))
+        {
+            if (_monitorEnumBest == null || mi.rcMonitor.right > _monitorEnumBest.Value.right)
+                _monitorEnumBest = mi.rcMonitor;
+        }
+        return true;
+    }
+
+    /// <summary>맨오른쪽 모니터의 rcMonitor 반환. 없으면 null.</summary>
+    static McpRect? GetRightmostMonitorRect()
+    {
+        _monitorEnumBest = null;
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, MonitorEnumCallback, IntPtr.Zero);
+        return _monitorEnumBest;
+    }
+
+    /// <summary>콘솔 호스트 고정 위치 (X,Y) 계산.</summary>
+    static (int x, int y) GetMcpWtTargetPos()
+    {
+        var mon = GetRightmostMonitorRect();
+        if (mon == null) return (0, 0);
+        return (mon.Value.right - McpWtOffsetFromRight, mon.Value.top + McpWtOffsetFromTop);
+    }
+
+    /// <summary>
+    /// WT 창 찾기 (CASCADIA_HOSTING_WINDOW_CLASS) → SetWindowPos(SWP_NOACTIVATE).
+    /// 딜레이 후 비동기 실행 — 창이 뜨기 전에 호출하면 실패하므로.
+    /// wtPid > 0 이면 해당 프로세스 소유 창만 이동 (Eye WT 창 오이동 방지).
+    /// </summary>
+    static void ScheduleWtWindowPosition(int delayMs = 900, int wtPid = 0)
+    {
+        var (targetX, targetY) = GetMcpWtTargetPos();
+        _ = Task.Delay(delayMs).ContinueWith(_ =>
+        {
+            try
+            {
+                var sb   = new System.Text.StringBuilder(256);
+                IntPtr found = IntPtr.Zero;
+
+                // Pass 1: PID 기반 (새로 생성된 WT 창 정확히 매칭)
+                if (wtPid > 0)
+                {
+                    WKAppBot.Win32.Native.NativeMethods.EnumWindows((hWnd, _) =>
+                    {
+                        sb.Clear(); GetClassNameW(hWnd, sb, 256);
+                        if (sb.ToString() == WtWindowClass)
+                        {
+                            GetWindowThreadProcessId(hWnd, out int wPid);
+                            if (wPid == wtPid) { found = hWnd; return false; }
+                        }
+                        return true;
+                    }, IntPtr.Zero);
+                }
+
+                // Pass 2: fallback — wt.exe가 기존 창에 탭 추가 후 즉시 종료 시 PID 없음
+                // → 임의의 WT 창 중 apbot-mcp 창(이미 존재)에 위치 적용
+                if (found == IntPtr.Zero)
+                {
+                    WKAppBot.Win32.Native.NativeMethods.EnumWindows((hWnd, _) =>
+                    {
+                        sb.Clear(); GetClassNameW(hWnd, sb, 256);
+                        if (sb.ToString() == WtWindowClass) { found = hWnd; return false; }
+                        return true;
+                    }, IntPtr.Zero);
+                }
+
+                if (found != IntPtr.Zero)
+                    SetWindowPos(found, IntPtr.Zero, targetX, targetY, McpWtWidth, McpWtHeight,
+                        SWP_NOACTIVATE | SWP_NOZORDER);
+            }
+            catch { }
+        });
+    }
+
+    /// <summary>
+    /// MCP 시작 시 앱봇관리 콘솔 탭 설정.
+    /// - stderr → TeeTextWriter → log 파일 (FileShare.ReadWrite)
+    /// - WT 탭으로 열기 (hot-swap 시 lock file로 중복 방지)
+    /// - 열린 후 고정 위치로 이동 (맨오른쪽 모니터 기준)
+    /// - --no-wt 플래그로 비활성화 가능
+    /// </summary>
+    static void TrySetupMcpConsoleHost(string[] args)
+    {
+        if (args.Contains("--no-wt")) return;
+        try
+        {
+            var parentPid = McpGetParentProcessId();
+            var sessionKey = parentPid > 0 ? parentPid.ToString() : Environment.ProcessId.ToString();
+            var tmpDir   = Path.GetTempPath();
+            var lockFile = Path.Combine(tmpDir, $"wkappbot-mcp-wt-{sessionKey}.lock");
+            var logFile  = Path.Combine(tmpDir, $"wkappbot-mcp-{sessionKey}.log");
+
+            // Tee Console.Error → real stderr + log file (항상, hot-swap 포함)
+            var tee = new TeeTextWriter(Console.Error, logFile, moveToOldOnDispose: false);
+            Console.SetError(tee);
+
+            if (!File.Exists(lockFile))
+            {
+                File.WriteAllText(lockFile, sessionKey);
+                // Eye FSW가 logFile 생성을 감지해서 WT 탭 자동 오픈
+                Console.Error.WriteLine($"[MCP] 콘솔 로그 시작 → {logFile} (Eye가 WT 탭 오픈)");
+            }
+            else
+            {
+                Console.Error.WriteLine($"[MCP] hot-swap — 기존 콘솔 탭 재사용 (session={sessionKey})");
+            }
+        }
+        catch (Exception ex)
+        {
+            try { Console.Error.WriteLine($"[MCP] 콘솔 호스트 설정 실패: {ex.Message}"); } catch { }
+        }
+    }
+
 }
