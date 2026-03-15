@@ -165,7 +165,7 @@ Options:
         catch { return null; }
     }
 
-    static CdpClient ConnectCdp(int port, bool withBar = true, bool verifyWebBot = false, bool ensureWindow = true)
+    static CdpClient ConnectCdp(int port, bool withBar = true, bool verifyWebBot = false, bool ensureWindow = true, string? navigateUrl = null)
     {
         var cdp = new CdpClient();
         cdp.ConnectAsync(port).GetAwaiter().GetResult();
@@ -174,13 +174,18 @@ Options:
 
         // Ensure we're connected to this session's tab in the correctly-positioned window.
         // Uses URL fragment (#wkbot-{hash}) to identify "my" tab across CLI invocations.
+        // navigateUrl: passed to EnsureCorrectWindowAsync to force dedicated tab creation
+        //   instead of falling back to "reusing current tab" (which might be an AI chat tab).
         if (ensureWindow)
         {
             try
             {
                 var sessionTag = GetSessionTag();
                 var targetName = $"web-{sessionTag ?? "default"}";
-                var targetId = cdp.EnsureCorrectWindowAsync(port, targetName).GetAwaiter().GetResult();
+                // Pass navigateUrl (or "about:blank" as sentinel) so the library creates a
+                // dedicated web tab rather than reusing the active AI chat tab.
+                var ensureNav = navigateUrl ?? "about:blank";
+                var targetId = cdp.EnsureCorrectWindowAsync(port, targetName, ensureNav).GetAwaiter().GetResult();
                 if (targetId != null && targetId != cdp.TargetId)
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;

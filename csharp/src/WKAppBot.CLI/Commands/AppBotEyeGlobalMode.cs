@@ -1236,25 +1236,52 @@ internal partial class Program
             }
 
             string wtTitle;
+            int watchPid = 0;
             if (fileName.StartsWith("wkappbot-eye-", StringComparison.Ordinal))
                 wtTitle = "앱봇아이";
             else
             {
                 // wkappbot-mcp-{sessionPid}.log → 대화명 조회
                 var sessionPart = fileName["wkappbot-mcp-".Length..];
-                wtTitle = int.TryParse(sessionPart, out var sessionPid)
-                    ? ResolveDisplayNameByPid(sessionPid)
-                    : "MCP";
+                if (int.TryParse(sessionPart, out var sessionPid))
+                {
+                    wtTitle   = ResolveDisplayNameByPid(sessionPid);
+                    watchPid  = sessionPid;
+                }
+                else wtTitle = "MCP";
+            }
+
+            // 프로세스 종료 감시 — 킬당해도 로그에 찍힘
+            if (watchPid > 0)
+            {
+                var logPath = logFilePath;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var p = Process.GetProcessById(watchPid);
+                        await p.WaitForExitAsync();
+                        var msg = p.ExitCode == 0
+                            ? "[MCP] Server stopped (stdin EOF)"
+                            : $"[MCP] 강제 종료됨 (exit={p.ExitCode}) ㅋ";
+                        await File.AppendAllTextAsync(logPath, msg + "\n");
+                    }
+                    catch { }
+                });
             }
 
             var logEsc = logFilePath.Replace("'", "''");
             var psCmd  = $"Get-Content -Wait -Path '{logEsc}'";
+            // 포커스 탈취 방지: 탭 열기 전 현재 포커스 저장 → 즉시 복원
+            var prevFocus = NativeMethods.GetForegroundWindow();
             var wtProc = Process.Start(new ProcessStartInfo
             {
                 FileName        = "wt.exe",
                 Arguments       = $"-w {McpWtWindowName} new-tab --title \"{wtTitle}\" -- powershell -NoProfile -NonInteractive -NoExit -Command \"{psCmd}\"",
                 UseShellExecute = true,
             });
+            if (prevFocus != IntPtr.Zero)
+                _ = Task.Delay(300).ContinueWith(_ => NativeMethods.SetForegroundWindowRaw(prevFocus));
             // 첫 탭 or apbot-mcp 창 없을 때만 위치 고정
             ScheduleWtWindowPosition(900, wtProc?.Id ?? 0);
             Console.WriteLine($"[EYE][CONSOLE] WT 탭 오픈: {wtTitle}");

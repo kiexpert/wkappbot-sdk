@@ -4,8 +4,10 @@ namespace WKAppBot.CLI;
 // Wraps ask --loop with agent-optimized defaults and a separate tab namespace.
 //
 // Tab namespace: {ai}-agent-{sessionHash}  (separate from ask: {ai}-{sessionHash})
-// Defaults (triad-agreed): timeout=90s, max-steps=20, retry=2, parallel=3, loop=on
-// Extra options: --agent-id <name>  --fresh  --verify-delay <ms>
+// Defaults (triad-agreed): timeout=90s, max-steps=20, retry=2, parallel=4, loop=on
+// Extra options: --agent-id <name>  --fresh  --triad  --slack  --verify-delay <ms>
+//
+// ⚠ Do NOT call 'wkappbot agent' from inside an agent loop — infinite recursion!
 
 internal partial class Program
 {
@@ -148,6 +150,11 @@ internal partial class Program
         if (ai is "triad" or "all")
         {
             Console.WriteLine("[AGENT] Triad mode — launching Gemini + GPT + Claude agents in parallel...");
+
+            // Pre-open a shared Slack thread so all 3 AI answers land in one thread
+            if (slackReport)
+                EnsureSlackThread("Triad", question);
+
             var tasks = new[]
             {
                 Task.Run(() => AskGemini(question, slackReport, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gemini-agent-{tabSuffix}", linePrefix: "[gemini] ")),
@@ -171,39 +178,56 @@ internal partial class Program
     static int AgentUsage()
     {
         Console.WriteLine(@"
-wkappbot agent — autonomous sub-agent execution (ask --loop with agent-optimized defaults)
+wkappbot agent — autonomous sub-agent (multi-step reasoning loop with tools)
+  vs ask:  ask = one-shot Q&A    agent = autonomous loop: plans → uses tools → verifies → repeats
 
 Usage:
-  wkappbot agent gemini|gpt|claude ""task"" [files...] [options]
+  wkappbot agent gemini|gpt|claude|triad ""task"" [files...] [options]
+
+  triad / all  — run Gemini + GPT + Claude in parallel, each prefixed [gemini]/[gpt]/[claude]
 
 Defaults (triad-agreed):
-  --timeout     90      seconds per step
-  --max-steps   20      max loop iterations
-  --retry       2       retries per tool call
-  --parallel    3       max concurrent tool calls
-  --verify-delay 400    ms to wait after UI actions
+  --timeout      90     seconds total hard kill
+  --max-steps    20     max reasoning loop iterations
+  --retry         2     retries per tool call on failure
+  --parallel      4     max concurrent tool calls per step
+  --verify-delay 400    ms to wait after UI actions before verifying
 
 Options:
-  --agent-id <name>   Named persistent tab (e.g. gemini-agent-myjob) — survives session restarts
-  --fresh             Force new conversation (clear previous context)
-  --triad             Add triad-planning hints to loop persona
-  --slack             Report result to Slack channel
-  --model <hint>      Model/version hint (e.g. 4.1, opus)
-  --timeout N         Override step timeout
-  --max-steps N       Override max steps
-  --retry N           Override retry count
-  --parallel N        Override parallel tool calls
+  --agent-id <name>   Named persistent tab — reuses context across calls, survives restarts
+                      Tab: '{ai}-agent-{name}'  (ask uses '{ai}-{session}')
+  --fresh             Force new conversation + clear AgentFileTracker session
+  --triad             Inject triad-planning hints into loop persona (multi-AI planning)
+  --slack             Report final result to Slack channel after completion
+  --model <hint>      Model/version hint (e.g. 2.0-flash, opus, 4.5)
+  --timeout N         Override total timeout (seconds)
+  --max-steps N       Override max loop iterations
+  --retry N           Override per-tool retry count
+  --parallel N        Override parallel tool call limit
 
-Tab namespace:
-  agent uses '{ai}-agent-{session}' tabs — separate from 'ask' tabs ('{ai}-{session}')
-  --agent-id pins to '{ai}-agent-{name}' for persistent named sessions
+Sub-commands (session/checkpoint management):
+  agent checkpoint [--label ""text""]   Save git snapshot (restore point on crash/undo)
+  agent dump-patch [--out f.patch]     Export uncommitted changes as patch file
+              [--apply]                Apply a previously dumped patch via git apply
+  agent session-status                 Show current AgentFileTracker session state
+  agent session-clear                  Reset session (same as --fresh without re-running)
+
+WARNING: Do NOT call 'wkappbot agent' from inside an agent loop!
+  Agents calling agents = infinite recursion. For nested tasks use 'wkappbot ask --loop'.
+
+APSP v1 (WKAppBot MCP extension — beyond standard MCP spec):
+  MCP progress notifications carry extra fields: mem_mb, cpu_pct, threads, handles
+  stdin/IO wait auto-detected by watchdog: status=wait_input|wait_lock|wait_ipc|wait_io|sleeping
+  data field format: ""N> output line""  (N=progress counter, correlates console with MCP stream)
 
 Examples:
-  wkappbot agent gemini ""refactor all test files to use xUnit""
-  wkappbot agent gpt ""analyze this screenshot and fix the UI bug"" screen.png
-  wkappbot agent claude ""investigate why build fails"" --slack
-  wkappbot agent gemini ""myjob task"" --agent-id myjob   # persistent named session
-  wkappbot agent claude ""task"" --triad --max-steps 30   # triad hints, more steps
+  wkappbot agent gemini ""analyze all *.cs files and find N+1 query patterns""
+  wkappbot agent gpt ""fix UI bug shown in screenshot"" screen.png --slack
+  wkappbot agent claude ""investigate why build fails"" --max-steps 30
+  wkappbot agent triad ""test MCP APSP v1 profiling + parallel tool calls""
+  wkappbot agent gemini ""task"" --agent-id myjob           # persistent named session
+  wkappbot agent gemini ""continue"" --agent-id myjob       # resume same named session
+  wkappbot agent claude ""plan"" --triad --fresh            # new session + triad hints
 ");
         return 1;
     }

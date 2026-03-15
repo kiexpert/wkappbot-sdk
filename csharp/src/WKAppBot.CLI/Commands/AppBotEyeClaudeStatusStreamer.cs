@@ -759,6 +759,14 @@ internal partial class Program
         }
         else
         {
+            // Idle status → never post a new channel message (would push to "latest")
+            // Only edit in-place is allowed for idle; if nothing to edit, silently skip.
+            if (statusType == "idle")
+            {
+                Console.WriteLine($"[EYE] Skip new-post (idle): {slackText[..Math.Min(slackText.Length, 80)]}");
+                return;
+            }
+
             // Not editable (type changed, has replies, or no longer latest) → post new message
             if (!hasReplies && state.SlackStatusTs != null)
             {

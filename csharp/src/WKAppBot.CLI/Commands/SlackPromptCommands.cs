@@ -571,6 +571,7 @@ internal partial class Program
 
         foreach (var m in messages)
         {
+          try {
             var ts = m["ts"]?.GetValue<string>() ?? "?";
             var user = m["username"]?.GetValue<string>()
                     ?? m["user"]?.GetValue<string>() ?? "?";
@@ -638,8 +639,9 @@ internal partial class Program
             var botId = m["bot_id"]?.GetValue<string>();
             if (botId != null) botLabel += $" bot={botId[..Math.Min(8, botId.Length)]}";
 
-            // Truncate text
-            var maxLen = Console.WindowWidth > 40 ? Console.WindowWidth - 30 : 120;
+            // Truncate text (Console.WindowWidth throws when stdout is redirected — fallback to 120)
+            int maxLen;
+            try { maxLen = Console.WindowWidth > 40 ? Console.WindowWidth - 30 : 120; } catch { maxLen = 120; }
             var preview = text.Length > maxLen ? text[..maxLen] + "…" : text;
 
             Console.Write($"  {timeStr} | ");
@@ -660,6 +662,7 @@ internal partial class Program
                 else
                     toDelete.Add((ts, preview));
             }
+          } catch (Exception _ex) { Console.WriteLine($"  [SLACK:LIST_ERR] {_ex.GetType().Name}: {_ex.Message}"); }
         }
 
         Console.WriteLine(new string('─', 120));

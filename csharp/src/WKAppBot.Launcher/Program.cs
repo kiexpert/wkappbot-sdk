@@ -9,9 +9,10 @@ namespace WKAppBot.Launcher;
 /// Fallback: spawns wkappbot-core.exe directly (~3s, rare — Eye not running).
 ///
 /// Routing control flags (parsed here, stripped before forwarding to Eye/Core):
-///   --only-eye   Eye pipe required — fail with exit 3 if Eye unavailable (no Core fallback)
-///   --only-core  Skip Eye pipe — run Core directly regardless of Eye state
-///   --timeout N  Kill Core after N seconds (Launcher-level watchdog, exit 2 on timeout)
+///   --only-eye       Eye pipe required — fail with exit 3 if Eye unavailable (no Core fallback)
+///   --only-core      Skip Eye pipe — run Core directly regardless of Eye state
+///   --timeout N      Kill Core after N seconds (Launcher-level watchdog, exit 2 on timeout)
+///   --timeout-exit N Override timeout exit code (default: 2); applies to both normal and mcp mode
 ///
 /// Fixed routing (flag-independent):
 ///   mcp  → Launcher owns stdio pipe permanently; Core runs behind proxy (restartable)
@@ -85,6 +86,36 @@ class Program
             return 1;
         }
 
+        int timeoutSec  = 0;
+        int timeoutExit = 2;
+        bool showWt     = args.Any(a => a == "--wt");
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--timeout"      && int.TryParse(args[i + 1], out var t) && t > 0) timeoutSec  = t;
+            if (args[i] == "--timeout-exit" && int.TryParse(args[i + 1], out var e))           timeoutExit = e;
+        }
+
+        // --wt: redirect Core stderr to a temp log and open a Windows Terminal tab tailing it
+        string? wtLogFile = null;
+        if (showWt)
+        {
+            wtLogFile = Path.Combine(Path.GetTempPath(), $"wkappbot-mcp-{Environment.ProcessId}.log");
+            File.WriteAllText(wtLogFile, ""); // create empty log
+            var wtTitle = $"WKAppBot MCP ({Environment.ProcessId})";
+            var psCmd = $"Get-Content -Wait -Path '{wtLogFile}'";
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName        = "wt.exe",
+                    Arguments       = $"--window 0 new-tab --title \"{wtTitle}\" -- powershell -NoExit -Command \"{psCmd}\"",
+                    UseShellExecute = true,
+                }) ;
+                Console.Error.WriteLine($"[LAUNCHER:MCP] WT monitor tab opened → {wtLogFile}");
+            }
+            catch (Exception ex) { Console.Error.WriteLine($"[LAUNCHER:MCP] wt.exe failed: {ex.Message}"); wtLogFile = null; }
+        }
+
         var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
 
         // stdin broadcaster — single reader, routes bytes to whichever Core is current
@@ -120,9 +151,9 @@ class Program
                 {
                     FileName        = core,
                     UseShellExecute = false,
-                    RedirectStandardInput  = true,   // fed by stdin broadcaster
-                    RedirectStandardOutput = false,   // inherited → flows to Claude Code
-                    RedirectStandardError  = false,   // inherited → flows to Claude Code
+                    RedirectStandardInput  = true,    // fed by stdin broadcaster
+                    RedirectStandardOutput = false,    // inherited → flows to Claude Code
+                    RedirectStandardError  = wtLogFile != null, // --wt: tee to log; else inherited
                     CreateNoWindow  = false,
                 }
             };
@@ -130,11 +161,35 @@ class Program
             if (!string.IsNullOrEmpty(dotnetRoot))
                 proc.StartInfo.EnvironmentVariables["DOTNET_ROOT"] = dotnetRoot;
 
+            // --wt: tee stderr to log file so WT tab can tail it
+            if (wtLogFile != null)
+            {
+                proc.ErrorDataReceived += (_, e) =>
+                {
+                    if (e.Data == null) return;
+                    Console.Error.WriteLine(e.Data);           // still flows to MCP caller
+                    try { File.AppendAllText(wtLogFile, e.Data + "\n"); } catch { }
+                };
+            }
+
             proc.Start();
+            if (wtLogFile != null) proc.BeginErrorReadLine();
             Volatile.Write(ref _current, proc);
             Console.Error.WriteLine($"[LAUNCHER:MCP] core started (pid={proc.Id})");
 
-            proc.WaitForExit();
+            if (timeoutSec > 0)
+            {
+                if (!proc.WaitForExit(timeoutSec * 1000))
+                {
+                    Console.Error.WriteLine($"[LAUNCHER:MCP] timeout {timeoutSec}s exceeded — killing core (pid={proc.Id})");
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    return timeoutExit;
+                }
+            }
+            else
+            {
+                proc.WaitForExit();
+            }
 
             var exit = proc.ExitCode;
             Console.Error.WriteLine($"[LAUNCHER:MCP] core exited (code={exit})");
@@ -161,10 +216,13 @@ class Program
             // Parse --timeout N (seconds) — Launcher-level watchdog.
             // Works for ALL commands, including ones that don't implement their own timeout.
             // stdout/stderr inherited (no piping overhead); Launcher simply kills Core if exceeded.
-            int timeoutSec = 0;
+            int timeoutSec  = 0;
+            int timeoutExit = 2;
             for (int i = 0; i < args.Length - 1; i++)
-                if (args[i] == "--timeout" && int.TryParse(args[i + 1], out var t) && t > 0)
-                    { timeoutSec = t; break; }
+            {
+                if (args[i] == "--timeout"      && int.TryParse(args[i + 1], out var t) && t > 0) timeoutSec  = t;
+                if (args[i] == "--timeout-exit" && int.TryParse(args[i + 1], out var e))           timeoutExit = e;
+            }
 
             using var proc = new Process
             {
@@ -195,7 +253,7 @@ class Program
                 {
                     Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s exceeded — killing core (pid={proc.Id})");
                     try { proc.Kill(entireProcessTree: true); } catch { }
-                    return 2; // distinct exit code: timeout
+                    return timeoutExit;
                 }
             }
             else

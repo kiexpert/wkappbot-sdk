@@ -79,12 +79,18 @@ internal partial class Program
         _cdpBrowserLock.Wait();
         try
         {
-            var cdp = ConnectCdp(port, withBar: false);
-
             var searchUrl = $"https://www.google.com/search?q={Uri.EscapeDataString(query)}&num={Math.Min(limit, 20)}";
             Console.WriteLine($"[SEARCH] \"{query}\" → {searchUrl}");
 
-            cdp.NavigateAsync(searchUrl).GetAwaiter().GetResult();
+            // Pass searchUrl as navigateUrl: EnsureCorrectWindowAsync will use a dedicated
+            // web tab (not an AI chat tab) and navigate it to searchUrl directly.
+            // If EnsureCorrectWindowAsync already navigated, NavigateAsync below is a no-op (same URL).
+            var cdp = ConnectCdp(port, withBar: false, navigateUrl: searchUrl);
+            // Ensure we are on the search URL (in case ConnectCdp's EnsureCorrectWindowAsync
+            // returned an existing tab that's not yet at searchUrl)
+            var curUrl = cdp.EvalAsync("location.href").GetAwaiter().GetResult() ?? "";
+            if (!curUrl.StartsWith(searchUrl.Split('?')[0], StringComparison.OrdinalIgnoreCase))
+                cdp.NavigateAsync(searchUrl).GetAwaiter().GetResult();
 
             // Poll via JS promise — waits up to 3s for h3 result elements to render
             var js = $$"""
@@ -184,7 +190,8 @@ internal partial class Program
         _cdpBrowserLock.Wait();
         try
         {
-            var cdp = ConnectCdp(port, withBar: false);
+            // Pass url as navigateUrl: ensures a dedicated web tab, never steals an AI chat tab
+            var cdp = ConnectCdp(port, withBar: false, navigateUrl: url);
 
             Console.WriteLine($"[READ] Navigating: {url}");
             cdp.NavigateAsync(url).GetAwaiter().GetResult();

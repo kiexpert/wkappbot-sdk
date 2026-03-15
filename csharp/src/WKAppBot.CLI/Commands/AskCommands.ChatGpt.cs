@@ -69,6 +69,8 @@ internal partial class Program
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
 
+        if (slackReport) EnsureSlackThread("ChatGPT", question);
+
         var task = Task.Run(async () =>
         {
             try
@@ -123,8 +125,10 @@ internal partial class Program
                     Console.WriteLine(existingTurns == 0
                         ? "[ASK] Fresh conversation -- injecting persona..."
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
+                    var personaTextGpt = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
+                    SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextGpt.Length > 800 ? personaTextGpt[..800] + "…" : personaTextGpt)}\n```", "System");
                     var (personaOk, personaResp) = await ChatGptSendAndWait(
-                        cdp, BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint), timeoutSec: 20);
+                        cdp, personaTextGpt, timeoutSec: 20);
                     if (!personaOk)
                     {
                         Console.WriteLine("[ASK] Persona injection failed, continuing anyway");
@@ -144,16 +148,34 @@ internal partial class Program
                 await Task.Delay(200);
 
 
+                // Prepend host handshake proof for loop sessions so GPT trusts the host is live
+                if (effectiveLoopPersona)
+                    question = BuildHostHandshake() + question;
+
                 // Send the actual question (with 9s-delay retry on timeout)
                 var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, attachFiles, returnAfterSend: noWait);
                 if (!ok && string.IsNullOrEmpty(answer))
                 {
                     Console.WriteLine("[ASK] ChatGPT timeout ??retrying in 9 seconds...");
+                    await TryRecoverChatGptTabAsync(cdp, "timeout before retry");
                     await Task.Delay(9000);
                     (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, returnAfterSend: noWait);
                 }
+                if (slackReport)
+                {
+                    EnsureSlackThread("ChatGPT", question);
+                    if (ok && !string.IsNullOrWhiteSpace(answer))
+                    {
+                        var gptSlack = NormalizeBlankLines(answer);
+                        SlackPostToThread(gptSlack.Length > 2000 ? gptSlack[..2000] + "…" : gptSlack, "ChatGPT");
+                    }
+                    else
+                        SlackPostToThread("❌ _응답 실패_ (timeout 또는 이미지 응답)", "ChatGPT");
+                }
+
+                Action<string, string?>? onStepReport = slackReport ? (msg, uname) => SlackPostToThread(msg, uname ?? "ChatGPT") : null;
                 if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-                    (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel);
+                    (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport);
                 return (ok, answer);
             }
             catch (Exception ex)
@@ -177,8 +199,7 @@ internal partial class Program
             Console.WriteLine(answer);
             Console.WriteLine("[ASK_FULL_ANSWER_END]");
 
-            if (slackReport)
-                ReportToSlack("ChatGPT", question, answer);
+            // Slack already handled above (initial answer) + loop onStepReport
         }
 
         UnregisterWaitingTab("chatgpt");
@@ -333,7 +354,16 @@ internal partial class Program
     {
         // ?? Phase 0: URL check + turn count (iconified OK) ??
         var currentUrl = await cdp.EvalAsync("location.href") ?? "";
-        int prevTurns = await CountChatGptTurns(cdp);
+        if (!currentUrl.Contains("chatgpt.com", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"[ASK:LOOP] GPT tab drifted to {currentUrl[..Math.Min(80, currentUrl.Length)]} — navigating back to chatgpt.com");
+            await cdp.NavigateAsync("https://chatgpt.com/");
+            await Task.Delay(3000);
+            currentUrl = await cdp.EvalAsync("location.href") ?? "";
+        }
+        // prevTurns captured just before send (after lock) — avoids lazy-DOM false positives
+        int prevTurns = 0;
+        string prevLastFingerprint = string.Empty;
 
         // NOTE: BringToFront removed ??steals OS focus. CDP works on background tabs.
 
@@ -345,6 +375,14 @@ internal partial class Program
         // ?? Browser exclusive zone: prompt input ??first response turn ??
         using var chatLock = ChromeTabLock.Acquire("ChatGPT");
         if (chatLock == null) return (false, null);
+
+        // Capture stable baseline AFTER lock — DOM fully settled, no stale prior-session answer.
+        // Fixes: WKAppBot reading an old unread GPT reply as the new response (off-by-1 DOM timing).
+        prevTurns = await CountChatGptTurns(cdp);
+        prevLastFingerprint = await cdp.EvalAsync(
+            "(() => { var els = document.querySelectorAll('[data-message-author-role=\"assistant\"]');" +
+            " return els.length > 0 ? (els[els.length-1].textContent?.substring(0,80) ?? '') : ''; })()") ?? string.Empty;
+        Console.WriteLine($"[ASK] Pre-send baseline: turns={prevTurns} tail=[{prevLastFingerprint[..Math.Min(50, prevLastFingerprint.Length)]}]");
 
         // ?? CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ??
         var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "ChatGPT");
@@ -743,6 +781,9 @@ internal partial class Program
             {
                 streamExtensions++;
                 Console.WriteLine($"[ASK] Still {(isThinking ? "thinking" : "streaming")}, extending timeout... (ext #{streamExtensions})");
+                // ext #1: window may be hidden/minimized → restore + bring to front
+                if (streamExtensions == 1)
+                    await TryRecoverChatGptTabAsync(cdp, $"thinking ext#{streamExtensions}");
                 sw.Restart();
             }
         }
@@ -826,14 +867,23 @@ internal partial class Program
     static void ShowChromeAnswer(CdpClient cdp)
     {
         var chromeHwnd = cdp.GetChromeWindowHandle();
-        if (chromeHwnd == IntPtr.Zero || !NativeMethods.IsIconic(chromeHwnd))
-            return; // not minimized ??already visible
+        if (chromeHwnd == IntPtr.Zero) return;
+
+        bool isIconic  = NativeMethods.IsIconic(chromeHwnd);
+        bool isVisible = NativeMethods.IsWindowVisible(chromeHwnd);
+        if (!isIconic && isVisible) return; // already normal-visible
 
         var title = WKAppBot.Win32.Window.WindowFinder.GetWindowText(chromeHwnd);
-        Console.WriteLine($"[ASK] Showing answer ??focusless restore \"{title}\"");
+        Console.WriteLine($"[ASK] Restoring Chrome window (iconic={isIconic}, visible={isVisible}): \"{title}\"");
+        // SW_RESTORE(9): restores minimized or hidden window, may steal focus (recovery use)
+        NativeMethods.ShowWindow(chromeHwnd, 9); // SW_RESTORE
+    }
 
-        // Focusless restore: SW_SHOWNOACTIVATE won't steal focus
-        NativeMethods.ShowWindow(chromeHwnd, 4); // SW_SHOWNOACTIVATE
+    static async Task TryRecoverChatGptTabAsync(CdpClient cdp, string reason)
+    {
+        Console.WriteLine($"[ASK] Recovery: {reason} → restore Chrome + bring tab to front");
+        ShowChromeAnswer(cdp);
+        await cdp.BringTabToFrontAsync();
     }
 
     // ?? UIA Send Button ??

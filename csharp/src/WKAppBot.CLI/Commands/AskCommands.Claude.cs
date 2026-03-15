@@ -22,9 +22,13 @@ internal partial class Program
     static readonly string[] ClaudeEditorSelectors =
     [
         "div.tiptap.ProseMirror",                          // Claude.ai ProseMirror (no attr filter — most reliable)
-        "div.tiptap.ProseMirror[contenteditable='true']",  // With attr
+        "div.tiptap.ProseMirror[contenteditable='true']",  // With attr (single-quote in CSS — safe in JS double-quoted eval)
         ".ProseMirror[contenteditable='true']",            // ProseMirror generic
-        "[contenteditable='true']",                        // Generic fallback
+        "[contenteditable='true']",                        // Generic contenteditable
+        "[contenteditable]",                               // contenteditable without value check
+        "[data-testid='composer-input']",                  // Claude.ai composer testid
+        "[data-testid='user-input']",                      // alt testid
+        "textarea",                                        // fallback if Claude.ai switched to textarea
     ];
 
     static async Task<string?> WaitForClaudeEditorA11y(CdpClient cdp)
@@ -34,23 +38,65 @@ internal partial class Program
             foreach (var sel in ClaudeEditorSelectors)
             {
                 var found = await cdp.EvalAsync(
-                    $"document.querySelector('{sel}') ? 'yes' : 'no'");
+                    $"document.querySelector(\"{sel}\") ? 'yes' : 'no'");
                 if (found == "yes") return sel;
             }
             await Task.Delay(500);
         }
-        Console.WriteLine("[ASK] Claude editor not found (selector chain exhausted)");
+        // Diagnostic: log what input-like elements exist on the page
+        var diag = await cdp.EvalAsync("""
+            (() => {
+                var ce = document.querySelectorAll('[contenteditable]').length;
+                var pm = document.querySelectorAll('.ProseMirror').length;
+                var ta = document.querySelectorAll('textarea').length;
+                var rb = document.querySelectorAll('[role="textbox"]').length;
+                return 'ce=' + ce + ' pm=' + pm + ' ta=' + ta + ' textbox=' + rb;
+            })()
+            """) ?? "unknown";
+        Console.WriteLine($"[ASK] Claude editor not found (selector chain exhausted) | dom: {diag}");
         return null;
     }
 
-    /// <summary>Insert text into Claude.ai ProseMirror via ClipboardEvent paste (only reliable method).</summary>
+    /// <summary>Insert text into Claude.ai editor. Supports ProseMirror (ClipboardEvent paste) and textarea (value setter).</summary>
     static async Task<bool> InsertTextClaudeProseMirror(CdpClient cdp, string selector, string text)
     {
         var escaped = text.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", "");
 
+        // Detect element type first so we can choose the right injection strategy
+        var tagName = await cdp.EvalAsync(
+            $"document.querySelector(\"{selector}\")?.tagName?.toLowerCase() ?? 'unknown'") ?? "unknown";
+
+        if (tagName == "textarea")
+        {
+            // Textarea: use native value setter + input/change events (React-compatible)
+            var taResult = await cdp.EvalAsync($$"""
+                (() => {
+                    var el = document.querySelector("{{selector}}");
+                    if (!el) return 'NOT_FOUND';
+                    el.focus();
+                    var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+                    if (setter) setter.call(el, '{{escaped}}');
+                    else el.value = '{{escaped}}';
+                    el.dispatchEvent(new Event('input', {bubbles: true}));
+                    el.dispatchEvent(new Event('change', {bubbles: true}));
+                    return el.value.length > 0 ? 'OK' : 'EMPTY';
+                })()
+                """);
+            if (taResult == "OK") return true;
+            Console.WriteLine($"[ASK] Textarea native setter result: {taResult}, trying Input.insertText...");
+            await cdp.EvalAsync($"document.querySelector(\"{selector}\")?.focus()");
+            await Task.Delay(100);
+            await cdp.SendAsync("Input.insertText", new JsonObject { ["text"] = text });
+            await Task.Delay(200);
+            var taVerify = await cdp.EvalAsync(
+                $"(document.querySelector(\"{selector}\")?.value?.length ?? 0).toString()") ?? "0";
+            return taVerify != "0";
+        }
+
+        // ProseMirror / contenteditable: ClipboardEvent paste
         var result = await cdp.EvalAsync($$"""
             (() => {
-                var el = document.querySelector('{{selector}}');
+                var el = document.querySelector("{{selector}}");
                 if (!el) return 'NOT_FOUND';
                 el.focus();
                 var dt = new DataTransfer();
@@ -64,12 +110,12 @@ internal partial class Program
 
         // Fallback: CDP Input.insertText
         Console.WriteLine($"[ASK] ClipboardEvent paste result: {result}, trying Input.insertText...");
-        await cdp.EvalAsync($"document.querySelector('{selector}')?.focus()");
+        await cdp.EvalAsync($"document.querySelector(\"{selector}\")?.focus()");
         await Task.Delay(100);
         await cdp.SendAsync("Input.insertText", new JsonObject { ["text"] = text });
         await Task.Delay(200);
         var verify = await cdp.EvalAsync(
-            $"document.querySelector('{selector}')?.textContent?.length ?? 0") ?? "0";
+            $"(document.querySelector(\"{selector}\")?.value?.length ?? document.querySelector(\"{selector}\")?.textContent?.length ?? 0).toString()") ?? "0";
         return verify != "0";
     }
 
@@ -103,6 +149,8 @@ internal partial class Program
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
+
+        if (slackReport) EnsureSlackThread("Claude", question);
 
         var task = Task.Run(async () =>
         {
@@ -147,9 +195,11 @@ internal partial class Program
                     Console.WriteLine(existingTurns == 0
                         ? "[ASK] Fresh Claude -- injecting persona..."
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
+                    var personaTextClaude = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
+                    SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextClaude.Length > 800 ? personaTextClaude[..800] + "…" : personaTextClaude)}\n```", "System");
                     var (personaOk, personaResp) = await ClaudeSendAndWaitAsync(
                         cdp,
-                        BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint),
+                        personaTextClaude,
                         timeoutSec: 20);
                     if (!personaOk)
                     {
@@ -196,7 +246,7 @@ internal partial class Program
                 await ClearContentEditable(cdp, editorSel);
                 var inserted = await InsertTextClaudeProseMirror(cdp, editorSel, question);
                 var editorContent = await cdp.EvalAsync(
-                    $"document.querySelector('{editorSel}')?.textContent?.substring(0,80) || 'EMPTY'") ?? "EMPTY";
+                    $"document.querySelector(\"{editorSel}\")?.textContent?.substring(0,80) || 'EMPTY'") ?? "EMPTY";
                 Console.WriteLine($"[ASK] After insert: {(inserted ? "OK" : "FAIL")}, editor=[{editorContent}]");
                 if (!inserted)
                 {
@@ -234,7 +284,7 @@ internal partial class Program
                     else
                     {
                         var remaining = await cdp.EvalAsync(
-                            $"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 99") ?? "99";
+                            $"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 99") ?? "99";
                         sendResult = remaining == "0" ? "JS_CLICK" : "CLICK_NOOP";
                     }
                 }
@@ -243,7 +293,7 @@ internal partial class Program
                 if (sendResult != "JS_CLICK")
                 {
                     Console.WriteLine("[ASK] JS click didn't send, trying Enter key...");
-                    await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
+                    await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.focus()");
                     await Task.Delay(100);
                     await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
                     {
@@ -265,7 +315,7 @@ internal partial class Program
                 LogRestoreFocus(prevFg, "after-send-Claude");
 
                 var afterSend = await cdp.EvalAsync(
-                    $"document.querySelector('{editorSel}')?.textContent?.length ?? -1") ?? "-1";
+                    $"document.querySelector(\"{editorSel}\")?.textContent?.length ?? -1") ?? "-1";
                 Console.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={preSendTurns})");
                 if (noWait)
                 {
@@ -282,10 +332,18 @@ internal partial class Program
 
                     var limitText = await cdp.EvalAsync("""
                         (() => {
-                            var t = (document.body?.innerText || '');
+                            // Only check the LAST AI message to avoid false positives from prior conversation
+                            var msgs = document.querySelectorAll('[data-is-streaming]');
+                            var t = msgs.length > 0 ? (msgs[msgs.length - 1].innerText || '') : '';
+                            // Fallback: check for standalone limit UI banners (not inside chat turns)
+                            if (!t) {
+                                var banners = document.querySelectorAll('[class*="limit"],[class*="usage"],[class*="quota"]');
+                                t = Array.from(banners).map(b => b.innerText).join('\n').substring(0, 800);
+                            }
                             var keys = ['usage limit', 'rate limit', 'too many requests', '요청이 너무 많', '사용량 한도'];
+                            var tl = t.toLowerCase();
                             for (var i = 0; i < keys.length; i++) {
-                                if (t.toLowerCase().includes(keys[i])) {
+                                if (tl.includes(keys[i])) {
                                     return t.substring(0, 800);
                                 }
                             }
@@ -421,10 +479,30 @@ internal partial class Program
         });
 
         var (ok, answer) = task.GetAwaiter().GetResult();
+
+        // Open Slack thread early (before loop) so every step lands in same thread
+        if (slackReport && ok && !string.IsNullOrWhiteSpace(answer))
+        {
+            EnsureSlackThread("Claude", question);
+            SlackPostToThread(answer.Length > 2000 ? answer[..2000] + "…" : answer, "Claude");
+        }
+
+        Action<string, string?>? onStepReport = slackReport ? (msg, uname) => SlackPostToThread(msg, uname ?? "Claude") : null;
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-            (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel)).GetAwaiter().GetResult();
-        if (IsClaudeLimitResponse(answer))
-            ok = false;
+            (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport)).GetAwaiter().GetResult();
+        bool isLimit = IsClaudeLimitResponse(answer);
+        if (isLimit) ok = false;
+
+        if (slackReport && isLimit)
+        {
+            EnsureSlackThread("Claude", question);
+            SlackPostToThread("❌ _Claude 메시지 한도 초과_ — claude.ai 사용량 확인 필요", "Claude");
+        }
+        else if (slackReport && !ok)
+        {
+            EnsureSlackThread("Claude", question);
+            SlackPostToThread("❌ _Claude 응답 실패_", "Claude");
+        }
 
         if (answer != null)
         {
@@ -432,8 +510,7 @@ internal partial class Program
             Console.WriteLine(answer.Length > 2000 ? answer[..2000] + "\n... (truncated)" : answer);
             Console.WriteLine("[ASK_ANSWER_END]");
 
-            if (slackReport)
-                ReportToSlack("Claude", question, answer);
+            // Slack already handled above (initial answer) + loop onStepReport
         }
 
         cdp.Dispose();
@@ -441,6 +518,127 @@ internal partial class Program
     }
 
     // ── Slack Report ──
+
+    // AsyncLocal: triad parent can pre-create a shared thread ts before spawning Task.Run children.
+    // Each child Task inherits the value and posts to the same thread (no duplicate headers).
+    internal static readonly System.Threading.AsyncLocal<string?> _slackSessionThreadTs = new();
+
+    // Per-session last-post tracker: sessionThreadTs → (msgTs, username, text).
+    // Used to detect "latest comment is mine" and append via chat.update instead of new post.
+    // Tool ⏳ markers update this too, so AI answers won't falsely append over tool messages.
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string msgTs, string user, string text)>
+        _slackThreadLastPost = new();
+    const int SlackMaxAppendLength = 3800; // Slack message text limit (conservative)
+
+    /// Post to thread and return the message ts (for later in-place updates). Null if no thread or error.
+    /// Also updates _slackThreadLastPost so subsequent calls know the current "last poster".
+    internal static string? SlackPostToThreadAndGetTs(string msg, string? username = null)
+    {
+        var threadTs = _slackSessionThreadTs.Value;
+        if (threadTs == null) return null;
+        try
+        {
+            var config = LoadSlackConfig();
+            var botToken = config?["bot_token"]?.GetValue<string>();
+            var channel  = config?["channel"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return null;
+            var uname = username ?? BotUsername;
+            var (ok, ts) = SlackSendViaApi(botToken, channel, msg,
+                threadTs: threadTs, username: uname).GetAwaiter().GetResult();
+            if (ok && ts != null)
+                _slackThreadLastPost[threadTs] = (ts, uname, msg);
+            return ok ? ts : null;
+        }
+        catch { return null; }
+    }
+
+    /// Update a specific Slack message in-place by its ts. Noop if config unavailable.
+    internal static void SlackUpdateThreadMessage(string msgTs, string text)
+    {
+        try
+        {
+            var config = LoadSlackConfig();
+            var botToken = config?["bot_token"]?.GetValue<string>();
+            var channel  = config?["channel"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return;
+            var (ok, _) = SlackUpdateMessageAsync(botToken, channel, msgTs, text).GetAwaiter().GetResult();
+            if (!ok) Console.WriteLine($"[SLACK] SlackUpdateThreadMessage failed for ts={msgTs}");
+        }
+        catch { }
+    }
+
+    /// Post text to the current session's Slack thread. Noop if no active thread.
+    /// If the latest thread message was posted by the same username, appends via chat.update
+    /// instead of creating a new message (per user request: "최신 댓글이 자기꺼인 경우만 편집").
+    internal static void SlackPostToThread(string msg, string? username = null)
+    {
+        var sessionTs = _slackSessionThreadTs.Value;
+        if (sessionTs == null) return;
+        try
+        {
+            var config = LoadSlackConfig();
+            var botToken = config?["bot_token"]?.GetValue<string>();
+            var channel  = config?["channel"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return;
+            var uname = username ?? BotUsername;
+
+            // Append via chat.update if the latest thread comment is from the same AI
+            if (_slackThreadLastPost.TryGetValue(sessionTs, out var last) && last.user == uname)
+            {
+                var combined = last.text + "\n\n" + msg;
+                if (combined.Length <= SlackMaxAppendLength)
+                {
+                    var (ok, _) = SlackUpdateMessageAsync(botToken, channel, last.msgTs, combined).GetAwaiter().GetResult();
+                    if (ok)
+                    {
+                        _slackThreadLastPost[sessionTs] = (last.msgTs, uname, combined);
+                        return;
+                    }
+                    // If update fails, fall through to post new
+                }
+                // Combined too long — fall through to new post
+            }
+
+            // Post new message (chunked for long content)
+            const int chunkSize = 3000;
+            string? newMsgTs = null;
+            for (int pos = 0; pos < msg.Length; pos += chunkSize)
+            {
+                var chunk = msg[pos..Math.Min(pos + chunkSize, msg.Length)];
+                var (ok, ts) = SlackSendViaApi(botToken, channel, chunk,
+                    threadTs: sessionTs, username: uname).GetAwaiter().GetResult();
+                if (ok && ts != null && pos == 0) newMsgTs = ts;
+            }
+            if (newMsgTs != null)
+                _slackThreadLastPost[sessionTs] = (newMsgTs, uname, msg.Length > SlackMaxAppendLength ? msg[..SlackMaxAppendLength] : msg);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Open a Slack thread for the current session if not already open.
+    /// Returns the thread ts. Safe to call multiple times (idempotent per AsyncLocal context).
+    /// </summary>
+    internal static string? EnsureSlackThread(string label, string question)
+    {
+        if (_slackSessionThreadTs.Value != null)
+            return _slackSessionThreadTs.Value;   // already opened by triad parent
+
+        try
+        {
+            var config = LoadSlackConfig();
+            var botToken = config?["bot_token"]?.GetValue<string>();
+            var channel  = config?["channel"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return null;
+
+            var qTrunc = question.Length > 200 ? question[..200] + "..." : question;
+            var (ok, ts) = SlackSendViaApi(botToken, channel, $"*[{label}]* {qTrunc}", username: BotUsername)
+                               .GetAwaiter().GetResult();
+            if (ok) _slackSessionThreadTs.Value = ts;
+            return ok ? ts : null;
+        }
+        catch { return null; }
+    }
 
     static void ReportToSlack(string aiName, string question, string answer)
     {
@@ -450,14 +648,24 @@ internal partial class Program
             if (config == null) return;
 
             var botToken = config["bot_token"]?.GetValue<string>();
-            var channel = config["channel"]?.GetValue<string>();
+            var channel  = config["channel"]?.GetValue<string>();
             if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return;
 
-            var truncated = answer.Length > 1500 ? answer[..1500] + "\n... (truncated)" : answer;
-            var msg = $"*[{aiName} 답변]*\n> Q: {question}\n\n{truncated}";
-            var (ok, _) = SlackSendViaApi(botToken, channel, msg, username: BotUsername).GetAwaiter().GetResult();
-            if (ok)
-                Console.WriteLine($"[ASK] Reported to Slack");
+            // Open (or reuse) the session thread — triad shares one thread, single AI gets its own
+            var ts = EnsureSlackThread(aiName, question);
+            if (ts == null) { Console.WriteLine("[ASK] Slack report: no thread ts"); return; }
+
+            // Thread: answer in 3000-char chunks (no truncation — split as needed)
+            const int chunkSize = 3000;
+            int pos = 0, part = 1;
+            while (pos < answer.Length)
+            {
+                var chunk = answer[pos..Math.Min(pos + chunkSize, answer.Length)];
+                SlackSendViaApi(botToken, channel, chunk, threadTs: ts, username: BotUsername).GetAwaiter().GetResult();
+                pos += chunkSize;
+                part++;
+            }
+            Console.WriteLine($"[ASK] Reported to Slack (thread {ts}, {part - 1} part(s))");
         }
         catch (Exception ex)
         {
