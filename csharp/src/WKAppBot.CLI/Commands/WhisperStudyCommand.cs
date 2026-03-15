@@ -102,7 +102,31 @@ internal partial class Program
             int sttOk = sttLabels.Values.Count(v => !string.IsNullOrEmpty(v.Text));
             Console.WriteLine($"[STUDY] STT recognized {sttOk}/{mp3Files.Count}");
 
-            // ── Concat → batch MP3 ──
+            // ── Concat → batch MP3 (size-capped: select files by cumulative size) ──
+            const long MaxBatchBytes  = 2 * 1024 * 1024; // 2MB total — safe for Gemini
+            const long MaxSingleBytes = 1 * 1024 * 1024; // 1MB per file — skip oversized singles
+            {
+                long cumSize = 0;
+                var capped = new List<string>();
+                int skipped = 0;
+                foreach (var f in mp3Files)
+                {
+                    var sz = new FileInfo(f).Length;
+                    if (sz > MaxSingleBytes) { skipped++; continue; } // single file too large → skip
+                    if (capped.Count > 0 && cumSize + sz > MaxBatchBytes) break;
+                    capped.Add(f);
+                    cumSize += sz;
+                }
+                if (skipped > 0 || capped.Count < mp3Files.Count)
+                    Console.WriteLine($"[STUDY] Size cap: {mp3Files.Count} → {capped.Count} files ({cumSize / 1024}KB, skipped_large={skipped})");
+                if (capped.Count == 0)
+                {
+                    Console.WriteLine("[STUDY] All files oversized — skipping batch.");
+                    if (timeout == TimeSpan.Zero) break;
+                    continue;
+                }
+                mp3Files = capped;
+            }
             var batchFile  = Path.Combine(basePath, $"study_batch_{DateTime.Now:yyyyMMdd_HHmmss}.mp3");
             var segmentMap = ConcatMp3Files(mp3Files, batchFile);
             if (segmentMap == null || segmentMap.Count == 0)
@@ -137,19 +161,32 @@ internal partial class Program
                 if (!success || string.IsNullOrWhiteSpace(response))
                 {
                     Console.WriteLine("[STUDY] AI query failed — keeping batch file for retry.");
-                    break;
+                    if (timeout == TimeSpan.Zero) break; else continue;
                 }
             }
             Console.WriteLine($"[STUDY] Response: {response.Length} chars");
 
-            // ── Parse ──
+            // ── Parse (retry with fresh tab if response looks like UI artifact) ──
             var studyResults = ParseStudyResponse(response, segmentMap);
             if (studyResults == null || studyResults.Count == 0)
             {
+                // "AnalysisAnalysis..." = stale Gemini tab state → retry with fresh session
+                bool looksLikeUiArtifact = !response.Contains('[') || response.StartsWith("Analysis");
+                if (looksLikeUiArtifact && engine == "gemini")
+                {
+                    Console.WriteLine("[STUDY] UI artifact detected — retrying with fresh Gemini tab...");
+                    (success, response) = AskAiForStudy(batchFile, prompt, engine, freshSession: true);
+                    if (success && !string.IsNullOrWhiteSpace(response))
+                        studyResults = ParseStudyResponse(response, segmentMap);
+                }
+            }
+            if (studyResults == null || studyResults.Count == 0)
+            {
                 Console.WriteLine("[STUDY] Failed to parse response. Raw:");
-                Console.WriteLine(response.Length > 2000 ? response[..2000] + "..." : response);
-                SaveRawResponse(basePath, response, segmentMap);
-                break;
+                Console.WriteLine(response?.Length > 2000 ? response[..2000] + "..." : response);
+                SaveRawResponse(basePath, response ?? "", segmentMap);
+                if (timeout == TimeSpan.Zero) break;
+                continue; // loop mode: skip bad batch and try next
             }
             Console.WriteLine($"[STUDY] Parsed {studyResults.Count} segments");
 
@@ -177,7 +214,7 @@ internal partial class Program
                           && sttFb.Confidence >= 0.3f)
                     {
                         var agree = WordJaccard(result.Transcript, sttFb.Text);
-                        if (agree < 0.25)
+                        if (agree < 0.15)
                             quarantineReason = $"disagree={agree:F2}(gemini=\"{result.Transcript[..Math.Min(20,result.Transcript.Length)]}\" stt=\"{sttFb.Text[..Math.Min(20,sttFb.Text.Length)]}\")";
                     }
                 }
@@ -244,6 +281,22 @@ internal partial class Program
             if (mapped > 0) Console.WriteLine($"[STUDY] Phoneme map: {mapped} new entries");
             SaveStudyResults(basePath, studyResults);
             SelfHeal(basePath, wavDir);
+
+            // ── Auto-slice → phoneme_db ──
+            var todayStr = DateTime.Now.ToString("yyyyMMdd");
+            int sliced2 = WhisperSliceCommand(["--date", todayStr]);
+            if (sliced2 == 0)
+            {
+                WhisperIndexCommand(["--move"]);
+                // Delete source MP3s from labeled folders (sliced → phoneme_db, no longer needed)
+                foreach (var labelDir in Directory.GetDirectories(wavDir)
+                             .Where(d => !Path.GetFileName(d).StartsWith("_")))
+                {
+                    foreach (var f in Directory.GetFiles(labelDir))
+                        try { File.Delete(f); } catch { }
+                }
+                Console.WriteLine("[STUDY] Auto-slice+index done → phoneme_db updated");
+            }
 
             // ── Cleanup ──
             try { File.Delete(batchFile); } catch { }
@@ -445,7 +498,7 @@ internal partial class Program
     /// Send batch audio to AI (Gemini or GPT) via `ask` command and capture response.
     /// Reuses existing AskCommand infrastructure (persona, tab routing, file attachment, streaming).
     /// </summary>
-    static (bool success, string? response) AskAiForStudy(string audioFile, string prompt, string engine = "gemini")
+    static (bool success, string? response) AskAiForStudy(string audioFile, string prompt, string engine = "gemini", bool freshSession = false)
     {
         // Write prompt to temp file (too long for command line arg)
         var promptFile = Path.Combine(Path.GetTempPath(), $"whisper_study_prompt_{DateTime.Now:HHmmss}.txt");
@@ -481,8 +534,10 @@ internal partial class Program
                 askArgs.Add("120");
                 askArgs.Add("--target-tag");
                 askArgs.Add($"{engine}-whisper"); // dedicated tab: never shares with triad/normal ask tabs
+                if (freshSession)
+                    askArgs.Add("--new-session"); // clear stale tab context on retry
 
-                Console.WriteLine($"[STUDY] Calling: ask {engine} <{askArgs.Count - 2} lines> {Path.GetFileName(audioFile)} --timeout 120 --target-tag {engine}-whisper");
+                Console.WriteLine($"[STUDY] Calling: ask {engine} <{askArgs.Count - 2} lines> {Path.GetFileName(audioFile)} --timeout 120 --target-tag {engine}-whisper{(freshSession ? " --new-session" : "")}");
                 AskCommand(askArgs.ToArray());
             }
             finally

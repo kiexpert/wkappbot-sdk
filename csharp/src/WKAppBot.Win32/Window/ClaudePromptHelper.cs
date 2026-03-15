@@ -717,6 +717,32 @@ public sealed class ClaudePromptHelper : IDisposable
     }
 
     /// <summary>
+    /// Inject text into prompt without submitting. Focusless-only.
+    /// Codex: WM_CHAR to renderer. Claude Desktop: MSAA put_accValue.
+    /// VS Code Claude Code: clipboard paste only (no Enter).
+    /// Returns false if focusless injection not possible for this host.
+    /// </summary>
+    public bool InjectTextOnly(PromptInfo prompt, string text)
+    {
+        if (prompt.HostType == HostCodexDesktop)
+            return TryPostMessageTextToChromiumRenderer(prompt, text, submit: false);
+        if (prompt.HostType == HostVsCodeClaudeCode)
+        {
+            SetClipboardText(text);
+            var prevFg = NativeMethods.GetForegroundWindow();
+            NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+            Thread.Sleep(150);
+            KeyboardInput.Hotkey(new[] { "ctrl", "v" });
+            Thread.Sleep(100);
+            if (prevFg != IntPtr.Zero && prevFg != prompt.WindowHandle)
+                NativeMethods.SmartSetForegroundWindow(prevFg);
+            return true;
+        }
+        // Claude Desktop: MSAA put_accValue (no submit)
+        return TryFocuslessInputNoSubmit(prompt, text);
+    }
+
+    /// <summary>
     /// Type text into the Claude prompt and submit with Enter.
     /// Strategy (2-tier):
     ///   1. Focusless: MSAA put_accValue via direct vtable (no focus steal!)
@@ -922,6 +948,17 @@ public sealed class ClaudePromptHelper : IDisposable
     /// Priority: MSAA put_accValue (direct vtable) → LegacyIAccessible.SetValue (UIA bridge).
     /// Returns true if text was successfully inserted AND submitted.
     /// </summary>
+    private bool TryFocuslessInputNoSubmit(PromptInfo prompt, string text)
+    {
+        // IA2 insertText — focusless, no submit
+        if (TryIA2InsertText(prompt, text))
+        {
+            Console.WriteLine("  [PROMPT] IA2 insert (no submit) OK");
+            return true;
+        }
+        return false;
+    }
+
     private bool TryFocuslessInput(PromptInfo prompt, string text)
     {
         try

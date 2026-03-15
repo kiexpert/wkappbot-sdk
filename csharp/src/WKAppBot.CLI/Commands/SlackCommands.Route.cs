@@ -184,7 +184,7 @@ internal partial class Program
             // Delete previous ack for this thread (if any)
             var oldAcks = LoadPendingAcks();
             if (oldAcks.TryGetValue(threadKey, out var oldAck))
-                Task.Run(async () => await SlackDeleteMessageAsync(botToken, oldAck.Channel, oldAck.AckTs)).Wait(3000);
+                Task.Run(async () => await SlackDeleteMessageAsync(botToken, oldAck.Channel, oldAck.AckTs, guardThreadStarter: false)).Wait(3000);
 
             SavePendingAck(threadKey, channel, ackTs);
         }

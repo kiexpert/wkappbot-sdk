@@ -492,6 +492,29 @@ internal partial class Program
                     Console.Write("  [OS]   ");
                     Console.ResetColor();
                     Console.WriteLine(Path.GetRelativePath(DataDir, osDir));
+
+                    // Recent captures (latest 3)
+                    var captures = Directory.GetFiles(osDir, "capture_*.png")
+                        .OrderByDescending(File.GetLastWriteTime).Take(3).ToArray();
+                    if (captures.Length > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
+                        Console.Write("  [CAP]  ");
+                        Console.ResetColor();
+                        Console.WriteLine(string.Join("  ", captures.Select(Path.GetFileName)));
+                    }
+
+                    // Recent info files: non-PNG, latest 5 by mtime (filename only)
+                    var infoFiles = Directory.GetFiles(osDir)
+                        .Where(f => !Path.GetExtension(f).Equals(".png", StringComparison.OrdinalIgnoreCase))
+                        .OrderByDescending(File.GetLastWriteTime).Take(5).ToArray();
+                    if (infoFiles.Length > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
+                        Console.Write("  [INFO] ");
+                        Console.ResetColor();
+                        Console.WriteLine(string.Join("  ", infoFiles.Select(Path.GetFileName)));
+                    }
                 }
             }
 
@@ -1261,7 +1284,7 @@ internal partial class Program
   --no-learn:  Skip per-control experience DB learning.");
 
         string title = args[0];
-        string output = GetArgValue(args, "-o") ?? $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+        string? output = GetArgValue(args, "-o");
         string? formId = GetArgValue(args, "--form");
         bool skipLearn = args.Any(a => a.Equals("--no-learn", StringComparison.OrdinalIgnoreCase));
 
@@ -1274,6 +1297,19 @@ internal partial class Program
 
         var win = windows[0];
         AppScanResult? scanResult = null;
+
+        // Default save location: experience/{proc}/{class}/ (same dir as inspect/scan data)
+        if (output == null)
+        {
+            NativeMethods.GetWindowThreadProcessId(win.Handle, out uint capPid);
+            string? capProc = null;
+            try { capProc = System.Diagnostics.Process.GetProcessById((int)capPid).ProcessName; } catch { }
+            var safeProc = SanitizePathToken(capProc ?? "unknown");
+            var safeClass = SanitizePathToken(win.ClassName);
+            var expDir = Path.Combine(DataDir, "experience", safeProc, safeClass);
+            Directory.CreateDirectory(expDir);
+            output = Path.Combine(expDir, $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+        }
 
         if (formId != null)
         {
@@ -1303,14 +1339,14 @@ internal partial class Program
             // Capture the MDI child window directly
             using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(form.Handle);
             WKAppBot.Win32.Input.ScreenCapture.SaveToFile(bmp, output);
-            Console.WriteLine($"Saved: {output} ({bmp.Width}x{bmp.Height})");
+            Console.WriteLine($"Saved: {Path.GetFullPath(output)} ({bmp.Width}x{bmp.Height})");
         }
         else
         {
             Console.WriteLine($"Capturing: {win}");
             using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(win.Handle);
             WKAppBot.Win32.Input.ScreenCapture.SaveToFile(bmp, output);
-            Console.WriteLine($"Saved: {output} ({bmp.Width}x{bmp.Height})");
+            Console.WriteLine($"Saved: {Path.GetFullPath(output)} ({bmp.Width}x{bmp.Height})");
         }
 
         // Per-control experience learning (auto when profile exists)

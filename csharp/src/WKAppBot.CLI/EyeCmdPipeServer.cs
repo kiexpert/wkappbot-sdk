@@ -17,11 +17,14 @@ internal static class EyeCmdPipeServer
 {
     internal const string PipeName = "WKAppBotCmdPipe";
     internal const string EndMarker = "\x00END";
-    internal const string CwdPrefix = "__cwd:";
+    internal const string CwdPrefix  = "__cwd:";
+    internal const string HwndPrefix = "__hwnd:";
     internal const string BgFlag = "__bg";
 
     /// <summary>Per-command caller CWD (set by Launcher, read by GetSessionTag)</summary>
     internal static readonly AsyncLocal<string?> CallerCwd = new();
+    /// <summary>Per-command caller foreground HWND hint (set by Launcher for direct prompt window lookup)</summary>
+    internal static readonly AsyncLocal<IntPtr?> CallerHwnd = new();
 
     public static void StartServer() => Task.Run(ServerLoop);
 
@@ -79,11 +82,21 @@ internal static class EyeCmdPipeServer
                 var args = JsonSerializer.Deserialize<string[]>(line ?? "[]") ?? [];
                 pw = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
 
-                // Extract CWD prefix (prepended by Launcher, backward-compatible)
+                // Extract CWD + HWND prefixes (prepended by Launcher, backward-compatible)
                 string? callerCwd = null;
-                if (args.Length > 0 && args[0].StartsWith(CwdPrefix, StringComparison.Ordinal))
+                IntPtr? callerHwnd = null;
+                while (args.Length > 0 && (args[0].StartsWith(CwdPrefix, StringComparison.Ordinal)
+                                        || args[0].StartsWith(HwndPrefix, StringComparison.Ordinal)))
                 {
-                    callerCwd = args[0].Substring(CwdPrefix.Length);
+                    if (args[0].StartsWith(CwdPrefix, StringComparison.Ordinal))
+                        callerCwd = args[0].Substring(CwdPrefix.Length);
+                    else if (args[0].StartsWith(HwndPrefix, StringComparison.Ordinal))
+                    {
+                        var hwndStr = args[0].Substring(HwndPrefix.Length);
+                        if (long.TryParse(hwndStr.TrimStart('0', 'x').TrimStart('0', 'X'),
+                                System.Globalization.NumberStyles.HexNumber, null, out var hwndVal))
+                            callerHwnd = new IntPtr(hwndVal);
+                    }
                     args = args[1..];
                 }
 
@@ -97,12 +110,12 @@ internal static class EyeCmdPipeServer
                         args = [..args, "--slack"];
                     await pw.WriteLineAsync("[BG] Running in background (result → Slack)");
                     await pw.WriteLineAsync($"{EndMarker} 0");
-                    var bgArgs = args; var bgCwd = callerCwd;
-                    _ = Task.Run(() => RunInEye(bgArgs, TextWriter.Null, bgCwd));
+                    var bgArgs = args; var bgCwd = callerCwd; var bgHwnd = callerHwnd;
+                    _ = Task.Run(() => RunInEye(bgArgs, TextWriter.Null, bgCwd, bgHwnd));
                 }
                 else
                 {
-                    int code = RunInEye(args, pw, callerCwd);
+                    int code = RunInEye(args, pw, callerCwd, callerHwnd);
                     await pw.WriteLineAsync($"{EndMarker} {code}");
                 }
             }
@@ -114,7 +127,7 @@ internal static class EyeCmdPipeServer
         }
     }
 
-    static int RunInEye(string[] args, TextWriter pipeWriter, string? callerCwd)
+    static int RunInEye(string[] args, TextWriter pipeWriter, string? callerCwd, IntPtr? callerHwnd = null)
     {
         // Build per-command log file path (same convention as Program.cs non-Eye mode)
         var logDir = Path.Combine(Program.DataDir, "logs");
@@ -128,8 +141,9 @@ internal static class EyeCmdPipeServer
         // AsyncLocal routing isolates this command's output from concurrent commands.
         var tee = new TeeTextWriter(pipeWriter, logFile);
         int code;
-        // CallerCwd stored in AsyncLocal — propagates to all async continuations of this command
+        // CallerCwd + CallerHwnd stored in AsyncLocal — propagates to all async continuations of this command
         CallerCwd.Value = callerCwd;
+        CallerHwnd.Value = callerHwnd;
         // RunningInEye=true prevents Program.cs from creating a second TeeTextWriter (duplicate log)
         Program.RunningInEye = true;
         using (ThreadRoutingWriter.Route(tee))

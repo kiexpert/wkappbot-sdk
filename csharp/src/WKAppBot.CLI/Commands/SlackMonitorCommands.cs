@@ -80,10 +80,10 @@ internal partial class Program
 
     /// <summary>
     /// Build Slack bot username from the active prompt window cards (Eye-cached).
-    /// Priority: callerCwd match → most-recent card → null (no cards).
+    /// Priority: callerHwnd exact match → callerCwd match → most-recent card → null (no cards).
     /// ParentName mapping: "claude"/"code"/"Code" → 클롣, "codex" → 코뎃, else → 앱봇.
     /// </summary>
-    static string? GetBotUsernameFromCachedCards(string? callerCwd = null)
+    static string? GetBotUsernameFromCachedCards(string? callerCwd = null, IntPtr? callerHwnd = null)
     {
         var cards = _cachedCards;
         // If no cards yet (Eye just started, first tick not done), build inline from tick files + prompts
@@ -97,6 +97,22 @@ internal partial class Program
 
         EyeParentCard? best = null;
 
+        // 0. Direct hwnd match — fastest path when iterating prompt windows
+        if (callerHwnd.HasValue && callerHwnd.Value != IntPtr.Zero)
+        {
+            var hwndPrompt = ClaudePromptHelper.GetAllCachedPrompts()
+                .FirstOrDefault(p => p.WindowHandle == callerHwnd.Value);
+            if (hwndPrompt != null)
+            {
+                var hwndPrefix = hwndPrompt.HostType?.Contains("codex") == true ? SlackCodexPrefix : SlackClaudePrefix;
+                var hwndCwd = hwndPrompt.HostType == "vscode-claudecode"
+                    ? ExtractCwdFromVsCodeTitle(hwndPrompt.WindowTitle)
+                    : callerCwd;
+                var hwndTag = !string.IsNullOrEmpty(hwndCwd) ? AbbreviateCwd(hwndCwd) : null;
+                return !string.IsNullOrWhiteSpace(hwndTag) ? $"{hwndPrefix}[{hwndTag}]" : hwndPrefix;
+            }
+        }
+
         // 1. Exact CWD match (caller CWD from pipe)
         if (!string.IsNullOrWhiteSpace(callerCwd))
         {
@@ -106,8 +122,33 @@ internal partial class Program
                     StringComparison.OrdinalIgnoreCase));
         }
 
-        // 2. Most-recently-updated card
-        if (best == null)
+        // 1b. Prompt window match via callerCwd (title-based — no card needed)
+        // "부모창 우선 확인": if we know the callerCwd, check VS Code windows by title first.
+        if (best == null && !string.IsNullOrWhiteSpace(callerCwd) && !IsSystemOrInstallDirectory(callerCwd))
+        {
+            var matchPrompt = ClaudePromptHelper.GetAllCachedPrompts()
+                .FirstOrDefault(p =>
+                {
+                    if (p.HostType != "vscode-claudecode") return false;
+                    var pCwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
+                    return !string.IsNullOrEmpty(pCwd) && string.Equals(
+                        pCwd.TrimEnd('\\', '/'), callerCwd.TrimEnd('\\', '/'),
+                        StringComparison.OrdinalIgnoreCase);
+                });
+            if (matchPrompt != null)
+            {
+                var matchPrefix = matchPrompt.HostType?.Contains("codex") == true ? SlackCodexPrefix : SlackClaudePrefix;
+                var matchTag = AbbreviateCwd(callerCwd);
+                return !string.IsNullOrWhiteSpace(matchTag) ? $"{matchPrefix}[{matchTag}]" : matchPrefix;
+            }
+            // callerCwd is known but no card/window matched — build directly from callerCwd
+            var directTag = AbbreviateCwd(callerCwd);
+            if (!string.IsNullOrWhiteSpace(directTag))
+                return $"{SlackClaudePrefix}[{directTag}]";
+        }
+
+        // 2. Most-recently-updated card (only when callerCwd is unknown)
+        if (best == null && string.IsNullOrWhiteSpace(callerCwd))
             best = cards.OrderByDescending(c => c.LastTsUtc).FirstOrDefault();
 
         if (best == null) return null;
@@ -124,8 +165,48 @@ internal partial class Program
         else
             return null; // unknown ParentName — let caller fall through to other detection
 
-        var cwdTag = string.IsNullOrWhiteSpace(best.Cwd) ? GetSlackFolderTag() : AbbreviateCwd(best.Cwd);
+        // claude-desktop: global instance, no CWD tag (install dir would abbreviate to "Claude")
+        // VS Code (Code.exe): CWD tag meaningful, but skip system/install dirs
+        if (pname == "claude" || pname == "claude.exe")
+            return prefix;
+
+        string? cwdTag = null;
+        if (!string.IsNullOrWhiteSpace(best.Cwd) && !IsSystemOrInstallDirectory(best.Cwd))
+            cwdTag = AbbreviateCwd(best.Cwd);
+        if (cwdTag == null)
+            cwdTag = GetSlackFolderTag();
         return $"{prefix}[{cwdTag}]";
+    }
+
+    /// <summary>
+    /// Walk the caller's process ancestry and return the first prompt window hwnd
+    /// that belongs to one of our known Claude/VS Code/Codex instances.
+    /// Returns IntPtr.Zero if not found.
+    /// </summary>
+    static IntPtr FindCallerParentPromptHwnd()
+    {
+        try
+        {
+            var known = ClaudePromptHelper.GetAllCachedPrompts()
+                .Where(p => p.HostType is "vscode-claudecode" or "claude-desktop" or "codex-desktop")
+                .ToList();
+            if (known.Count == 0) return IntPtr.Zero;
+
+            int pid = Process.GetCurrentProcess().Id;
+            for (int depth = 0; depth < 8; depth++)
+            {
+                foreach (var pi in known)
+                {
+                    NativeMethods.GetWindowThreadProcessId(pi.WindowHandle, out uint winPid);
+                    if ((int)winPid == pid) return pi.WindowHandle;
+                }
+                var ppid = GetParentPidForCodexCheck(pid);
+                if (ppid <= 0) break;
+                pid = ppid;
+            }
+        }
+        catch { }
+        return IntPtr.Zero;
     }
 
     static string? GetSendReplyUsername(bool printDecision = false)
@@ -134,7 +215,10 @@ internal partial class Program
 
         // Priority 1: prompt window cards (app type + CWD from actual Claude/Codex instances)
         var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
-        var cardUsername = GetBotUsernameFromCachedCards(callerCwd);
+        // Prefer pipe-delivered hwnd (Launcher sends GetForegroundWindow) — faster than process-tree walk.
+        // Fall back to process tree walk when running Core directly (no Eye pipe, no CallerHwnd).
+        var callerHwnd = EyeCmdPipeServer.CallerHwnd.Value ?? FindCallerParentPromptHwnd();
+        var cardUsername = GetBotUsernameFromCachedCards(callerCwd, callerHwnd);
         if (!string.IsNullOrEmpty(cardUsername))
             username = cardUsername;
         // Priority 2: certain process-ancestry detection
@@ -554,22 +638,10 @@ internal partial class Program
         _ => "Claude"
     };
 
-    static readonly string SlackCodexPrefix =
-        string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_CODEX_PREFIX"))
-            ? "코뎃"
-            : Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_CODEX_PREFIX")!.Trim();
-    static readonly string SlackClaudePrefix =
-        string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_CLAUDE_PREFIX"))
-            ? "클롣"
-            : Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_CLAUDE_PREFIX")!.Trim();
-    static readonly string SlackGenericPrefix =
-        string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_GENERIC_PREFIX"))
-            ? "앱봇"
-            : Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_GENERIC_PREFIX")!.Trim();
-    static readonly string SlackBroadcastUsername =
-        string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_BROADCAST_NAME"))
-            ? "앱봇아이"
-            : Environment.GetEnvironmentVariable("WKAPPBOT_SLACK_BROADCAST_NAME")!.Trim();
+    const string SlackCodexPrefix = "코덳앱";
+    const string SlackClaudePrefix = "클롣";
+    const string SlackGenericPrefix = "앱봇";
+    const string SlackBroadcastUsername = "앱봇아이";
 
     static string GetSlackFolderTag()
     {
@@ -824,10 +896,22 @@ internal partial class Program
 
     /// <summary>
     /// Delete a Slack message via chat.delete API.
-    /// Used to clean up old status messages when relocating to bottom of channel.
+    /// guardThreadStarter=true (default): refuses to delete if the message has replies (is a thread starter).
+    /// Pass false for ack/reply messages that are themselves inside threads (not thread starters).
     /// </summary>
-    static async Task<bool> SlackDeleteMessageAsync(string botToken, string channel, string ts)
+    static async Task<bool> SlackDeleteMessageAsync(string botToken, string channel, string ts,
+        bool guardThreadStarter = true)
     {
+        if (guardThreadStarter)
+        {
+            var hasReplies = await SlackMessageHasRepliesAsync(botToken, channel, ts);
+            if (hasReplies)
+            {
+                Console.WriteLine($"[SLACK] SKIP delete ts={ts} — thread starter (has replies)");
+                return false;
+            }
+        }
+
         using var http = new HttpClient();
         var payload = JsonSerializer.Serialize(new { channel, ts });
         var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
@@ -880,6 +964,33 @@ internal partial class Program
         return ts;
     }
 
+    /// <summary>
+    /// Check if a specific Slack message has any replies.
+    /// Uses conversations.replies (more reliable than history reply_count field).
+    /// Returns true on API failure (conservative: don't delete if uncertain).
+    /// </summary>
+    static async Task<bool> SlackMessageHasRepliesAsync(string botToken, string channel, string messageTs)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            using var req = new HttpRequestMessage(HttpMethod.Get,
+                $"https://slack.com/api/conversations.replies?channel={Uri.EscapeDataString(channel)}&ts={Uri.EscapeDataString(messageTs)}&limit=2");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+
+            var resp = await http.SendAsync(req);
+            var body = await resp.Content.ReadAsStringAsync();
+            var json = JsonSerializer.Deserialize<JsonNode>(body);
+            if (json?["ok"]?.GetValue<bool>() != true) return true; // API error → assume has replies (don't delete)
+
+            // conversations.replies returns the parent message + replies.
+            // If count > 1, there is at least one reply.
+            var messages = json?["messages"]?.AsArray();
+            return (messages?.Count ?? 0) > 1;
+        }
+        catch { return true; } // Network/parse error → assume has replies (don't delete)
+    }
+
     // ── Pending Ack file-based IPC ──────────────────────────────
     // Shared between AppBotEye (writes ack ts) and CLI (reads + deletes ack before replying)
     // File: wkappbot.hq/runtime/pending_acks.json
@@ -919,7 +1030,7 @@ internal partial class Program
 
             // Actually delete the Slack message
             var deleted = Task.Run(async () =>
-                await SlackDeleteMessageAsync(botToken, entry.Channel, entry.AckTs)).GetAwaiter().GetResult();
+                await SlackDeleteMessageAsync(botToken, entry.Channel, entry.AckTs, guardThreadStarter: false)).GetAwaiter().GetResult();
             if (deleted)
                 Console.WriteLine($"[SLACK] Deleted pending ack in thread {threadTs}");
             return deleted;

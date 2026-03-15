@@ -561,6 +561,7 @@ internal partial class Program
 
         // Collect delete candidates
         var toDelete = new List<(string ts, string preview)>();
+        var toSkipThreadStarter = new List<(string ts, string preview, int replies)>();
 
         var header = threadTs != null
             ? $"[SLACK] Thread ({messages.Count} messages):"
@@ -652,15 +653,27 @@ internal partial class Program
             Console.ResetColor();
 
             // Check delete pattern
-            if (deletePattern != null && replyCount == 0
-                && WildcardMatch(text, deletePattern))
+            if (deletePattern != null && WildcardMatch(text, deletePattern))
             {
-                toDelete.Add((ts, preview));
+                if (replyCount > 0)
+                    toSkipThreadStarter.Add((ts, preview, replyCount)); // thread starter — refuse delete
+                else
+                    toDelete.Add((ts, preview));
             }
         }
 
         Console.WriteLine(new string('─', 120));
         Console.WriteLine($"  Total: {messages.Count} messages");
+
+        // ── Thread-starter protection: warn and refuse ──
+        if (deletePattern != null && toSkipThreadStarter.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"\n[SLACK] ✗ REFUSED — {toSkipThreadStarter.Count} thread-starter(s) matched but will NOT be deleted (has replies):");
+            Console.ResetColor();
+            foreach (var (ts, preview, rc) in toSkipThreadStarter)
+                Console.WriteLine($"  ✗ SKIP {ts} | 💬{rc} | {preview}");
+        }
 
         // ── Delete matching messages ──
         if (deletePattern != null && toDelete.Count > 0)
@@ -672,7 +685,7 @@ internal partial class Program
             foreach (var (ts, preview) in toDelete)
             {
                 var ok = Task.Run(async () =>
-                    await SlackDeleteMessageAsync(botToken, channel, ts))
+                    await SlackDeleteMessageAsync(botToken, channel, ts, guardThreadStarter: false)) // pre-scanned r=0
                     .GetAwaiter().GetResult();
                 var status = ok ? "✓" : "✗";
                 Console.WriteLine($"  {status} {ts} | {preview}");
@@ -681,12 +694,71 @@ internal partial class Program
             }
             Console.WriteLine($"  Deleted: {deleted}/{toDelete.Count}");
         }
-        else if (deletePattern != null)
+        else if (deletePattern != null && toSkipThreadStarter.Count == 0)
         {
             Console.WriteLine($"\n[SLACK] No r=0 messages matching \"{deletePattern}\".");
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// wkappbot slack delete &lt;ts&gt; [ts2 ts3 ...] [--force]
+    /// Delete one or more Slack messages by timestamp.
+    /// Thread-starter messages (has replies) are refused unless --force is given.
+    /// </summary>
+    static int SlackDeleteCommand(string[] args)
+    {
+        var config = LoadSlackConfig();
+        if (config == null) return 1;
+        var botToken = config["bot_token"]?.GetValue<string>();
+        var channel = config["channel"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
+        {
+            Console.WriteLine("[SLACK] bot_token or channel missing in config.");
+            return 1;
+        }
+
+        bool force = args.Contains("--force");
+        var tsList = args.Skip(1)
+            .Where(a => !a.StartsWith("--") && a.Contains('.') && char.IsDigit(a[0]))
+            .ToList();
+
+        if (tsList.Count == 0)
+        {
+            Console.WriteLine("Usage: wkappbot slack delete <ts> [ts2 ...] [--force]");
+            Console.WriteLine("  ts: message timestamp (e.g. 1773554407.386809)");
+            Console.WriteLine("  --force: delete even if the message is a thread starter (has replies)");
+            return 1;
+        }
+
+        int deleted = 0, skipped = 0, failed = 0;
+        foreach (var ts in tsList)
+        {
+            var ok = Task.Run(async () =>
+                await SlackDeleteMessageAsync(botToken, channel, ts, guardThreadStarter: !force))
+                .GetAwaiter().GetResult();
+
+            if (ok)
+            {
+                Console.WriteLine($"  ✓ {ts}");
+                deleted++;
+            }
+            else
+            {
+                // Check if it was a thread-starter skip or an actual API failure
+                // SlackDeleteMessageAsync logs SKIP message itself when guardThreadStarter fires
+                Console.WriteLine($"  ✗ {ts}");
+                if (!force)
+                    skipped++;
+                else
+                    failed++;
+            }
+            if (tsList.Count > 1) Thread.Sleep(300); // rate limit
+        }
+
+        Console.WriteLine($"  Deleted: {deleted}/{tsList.Count}" + (skipped > 0 ? $" | Skipped (thread-starter): {skipped}" : ""));
+        return deleted > 0 ? 0 : 1;
     }
 
 }

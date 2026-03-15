@@ -55,6 +55,8 @@ internal partial class Program
         var includeHidden = args.Contains("--all");
         var depth = ParseIntFlag(args, "--depth", 3, 1, 8);
         var limit = ParseIntFlag(args, "--limit", 12, 1, 100);
+        var injectText = GetArgValue(args, "--inject");
+        var injectSubmit = args.Contains("--submit");
         var names = ParseNameArgs(args);
         var hints = BuildAuthorHints(names);
         var hostTarget = ResolveHostTarget(hints);
@@ -253,18 +255,44 @@ internal partial class Program
             }
         }
 
+        // ── --inject: focusless text injection test ──────────────────────────
+        // Only injects into --target <grap> window, or if not specified → codex-desktop only (safe default)
+        if (!string.IsNullOrEmpty(injectText))
+        {
+            Console.WriteLine();
+            var injectTarget = GetArgValue(args, "--target");
+            Console.WriteLine($"[PROMPT-PROBE] === Inject Test (submit={injectSubmit} target={injectTarget ?? "codex-only"}) ===");
+            ClaudePromptHelper.AllowFocusSteal = injectSubmit;
+
+            var targets = allPrompts.Where(p =>
+                injectTarget != null
+                    ? (p.WindowTitle?.Contains(injectTarget, StringComparison.OrdinalIgnoreCase) == true
+                       || p.HostType?.Contains(injectTarget, StringComparison.OrdinalIgnoreCase) == true)
+                    : p.HostType == "codex-desktop"
+            ).ToList();
+
+            if (targets.Count == 0)
+            {
+                Console.WriteLine("  no matching prompt windows for injection");
+            }
+            else
+            {
+                foreach (var p in targets)
+                {
+                    Console.Write($"  [{p.HostType}] 0x{p.WindowHandle:X} \"{TrimForLog(p.WindowTitle, 40)}\" → ");
+                    bool ok = injectSubmit
+                        ? helper.TypeAndSubmit(p, injectText)
+                        : helper.InjectTextOnly(p, injectText);
+                    Console.WriteLine(ok ? "OK" : "FAIL");
+                }
+            }
+        }
+
         Console.WriteLine();
         Console.WriteLine("[PROMPT-PROBE] Done.");
         return 0;
     }
 
-    static string GetLastOutputLine(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return "(empty)";
-        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var last = lines.LastOrDefault(l => l.Length >= 4) ?? text.Trim();
-        return last.Length > 120 ? last[..120] + "…" : last;
-    }
 
     static bool DumpWindowRuntimeState(IntPtr hWnd)
     {
@@ -762,9 +790,15 @@ internal partial class Program
             cwd = ExtractCwdFromVsCodeTitle(prompt.WindowTitle);
             cwdSource = cwd != null ? $"vscode-title:{cwd}" : "vscode-title:failed";
         }
+        else if (host == "codex-desktop")
+        {
+            // Codex: UIA app-header-portal-main button → project folder name (타이틀은 항상 "Codex")
+            cwd = ExtractCwdFromCodexWindow(prompt.WindowHandle);
+            cwdSource = cwd != null ? $"codex-uia:{cwd}" : "codex-uia:failed";
+        }
         else
         {
-            // Codex / Claude Desktop: read process CWD via PEB
+            // Claude Desktop: read process CWD via PEB
             cwd = NativeMethods.GetProcessCurrentDirectory(pid);
             cwdSource = cwd != null ? $"proc-cwd:{cwd}" : "proc-cwd:failed";
         }

@@ -80,39 +80,42 @@ internal partial class Program
                 // Word = filename up to last _NNNN suffix (e.g., "안녕_0001" → "안녕")
                 var word = ExtractWordFromSliceName(name);
 
-                var (code, voicedCount) = ExtractFirstSyllableCodeEx(mp3);
-                if (code == 0)
+                // FSA trie: extract per-syllable code sequence → each code = one folder level
+                var (syllables, totalVoiced) = ExtractSyllableSequence(mp3);
+                if (syllables.Count == 0)
                 {
                     skipped++;
                     Console.WriteLine($"[INDEX] SKIP  {name} (no voiced frame)");
                     continue;
                 }
 
-                // Too few voiced frames → incomplete/ambiguous phoneme → Recycle Bin
-                if (voicedCount < MinVoicedFrames)
+                // Too few voiced frames → incomplete/ambiguous → Recycle Bin
+                if (totalVoiced < MinVoicedFrames)
                 {
                     trashed++;
-                    Console.WriteLine($"[INDEX] TRASH {name} ({voicedCount} frames < {MinVoicedFrames})");
+                    Console.WriteLine($"[INDEX] TRASH {name} ({totalVoiced} frames < {MinVoicedFrames})");
                     if (!dryRun)
                         FileSystem.DeleteFile(mp3, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                     continue;
                 }
 
-                var codeStr = FormatIndexCode(code);
-                var destDir = Path.Combine(outDir, codeStr);
+                // Build trie path: phoneme_db/<code0>/<code1>/<code2>/...
+                var destDir = syllables.Aggregate(outDir,
+                    (dir, sc) => Path.Combine(dir, FormatIndexCode(sc)));
 
-                // Avoid collisions: keep original seq suffix for dedup
+                var pathStr = string.Join("/", syllables.Select(FormatIndexCode));
+
+                // Avoid collisions
                 var destFile = Path.Combine(destDir, $"{word}{Path.GetExtension(mp3)}");
                 if (File.Exists(destFile))
                 {
-                    // Append seq number from original name to avoid overwrite
                     var match = System.Text.RegularExpressions.Regex.Match(name, @"_(\d+)$");
                     var seq   = match.Success ? match.Groups[1].Value : "dup";
                     destFile  = Path.Combine(destDir, $"{word}_{seq}{Path.GetExtension(mp3)}");
                 }
 
                 ok++;
-                Console.WriteLine($"[INDEX] {codeStr}/  {word}  ← {name}");
+                Console.WriteLine($"[INDEX] {pathStr}/  {word}  ← {name}  ({syllables.Count} syllables)");
 
                 if (!dryRun)
                 {
@@ -258,6 +261,113 @@ internal partial class Program
             .OrderByDescending(g => g.Count())
             .First().Key;
         return (dominant, syllableCodes.Count);
+    }
+
+    /// <summary>
+    /// Extract RLE-deduplicated token sequence from MP3 for FSA trie path.
+    /// Returns (tokenList, totalVoicedFrames).
+    /// Each entry = one distinct token (consecutive duplicates collapsed).
+    /// </summary>
+    static (List<ushort> syllables, int totalVoiced) ExtractSyllableSequence(string mp3Path, int maxSyllables = 8)
+    {
+        const int HalfFft = IdxFftSize / 2;
+
+        var hann = new float[IdxFftSize];
+        for (int i = 0; i < IdxFftSize; i++)
+            hann[i] = 0.5f * (1f - MathF.Cos(2f * MathF.PI * i / IdxFftSize));
+
+        var pcm = new List<float>(IdxSampleRate * 3);
+        using (var reader = new Mp3FileReader(mp3Path))
+        {
+            var fmt = new WaveFormat(IdxSampleRate, 16, 1);
+            using var rs = new MediaFoundationResampler(reader, fmt) { ResamplerQuality = 6 };
+            var buf = new byte[IdxFftSize * 2];
+            int n;
+            while ((n = rs.Read(buf, 0, buf.Length)) > 0)
+                for (int i = 0; i < n - 1; i += 2)
+                    pcm.Add((short)(buf[i] | (buf[i + 1] << 8)) / 32768f);
+        }
+        if (pcm.Count < IdxFftSize) return ([], 0);
+
+        // Pass 1: raw band energies for noise floor
+        int frameCount = (pcm.Count - IdxFftSize) / (IdxFftSize / 2) + 1;
+        var allRaw = new double[frameCount][];
+        var fftBuf = new Complex[IdxFftSize];
+        int fi = 0;
+        for (int off = 0; off + IdxFftSize <= pcm.Count; off += IdxFftSize / 2, fi++)
+        {
+            for (int i = 0; i < IdxFftSize; i++)
+            {
+                float s = pcm[off + i];
+                if (i > 0) s -= IdxPreEmph * pcm[off + i - 1];
+                fftBuf[i] = new Complex(s * hann[i], 0);
+            }
+            WhisperEngine.Fft(fftBuf);
+            var raw = new double[IdxBandCount];
+            for (int b = 0; b < IdxBandCount; b++)
+            {
+                int loK = IndexBands[b].Lo * IdxFftSize / IdxSampleRate;
+                int hiK = IndexBands[b].Hi * IdxFftSize / IdxSampleRate;
+                for (int k = Math.Max(1, loK); k < Math.Min(HalfFft, hiK); k++)
+                    raw[b] += fftBuf[k].Magnitude;
+            }
+            allRaw[fi] = raw;
+        }
+        frameCount = fi;
+
+        var noise = new double[IdxBandCount];
+        for (int b = 0; b < IdxBandCount; b++)
+        {
+            var sorted = allRaw.Take(frameCount).Select(r => r[b]).OrderBy(v => v).ToArray();
+            int idx20  = Math.Max(0, (int)(sorted.Length * 0.20) - 1);
+            noise[b]   = sorted[idx20];
+        }
+
+        // Pass 2: RLE-deduplicate tokens → FSA trie path (one folder per distinct token)
+        var tokens      = new List<ushort>();
+        int totalVoiced = 0;
+        ushort lastSc   = 0;
+        var    ranked   = new int[IdxBandCount];
+
+        for (int f = 0; f < frameCount; f++)
+        {
+            var raw   = allRaw[f];
+            var clean = new double[IdxBandCount];
+            for (int b = 0; b < IdxBandCount; b++)
+                clean[b] = Math.Max(0, raw[b] - noise[b]);
+
+            for (int b = 0; b < IdxBandCount; b++) ranked[b] = b;
+            for (int i = 1; i < IdxBandCount; i++)
+            {
+                int k = ranked[i]; double kv = clean[k]; int j = i - 1;
+                while (j >= 0 && clean[ranked[j]] < kv) { ranked[j + 1] = ranked[j]; j--; }
+                ranked[j + 1] = k;
+            }
+            ushort sc = 0;
+            for (int r = 0; r < 5; r++)
+            {
+                int idx  = ranked[r];
+                int gray = idx ^ (idx >> 1);
+                sc |= (ushort)(gray << (12 - r * 3));
+            }
+            if (clean[ranked[0]] < noise[ranked[0]] * 1.5) sc = 0;
+
+            if (sc != 0)
+            {
+                totalVoiced++;
+                if (sc != lastSc) // RLE: skip consecutive duplicates
+                {
+                    if (tokens.Count < maxSyllables) tokens.Add(sc);
+                    lastSc = sc;
+                }
+            }
+            else
+            {
+                lastSc = 0; // silence resets RLE — next voiced token always added
+            }
+        }
+
+        return (tokens, totalVoiced);
     }
 
     /// <summary>
