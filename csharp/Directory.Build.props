@@ -1,5 +1,27 @@
 <Project>
   <PropertyGroup>
-    <WKAppBotVersion>4.1.0</WKAppBotVersion>
+    <!-- Major.Minor set manually on each minor/major bump. Patch is auto-counted from git tag v$(WKAppBotBaseVersion). -->
+    <WKAppBotBaseVersion>4.1</WKAppBotBaseVersion>
+    <WKAppBotVersion>$(WKAppBotBaseVersion).0</WKAppBotVersion>
   </PropertyGroup>
+
+  <!--
+    Auto-patch: counts commits since tag v$(WKAppBotBaseVersion).
+    Overrides $(Version) before GetAssemblyVersion runs.
+    To start a new minor cycle: bump WKAppBotBaseVersion and create a new git tag v4.2 etc.
+  -->
+  <Target Name="_WKAutoVersion" BeforeTargets="GetAssemblyVersion">
+    <Exec Command="git rev-list --count v$(WKAppBotBaseVersion)..HEAD"
+          ConsoleToMSBuild="true"
+          IgnoreExitCode="true"
+          WorkingDirectory="$(MSBuildThisFileDirectory)">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_WKPatch" />
+    </Exec>
+    <PropertyGroup>
+      <_WKPatch Condition="'$(_WKPatch)' == ''">0</_WKPatch>
+      <Version>$(WKAppBotBaseVersion).$(_WKPatch.Trim())</Version>
+      <WKAppBotVersion>$(Version)</WKAppBotVersion>
+    </PropertyGroup>
+    <Message Text="[WKAppBot] version: $(WKAppBotVersion)" Importance="normal" />
+  </Target>
 </Project>
