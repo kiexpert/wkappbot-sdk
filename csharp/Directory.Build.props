@@ -11,6 +11,15 @@
     To start a new minor cycle: bump WKAppBotBaseVersion and create a new git tag v4.2 etc.
   -->
   <Target Name="_WKAutoVersion" BeforeTargets="GetAssemblyVersion">
+    <!-- Check tag exists first -->
+    <Exec Command="git rev-parse v$(WKAppBotBaseVersion)"
+          ConsoleToMSBuild="true"
+          IgnoreExitCode="true"
+          WorkingDirectory="$(MSBuildThisFileDirectory)">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_WKTagHash" />
+    </Exec>
+    <Warning Condition="'$(_WKTagHash.Trim())' == ''"
+             Text="[WKAppBot] git tag 'v$(WKAppBotBaseVersion)' not found — patch will always be 0! Run: git tag v$(WKAppBotBaseVersion) &lt;commit-hash&gt;" />
     <Exec Command="git rev-list --count v$(WKAppBotBaseVersion)..HEAD"
           ConsoleToMSBuild="true"
           IgnoreExitCode="true"
@@ -18,7 +27,7 @@
       <Output TaskParameter="ConsoleOutput" PropertyName="_WKPatch" />
     </Exec>
     <PropertyGroup>
-      <_WKPatch Condition="'$(_WKPatch)' == ''">0</_WKPatch>
+      <_WKPatch Condition="'$(_WKPatch.Trim())' == ''">0</_WKPatch>
       <Version>$(WKAppBotBaseVersion).$(_WKPatch.Trim())</Version>
       <WKAppBotVersion>$(Version)</WKAppBotVersion>
     </PropertyGroup>

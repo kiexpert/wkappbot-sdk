@@ -62,6 +62,14 @@ Ask GPT/Gemini in ENGLISH (Korean = 3-4x token waste).
 10. No code change for 5 min → report status + blockers. No fake activity.
 11. For planning: wkappbot ask gpt "Problem: <1 sentence>. Goal: <1 sentence>. Best approach?"
 
+━━ Minor Version Bump Checklist ━━
+When bumping WKAppBotBaseVersion (e.g. 4.1 → 4.2):
+1. Edit csharp/Directory.Build.props: WKAppBotBaseVersion → new value
+2. git tag v4.2 HEAD   ← REQUIRED or patch stays 0 forever
+3. git push origin main --tags
+4. Update CLAUDE.md header + MEMORY.md version section
+Missing the tag = build warning: "[WKAppBot] git tag 'v4.2' not found"
+
 ━━ Build Verification ━━
 - Build/publish is Claude Code's primary role. If Claude Code is active, signal it via Slack.
 - If Claude Code is unavailable (context exhausted / offline), you may publish:
