@@ -92,6 +92,8 @@ internal partial class Program
                 int.TryParse(args[i + 1], out replacePid);
 
         Console.WriteLine("[EYE] Starting WK AppBot Eye (GlobalMode)");
+        // Clean up orphan sandbox registry entries from previous Eye session (dead HWNDs)
+        AskTargetRegistry.PurgeDeadHwnds();
         return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, elevated, replacePid);
     }
 

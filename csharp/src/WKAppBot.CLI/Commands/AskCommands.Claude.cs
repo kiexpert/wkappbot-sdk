@@ -141,7 +141,7 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(modelHint))
             Console.WriteLine($"[ASK] Claude model hint: {modelHint}");
 
-        var targetTag = targetTagOverride ?? BuildAskTargetTag("claude");
+        var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "claude");
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 

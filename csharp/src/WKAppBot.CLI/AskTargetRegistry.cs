@@ -1,29 +1,42 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// File-backed registry mapping target tags (e.g. "gemini-a1b2c3d4") to Chrome target IDs.
-/// Survives across CLI invocations within the same session.
+/// File-backed registry mapping sandbox keys to Chrome target IDs + expected hosts.
+///
+/// Key format: "{command}+{subcommand}+{promptHwnd:X8}"
+///   e.g. "ask+claude+001A2B3C"  "ask+gemini+001A2B3C"  "web+google.com+001A2B3C"
+///
+/// Contract:
+///   - key ↔ expectedHost: 1:1 fixed. Same HWND+command → always the same tab.
+///   - URL mismatch → immediate invalidation + new tab (fast-fail).
+///   - Eye restart: PurgeDeadHwnds() removes entries for dead HWND handles.
 /// </summary>
 internal static class AskTargetRegistry
 {
     private static readonly string _filePath = Path.Combine(
         AppContext.BaseDirectory, "wkappbot.hq", "runtime", "ask_targets.json");
 
-    private static Dictionary<string, string> Load()
+    internal record RegistryEntry(
+        [property: JsonPropertyName("targetId")]  string TargetId,
+        [property: JsonPropertyName("expectedHost")] string ExpectedHost);
+
+    private static Dictionary<string, RegistryEntry> Load()
     {
         try
         {
             if (!File.Exists(_filePath)) return new(StringComparer.OrdinalIgnoreCase);
             var json = File.ReadAllText(_filePath);
-            return JsonSerializer.Deserialize<Dictionary<string, string>>(json)
+            return JsonSerializer.Deserialize<Dictionary<string, RegistryEntry>>(json,
+                       new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                    ?? new(StringComparer.OrdinalIgnoreCase);
         }
         catch { return new(StringComparer.OrdinalIgnoreCase); }
     }
 
-    private static void Save(Dictionary<string, string> dict)
+    private static void Save(Dictionary<string, RegistryEntry> dict)
     {
         try
         {
@@ -33,23 +46,70 @@ internal static class AskTargetRegistry
         catch { /* best effort */ }
     }
 
-    internal static string? GetTargetId(string tag)
+    /// <summary>Get the registry entry for a sandbox key. Returns null if not found.</summary>
+    internal static RegistryEntry? GetEntry(string key)
     {
         var dict = Load();
-        return dict.TryGetValue(tag, out var id) ? id : null;
+        return dict.TryGetValue(key, out var entry) ? entry : null;
     }
 
-    internal static void SetTargetId(string tag, string targetId)
+    /// <summary>Register or update a sandbox key → (targetId, expectedHost).</summary>
+    internal static void SetEntry(string key, string targetId, string expectedHost)
     {
         var dict = Load();
-        dict[tag] = targetId;
+        dict[key] = new RegistryEntry(targetId, expectedHost);
         Save(dict);
     }
 
-    internal static void RemoveTargetId(string tag)
+    /// <summary>Immediately invalidate a key (fast-fail on URL mismatch).</summary>
+    internal static void RemoveEntry(string key)
     {
         var dict = Load();
-        if (dict.Remove(tag))
+        if (dict.Remove(key))
             Save(dict);
     }
+
+    /// <summary>
+    /// Remove all entries whose HWND segment is dead (IsWindow == false).
+    /// Called on Eye restart to clean up orphan entries from the previous session.
+    /// Key format: "cmd+sub+HWND8" — last '+'-segment is 8-char hex HWND.
+    /// </summary>
+    internal static void PurgeDeadHwnds()
+    {
+        var dict = Load();
+        var removed = new List<string>();
+        foreach (var key in dict.Keys)
+        {
+            var parts = key.Split('+');
+            if (parts.Length < 3) continue;
+            var hwndStr = parts[^1];
+            // Only purge HWND-based keys (8 hex chars, non-zero)
+            if (hwndStr.Length != 8) continue;
+            if (!long.TryParse(hwndStr, System.Globalization.NumberStyles.HexNumber, null, out var hwndVal)) continue;
+            if (hwndVal == 0) continue; // cwdHash fallback key — skip
+            var hwnd = new IntPtr(hwndVal);
+            if (!WKAppBot.Win32.Native.NativeMethods.IsWindow(hwnd))
+                removed.Add(key);
+        }
+        if (removed.Count == 0) return;
+        foreach (var k in removed) dict.Remove(k);
+        Save(dict);
+        Console.WriteLine($"[SANDBOX] Purged {removed.Count} dead-HWND registry entry/entries");
+    }
+
+    // ── Legacy shims: backward-compat for any remaining old callers ────────
+
+    internal static string? GetTargetId(string tag)
+        => GetEntry(tag)?.TargetId;
+
+    internal static void SetTargetId(string tag, string targetId)
+    {
+        // Legacy: expectedHost unknown — preserve existing if any
+        var dict = Load();
+        var existing = dict.TryGetValue(tag, out var e) ? e : null;
+        dict[tag] = new RegistryEntry(targetId, existing?.ExpectedHost ?? "");
+        Save(dict);
+    }
+
+    internal static void RemoveTargetId(string tag) => RemoveEntry(tag);
 }
