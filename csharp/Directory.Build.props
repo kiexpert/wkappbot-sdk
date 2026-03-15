@@ -29,7 +29,8 @@
     <Warning Condition="'$(_WKBumpCommit.Trim())' == ''"
              Text="[WKAppBot] Could not find bump commit for v$(WKAppBotBaseVersion) — patch defaults to 0." />
     <PropertyGroup>
-      <_WKPatch Condition="'$(_WKPatch.Trim())' == ''">0</_WKPatch>
+      <!-- Fallback: empty or non-numeric (e.g. git not in PATH during AOT build) → 0 -->
+      <_WKPatch Condition="'$(_WKPatch.Trim())' == '' Or '$([System.Text.RegularExpressions.Regex]::IsMatch($(_WKPatch.Trim()), `^\d+$`))' == 'false'">0</_WKPatch>
       <Version>$(WKAppBotBaseVersion).$(_WKPatch.Trim())</Version>
       <WKAppBotVersion>$(Version)</WKAppBotVersion>
     </PropertyGroup>

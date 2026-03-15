@@ -17,6 +17,42 @@ internal partial class Program
     static readonly object McpWriteGate = new();
     static readonly ConcurrentDictionary<string, SemaphoreSlim> McpActionGates = new();
 
+    // ── APSP v1 프로파일링 메트릭 ────────────────────────────────────
+    /// <summary>툴 child process 프로파일링 기본 정보. progress 알림에 확장 필드로 포함.</summary>
+    record McpProgressMeta(long MemMb, double? CpuPct, int Threads, int Handles);
+
+    /// <summary>AsyncLocal 사이드채널: PushLine → EmitToolProgress 메트릭 전달 (시그니처 변경 없음).</summary>
+    static readonly AsyncLocal<McpProgressMeta?> _currentProgressMeta = new();
+
+    /// <summary>CPU% 델타 계산용 이전 샘플 (PID 키).</summary>
+    static readonly ConcurrentDictionary<int, (TimeSpan cpu, DateTime time)> _cpuPrevSamples = new();
+
+    static McpProgressMeta? SampleProcessMetrics(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            p.Refresh();
+            var memMb   = p.WorkingSet64 / (1024 * 1024);
+            var threads = p.Threads.Count;
+            var handles = p.HandleCount;
+            var cpuNow  = p.TotalProcessorTime;
+            var timeNow = DateTime.UtcNow;
+
+            double? cpuPct = null;
+            if (_cpuPrevSamples.TryGetValue(pid, out var prev))
+            {
+                var cpuDelta  = (cpuNow - prev.cpu).TotalMilliseconds;
+                var timeDelta = (timeNow - prev.time).TotalMilliseconds;
+                if (timeDelta > 50)
+                    cpuPct = Math.Round(cpuDelta / timeDelta / Environment.ProcessorCount * 100, 1);
+            }
+            _cpuPrevSamples[pid] = (cpuNow, timeNow);
+            return new McpProgressMeta(memMb, cpuPct, threads, handles);
+        }
+        catch { return null; }
+    }
+
     /// <summary>
     /// Launcher mode: all tool calls spawn fresh subprocess (wkappbot.exe on disk).
     /// Enabled by --launcher flag. MCP connection survives hot-swap of core binary.
@@ -733,28 +769,47 @@ internal partial class Program
     {
         if (string.IsNullOrWhiteSpace(line)) return;
 
+        // \x00STATUS\x00 prefix: 워치독 등에서 status 필드 오버라이드 (e.g. "\x00waiting\x00msg")
+        string status = "running";
+        if (line.Length > 2 && line[0] == '\x00')
+        {
+            var end = line.IndexOf('\x00', 1);
+            if (end > 1)
+            {
+                status = line[1..end];
+                line = line[(end + 1)..];
+            }
+        }
+        if (string.IsNullOrWhiteSpace(line)) return;
+
         const int max = 800;
         var text = line.Length > max ? line[..max] + "..." : line;
         var n = System.Threading.Interlocked.Increment(ref progressCounter[0]);
         var elapsed = sw.Elapsed.TotalSeconds;
 
+        // APSP v1: child process 프로파일링 메트릭 (AsyncLocal 사이드채널)
+        var meta = _currentProgressMeta.Value;
+
         if (progressToken != null)
         {
             // Standard MCP notifications/progress with APSP extended fields
-            var note = new JsonObject
+            var prms = new JsonObject
             {
-                ["jsonrpc"] = "2.0",
-                ["method"] = "notifications/progress",
-                ["params"] = new JsonObject
-                {
-                    ["progressToken"] = progressToken.DeepClone(),
-                    ["progress"] = n,
-                    // APSP v1 extensions
-                    ["status"] = "running",
-                    ["elapsed"] = Math.Round(elapsed, 2),
-                    ["data"] = text
-                }
+                ["progressToken"] = progressToken.DeepClone(),
+                ["progress"] = n,
+                // APSP v1 extensions
+                ["status"]  = status,
+                ["elapsed"] = Math.Round(elapsed, 2),
+                ["data"]    = $"{n}> {text}"   // N> prefix: progress번호와 콘솔출력 1:1 매칭
             };
+            if (meta != null)
+            {
+                prms["mem_mb"]  = meta.MemMb;
+                if (meta.CpuPct.HasValue) prms["cpu_pct"] = meta.CpuPct.Value;
+                prms["threads"] = meta.Threads;
+                prms["handles"] = meta.Handles;
+            }
+            var note = new JsonObject { ["jsonrpc"] = "2.0", ["method"] = "notifications/progress", ["params"] = prms };
             WriteJsonRpc(writer, note);
         }
         else
@@ -881,15 +936,16 @@ internal partial class Program
 
         var sb = new StringBuilder();
         object gate = new();
+        int pushedPid = 0; // child PID — set after proc.Start()
 
         void PushLine(string line)
         {
             if (line == null) return;
-            lock (gate)
-            {
-                sb.AppendLine(line);
-            }
+            lock (gate) { sb.AppendLine(line); }
+            // AsyncLocal 사이드채널: EmitToolProgress가 읽어서 progress 알림에 메트릭 포함
+            _currentProgressMeta.Value = pushedPid > 0 ? SampleProcessMetrics(pushedPid) : null;
             onOutputLine?.Invoke(line);
+            _currentProgressMeta.Value = null;
         }
 
         async Task PumpAsync(StreamReader reader)
@@ -907,10 +963,16 @@ internal partial class Program
             using var proc = Process.Start(psi);
             if (proc == null) return ("Error: failed to start child process", 1);
 
+            pushedPid = proc.Id; // PushLine이 메트릭 샘플링에 사용
             var outTask = PumpAsync(proc.StandardOutput);
             var errTask = PumpAsync(proc.StandardError);
 
+            using var watchdogCts = new CancellationTokenSource();
+            var watchdogTask = McpToolWaitWatchdog(proc.Id, command, onOutputLine, watchdogCts.Token);
+
             proc.WaitForExit();
+            watchdogCts.Cancel();
+            try { watchdogTask.Wait(500); } catch { }
             Task.WaitAll(outTask, errTask);
 
             return (sb.ToString().Trim(), proc.ExitCode);
@@ -918,6 +980,85 @@ internal partial class Program
         catch (Exception ex)
         {
             return ($"Error: out-of-proc execution failed: {ex.Message}", 1);
+        }
+    }
+
+    /// <summary>
+    /// MCP 툴 프로세스 블로킹 대기 감지 워치독.
+    /// ProcessThread.ThreadState/WaitReason API 사용 (NtQuerySystemInformation 불필요).
+    /// 모든 스레드가 Wait 상태일 때 MCP 콜러에 즉시 통보 + 콘솔 출력 + Slack 알림.
+    ///
+    /// WaitReason별 태그:
+    ///   UserRequest  → [WAIT_INPUT]  (stdin/콘솔 읽기 대기 — e.g. cmd.exe 무인수 실행)
+    ///   LpcReply     → [WAIT_IPC]    (IPC 대기)
+    ///   Executive    → [WAIT_KERNEL] (커널 객체 대기)
+    ///   기타         → [WAIT_OTHER]
+    /// </summary>
+    static async Task McpToolWaitWatchdog(int pid, string cmdLabel, Action<string>? onOutputLine, CancellationToken cancel)
+    {
+        var reported = new HashSet<string>(StringComparer.Ordinal);
+        try { await Task.Delay(5000, cancel).ConfigureAwait(false); } catch (OperationCanceledException) { return; }
+
+        while (!cancel.IsCancellationRequested)
+        {
+            try
+            {
+                using var p = Process.GetProcessById(pid);
+                if (p.HasExited) break;
+
+                var threads = p.Threads.Cast<ProcessThread>().ToList();
+                if (threads.Count == 0) break;
+
+                // 모든 스레드가 Wait 상태인지 확인
+                var waitReasons = new List<ThreadWaitReason>();
+                foreach (var t in threads)
+                {
+                    try
+                    {
+                        if (t.ThreadState == System.Diagnostics.ThreadState.Wait)
+                            waitReasons.Add(t.WaitReason);
+                    }
+                    catch { /* 스레드 종료 경쟁 */ }
+                }
+
+                if (waitReasons.Count > 0 && waitReasons.Count >= threads.Count - 1)
+                {
+                    // 지배적 WaitReason 판별
+                    var dominant = waitReasons
+                        .GroupBy(r => r)
+                        .OrderByDescending(g => g.Count())
+                        .First().Key;
+
+                    var (tag, statusVal, desc) = dominant switch
+                    {
+                        ThreadWaitReason.UserRequest    => ("[WAIT_INPUT]", "wait_input",  "stdin/콘솔 입력 대기 (cmd.exe 등)"),
+                        ThreadWaitReason.LpcReply       => ("[WAIT_IPC]",   "wait_ipc",   "IPC 응답 대기"),
+                        ThreadWaitReason.LpcReceive     => ("[WAIT_IPC]",   "wait_ipc",   "IPC 수신 대기"),
+                        ThreadWaitReason.Executive      => ("[WAIT_LOCK]",  "wait_lock",  "동기화 객체 대기 (mutex/event/semaphore)"),
+                        ThreadWaitReason.Suspended      => ("[WAIT_SUSP]",  "suspended",  "일시정지됨"),
+                        ThreadWaitReason.PageIn         => ("[WAIT_IO]",    "wait_io",    "디스크 I/O 대기"),
+                        ThreadWaitReason.ExecutionDelay => ("[WAIT_SLEEP]", "sleeping",   "sleep/delay 대기"),
+                        _                               => ("[WAIT_OTHER]", "waiting",    $"대기중 ({dominant})")
+                    };
+
+                    if (reported.Add(tag))
+                    {
+                        var msg = $"{tag} 툴 프로세스 블로킹! {desc} — pid={pid} cmd={cmdLabel}";
+                        Console.Error.WriteLine($"[MCP] ⚠ {msg}");
+                        // \x00STATUS\x00 prefix → EmitToolProgress의 status 필드에 반영
+                        onOutputLine?.Invoke($"\x00{statusVal}\x00⚠ {msg}");
+                    }
+                }
+                else
+                {
+                    // 프로세스 재개 → 같은 이유 재알림 허용
+                    reported.Clear();
+                }
+            }
+            catch (ArgumentException) { break; } // 프로세스 종료
+            catch { }
+
+            try { await Task.Delay(5000, cancel).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
         }
     }
 
