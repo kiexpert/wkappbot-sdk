@@ -65,10 +65,9 @@ Ask GPT/Gemini in ENGLISH (Korean = 3-4x token waste).
 ━━ Minor Version Bump Checklist ━━
 When bumping WKAppBotBaseVersion (e.g. 4.1 → 4.2):
 1. Edit csharp/Directory.Build.props: WKAppBotBaseVersion → new value
-2. git tag v4.2 HEAD   ← REQUIRED or patch stays 0 forever
-3. git push origin main --tags
-4. Update CLAUDE.md header + MEMORY.md version section
-Missing the tag = build warning: "[WKAppBot] git tag 'v4.2' not found"
+2. Commit the change (no tag needed — build auto-detects via git pickaxe)
+3. Update CLAUDE.md header + MEMORY.md version section
+Patch = commits since the bump commit, auto-found by searching git history.
 
 ━━ Build Verification ━━
 - Build/publish is Claude Code's primary role. If Claude Code is active, signal it via Slack.

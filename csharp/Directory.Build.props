@@ -6,26 +6,28 @@
   </PropertyGroup>
 
   <!--
-    Auto-patch: counts commits since tag v$(WKAppBotBaseVersion).
-    Overrides $(Version) before GetAssemblyVersion runs.
-    To start a new minor cycle: bump WKAppBotBaseVersion and create a new git tag v4.2 etc.
+    Auto-patch: no tags needed.
+    Finds the commit that introduced the current WKAppBotBaseVersion value via git pickaxe (-S),
+    then counts commits since that point. Just bump WKAppBotBaseVersion — done.
   -->
   <Target Name="_WKAutoVersion" BeforeTargets="GetAssemblyVersion">
-    <!-- Check tag exists first -->
-    <Exec Command="git rev-parse v$(WKAppBotBaseVersion)"
+    <!-- Find the commit where WKAppBotBaseVersion was set to current value -->
+    <Exec Command="git log -1 --format=%%H -S &quot;&lt;WKAppBotBaseVersion&gt;$(WKAppBotBaseVersion)&lt;/WKAppBotBaseVersion&gt;&quot; -- Directory.Build.props"
           ConsoleToMSBuild="true"
           IgnoreExitCode="true"
           WorkingDirectory="$(MSBuildThisFileDirectory)">
-      <Output TaskParameter="ConsoleOutput" PropertyName="_WKTagHash" />
+      <Output TaskParameter="ConsoleOutput" PropertyName="_WKBumpCommit" />
     </Exec>
-    <Warning Condition="'$(_WKTagHash.Trim())' == ''"
-             Text="[WKAppBot] git tag 'v$(WKAppBotBaseVersion)' not found — patch will always be 0! Run: git tag v$(WKAppBotBaseVersion) &lt;commit-hash&gt;" />
-    <Exec Command="git rev-list --count v$(WKAppBotBaseVersion)..HEAD"
+    <!-- Count commits since the bump commit -->
+    <Exec Command="git rev-list --count $(_WKBumpCommit.Trim())..HEAD"
           ConsoleToMSBuild="true"
           IgnoreExitCode="true"
-          WorkingDirectory="$(MSBuildThisFileDirectory)">
+          WorkingDirectory="$(MSBuildThisFileDirectory)"
+          Condition="'$(_WKBumpCommit.Trim())' != ''">
       <Output TaskParameter="ConsoleOutput" PropertyName="_WKPatch" />
     </Exec>
+    <Warning Condition="'$(_WKBumpCommit.Trim())' == ''"
+             Text="[WKAppBot] Could not find bump commit for v$(WKAppBotBaseVersion) — patch defaults to 0." />
     <PropertyGroup>
       <_WKPatch Condition="'$(_WKPatch.Trim())' == ''">0</_WKPatch>
       <Version>$(WKAppBotBaseVersion).$(_WKPatch.Trim())</Version>
