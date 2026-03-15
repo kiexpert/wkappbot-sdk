@@ -184,7 +184,7 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(modelHint))
             Console.WriteLine($"[ASK] Gemini model hint: {modelHint}");
 
-        var targetTag = targetTagOverride ?? BuildAskTargetTag("gemini");
+        var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "gemini");
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 

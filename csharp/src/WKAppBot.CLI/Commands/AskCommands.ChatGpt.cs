@@ -60,7 +60,7 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(modelHint))
             Console.WriteLine($"[ASK] ChatGPT model hint: {modelHint}");
 
-        var targetTag = targetTagOverride ?? BuildAskTargetTag("gpt");
+        var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "gpt");
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 

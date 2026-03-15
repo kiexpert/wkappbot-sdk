@@ -173,24 +173,38 @@ Options:
             cdp.InjectWebBotBar = true;
 
         // Ensure we're connected to this session's tab in the correctly-positioned window.
-        // Uses URL fragment (#wkbot-{hash}) to identify "my" tab across CLI invocations.
-        // navigateUrl: passed to EnsureCorrectWindowAsync to force dedicated tab creation
-        //   instead of falling back to "reusing current tab" (which might be an AI chat tab).
+        // When navigateUrl is provided: use sandbox key "web+{host}+{hwnd:X8}" — guaranteed isolated tab per host+HWND.
+        // When no navigateUrl: legacy "web-{cwdHash}" path (general web browsing, no host constraint).
         if (ensureWindow)
         {
             try
             {
-                var sessionTag = GetSessionTag();
-                var targetName = $"web-{sessionTag ?? "default"}";
-                // Pass navigateUrl (or "about:blank" as sentinel) so the library creates a
-                // dedicated web tab rather than reusing the active AI chat tab.
-                var ensureNav = navigateUrl ?? "about:blank";
-                var targetId = cdp.EnsureCorrectWindowAsync(port, targetName, ensureNav).GetAwaiter().GetResult();
-                if (targetId != null && targetId != cdp.TargetId)
+                if (!string.IsNullOrWhiteSpace(navigateUrl))
                 {
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine($"[WEB] Switched to WebBot tab (tag={sessionTag ?? "?"}, target={targetId?[..8]})");
-                    Console.ResetColor();
+                    // Sandboxed: web+{host}+{hwnd} key → GetOrCreateSandboxedTabAsync
+                    var host = new Uri(navigateUrl).Host;
+                    var sandboxKey = BuildSandboxKey("web", host);
+                    var targetId = Task.Run(() => GetOrCreateSandboxedTabAsync(cdp, port, sandboxKey, host))
+                                       .GetAwaiter().GetResult();
+                    if (targetId != null && targetId != cdp.TargetId)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"[WEB] Sandboxed tab (key={sandboxKey}, target={targetId[..Math.Min(8,targetId.Length)]})");
+                        Console.ResetColor();
+                    }
+                }
+                else
+                {
+                    // Legacy: general web tab by cwdHash (no host constraint)
+                    var sessionTag = GetSessionTag();
+                    var targetName = $"web-{sessionTag ?? "default"}";
+                    var targetId = cdp.EnsureCorrectWindowAsync(port, targetName, "about:blank").GetAwaiter().GetResult();
+                    if (targetId != null && targetId != cdp.TargetId)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"[WEB] Switched to WebBot tab (tag={sessionTag ?? "?"}, target={targetId?[..8]})");
+                        Console.ResetColor();
+                    }
                 }
             }
             catch (Exception ex)

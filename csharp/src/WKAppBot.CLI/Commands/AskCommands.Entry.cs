@@ -313,6 +313,99 @@ Examples:
         return $"{provider}-{hash}";
     }
 
+    /// <summary>
+    /// Build a sandbox key: "{command}+{subcommand}+{hwnd:X8}".
+    /// HWND-based: each prompt window → isolated Chrome tab, guaranteed no cross-contamination.
+    /// Falls back to cwdHash if HWND not available (direct CLI mode, no Eye).
+    /// </summary>
+    static string BuildSandboxKey(string command, string subcommand)
+    {
+        var hwnd = EyeCmdPipeServer.CallerHwnd.Value ?? IntPtr.Zero;
+        var hwndStr = hwnd != IntPtr.Zero
+            ? hwnd.ToInt64().ToString("X8")
+            : (GetSessionTag() ?? "00000000");
+        return $"{command}+{subcommand}+{hwndStr}";
+    }
+
+    /// <summary>
+    /// GetOrCreateSandboxedTab — core sandboxing algorithm:
+    ///   ① Registry hit → validate URL against expectedHost
+    ///       match  → return existing tab (reconnect)
+    ///       mismatch → fast-fail: invalidate registry + create new tab (leave polluted tab for debugging)
+    ///   ② Registry miss → EnsureCorrectWindowAsync (existing positioning logic) → register
+    /// </summary>
+    static async Task<string?> GetOrCreateSandboxedTabAsync(CdpClient cdp, int port, string key, string expectedHost)
+    {
+        var entry = AskTargetRegistry.GetEntry(key);
+        if (entry != null)
+        {
+            // Registry hit — validate URL
+            var targets = await GetPageTargetsAsync(port);
+            var tab = targets.FirstOrDefault(t => t.Id == entry.TargetId);
+            if (tab != null)
+            {
+                if (tab.Url.Contains(expectedHost, StringComparison.OrdinalIgnoreCase))
+                {
+                    // ✓ URL OK — reconnect to this tab
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"[SANDBOX] ✓ Hit: {key} → {entry.TargetId[..Math.Min(8,entry.TargetId.Length)]}");
+                    Console.ResetColor();
+                    if (cdp.TargetId != entry.TargetId)
+                        await cdp.SwitchToTargetAsync(entry.TargetId, port);
+                    return entry.TargetId;
+                }
+                else
+                {
+                    // ✗ URL mismatch — fast-fail: invalidate + new tab
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[SANDBOX] ✗ Mismatch: {key}");
+                    Console.WriteLine($"[SANDBOX]   expected host: {expectedHost}");
+                    Console.WriteLine($"[SANDBOX]   actual url:    {tab.Url[..Math.Min(80, tab.Url.Length)]}");
+                    Console.WriteLine($"[SANDBOX]   → invalidating registry, creating clean tab");
+                    Console.ResetColor();
+
+                    AskTargetRegistry.RemoveEntry(key);
+                    // Leave polluted tab alive (debugging) — create a new clean tab
+                    try
+                    {
+                        var result = await cdp.SendAsync("Target.createTarget",
+                            new System.Text.Json.Nodes.JsonObject { ["url"] = $"https://{expectedHost}" });
+                        var newId = result?["targetId"]?.GetValue<string>();
+                        if (newId != null)
+                        {
+                            await cdp.SwitchToTargetAsync(newId, port);
+                            AskTargetRegistry.SetEntry(key, newId, expectedHost);
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"[SANDBOX] ✓ New tab after mismatch: {newId[..Math.Min(8,newId.Length)]}");
+                            Console.ResetColor();
+                            return newId;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[SANDBOX] Create failed after mismatch: {ex.Message}");
+                    }
+                    return null;
+                }
+            }
+            else
+            {
+                // Tab gone — remove stale entry, fall through to create
+                Console.WriteLine($"[SANDBOX] Stale entry {key} (tab no longer exists) — removing");
+                AskTargetRegistry.RemoveEntry(key);
+            }
+        }
+
+        // Registry miss — use EnsureCorrectWindowAsync (handles window positioning + creation)
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"[SANDBOX] Miss: {key} — creating via EnsureCorrectWindowAsync");
+        Console.ResetColor();
+        var targetId = await cdp.EnsureCorrectWindowAsync(port, key, $"https://{expectedHost}", savedTargetId: null);
+        if (targetId != null)
+            AskTargetRegistry.SetEntry(key, targetId, expectedHost);
+        return targetId;
+    }
+
     static CdpClient? EnsureCdpConnection(int port = 9222, string? preferredHost = null, bool newTab = false, string? targetTag = null)
     {
         var task = Task.Run(async () =>
@@ -331,56 +424,27 @@ Examples:
                 var cdp = new CdpClient();
                 await cdp.ConnectAsync(port, timeoutMs: 5000);
 
-                var savedTargetId = !string.IsNullOrWhiteSpace(targetTag) ? AskTargetRegistry.GetTargetId(targetTag) : null;
-
-                await CloseBlankTabs(port);
-                if (!string.IsNullOrWhiteSpace(preferredHost))
-                    await CloseStaleDuplicateTabs(port, preferredHost, savedTargetId);
-                if (savedTargetId != null)
-                    Console.WriteLine($"[ASK] Registry hit: {targetTag} ??{savedTargetId[..Math.Min(8, savedTargetId.Length)]}");
-
-                var navigateUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
-                var resolvedId = await cdp.EnsureCorrectWindowAsync(port, targetTag, navigateUrl, savedTargetId: savedTargetId);
-
-                if (!string.IsNullOrWhiteSpace(preferredHost))
+                // Sandbox: Registry hit → URL validate → fast-fail on mismatch
+                // Registry miss → EnsureCorrectWindowAsync (positioning + creation)
+                string? resolvedId;
+                if (!string.IsNullOrWhiteSpace(preferredHost) && !string.IsNullOrWhiteSpace(targetTag))
                 {
-                    var tabUrl = await cdp.EvalAsync("location.href") ?? "";
-                    if (tabUrl == "about:blank" || !tabUrl.Contains(preferredHost, StringComparison.OrdinalIgnoreCase))
-                    {
-                        Console.WriteLine($"[ASK] Wrong tab: {tabUrl} (expected {preferredHost})");
-
-                        if (tabUrl == "about:blank")
-                        {
-                            Console.WriteLine("[ASK] Closing about:blank...");
-                            try { await cdp.EvalAsync("window.close()"); } catch { }
-                            await Task.Delay(500);
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(targetTag))
-                            AskTargetRegistry.SetTargetId(targetTag, null!);
-
-                        Console.WriteLine($"[ASK] Reconnecting to {preferredHost}...");
-                        await cdp.ConnectAsync(port, timeoutMs: 5000);
-                        resolvedId = await cdp.EnsureCorrectWindowAsync(port, targetTag, $"https://{preferredHost}", savedTargetId: null);
-                        await Task.Delay(2000);
-
-                        tabUrl = await cdp.EvalAsync("location.href") ?? "";
-                        if (!tabUrl.Contains(preferredHost, StringComparison.OrdinalIgnoreCase))
-                        {
-                            await cdp.NavigateAsync($"https://{preferredHost}");
-                            await Task.Delay(3000);
-                        }
-
-                        Console.WriteLine($"[ASK] Now on: {await cdp.EvalAsync("location.href")}");
-                    }
+                    resolvedId = await GetOrCreateSandboxedTabAsync(cdp, port, targetTag, preferredHost);
                 }
-
-                if (resolvedId != null && !string.IsNullOrWhiteSpace(targetTag))
+                else
                 {
-                    AskTargetRegistry.SetTargetId(targetTag, resolvedId);
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"[ASK] Target: {targetTag} ??{resolvedId[..Math.Min(8, resolvedId.Length)]}");
-                    Console.ResetColor();
+                    // No host constraint — fall back to old EnsureCorrectWindowAsync path
+                    var savedTargetId = !string.IsNullOrWhiteSpace(targetTag) ? AskTargetRegistry.GetTargetId(targetTag) : null;
+                    await CloseBlankTabs(port);
+                    var navigateUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
+                    resolvedId = await cdp.EnsureCorrectWindowAsync(port, targetTag, navigateUrl, savedTargetId: savedTargetId);
+                    if (resolvedId != null && !string.IsNullOrWhiteSpace(targetTag))
+                    {
+                        AskTargetRegistry.SetTargetId(targetTag, resolvedId);
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"[ASK] Target: {targetTag} → {resolvedId[..Math.Min(8, resolvedId.Length)]}");
+                        Console.ResetColor();
+                    }
                 }
 
                 var chromeHwnd = cdp.GetChromeWindowHandle();
