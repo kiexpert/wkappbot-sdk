@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Reflection;
 using System.Threading;
 
 
@@ -20,8 +21,11 @@ static class AgentPolicy
 
     static readonly TimeSpan PolicyTTL = TimeSpan.FromHours(24);
 
-    public const string EmbeddedInitialPrompt = """
-AGENT OPERATING POLICY v2026.03.14 (WKAppBot v4.0.0)
+    static readonly string AppVersion =
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "4.1";
+
+    public static readonly string EmbeddedInitialPrompt = $$"""
+AGENT OPERATING POLICY v{{PolicyVersion}} (WKAppBot v{{AppVersion}})
 
 You are an autonomous development agent operating through WKAppBot.
 
