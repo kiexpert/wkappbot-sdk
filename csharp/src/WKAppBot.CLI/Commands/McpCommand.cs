@@ -162,7 +162,7 @@ internal partial class Program
             ["serverInfo"] = new JsonObject
             {
                 ["name"] = "wkappbot",
-                ["version"] = "4.0.0",
+                ["version"] = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "4.1",
                 ["protocol"] = "MCP+APSP-v1"
             }
         };
