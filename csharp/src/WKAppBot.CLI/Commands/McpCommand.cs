@@ -997,8 +997,10 @@ internal partial class Program
     static async Task McpToolWaitWatchdog(int pid, string cmdLabel, Action<string>? onOutputLine, CancellationToken cancel)
     {
         var reported = new HashSet<string>(StringComparer.Ordinal);
-        try { await Task.Delay(5000, cancel).ConfigureAwait(false); } catch (OperationCanceledException) { return; }
+        // 프로세스 시작 직후 안정화 대기
+        try { await Task.Delay(1000, cancel).ConfigureAwait(false); } catch (OperationCanceledException) { return; }
 
+        bool isBlocking = false;
         while (!cancel.IsCancellationRequested)
         {
             try
@@ -1009,7 +1011,6 @@ internal partial class Program
                 var threads = p.Threads.Cast<ProcessThread>().ToList();
                 if (threads.Count == 0) break;
 
-                // 모든 스레드가 Wait 상태인지 확인
                 var waitReasons = new List<ThreadWaitReason>();
                 foreach (var t in threads)
                 {
@@ -1018,12 +1019,12 @@ internal partial class Program
                         if (t.ThreadState == System.Diagnostics.ThreadState.Wait)
                             waitReasons.Add(t.WaitReason);
                     }
-                    catch { /* 스레드 종료 경쟁 */ }
+                    catch { }
                 }
 
                 if (waitReasons.Count > 0 && waitReasons.Count >= threads.Count - 1)
                 {
-                    // 지배적 WaitReason 판별
+                    isBlocking = true;
                     var dominant = waitReasons
                         .GroupBy(r => r)
                         .OrderByDescending(g => g.Count())
@@ -1045,20 +1046,26 @@ internal partial class Program
                     {
                         var msg = $"{tag} 툴 프로세스 블로킹! {desc} — pid={pid} cmd={cmdLabel}";
                         Console.Error.WriteLine($"[MCP] ⚠ {msg}");
-                        // \x00STATUS\x00 prefix → EmitToolProgress의 status 필드에 반영
                         onOutputLine?.Invoke($"\x00{statusVal}\x00⚠ {msg}");
                     }
                 }
                 else
                 {
-                    // 프로세스 재개 → 같은 이유 재알림 허용
-                    reported.Clear();
+                    if (isBlocking)
+                    {
+                        // 블로킹 해제 → 재개 알림 + 재알림 허용
+                        isBlocking = false;
+                        reported.Clear();
+                        onOutputLine?.Invoke($"\x00running\x00[RESUMED] 툴 프로세스 재개됨 — pid={pid}");
+                    }
                 }
             }
-            catch (ArgumentException) { break; } // 프로세스 종료
+            catch (ArgumentException) { break; }
             catch { }
 
-            try { await Task.Delay(5000, cancel).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
+            // 블로킹 중: 50ms 거의 실시간 / 정상: 500ms
+            var delay = isBlocking ? 50 : 500;
+            try { await Task.Delay(delay, cancel).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
         }
     }
 

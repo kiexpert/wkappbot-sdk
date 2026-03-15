@@ -854,6 +854,20 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
+    /// Bring this tab to the OS foreground (recovery use only — steals focus).
+    /// Uses Page.bringToFront which activates the tab AND brings Chrome to front.
+    /// </summary>
+    public async Task BringTabToFrontAsync()
+    {
+        try
+        {
+            await SendAsync("Page.bringToFront", new JsonObject());
+            Console.WriteLine("[CDP] Tab brought to front (recovery)");
+        }
+        catch { }
+    }
+
+    /// <summary>
     /// Activate this tab in Chrome WITHOUT stealing OS foreground window.
     /// Uses Target.activateTarget which makes the tab active in Chrome internally
     /// (Chrome-level tab switch) without triggering an OS SetForegroundWindow call.
@@ -1823,8 +1837,13 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                 var existingWb = await GetWindowForTargetAsync(existingTid);
                 if (existingWb != null && IsAtExpectedBounds(existingWb.Value, expX, expY, expW, expH))
                 {
-                    // Found a correctly-positioned window — create tab here
-                    Console.WriteLine($"[ASK] Reusing window at ({existingWb.Value.left},{existingWb.Value.top}) for new tab");
+                    // Minimize Chrome before tab creation to prevent OS focus steal
+                    Console.WriteLine($"[ASK] Reusing window at ({existingWb.Value.left},{existingWb.Value.top}) for new tab (minimizing first)");
+                    await SendAsync("Browser.setWindowBounds", new JsonObject
+                    {
+                        ["windowId"] = existingWb.Value.windowId,
+                        ["bounds"]   = new JsonObject { ["windowState"] = "minimized" }
+                    });
                     var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
                     newTargetId = result?["targetId"]?.GetValue<string>();
                     break;
@@ -1850,8 +1869,11 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                 if (newTargetId == null) return TargetId;
             }
 
-            // Position new window at expected bounds
+            // Minimize new window immediately after creation to return focus to user
             await Task.Delay(300);
+            await MinimizeWindowAsync(newTargetId);
+
+            // Position new window at expected bounds (while minimized — takes effect on restore)
             var newWb = await GetWindowForTargetAsync(newTargetId);
             if (newWb != null)
                 await SetWindowBoundsAsync(newWb.Value.windowId, expX, expY, expW, expH);
@@ -1860,8 +1882,8 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         await Task.Delay(200);
         await SwitchToTargetAsync(newTargetId, port);
 
-        if (minimizeAfter)
-            await MinimizeWindowAsync(newTargetId);
+        if (!minimizeAfter)
+            await MinimizeWindowAsync(newTargetId); // minimize to prevent focus steal — user restores manually
         return newTargetId;
     }
 

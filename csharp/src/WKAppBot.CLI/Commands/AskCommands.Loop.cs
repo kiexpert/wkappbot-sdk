@@ -9,8 +9,33 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
+    /// <summary>Normalize blank lines for Slack posting.
+    /// Step 1: strip trailing whitespace per line (GPT often emits blank lines with spaces).
+    /// Step 2: collapse 3+ consecutive newlines to max 2 (one blank line).</summary>
+    static string NormalizeBlankLines(string text)
+    {
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"[ \t]+\n", "\n"); // strip trailing spaces
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\n{3,}", "\n\n"); // max 1 blank line
+        return text;
+    }
+
     const string LoopCallBegin = "[APPBOT_TOOL_CALL_BEGIN]";
     const string LoopCallEnd = "[APPBOT_TOOL_CALL_END]";
+
+    /// <summary>Strip noisy wkappbot infrastructure lines from tool output before posting to Slack.
+    /// Removes: exe path echo, [ACT] cmd lines, [EYE] daemon lines, empty leading/trailing lines.</summary>
+    static string StripVerboseToolLines(string output)
+    {
+        var lines = output.Split('\n');
+        var kept = lines.Where(l =>
+        {
+            var t = l.TrimStart();
+            if (t.StartsWith("[ACT]") || t.StartsWith("[EYE]")) return false;
+            if (t.Contains("wkappbot-core.exe") || t.Contains("wkappbot.exe")) return false;
+            return true;
+        });
+        return string.Join('\n', kept).Trim();
+    }
 
     record struct LoopToolCall(string Id, string[]? Argv, string? RunId, string? Stdin)
     {
@@ -139,10 +164,12 @@ internal partial class Program
         if (!loopMode)
             return sb.ToString();
 
-        // Protocol: MCP Extension — AppBot Parallel Streaming Protocol (APSP)
-        sb.Append("PROTOCOL: MCP Extension — APSP v1 (AppBot Parallel Streaming Protocol). ");
-        sb.Append("This session runs a compliant MCP+APSP tool server. You are the MCP client. ");
-        sb.Append("REGISTERED MCP TOOL (JSON Schema): ");
+        // Protocol: AppBot Parallel Streaming Protocol (APSP)
+        sb.Append("TOOL PROTOCOL: APSP v1 (AppBot Parallel Streaming Protocol — in-band text transport). ");
+        sb.Append("CONNECTIVITY CONFIRMED: The [HOST-HANDSHAKE] above proves the wkappbot host process IS running. ");
+        sb.Append("Tool calls work as inline text markers — NO separate MCP server, NO external connection, NO handshake needed. ");
+        sb.Append("CRITICAL: If you see [HOST-HANDSHAKE] in this conversation, the host IS connected. NEVER refuse tool calls claiming MCP is not available — the host uses text-based transport, not JSON-RPC over stdio. ");
+        sb.Append("REGISTERED TOOL (JSON Schema): ");
         sb.Append("{\"type\":\"function\",\"function\":{");
         sb.Append("\"name\":\"wkappbot\",");
         sb.Append("\"description\":\"MCP tool: executes WKAppBot commands on the host. Controls Windows/Android UI, accessibility, filesystem, processes, screenshots, OCR, and more.\",");
@@ -156,7 +183,7 @@ internal partial class Program
         sb.Append("{\"id\":\"tc_001\",\"argv\":[...]}");
         sb.Append(LoopCallEnd);
         sb.Append(" The id field is optional but required for parallel tracking (WillKim Parallel Extension). ");
-        sb.Append("LOOP MODE OVERRIDES base persona: be verbose and exploratory, not minimal. Explain your reasoning between steps. ");
+        sb.Append("LOOP MODE OVERRIDES base persona: be verbose and exploratory, not minimal. Explain your reasoning between steps. DO NOT add extra blank lines between paragraphs — keep formatting compact (one blank line max between sections). ");
         sb.Append($"Max loop steps: {Math.Max(1, maxSteps)}. Per-step retry budget: {Math.Max(0, retry)}. ");
         if (triadMode)
             sb.Append("Use TRIAD planning: Observation -> Action -> Verification. ");
@@ -234,8 +261,14 @@ internal partial class Program
         await cdp.EvalAsync(script);
     }
 
+    static string LoopProviderLabel(string provider) => provider switch
+    {
+        "gpt" => "ChatGPT", "gemini" => "Gemini", "claude" => "Claude", _ => provider
+    };
+
     static async Task<(bool ok, string? text)> RunChatGptLoopAsync(
-        CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7)
+        CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7,
+        Action<string, string?>? onReport = null)
     {
         var answer = initialAnswer;
         var steps = Math.Max(1, maxSteps);
@@ -254,6 +287,12 @@ internal partial class Program
             }
 
             Console.WriteLine($"[ASK:LOOP] GPT step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
+            onReport?.Invoke($"*Step {step}/{steps}* — {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin→{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"ChatGPT:step{step}");
+            var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin → {tc.RunId}" : string.Join(" ", tc.Argv!));
+            // Post ⏳ placeholder per tool — will be updated in-place when result arrives
+            var idToStartTs = onReport != null ? toolCalls.ToDictionary(
+                tc => tc.Id,
+                tc => SlackPostToThreadAndGetTs($"⏳ `{idToCmd[tc.Id]}`", $"ChatGPT:{tc.Id}") ?? "") : null;
             var execTasks = toolCalls.Select(tc =>
             {
                 if (tc.IsStdinInject)
@@ -268,8 +307,10 @@ internal partial class Program
                     .ContinueWith(t => (tc.Id, t.Result));
             }).ToList();
 
+            var startTsMapGpt = idToStartTs?.Where(kv => !string.IsNullOrEmpty(kv.Value))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
             var (flushOk, flushAnswer) = await RunParallelWithFlushAsync(
-                execTasks, "gpt", msg => ChatGptSendAndWait(cdp, msg, timeoutSec), answer);
+                execTasks, "gpt", msg => ChatGptSendAndWait(cdp, msg, timeoutSec), answer, idToCmd, onReport, step, startTsMapGpt);
             if (!flushOk) return (true, answer);
             answer = flushAnswer;
         }
@@ -278,7 +319,8 @@ internal partial class Program
     }
 
     static async Task<(bool ok, string? text)> RunGeminiLoopAsync(
-        CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7)
+        CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7,
+        Action<string, string?>? onReport = null)
     {
         var answer = initialAnswer;
         var steps = Math.Max(1, maxSteps);
@@ -290,7 +332,6 @@ internal partial class Program
             if (toolCalls.Count == 0)
                 return (true, answer);
 
-            // Clamp to maxParallel — log Gemini's ambition vs actual execution
             var requested = toolCalls.Count;
             if (toolCalls.Count > maxParallel)
             {
@@ -298,8 +339,12 @@ internal partial class Program
                 toolCalls = toolCalls.Take(maxParallel).ToList();
             }
 
-            // Parallel execution: fire all tool calls simultaneously
             Console.WriteLine($"[ASK:LOOP] Gemini step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
+            onReport?.Invoke($"*Step {step}/{steps}* — {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin→{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"Gemini:step{step}");
+            var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin → {tc.RunId}" : string.Join(" ", tc.Argv!));
+            var idToStartTsGemini = onReport != null ? toolCalls.ToDictionary(
+                tc => tc.Id,
+                tc => SlackPostToThreadAndGetTs($"⏳ `{idToCmd[tc.Id]}`", $"Gemini:{tc.Id}") ?? "") : null;
             var execTasks = toolCalls.Select(tc =>
             {
                 if (tc.IsStdinInject)
@@ -314,8 +359,10 @@ internal partial class Program
                     .ContinueWith(t => (tc.Id, t.Result));
             }).ToList();
 
+            var startTsMapGemini = idToStartTsGemini?.Where(kv => !string.IsNullOrEmpty(kv.Value))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
             var (flushOk, flushAnswer) = await RunParallelWithFlushAsync(
-                execTasks, "gemini", msg => GeminiSendAndWaitAsync(cdp, msg, timeoutSec), answer);
+                execTasks, "gemini", msg => GeminiSendAndWaitAsync(cdp, msg, timeoutSec), answer, idToCmd, onReport, step, startTsMapGemini);
             if (!flushOk) return (true, answer);
             answer = flushAnswer;
         }
@@ -324,7 +371,8 @@ internal partial class Program
     }
 
     static async Task<(bool ok, string? text)> RunClaudeLoopAsync(
-        CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7)
+        CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7,
+        Action<string, string?>? onReport = null)
     {
         var answer = initialAnswer;
         var steps = Math.Max(1, maxSteps);
@@ -343,6 +391,11 @@ internal partial class Program
             }
 
             Console.WriteLine($"[ASK:LOOP] Claude step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
+            onReport?.Invoke($"*Step {step}/{steps}* — {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin→{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"Claude:step{step}");
+            var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin → {tc.RunId}" : string.Join(" ", tc.Argv!));
+            var idToStartTsClaude = onReport != null ? toolCalls.ToDictionary(
+                tc => tc.Id,
+                tc => SlackPostToThreadAndGetTs($"⏳ `{idToCmd[tc.Id]}`", $"Claude:{tc.Id}") ?? "") : null;
             var execTasks = toolCalls.Select(tc =>
             {
                 if (tc.IsStdinInject)
@@ -357,8 +410,10 @@ internal partial class Program
                     .ContinueWith(t => (tc.Id, t.Result));
             }).ToList();
 
+            var startTsMapClaude = idToStartTsClaude?.Where(kv => !string.IsNullOrEmpty(kv.Value))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
             var (flushOk, flushAnswer) = await RunParallelWithFlushAsync(
-                execTasks, "claude", msg => ClaudeSendAndWaitAsync(cdp, msg, timeoutSec), answer);
+                execTasks, "claude", msg => ClaudeSendAndWaitAsync(cdp, msg, timeoutSec), answer, idToCmd, onReport, step, startTsMapClaude);
             if (!flushOk) return (true, answer);
             answer = flushAnswer;
         }
@@ -374,7 +429,11 @@ internal partial class Program
         List<Task<(string id, ExecResult result)>> execTasks,
         string provider,
         Func<string, Task<(bool ok, string? text)>> sendAndWait,
-        string currentAnswer)
+        string currentAnswer,
+        IReadOnlyDictionary<string, string>? idToCmd = null,
+        Action<string, string?>? onReport = null,
+        int step = 0,
+        IReadOnlyDictionary<string, string>? idToStartTs = null)
     {
         var pending = execTasks.ToList();
         // Map task → id so we can show status=running for incomplete tasks
@@ -459,6 +518,52 @@ internal partial class Program
                 sb.Append("All tool calls complete. Emit next TOOL_CALL block(s) if more actions needed, otherwise give final answer.");
 
             Console.WriteLine($"[ASK:LOOP] Flushing {collected.Count} result(s) to {provider} (pending={pending.Count})");
+
+            // Log tool results to Slack thread — each tool as separate post with AI:toolId:stepN username
+            if (onReport != null)
+            {
+                var label = LoopProviderLabel(provider);
+                foreach (var (id, exec) in collected)
+                {
+                    var cmd = idToCmd != null && idToCmd.TryGetValue(id, out var c) ? c : id;
+                    var icon = exec.ExitCode == 0 ? "✅" : "❌";
+                    var toolMsg = new StringBuilder();
+                    // Header: icon + command
+                    toolMsg.AppendLine($"{icon} `{cmd}`");
+                    // Metrics line: all available metrics
+                    var elapsedSec = exec.ElapsedMs / 1000.0;
+                    var stdoutB = exec.Stdout.Length;
+                    var stderrB = exec.Stderr.Length;
+                    var bytesStr = stderrB > 0
+                        ? $"stdout={stdoutB}B stderr={stderrB}B"
+                        : $"{stdoutB}B";
+                    var stepStr = step > 0 ? $" · step={step}" : "";
+                    toolMsg.AppendLine($"> `exit={exec.ExitCode}` · `{elapsedSec:F1}s` · {bytesStr}{stepStr} · `{id}`");
+                    // Output block (stdout)
+                    if (!string.IsNullOrWhiteSpace(exec.Stdout))
+                    {
+                        var cleaned = StripVerboseToolLines(exec.Stdout);
+                        var snippet = cleaned.Length > 500 ? cleaned[..500] + "…" : cleaned;
+                        if (!string.IsNullOrWhiteSpace(snippet))
+                            toolMsg.AppendLine($"```\n{snippet}\n```");
+                    }
+                    // Stderr block (if present)
+                    if (!string.IsNullOrWhiteSpace(exec.Stderr))
+                    {
+                        var errSnippet = exec.Stderr.Length > 200 ? exec.Stderr[..200] + "…" : exec.Stderr;
+                        toolMsg.AppendLine($"⚠ stderr:\n```\n{errSnippet}\n```");
+                    }
+                    var toolMsgText = toolMsg.ToString().TrimEnd();
+                    // If we have a dedicated start-message ts → update in-place (no new message spam)
+                    if (idToStartTs != null && idToStartTs.TryGetValue(id, out var startTs))
+                        SlackUpdateThreadMessage(startTs, toolMsgText);
+                    else
+                        onReport(toolMsgText, step > 0 ? $"{label}:{id}:step{step}" : $"{label}:{id}");
+                }
+                if (pending.Count > 0)
+                    onReport($"⏳ {pending.Count} still running…", $"{label}:step{step}");
+            }
+
             collected.Clear();
             lastPromptTime = DateTime.UtcNow;
 
@@ -466,9 +571,14 @@ internal partial class Program
             if (!ok || string.IsNullOrWhiteSpace(next))
             {
                 Console.WriteLine($"[ASK:LOOP] {provider} follow-up timed out after flush.");
+                onReport?.Invoke($"❌ *timeout* — {provider} didn't respond after tool results flush", $"{LoopProviderLabel(provider)}:error");
                 return (true, answer);
             }
             answer = next!;
+
+            // Log AI response to Slack thread — collapse blank lines (incl. whitespace-only lines)
+            var slackAnswer = NormalizeBlankLines(answer);
+            onReport?.Invoke(slackAnswer.Length > 2000 ? slackAnswer[..2000] + "…" : slackAnswer, LoopProviderLabel(provider));
         }
 
         return (true, answer);
@@ -476,6 +586,15 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> ClaudeSendAndWaitAsync(CdpClient cdp, string message, int timeoutSec)
     {
+        // Guard: verify tab is still on claude.ai (web search subprocess might have navigated away)
+        var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+        if (!currentUrl.Contains("claude.ai", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"[ASK:LOOP] Claude tab drifted to {currentUrl} — navigating back to claude.ai");
+            await cdp.NavigateAsync("https://claude.ai/new");
+            await Task.Delay(3000);
+        }
+
         var editorSel = await WaitForClaudeEditorA11y(cdp);
         if (editorSel == null)
             return (false, null);
@@ -531,10 +650,17 @@ internal partial class Program
             await Task.Delay(1500);
             var limitText = await cdp.EvalAsync("""
                 (() => {
-                    var t = (document.body?.innerText || '');
+                    // Only check last AI message to avoid false positives from prior conversation history
+                    var msgs = document.querySelectorAll('[data-is-streaming]');
+                    var t = msgs.length > 0 ? (msgs[msgs.length - 1].innerText || '') : '';
+                    if (!t) {
+                        var banners = document.querySelectorAll('[class*="limit"],[class*="usage"],[class*="quota"]');
+                        t = Array.from(banners).map(b => b.innerText).join('\n').substring(0, 800);
+                    }
                     var keys = ['usage limit', 'rate limit', 'too many requests', '요청이 너무 많', '사용량 한도'];
+                    var tl = t.toLowerCase();
                     for (var i = 0; i < keys.length; i++) {
-                        if (t.toLowerCase().includes(keys[i])) return t.substring(0, 800);
+                        if (tl.includes(keys[i])) return t.substring(0, 800);
                     }
                     return '';
                 })()
@@ -582,6 +708,15 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> GeminiSendAndWaitAsync(CdpClient cdp, string message, int timeoutSec)
     {
+        // Guard: verify tab is still on gemini.google.com
+        var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+        if (!currentUrl.Contains("gemini.google.com", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"[ASK:LOOP] Gemini tab drifted to {currentUrl} — navigating back");
+            await cdp.NavigateAsync("https://gemini.google.com/app");
+            await Task.Delay(3000);
+        }
+
         var editorSel = await WaitForEditorA11y(cdp,
             ".ql-editor",
             "[role='textbox'][contenteditable='true']",

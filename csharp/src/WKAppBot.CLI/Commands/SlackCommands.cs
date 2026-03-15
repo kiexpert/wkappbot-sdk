@@ -174,6 +174,34 @@ internal partial class Program
         try { File.Delete(SlackPidFile); } catch { }
     }
 
+    /// <summary>
+    /// Split a message into a short channel-visible header and optional thread overflow.
+    /// Channel part: up to first blank line (paragraph boundary), capped at 5 lines.
+    /// Overflow: everything after the split point → posted as a thread reply.
+    /// </summary>
+    static (string header, string? overflow) SplitMessageForChannel(string message)
+    {
+        var lines = message.Split('\n');
+
+        // Find first blank line (paragraph boundary)
+        int splitAt = lines.Length;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (string.IsNullOrWhiteSpace(lines[i]))
+            {
+                splitAt = i;
+                break;
+            }
+        }
+
+        // Cap channel part at 5 lines
+        splitAt = Math.Min(splitAt, 5);
+
+        var header = string.Join('\n', lines[..splitAt]).TrimEnd();
+        var overflow = string.Join('\n', lines[splitAt..]).Trim();
+        return (header, string.IsNullOrWhiteSpace(overflow) ? null : overflow);
+    }
+
     /// <summary>Send a message to the configured channel.</summary>
     static int SlackSendCommand(string[] args)
     {
@@ -200,21 +228,30 @@ internal partial class Program
             return 1;
         }
 
-        // Send text message (get thread_ts for file uploads)
+        // Split message: short channel header + optional thread overflow
         string? threadTs = null;
         var senderName = GetSendReplyUsername(printDecision: true);
         if (!string.IsNullOrWhiteSpace(message))
         {
-            var (ok, ts) = SlackSendViaApi(botToken, channel, message, username: senderName).GetAwaiter().GetResult();
-            if (ok)
-            {
-                Console.WriteLine($"[SLACK] Sent: {message.Split('\n')[0]}{(textParts.Count > 1 ? $" (+{textParts.Count - 1} lines)" : "")}");
-                threadTs = ts;
-            }
-            else
+            var (header, overflow) = SplitMessageForChannel(message);
+
+            // Post channel header
+            var (ok, ts) = SlackSendViaApi(botToken, channel, header, username: senderName).GetAwaiter().GetResult();
+            if (!ok)
             {
                 Console.WriteLine("[SLACK] Failed to send message");
                 return 1;
+            }
+            threadTs = ts;
+            Console.WriteLine($"[SLACK] Sent: {header.Split('\n')[0]}{(overflow != null ? " (+thread)" : "")}");
+
+            // Post overflow as thread reply (chunked at 3900 chars)
+            if (overflow != null)
+            {
+                var chunks = ChunkText(overflow, 3900);
+                foreach (var chunk in chunks)
+                    SlackSendViaApi(botToken, channel, chunk, threadTs: threadTs, username: senderName).GetAwaiter().GetResult();
+                Console.WriteLine($"[SLACK] Thread: {overflow.Split('\n').Length} lines → {chunks.Count} chunk(s)");
             }
         }
 
@@ -227,6 +264,27 @@ internal partial class Program
         }
 
         return 0;
+    }
+
+    /// <summary>Split text into chunks of at most maxLen characters, breaking on newlines.</summary>
+    static List<string> ChunkText(string text, int maxLen)
+    {
+        var chunks = new List<string>();
+        var lines = text.Split('\n');
+        var sb = new System.Text.StringBuilder();
+        foreach (var line in lines)
+        {
+            var candidate = sb.Length == 0 ? line : sb + "\n" + line;
+            if (candidate.Length > maxLen && sb.Length > 0)
+            {
+                chunks.Add(sb.ToString().TrimEnd());
+                sb.Clear();
+            }
+            if (sb.Length > 0) sb.Append('\n');
+            sb.Append(line);
+        }
+        if (sb.Length > 0) chunks.Add(sb.ToString().TrimEnd());
+        return chunks;
     }
 
     /// <summary>Test Slack connection.</summary>

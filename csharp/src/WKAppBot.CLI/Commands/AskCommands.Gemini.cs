@@ -34,6 +34,17 @@ internal partial class Program
         return GeminiStopNoticeKeywords.Any(k => text.Contains(k, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// Strip "Gemini의 응답" UI label prepended by Gemini web UI.
+    /// Applied at the source so it doesn't appear in loop context, Slack, or console.
+    static string StripGeminiUiPrefix(string text)
+    {
+        if (!text.StartsWith("Gemini")) return text;
+        var eo = text.IndexOf('\uC751'); // 응
+        if (eo > 0 && eo < 15 && eo + 1 < text.Length && text[eo + 1] == '\uB2F5') // 답
+            return text[(eo + 2)..].TrimStart();
+        return text;
+    }
+
     // Wait for stop to clear naturally — never clicks stop (preserves ongoing generation)
     static async Task<bool> WaitWhileGeminiStopVisibleNoClickAsync(CdpClient cdp, int maxWaitMs = 30000)
     {
@@ -156,7 +167,7 @@ internal partial class Program
             {
                 if (IsGeminiStoppedNotice(text))
                     return (false, text);
-                return (true, text);
+                return (true, StripGeminiUiPrefix(text));
             }
             retryText = text;
         }
@@ -186,6 +197,9 @@ internal partial class Program
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
+
+        // Pre-open Slack thread before task so inside-task code (persona injection etc.) can post to it
+        if (slackReport) EnsureSlackThread("Gemini", question);
 
         var task = Task.Run(async () =>
         {
@@ -268,7 +282,9 @@ internal partial class Program
                         ? "[ASK] Fresh Gemini -- injecting persona..."
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
                     await ClearContentEditable(cdp, editorSel);
-                    await InsertTextContentEditable(cdp, editorSel, BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint));
+                    var personaText = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
+                    SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "…" : personaText)}\n```", "System");
+                    await InsertTextContentEditable(cdp, editorSel, personaText);
                     await Task.Delay(300);
 
                     // Send persona (button click ??Enter fallback)
@@ -398,6 +414,10 @@ internal partial class Program
                     }
                 }
                 // ?? Browser exclusive: question input ??send complete ??
+                // Prepend host handshake proof for loop sessions so Gemini trusts the host is live
+                if (effectiveLoopPersona)
+                    question = BuildHostHandshake() + question;
+
                 using var questionLock = ChromeTabLock.Acquire("Gemini");
                 if (questionLock == null) return (false, (string?)null);
 
@@ -701,7 +721,7 @@ internal partial class Program
                             && text.Contains("[APPBOT_TOOL_CALL_END]"))
                         {
                             Console.WriteLine("\n── [STREAM-TOOLCALL] complete — firing immediately ──");
-                            return (true, text);
+                            return (true, StripGeminiUiPrefix(text));
                         }
                     }
 
@@ -761,7 +781,7 @@ internal partial class Program
                             Console.WriteLine($"[ASK] Response received ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
                             if (geminiSavedImages.Count > 0)
                                 Console.WriteLine($"[ASK] Downloaded {geminiSavedImages.Count} generated image(s)");
-                            return (true, text);
+                            return (true, StripGeminiUiPrefix(text));
                         }
                     }
                     else
@@ -783,7 +803,7 @@ internal partial class Program
                         return (false, lastText);
                     }
                     Console.WriteLine($"[ASK] Timeout ??partial response ({lastText.Length} chars)");
-                    return (true, lastText);
+                    return (true, StripGeminiUiPrefix(lastText));
                 }
                 Console.WriteLine("[ASK] Timeout ??no response, retrying once...");
 
@@ -824,7 +844,7 @@ internal partial class Program
                             return (false, text);
                         }
                         Console.WriteLine($"[ASK] Retry: response ({text.Length} chars)");
-                        return (true, text);
+                        return (true, StripGeminiUiPrefix(text));
                     }
                     retryText = text;
                 }
@@ -849,8 +869,29 @@ internal partial class Program
         });
 
         var (ok, answer) = task.GetAwaiter().GetResult();
+        if (answer != null) answer = StripGeminiUiPrefix(answer); // safety net: catches any missed return path
+
+        if (slackReport && !string.IsNullOrWhiteSpace(answer))
+        {
+            EnsureSlackThread("Gemini", question);
+            var forSlack = answer; // already stripped of "Gemini의 응답" prefix by StripGeminiUiPrefix at source
+            // Strip stop notice suffix (e.g. "대답이 중지되었습니다") before posting to Slack
+            foreach (var kw in GeminiStopNoticeKeywords)
+            {
+                var ki = forSlack.IndexOf(kw, StringComparison.OrdinalIgnoreCase);
+                if (ki >= 0) { forSlack = forSlack[..ki].TrimEnd(); break; }
+            }
+            if (!string.IsNullOrWhiteSpace(forSlack))
+            {
+                var suffix = ok ? "" : "\n⚠️ _응답 중지됨_";
+                var post = forSlack.Length > 2000 ? forSlack[..2000] + "…" : forSlack;
+                SlackPostToThread(post + suffix, "Gemini");
+            }
+        }
+
+        Action<string, string?>? onStepReport = slackReport ? (msg, uname) => SlackPostToThread(msg, uname ?? "Gemini") : null;
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-            (ok, answer) = Task.Run(() => RunGeminiLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel)).GetAwaiter().GetResult();
+            (ok, answer) = Task.Run(() => RunGeminiLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport)).GetAwaiter().GetResult();
 
         if (ok && answer != null)
         {
@@ -859,17 +900,14 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("?? Gemini ?듬? ??");
             Console.ResetColor();
-            // Remove "Gemini???묐떟" prefix if present
-            var cleaned = answer.StartsWith("Gemini???묐떟") ? answer["Gemini???묐떟".Length..] : answer;
-            Console.WriteLine(cleaned.Length > 2000 ? cleaned[..2000] + "\n... (truncated)" : cleaned);
+            Console.WriteLine(answer.Length > 2000 ? answer[..2000] + "\n... (truncated)" : answer);
 
             // Full answer marker (for programmatic capture by whisper study etc.)
             Console.WriteLine("[ASK_FULL_ANSWER_BEGIN]");
-            Console.WriteLine(cleaned);
+            Console.WriteLine(answer);
             Console.WriteLine("[ASK_FULL_ANSWER_END]");
 
-            if (slackReport)
-                ReportToSlack("Gemini", question, cleaned);
+            // Slack already handled above (initial answer) + loop onStepReport
         }
 
         UnregisterWaitingTab("gemini");
