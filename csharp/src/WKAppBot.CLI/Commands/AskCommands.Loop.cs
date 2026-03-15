@@ -626,7 +626,7 @@ internal partial class Program
 
         if (clickResult != "CLICKED")
         {
-            await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
+            await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.focus()");
             await Task.Delay(80);
             await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
             {
@@ -744,7 +744,7 @@ internal partial class Program
         var sendResult = "PENDING";
         for (int sendAttempt = 0; sendAttempt < 5; sendAttempt++)
         {
-            var remaining = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 0") ?? "0";
+            var remaining = await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 0") ?? "0";
             if (remaining == "0" && sendAttempt > 0)
             {
                 sendResult = $"SENT(attempt={sendAttempt})";

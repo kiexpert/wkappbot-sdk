@@ -314,8 +314,9 @@ internal partial class Program
         {
             foreach (var sel in ChatGptEditorSelectors)
             {
+                var esc = sel.Replace("\\", "\\\\").Replace("\"", "\\\"");
                 var found = await cdp.EvalAsync(
-                    $"document.querySelector('{sel}') ? 'yes' : 'no'");
+                    $"document.querySelector(\"{esc}\") ? 'yes' : 'no'");
                 if (found == "yes") { Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s → {sel}"); return sel; }
             }
             if (attempt % 2 == 0) { Console.Write("."); Console.Out.Flush(); }
@@ -337,7 +338,10 @@ internal partial class Program
         {
             foreach (var sel in selectors)
             {
-                var found = await cdp.EvalAsync($"document.querySelector('{sel}') ? 'yes' : 'no'");
+                // Use double-quote JS string so selectors with single quotes (e.g. [role='textbox'])
+                // don't cause "SyntaxError: missing ) after argument list"
+                var esc = sel.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var found = await cdp.EvalAsync($"document.querySelector(\"{esc}\") ? 'yes' : 'no'");
                 if (found == "yes") return sel;
             }
             await Task.Delay(500);
