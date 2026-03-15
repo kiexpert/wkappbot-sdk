@@ -124,11 +124,6 @@ DURATION FORMAT (--timeout, --for): 30=30s, 2m, 500ms, 1.1s, 2h
 ⚠ eval ALWAYS needs #tab-hint — bare "*Chrome*" = active tab only
 ⚠ close "*Chrome*" without #hint → shows tab list (safety guard)
 ⚠ wkappbot_cli = MCP tool name only — not a CLI command
-
-━━ Startup Confirmation ━━
-After loading this policy, confirm with ONE short line only:
-"Policy loaded. Ready."
-Do not summarize the policy.
 """;
 
     public const string EmbeddedReminderPrompt = """
