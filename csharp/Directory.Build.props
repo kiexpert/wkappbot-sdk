@@ -18,8 +18,8 @@
           WorkingDirectory="$(MSBuildThisFileDirectory)">
       <Output TaskParameter="ConsoleOutput" PropertyName="_WKBumpCommit" />
     </Exec>
-    <!-- Count commits since the bump commit -->
-    <Exec Command="git rev-list --count $(_WKBumpCommit.Trim())..HEAD"
+    <!-- Count only source-touching commits since the bump (docs/md/txt excluded) -->
+    <Exec Command="git rev-list --count $(_WKBumpCommit.Trim())..HEAD -- &quot;*.cs&quot; &quot;*.csproj&quot; &quot;*.props&quot; &quot;*.yaml&quot;"
           ConsoleToMSBuild="true"
           IgnoreExitCode="true"
           WorkingDirectory="$(MSBuildThisFileDirectory)"
