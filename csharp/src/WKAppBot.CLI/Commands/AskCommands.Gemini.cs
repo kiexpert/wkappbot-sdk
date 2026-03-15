@@ -291,7 +291,7 @@ internal partial class Program
                     var personaSent = false;
                     for (int ps = 0; ps < 5; ps++)
                     {
-                        var rem = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 0") ?? "0";
+                        var rem = await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 0") ?? "0";
                         if (rem == "0" && ps > 0) { personaSent = true; break; }
                         await cdp.EvalAsync("document.querySelector('button[aria-label=\"Send message\"], button[aria-label*=\"Send\"], .send-button, button.send-button')?.click()");
                         await Task.Delay(500);
@@ -436,7 +436,7 @@ internal partial class Program
                 {
                     // ?? Tier 2: CDP Input.insertText (needs focus) ??
                     Console.WriteLine("[ASK] Focusless insert failed, trying CDP Input.insertText...");
-                    await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
+                    await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.focus()");
                     await Task.Delay(100);
                     await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
                     {
@@ -456,7 +456,7 @@ internal partial class Program
                     await Task.Delay(200);
 
                     var verify = await cdp.EvalAsync(
-                        $"document.querySelector('{editorSel}')?.textContent?.length ?? 0") ?? "0";
+                        $"document.querySelector(\"{editorSel}\")?.textContent?.length ?? 0") ?? "0";
                     if (verify == "0")
                     {
                         zoom?.ShowFail("insert failed");
@@ -531,7 +531,7 @@ internal partial class Program
                         // If editor is already empty, message was sent — Gemini is responding (stop = normal)
                         if (sendAttempt > 0)
                         {
-                            var editorLen = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 0") ?? "0";
+                            var editorLen = await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 0") ?? "0";
                             if (editorLen == "0")
                             {
                                 sendResult = $"SENT(attempt={sendAttempt})";
@@ -555,7 +555,7 @@ internal partial class Program
                     }
 
                     // Check if editor cleared OR response started (= already sent, don't re-send!)
-                    var remaining = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 0") ?? "0";
+                    var remaining = await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 0") ?? "0";
                     if (remaining == "0" && sendAttempt > 0)
                     {
                         sendResult = $"SENT(attempt={sendAttempt})";
