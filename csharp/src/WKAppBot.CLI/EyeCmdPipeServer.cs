@@ -136,6 +136,7 @@ internal static class EyeCmdPipeServer
         if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow" or "ask")
             cmdTag += $"-{args[1].ToLowerInvariant()}";
         var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.txt");
+        Program._currentLogPath = logFile; // track for auto-heal diagnostics
 
         // TeeTextWriter wraps pipeWriter: output goes to pipe (real-time) AND log file.
         // AsyncLocal routing isolates this command's output from concurrent commands.

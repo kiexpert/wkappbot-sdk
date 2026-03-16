@@ -64,6 +64,7 @@ internal partial class Program
 
     internal static int Main(string[] args)
     {
+        var _mainStarted = System.Diagnostics.Stopwatch.StartNew();
         // Force UTF-8 globally — console + child processes inherit codepage 65001
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
@@ -82,6 +83,9 @@ internal partial class Program
 
         // Kill ghost zoom overlays from previous invocations (keeps exe unlocked for publish)
         try { InputZoomHost.CloseAllGhosts(); } catch { }
+
+        // Auto-create busybox symlinks (a11y.exe, wka11y.exe → wkappbot.exe) if missing
+        EnsureBusyboxAliases();
 
         // Orphan guard: if parent dies, exit too (prevents ghost processes like stuck win-click).
         // Eye mode is intentionally long-running/detached → skip.
@@ -126,6 +130,8 @@ internal partial class Program
         if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow")
             cmdTag += $"-{args[1].ToLowerInvariant()}";
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
+        // Track current command log path for auto-heal diagnostics (non-Eye mode only; Eye sets it in RunInEye)
+        if (!RunningInEye) _currentLogPath = logFile;
         // RunningInEye: skip Console.SetOut — log tee is handled by EyeCmdPipeServer (per-command, parallel-safe)
         TeeTextWriter? tee = RunningInEye ? null : new TeeTextWriter(Console.Out, logFile);
         // Wrap tee in ThreadRoutingWriter so EyeCmdPipeServer.Route() can redirect per-command output.
@@ -166,7 +172,10 @@ internal partial class Program
             // Busybox-style: detect command from exe name (symlink-friendly)
             // e.g. a11y.exe find "*메모장*" → wkappbot a11y find "*메모장*"
             //      inspect.exe "*메모장*"   → wkappbot inspect "*메모장*"
-            var exeBaseName = Path.GetFileNameWithoutExtension(exePath).ToLowerInvariant();
+            // Use argv[0] instead of ProcessPath — ProcessPath resolves symlinks to real target,
+            // while GetCommandLineArgs()[0] preserves the original invocation name (symlink name).
+            var argv0 = Environment.GetCommandLineArgs().FirstOrDefault() ?? exePath;
+            var exeBaseName = Path.GetFileNameWithoutExtension(argv0).ToLowerInvariant();
             var implicitCmd = DetectCommandFromExeName(exeBaseName);
             if (implicitCmd != null && (args.Length == 0 || args[0].ToLowerInvariant() != implicitCmd))
             {
@@ -299,6 +308,7 @@ internal partial class Program
                 "speak" => SpeakCommand(restArgs),
                 "whisper" => WhisperCommand(restArgs),
                 "newchat" => NewChatCommand(restArgs),
+                "prompt"  => PromptCommand(restArgs),
                 "schedule" => ScheduleCommand(restArgs),
                 "knowhow" => KnowhowCommand(restArgs),
                 "win-move" => WindowMoveCommand(restArgs),
@@ -395,7 +405,7 @@ internal partial class Program
             catch { }
             if (tee != null) Console.SetOut(tee.OriginalConsole);
             tee?.Dispose(); // normal-exit atexit-style move to logs/old
-            if (tee != null) Console.WriteLine($"Log saved: {tee.LogPath}");
+            if (tee != null) Console.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
             timeoutTimer?.Dispose();
         }
     }

@@ -134,7 +134,7 @@ internal partial class Program
         return int.TryParse(result, out var v) ? v : 0;
     }
 
-    static int AskClaude(string question, bool slackReport, int timeoutSec, bool newTab, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null)
+    static int AskClaude(string question, bool slackReport, int timeoutSec, bool newTab, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] Claude: {question}");
@@ -487,7 +487,17 @@ internal partial class Program
             SlackPostToThread(answer.Length > 2000 ? answer[..2000] + "…" : answer, "Claude");
         }
 
-        Action<string, string?>? onStepReport = slackReport ? (msg, uname) => SlackPostToThread(msg, uname ?? "Claude") : null;
+        // Log initial answer to shared triad context (for recovery by other AIs if needed)
+        if (ok && !string.IsNullOrWhiteSpace(answer))
+            triadCtx?.LogStep("Claude", answer);
+
+        Action<string, string?>? onStepReport = slackReport || triadCtx != null
+            ? (msg, uname) =>
+            {
+                if (slackReport) SlackPostToThread(msg, uname ?? "Claude");
+                triadCtx?.LogStep("Claude", msg);
+            }
+            : null;
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
             (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport)).GetAwaiter().GetResult();
         bool isLimit = IsClaudeLimitResponse(answer);

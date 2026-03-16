@@ -53,7 +53,7 @@ internal partial class Program
         "If asked to generate/create/draw an image, USE your image generation tool (DALL-E/Imagen). Do NOT make ASCII art. " +
         "Confirm you understood with exactly: READY";
 
-    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null)
+    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] ChatGPT: {question}");
@@ -173,7 +173,17 @@ internal partial class Program
                         SlackPostToThread("❌ _응답 실패_ (timeout 또는 이미지 응답)", "ChatGPT");
                 }
 
-                Action<string, string?>? onStepReport = slackReport ? (msg, uname) => SlackPostToThread(msg, uname ?? "ChatGPT") : null;
+                // Log initial answer to shared triad context (for recovery by other AIs if needed)
+                if (ok && !string.IsNullOrWhiteSpace(answer))
+                    triadCtx?.LogStep("ChatGPT", answer);
+
+                Action<string, string?>? onStepReport = slackReport || triadCtx != null
+                    ? (msg, uname) =>
+                    {
+                        if (slackReport) SlackPostToThread(msg, uname ?? "ChatGPT");
+                        triadCtx?.LogStep("ChatGPT", msg);
+                    }
+                    : null;
                 if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
                     (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport);
                 return (ok, answer);

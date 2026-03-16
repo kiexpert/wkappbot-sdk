@@ -27,6 +27,7 @@
     <PackageReference Include="NAudio.Lame" Version="2.1.0" />
     <PackageReference Include="System.Speech" Version="8.*" />
     <PackageReference Include="NAudio" Version="2.*" />
+    <PackageReference Include="PdfPig" Version="0.1.13" />
   </ItemGroup>
 
   <ItemGroup>

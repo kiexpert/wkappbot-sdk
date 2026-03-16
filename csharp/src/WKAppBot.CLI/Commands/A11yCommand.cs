@@ -720,8 +720,9 @@ internal partial class Program
                 };
 
                 // Zoom: fire in parallel so it doesn't block the action (WPF creation ~330ms)
+                // Skip zoom for stress test (--count N > 1) — avoid 334ms+800ms overhead per iteration
                 Task<ClickZoomHelper?>? zoomTask = null;
-                if (action != "highlight")
+                if (action != "highlight" && countN == 1)
                 {
                     var capturedHwnd = elHwnd; var capturedRect = elRect;
                     var capturedLabel = $"{elType} \"{elName}\"";
@@ -735,6 +736,10 @@ internal partial class Program
                 var swTotal = System.Diagnostics.Stopwatch.StartNew();
                 for (int ci = 0; ci < countN; ci++)
                 {
+                    // Reset auto-heal tier log before each click/invoke attempt
+                    if (action is "click" or "invoke")
+                        _autoHealTiers = new List<string>();
+
                     var swIter = System.Diagnostics.Stopwatch.StartNew();
                     success = action switch
                     {
@@ -767,7 +772,18 @@ internal partial class Program
                 if (countN == 1)
                     PrintNodeAfter(root, _nodeBefore, action, success, swTotal.ElapsedMilliseconds);
 
-                var zoom = zoomTask?.GetAwaiter().GetResult();
+                // Zoom: fire-and-forget ShowPass/Dispose — don't block action result on WPF fade
+                var capturedSuccess = success; var capturedAction = action;
+                if (zoomTask != null)
+                    _ = zoomTask.ContinueWith(t =>
+                    {
+                        var zoom = t.Result;
+                        if (zoom == null) return;
+                        if (capturedSuccess) zoom.ShowPass($"{capturedAction} OK");
+                        else zoom.ShowFail($"{capturedAction} FAIL");
+                        Thread.Sleep(800);
+                        zoom.Dispose();
+                    }, TaskContinuationOptions.OnlyOnRanToCompletion);
 
                 // --speak: TTS 카라오케 (a11y 공통 옵션)
                 if (speak && success)
@@ -790,14 +806,12 @@ internal partial class Program
                     }
                 }
 
-                // Zoom result feedback + fade
-                if (zoom != null)
-                {
-                    if (success) zoom.ShowPass($"{action} OK");
-                    else zoom.ShowFail($"{action} FAIL");
-                    Thread.Sleep(800);
-                    zoom.Dispose();
-                }
+                // Zoom result feedback handled above via ContinueWith (fire-and-forget)
+
+                // Auto-heal: click/invoke 전 티어 실패 시 삼두에 해결방법 자동 문의
+                // 조건: CWD=WKAppBot 프로젝트 OR --auto-heal 플래그
+                if (!success && action is "click" or "invoke" && ShouldAutoHeal(args))
+                    FireAutoHeal(action, root, hwnd, title);
             }
             else
             {

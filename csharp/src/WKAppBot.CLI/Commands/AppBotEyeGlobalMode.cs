@@ -583,8 +583,9 @@ internal partial class Program
         }
 
         // ── Context usage monitor (per-card) ──
-        // Track last warned pct per CWD — re-warn on every 1% increment from 90%
-        var contextWarnedPcts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        // Track last warned MB + JSONL path per CWD.
+        // Path change = new session (ctime-new file) → reset MB counter so new session gets fresh warnings.
+        var contextWarnedPcts = new Dictionary<string, (int mb, string? path)>(StringComparer.OrdinalIgnoreCase);
 
         // ── Duplicate Eye self-close: Z-order check every ~10s ──
         // EnumWindows enumerates top-level windows top-to-bottom (Z-order).

@@ -1,10 +1,15 @@
+using System.Text;
 using System.Text.RegularExpressions;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 
 namespace WKAppBot.CLI;
 
 // partial class: wkappbot file <subcommand> — read-only filesystem tools for loop agents
-// file read <path> [--offset N] [--limit N]
-// file grep <pattern> [--path dir/file] [--type ext] [-i] [-C N] [--max N]
+// file read <path> [--offset N] [--limit N] [--encoding N]
+// file read-pdf <path> [--pages N-M] [--max-chars N]
+// file grep <pattern> [--path dir/file] [--type ext] [-i] [-C N] [--max N] [--encoding N]
 // file glob <pattern> [--path dir]
 internal partial class Program
 {
@@ -14,6 +19,8 @@ internal partial class Program
         return args[0].ToLowerInvariant() switch
         {
             "read"                   => FileReadCommand(args[1..]),
+            "read-pdf"               => FileReadPdfCommand(args[1..]),
+            "write"                  => FileWriteCommand(args[1..]),
             "grep"                   => FileGrepCommand(args[1..]),
             "glob"                   => FileGlobCommand(args[1..]),
             "--help" or "-h" or "help" => FileToolUsage(),
@@ -24,28 +31,50 @@ internal partial class Program
     static string FileDefaultDir() =>
         EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
 
+    /// <summary>
+    /// Detect file encoding: --encoding flag > BOM > Encoding.Default (system ANSI codepage).
+    /// On Korean Windows, Encoding.Default = CP949 automatically.
+    /// </summary>
+    static Encoding DetectFileEncoding(byte[] bytes, int? explicitCodepage)
+    {
+        if (explicitCodepage.HasValue)
+            return Encoding.GetEncoding(explicitCodepage.Value);
+        // BOM detection
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+        if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
+            return Encoding.Unicode;   // UTF-16 LE
+        if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
+            return Encoding.BigEndianUnicode; // UTF-16 BE
+        // Fallback: system ANSI codepage (CP949 on Korean Windows)
+        return Encoding.Default;
+    }
+
     // ── file read ──────────────────────────────────────────────────────────
     static int FileReadCommand(string[] args)
     {
         string? path = null;
         int offset = 0;
         int limit  = 2000;
+        int? encoding = null;
 
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--offset" && i + 1 < args.Length) int.TryParse(args[++i], out offset);
             else if (args[i] == "--limit" && i + 1 < args.Length) int.TryParse(args[++i], out limit);
+            else if (args[i] == "--encoding" && i + 1 < args.Length) { if (int.TryParse(args[++i], out int cp)) encoding = cp; }
             else if (!args[i].StartsWith("--")) path = args[i];
         }
 
         if (string.IsNullOrEmpty(path))
-            return Error("Usage: file read <path> [--offset N] [--limit N]");
-        if (!File.Exists(path))
-            return Error($"File not found: {path}");
+            return Error("Usage: file read <path> [--offset N] [--limit N] [--encoding N]");
+        if (!File.Exists(path)) { var nfd = path.Normalize(NormalizationForm.FormD); if (File.Exists(nfd)) path = nfd; else return Error($"File not found: {path}"); }
 
         try
         {
-            var lines = File.ReadAllLines(path);
+            var bytes = File.ReadAllBytes(path);
+            var enc   = DetectFileEncoding(bytes, encoding);
+            var lines = enc.GetString(bytes).ReplaceLineEndings("\n").Split('\n');
             int total  = lines.Length;
             int start  = Math.Max(0, offset);
             int end    = Math.Min(total, start + limit);
@@ -71,6 +100,7 @@ internal partial class Program
         bool    ignoreCase  = false;
         int     context     = 0;
         int     maxResults  = 200;
+        int?    encoding    = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -79,6 +109,7 @@ internal partial class Program
             else if (args[i] is "-i" or "--ignore-case")           ignoreCase = true;
             else if ((args[i] is "-C" or "--context") && i + 1 < args.Length) int.TryParse(args[++i], out context);
             else if (args[i] == "--max"   && i + 1 < args.Length) int.TryParse(args[++i], out maxResults);
+            else if (args[i] == "--encoding" && i + 1 < args.Length) { if (int.TryParse(args[++i], out int cp)) encoding = cp; }
             else if (!args[i].StartsWith("-"))                     pattern = args[i];
         }
 
@@ -114,14 +145,12 @@ internal partial class Program
                 string[] lines;
                 try
                 {
+                    var fileBytes = File.ReadAllBytes(file);
                     // Skip binary files: check first 8KB for null bytes
-                    using (var fs = File.OpenRead(file))
-                    {
-                        var buf = new byte[Math.Min(8192, fs.Length)];
-                        int n = fs.Read(buf, 0, buf.Length);
-                        if (Array.IndexOf(buf, (byte)0, 0, n) >= 0) continue; // binary
-                    }
-                    lines = File.ReadAllLines(file);
+                    int checkLen = Math.Min(8192, fileBytes.Length);
+                    if (Array.IndexOf(fileBytes, (byte)0, 0, checkLen) >= 0) continue;
+                    var enc = DetectFileEncoding(fileBytes, encoding);
+                    lines = enc.GetString(fileBytes).ReplaceLineEndings("\n").Split('\n');
                 }
                 catch { continue; }
 
@@ -231,35 +260,195 @@ internal partial class Program
                         .ToList();
     }
 
+    // ── file write ─────────────────────────────────────────────────────────
+    // Write Unicode content to a file, re-encoding to target charset.
+    // Content sources (pick one):
+    //   --stdin        read from stdin until EOF (pipe mode)
+    //   --text "..."   inline text content
+    //   --file <src>   read from source file (auto-detect encoding), write to target
+    // Use case: Claude edits CP949 Korean source files without byte-level splicing.
+    //   wkappbot file write legacy.cpp --encoding 949 --stdin  < edited_unicode.txt
+    //   wkappbot file write legacy.cpp --encoding 949 --file tmp_edit.txt
+    static int FileWriteCommand(string[] args)
+    {
+        string? path     = null;
+        int?    encoding = null;
+        string? text     = null;
+        string? srcFile  = null;
+        bool    stdin    = false;
+        bool    append   = false;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            if      (args[i] == "--encoding" && i + 1 < args.Length) { if (int.TryParse(args[++i], out int cp)) encoding = cp; }
+            else if (args[i] == "--text"     && i + 1 < args.Length) text    = args[++i];
+            else if (args[i] == "--file"     && i + 1 < args.Length) srcFile = args[++i];
+            else if (args[i] == "--stdin")  stdin  = true;
+            else if (args[i] == "--append") append = true;
+            else if (!args[i].StartsWith("--")) path = args[i];
+        }
+
+        if (string.IsNullOrEmpty(path))
+            return Error("Usage: file write <path> [--encoding N] (--stdin | --text \"...\" | --file <src>) [--append]");
+
+        string content;
+        if (stdin)
+        {
+            Console.InputEncoding = Encoding.UTF8;
+            content = Console.In.ReadToEnd();
+        }
+        else if (srcFile != null)
+        {
+            if (!File.Exists(srcFile)) return Error($"Source file not found: {srcFile}");
+            var srcBytes = File.ReadAllBytes(srcFile);
+            content = DetectFileEncoding(srcBytes, null).GetString(srcBytes);
+        }
+        else if (text != null)
+        {
+            content = text;
+        }
+        else
+        {
+            return Error("Specify content via --stdin, --text, or --file");
+        }
+
+        try
+        {
+            var enc = encoding.HasValue ? Encoding.GetEncoding(encoding.Value) : new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            var bytes = enc.GetBytes(content);
+            if (append)
+                using (var fs = File.Open(path, FileMode.Append)) fs.Write(bytes, 0, bytes.Length);
+            else
+                File.WriteAllBytes(path, bytes);
+
+            var encName = encoding.HasValue ? $"CP{encoding}" : "UTF-8";
+            Console.WriteLine($"[FILE] write OK → {path} ({bytes.Length} bytes, {encName})");
+            return 0;
+        }
+        catch (Exception ex) { return Error($"Write failed: {ex.Message}"); }
+    }
+
+    // ── file read-pdf ──────────────────────────────────────────────────────
+    // Extracts text from a PDF file page by page using PdfPig (pure .NET).
+    // Handles Korean/CJK embedded fonts correctly without encoding conversion issues.
+    static int FileReadPdfCommand(string[] args)
+    {
+        string? path     = null;
+        int     pgFrom   = 1;
+        int     pgTo     = int.MaxValue;
+        int     maxChars = 200_000;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--pages" && i + 1 < args.Length)
+            {
+                var pages = args[++i];
+                var dash  = pages.IndexOf('-');
+                if (dash > 0 &&
+                    int.TryParse(pages[..dash],       out int a) &&
+                    int.TryParse(pages[(dash + 1)..], out int b))
+                { pgFrom = a; pgTo = b; }
+                else if (int.TryParse(pages, out int single))
+                { pgFrom = pgTo = single; }
+                else return Error($"Invalid --pages value: {pages} (expected N or N-M)");
+            }
+            else if (args[i] == "--max-chars" && i + 1 < args.Length)
+                int.TryParse(args[++i], out maxChars);
+            else if (!args[i].StartsWith("--"))
+                path = args[i];
+        }
+
+        if (string.IsNullOrEmpty(path))
+            return Error("Usage: file read-pdf <path> [--pages N-M] [--max-chars N]");
+        // NFD fallback: NTFS may store Korean filenames in NFD (decomposed jamo) while CLI passes NFC.
+        // File.Exists uses exact Unicode match — try NFD if NFC fails.
+        if (!File.Exists(path))
+        {
+            var nfd = path.Normalize(NormalizationForm.FormD);
+            if (File.Exists(nfd)) path = nfd;
+            else return Error($"File not found: {path}");
+        }
+
+        try
+        {
+            using var pdf = PdfDocument.Open(path);
+            int totalPages = pdf.NumberOfPages;
+            int from = Math.Max(1, pgFrom);
+            int to   = Math.Min(totalPages, pgTo == int.MaxValue ? totalPages : pgTo);
+
+            Console.WriteLine($"[PDF] {path} ({totalPages} pages, showing {from}-{to})");
+
+            int  chars     = 0;
+            bool truncated = false;
+
+            for (int p = from; p <= to && !truncated; p++)
+            {
+                var page = pdf.GetPage(p);
+                // GetWords() uses spatial positioning to detect word boundaries,
+                // which correctly inserts spaces in Korean/CJK PDFs that omit them.
+                // Fallback to page.Text if GetWords() yields nothing.
+                var words = page.GetWords().ToList();
+                var pageText = words.Count > 0
+                    ? string.Join(" ", words.Select(w => w.Text))
+                    : page.Text;
+                Console.WriteLine($"\n--- Page {p} ---");
+
+                int remaining = maxChars - chars;
+                if (pageText.Length > remaining)
+                {
+                    Console.Write(pageText[..remaining]);
+                    Console.WriteLine($"\n... (truncated at {maxChars} chars — use --max-chars to increase)");
+                    truncated = true;
+                }
+                else
+                {
+                    Console.Write(pageText);
+                    chars += pageText.Length;
+                }
+            }
+
+            if (!truncated)
+                Console.WriteLine($"\n[PDF] {chars} chars extracted from {to - from + 1} page(s)");
+
+            return 0;
+        }
+        catch (Exception ex) { return Error($"PDF read failed: {ex.Message}"); }
+    }
+
     // ── usage ──────────────────────────────────────────────────────────────
     static int FileToolUsage()
     {
         Console.WriteLine(@"
-wkappbot file — read-only filesystem tools
+wkappbot file — filesystem tools (read + write + PDF)
 
 Usage:
-  wkappbot file read <path> [--offset N] [--limit N]
-      Read file with line numbers. Default: 2000 lines.
-      --offset N  start at line N (0-based)
-      --limit N   max lines
+  wkappbot file read <path> [--offset N] [--limit N] [--encoding N]
+      Read file with line numbers. Encoding: --encoding > BOM > system ANSI (CP949 on KR).
 
-  wkappbot file grep <pattern> [--path dir/file] [--type ext] [-i] [-C N] [--max N]
-      Regex search across files. Default root: caller CWD.
-      --path dir  search directory (or single file)
-      --type ext  filter by extension (e.g. cs, ts, py)
-      -i          ignore case
-      -C N        N context lines around each match
-      --max N     max matches (default: 200)
+  wkappbot file read-pdf <path> [--pages N-M] [--max-chars N]
+      Extract text from PDF (Korean/CJK safe). --pages 1-5, --max-chars 50000.
+
+  wkappbot file write <path> [--encoding N] (--stdin | --text ""..."" | --file <src>) [--append]
+      Write content to file, re-encoding to target charset.
+      --encoding N  target codepage (e.g. 949 for CP949/EUC-KR)
+      --stdin       read content from stdin (pipe mode)
+      --text ""...""  inline content
+      --file <src>  copy from source file (auto-detect source encoding)
+      --append      append instead of overwrite
+
+  wkappbot file grep <pattern> [--path dir/file] [--type ext] [-i] [-C N] [--max N] [--encoding N]
+      Regex search across files.
 
   wkappbot file glob <pattern> [--path dir]
       Find files. Supports ** for recursive.
-      --path dir  root directory (default: caller CWD)
 
 Examples:
-  wkappbot file read W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Program.cs --limit 50
+  wkappbot file read legacy.cpp --encoding 949
+  wkappbot file read-pdf report.pdf --pages 1-10
+  wkappbot file write legacy.cpp --encoding 949 --file tmp_edit.txt
+  wkappbot file write legacy.cpp --encoding 949 --stdin  < edited.txt
   wkappbot file grep ""static int.*Command"" --path W:/GitHub/WKAppBot/csharp --type cs
   wkappbot file glob ""**/*.cs"" --path W:/GitHub/WKAppBot/csharp/src
-  wkappbot file glob ""Commands/*.cs"" --path W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI
 ");
         return 1;
     }

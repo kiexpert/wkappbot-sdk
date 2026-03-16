@@ -285,11 +285,89 @@ internal partial class Program
     }
 
     /// <summary>
+    /// Try to read Claude usage from claude.ai/settings/usage via CDP (Chrome, no app needed).
+    /// Falls back to UIA approach if CDP unavailable or not logged in.
+    /// </summary>
+    static ClaudeUsageReport? ProbeClaudeUsageViaWeb()
+    {
+        try
+        {
+            _cdpBrowserLock.Wait(3000);
+            try
+            {
+                var cdp = ConnectCdp(9222, withBar: false, navigateUrl: ClaudeUsageUrl);
+                cdp.NavigateAsync(ClaudeUsageUrl).GetAwaiter().GetResult();
+
+                var js = """
+                    new Promise(resolve => {
+                        let tries = 0;
+                        const check = () => {
+                            const t = document.body?.innerText?.trim() || '';
+                            // Wait until usage % appears or 3s
+                            if (t.includes('%') || ++tries >= 15) resolve(t);
+                            else setTimeout(check, 200);
+                        };
+                        check();
+                    })
+                    """;
+
+                var text = cdp.EvalAsync(js, awaitPromise: true).GetAwaiter().GetResult() ?? "";
+                if (text.StartsWith('"') && text.EndsWith('"'))
+                    text = System.Text.Json.JsonSerializer.Deserialize<string>(text) ?? "";
+
+                if (string.IsNullOrWhiteSpace(text) || !text.Contains('%'))
+                    return null; // not logged in or page didn't load
+
+                Console.WriteLine($"[USAGE] Web page loaded ({text.Length} chars)");
+                return ParseUsageFromWebText(text);
+            }
+            finally { _cdpBrowserLock.Release(); }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[USAGE] Web probe failed: {ex.Message} — falling back to UIA");
+            return null;
+        }
+    }
+
+    static ClaudeUsageReport ParseUsageFromWebText(string text)
+    {
+        var report = new ClaudeUsageReport();
+        // Matches "42%" or "42% 사용됨" or "42 % used"
+        var pctRx  = new Regex(@"(\d+)\s*%");
+        var resetRx = new Regex(@"재설정[^\n]{0,40}|reset[^\n]{0,40}", RegexOptions.IgnoreCase);
+
+        var pcts   = pctRx.Matches(text).Select(m => int.Parse(m.Groups[1].Value)).ToList();
+        var resets = resetRx.Matches(text).Select(m => m.Value.Trim()).ToList();
+
+        if (pcts.Count >= 1) report.SessionPercent      = pcts[0];
+        if (pcts.Count >= 2) report.WeeklyAllPercent    = pcts[1];
+        if (pcts.Count >= 3) report.WeeklySonnetPercent = pcts[2];
+
+        if (resets.Count >= 1) report.SessionReset    = resets[0];
+        if (resets.Count >= 2) report.WeeklyAllReset  = resets[1];
+        if (resets.Count >= 3) report.WeeklySonnetReset = resets[2];
+
+        return report;
+    }
+
+    /// <summary>
     /// claude-usage — one-shot usage probe with Slack alert.
+    /// Web-first (CDP, no app needed) → UIA fallback (Claude Desktop).
     /// </summary>
     static int A11yClaudeUsage()
     {
-        var report = ProbeClaudeUsage(verbose: true);
+        // Try web first (fast, no app needed)
+        Console.WriteLine("[USAGE] Trying web probe (claude.ai/settings/usage)...");
+        var report = ProbeClaudeUsageViaWeb();
+
+        // Fallback to UIA if web failed
+        if (report == null)
+        {
+            Console.WriteLine("[USAGE] Web probe unavailable — probing via Claude Desktop UIA...");
+            report = ProbeClaudeUsage(verbose: true);
+        }
+
         if (report == null) return 1;
 
         var sessionRemain = 100 - report.SessionPercent;
@@ -300,6 +378,7 @@ internal partial class Program
         Console.WriteLine($"  Session: {report.SessionPercent}% used ({sessionRemain}% left) — {report.SessionReset ?? "?"}");
         Console.WriteLine($"  Weekly:  {report.WeeklyAllPercent}% used ({weeklyRemain}% left) — {report.WeeklyAllReset ?? "?"}");
         Console.WriteLine($"  Sonnet:  {report.WeeklySonnetPercent}% used — {report.WeeklySonnetReset ?? "?"}");
+        Console.WriteLine($"  URL:     {ClaudeUsageUrl}");
 
         // Slack alert at thresholds
         string? slackMsg = null;

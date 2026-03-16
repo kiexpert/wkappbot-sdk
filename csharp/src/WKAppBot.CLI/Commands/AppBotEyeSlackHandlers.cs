@@ -52,6 +52,77 @@ internal partial class Program
     /// → 포워딩 대상이 명확하지 않을 때 같은 프로젝트의 모든 AI에게 브로드캐스트.
     /// 단일 프롬프트 버전은 첫 번째 요소를 쓰면 됨.
     /// </summary>
+    static DateTime _lastAppbotVsCodeSpawnAt = DateTime.MinValue;
+
+    /// <summary>
+    /// Spawn appbot VS Code window if not already open (60s cooldown).
+    /// If pendingMessage is provided, delivers it to the window once Claude Code is ready
+    /// (polls up to 20s for the prompt input to appear, then types + submits).
+    /// Reusable from anywhere: routing fallback, newchat, homework, etc.
+    /// </summary>
+    static void TrySpawnAppbotVsCode(string? pendingMessage = null)
+    {
+        var cooldown = TimeSpan.FromSeconds(60);
+        if (DateTime.UtcNow - _lastAppbotVsCodeSpawnAt < cooldown) return;
+        _lastAppbotVsCodeSpawnAt = DateTime.UtcNow;
+
+        var appbotDir = Environment.CurrentDirectory; // "W:\GitHub\WKAppBot"
+        if (string.IsNullOrWhiteSpace(appbotDir) || IsSystemOrInstallDirectory(appbotDir)) return;
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[EYE][SLACK] 앱봇 창 없음 — VS Code 스폰: {appbotDir}");
+        Console.ResetColor();
+
+        try { System.Diagnostics.Process.Start("code.exe", $"\"{appbotDir}\""); }
+        catch (Exception ex) { Console.WriteLine($"[EYE][SLACK] VS Code 스폰 실패: {ex.Message}"); return; }
+
+        if (string.IsNullOrWhiteSpace(pendingMessage)) return;
+
+        // Background: poll until the prompt window is ready, then deliver the message
+        var msg = pendingMessage;
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            const int maxWaitSec = 20;
+            const int pollMs = 1000;
+            ClaudePromptHelper.PromptInfo? target = null;
+
+            for (int i = 0; i < maxWaitSec; i++)
+            {
+                System.Threading.Thread.Sleep(pollMs);
+                try
+                {
+                    using var ph = new ClaudePromptHelper();
+                    var all = ph.FindAllPrompts();
+                    var cwdFolder = Path.GetFileName(Environment.CurrentDirectory);
+                    target = all.FirstOrDefault(p =>
+                        p.WindowTitle.Contains(cwdFolder, StringComparison.OrdinalIgnoreCase));
+                    if (target != null) break;
+                }
+                catch { }
+            }
+
+            if (target == null)
+            {
+                Console.WriteLine("[EYE][SLACK] VS Code 스폰 후 창 미발견 — 메시지 전달 포기");
+                return;
+            }
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"[EYE][SLACK] VS Code 준비 완료 — 대기 메시지 전달: {msg[..Math.Min(60, msg.Length)]}...");
+            Console.ResetColor();
+            try
+            {
+                using var ph = new ClaudePromptHelper();
+                ClaudePromptHelper.AllowFocusSteal = true;
+                ph.TypeAndSubmit(target, msg);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EYE][SLACK] 메시지 전달 실패: {ex.Message}");
+            }
+        });
+    }
+
     static List<ClaudePromptHelper.PromptInfo> ResolveWorkspaceScopedPrompts(ClaudePromptHelper promptHelper)
     {
         var cwdFolder = Path.GetFileName(Environment.CurrentDirectory); // "WKAppBot"
@@ -60,6 +131,7 @@ internal partial class Program
         if (allPrompts.Count == 0)
         {
             Console.WriteLine("[EYE][SLACK] ResolveWorkspaceScopedPrompts: no prompts found at all");
+            TrySpawnAppbotVsCode();
             var last = promptHelper.FindPrompt();
             return last != null ? new List<ClaudePromptHelper.PromptInfo> { last } : new List<ClaudePromptHelper.PromptInfo>();
         }
@@ -80,7 +152,19 @@ internal partial class Program
             return myPrompts;
         }
 
-        // CWD 매칭 실패 → 첫 번째만
+        // CWD 타이틀 매칭 실패 → cached appbot hwnd 우선, 없으면 첫 번째
+        if (_cachedAppbotOwnHwnd != IntPtr.Zero && IsWindow(_cachedAppbotOwnHwnd))
+        {
+            var cached = allPrompts.FirstOrDefault(p => p.WindowHandle == _cachedAppbotOwnHwnd);
+            if (cached != null)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[EYE][SLACK] FindMyPrompts: no CWD title match for \"{cwdFolder}\", using cached appbot hwnd 0x{_cachedAppbotOwnHwnd:X}");
+                Console.ResetColor();
+                return new List<ClaudePromptHelper.PromptInfo> { cached };
+            }
+        }
+
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"[EYE][SLACK] FindMyPrompts: no CWD match for \"{cwdFolder}\" in {allPrompts.Count} prompts, using first");
         Console.ResetColor();
@@ -123,12 +207,23 @@ internal partial class Program
 
         Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: owner=\"{owner ?? "(none)"}\" recent={recentAuthors.Count} hostTarget={hostTarget} tags=[{string.Join(", ", cwdTags)}]");
 
+        // cwdTags.Count == 0 means bot username has no [CWD] tag (e.g. "클롣" with no workspace).
+        // In that case we route only to own workspace, NOT all prompts.
+        if (cwdTags.Count == 0)
+        {
+            var ownOnly = ResolveWorkspaceScopedPrompts(promptHelper);
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no CWD tag in authors [{string.Join(", ", allAuthors)}] → own workspace only ({ownOnly.Count})");
+            Console.ResetColor();
+            return ownOnly;
+        }
+
         Console.WriteLine($"[EYE][SLACK] PromptCandidates: total={allPrompts.Count}");
         foreach (var p in allPrompts)
         {
             var hostMatch = MatchesHostTarget(p, hostTarget);
             var searchTitle = GetPromptSearchableTitle(p);
-            var cwdMatch = cwdTags.Count == 0 || cwdTags.Any(tag => searchTitle.Contains(tag, StringComparison.OrdinalIgnoreCase));
+            var cwdMatch = cwdTags.Any(tag => searchTitle.Contains(tag, StringComparison.OrdinalIgnoreCase));
             var selected = hostMatch && cwdMatch;
             var st = promptHelper.ProbeSubmitState(p);
             var shortTitle = p.WindowTitle.Length > 72 ? p.WindowTitle[..69] + "..." : p.WindowTitle;
@@ -140,7 +235,7 @@ internal partial class Program
 
         var matched = allPrompts
             .Where(p => MatchesHostTarget(p, hostTarget))
-            .Where(p => cwdTags.Count == 0 || cwdTags.Any(tag => GetPromptSearchableTitle(p).Contains(tag, StringComparison.OrdinalIgnoreCase)))
+            .Where(p => cwdTags.Any(tag => GetPromptSearchableTitle(p).Contains(tag, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
         if (matched.Count > 0)

@@ -177,7 +177,7 @@ internal partial class Program
         return (false, retryText);
     }
 
-    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null)
+    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] Gemini: {question}");
@@ -889,7 +889,17 @@ internal partial class Program
             }
         }
 
-        Action<string, string?>? onStepReport = slackReport ? (msg, uname) => SlackPostToThread(msg, uname ?? "Gemini") : null;
+        // Log initial answer to shared triad context (for recovery by other AIs if needed)
+        if (ok && !string.IsNullOrWhiteSpace(answer))
+            triadCtx?.LogStep("Gemini", answer);
+
+        Action<string, string?>? onStepReport = slackReport || triadCtx != null
+            ? (msg, uname) =>
+            {
+                if (slackReport) SlackPostToThread(msg, uname ?? "Gemini");
+                triadCtx?.LogStep("Gemini", msg);
+            }
+            : null;
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
             (ok, answer) = Task.Run(() => RunGeminiLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport)).GetAwaiter().GetResult();
 
