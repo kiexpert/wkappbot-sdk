@@ -305,7 +305,7 @@ Data Directory:
 
         // Exact match first (symlink named exactly as command)
         string[] knownCommands = {
-            "a11y", "inspect", "ocr", "logcat", "capture", "scan",
+            "a11y", "inspect", "ocr", "logcat", "grep", "capture", "scan",
             "windows", "snapshot", "readiness", "ask"
         };
         foreach (var cmd in knownCommands)
@@ -323,7 +323,7 @@ Data Directory:
     }
 
     // Busybox aliases to auto-create as symlinks next to wkappbot.exe
-    static readonly string[] BusyboxAliases = { "a11y", "wka11y" };
+    static readonly string[] BusyboxAliases = { "a11y", "wka11y", "grep" };
 
     /// <summary>
     /// Ensure busybox-style symlinks exist next to wkappbot.exe.

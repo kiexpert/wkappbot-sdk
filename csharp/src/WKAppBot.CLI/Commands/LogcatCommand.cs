@@ -122,12 +122,19 @@ internal partial class Program
 
             var pastFiles = pastDirs.Distinct(StringComparer.OrdinalIgnoreCase)
                 .Where(Directory.Exists)
-                .SelectMany(dir => Directory.GetFiles(dir, "*.*", SearchOption.TopDirectoryOnly))
+                .SelectMany(dir => { try { return Directory.GetFiles(dir, "*", SearchOption.TopDirectoryOnly); } catch { return Array.Empty<string>(); } })
                 .Select(p => new FileInfo(p))
-                .Where(f => IsFilePatternMatch(f.Name, filePatterns)
-                         && !f.Name.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)
-                         && f.LastWriteTimeUtc >= cutoff)
-                .OrderBy(f => f.LastWriteTimeUtc)
+                .Where(f =>
+                {
+                    try
+                    {
+                        return IsFilePatternMatch(f.Name, filePatterns)
+                            && !f.Name.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)
+                            && f.LastWriteTimeUtc >= cutoff;
+                    }
+                    catch { return false; } // e.g. \\.\nul device file throws on LastWriteTimeUtc
+                })
+                .OrderBy(f => { try { return f.LastWriteTimeUtc; } catch { return DateTime.MinValue; } })
                 .ToList();
 
             if (pastFiles.Count > 0)
@@ -164,7 +171,7 @@ internal partial class Program
             {
                 IncludeSubdirectories = maxDepth != 0,
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
-                Filter = "*.*",
+                Filter = "*",
                 EnableRaisingEvents = true
             };
 
@@ -268,6 +275,8 @@ internal partial class Program
         return $"{seconds:0}s";
     }
 
+    const int MaxLineLengthForEmit = 32_768; // 32 KB — guard against binary files with no newlines
+
     static void EmitDeltaLines(
         string path,
         Dictionary<string, long> offsets,
@@ -284,10 +293,12 @@ internal partial class Program
         long start = 0;
         if (offsets.TryGetValue(path, out var prev)) start = prev;
 
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        FileStream? fs = null;
+        try { fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete); }
+        catch { return; } // locked or inaccessible — skip silently
         if (start > fs.Length) start = 0;
         fs.Seek(start, SeekOrigin.Begin);
-        using var sr = new StreamReader(fs, Encoding.UTF8, true);
+        using var sr = new StreamReader(fs, Encoding.UTF8, true); // sr owns fs
 
         long emitted = lineCounts.TryGetValue(path, out var lc) ? lc : 0;
 
@@ -297,7 +308,10 @@ internal partial class Program
             var tail = new Queue<string>(8);
             while (!sr.EndOfStream)
             {
-                var line = sr.ReadLine() ?? "";
+                string? line;
+                try { line = sr.ReadLine(); } catch { break; }
+                if (line == null) break;
+                if (line.Length > MaxLineLengthForEmit) break; // binary file guard
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 if (tail.Count == 7) tail.Dequeue();
                 tail.Enqueue(line);
@@ -314,7 +328,9 @@ internal partial class Program
         var buf = new List<string>();
         while (!sr.EndOfStream)
         {
-            var line = sr.ReadLine() ?? "";
+            string? line;
+            try { line = sr.ReadLine(); } catch { break; }
+            if (line == null || line.Length > MaxLineLengthForEmit) break; // binary file guard
             if (!string.IsNullOrWhiteSpace(line)) buf.Add(line);
         }
 
