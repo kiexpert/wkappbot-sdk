@@ -139,6 +139,31 @@ internal partial class Program
         Directory.CreateDirectory(logDir);
         RotateOldLogs(logDir, staleHours: 24);
         var pid = Environment.ProcessId;
+
+        // ── Alias rewrite (runs BEFORE cmdTag/logFile so all downstream sees canonical command) ──
+        // Step 1: busybox exe-name → prepend implicit command (symlink-friendly)
+        //   grap.exe error *.log  → args = ["grap", "error", "*.log"]
+        //   a11y.exe find "*foo*" → args = ["a11y", "find", "*foo*"]
+        // Use argv[0] (not ProcessPath) — ProcessPath resolves symlinks, argv[0] preserves link name.
+        {
+            var argv0 = Environment.GetCommandLineArgs().FirstOrDefault() ?? exePath;
+            var exeBaseName = Path.GetFileNameWithoutExtension(argv0).ToLowerInvariant();
+            var implicitCmd = DetectCommandFromExeName(exeBaseName);
+            if (implicitCmd != null && (args.Length == 0 || args[0].ToLowerInvariant() != implicitCmd))
+                args = new[] { implicitCmd }.Concat(args).ToArray();
+        }
+        // Step 2: command alias → canonical command + arg translation
+        //   grep: logcat alias, same arg order
+        //   grap: logcat alias, grep-compat arg order (pattern first → fileFilter first)
+        if (args.Length > 0)
+        {
+            var a0 = args[0].ToLowerInvariant();
+            if (a0 == "grap")
+                args = new[] { "logcat" }.Concat(GrapArgsToLogcat(args.Skip(1).ToArray())).ToArray();
+            else if (a0 == "grep")
+                args = new[] { "logcat" }.Concat(GrapArgsToLogcat(args.Skip(1).ToArray())).ToArray();
+        }
+
         // Include command name in log filename for easy identification via ls
         // e.g. "wkappbot.exe.out-20260221_211427.eye.pid=36944.txt"
         var cmdTag = args.Length > 0 ? args[0].ToLowerInvariant().Replace(" ", "-") : "noargs";
@@ -186,19 +211,6 @@ internal partial class Program
             // Policy broadcast only on Eye spawn (not every CLI command)
             // — prevents stdout pollution for ask/web/other commands
             
-            // Busybox-style: detect command from exe name (symlink-friendly)
-            // e.g. a11y.exe find "*메모장*" → wkappbot a11y find "*메모장*"
-            //      inspect.exe "*메모장*"   → wkappbot inspect "*메모장*"
-            // Use argv[0] instead of ProcessPath — ProcessPath resolves symlinks to real target,
-            // while GetCommandLineArgs()[0] preserves the original invocation name (symlink name).
-            var argv0 = Environment.GetCommandLineArgs().FirstOrDefault() ?? exePath;
-            var exeBaseName = Path.GetFileNameWithoutExtension(argv0).ToLowerInvariant();
-            var implicitCmd = DetectCommandFromExeName(exeBaseName);
-            if (implicitCmd != null && (args.Length == 0 || args[0].ToLowerInvariant() != implicitCmd))
-            {
-                args = new string[] { implicitCmd }.Concat(args).ToArray();
-            }
-
             if (args.Length == 0)
             {
                 PrintUsage();
@@ -294,8 +306,7 @@ internal partial class Program
                 "scan" => ScanCommand(restArgs),
                 "ask" => AskCommand(restArgs),
                 "agent" => AgentCommand(restArgs),
-                "logcat" or "grep" => LogcatCommand(restArgs),
-                "grap" => LogcatCommand(GrapArgsToLogcat(restArgs)),
+                "logcat" => LogcatCommand(restArgs),
                 "eye" => AppBotEyeCommand(restArgs),
                 "slack" => SlackCommand(restArgs),
                 "web" => WebCommand(restArgs),
