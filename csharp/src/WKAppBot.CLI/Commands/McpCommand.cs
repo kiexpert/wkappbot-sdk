@@ -229,6 +229,9 @@ internal partial class Program
         "File I/O: file-read (read file as Unicode, encoding-aware), file-write (write Unicode→target encoding, @file reference)\n" +
         "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ), slack (send Slack message), eye (eye tick — status snapshot)\n" +
         "Diagnostics: prompt-probe (scan all AI prompt windows — Claude Desktop, VS Code Claude Code, Codex — and report certainty, Slack display names, CWD; use all=true to include hidden/minimized windows)\n" +
+        "Log search: logcat (search+stream wkappbot logs; use wkappbot_cli for full options)\n" +
+        "  ⭐ Token-efficient log access pattern: wkappbot_cli [\"logcat\",\"--hq\",\"--past\",\"30s\",\"*.file.*\",\"keyword\"] → grep-style exit\n" +
+        "  file glob: *.file.* / *.eye.* / ** (all) — supports ';' OR. text filters: pure regex, multiple = AND\n" +
         "Filesystem (read-only): file-read (encoding-aware read), file-write (write with encoding; auto-tracks original for patch restore)\n" +
         "Agent session: agent-checkpoint (snapshot before risky change), agent-dump-patch (write unified patch + restore hints to repo root)\n" +
         "Web: web-fetch (HTTP GET), web-search (Google via CDP), web-read (navigate+extract text)\n" +
@@ -268,7 +271,9 @@ internal partial class Program
                 // Auto-generated from GetUsageText() — stays in sync with CLI help automatically
                 "Run any wkappbot CLI command via argv array. argv[0] = wkappbot command name.\n" +
                 "Examples: [\"a11y\",\"invoke\",\"*OK*\"], [\"file\",\"read\",\"src/foo.cs\"], [\"web\",\"search\",\"query\"],\n" +
-                "          [\"agent\",\"checkpoint\",\"--label\",\"before compile\"], [\"slack\",\"send\",\"hello\"]\n" +
+                "          [\"agent\",\"checkpoint\",\"--label\",\"before compile\"], [\"slack\",\"send\",\"hello\"],\n" +
+                "          [\"logcat\",\"--hq\",\"--past\",\"30s\",\"*.file.*\",\"OCR-DEEP\"]  ← grep-style log search (exits after scan)\n" +
+                "          [\"logcat\",\"--hq\",\"--past\",\"1h\",\"**\",\"exception\"]          ← search all logs last 1h for 'exception'\n" +
                 "⚠ Build/publish: prefer signaling Claude Code via Slack. If Claude Code is offline, checkpoint first then publish.\n\n" +
                 GetUsageText(),
                 new JsonObject {
