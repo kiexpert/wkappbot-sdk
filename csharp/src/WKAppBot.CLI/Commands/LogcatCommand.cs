@@ -18,7 +18,8 @@ internal partial class Program
         string? baseDirOverride = null;
         int maxDepth = 0; // 0 = current dir only, -1 = unlimited, N = depth limit
         bool includeHq = false;
-        double pastSeconds = 0; // 0 = no past scan; >0 = scan existing files this old
+        double pastSeconds = 0;    // 0 = no past scan; >0 = scan existing files this old
+        bool follow = false;       // --past without --follow: scan and exit (grep-style)
         double timeoutSeconds = 0; // 0 = run forever
 
         // Parse positional + named args
@@ -34,6 +35,7 @@ internal partial class Program
             else if (a == "--hq") { includeHq = true; }
             else if (a == "--past" && i + 1 < args.Length) { pastSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--past=")) { pastSeconds = ParsePastDuration(a[7..]); }
+            else if (a is "--follow" or "-f") { follow = true; }
             else if (a == "--timeout" && i + 1 < args.Length) { timeoutSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--timeout=")) { timeoutSeconds = ParsePastDuration(a[10..]); }
             else { positional.Add(a); }
@@ -102,12 +104,19 @@ internal partial class Program
                 Console.WriteLine($"[LOGCAT] --past: scanning {pastFiles.Count} file(s) from last {FormatDuration(pastSeconds)}");
                 foreach (var f in pastFiles)
                     EmitDeltaLines(f.FullName, pastOffsets, pastLineCounts, msgRegex, ref pastHeader);
-                Console.WriteLine("[LOGCAT] --past: done, entering live mode...");
             }
             else
             {
                 Console.WriteLine($"[LOGCAT] --past: no files found in last {FormatDuration(pastSeconds)}");
             }
+
+            // --past without --follow/--timeout: grep-style, exit after scan
+            if (!follow && timeoutSeconds == 0)
+            {
+                Console.WriteLine($"[LOGCAT] --past: done ({pastFiles.Count} file(s))");
+                return 0;
+            }
+            Console.WriteLine("[LOGCAT] --past: done, entering live mode...");
         }
 
         var watchers = new List<FileSystemWatcher>();
