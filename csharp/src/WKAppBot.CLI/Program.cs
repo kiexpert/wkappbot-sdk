@@ -88,6 +88,14 @@ internal partial class Program
             return McpCommand(args.Skip(1).ToArray());
         }
 
+        // help: fast path — skip TeeWriter, RotateOldLogs, Eye tick, LaunchEye, OrphanGuard
+        // Skip fast path when profiling so all init stages are visible
+        if (!_profiling && (args.Length == 0 || args[0] is "help" or "--help" or "-h"))
+        {
+            PrintUsage();
+            return 0;
+        }
+
         // Enable DPI awareness
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
         prof("DpiAwareness set");
@@ -215,6 +223,7 @@ internal partial class Program
             
             if (args.Length == 0)
             {
+                prof("PrintUsage (no-args)");
                 PrintUsage();
                 return 1;
             }

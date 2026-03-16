@@ -84,8 +84,10 @@ class Program
 
         // eye: IS the daemon, must run core directly
         // file: read-only utility (PDF/OCR may take several seconds) — skip Eye pipe to avoid timeout
+        // help/no-args: fast path — skip Eye pipe, run Core directly (Core is ~22ms for help)
         // logcat/grep/grap: streaming log monitor — needs direct stdout, TeeConsole, full error handling
-        if (!onlyCore && cmd != "eye" && cmd != "file" && cmd != "logcat" && cmd != "grep" && cmd != "grap")
+        if (!onlyCore && cmd != "eye" && cmd != "file" && cmd != "logcat" && cmd != "grep" && cmd != "grap"
+            && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
             if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code))
                 return code;
