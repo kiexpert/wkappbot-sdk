@@ -159,6 +159,8 @@ Utility:
   logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]
       Stream logs in real-time. Default: CWD only. -r unlimited, -r=3 depth 3. --hq adds HQ+openclaw.
       File filter supports grap patterns: wildcards, regex: prefix, ';' OR.
+  grep  <pattern> [files]    (alias → logcat, grep-compat arg order)
+  grap  <pattern> [files]    (alias → logcat, grep-compat arg order — WKAppBot official pattern name)
   ask gpt|gemini|claude ""question"" [file.png] [--slack] [--new-tab]
       Ask AI via CDP (focusless). Auto-closes blank tabs, validates URL.
   ask triad ""question""
@@ -324,6 +326,52 @@ Data Directory:
 
     // Busybox aliases to auto-create as symlinks next to wkappbot.exe
     static readonly string[] BusyboxAliases = { "a11y", "wka11y", "grep", "grap" };
+
+    static void PrintGrapHelp(string alias)
+    {
+        var isgrap = alias == "grap";
+        Console.WriteLine($"""
+            {alias} — WKAppBot log search ({(isgrap ? "grab accessibility pattern, official WKAppBot name" : "legacy grep alias")})
+            Internally: {alias} <pattern> [files...] → logcat <files> <pattern>
+
+            Usage:
+              {alias} <pattern> [files...] [options]
+
+            Arguments:
+              <pattern>     Regex pattern to search (case-insensitive by default)
+              [files...]    File glob(s) to search, ';' OR  e.g. "*.log;*.txt"
+                            Default: *.txt in current directory
+
+            Options:
+              -r, --recursive       Recursive (unlimited depth)
+              -r=N                  Recursive up to depth N
+              --basedir <dir>       Search root directory (default: CWD)
+              --hq                  Include wkappbot.hq + openclaw log dirs
+              --past <duration>     Scan files modified within duration (e.g. 1h, 30m, 2d)
+                                    Without --follow: scan and exit (grep-style, one-shot)
+              -f, --follow          Follow new log entries after --past scan (tail -f style)
+              --timeout <duration>  Watch mode: follow for duration then exit
+                                    e.g. --timeout 30s, --timeout 5m  (implies --follow)
+
+              -i, --case-sensitive  Case-sensitive match (default: insensitive)
+              -v, --invert-match    Invert match
+              -l, --files-with-matches  Print filenames only
+              -c, --count           Count matches per file
+              -m N, --max-count N   Stop after N matches per file
+              -A N                  N lines after match
+              -B N                  N lines before match
+              -C N                  N lines context (before + after)
+
+            Examples:
+              {alias} error                          # search *.txt in CWD
+              {alias} error *.log                    # search *.log files
+              {alias} "NullRef" *.log -C3            # 3 lines context
+              {alias} error *.log --past 1h          # last 1h, then exit
+              {alias} error *.log --past 1h -f       # last 1h, then follow
+              {alias} error *.log --timeout 30s      # watch for 30 seconds
+              {alias} error --hq -r                  # recursive in HQ logs
+            """);
+    }
 
     /// <summary>
     /// Translates grep-style args to logcat-style args for the `grap` busybox alias.
