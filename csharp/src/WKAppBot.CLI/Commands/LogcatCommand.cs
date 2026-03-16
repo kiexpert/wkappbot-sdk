@@ -255,11 +255,31 @@ internal partial class Program
         using var sr = new StreamReader(fs, Encoding.UTF8, true);
 
         long emitted = lineCounts.TryGetValue(path, out var lc) ? lc : 0;
+        // No filter: print path + last 5 non-empty lines (tail-preview mode)
+        if (msgRegex == null)
+        {
+            var tail = new System.Collections.Generic.Queue<string>(6);
+            while (!sr.EndOfStream)
+            {
+                var line = sr.ReadLine() ?? "";
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (tail.Count == 5) tail.Dequeue();
+                tail.Enqueue(line);
+            }
+            Console.WriteLine($"{path}");
+            foreach (var line in tail)
+                Console.WriteLine($"  {line}");
+            lastHeaderPath = path;
+            offsets[path] = fs.Length;
+            lineCounts[path] = emitted;
+            return;
+        }
+
         while (!sr.EndOfStream)
         {
             var line = sr.ReadLine() ?? "";
             if (string.IsNullOrWhiteSpace(line)) continue;
-            if (msgRegex != null && !msgRegex.IsMatch(line)) continue;
+            if (!msgRegex.IsMatch(line)) continue;
 
             emitted++;
             if (!string.Equals(lastHeaderPath, path, StringComparison.OrdinalIgnoreCase))
