@@ -20,11 +20,38 @@ namespace WKAppBot.Launcher;
 /// </summary>
 class Program
 {
+    // Busybox aliases: symlink names that map to an implicit first argument
+    static readonly (string name, string cmd)[] BusyboxAliases =
+    {
+        ("a11y",   "a11y"),
+        ("wka11y", "a11y"),
+        ("inspect","inspect"),
+        ("ocr",    "ocr"),
+        ("logcat", "logcat"),
+        ("scan",   "scan"),
+    };
+
     [STAThread]
     static int Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
+
+        // Busybox-style: if invoked as a11y.exe / wka11y.exe / etc., prepend implicit command.
+        // Must be done in Launcher because Core is spawned as a new process — argv[0] loses the symlink name.
+        // Also auto-create missing symlinks when running as wkappbot.exe.
+        var argv0      = Environment.GetCommandLineArgs().FirstOrDefault() ?? "";
+        var exeBase    = Path.GetFileNameWithoutExtension(argv0).ToLowerInvariant();
+        var implicitCmd = BusyboxAliases
+            .Where(x => exeBase == x.name || exeBase.Contains(x.name))
+            .Select(x => x.cmd)
+            .FirstOrDefault();
+        if (implicitCmd != null && (args.Length == 0 || args[0].ToLowerInvariant() != implicitCmd))
+            args = new[] { implicitCmd }.Concat(args).ToArray();
+
+        // Auto-create missing busybox symlinks (runs only when argv0 == wkappbot)
+        if (exeBase == "wkappbot")
+            EnsureBusyboxAliases();
 
         if (args.Length == 0)
         {
@@ -268,5 +295,61 @@ class Program
             Console.Error.WriteLine($"[LAUNCHER] Failed to run core: {ex.Message}");
             return 1;
         }
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
+
+    /// <summary>
+    /// Auto-create busybox symlinks (a11y.exe, wka11y.exe → wkappbot.exe) if missing.
+    /// Symlink preferred; falls back to hardlink if no permission.
+    /// Stale hardlinks (size mismatch after hot-swap) are deleted and recreated.
+    /// </summary>
+    static void EnsureBusyboxAliases()
+    {
+        try
+        {
+            var exePath = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exePath)) return;
+            var dir = Path.GetDirectoryName(exePath);
+            if (string.IsNullOrEmpty(dir)) return;
+
+            var targetName = Path.GetFileName(exePath); // wkappbot.exe
+            long targetSize = new FileInfo(exePath).Length;
+
+            var aliasNames = BusyboxAliases.Select(x => x.name).Distinct();
+            foreach (var alias in aliasNames)
+            {
+                var linkPath = Path.Combine(dir, alias + ".exe");
+
+                if (File.Exists(linkPath))
+                {
+                    bool isSymlink = File.ResolveLinkTarget(linkPath, returnFinalTarget: false) != null;
+                    if (!isSymlink)
+                    {
+                        // Stale hardlink check
+                        if (new FileInfo(linkPath).Length != targetSize)
+                            try { File.Delete(linkPath); } catch { continue; }
+                        else continue;
+                    }
+                    else continue;
+                }
+                else
+                {
+                    try { if (File.GetAttributes(linkPath) != 0) continue; } catch { }
+                }
+
+                try
+                {
+                    File.CreateSymbolicLink(linkPath, targetName);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    try { CreateHardLink(linkPath, exePath, IntPtr.Zero); } catch { }
+                }
+                catch { }
+            }
+        }
+        catch { }
     }
 }

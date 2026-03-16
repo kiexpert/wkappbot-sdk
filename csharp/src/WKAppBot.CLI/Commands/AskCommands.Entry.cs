@@ -158,21 +158,57 @@ Examples:
 
     /// <summary>
     /// Run Gemini, GPT, Claude in parallel with per-AI output prefixes ([gemini], [gpt], [claude]).
-    /// Each AI gets its own thread and PrefixWriter → lines interleave but are clearly labeled.
+    /// Pre-creates a single unified Slack thread before spawning tasks — all three AIs post replies
+    /// to the same thread (AsyncLocal _slackSessionThreadTs inheritance).
+    /// If an AI fails, RunTriadAiWithRecovery retries once with context from the other AIs.
     /// </summary>
     static int AskTriadParallel(string question, bool slackReport, int timeoutSec, List<string>? attachFiles,
         bool newSession, bool loopMode, int loopMaxSteps, int loopRetry, int loopMaxParallel,
         string? modelHint, bool noWait)
     {
         // Triad always starts fresh per-AI — prevents stale session cross-contamination.
-        // Use --new-session explicitly if you want to force even without triad.
         var freshSession = true;
-        Console.WriteLine($"[TRIAD] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
+        Console.WriteLine("[TRIAD] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
+
+        // ── Unified Slack thread ──────────────────────────────────────────────────────────
+        // Set _slackSessionThreadTs.Value BEFORE spawning Task.Run children.
+        // AsyncLocal inheritance: each child task sees this value from the moment it starts.
+        // EnsureSlackThread inside each AI is idempotent — returns immediately if already set.
+        if (slackReport)
+        {
+            var qTrunc = question.Length > 120 ? question[..120] + "..." : question;
+            var config = LoadSlackConfig();
+            var botToken = config?["bot_token"]?.GetValue<string>();
+            var channel  = config?["channel"]?.GetValue<string>();
+            if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
+            {
+                var (ok, ts) = SlackSendViaApi(botToken, channel,
+                    $"*[🔱 TRIAD]* {qTrunc}", username: BotUsername).GetAwaiter().GetResult();
+                if (ok && ts != null)
+                {
+                    _slackSessionThreadTs.Value = ts;
+                    Console.WriteLine($"[TRIAD] Unified Slack thread: {ts}");
+                }
+            }
+        }
+
+        // ── Shared context for recovery (in-memory + JSONL files) ────────────────────────
+        // Session folder: {DataDir}/triad/{yyyyMMdd_HHmmss} — one folder per triad run.
+        // Each AI writes its steps to {sessionDir}/{ai}.jsonl for crash-safe recovery.
+        var sessionId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        var sessionDir = Path.Combine(DataDir, "triad", sessionId);
+        var ctx = new TriadSharedContext(question, sessionDir);
+        _triadLastSessionDir = sessionDir;
+        Console.WriteLine($"[TRIAD] Session dir: {sessionDir}");
+
         var tasks = new[]
         {
-            Task.Run(() => AskGemini(question, slackReport, timeoutSec, newTab: false, attachFiles, freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait, targetTagOverride: null, linePrefix: "[gemini] ")),
-            Task.Run(() => AskChatGpt(question, slackReport, timeoutSec, newTab: false, attachFiles, freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait, targetTagOverride: null, linePrefix: "[gpt] ")),
-            Task.Run(() => AskClaude(question, slackReport, timeoutSec, newTab: false, freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait, targetTagOverride: null, linePrefix: "[claude] ")),
+            Task.Run(() => RunTriadAiWithRecovery("gemini", question, slackReport, timeoutSec, attachFiles,
+                freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gemini] ")),
+            Task.Run(() => RunTriadAiWithRecovery("gpt", question, slackReport, timeoutSec, attachFiles,
+                freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gpt] ")),
+            Task.Run(() => RunTriadAiWithRecovery("claude", question, slackReport, timeoutSec, attachFiles,
+                freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[claude] ")),
         };
         Task.WaitAll(tasks);
         var results = tasks.Select(t => t.Result).ToArray();

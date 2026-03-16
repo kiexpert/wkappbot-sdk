@@ -58,9 +58,39 @@ internal partial class Program
 
         string? messageTs = null;
 
-        if (files.Count == 0)
+        // Split message: short channel header + optional thread overflow (same as slack send)
+        var (header, overflow) = SplitMessageForChannel(slackMsg);
+
+        var botToken = LoadSlackBotToken();
+        if (!string.IsNullOrEmpty(botToken))
         {
-            // Text only — use webhook (fast, no token needed)
+            // Bot API path: full threading support
+            messageTs = SuggestPostMessage(botToken, header);
+            if (messageTs != null)
+            {
+                Console.WriteLine($"[SUGGEST] Slack sent: {header.Split('\n')[0]}{(overflow != null || files.Count > 0 ? " (+thread)" : "")}");
+                // Post overflow as thread reply
+                if (overflow != null)
+                {
+                    foreach (var chunk in ChunkText(overflow, 3900))
+                        SuggestPostMessage(botToken, chunk, threadTs: messageTs);
+                    Console.WriteLine($"[SUGGEST] Thread: {overflow.Split('\n').Length} overflow line(s)");
+                }
+                // Upload files as thread replies
+                foreach (var f in files)
+                {
+                    Console.WriteLine($"[SUGGEST] Uploading {Path.GetFileName(f)}...");
+                    SlackUploadFileAsync(botToken, SuggestChannel, f,
+                        title: Path.GetFileName(f), threadTs: messageTs).GetAwaiter().GetResult();
+                }
+                if (files.Count > 0) Console.WriteLine("[SUGGEST] File(s) uploaded OK");
+            }
+            else
+                Console.Error.WriteLine("[SUGGEST] chat.postMessage failed");
+        }
+        else if (files.Count == 0)
+        {
+            // No bot token, no files — use webhook (fast fallback)
             try
             {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
@@ -79,34 +109,7 @@ internal partial class Program
         }
         else
         {
-            // Has files — need bot_token API for upload
-            var botToken = LoadSlackBotToken();
-            if (string.IsNullOrEmpty(botToken))
-            {
-                Console.Error.WriteLine("[SUGGEST] No bot_token found — cannot upload files. Falling back to webhook (text only).");
-                // Fall back to webhook for text
-                try
-                {
-                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-                    var payload = JsonSerializer.Serialize(new { text = slackMsg });
-                    var content = new StringContent(payload, Encoding.UTF8, "application/json");
-                    http.PostAsync(SuggestWebhookUrl, content).GetAwaiter().GetResult();
-                }
-                catch { }
-            }
-            else
-            {
-                // Send text first via chat.postMessage to get ts for thread
-                messageTs = SuggestPostMessage(botToken, slackMsg);
-                // Upload files as thread replies
-                foreach (var f in files)
-                {
-                    Console.WriteLine($"[SUGGEST] Uploading {Path.GetFileName(f)}...");
-                    SlackUploadFileAsync(botToken, SuggestChannel, f,
-                        title: Path.GetFileName(f), threadTs: messageTs).GetAwaiter().GetResult();
-                }
-                Console.WriteLine("[SUGGEST] Slack sent with file(s) OK");
-            }
+            Console.Error.WriteLine("[SUGGEST] No bot_token found — cannot upload files.");
         }
 
         // Save to HQ suggestions.jsonl
@@ -136,14 +139,16 @@ internal partial class Program
     }
 
     /// <summary>Post a message via chat.postMessage and return the ts (for threading file uploads).</summary>
-    static string? SuggestPostMessage(string botToken, string text)
+    static string? SuggestPostMessage(string botToken, string text, string? threadTs = null)
     {
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             http.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
-            var payload = JsonSerializer.Serialize(new { channel = SuggestChannel, text = text });
+            var payload = threadTs != null
+                ? JsonSerializer.Serialize(new { channel = SuggestChannel, text = text, thread_ts = threadTs })
+                : JsonSerializer.Serialize(new { channel = SuggestChannel, text = text });
             var content = new StringContent(payload, Encoding.UTF8, "application/json");
             var resp = http.PostAsync("https://slack.com/api/chat.postMessage", content).GetAwaiter().GetResult();
             var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();

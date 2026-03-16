@@ -47,10 +47,20 @@ internal partial class Program
 
         // ── Last status type (executing/idle/etc.) for edit-vs-delete decision ──
         public string? LastStatusType;
+
+        // ── Homework injection: idle 1min → pending suggestions → newchat ──
+        public DateTime? IdleStartedAt;
+        public bool HomeworkNotified;
+        public DateTime? LastHomeworkAt; // global cooldown — prevents re-fire across session resets
+        public string? FullCwd;          // full workspace path (for JSONL new-session detection)
     }
 
     // Per-hwnd instance state dictionary. Entries added on first encounter, purged when window gone.
     static readonly Dictionary<IntPtr, ClaudeInstanceState> _instanceStates = new();
+
+    // Cached hwnd of appbot's own VS Code window (the WKAppBot project window).
+    // Updated by status streaming loop. Used as routing fallback when title-based CWD match fails.
+    internal static IntPtr _cachedAppbotOwnHwnd = IntPtr.Zero;
 
     static ClaudeInstanceState GetOrCreateInstanceState(IntPtr hwnd)
     {
@@ -133,7 +143,7 @@ internal partial class Program
         string? slackBotToken, string? slackChannel, string botUsername,
         SlackSocketClient? slackClient,
         string statusTsFile,
-        Dictionary<string, int> contextWarnedPcts)
+        Dictionary<string, (int mb, string? path)> contextWarnedPcts)
     {
         const int RateLimitCooldownMinutes = 30;
         const int RateLimitAlertCooldownMinutes = 30;
@@ -177,12 +187,20 @@ internal partial class Program
                 if (sizeMB < WarnStartMB || jsonlPath == null) continue;
 
                 var cwdKey = card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
-                contextWarnedPcts.TryGetValue(cwdKey, out int prevWarnedMB);
+                contextWarnedPcts.TryGetValue(cwdKey, out var prevWarned);
                 var curMB = (int)sizeMB; // 1MB 단위 dedup
-                if (curMB <= prevWarnedMB) continue;
+
+                // New session detected: jsonlPath changed (ctime-new file selected by mtime) → reset counter
+                if (prevWarned.path != null && prevWarned.path != jsonlPath)
+                {
+                    Console.WriteLine($"[EYE] [{AbbreviateCwd(card.Cwd)}] New session JSONL — context warn counter reset (was {prevWarned.mb}MB)");
+                    prevWarned = (0, null);
+                }
+
+                if (curMB <= prevWarned.mb) continue;
 
                 var cwdTag = AbbreviateCwd(card.Cwd);
-                contextWarnedPcts[cwdKey] = curMB;
+                contextWarnedPcts[cwdKey] = (curMB, jsonlPath);
 
                 if (sizeMB >= UrgentMB && !string.IsNullOrEmpty(slackBotToken))
                 {
@@ -300,6 +318,14 @@ internal partial class Program
             bool isVsCode = hostType == "vscode-claudecode" || hostType == "codex-desktop";
             var label = string.IsNullOrEmpty(state.CwdLabel) ? "" : $"[{state.CwdLabel}] ";
 
+            // Cache appbot's own VS Code window hwnd for routing fallback (see ResolveWorkspaceScopedPrompts)
+            var appbotFolder = Path.GetFileName(Environment.CurrentDirectory); // "WKAppBot"
+            if (!string.IsNullOrEmpty(appbotFolder) && !string.IsNullOrEmpty(state.CwdLabel) &&
+                state.CwdLabel.Contains(appbotFolder, StringComparison.OrdinalIgnoreCase))
+                _cachedAppbotOwnHwnd = hwnd;
+            // Slack status text omits label — CWD already shown in bot username (e.g. "클롣[WG-WKAppBot]")
+            const string slackLabel = "";
+
             Tuple<string, string>? claudeStatus = null;
             try
             {
@@ -323,6 +349,7 @@ internal partial class Program
                     }
                     if (!string.IsNullOrEmpty(vsCwd))
                     {
+                        state.FullCwd ??= vsCwd; // store once for homework JSONL detection
                         var vsMatchCard = _cachedCards.FirstOrDefault(c =>
                             string.Equals(c.Cwd, vsCwd, StringComparison.OrdinalIgnoreCase));
                         var ageSec = vsMatchCard != null
@@ -429,13 +456,15 @@ internal partial class Program
                                     && state.LastSlackStatusText?.Contains(":zzz:") != true)
                                 {
                                     var idleSuffix = state.LastExecutingText != null ? $" after: {state.LastExecutingText}" : "";
-                                    var idleMsg = $":zzz: {label}Idle{idleSuffix}";
+                                    var idleMsg = $":zzz: {slackLabel}Idle{idleSuffix}";
                                     var instUser2 = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
                                     Task.Run(async () => await PostOrUpdateAiStatusAsync(
                                         hwnd, state, idleMsg, "idle",
                                         slackBotToken!, slackChannel!, instUser2, statusTsFile, primaryHwnd))
                                         .Wait(5000);
                                     state.IdleMessageSent = true;
+                                    state.IdleStartedAt = DateTime.UtcNow;
+                                    state.HomeworkNotified = false;
                                     state.LastExecutingText = null;
                                     Console.WriteLine($"[EYE] {label}VS Code → idle: {idleMsg}");
                                 }
@@ -452,6 +481,7 @@ internal partial class Program
                                     state.IdleAfterText = null;
                                 }
                                 state.IdleMessageSent = false;
+                                state.IdleStartedAt = null;
                                 var statusEmoji = claudeStatus.Item1 switch
                                 {
                                     "executing" => ":gear:",
@@ -460,7 +490,7 @@ internal partial class Program
                                     "rate_limit" => ":warning:",
                                     _ => ":robot_face:"
                                 };
-                                slackText = $"{statusEmoji} {label}Claude: {claudeStatus.Item2}";
+                                slackText = $"{statusEmoji} {slackLabel}Claude: {claudeStatus.Item2}";
                             }
 
                             if (slackText == state.LastSlackStatusText) goto skipStatusStreaming;
@@ -492,7 +522,7 @@ internal partial class Program
                                         state.LastExecutingText = null;
                                     }
                                     var idleSuffix = state.IdleAfterText != null ? $" after: {state.IdleAfterText}" : "";
-                                    var idleMsg = $":zzz: {label}Idle{idleSuffix}";
+                                    var idleMsg = $":zzz: {slackLabel}Idle{idleSuffix}";
 
                                     var instanceUsername2 = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
                                     Task.Run(async () => await PostOrUpdateAiStatusAsync(
@@ -500,17 +530,38 @@ internal partial class Program
                                         slackBotToken!, slackChannel!, instanceUsername2, statusTsFile, primaryHwnd))
                                         .Wait(5000);
                                     state.IdleMessageSent = true;
+                                    state.IdleStartedAt = DateTime.UtcNow;
+                                    state.HomeworkNotified = false;
                                     Console.WriteLine($"[EYE] {label}Spinner idle: {idleMsg}");
                                 }
                                 else if (state.IdleMessageSent && !spinnerIdle)
                                 {
                                     // Spinner active again → Claude resumed → clear idle so next tick posts executing
                                     state.IdleMessageSent = false;
+                                    state.IdleStartedAt = null;
                                     state.LastSlackStatusText = null;
                                     ResetSpinnerDetection(state);
                                     Console.WriteLine($"[EYE] {label}Activity resumed — idle cleared");
                                 }
                             }
+                            catch { }
+                        }
+
+                        // ── Homework injection: idle 1min + pending suggestions → newchat (WKAppBot only) ──
+                        // LastHomeworkAt persisted to disk — survives Eye restarts (no re-fire on restart).
+                        // 4h cooldown prevents loop: homework opens newchat → new session idle → re-fire.
+                        if (state.LastHomeworkAt == null && !string.IsNullOrEmpty(state.FullCwd ?? state.CwdLabel))
+                        {
+                            var ck = state.FullCwd ?? state.CwdLabel;
+                            state.LastHomeworkAt = LoadHomeworkAt(ck);
+                        }
+                        if (state.IdleMessageSent && !state.HomeworkNotified
+                            && state.IdleStartedAt != null
+                            && (DateTime.UtcNow - state.IdleStartedAt.Value).TotalMinutes >= 1
+                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalHours >= 1)
+                            && state.CwdLabel.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase))
+                        {
+                            try { CheckAndSendHomework(state, hwnd, label); }
                             catch { }
                         }
 
@@ -795,6 +846,112 @@ internal partial class Program
                 Console.WriteLine($"[EYE] Post FAILED [{statusType}]: {slackText[..Math.Min(slackText.Length, 60)]}");
             }
             state.LastSlackStatusText = slackText;
+        }
+    }
+
+    // ── Homework injection ────────────────────────────────────────────────────────────────
+    // Persisted homework cooldown file — survives Eye restarts (per CWD key).
+    static string _homeworkStatePath => Path.Combine(DataDir, "homework_state.json");
+
+    static DateTime? LoadHomeworkAt(string cwdKey)
+    {
+        try
+        {
+            if (!File.Exists(_homeworkStatePath)) return null;
+            var json = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(_homeworkStatePath));
+            var val = json?[cwdKey]?.GetValue<string>();
+            return val != null ? DateTime.Parse(val, null, System.Globalization.DateTimeStyles.RoundtripKind) : null;
+        }
+        catch { return null; }
+    }
+
+    static void SaveHomeworkAt(string cwdKey, DateTime at)
+    {
+        try
+        {
+            System.Text.Json.Nodes.JsonObject obj;
+            if (File.Exists(_homeworkStatePath))
+            {
+                var existing = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(_homeworkStatePath));
+                obj = existing as System.Text.Json.Nodes.JsonObject ?? new();
+            }
+            else obj = new();
+            obj[cwdKey] = at.ToString("O");
+            File.WriteAllText(_homeworkStatePath, obj.ToJsonString());
+        }
+        catch { }
+    }
+
+    // Fired once per idle session (HomeworkNotified guard) when Claude has been idle 1+ min.
+    // Only for WKAppBot instances (CwdLabel check). Reads suggestions.jsonl for pending items,
+    // types prompt directly via TypeAndSubmit (NO /clear, NO policy injection).
+    static void CheckAndSendHomework(ClaudeInstanceState state, IntPtr hwnd, string label)
+    {
+        state.HomeworkNotified = true;  // set first — prevent double-fire even on exception
+        state.LastHomeworkAt = DateTime.UtcNow; // 1h global cooldown (see idle check condition)
+
+        // Persist to disk — survives Eye restarts
+        var cwdKey = state.FullCwd ?? state.CwdLabel;
+        if (!string.IsNullOrEmpty(cwdKey))
+            SaveHomeworkAt(cwdKey, state.LastHomeworkAt.Value);
+
+        var suggPath = Path.Combine(DataDir, "suggestions.jsonl");
+        if (!File.Exists(suggPath)) return;
+
+        // Count non-done/non-archived items
+        var pending = new List<string>();
+        foreach (var line in File.ReadAllLines(suggPath))
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            try
+            {
+                var node = System.Text.Json.Nodes.JsonNode.Parse(line);
+                var status = node?["status"]?.GetValue<string>() ?? "pending";
+                if (status is "done" or "archived") continue;
+                var text = node?["text"]?.GetValue<string>() ?? "";
+                // First line only for summary
+                var summary = text.Split('\n')[0];
+                if (summary.Length > 100) summary = summary[..100] + "...";
+                pending.Add(summary);
+            }
+            catch { }
+        }
+
+        if (pending.Count == 0) return; // no pending → nothing to do
+
+        // Build prompt (English, as user requested)
+        var summaryLines = string.Join("\n", pending.Take(5).Select((s, i) => $"  {i + 1}. {s}"));
+        var moreNote = pending.Count > 5 ? $"\n  ... and {pending.Count - 5} more" : "";
+        var prompt =
+            $"You have {pending.Count} pending suggestion homework item(s) in suggestions.jsonl.\n" +
+            $"File: {suggPath}\n\n" +
+            $"Items:\n{summaryLines}{moreNote}\n\n" +
+            $"Please review and process them when you have a chance.";
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"[EYE] {label}Homework injection → {pending.Count} pending suggestions");
+        Console.ResetColor();
+
+        // Deliver directly via TypeAndSubmit (no /clear, no policy) — window should be open since we just saw it idle.
+        // If window gone, TrySpawnAppbotVsCode will open VS Code and deliver after it's ready.
+        try
+        {
+            using var ph = new ClaudePromptHelper();
+            var pi = ph.FindPromptForCwd(state.FullCwd ?? state.CwdLabel);
+            if (pi != null)
+            {
+                ClaudePromptHelper.AllowFocusSteal = true;
+                ph.TypeAndSubmit(pi, prompt);
+            }
+            else
+            {
+                Console.WriteLine($"[EYE] {label}Homework: window not found — spawning VS Code and queuing");
+                TrySpawnAppbotVsCode(prompt);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[EYE] Homework delivery failed: {ex.Message}");
         }
     }
 }

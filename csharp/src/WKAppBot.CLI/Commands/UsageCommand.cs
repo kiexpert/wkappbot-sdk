@@ -1,8 +1,15 @@
-﻿namespace WKAppBot.CLI;
+﻿using System.Runtime.InteropServices;
+
+namespace WKAppBot.CLI;
 
 // partial class: PrintUsage + Error + GetArgValue (shared utilities)
 internal partial class Program
 {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
+
+    static void CreateHardLinkNative(string linkPath, string targetPath) =>
+        CreateHardLink(linkPath, targetPath, IntPtr.Zero);
     /// <summary>Full help text — single source of truth for CLI help AND MCP tool description.</summary>
     internal static string GetUsageText()
     {
@@ -313,5 +320,87 @@ Data Directory:
         }
 
         return null;
+    }
+
+    // Busybox aliases to auto-create as symlinks next to wkappbot.exe
+    static readonly string[] BusyboxAliases = { "a11y", "wka11y" };
+
+    /// <summary>
+    /// Ensure busybox-style symlinks exist next to wkappbot.exe.
+    /// Called once at startup — silently skips on permission error or if already present.
+    ///
+    /// Fallback chain:
+    ///   1. Symlink (preferred) — follows filename across hot-swap
+    ///   2. Hardlink (fallback when no permission) — stale after hot-swap; re-upgraded next run
+    ///
+    /// Stale hardlink detection: after hot-swap wkappbot.exe is a new file (different size/time)
+    /// while the hardlink still points to the old inode. We detect this by comparing file sizes —
+    /// if they diverge, delete the hardlink and retry as symlink.
+    /// </summary>
+    internal static void EnsureBusyboxAliases()
+    {
+        try
+        {
+            var exePath = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exePath)) return;
+
+            // Only auto-create when running as wkappbot itself, not as an alias
+            // Accept both "wkappbot.exe" and "wkappbot-core.exe" (publish artifact name)
+            var exeBase = Path.GetFileNameWithoutExtension(exePath);
+            if (!exeBase.StartsWith("wkappbot", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var dir = Path.GetDirectoryName(exePath);
+            if (string.IsNullOrEmpty(dir)) return;
+
+            // Symlink target is always wkappbot.exe (the wrapper), regardless of which exe is running
+            var targetName = "wkappbot.exe";
+            var targetPath = Path.Combine(dir, targetName);
+            if (!File.Exists(targetPath)) return; // wrapper not present yet — skip
+
+            long targetSize = new FileInfo(targetPath).Length;
+
+            foreach (var alias in BusyboxAliases)
+            {
+                var linkPath = Path.Combine(dir, alias + ".exe");
+
+                // Check for stale hardlink: no symlink target + size mismatch → delete and recreate
+                if (File.Exists(linkPath))
+                {
+                    bool isSymlink = File.ResolveLinkTarget(linkPath, returnFinalTarget: false) != null;
+                    if (!isSymlink)
+                    {
+                        // It's a hardlink (or copy). Check if stale after hot-swap.
+                        long linkSize = new FileInfo(linkPath).Length;
+                        if (linkSize != targetSize)
+                        {
+                            // Stale hardlink — delete and fall through to recreate
+                            try { File.Delete(linkPath); } catch { continue; }
+                        }
+                        else continue; // hardlink still matches, keep it
+                    }
+                    else continue; // symlink exists, good
+                }
+                // Also skip dangling symlinks (File.Exists=false but path exists)
+                else
+                {
+                    try { if (File.GetAttributes(linkPath) != 0) continue; } catch { }
+                }
+
+                // Try symlink first, fall back to hardlink
+                try
+                {
+                    File.CreateSymbolicLink(linkPath, targetName);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // No symlink permission — create hardlink as temporary fallback.
+                    // Will be upgraded to symlink on next run if permission is granted.
+                    try { CreateHardLinkNative(linkPath, targetPath); } catch { }
+                }
+                catch { }
+            }
+        }
+        catch { }
     }
 }

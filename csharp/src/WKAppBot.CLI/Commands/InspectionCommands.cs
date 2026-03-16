@@ -246,6 +246,30 @@ internal partial class Program
             Console.WriteLine($"Window: {mainWin}");
         }
 
+        // [PROCESS] section: Priv/WS memory, handles, threads, GDI/USER objects
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(inspectHandle, out uint procPid);
+            var proc = System.Diagnostics.Process.GetProcessById((int)procPid);
+            var privMB  = proc.PrivateMemorySize64 / (1024.0 * 1024.0);
+            var wsMB    = proc.WorkingSet64 / (1024.0 * 1024.0);
+            var handles = proc.HandleCount;
+            var threads = proc.Threads.Count;
+            const uint GR_GDIOBJECTS  = 0;
+            const uint GR_USEROBJECTS = 1;
+            const uint PROCESS_QUERY_INFORMATION = 0x0400;
+            var hProc = NativeMethods.OpenProcess(PROCESS_QUERY_INFORMATION, false, procPid);
+            uint gdi = 0, user = 0;
+            if (hProc != IntPtr.Zero)
+            {
+                gdi  = NativeMethods.GetGuiResources(hProc, GR_GDIOBJECTS);
+                user = NativeMethods.GetGuiResources(hProc, GR_USEROBJECTS);
+                NativeMethods.CloseHandle(hProc);
+            }
+            Console.WriteLine($"[PROCESS] pid={procPid} {proc.ProcessName}  Priv={privMB:F1}MB  WS={wsMB:F1}MB  handles={handles}  threads={threads}  GDI={gdi}  USER={user}");
+        }
+        catch { /* best effort — skip if access denied */ }
+
         // 노하우 방송: 프로파일 매칭 → 해당 폼 폴더의 knowhow.md
         BroadcastInspectKnowhow(mainWin.Handle, mainWin.ClassName, matchedFormId, matchedFormTitle);
 

@@ -133,6 +133,22 @@ Then immediately:
 
         Console.WriteLine($"[NEWCHAT] Found: [Edit] \"{editEl.Name}\" at ({editEl.BoundingRectangle.X},{editEl.BoundingRectangle.Y})");
 
+        // Guard: if input field already has content, user may be typing — abort
+        try
+        {
+            var existing = editEl.Patterns.Value.IsSupported
+                ? editEl.Patterns.Value.Pattern.Value.Value ?? ""
+                : "";
+            if (!string.IsNullOrWhiteSpace(existing))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[NEWCHAT] Input field has pending text ({existing.Length} chars) — aborting to avoid overwriting user input");
+                Console.ResetColor();
+                return Error("[NEWCHAT] Input not empty — user may be typing");
+            }
+        }
+        catch { /* ignore — proceed if value check fails */ }
+
         var prevFg = NativeMethods.GetForegroundWindow();
 
         // Probe readiness before any keyboard input (AssertReadiness now throws if skipped)

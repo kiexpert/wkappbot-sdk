@@ -640,6 +640,10 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool FlashWindow(IntPtr hWnd, bool bInvert);
 
+    // GDI/USER object counts for a process handle (GR_GDIOBJECTS=0, GR_USEROBJECTS=1)
+    [DllImport("user32.dll")]
+    public static extern uint GetGuiResources(IntPtr hProcess, uint uiFlags);
+
     [DllImport("user32.dll")]
     public static extern bool FlashWindowEx(ref FLASHWINFO pwfi);
 
