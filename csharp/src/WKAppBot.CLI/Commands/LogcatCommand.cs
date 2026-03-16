@@ -5,10 +5,15 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // wkappbot logcat <fileFilter> [regex1 regex2 ...] [--basedir <dir>] [-r[=N]] [--hq] [--past Ns/Nm/Nh]
-    // fileFilter : glob pattern, ';' = OR  (e.g. "*.file.*;*.eye.*")
-    // regex args : pure regex, multiple = AND  (e.g. "OCR-DEEP" "block(len|size)")
-    // Default: current directory only. -r unlimited depth. -r=3 depth limit. --hq adds HQ+openclaw.
+    // wkappbot logcat <fileFilter> [regex ...] [grep-opts] [--hq] [--past N] [-f] [--timeout N] [-r]
+    // fileFilter : glob + ';' OR  (e.g. "*.file.*;*.eye.*" / "**" = all)
+    // regex args : pure regex, multiple = AND. grep-compatible options:
+    //   -A N / -B N / -C N  after/before/context lines
+    //   -v                  invert match
+    //   -l                  filenames only (no content)
+    //   -c                  count matches per file
+    //   -m N                stop after N matches per file
+    //   -i / --no-ignore-case  case-sensitive (default: case-insensitive)
     static int LogcatCommand(string[] args)
     {
         var selfPid = Environment.ProcessId;
@@ -21,7 +26,14 @@ internal partial class Program
         double pastSeconds = 0;    // 0 = no past scan; >0 = scan existing files this old
         bool follow = false;       // --past without --follow: scan and exit (grep-style)
         double timeoutSeconds = 0; // 0 = run forever
-        int contextLines = 0;      // -C N: show N lines before+after each match
+        int contextLines = 0;      // -C N: lines before+after each match
+        int afterLines = 0;        // -A N
+        int beforeLines = 0;       // -B N
+        bool invertMatch = false;  // -v
+        bool filesOnly = false;    // -l: filenames only
+        bool countOnly = false;    // -c: count per file
+        int maxCount = int.MaxValue; // -m N: max matches per file
+        bool caseSensitive = false;  // -i flips to case-sensitive (default: insensitive)
 
         // Parse positional + named args
         var positional = new List<string>();
@@ -37,8 +49,18 @@ internal partial class Program
             else if (a == "--past" && i + 1 < args.Length) { pastSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--past=")) { pastSeconds = ParsePastDuration(a[7..]); }
             else if (a is "--follow" or "-f") { follow = true; }
-            else if ((a == "-C" || a == "--context") && i + 1 < args.Length && int.TryParse(args[++i], out var c)) { contextLines = c; }
-            else if (a.StartsWith("-C") && int.TryParse(a[2..], out var c2)) { contextLines = c2; }
+            else if ((a == "-C" || a == "--context")       && i + 1 < args.Length && int.TryParse(args[++i], out var c))   { contextLines = c; }
+            else if (a.StartsWith("-C")                    && int.TryParse(a[2..], out var c2))  { contextLines = c2; }
+            else if ((a == "-A" || a == "--after-context") && i + 1 < args.Length && int.TryParse(args[++i], out var ac))  { afterLines = ac; }
+            else if (a.StartsWith("-A")                    && int.TryParse(a[2..], out var ac2)) { afterLines = ac2; }
+            else if ((a == "-B" || a == "--before-context")&& i + 1 < args.Length && int.TryParse(args[++i], out var bc))  { beforeLines = bc; }
+            else if (a.StartsWith("-B")                    && int.TryParse(a[2..], out var bc2)) { beforeLines = bc2; }
+            else if (a is "-v" or "--invert-match")        { invertMatch = true; }
+            else if (a is "-l" or "--files-with-matches")  { filesOnly = true; }
+            else if (a is "-c" or "--count")               { countOnly = true; }
+            else if ((a == "-m" || a == "--max-count")     && i + 1 < args.Length && int.TryParse(args[++i], out var mx))  { maxCount = mx; }
+            else if (a.StartsWith("-m")                    && int.TryParse(a[2..], out var mx2)) { maxCount = mx2; }
+            else if (a is "-i" or "--case-sensitive")      { caseSensitive = true; }
             else if (a == "--timeout" && i + 1 < args.Length) { timeoutSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--timeout=")) { timeoutSeconds = ParsePastDuration(a[10..]); }
             else { positional.Add(a); }
@@ -54,9 +76,15 @@ internal partial class Program
         var filePatterns = fileFilterArg.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (filePatterns.Length == 0) filePatterns = new[] { "*.txt" };
 
+        // -C overrides -A/-B
+        if (contextLines > 0) { afterLines = contextLines; beforeLines = contextLines; }
+
         Regex? msgRegex = null;
         if (!string.IsNullOrWhiteSpace(messageFilterArg) && messageFilterArg != "*")
-            msgRegex = new Regex(messageFilterArg, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        {
+            var rxOpts = RegexOptions.Compiled | (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase);
+            msgRegex = new Regex(messageFilterArg, rxOpts);
+        }
 
         // Build watch directories: default = CWD (or --basedir)
         var baseDir = baseDirOverride ?? Environment.CurrentDirectory;
@@ -106,7 +134,7 @@ internal partial class Program
             {
                 Console.WriteLine($"[LOGCAT] --past: scanning {pastFiles.Count} file(s) from last {FormatDuration(pastSeconds)}");
                 foreach (var f in pastFiles)
-                    EmitDeltaLines(f.FullName, pastOffsets, pastLineCounts, msgRegex, ref pastHeader, contextLines);
+                    EmitDeltaLines(f.FullName, pastOffsets, pastLineCounts, msgRegex, ref pastHeader, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount);
             }
             else
             {
@@ -149,7 +177,7 @@ internal partial class Program
                     var fn = Path.GetFileName(e.FullPath);
                     if (!IsFilePatternMatch(fn, filePatterns)) return;
                     if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
-                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines);
+                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount);
                 }
                 catch { }
             };
@@ -162,7 +190,7 @@ internal partial class Program
                     var fn = Path.GetFileName(e.FullPath);
                     if (!IsFilePatternMatch(fn, filePatterns)) return;
                     if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
-                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines);
+                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount);
                 }
                 catch { }
             };
@@ -246,7 +274,10 @@ internal partial class Program
         Dictionary<string, long> lineCounts,
         Regex? msgRegex,
         ref string lastHeaderPath,
-        int contextLines = 0)
+        int contextLines = 0,
+        int afterLines = 0, int beforeLines = 0,
+        bool invertMatch = false, bool filesOnly = false,
+        bool countOnly = false, int maxCount = int.MaxValue)
     {
         if (!File.Exists(path)) return;
 
@@ -259,20 +290,20 @@ internal partial class Program
         using var sr = new StreamReader(fs, Encoding.UTF8, true);
 
         long emitted = lineCounts.TryGetValue(path, out var lc) ? lc : 0;
-        // No filter: print path + last 5 non-empty lines (tail-preview mode)
-        if (msgRegex == null)
+
+        // No filter: tail-preview mode — path + last 7 non-empty lines
+        if (msgRegex == null && !invertMatch)
         {
-            var tail = new Queue<string>(6);
+            var tail = new Queue<string>(8);
             while (!sr.EndOfStream)
             {
                 var line = sr.ReadLine() ?? "";
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                if (tail.Count == 5) tail.Dequeue();
+                if (tail.Count == 7) tail.Dequeue();
                 tail.Enqueue(line);
             }
             Console.WriteLine($"{path}");
-            foreach (var line in tail)
-                Console.WriteLine($"  {line}");
+            foreach (var line in tail) Console.WriteLine($"  {line}");
             lastHeaderPath = path;
             offsets[path] = fs.Length;
             lineCounts[path] = emitted;
@@ -287,10 +318,30 @@ internal partial class Program
             if (!string.IsNullOrWhiteSpace(line)) buf.Add(line);
         }
 
-        int printUntil = -1; // index up to which we must print (for after-context)
-        for (int i = 0; i < buf.Count; i++)
+        // -l: filenames only
+        if (filesOnly)
         {
-            if (!msgRegex.IsMatch(buf[i])) continue;
+            bool any = buf.Any(l => msgRegex == null ? !invertMatch : msgRegex.IsMatch(l) != invertMatch);
+            if (any) Console.WriteLine(path);
+            offsets[path] = fs.Length; lineCounts[path] = emitted;
+            return;
+        }
+
+        // -c: count only
+        int matchCount = 0;
+        if (countOnly)
+        {
+            matchCount = buf.Count(l => msgRegex == null ? !invertMatch : msgRegex.IsMatch(l) != invertMatch);
+            if (matchCount > 0) Console.WriteLine($"{path}: {matchCount}");
+            offsets[path] = fs.Length; lineCounts[path] = emitted;
+            return;
+        }
+
+        int printUntil = -1;
+        for (int i = 0; i < buf.Count && emitted < maxCount; i++)
+        {
+            bool matched = msgRegex == null ? true : msgRegex.IsMatch(buf[i]);
+            if (matched == invertMatch) continue; // -v: flip
 
             emitted++;
             if (!string.Equals(lastHeaderPath, path, StringComparison.OrdinalIgnoreCase))
@@ -299,10 +350,12 @@ internal partial class Program
                 lastHeaderPath = path;
             }
 
-            int from = Math.Max(printUntil + 1, i - contextLines);
-            int to   = Math.Min(buf.Count - 1, i + contextLines);
+            int bef  = Math.Max(beforeLines, 0);
+            int aft  = Math.Max(afterLines, 0);
+            int from = Math.Max(printUntil + 1, i - bef);
+            int to   = Math.Min(buf.Count - 1, i + aft);
 
-            if (contextLines > 0 && from > printUntil + 1)
+            if ((bef > 0 || aft > 0) && from > printUntil + 1)
                 Console.WriteLine("--");
 
             for (int j = from; j <= to; j++)
