@@ -341,6 +341,7 @@ internal partial class Program
         int     pgTo     = int.MaxValue;
         int     maxChars = 200_000;
         bool    useOcr   = false;
+        bool    deepOcr  = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -360,12 +361,14 @@ internal partial class Program
                 int.TryParse(args[++i], out maxChars);
             else if (args[i] == "--ocr")
                 useOcr = true;
+            else if (args[i] == "--ocr-deep")
+                useOcr = deepOcr = true;
             else if (!args[i].StartsWith("--"))
                 path = args[i];
         }
 
         if (string.IsNullOrEmpty(path))
-            return Error("Usage: file read-pdf <path> [--pages N-M] [--max-chars N] [--ocr]");
+            return Error("Usage: file read-pdf <path> [--pages N-M] [--max-chars N] [--ocr] [--ocr-deep]");
 
         // NFD fallback: NTFS may store Korean filenames in NFD (decomposed jamo) while CLI passes NFC.
         if (!File.Exists(path))
@@ -375,10 +378,10 @@ internal partial class Program
             else return Error($"File not found: {path}");
         }
 
-        return Task.Run(() => FileReadPdfAsync(path, pgFrom, pgTo, maxChars, useOcr)).GetAwaiter().GetResult();
+        return Task.Run(() => FileReadPdfAsync(path, pgFrom, pgTo, maxChars, useOcr, deepOcr)).GetAwaiter().GetResult();
     }
 
-    static async Task<int> FileReadPdfAsync(string path, int pgFrom, int pgTo, int maxChars, bool useOcr)
+    static async Task<int> FileReadPdfAsync(string path, int pgFrom, int pgTo, int maxChars, bool useOcr, bool deepOcr = false)
     {
         try
         {
@@ -387,7 +390,7 @@ internal partial class Program
             int from = Math.Max(1, pgFrom);
             int to   = Math.Min(totalPages, pgTo == int.MaxValue ? totalPages : pgTo);
 
-            Console.WriteLine($"[PDF] {path} ({totalPages} pages, showing {from}-{to}){(useOcr ? " [+OCR]" : "")}");
+            Console.WriteLine($"[PDF] {path} ({totalPages} pages, showing {from}-{to}){(deepOcr ? " [+OCR-DEEP]" : useOcr ? " [+OCR]" : "")}");
 
             // Load Windows.Data.Pdf for rendering (OCR mode)
             Windows.Data.Pdf.PdfDocument? winPdf = null;
@@ -419,7 +422,7 @@ internal partial class Program
                     ? string.Join(" ", words.Select(w => w.Text))
                     : page.Text;
 
-                // OCR additions: render page → OCR → find tokens missing from PdfPig text
+                // OCR additions: render page → full-page OCR + deep-scan OCR → diff vs PdfPig
                 string ocrAdditions = "";
                 if (useOcr && winPdf != null && ocr != null)
                 {
@@ -431,8 +434,17 @@ internal partial class Program
                         await pdfPage.RenderToStreamAsync(stream, opts);
                         stream.Seek(0);
                         using var bmp = new System.Drawing.Bitmap(stream.AsStream());
-                        var ocrResult = await ocr.RecognizeAll(bmp);
-                        ocrAdditions = ComputePdfOcrAdditions(pageText, ocrResult.FullText);
+
+                        // Pass 1: full-page OCR (fast, catches normal text)
+                        var pageOcr = await ocr.RecognizeAll(bmp);
+                        // Pass 2: deep-scan OCR — only with --ocr-deep (line bands → segments)
+                        var combined = pageOcr.FullText;
+                        if (deepOcr)
+                        {
+                            var deepText = await DeepScanOcrAsync(bmp, ocr);
+                            combined += " " + deepText;
+                        }
+                        ocrAdditions = ComputePdfOcrAdditions(pageText, combined);
                     }
                     catch (Exception ocrEx) { Console.WriteLine($"[PDF+OCR] page {p} error: {ocrEx.GetType().Name}: {ocrEx.Message}"); }
                 }
