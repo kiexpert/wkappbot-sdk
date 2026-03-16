@@ -29,6 +29,12 @@ internal partial class Program
     /// <summary>Set by EyeCmdPipeServer before calling Main() — skips TeeWriter, crash handler, LaunchEye.</summary>
     internal static volatile bool RunningInEye = false;
 
+    /// <summary>True when logcat runs in piped stdout (grep-mode): matches → OriginalStdout, diagnostics → stderr.</summary>
+    internal static bool GrepModeActive = false;
+
+    /// <summary>Original Console.Out before TeeTextWriter is installed. Used by grep-mode to write matches to real stdout.</summary>
+    internal static TextWriter OriginalStdout = Console.Out;
+
     /// <summary>
     /// Runtime data directory: {exe_dir}/wkappbot.hq/
     /// All logs, profiles, output go here — keeps SDK/bin clean.
@@ -196,8 +202,20 @@ internal partial class Program
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
         // Track current command log path for auto-heal diagnostics (non-Eye mode only; Eye sets it in RunInEye)
         if (!RunningInEye) _currentLogPath = logFile;
+
+        // Grep-mode: logcat family (logcat/grap/grep) with stdout redirected (no watch flags).
+        // result=$(grap pattern *.txt) must work like grep: matches to stdout, diagnostics to stderr.
+        // Detected here (before TeeWriter) so TeeWriter can echo to stderr instead of stdout.
+        GrepModeActive = Console.IsOutputRedirected
+            && args.Length > 0 && args[0].ToLowerInvariant() == "logcat"
+            && !args.Any(a => a is "--past" or "--follow" or "-f" or "--timeout");
+
+        // Preserve original stdout for match output in grep-mode (TeeWriter replaces Console.Out below).
+        OriginalStdout = Console.Out;
+
         // RunningInEye: skip Console.SetOut — log tee is handled by EyeCmdPipeServer (per-command, parallel-safe)
-        TeeTextWriter? tee = RunningInEye ? null : new TeeTextWriter(Console.Out, logFile);
+        // Grep-mode: echo diagnostics to stderr so stdout contains only match lines (grep-compat).
+        TeeTextWriter? tee = RunningInEye ? null : new TeeTextWriter(GrepModeActive ? Console.Error : Console.Out, logFile);
         // Wrap tee in ThreadRoutingWriter so EyeCmdPipeServer.Route() can redirect per-command output.
         // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
@@ -291,7 +309,7 @@ internal partial class Program
 
             // Global Eye tick (for eye --global multi-parent monitor)
             try { EmitEyeTick(command, cmdTag, "start"); } catch { }
-            Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
+            if (!GrepModeActive) Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
             try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
             try
             {
@@ -313,7 +331,7 @@ internal partial class Program
             }
 
             try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
-            try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
+            if (!GrepModeActive) try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
             prof("dispatch");
 
             exitCode = command switch
