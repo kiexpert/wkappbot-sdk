@@ -98,10 +98,39 @@ internal partial class Program
             dirs.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "logs"));
         }
 
+        // Non-TTY (piped/redirected) without explicit watch flags → one-shot grep mode.
+        // result=$(grap pattern *.txt) should work like grep: scan files, output matches, exit.
+        // Diagnostic lines go to stderr so stdout contains only matches (grep-compatible).
+        bool autoOneShot = Console.IsOutputRedirected && pastSeconds == 0 && !follow && timeoutSeconds == 0;
+
         var depthLabel   = maxDepth == 0 ? "" : maxDepth == -1 ? " -r" : $" -r={maxDepth}";
         var pastLabel    = pastSeconds    > 0 ? $" --past {FormatDuration(pastSeconds)}" : "";
         var timeoutLabel = timeoutSeconds > 0 ? $" --timeout {FormatDuration(timeoutSeconds)}" : "";
-        Console.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")}{pastLabel}{timeoutLabel} (Ctrl+C to stop)");
+        var diagOut = autoOneShot ? Console.Error : Console.Out;
+        diagOut.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")}{pastLabel}{timeoutLabel}{(autoOneShot ? " (grep-mode)" : " (Ctrl+C to stop)")}");
+
+        // Auto one-shot: scan all matching files, emit matches, exit (no watch loop)
+        if (autoOneShot)
+        {
+            var searchOpt = maxDepth != 0 ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            var oneShotOffsets    = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            var oneShotLineCounts = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            string oneShotHeader  = "";
+
+            var allFiles = dirs.Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(Directory.Exists)
+                .SelectMany(dir => { try { return Directory.GetFiles(dir, "*", searchOpt); } catch { return Array.Empty<string>(); } })
+                .Where(p => { var fn = Path.GetFileName(p); return IsFilePatternMatch(fn, filePatterns) && !fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase); })
+                .OrderBy(p => { try { return new FileInfo(p).LastWriteTimeUtc; } catch { return DateTime.MinValue; } })
+                .ToList();
+
+            var grepOut = OriginalStdout;
+            foreach (var filePath in allFiles)
+                EmitDeltaLines(filePath, oneShotOffsets, oneShotLineCounts, msgRegex, ref oneShotHeader, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount, grepOut);
+
+            try { grepOut.Flush(); } catch { }
+            return 0;
+        }
 
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
@@ -221,7 +250,7 @@ internal partial class Program
             try { w.EnableRaisingEvents = false; w.Dispose(); } catch { }
         }
 
-        Console.WriteLine("[LOGCAT] stopped");
+        diagOut.WriteLine("[LOGCAT] stopped");
         return 0;
     }
 
@@ -286,7 +315,8 @@ internal partial class Program
         int contextLines = 0,
         int afterLines = 0, int beforeLines = 0,
         bool invertMatch = false, bool filesOnly = false,
-        bool countOnly = false, int maxCount = int.MaxValue)
+        bool countOnly = false, int maxCount = int.MaxValue,
+        TextWriter? grepOut = null)  // non-null → grep-mode: clean output to this writer
     {
         if (!File.Exists(path)) return;
 
@@ -316,8 +346,15 @@ internal partial class Program
                 if (tail.Count == 7) tail.Dequeue();
                 tail.Enqueue(line);
             }
-            Console.WriteLine($"{path}");
-            foreach (var line in tail) Console.WriteLine($"  {line}");
+            if (grepOut != null)
+            {
+                foreach (var line in tail) grepOut.WriteLine($"{path}:{line}");
+            }
+            else
+            {
+                Console.WriteLine($"{path}");
+                foreach (var line in tail) Console.WriteLine($"  {line}");
+            }
             lastHeaderPath = path;
             offsets[path] = fs.Length;
             lineCounts[path] = emitted;
@@ -338,7 +375,7 @@ internal partial class Program
         if (filesOnly)
         {
             bool any = buf.Any(l => msgRegex == null ? !invertMatch : msgRegex.IsMatch(l) != invertMatch);
-            if (any) Console.WriteLine(path);
+            if (any) (grepOut ?? Console.Out).WriteLine(path);
             offsets[path] = fs.Length; lineCounts[path] = emitted;
             return;
         }
@@ -348,7 +385,7 @@ internal partial class Program
         if (countOnly)
         {
             matchCount = buf.Count(l => msgRegex == null ? !invertMatch : msgRegex.IsMatch(l) != invertMatch);
-            if (matchCount > 0) Console.WriteLine($"{path}: {matchCount}");
+            if (matchCount > 0) (grepOut ?? Console.Out).WriteLine($"{path}: {matchCount}");
             offsets[path] = fs.Length; lineCounts[path] = emitted;
             return;
         }
@@ -360,26 +397,43 @@ internal partial class Program
             if (matched == invertMatch) continue; // -v: flip
 
             emitted++;
-            if (!string.Equals(lastHeaderPath, path, StringComparison.OrdinalIgnoreCase))
+            if (grepOut != null)
             {
-                Console.WriteLine($"풀경로: {path}");
-                lastHeaderPath = path;
+                // Grep-mode: clean output — file:content (no timestamps, no markers)
+                int bef  = Math.Max(beforeLines, 0);
+                int aft  = Math.Max(afterLines, 0);
+                int from = Math.Max(printUntil + 1, i - bef);
+                int to   = Math.Min(buf.Count - 1, i + aft);
+                if ((bef > 0 || aft > 0) && from > printUntil + 1)
+                    grepOut.WriteLine("--");
+                for (int j = from; j <= to; j++)
+                    grepOut.WriteLine($"{path}:{buf[j]}");
+                printUntil = to;
             }
-
-            int bef  = Math.Max(beforeLines, 0);
-            int aft  = Math.Max(afterLines, 0);
-            int from = Math.Max(printUntil + 1, i - bef);
-            int to   = Math.Min(buf.Count - 1, i + aft);
-
-            if ((bef > 0 || aft > 0) && from > printUntil + 1)
-                Console.WriteLine("--");
-
-            for (int j = from; j <= to; j++)
+            else
             {
-                var marker = j == i ? $"\t...({emitted})" : "\t      ";
-                Console.WriteLine($"{marker}: {buf[j]} ({DateTime.Now:HH:mm:ss})");
+                // Interactive mode: file header + marker + timestamp
+                if (!string.Equals(lastHeaderPath, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"풀경로: {path}");
+                    lastHeaderPath = path;
+                }
+
+                int bef  = Math.Max(beforeLines, 0);
+                int aft  = Math.Max(afterLines, 0);
+                int from = Math.Max(printUntil + 1, i - bef);
+                int to   = Math.Min(buf.Count - 1, i + aft);
+
+                if ((bef > 0 || aft > 0) && from > printUntil + 1)
+                    Console.WriteLine("--");
+
+                for (int j = from; j <= to; j++)
+                {
+                    var marker = j == i ? $"\t...({emitted})" : "\t      ";
+                    Console.WriteLine($"{marker}: {buf[j]} ({DateTime.Now:HH:mm:ss})");
+                }
+                printUntil = to;
             }
-            printUntil = to;
         }
 
         lineCounts[path] = emitted;
