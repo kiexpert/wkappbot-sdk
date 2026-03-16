@@ -3,12 +3,13 @@ using System.Text.RegularExpressions;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
+using WKAppBot.Vision;
 
 namespace WKAppBot.CLI;
 
 // partial class: wkappbot file <subcommand> — read-only filesystem tools for loop agents
 // file read <path> [--offset N] [--limit N] [--encoding N]
-// file read-pdf <path> [--pages N-M] [--max-chars N]
+// file read-pdf <path> [--pages N-M] [--max-chars N] [--ocr]
 // file grep <pattern> [--path dir/file] [--type ext] [-i] [-C N] [--max N] [--encoding N]
 // file glob <pattern> [--path dir]
 internal partial class Program
@@ -330,13 +331,16 @@ internal partial class Program
 
     // ── file read-pdf ──────────────────────────────────────────────────────
     // Extracts text from a PDF file page by page using PdfPig (pure .NET).
-    // Handles Korean/CJK embedded fonts correctly without encoding conversion issues.
+    // --ocr: also OCR-renders each page via Windows.Data.Pdf + Windows OCR,
+    //        appending [+OCR: ...] for content present in OCR but missing from PdfPig
+    //        (catches math formula variables, diagram labels, etc.)
     static int FileReadPdfCommand(string[] args)
     {
         string? path     = null;
         int     pgFrom   = 1;
         int     pgTo     = int.MaxValue;
         int     maxChars = 200_000;
+        bool    useOcr   = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -354,14 +358,16 @@ internal partial class Program
             }
             else if (args[i] == "--max-chars" && i + 1 < args.Length)
                 int.TryParse(args[++i], out maxChars);
+            else if (args[i] == "--ocr")
+                useOcr = true;
             else if (!args[i].StartsWith("--"))
                 path = args[i];
         }
 
         if (string.IsNullOrEmpty(path))
-            return Error("Usage: file read-pdf <path> [--pages N-M] [--max-chars N]");
+            return Error("Usage: file read-pdf <path> [--pages N-M] [--max-chars N] [--ocr]");
+
         // NFD fallback: NTFS may store Korean filenames in NFD (decomposed jamo) while CLI passes NFC.
-        // File.Exists uses exact Unicode match — try NFD if NFC fails.
         if (!File.Exists(path))
         {
             var nfd = path.Normalize(NormalizationForm.FormD);
@@ -369,6 +375,11 @@ internal partial class Program
             else return Error($"File not found: {path}");
         }
 
+        return Task.Run(() => FileReadPdfAsync(path, pgFrom, pgTo, maxChars, useOcr)).GetAwaiter().GetResult();
+    }
+
+    static async Task<int> FileReadPdfAsync(string path, int pgFrom, int pgTo, int maxChars, bool useOcr)
+    {
         try
         {
             using var pdf = PdfDocument.Open(path);
@@ -376,43 +387,116 @@ internal partial class Program
             int from = Math.Max(1, pgFrom);
             int to   = Math.Min(totalPages, pgTo == int.MaxValue ? totalPages : pgTo);
 
-            Console.WriteLine($"[PDF] {path} ({totalPages} pages, showing {from}-{to})");
+            Console.WriteLine($"[PDF] {path} ({totalPages} pages, showing {from}-{to}){(useOcr ? " [+OCR]" : "")}");
+
+            // Load Windows.Data.Pdf for rendering (OCR mode)
+            Windows.Data.Pdf.PdfDocument? winPdf = null;
+            SimpleOcrAnalyzer? ocr = null;
+            if (useOcr)
+            {
+                try
+                {
+                    var absPath = Path.GetFullPath(path).Replace('/', '\\');
+                    var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(absPath);
+                    winPdf = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(storageFile);
+                    ocr = new SimpleOcrAnalyzer("ko", "en-US");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[PDF] OCR init failed: {ex.Message} — continuing without OCR");
+                    useOcr = false;
+                }
+            }
 
             int  chars     = 0;
             bool truncated = false;
 
             for (int p = from; p <= to && !truncated; p++)
             {
-                var page = pdf.GetPage(p);
-                // GetWords() uses spatial positioning to detect word boundaries,
-                // which correctly inserts spaces in Korean/CJK PDFs that omit them.
-                // Fallback to page.Text if GetWords() yields nothing.
-                var words = page.GetWords().ToList();
+                var page     = pdf.GetPage(p);
+                var words    = page.GetWords().ToList();
                 var pageText = words.Count > 0
                     ? string.Join(" ", words.Select(w => w.Text))
                     : page.Text;
+
+                // OCR additions: render page → OCR → find tokens missing from PdfPig text
+                string ocrAdditions = "";
+                if (useOcr && winPdf != null && ocr != null)
+                {
+                    try
+                    {
+                        var pdfPage = winPdf.GetPage((uint)(p - 1));
+                        using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                        var opts = new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = 1700 };
+                        await pdfPage.RenderToStreamAsync(stream, opts);
+                        stream.Seek(0);
+                        using var bmp = new System.Drawing.Bitmap(stream.AsStream());
+                        var ocrResult = await ocr.RecognizeAll(bmp);
+                        ocrAdditions = ComputePdfOcrAdditions(pageText, ocrResult.FullText);
+                    }
+                    catch (Exception ocrEx) { Console.WriteLine($"[PDF+OCR] page {p} error: {ocrEx.GetType().Name}: {ocrEx.Message}"); }
+                }
+
                 Console.WriteLine($"\n--- Page {p} ---");
 
                 int remaining = maxChars - chars;
-                if (pageText.Length > remaining)
+                var output = pageText;
+                if (output.Length > remaining)
                 {
-                    Console.Write(pageText[..remaining]);
+                    Console.Write(output[..remaining]);
                     Console.WriteLine($"\n... (truncated at {maxChars} chars — use --max-chars to increase)");
                     truncated = true;
                 }
                 else
                 {
-                    Console.Write(pageText);
-                    chars += pageText.Length;
+                    Console.Write(output);
+                    chars += output.Length;
+                }
+
+                if (!string.IsNullOrWhiteSpace(ocrAdditions) && !truncated)
+                {
+                    Console.WriteLine($"\n[+OCR: {ocrAdditions}]");
+                    chars += ocrAdditions.Length;
                 }
             }
 
+            ocr?.Dispose();
             if (!truncated)
                 Console.WriteLine($"\n[PDF] {chars} chars extracted from {to - from + 1} page(s)");
 
             return 0;
         }
         catch (Exception ex) { return Error($"PDF read failed: {ex.Message}"); }
+    }
+
+    // Compare PdfPig text vs OCR text — return OCR-only lines (content PdfPig missed).
+    // Strategy: for each OCR line, if >40% of its words are absent from pdfText → include as addition.
+    static string ComputePdfOcrAdditions(string pdfText, string ocrText)
+    {
+        if (string.IsNullOrWhiteSpace(ocrText)) return "";
+
+        static string Norm(string w) => w.ToLower().Trim('.', ',', '(', ')', ':', ';', '「', '」', '『', '』');
+
+        var pdfWords = new HashSet<string>(
+            pdfText.Split(new char[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                   .Select(Norm).Where(w => w.Length >= 2),
+            StringComparer.OrdinalIgnoreCase);
+
+        var additions = new List<string>();
+        foreach (var line in ocrText.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length < 3) continue;
+            var lineWords = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (lineWords.Length == 0) continue;
+            int newCount = lineWords.Count(w => !pdfWords.Contains(Norm(w)));
+            double ratio = (double)newCount / lineWords.Length;
+            // Include line if most of it is novel AND has at least 2 new words
+            if (ratio >= 0.5 && newCount >= 2)
+                additions.Add(trimmed);
+        }
+
+        return additions.Count == 0 ? "" : string.Join(" | ", additions);
     }
 
     // ── usage ──────────────────────────────────────────────────────────────
@@ -425,8 +509,9 @@ Usage:
   wkappbot file read <path> [--offset N] [--limit N] [--encoding N]
       Read file with line numbers. Encoding: --encoding > BOM > system ANSI (CP949 on KR).
 
-  wkappbot file read-pdf <path> [--pages N-M] [--max-chars N]
+  wkappbot file read-pdf <path> [--pages N-M] [--max-chars N] [--ocr]
       Extract text from PDF (Korean/CJK safe). --pages 1-5, --max-chars 50000.
+      --ocr: also OCR each page via Windows OCR; appends [+OCR: ...] for content PdfPig missed.
 
   wkappbot file write <path> [--encoding N] (--stdin | --text ""..."" | --file <src>) [--append]
       Write content to file, re-encoding to target charset.

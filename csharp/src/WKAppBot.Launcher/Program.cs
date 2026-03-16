@@ -81,7 +81,8 @@ class Program
             return RunMcpProxy(forwardArgs);
 
         // eye: IS the daemon, must run core directly
-        if (!onlyCore && cmd != "eye")
+        // file: read-only utility (PDF/OCR may take several seconds) — skip Eye pipe to avoid timeout
+        if (!onlyCore && cmd != "eye" && cmd != "file")
         {
             if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code))
                 return code;
