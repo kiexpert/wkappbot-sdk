@@ -268,6 +268,62 @@ internal partial class Program
                     },
                     ["required"] = new JsonArray { "action" }
                 }),
+            McpTool("grap",
+                "Search wkappbot logs — grep-compatible syntax (grap = GRab Accessibility Pattern).\n" +
+                "Pattern comes first, files second — exactly like classic grep/rg.\n" +
+                "Internally rewrites to logcat with translated args.\n\n" +
+                "Examples:\n" +
+                "  {pattern:\"exception\"}                                    → search *.txt in CWD\n" +
+                "  {pattern:\"NullRef\", files:\"*.log\", past:\"1h\"}           → last 1h, exit\n" +
+                "  {pattern:\"error\", files:\"*.log\", past:\"30m\", follow:true}→ scan then stream\n" +
+                "  {pattern:\"error\", hq:true, recursive:true}               → all HQ logs\n" +
+                "  {pattern:\"OCR\", files:\"*.file.*\", timeout:\"30s\"}        → watch 30s\n" +
+                "  {pattern:\"err\", context:3}                               → 3 lines context\n",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["pattern"]        = Prop("string",  "Regex pattern to search (case-insensitive by default). Required."),
+                        ["files"]          = Prop("string",  "File glob(s). ';' OR. e.g. \"*.log\" / \"*.log;*.txt\" / \"**\". Default: *.txt"),
+                        ["past"]           = Prop("string",  "Scan files modified within duration (1h / 30m / 2d). Without follow: exits after scan."),
+                        ["follow"]         = Prop("boolean", "Follow new entries after --past scan (tail -f style)."),
+                        ["timeout"]        = Prop("string",  "Watch for duration then exit (e.g. 30s, 5m). Implies follow."),
+                        ["hq"]             = Prop("boolean", "Include wkappbot.hq + openclaw log dirs."),
+                        ["recursive"]      = Prop("boolean", "Recursive search (unlimited depth)."),
+                        ["basedir"]        = Prop("string",  "Search root directory (default: CWD)."),
+                        ["invert"]         = Prop("boolean", "Invert match (-v)."),
+                        ["files_only"]     = Prop("boolean", "Print filenames only (-l)."),
+                        ["count"]          = Prop("boolean", "Count matches per file (-c)."),
+                        ["context"]        = Prop("integer", "Context lines before+after match (-C N)."),
+                        ["case_sensitive"] = Prop("boolean", "Case-sensitive (default: insensitive)."),
+                    },
+                    ["required"] = new JsonArray { "pattern" }
+                }),
+            McpTool("logcat",
+                "Search+stream wkappbot logs — native logcat syntax (fileFilter first, pattern second).\n" +
+                "Prefer grap if you think in grep terms. Use logcat for full fileFilter control.\n\n" +
+                "Examples:\n" +
+                "  {files:\"*.file.*\", pattern:\"OCR-DEEP\", past:\"30s\"}     → one-shot scan, exit\n" +
+                "  {files:\"**\", pattern:\"exception\", past:\"1h\", hq:true}  → all logs last 1h\n" +
+                "  {files:\"*.eye.*\", pattern:\"error\", timeout:\"1m\"}       → watch 1 minute\n",
+                new JsonObject {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject {
+                        ["files"]          = Prop("string",  "File glob(s). ';' OR. e.g. \"*.log\" / \"*.file.*\" / \"**\" (all). Default: *.txt"),
+                        ["pattern"]        = Prop("string",  "Regex pattern to search (case-insensitive). Default: match all."),
+                        ["past"]           = Prop("string",  "Scan files modified within duration (1h / 30m / 2d). Without follow: exits after scan."),
+                        ["follow"]         = Prop("boolean", "Follow new entries after --past scan."),
+                        ["timeout"]        = Prop("string",  "Watch for duration then exit (e.g. 30s, 5m). Implies follow."),
+                        ["hq"]             = Prop("boolean", "Include wkappbot.hq + openclaw log dirs."),
+                        ["recursive"]      = Prop("boolean", "Recursive search (unlimited depth)."),
+                        ["basedir"]        = Prop("string",  "Search root directory (default: CWD)."),
+                        ["invert"]         = Prop("boolean", "Invert match (-v)."),
+                        ["files_only"]     = Prop("boolean", "Print filenames only (-l)."),
+                        ["count"]          = Prop("boolean", "Count matches per file (-c)."),
+                        ["context"]        = Prop("integer", "Context lines before+after match (-C N)."),
+                        ["case_sensitive"] = Prop("boolean", "Case-sensitive (default: insensitive)."),
+                    },
+                    ["required"] = new JsonArray()
+                }),
             McpTool("wkappbot_cli",
                 // Auto-generated from GetUsageText() — stays in sync with CLI help automatically
                 "Run any wkappbot CLI command via argv array. argv[0] = wkappbot command name.\n" +
@@ -354,6 +410,10 @@ internal partial class Program
                         => RunCliCaptureWithCodeExternal("a11y", BuildUnifiedArgs(arguments), emitProgress),
                     "wkappbot_cli"
                         => RunWkappbotCliExternal(arguments, emitProgress),
+                    "logcat"
+                        => RunCliCaptureWithCodeExternal("logcat", BuildLogcatArgs(arguments, grapCompat: false), emitProgress),
+                    "grap"
+                        => RunCliCaptureWithCodeExternal("logcat", BuildLogcatArgs(arguments, grapCompat: true), emitProgress),
                     _ => ($"Unknown tool: {toolName}", 1)
                 }
                 : toolName switch
@@ -364,6 +424,10 @@ internal partial class Program
                         ? RunCliCaptureWithCodeExternal("a11y", BuildUnifiedArgs(arguments), emitProgress)
                         : RunCliCaptureWithCode("a11y", BuildUnifiedArgs(arguments), emitProgress),
                     "wkappbot_cli" => RunWkappbotCli(arguments, emitProgress),
+                    "logcat"
+                        => RunCliCaptureWithCode("logcat", BuildLogcatArgs(arguments, grapCompat: false), emitProgress),
+                    "grap"
+                        => RunCliCaptureWithCode("logcat", BuildLogcatArgs(arguments, grapCompat: true), emitProgress),
                     _ => ($"Unknown tool: {toolName}", 1)
                 };
 
@@ -420,6 +484,38 @@ internal partial class Program
         var list = new List<string>();
         if (args["all"]?.GetValue<bool>() == true) list.Add("--all");
         if (args["text"] is JsonNode t) list.Add(t.GetValue<string>()); // optional name filter
+        return list.ToArray();
+    }
+
+    /// <summary>
+    /// Build logcat CLI args from MCP tool params.
+    /// grapCompat=true: grap tool (pattern first) — positional order is [fileFilter, pattern].
+    /// grapCompat=false: logcat tool (fileFilter first) — positional order is [fileFilter, pattern].
+    /// Both end up with same logcat positionals; difference is which param maps to which.
+    /// </summary>
+    static string[] BuildLogcatArgs(JsonObject args, bool grapCompat)
+    {
+        var list = new List<string>();
+
+        var pattern = args["pattern"]?.GetValue<string>() ?? "";
+        var files   = args["files"]?.GetValue<string>() ?? "";
+
+        // logcat positionals: fileFilter then pattern
+        if (!string.IsNullOrEmpty(files))   list.Add(files);
+        if (!string.IsNullOrEmpty(pattern)) list.Add(pattern);
+
+        if (args["hq"]?.GetValue<bool>()        == true) list.Add("--hq");
+        if (args["recursive"]?.GetValue<bool>() == true) list.Add("-r");
+        if (args["follow"]?.GetValue<bool>()    == true) list.Add("-f");
+        if (args["invert"]?.GetValue<bool>()    == true) list.Add("-v");
+        if (args["files_only"]?.GetValue<bool>()== true) list.Add("-l");
+        if (args["count"]?.GetValue<bool>()     == true) list.Add("-c");
+        if (args["case_sensitive"]?.GetValue<bool>() == true) list.Add("-i");
+        if (args["basedir"] is JsonNode bd)  { list.Add("--basedir"); list.Add(bd.GetValue<string>()); }
+        if (args["past"]    is JsonNode ps)  { list.Add("--past");    list.Add(ps.GetValue<string>()); }
+        if (args["timeout"] is JsonNode to)  { list.Add("--timeout"); list.Add(to.GetValue<string>()); }
+        if (args["context"] is JsonNode ctx) { list.Add("-C");        list.Add(ctx.GetValue<int>().ToString()); }
+
         return list.ToArray();
     }
 
