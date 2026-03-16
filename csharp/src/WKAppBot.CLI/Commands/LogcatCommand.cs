@@ -21,6 +21,7 @@ internal partial class Program
         double pastSeconds = 0;    // 0 = no past scan; >0 = scan existing files this old
         bool follow = false;       // --past without --follow: scan and exit (grep-style)
         double timeoutSeconds = 0; // 0 = run forever
+        int contextLines = 0;      // -C N: show N lines before+after each match
 
         // Parse positional + named args
         var positional = new List<string>();
@@ -36,6 +37,8 @@ internal partial class Program
             else if (a == "--past" && i + 1 < args.Length) { pastSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--past=")) { pastSeconds = ParsePastDuration(a[7..]); }
             else if (a is "--follow" or "-f") { follow = true; }
+            else if ((a == "-C" || a == "--context") && i + 1 < args.Length && int.TryParse(args[++i], out var c)) { contextLines = c; }
+            else if (a.StartsWith("-C") && int.TryParse(a[2..], out var c2)) { contextLines = c2; }
             else if (a == "--timeout" && i + 1 < args.Length) { timeoutSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--timeout=")) { timeoutSeconds = ParsePastDuration(a[10..]); }
             else { positional.Add(a); }
@@ -103,7 +106,7 @@ internal partial class Program
             {
                 Console.WriteLine($"[LOGCAT] --past: scanning {pastFiles.Count} file(s) from last {FormatDuration(pastSeconds)}");
                 foreach (var f in pastFiles)
-                    EmitDeltaLines(f.FullName, pastOffsets, pastLineCounts, msgRegex, ref pastHeader);
+                    EmitDeltaLines(f.FullName, pastOffsets, pastLineCounts, msgRegex, ref pastHeader, contextLines);
             }
             else
             {
@@ -146,7 +149,7 @@ internal partial class Program
                     var fn = Path.GetFileName(e.FullPath);
                     if (!IsFilePatternMatch(fn, filePatterns)) return;
                     if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
-                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath);
+                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines);
                 }
                 catch { }
             };
@@ -159,7 +162,7 @@ internal partial class Program
                     var fn = Path.GetFileName(e.FullPath);
                     if (!IsFilePatternMatch(fn, filePatterns)) return;
                     if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
-                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath);
+                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines);
                 }
                 catch { }
             };
@@ -242,7 +245,8 @@ internal partial class Program
         Dictionary<string, long> offsets,
         Dictionary<string, long> lineCounts,
         Regex? msgRegex,
-        ref string lastHeaderPath)
+        ref string lastHeaderPath,
+        int contextLines = 0)
     {
         if (!File.Exists(path)) return;
 
@@ -258,7 +262,7 @@ internal partial class Program
         // No filter: print path + last 5 non-empty lines (tail-preview mode)
         if (msgRegex == null)
         {
-            var tail = new System.Collections.Generic.Queue<string>(6);
+            var tail = new Queue<string>(6);
             while (!sr.EndOfStream)
             {
                 var line = sr.ReadLine() ?? "";
@@ -275,11 +279,18 @@ internal partial class Program
             return;
         }
 
+        // Read all new lines into buffer (needed for before-context)
+        var buf = new List<string>();
         while (!sr.EndOfStream)
         {
             var line = sr.ReadLine() ?? "";
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            if (!msgRegex.IsMatch(line)) continue;
+            if (!string.IsNullOrWhiteSpace(line)) buf.Add(line);
+        }
+
+        int printUntil = -1; // index up to which we must print (for after-context)
+        for (int i = 0; i < buf.Count; i++)
+        {
+            if (!msgRegex.IsMatch(buf[i])) continue;
 
             emitted++;
             if (!string.Equals(lastHeaderPath, path, StringComparison.OrdinalIgnoreCase))
@@ -287,7 +298,19 @@ internal partial class Program
                 Console.WriteLine($"풀경로: {path}");
                 lastHeaderPath = path;
             }
-            Console.WriteLine($"\t...({emitted}): {line} ({DateTime.Now:HH:mm:ss})");
+
+            int from = Math.Max(printUntil + 1, i - contextLines);
+            int to   = Math.Min(buf.Count - 1, i + contextLines);
+
+            if (contextLines > 0 && from > printUntil + 1)
+                Console.WriteLine("--");
+
+            for (int j = from; j <= to; j++)
+            {
+                var marker = j == i ? $"\t...({emitted})" : "\t      ";
+                Console.WriteLine($"{marker}: {buf[j]} ({DateTime.Now:HH:mm:ss})");
+            }
+            printUntil = to;
         }
 
         lineCounts[path] = emitted;
