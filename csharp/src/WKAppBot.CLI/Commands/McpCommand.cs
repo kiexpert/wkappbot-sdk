@@ -229,8 +229,9 @@ internal partial class Program
         "File I/O: file-read (read file as Unicode, encoding-aware), file-write (write Unicode→target encoding, @file reference)\n" +
         "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ), slack (send Slack message), eye (eye tick — status snapshot)\n" +
         "Diagnostics: prompt-probe (scan all AI prompt windows — Claude Desktop, VS Code Claude Code, Codex — and report certainty, Slack display names, CWD; use all=true to include hidden/minimized windows)\n" +
-        "Log search: logcat (search+stream wkappbot logs; use wkappbot_cli for full options)\n" +
+        "Log search: logcat / grap / grep (search+stream wkappbot logs; use wkappbot_cli for full options)\n" +
         "  ⭐ Token-efficient log access pattern: wkappbot_cli [\"logcat\",\"--hq\",\"--past\",\"30s\",\"*.file.*\",\"keyword\"] → grep-style exit\n" +
+        "  ⭐ grep-compat alias: wkappbot_cli [\"grap\",\"keyword\",\"*.log\",\"--hq\",\"--past\",\"30s\"] (pattern first, files second)\n" +
         "  file glob: *.file.* / *.eye.* / ** (all) — supports ';' OR. text filters: pure regex, multiple = AND\n" +
         "Filesystem (read-only): file-read (encoding-aware read), file-write (write with encoding; auto-tracks original for patch restore)\n" +
         "Agent session: agent-checkpoint (snapshot before risky change), agent-dump-patch (write unified patch + restore hints to repo root)\n" +
@@ -274,6 +275,8 @@ internal partial class Program
                 "          [\"agent\",\"checkpoint\",\"--label\",\"before compile\"], [\"slack\",\"send\",\"hello\"],\n" +
                 "          [\"logcat\",\"--hq\",\"--past\",\"30s\",\"*.file.*\",\"OCR-DEEP\"]  ← grep-style log search (exits after scan)\n" +
                 "          [\"logcat\",\"--hq\",\"--past\",\"1h\",\"**\",\"exception\"]          ← search all logs last 1h for 'exception'\n" +
+                "          [\"grap\",\"exception\",\"*.log\",\"--past\",\"1h\"]               ← grap alias: grep-compat order (pattern first)\n" +
+                "          [\"grep\",\"exception\",\"*.log\",\"--past\",\"1h\"]               ← grep alias: same as grap\n" +
                 "⚠ Build/publish: prefer signaling Claude Code via Slack. If Claude Code is offline, checkpoint first then publish.\n\n" +
                 GetUsageText(),
                 new JsonObject {

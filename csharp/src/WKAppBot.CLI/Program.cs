@@ -153,15 +153,17 @@ internal partial class Program
                 args = new[] { implicitCmd }.Concat(args).ToArray();
         }
         // Step 2: command alias → canonical command + arg translation
-        //   grep: logcat alias, same arg order
-        //   grap: logcat alias, grep-compat arg order (pattern first → fileFilter first)
-        if (args.Length > 0)
+        //   grep/grap: logcat alias, grep-compat arg order (pattern first → fileFilter first)
+        if (args.Length > 0 && args[0].ToLowerInvariant() is "grep" or "grap")
         {
-            var a0 = args[0].ToLowerInvariant();
-            if (a0 == "grap")
-                args = new[] { "logcat" }.Concat(GrapArgsToLogcat(args.Skip(1).ToArray())).ToArray();
-            else if (a0 == "grep")
-                args = new[] { "logcat" }.Concat(GrapArgsToLogcat(args.Skip(1).ToArray())).ToArray();
+            var alias = args[0].ToLowerInvariant();
+            // --help: show alias-specific help (before rewrite)
+            if (args.Any(a => a is "--help" or "-h"))
+            {
+                PrintGrapHelp(alias);
+                return 0;
+            }
+            args = new[] { "logcat" }.Concat(GrapArgsToLogcat(args.Skip(1).ToArray())).ToArray();
         }
 
         // Include command name in log filename for easy identification via ls
