@@ -29,6 +29,7 @@ class Program
         ("ocr",    "ocr"),
         ("logcat", "logcat"),
         ("grep",   "logcat"), // grep → logcat alias (busybox-style)
+        ("grap",   "logcat"), // grap → logcat alias (WKAppBot official pattern name ㅋ)
         ("scan",   "scan"),
     };
 
@@ -83,8 +84,8 @@ class Program
 
         // eye: IS the daemon, must run core directly
         // file: read-only utility (PDF/OCR may take several seconds) — skip Eye pipe to avoid timeout
-        // logcat/grep: streaming log monitor — needs direct stdout, TeeConsole, full error handling
-        if (!onlyCore && cmd != "eye" && cmd != "file" && cmd != "logcat" && cmd != "grep")
+        // logcat/grep/grap: streaming log monitor — needs direct stdout, TeeConsole, full error handling
+        if (!onlyCore && cmd != "eye" && cmd != "file" && cmd != "logcat" && cmd != "grep" && cmd != "grap")
         {
             if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code))
                 return code;

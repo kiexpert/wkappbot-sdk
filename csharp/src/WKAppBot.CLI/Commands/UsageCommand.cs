@@ -305,7 +305,7 @@ Data Directory:
 
         // Exact match first (symlink named exactly as command)
         string[] knownCommands = {
-            "a11y", "inspect", "ocr", "logcat", "grep", "capture", "scan",
+            "a11y", "inspect", "ocr", "logcat", "grep", "grap", "capture", "scan",
             "windows", "snapshot", "readiness", "ask"
         };
         foreach (var cmd in knownCommands)

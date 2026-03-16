@@ -294,7 +294,7 @@ internal partial class Program
                 "scan" => ScanCommand(restArgs),
                 "ask" => AskCommand(restArgs),
                 "agent" => AgentCommand(restArgs),
-                "logcat" or "grep" => LogcatCommand(restArgs),
+                "logcat" or "grep" or "grap" => LogcatCommand(restArgs),
                 "eye" => AppBotEyeCommand(restArgs),
                 "slack" => SlackCommand(restArgs),
                 "web" => WebCommand(restArgs),
