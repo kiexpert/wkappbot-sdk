@@ -65,6 +65,16 @@ internal partial class Program
     internal static int Main(string[] args)
     {
         var _mainStarted = System.Diagnostics.Stopwatch.StartNew();
+
+        // WKAPPBOT_PROFILE=1 → emit [PROFILE] Xms label to stderr for startup diagnostics.
+        // Usage: WKAPPBOT_PROFILE=1 wkappbot grep foo
+        bool _profiling = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1";
+        Action<string> prof = _profiling
+            ? (label => { try { Console.Error.WriteLine($"[PROFILE] {_mainStarted.ElapsedMilliseconds}ms {label}"); } catch { } })
+            : (_ => { });
+
+        prof("Main() entered");
+
         // Force UTF-8 globally — console + child processes inherit codepage 65001
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
@@ -80,12 +90,16 @@ internal partial class Program
 
         // Enable DPI awareness
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
+        prof("DpiAwareness set");
 
         // Kill ghost zoom overlays from previous invocations (keeps exe unlocked for publish)
         try { InputZoomHost.CloseAllGhosts(); } catch { }
+        prof("CloseAllGhosts done");
 
-        // Auto-create busybox symlinks (a11y.exe, wka11y.exe → wkappbot.exe) if missing
-        EnsureBusyboxAliases();
+        // Auto-create busybox symlinks (a11y.exe, wka11y.exe → wkappbot.exe) if missing.
+        // Background: file ops (ResolveLinkTarget, CreateSymbolicLink) can block on VHD/network drives.
+        ThreadPool.QueueUserWorkItem(_ => { try { EnsureBusyboxAliases(); } catch { } });
+        prof("EnsureBusyboxAliases queued (background)");
 
         // Orphan guard: if parent dies, exit too (prevents ghost processes like stuck win-click).
         // Eye mode is intentionally long-running/detached → skip.
@@ -116,6 +130,8 @@ internal partial class Program
         // Screen reader mode: once enabled for Chromium/Electron, stays ON permanently.
         // No restore on exit — next run starts instantly (no broadcast delay).
 
+        prof("OrphanGuard started");
+
         // Auto-log: tee all console output to file
         var exePath = Environment.ProcessPath ?? "wkappbot.exe";
         var exeName = Path.GetFileName(exePath);
@@ -137,6 +153,7 @@ internal partial class Program
         // Wrap tee in ThreadRoutingWriter so EyeCmdPipeServer.Route() can redirect per-command output.
         // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
+        prof("TeeWriter ready");
 
         // ── Crash handler: dump stack trace to log, DON'T move to old/ (crash evidence) ──
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -234,6 +251,8 @@ internal partial class Program
                 }
             }
 
+            prof($"command={command}");
+
             // Global Eye tick (for eye --global multi-parent monitor)
             try { EmitEyeTick(command, cmdTag, "start"); } catch { }
             Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
@@ -259,6 +278,7 @@ internal partial class Program
 
             try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
             try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
+            prof("dispatch");
 
             exitCode = command switch
             {
@@ -274,7 +294,7 @@ internal partial class Program
                 "scan" => ScanCommand(restArgs),
                 "ask" => AskCommand(restArgs),
                 "agent" => AgentCommand(restArgs),
-                "logcat" => LogcatCommand(restArgs),
+                "logcat" or "grep" => LogcatCommand(restArgs),
                 "eye" => AppBotEyeCommand(restArgs),
                 "slack" => SlackCommand(restArgs),
                 "web" => WebCommand(restArgs),
@@ -388,9 +408,12 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.Error.WriteLine($"Error: {ex.Message}");
-            Console.ResetColor();
+            var errorMsg = $"Error: {ex.GetType().Name}: {ex.Message}";
+            try { Console.ForegroundColor = ConsoleColor.Red; } catch { }
+            // Console.Error broken in Git Bash (mintty pipes) — write to stdout too
+            try { Console.Error.WriteLine(errorMsg); } catch { }
+            try { Console.WriteLine(errorMsg); } catch { }
+            try { Console.ResetColor(); } catch { }
             return 1;
         }
         finally
@@ -652,6 +675,20 @@ internal partial class Program
         catch { return Array.Empty<string>(); }
     }
 
+    /// <summary>
+    /// Safe wrapper for Process.MainWindowTitle — times out after <paramref name="timeoutMs"/> ms.
+    /// Process.MainWindowTitle calls GetWindowText (Win32) which sends WM_GETTEXT via SendMessage.
+    /// For hung/not-responding windows this blocks for up to 30 seconds. This wrapper avoids that.
+    /// </summary>
+    static string GetMainWindowTitleSafe(System.Diagnostics.Process p, int timeoutMs = 150)
+    {
+        string? title = null;
+        var t = new Thread(() => { try { title = p.MainWindowTitle; } catch { } }) { IsBackground = true };
+        t.Start();
+        t.Join(timeoutMs);
+        return title ?? "";
+    }
+
     static (int hostPid, string hostName, string hostTitle) FindLogicalHost(int selfPid, int directParentPid)
     {
         static bool IsShell(string n)
@@ -671,7 +708,7 @@ internal partial class Program
             {
                 var p = System.Diagnostics.Process.GetProcessById(cur);
                 var name = p.ProcessName ?? "unknown";
-                var title = p.MainWindowTitle ?? "";
+                var title = GetMainWindowTitleSafe(p);
 
                 if (!IsShell(name) && !string.IsNullOrWhiteSpace(title))
                     return (cur, name, title);
@@ -689,7 +726,7 @@ internal partial class Program
             try
             {
                 var p = System.Diagnostics.Process.GetProcessById(directParentPid);
-                return (directParentPid, p.ProcessName ?? "unknown", p.MainWindowTitle ?? "");
+                return (directParentPid, p.ProcessName ?? "unknown", GetMainWindowTitleSafe(p));
             }
             catch { }
         }
