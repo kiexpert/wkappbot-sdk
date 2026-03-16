@@ -406,10 +406,33 @@ Data Directory:
         if (positional.Count == 0)
             return flags.ToArray(); // no positionals — pass through as-is
 
-        var pattern    = positional[0];
-        var fileFilter = positional.Count > 1
-            ? string.Join(";", positional.Skip(1))  // multiple files → ';' OR glob
-            : "*.txt";                               // no file arg → default logcat filter
+        // Auto-detect if first arg looks like a file glob (contains * ? or looks like *.ext)
+        // and swap to [fileFilter, pattern] order. Handles common mistake: grap *.log error
+        static bool IsGlobLike(string s) =>
+            s.Contains('*') || s.Contains('?') || s.Contains('/') || s.Contains('\\') ||
+            (s.StartsWith("*.") || System.IO.Path.HasExtension(s));
+
+        string pattern, fileFilter;
+        if (positional.Count == 1 && IsGlobLike(positional[0]))
+        {
+            // grap *.log → fileFilter=*.log, pattern=* (show all)
+            fileFilter = positional[0];
+            pattern    = "";
+        }
+        else if (positional.Count >= 2 && IsGlobLike(positional[0]) && !IsGlobLike(positional[1]))
+        {
+            // grap *.log error → auto-swap: fileFilter=*.log, pattern=error
+            fileFilter = string.Join(";", positional.Take(positional.Count - 1));
+            pattern    = positional[positional.Count - 1];
+        }
+        else
+        {
+            // Normal grep order: pattern first, files second
+            pattern    = positional[0];
+            fileFilter = positional.Count > 1
+                ? string.Join(";", positional.Skip(1))  // multiple files → ';' OR glob
+                : "*.txt";                               // no file arg → default logcat filter
+        }
 
         return new[] { fileFilter, pattern }.Concat(flags).ToArray();
     }

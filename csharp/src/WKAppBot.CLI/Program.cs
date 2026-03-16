@@ -177,9 +177,10 @@ internal partial class Program
         if (args.Length > 0 && args[0].ToLowerInvariant() is "grep" or "grap")
         {
             var alias = args[0].ToLowerInvariant();
-            // --help: show alias-specific help (before rewrite)
-            if (args.Any(a => a is "--help" or "-h"))
+            // --help or no-args: show alias-specific help (before rewrite)
+            if (args.Length == 1 || args.Any(a => a is "--help" or "-h"))
             {
+                prof("PrintGrapHelp");
                 PrintGrapHelp(alias);
                 return 0;
             }

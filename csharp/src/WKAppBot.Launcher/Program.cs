@@ -48,8 +48,14 @@ class Program
             .Where(x => exeBase == x.name || exeBase.Contains(x.name))
             .Select(x => x.cmd)
             .FirstOrDefault();
-        if (implicitCmd != null && (args.Length == 0 || args[0].ToLowerInvariant() != implicitCmd))
-            args = new[] { implicitCmd }.Concat(args).ToArray();
+        if (implicitCmd != null)
+        {
+            // grap/grep: pass alias name to Core (not "logcat") — Core handles arg-order translation + help.
+            // This allows Core's help fast path to show grap-specific help for "grap" with no args.
+            var prependCmd = (exeBase == "grap" || exeBase == "grep") ? exeBase : implicitCmd;
+            if (args.Length == 0 || args[0].ToLowerInvariant() != prependCmd)
+                args = new[] { prependCmd }.Concat(args).ToArray();
+        }
 
         // Auto-create missing busybox symlinks (runs only when argv0 == wkappbot)
         if (exeBase == "wkappbot")
