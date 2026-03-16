@@ -127,7 +127,7 @@ internal partial class Program
         // e.g. "wkappbot.exe.out-20260221_211427.eye.pid=36944.txt"
         var cmdTag = args.Length > 0 ? args[0].ToLowerInvariant().Replace(" ", "-") : "noargs";
         // For multi-word commands like "slack send", include subcommand too
-        if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow")
+        if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow" or "file")
             cmdTag += $"-{args[1].ToLowerInvariant()}";
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
         // Track current command log path for auto-heal diagnostics (non-Eye mode only; Eye sets it in RunInEye)

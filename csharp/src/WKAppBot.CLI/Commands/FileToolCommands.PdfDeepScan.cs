@@ -2,30 +2,32 @@ using WKAppBot.Vision;
 
 namespace WKAppBot.CLI;
 
-// Deep-scan OCR for PDF pages: pixel-based line detection → segment slicing → per-segment OCR.
-// Complements full-page OCR by catching math formula variables, subscripts, isolated symbols
-// that PdfPig can't decode and full-page OCR misses due to scale/font issues.
+// Deep-scan OCR fallback for PDF pages.
 //
-// Algorithm:
-//   1. Row scan  — find rows with dark pixels → group into line bands
-//   2. Col scan  — within each band, find column gaps → split into segments
-//   3. Strip OCR — OCR full band strip first (fast path, catches normal text)
-//   4. Seg OCR   — if strip got < 5 chars/100px, OCR segments individually (slow path, catches formulas)
+// Step 1 (caller): full-page OCR → OcrFullResult with word coordinates  (1 call, fast)
+// Step 2 (here):   pixel line detection → segment list
+//                  segments NOT covered by step-1 OCR words → crop → additional OCR  (fallback)
+//
+// "Not covered" = segment rect has zero overlapping OcrWords, or OCR word density < threshold.
+// This catches math formula variables, subscripts, table cells that Windows OCR misses at full scale.
 internal partial class Program
 {
-    // Background luminance threshold: pixels darker than this are "content".
-    const int PdfBgLum = 220;
+    const int PdfBgLum = 220; // pixels darker than this are "content"
 
     /// <summary>
-    /// Deep-scan OCR: detect pixel line bands → segment slicing → OCR.
-    /// Returns all text found, joining strip and segment results.
-    /// Called as a second OCR pass after full-page OCR.
+    /// Additional OCR pass for regions the full-page OCR missed.
+    /// Call AFTER RecognizeAll() on the full page — pass in the OcrFullResult for coverage check.
+    /// Returns supplemental text found in uncovered regions.
     /// </summary>
-    static async Task<string> DeepScanOcrAsync(System.Drawing.Bitmap bmp, SimpleOcrAnalyzer ocr)
+    static async Task<string> DeepScanOcrAsync(
+        System.Drawing.Bitmap bmp,
+        SimpleOcrAnalyzer ocr,
+        OcrFullResult fullOcr,
+        Action<string>? onFound = null)
     {
         int w = bmp.Width, h = bmp.Height;
 
-        // Copy bitmap pixels to managed array for fast access (avoid GetPixel overhead)
+        // ── Copy pixels for fast row/col scanning ──────────────────────────────
         var bmpData = bmp.LockBits(
             new System.Drawing.Rectangle(0, 0, w, h),
             System.Drawing.Imaging.ImageLockMode.ReadOnly,
@@ -35,102 +37,106 @@ internal partial class Program
         bmp.UnlockBits(bmpData);
         int stride = bmpData.Stride;
 
-        // Step 1: detect active rows (rows with ≥0.3% dark pixels)
+        // ── Step 1: detect pixel-active rows → line bands ─────────────────────
         var activeRows = new bool[h];
         for (int y = 0; y < h; y++)
         {
             int dark = 0, off = y * stride;
             for (int x = 0; x < w; x++)
             {
-                int lum = (pixels[off + x * 4 + 2] + pixels[off + x * 4 + 1] + pixels[off + x * 4]) / 3;
+                int lum = (pixels[off + x*4+2] + pixels[off + x*4+1] + pixels[off + x*4]) / 3;
                 if (lum < PdfBgLum && ++dark > w * 0.003) break;
             }
             activeRows[y] = dark > w * 0.003;
         }
 
-        // Step 2: group active rows into line bands (gap > 6px = new band)
         var bands = new List<(int top, int bottom)>();
-        int bandStart = -1, lastActiveRow = -1;
+        int bandStart = -1, lastActive = -1;
         for (int y = 0; y <= h; y++)
         {
             bool act = y < h && activeRows[y];
-            if (act) { if (bandStart < 0) bandStart = y; lastActiveRow = y; }
-            else if (bandStart >= 0 && (y - lastActiveRow > 6 || y == h))
+            if (act) { if (bandStart < 0) bandStart = y; lastActive = y; }
+            else if (bandStart >= 0 && (y - lastActive > 6 || y == h))
             {
-                bands.Add((Math.Max(0, bandStart - 2), Math.Min(h - 1, lastActiveRow + 2)));
+                bands.Add((Math.Max(0, bandStart - 2), Math.Min(h - 1, lastActive + 2)));
                 bandStart = -1;
             }
         }
 
-        // Step 3 & 4: OCR each band (cap total segment calls at 40/page to stay fast)
+        // ── Step 2: build OCR coverage map (word bounding boxes) ─────────────
+        // OcrWord coords are in bitmap pixels (already scaled back by RecognizeAll)
+        var covered = fullOcr.Words
+            .Select(ww => new System.Drawing.Rectangle(ww.X, ww.Y, Math.Max(1, ww.Width), Math.Max(1, ww.Height)))
+            .ToList();
+
+        bool IsCovered(System.Drawing.Rectangle seg)
+        {
+            foreach (var box in covered)
+                if (box.IntersectsWith(seg)) return true;
+            return false;
+        }
+
+        // ── Step 3: per-band column scan → segments → fallback OCR ───────────
         var results = new List<string>();
-        int totalSegs = 0;
+        int totalFallback = 0;
+
         foreach (var (top, bottom) in bands)
         {
             int bh = bottom - top + 1;
             if (bh < 3) continue;
 
-            // Strip OCR: full-width band, upscale to min 80px height for accuracy
-            string stripText = "";
-            try
-            {
-                var stripRect = new System.Drawing.Rectangle(0, top, w, bh);
-                using var strip = bmp.Clone(stripRect, bmp.PixelFormat);
-                var ocrR = await ocr.RecognizeAll(strip);
-                stripText = ocrR.FullText.Trim();
-                if (!string.IsNullOrWhiteSpace(stripText))
-                    results.Add(stripText);
-            }
-            catch { }
-
-            // Segment OCR slow path: if strip got < 5 chars per 100px width → probably formula/symbols
-            double stripDensity = (double)stripText.Replace(" ", "").Length / (w / 100.0);
-            if (stripDensity >= 5 || totalSegs >= 40) continue;
-
-            // Detect column gaps within this band to find segments
+            // Column scan → active cols + pixel count (used for coverage judgment below)
             var activeCols = new bool[w];
+            int darkPixels = 0;
             for (int x = 0; x < w; x++)
                 for (int y = top; y <= bottom; y++)
                 {
-                    int lum = (pixels[y * stride + x * 4 + 2] + pixels[y * stride + x * 4 + 1] + pixels[y * stride + x * 4]) / 3;
-                    if (lum < PdfBgLum) { activeCols[x] = true; break; }
+                    int lum = (pixels[y*stride + x*4+2] + pixels[y*stride + x*4+1] + pixels[y*stride + x*4]) / 3;
+                    if (lum < PdfBgLum) { activeCols[x] = true; darkPixels++; break; }
                 }
 
-            // Group active columns into segments (gap >= 5px = new segment)
-            var segs = new List<(int left, int right)>();
+            // "미진" check: OCR chars vs pixel activity ratio
+            // If OCR got plenty of text relative to pixel density → well-covered, skip
+            int bandOcrChars = fullOcr.Words
+                .Where(ww => ww.Y >= top - 4 && ww.Y <= bottom + 4)
+                .Sum(ww => ww.Text.Length);
+            double pixelDensity  = (double)darkPixels / w;          // active cols / total cols
+            double charPerPixel  = pixelDensity > 0 ? bandOcrChars / (pixelDensity * w) : 0;
+            if (charPerPixel >= 0.4) continue; // OCR coverage sufficient → skip this band
+
             int segStart = -1, lastActiveCol = -1;
+            var segs = new List<System.Drawing.Rectangle>();
             for (int x = 0; x <= w; x++)
             {
                 bool act = x < w && activeCols[x];
                 if (act) { if (segStart < 0) segStart = x; lastActiveCol = x; }
                 else if (segStart >= 0 && (x - lastActiveCol > 5 || x == w))
                 {
-                    if (lastActiveCol - segStart >= 5)
-                        segs.Add((Math.Max(0, segStart - 1), Math.Min(w - 1, lastActiveCol + 1)));
+                    int sw = lastActiveCol - segStart + 1;
+                    if (sw >= 6)
+                        segs.Add(new System.Drawing.Rectangle(
+                            Math.Max(0, segStart - 1), top,
+                            Math.Min(sw + 2, w - segStart + 1), bh));
                     segStart = -1;
                 }
             }
 
-            // OCR each segment (skip slivers < 6px wide, cap at 10 segs/band, 40 total/page)
-            int segCount = 0;
-            foreach (var (left, right) in segs)
+            // Fallback OCR only for uncovered segments
+            foreach (var seg in segs)
             {
-                int sw = right - left + 1;
-                if (sw < 6 || bh < 3) continue;
-                if (++segCount > 10 || ++totalSegs > 40) break;
+                if (totalFallback >= 60) goto done;
+                if (IsCovered(seg)) continue; // full-page OCR already got this
                 try
                 {
-                    var segRect = new System.Drawing.Rectangle(left, top, sw, bh);
-                    using var seg = bmp.Clone(segRect, bmp.PixelFormat);
-                    var ocrR = await ocr.RecognizeAll(seg);
-                    var text = ocrR.FullText.Trim();
-                    if (text.Length >= 1)
-                        results.Add(text);
+                    using var crop = bmp.Clone(seg, bmp.PixelFormat);
+                    var r = await ocr.RecognizeAll(crop);
+                    var t = r.FullText.Trim();
+                    if (t.Length >= 1) { onFound?.Invoke(t); results.Add(t); totalFallback++; }
                 }
                 catch { }
             }
         }
-
+        done:
         return string.Join(" ", results.Where(t => !string.IsNullOrWhiteSpace(t)));
     }
 }

@@ -5,7 +5,9 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // wkappbot logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]
+    // wkappbot logcat <fileFilter> [regex1 regex2 ...] [--basedir <dir>] [-r[=N]] [--hq] [--past Ns/Nm/Nh]
+    // fileFilter : glob pattern, ';' = OR  (e.g. "*.file.*;*.eye.*")
+    // regex args : pure regex, multiple = AND  (e.g. "OCR-DEEP" "block(len|size)")
     // Default: current directory only. -r unlimited depth. -r=3 depth limit. --hq adds HQ+openclaw.
     static int LogcatCommand(string[] args)
     {
@@ -16,6 +18,8 @@ internal partial class Program
         string? baseDirOverride = null;
         int maxDepth = 0; // 0 = current dir only, -1 = unlimited, N = depth limit
         bool includeHq = false;
+        double pastSeconds = 0; // 0 = no past scan; >0 = scan existing files this old
+        double timeoutSeconds = 0; // 0 = run forever
 
         // Parse positional + named args
         var positional = new List<string>();
@@ -28,10 +32,19 @@ internal partial class Program
             else if (a.StartsWith("-r=") && int.TryParse(a[3..], out var d)) { maxDepth = d; }
             else if (a.StartsWith("--recursive=") && int.TryParse(a[12..], out var d2)) { maxDepth = d2; }
             else if (a == "--hq") { includeHq = true; }
+            else if (a == "--past" && i + 1 < args.Length) { pastSeconds = ParsePastDuration(args[++i]); }
+            else if (a.StartsWith("--past=")) { pastSeconds = ParsePastDuration(a[7..]); }
+            else if (a == "--timeout" && i + 1 < args.Length) { timeoutSeconds = ParsePastDuration(args[++i]); }
+            else if (a.StartsWith("--timeout=")) { timeoutSeconds = ParsePastDuration(a[10..]); }
             else { positional.Add(a); }
         }
         if (positional.Count > 0) fileFilterArg = positional[0];
-        if (positional.Count > 1) messageFilterArg = positional[1];
+        // positional[1..] = regex patterns → AND lookahead: (?=.*pat1)(?=.*pat2)...
+        var keywords = positional.Skip(1).ToList();
+        if (keywords.Count == 1)
+            messageFilterArg = keywords[0];
+        else if (keywords.Count > 1)
+            messageFilterArg = string.Concat(keywords.Select(k => $"(?=.*(?:{k}))"));
 
         var filePatterns = fileFilterArg.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (filePatterns.Length == 0) filePatterns = new[] { "*.txt" };
@@ -52,11 +65,50 @@ internal partial class Program
             dirs.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "logs"));
         }
 
-        var depthLabel = maxDepth == 0 ? "" : maxDepth == -1 ? " -r" : $" -r={maxDepth}";
-        Console.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")} (Ctrl+C to stop)");
+        var depthLabel   = maxDepth == 0 ? "" : maxDepth == -1 ? " -r" : $" -r={maxDepth}";
+        var pastLabel    = pastSeconds    > 0 ? $" --past {FormatDuration(pastSeconds)}" : "";
+        var timeoutLabel = timeoutSeconds > 0 ? $" --timeout {FormatDuration(timeoutSeconds)}" : "";
+        Console.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")}{pastLabel}{timeoutLabel} (Ctrl+C to stop)");
 
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        if (timeoutSeconds > 0) cts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
+        // --past: scan existing files modified within the window before entering live mode
+        if (pastSeconds > 0)
+        {
+            var cutoff = DateTime.UtcNow.AddSeconds(-pastSeconds);
+            var pastDirs = new List<string>(dirs);
+            // Always include HQ logs/old when --past is active (that's where finished logs live)
+            if (includeHq)
+                pastDirs.Add(Path.Combine(DataDir, "logs", "old"));
+
+            var pastOffsets   = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            var pastLineCounts = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            string pastHeader = "";
+
+            var pastFiles = pastDirs.Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(Directory.Exists)
+                .SelectMany(dir => Directory.GetFiles(dir, "*.*", SearchOption.TopDirectoryOnly))
+                .Select(p => new FileInfo(p))
+                .Where(f => IsFilePatternMatch(f.Name, filePatterns)
+                         && !f.Name.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)
+                         && f.LastWriteTimeUtc >= cutoff)
+                .OrderBy(f => f.LastWriteTimeUtc)
+                .ToList();
+
+            if (pastFiles.Count > 0)
+            {
+                Console.WriteLine($"[LOGCAT] --past: scanning {pastFiles.Count} file(s) from last {FormatDuration(pastSeconds)}");
+                foreach (var f in pastFiles)
+                    EmitDeltaLines(f.FullName, pastOffsets, pastLineCounts, msgRegex, ref pastHeader);
+                Console.WriteLine("[LOGCAT] --past: done, entering live mode...");
+            }
+            else
+            {
+                Console.WriteLine($"[LOGCAT] --past: no files found in last {FormatDuration(pastSeconds)}");
+            }
+        }
 
         var watchers = new List<FileSystemWatcher>();
         var offsets = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
@@ -110,7 +162,12 @@ internal partial class Program
         }
 
         while (!cts.IsCancellationRequested)
+        {
             Thread.Sleep(120);
+            // Broken pipe: stdout closed (e.g. piped to head/grep that exited)
+            try { if (Console.IsOutputRedirected) Console.Out.Flush(); }
+            catch (IOException) { break; }
+        }
 
         foreach (var w in watchers)
         {
@@ -151,6 +208,24 @@ internal partial class Program
             .Replace("\\*", ".*")
             .Replace("\\?", ".") + "$";
         return Regex.IsMatch(input, regex, RegexOptions.IgnoreCase);
+    }
+
+    // Parse duration string: "30s" / "5m" / "1h" / "3600" (bare number = seconds)
+    static double ParsePastDuration(string s)
+    {
+        s = s.Trim().ToLowerInvariant();
+        if (s.EndsWith("h") && double.TryParse(s[..^1], out var h)) return h * 3600;
+        if (s.EndsWith("m") && double.TryParse(s[..^1], out var m)) return m * 60;
+        if (s.EndsWith("s") && double.TryParse(s[..^1], out var sec)) return sec;
+        if (double.TryParse(s, out var bare)) return bare;
+        return 3600; // default 1h
+    }
+
+    static string FormatDuration(double seconds)
+    {
+        if (seconds >= 3600) return $"{seconds / 3600:0.#}h";
+        if (seconds >= 60)   return $"{seconds / 60:0.#}m";
+        return $"{seconds:0}s";
     }
 
     static void EmitDeltaLines(

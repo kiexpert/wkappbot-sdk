@@ -435,13 +435,25 @@ internal partial class Program
                         stream.Seek(0);
                         using var bmp = new System.Drawing.Bitmap(stream.AsStream());
 
-                        // Pass 1: full-page OCR (fast, catches normal text)
+                        // Pass 1: full-page OCR (fast, catches normal text + word coords)
+                        Console.Write($"[PDF+OCR] p{p} fullpage...");
+                        Console.Out.Flush();
                         var pageOcr = await ocr.RecognizeAll(bmp);
-                        // Pass 2: deep-scan OCR — only with --ocr-deep (line bands → segments)
+                        Console.WriteLine($" {pageOcr.Words.Count} words");
                         var combined = pageOcr.FullText;
+                        // Pass 2: coverage-guided fallback — only for uncovered pixel regions
                         if (deepOcr)
                         {
-                            var deepText = await DeepScanOcrAsync(bmp, ocr);
+                            int deepHits = 0;
+                            Console.Write($"[PDF+OCR] p{p} deep...");
+                            Console.Out.Flush();
+                            var deepText = await DeepScanOcrAsync(bmp, ocr, pageOcr, t =>
+                            {
+                                if (deepHits == 0) Console.WriteLine();
+                                Console.WriteLine($"[OCR-DEEP] → {t}");
+                                deepHits++;
+                            });
+                            if (deepHits == 0) Console.WriteLine(" nothing new");
                             combined += " " + deepText;
                         }
                         ocrAdditions = ComputePdfOcrAdditions(pageText, combined);
