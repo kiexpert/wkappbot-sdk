@@ -159,8 +159,7 @@ Utility:
   logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]
       Stream logs in real-time. Default: CWD only. -r unlimited, -r=3 depth 3. --hq adds HQ+openclaw.
       File filter supports grap patterns: wildcards, regex: prefix, ';' OR.
-  grep  <pattern> [files]    (alias → logcat, grep-compat arg order)
-  grap  <pattern> [files]    (alias → logcat, grep-compat arg order — WKAppBot official pattern name)
+  grep / grap  <pattern> [files]   (logcat aliases, grep-compat arg order — run `grap --help` for details)
   ask gpt|gemini|claude ""question"" [file.png] [--slack] [--new-tab]
       Ask AI via CDP (focusless). Auto-closes blank tabs, validates URL.
   ask triad ""question""

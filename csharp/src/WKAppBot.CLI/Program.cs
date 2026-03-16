@@ -90,10 +90,22 @@ internal partial class Program
 
         // help: fast path — skip TeeWriter, RotateOldLogs, Eye tick, LaunchEye, OrphanGuard
         // Skip fast path when profiling so all init stages are visible
-        if (!_profiling && (args.Length == 0 || args[0] is "help" or "--help" or "-h"))
         {
-            PrintUsage();
-            return 0;
+            var argv0help = Environment.GetCommandLineArgs().FirstOrDefault() ?? "";
+            var exeBaseHelp = Path.GetFileNameWithoutExtension(argv0help).ToLowerInvariant();
+            var a0 = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+            bool isGrapAlias   = exeBaseHelp == "grap" || exeBaseHelp == "grep" || a0 == "grap" || a0 == "grep";
+            bool hasHelpFlag   = args.Any(a => a == "--help" || a == "-h");
+            bool isHelpRequest = args.Length == 0 || a0 == "help" || a0 == "--help" || a0 == "-h"
+                              || (isGrapAlias && (args.Length == 1 || hasHelpFlag));
+            if (!_profiling && isHelpRequest)
+            {
+                if (isGrapAlias)
+                    PrintGrapHelp(a0 == "grep" || exeBaseHelp == "grep" ? "grep" : "grap");
+                else
+                    PrintUsage();
+                return 0;
+            }
         }
 
         // Enable DPI awareness
