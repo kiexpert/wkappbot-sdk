@@ -323,7 +323,50 @@ Data Directory:
     }
 
     // Busybox aliases to auto-create as symlinks next to wkappbot.exe
-    static readonly string[] BusyboxAliases = { "a11y", "wka11y", "grep" };
+    static readonly string[] BusyboxAliases = { "a11y", "wka11y", "grep", "grap" };
+
+    /// <summary>
+    /// Translates grep-style args to logcat-style args for the `grap` busybox alias.
+    /// grep:   grap [opts] pattern [file/dir...]
+    /// logcat: logcat fileFilter pattern [opts]
+    ///
+    /// Transformation: swap positional order — pattern (first) ↔ fileFilter (rest joined with ';')
+    /// Flags (-v, -l, -c, -r, -A, -B, -C, -m, -i) pass through unchanged (logcat already supports them).
+    /// </summary>
+    static string[] GrapArgsToLogcat(string[] args)
+    {
+        var flags = new List<string>();
+        var positional = new List<string>();
+
+        // Separate flags from positionals (flags = anything starting with '-', including their value args)
+        for (int i = 0; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (a.StartsWith('-'))
+            {
+                flags.Add(a);
+                // Flags that consume the next arg as value
+                if (a is "-A" or "-B" or "-C" or "--context" or "--after-context" or "--before-context"
+                        or "-m" or "--max-count" or "--basedir" or "--past" or "--timeout"
+                    && i + 1 < args.Length)
+                    flags.Add(args[++i]);
+            }
+            else positional.Add(a);
+        }
+
+        // grep positionals: [pattern, file1, file2, ...]
+        // logcat positionals: [fileFilter, pattern]
+        if (positional.Count == 0)
+            return flags.ToArray(); // no positionals — pass through as-is
+
+        var pattern    = positional[0];
+        var fileFilter = positional.Count > 1
+            ? string.Join(";", positional.Skip(1))  // multiple files → ';' OR glob
+            : "*.txt";                               // no file arg → default logcat filter
+
+        return new[] { fileFilter, pattern }.Concat(flags).ToArray();
+    }
+
 
     /// <summary>
     /// Ensure busybox-style symlinks exist next to wkappbot.exe.
