@@ -151,7 +151,7 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>suggest list — show pending suggestions in a pretty format.</summary>
+    /// <summary>suggest list — show pending suggestions in a pretty format. Auto-syncs slack_ts from Slack.</summary>
     static int SuggestListCommand(string[] args)
     {
         var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
@@ -168,6 +168,78 @@ internal partial class Program
         {
             Console.WriteLine("[SUGGEST] No pending suggestions. 🎉");
             return 0;
+        }
+
+        // ── Auto-sync slack_ts: fetch Slack messages since latest HQ entry ──
+        var entries = lines.Select(l => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(l)!).ToList();
+        var unsynced = entries.Where(e => e["slack_ts"] == null || e["slack_ts"]?.GetValue<string>() == null).ToList();
+
+        if (unsynced.Count > 0)
+        {
+            var botToken = LoadSlackBotToken();
+            if (!string.IsNullOrEmpty(botToken))
+            {
+                // Use HQ file mtime as oldest — only fetch Slack messages since last local update
+                var fileMtime = File.GetLastWriteTimeUtc(jsonlPath);
+                var oldestUnix = ((DateTimeOffset)fileMtime).AddMinutes(-5).ToUnixTimeSeconds(); // -5min buffer
+                Console.WriteLine($"[SUGGEST] Syncing slack_ts from Slack (since {fileMtime.ToLocalTime():MM-dd HH:mm})...");
+                {
+
+                    try
+                    {
+                        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                        http.DefaultRequestHeaders.Authorization =
+                            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+                        var url = $"https://slack.com/api/conversations.history?channel={SuggestChannel}&limit=200&oldest={oldestUnix}";
+                        var resp = http.GetAsync(url).GetAwaiter().GetResult();
+                        var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                        var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(body);
+                        var msgs = json?["messages"]?.AsArray() ?? new System.Text.Json.Nodes.JsonArray();
+
+                        // Filter 건의 messages only
+                        var suggestMsgs = msgs
+                            .Where(m => (m?["text"]?.GetValue<string>() ?? "").Contains(":memo: *[건의]*"))
+                            .Select(m => (ts: m!["ts"]!.GetValue<string>(), body: string.Join("\n", (m["text"]?.GetValue<string>() ?? "").Split('\n').Skip(1))))
+                            .ToList();
+
+                        int synced = 0;
+                        bool changed = false;
+                        for (int i = 0; i < entries.Count; i++)
+                        {
+                            if (entries[i]["slack_ts"] != null) continue;
+                            var eText = (entries[i]["text"]?.GetValue<string>() ?? "").Trim();
+                            var eKey = eText[..Math.Min(40, eText.Length)].ToLower();
+
+                            var best = suggestMsgs
+                                .Select(sm => (sm.ts, score: Enumerable.Zip(eKey, sm.body.Trim().ToLower()).Count(p => p.First == p.Second)))
+                                .Where(x => x.score >= 20)
+                                .OrderByDescending(x => x.score)
+                                .FirstOrDefault();
+
+                            if (best.ts != null)
+                            {
+                                var obj = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, object?>>(lines[i])!;
+                                obj["slack_ts"] = best.ts;
+                                lines[i] = System.Text.Json.JsonSerializer.Serialize(obj);
+                                entries[i] = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(lines[i])!;
+                                synced++;
+                                changed = true;
+                            }
+                        }
+
+                        if (changed)
+                            File.WriteAllLines(jsonlPath, lines);
+                        if (synced > 0)
+                            Console.WriteLine($"[SUGGEST] Synced {synced} slack_ts from Slack ✓");
+                        else
+                            Console.WriteLine($"[SUGGEST] No new matches found in Slack.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[SUGGEST] Slack sync failed: {ex.Message}");
+                    }
+                }
+            }
         }
 
         Console.WriteLine($"[SUGGEST] Pending: {lines.Count} suggestion(s)");
