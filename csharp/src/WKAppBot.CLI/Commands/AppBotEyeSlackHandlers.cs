@@ -676,6 +676,13 @@ internal partial class Program
             try
             {
                 ClaudePromptHelper.AllowFocusSteal = true;
+                // 기존 내용이 있으면 먼저 지우기 (안 지우면 append됨)
+                if (!string.IsNullOrEmpty(existingInput))
+                {
+                    var cleared = promptHelper.ClearCurrentInput(prompt);
+                    Console.WriteLine($"  [SLACK→PROMPT] ClearCurrentInput={cleared}");
+                    Thread.Sleep(50);
+                }
                 result = promptHelper.TypeAndSubmit(prompt, text);
             }
             finally { ClaudePromptHelper.AllowFocusSteal = prevAllow; }
