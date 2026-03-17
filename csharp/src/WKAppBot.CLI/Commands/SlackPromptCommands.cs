@@ -484,12 +484,26 @@ internal partial class Program
     }
 
     /// <summary>
-    /// wkappbot slack list [thread_ts] [--limit N] [--delete-pattern "pat"]
+    /// wkappbot slack list [thread_ts] [--limit N] [--search "keyword"] [--from "user"] [--delete-pattern "pat"]
     /// List recent channel messages or thread replies with full Slack metadata.
     /// thread_ts auto-detected: if first non-flag arg looks like "1234.5678", treat as thread.
+    /// --search / --grep / -g : filter messages by text (case-insensitive substring or regex)
+    /// --from "user" : filter by sender username
     /// </summary>
     static int SlackListCommand(string[] args)
     {
+        if (args.Length >= 2 && args[1] is "-h" or "--help" or "help")
+        {
+            Console.WriteLine("Usage: wkappbot slack list [ts] [options]");
+            Console.WriteLine("  --limit N              Max messages to fetch (default 20)");
+            Console.WriteLine("  --search / --grep / -g Filter by text (case-insensitive substring or regex)");
+            Console.WriteLine("  --from \"user\"          Filter by sender username");
+            Console.WriteLine("  --thread ts            Fetch replies in thread");
+            Console.WriteLine("  --channel / -c id      Override channel ID");
+            Console.WriteLine("  --delete-pattern pat   Delete r=0 messages matching glob pattern");
+            return 0;
+        }
+
         var config = LoadSlackConfig();
         if (config == null) return 1;
         var botToken = config["bot_token"]?.GetValue<string>();
@@ -503,6 +517,8 @@ internal partial class Program
         int limit = 20;
         string? deletePattern = null;
         string? threadTs = null;
+        string? searchPattern = null;
+        string? fromFilter = null;
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--limit" && i + 1 < args.Length)
@@ -513,11 +529,19 @@ internal partial class Program
                 threadTs = args[++i];
             else if ((args[i] == "--channel" || args[i] == "-c") && i + 1 < args.Length)
                 channel = args[++i];
+            else if ((args[i] == "--search" || args[i] == "--grep" || args[i] == "-g") && i + 1 < args.Length)
+                searchPattern = args[++i];
+            else if (args[i] == "--from" && i + 1 < args.Length)
+                fromFilter = args[++i];
             else if (args[i].StartsWith("C0", StringComparison.Ordinal) && args[i].Length >= 8)
                 channel = args[i]; // auto-detect channel ID: "C0A21P52EAH"
             else if (args[i].Contains('.') && char.IsDigit(args[i][0]))
                 threadTs = args[i]; // auto-detect ts: "1234567890.123456"
         }
+
+        // If search filter is active, fetch more messages to have enough after filtering
+        if (searchPattern != null || fromFilter != null)
+            limit = Math.Max(limit, 200);
 
         List<JsonNode> messages;
         if (threadTs != null)
@@ -559,13 +583,38 @@ internal partial class Program
             return 0;
         }
 
+        // ── Client-side filtering ──
+        System.Text.RegularExpressions.Regex? searchRegex = null;
+        if (searchPattern != null)
+        {
+            try { searchRegex = new System.Text.RegularExpressions.Regex(searchPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase); }
+            catch { /* invalid regex → fallback to substring */ }
+        }
+
+        if (searchPattern != null || fromFilter != null)
+        {
+            messages = messages.Where(m => {
+                var text = m["text"]?.GetValue<string>() ?? "";
+                var user = m["username"]?.GetValue<string>() ?? m["user"]?.GetValue<string>() ?? "";
+                bool textMatch = searchPattern == null || (searchRegex != null
+                    ? searchRegex.IsMatch(text)
+                    : text.Contains(searchPattern, StringComparison.OrdinalIgnoreCase));
+                bool fromMatch = fromFilter == null ||
+                    user.Contains(fromFilter, StringComparison.OrdinalIgnoreCase);
+                return textMatch && fromMatch;
+            }).ToList();
+        }
+
         // Collect delete candidates
         var toDelete = new List<(string ts, string preview)>();
         var toSkipThreadStarter = new List<(string ts, string preview, int replies)>();
 
+        var filterDesc = "";
+        if (searchPattern != null) filterDesc += $" search=\"{searchPattern}\"";
+        if (fromFilter != null) filterDesc += $" from=\"{fromFilter}\"";
         var header = threadTs != null
-            ? $"[SLACK] Thread ({messages.Count} messages):"
-            : $"[SLACK] Channel messages (latest {messages.Count}):";
+            ? $"[SLACK] Thread ({messages.Count} messages){filterDesc}:"
+            : $"[SLACK] Channel messages ({messages.Count}){filterDesc}:";
         Console.WriteLine(header);
         Console.WriteLine(new string('─', 120));
 
