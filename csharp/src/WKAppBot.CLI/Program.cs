@@ -677,10 +677,10 @@ internal partial class Program
         }
         else
         {
-            // Take part before # (main window), before ; (OR patterns)
-            main = pattern.Split('#')[0].Split(';')[0].Trim();
-            // Strip wildcards, spaces, hyphens → compact keyword (e.g. "Visual Studio Code" → "VisualStudioCode")
-            main = main.Replace("*", "").Replace("?", "").Replace(" ", "").Replace("-", "").Trim();
+            // Cut at first #/;/ — take main window token only
+            main = pattern.Split('#', '/', ';')[0].Trim();
+            // Trim edge wildcards, then strip spaces/hyphens → compact keyword ("*영웅문*" → "영웅문")
+            main = main.Trim().Trim('*', '?').Replace(" ", "").Replace("-", "").Trim();
         }
 
         // Strip filesystem-unsafe chars
