@@ -14,6 +14,9 @@ internal partial class Program
 
     static int SuggestCommand(string[] args)
     {
+        if (args.Length > 0 && args[0] is "resolve")
+            return SuggestResolveCommand(args[1..]);
+
         if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
         {
             Console.WriteLine("Usage: wkappbot suggest \"text\" [file.png] [\"more text\"]");
@@ -27,10 +30,14 @@ internal partial class Program
             Console.WriteLine("     Short & precise wins. Senior Claudes will thank you. 🙏");
             Console.ResetColor();
             Console.WriteLine();
+            Console.WriteLine("Subcommands:");
+            Console.WriteLine("  resolve <ts> \"note\"  Mark suggestion as resolved + Slack reply");
+            Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  wkappbot suggest \"Magnifier doesn't appear when form opens\"");
             Console.WriteLine("  wkappbot suggest \"Need UIA support for MDI child windows\" screenshot.png");
             Console.WriteLine("  wkappbot suggest \"Bug found\" error.png \"Steps to reproduce: ...\"");
+            Console.WriteLine("  wkappbot suggest resolve 2026-03-17T05:00:00 \"Fixed in v4.4.5\"");
             return 0;
         }
 
@@ -64,16 +71,17 @@ internal partial class Program
         var botToken = LoadSlackBotToken();
         if (!string.IsNullOrEmpty(botToken))
         {
-            // Bot API path: full threading support
-            messageTs = SuggestPostMessage(botToken, header);
-            if (messageTs != null)
+            // Use shared SlackSendViaApi (same as 'slack send')
+            var (ok, ts) = SlackSendViaApi(botToken, SuggestChannel, header).GetAwaiter().GetResult();
+            if (ok)
             {
+                messageTs = ts;
                 Console.WriteLine($"[SUGGEST] Slack sent: {header.Split('\n')[0]}{(overflow != null || files.Count > 0 ? " (+thread)" : "")}");
                 // Post overflow as thread reply
                 if (overflow != null)
                 {
                     foreach (var chunk in ChunkText(overflow, 3900))
-                        SuggestPostMessage(botToken, chunk, threadTs: messageTs);
+                        SlackSendViaApi(botToken, SuggestChannel, chunk, threadTs: messageTs).GetAwaiter().GetResult();
                     Console.WriteLine($"[SUGGEST] Thread: {overflow.Split('\n').Length} overflow line(s)");
                 }
                 // Upload files as thread replies
@@ -124,7 +132,8 @@ internal partial class Program
                 from = cwdTag,
                 cwd = Environment.CurrentDirectory,
                 text = text,
-                files = files.Select(Path.GetFileName).ToArray()
+                files = files.Select(Path.GetFileName).ToArray(),
+                slack_ts = messageTs  // Slack message ts for thread reply in resolve
             };
             var json = JsonSerializer.Serialize(entry);
             File.AppendAllText(jsonlPath, json + Environment.NewLine);
@@ -138,30 +147,108 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>Post a message via chat.postMessage and return the ts (for threading file uploads).</summary>
-    static string? SuggestPostMessage(string botToken, string text, string? threadTs = null)
+    /// <summary>suggest resolve &lt;ts_prefix&gt; "note" — mark done in JSONL + Slack reply.</summary>
+    static int SuggestResolveCommand(string[] args)
     {
-        try
+        if (args.Length < 1 || args[0] is "-h" or "--help")
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            http.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
-            var payload = threadTs != null
-                ? JsonSerializer.Serialize(new { channel = SuggestChannel, text = text, thread_ts = threadTs })
-                : JsonSerializer.Serialize(new { channel = SuggestChannel, text = text });
-            var content = new StringContent(payload, Encoding.UTF8, "application/json");
-            var resp = http.PostAsync("https://slack.com/api/chat.postMessage", content).GetAwaiter().GetResult();
-            var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            var json = JsonSerializer.Deserialize<JsonNode>(body);
-            if (json?["ok"]?.GetValue<bool>() == true)
-                return json["ts"]?.GetValue<string>();
-            Console.Error.WriteLine($"[SUGGEST] chat.postMessage error: {json?["error"]}");
+            Console.WriteLine("Usage: wkappbot suggest resolve <ts> \"note\"");
+            Console.WriteLine("  ts  : ISO timestamp prefix (e.g. 2026-03-17T05) or full ts");
+            Console.WriteLine("  note: resolution summary (English preferred)");
+            return 0;
         }
-        catch (Exception ex)
+
+        var tsPrefix = args[0];
+        var note = args.Length >= 2 ? string.Join(" ", args[1..]) : "resolved";
+
+        var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+        var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
+        var historyPath = Path.Combine(hqDir, "suggestions_history.jsonl");
+
+        if (!File.Exists(jsonlPath))
         {
-            Console.Error.WriteLine($"[SUGGEST] chat.postMessage failed: {ex.Message}");
+            Console.Error.WriteLine("[RESOLVE] suggestions.jsonl not found");
+            return 1;
         }
-        return null;
+
+        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        int matchIdx = -1;
+        JsonNode? matchEntry = null;
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            try
+            {
+                var node = JsonSerializer.Deserialize<JsonNode>(lines[i]);
+                var entryTs = node?["ts"]?.GetValue<string>() ?? "";
+                if (entryTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchIdx = i;
+                    matchEntry = node;
+                    break;
+                }
+            }
+            catch { }
+        }
+
+        if (matchIdx < 0 || matchEntry == null)
+        {
+            Console.Error.WriteLine($"[RESOLVE] No suggestion found with ts prefix: {tsPrefix}");
+            return 1;
+        }
+
+        var entryText = matchEntry["text"]?.GetValue<string>() ?? "";
+        var slackTs = matchEntry["slack_ts"]?.GetValue<string>();
+        var from = matchEntry["from"]?.GetValue<string>() ?? "unknown";
+        var preview = entryText.Split('\n')[0];
+        if (preview.Length > 80) preview = preview[..80] + "…";
+        Console.WriteLine($"[RESOLVE] Found: [{from}] {preview}");
+
+        // Build resolved entry for history
+        var resolvedObj = new Dictionary<string, object?>
+        {
+            ["ts"] = matchEntry["ts"]?.GetValue<string>(),
+            ["from"] = from,
+            ["cwd"] = matchEntry["cwd"]?.GetValue<string>(),
+            ["text"] = entryText,
+            ["files"] = matchEntry["files"]?.AsArray().Select(f => f?.GetValue<string>()).ToArray(),
+            ["slack_ts"] = slackTs,
+            ["review_status"] = "done",
+            ["review_note"] = note,
+            ["review_ts"] = DateTime.UtcNow.ToString("o")
+        };
+        var resolvedJson = JsonSerializer.Serialize(resolvedObj);
+
+        // Move: append to history, remove from active
+        File.AppendAllText(historyPath, resolvedJson + Environment.NewLine);
+        lines.RemoveAt(matchIdx);
+        File.WriteAllLines(jsonlPath, lines);
+        Console.WriteLine($"[RESOLVE] Moved to history: {note}");
+
+        // Slack reply if slack_ts is available — uses shared SlackSendViaApi (same as 'slack reply')
+        if (!string.IsNullOrEmpty(slackTs))
+        {
+            var botToken = LoadSlackBotToken();
+            if (!string.IsNullOrEmpty(botToken))
+            {
+                var replyText = $":white_check_mark: *RESOLVED* — {note}";
+                var (ok, _) = SlackSendViaApi(botToken, SuggestChannel, replyText, threadTs: slackTs).GetAwaiter().GetResult();
+                if (ok)
+                    Console.WriteLine($"[RESOLVE] Slack reply sent to thread {slackTs}");
+                else
+                    Console.Error.WriteLine($"[RESOLVE] Slack reply failed");
+            }
+            else
+            {
+                Console.Error.WriteLine("[RESOLVE] No bot_token — Slack reply skipped");
+            }
+        }
+        else
+        {
+            Console.WriteLine("[RESOLVE] No slack_ts recorded — Slack reply skipped");
+        }
+
+        return 0;
     }
 
     /// <summary>Load bot_token from webhook.json.</summary>
