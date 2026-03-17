@@ -1022,10 +1022,31 @@ public sealed class ClaudePromptHelper : IDisposable
                 return false;
             }
 
-            // kbFocus 체크 — 불일치 시 경고만 (abort X). GetRendererHwndByRect가 올바른 패널을 이미 선택함
+            // 캐럿 좌표가 PromptRect 안에 있으면 → WM_CHAR 안전 (프롬프트에 실제로 입력 중)
+            // 크롬 창 범위에 있더라도 에디터/터미널일 수 있으므로 rect 포함 여부로 판단
             var kbFocus = NativeMethods.GetKeyboardFocusHwnd();
-            if (kbFocus != IntPtr.Zero && kbFocus != rendererHwnd)
-                Console.WriteLine($"  [PROMPT] WM_CHAR: renderer=0x{rendererHwnd:X8} kbFocus=0x{kbFocus:X8} mismatch — trying anyway");
+            if (prompt.PromptRect != System.Drawing.Rectangle.Empty && kbFocus != IntPtr.Zero)
+            {
+                var caretPos = GetCaretScreenPos(kbFocus);
+                if (caretPos.HasValue)
+                {
+                    if (prompt.PromptRect.Contains(caretPos.Value))
+                        Console.WriteLine($"  [PROMPT] WM_CHAR: caret {caretPos.Value} inside PromptRect — safe");
+                    else
+                    {
+                        Console.WriteLine($"  [PROMPT] WM_CHAR: caret {caretPos.Value} outside PromptRect {prompt.PromptRect} — abort");
+                        return false;
+                    }
+                }
+                else
+                {
+                    // 캐럿 없음 (포커스가 프롬프트에 없음) → TP2에 맡김
+                    Console.WriteLine($"  [PROMPT] WM_CHAR: no caret found — abort (not in prompt)");
+                    return false;
+                }
+            }
+            else if (kbFocus != IntPtr.Zero && kbFocus != rendererHwnd)
+                Console.WriteLine($"  [PROMPT] WM_CHAR: no PromptRect, renderer=0x{rendererHwnd:X8} kbFocus=0x{kbFocus:X8} — trying anyway");
 
             const int WM_CHAR = 0x0102;
             var ok = true;
@@ -1644,6 +1665,36 @@ public sealed class ClaudePromptHelper : IDisposable
         Console.WriteLine($"  [PROMPT] WM_CHAR: no rect match — using first renderer");
         return candidates.Count > 0 ? candidates[0] : IntPtr.Zero;
     }
+
+    /// <summary>
+    /// Get caret screen position of the thread owning kbFocusHwnd.
+    /// Uses AttachThreadInput trick so GetCaretPos works cross-process.
+    /// Returns null if caret not available or attach fails.
+    /// </summary>
+    private static System.Drawing.Point? GetCaretScreenPos(IntPtr kbFocusHwnd)
+    {
+        if (kbFocusHwnd == IntPtr.Zero) return null;
+        uint targetTid = NativeMethods.GetWindowThreadProcessId(kbFocusHwnd, out _);
+        uint ourTid = GetCurrentThreadId();
+        bool attached = targetTid != ourTid && NativeMethods.AttachThreadInput(ourTid, targetTid, true);
+        try
+        {
+            var pt = new POINT();
+            if (!GetCaretPos(out pt)) return null;
+            NativeMethods.ClientToScreen(kbFocusHwnd, ref pt);
+            return new System.Drawing.Point(pt.X, pt.Y);
+        }
+        finally
+        {
+            if (attached) NativeMethods.AttachThreadInput(ourTid, targetTid, false);
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetCaretPos(out POINT lpPoint);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 
     private static IntPtr GetRendererHwnd(IntPtr topWindow)
     {

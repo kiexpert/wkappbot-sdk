@@ -645,7 +645,14 @@ internal partial class Program
         {
             if (isCodexPrompt)
                 Console.WriteLine("  [WARN] codex-desktop: stage-check is limited, using legacy submit path");
-            result = promptHelper.TypeAndSubmit(prompt, text);
+            // Probe() already confirmed user yield — allow focus-steal as last resort
+            var prevAllow = ClaudePromptHelper.AllowFocusSteal;
+            try
+            {
+                ClaudePromptHelper.AllowFocusSteal = true;
+                result = promptHelper.TypeAndSubmit(prompt, text);
+            }
+            finally { ClaudePromptHelper.AllowFocusSteal = prevAllow; }
         }
         else for (int attempt = 1; attempt <= 3; attempt++)
         {
