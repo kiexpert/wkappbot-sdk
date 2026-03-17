@@ -196,7 +196,7 @@ public sealed class TeeTextWriter : TextWriter
                     var dir = Path.GetDirectoryName(_logPath);
                     if (!string.IsNullOrWhiteSpace(dir))
                     {
-                        var subDirName = string.IsNullOrWhiteSpace(_oldSubDir) ? "old" : $"old-{_oldSubDir}";
+                        var subDirName = string.IsNullOrWhiteSpace(_oldSubDir) ? "old" : $"old {_oldSubDir}";
                         var oldDir = Path.Combine(dir, subDirName);
                         Directory.CreateDirectory(oldDir);
 

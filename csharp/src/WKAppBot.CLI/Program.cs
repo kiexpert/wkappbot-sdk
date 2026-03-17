@@ -619,9 +619,12 @@ internal partial class Program
         {
             case "a11y":
             {
-                // a11y <action> → old-{action}/  (action is the real command)
+                // a11y <action> <grap-pattern> → old {action} {mainWin}/
                 var action = sub.Length > 0 ? sub : "a11y";
-                return (action, action);
+                var grap   = args.Length > 2 ? args[2] : "";
+                var win    = ExtractMainWindowFromGrap(grap);
+                var dir    = win != null ? $"{action} {win}" : action;
+                return (action, dir);
             }
 
             case "web":
@@ -659,6 +662,22 @@ internal partial class Program
             default:
                 return (cmd, cmd);
         }
+    }
+
+    /// <summary>Extract main window name from grap pattern for log folder naming.
+    /// "영웅문#실시간계좌" → "영웅문", "*메모장*" → "메모장", "regex:..." → null</summary>
+    static string? ExtractMainWindowFromGrap(string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern)) return null;
+        if (pattern.StartsWith("adb://", StringComparison.OrdinalIgnoreCase)) return null;
+        if (pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase)) return null;
+        // Take part before # (main window), before ; (OR patterns)
+        var main = pattern.Split('#')[0].Split(';')[0].Trim();
+        // Strip wildcards
+        main = main.Replace("*", "").Replace("?", "").Trim();
+        // Strip filesystem-unsafe chars
+        main = string.Concat(main.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+        return main.Length >= 2 ? main : null;
     }
 
     static string? ExtractUrlHost(string url)
@@ -706,7 +725,7 @@ internal partial class Program
 
                 try
                 {
-                    var destDir = Path.Combine(logDir, $"old-{OldSubDirFromCmdTag(f.Name)}");
+                    var destDir = Path.Combine(logDir, $"old {OldSubDirFromCmdTag(f.Name)}");
                     Directory.CreateDirectory(destDir);
                     var dest = Path.Combine(destDir, f.Name);
                     if (File.Exists(dest))
