@@ -100,6 +100,21 @@ internal partial class Program
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
         DbgFile("after ConsoleCP");
 
+        // --args-file <path>: UTF-8 file fallback for Korean args garbled via bash→PowerShell CP949
+        {
+            var argsFileIdx = Array.FindIndex(args, a => a == "--args-file");
+            if (argsFileIdx >= 0 && argsFileIdx + 1 < args.Length)
+            {
+                var argsFilePath = args[argsFileIdx + 1];
+                if (File.Exists(argsFilePath))
+                {
+                    var fileArgs = File.ReadAllLines(argsFilePath, Encoding.UTF8)
+                        .Where(l => l.Length > 0).ToArray();
+                    args = args[..argsFileIdx].Concat(fileArgs).Concat(args[(argsFileIdx + 2)..]).ToArray();
+                }
+            }
+        }
+
         // MCP stdio server — must run BEFORE TeeTextWriter (stdout = JSON-RPC only)
         if (args.Length > 0 && args[0] == "mcp")
         {
