@@ -87,10 +87,14 @@ Usage:
       HTTP GET — returns response body (no browser needed).
   web search <query> [--limit N]
       Google search via Chrome CDP (no API key required).
-  web read <url> [--max-chars N]
+  web read <url> [--max-chars N] [--speak]
       Navigate URL + extract rendered text content.
-  file read <path> [--offset N] [--limit N]
-      Read any file with line numbers (encoding-aware: --encoding 949/utf-16).
+  web html <url>
+      Capture raw HTML of browser tab via CDP.
+  file read <path> [--offset N] [--limit N] [--encoding 949|utf-16]
+      Read file with line numbers. .pdf → auto-routes to read-pdf.
+  file read-pdf <path> [--ocr] [--page N] [--pages N-M]
+      Extract text from PDF. --ocr: Windows.Media.Ocr fallback for scanned PDFs.
   file grep <regex> [--path <dir>] [--type <ext>] [-i] [-C N] [--max N]
       Regex search across files. -i=case-insensitive, -C=context lines.
   file glob <pattern> [--path <dir>]
@@ -184,9 +188,11 @@ Utility:
       COM adapter commands (session per folder).
   telegram send ""text""
       Send message via Telegram (A11Y-first).
-  suggest ""text""
+  suggest ""text"" [file.png]
       Send suggestion/feature request to Slack (auto-tags CWD workspace).
       ⚠ Write in ENGLISH — Korean = 2-3x token cost. Short & precise wins.
+  suggest resolve <ts> ""note""
+      Mark suggestion resolved + Slack thread reply.
   claude-usage
       Probe Claude Desktop usage (session/weekly %) via UIA. Slack alerts at 85%/95%.
   prompt-probe [names...] [--names a,b,c] [--depth N] [--limit N] [--all]
