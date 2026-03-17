@@ -424,14 +424,34 @@ internal partial class Program
         return 0;
     }
 
+    /// <summary>
+    /// Parse a user-supplied time string to a Slack epoch ts string.
+    /// Accepts: Slack ts (1234567890.123), Unix epoch (1234567890), ISO date/datetime (2026-03-17 or 2026-03-17T05:00).
+    /// </summary>
+    static string? ParseSlackTs(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        // Already a Slack ts or Unix epoch
+        if (double.TryParse(s, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out _))
+            return s;
+        // ISO date/datetime → Unix epoch
+        if (DateTime.TryParse(s, null, System.Globalization.DateTimeStyles.AssumeLocal, out var dt))
+            return ((DateTimeOffset)dt).ToUnixTimeSeconds().ToString();
+        Console.WriteLine($"[SLACK] --oldest/--latest: cannot parse '{s}' as timestamp");
+        return null;
+    }
+
     /// <summary>Fetch channel history via conversations.history API.</summary>
     static async Task<List<JsonNode>> SlackFetchHistoryAsync(string botToken, string channel,
-        string? oldest = null, int limit = 20, bool inclusive = false)
+        string? oldest = null, int limit = 20, bool inclusive = false, string? latest = null)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
         var url = $"https://slack.com/api/conversations.history?channel={channel}&limit={limit}";
         if (!string.IsNullOrEmpty(oldest))
             url += $"&oldest={oldest}";
+        if (!string.IsNullOrEmpty(latest))
+            url += $"&latest={latest}";
         if (inclusive)
             url += "&inclusive=true";
 
@@ -495,12 +515,14 @@ internal partial class Program
         if (args.Length >= 2 && args[1] is "-h" or "--help" or "help")
         {
             Console.WriteLine("Usage: wkappbot slack list [ts] [options]");
-            Console.WriteLine("  --limit N              Max messages to fetch (default 20)");
-            Console.WriteLine("  --search / --grep / -g Filter by text (case-insensitive substring or regex)");
-            Console.WriteLine("  --from \"user\"          Filter by sender username");
-            Console.WriteLine("  --thread ts            Fetch replies in thread");
-            Console.WriteLine("  --channel / -c id      Override channel ID");
-            Console.WriteLine("  --delete-pattern pat   Delete r=0 messages matching glob pattern");
+            Console.WriteLine("  --limit N                     Max messages to fetch (default 20)");
+            Console.WriteLine("  --search / --grep / -g        Filter by text (substring or regex)");
+            Console.WriteLine("  --from \"user\"                Filter by sender username");
+            Console.WriteLine("  --oldest / --since / --after  Show messages after ts/date");
+            Console.WriteLine("  --latest / --before           Show messages before ts/date");
+            Console.WriteLine("  --thread ts                   Fetch replies in thread");
+            Console.WriteLine("  --channel / -c id             Override channel ID");
+            Console.WriteLine("  --delete-pattern pat          Delete r=0 messages matching glob");
             return 0;
         }
 
@@ -519,6 +541,8 @@ internal partial class Program
         string? threadTs = null;
         string? searchPattern = null;
         string? fromFilter = null;
+        string? oldest = null;   // --oldest: Slack epoch ts or parseable date
+        string? latest = null;   // --latest / --before
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--limit" && i + 1 < args.Length)
@@ -533,6 +557,10 @@ internal partial class Program
                 searchPattern = args[++i];
             else if (args[i] == "--from" && i + 1 < args.Length)
                 fromFilter = args[++i];
+            else if ((args[i] == "--oldest" || args[i] == "--since" || args[i] == "--after") && i + 1 < args.Length)
+                oldest = ParseSlackTs(args[++i]);
+            else if ((args[i] == "--latest" || args[i] == "--before") && i + 1 < args.Length)
+                latest = ParseSlackTs(args[++i]);
             else if (args[i].StartsWith("C0", StringComparison.Ordinal) && args[i].Length >= 8)
                 channel = args[i]; // auto-detect channel ID: "C0A21P52EAH"
             else if (args[i].Contains('.') && char.IsDigit(args[i][0]))
@@ -550,6 +578,7 @@ internal partial class Program
             messages = Task.Run(async () =>
                 await SlackFetchRepliesAsync(botToken, channel, threadTs, limit))
                 .GetAwaiter().GetResult();
+
 
             // If empty or single (no replies) → maybe it's a reply ts, not the parent
             // Fetch that message to find its thread_ts (parent)
@@ -573,7 +602,7 @@ internal partial class Program
         else
         {
             messages = Task.Run(async () =>
-                await SlackFetchHistoryAsync(botToken, channel, limit: limit))
+                await SlackFetchHistoryAsync(botToken, channel, limit: limit, oldest: oldest, latest: latest))
                 .GetAwaiter().GetResult();
         }
 
