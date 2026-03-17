@@ -1,0 +1,567 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Net.Http;
+using System.Net.WebSockets;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace WKAppBot.WebBot;
+
+public sealed partial class CdpClient
+{
+    /// <summary>Evaluate JavaScript and return the result as string.</summary>
+    public async Task<string?> EvalAsync(string expression, bool awaitPromise = false)
+    {
+        var parameters = new JsonObject
+        {
+            ["expression"] = expression,
+            ["returnByValue"] = true,
+        };
+        if (awaitPromise)
+            parameters["awaitPromise"] = true;
+
+        JsonNode? result;
+        if (_currentContextId.HasValue)
+        {
+            parameters["contextId"] = _currentContextId.Value;
+            result = await SendAsync("Runtime.evaluate", parameters);
+        }
+        else
+        {
+            result = await SendAsync("Runtime.evaluate", parameters);
+        }
+
+        // Log JS exceptions to console (previously silent — returned null with no trace)
+        var exDetails = result?["exceptionDetails"];
+        if (exDetails != null)
+        {
+            var msg = exDetails["exception"]?["description"]?.GetValue<string>()
+                   ?? exDetails["text"]?.GetValue<string>()
+                   ?? "unknown JS error";
+            var line = exDetails["lineNumber"]?.GetValue<int>() ?? -1;
+            Console.WriteLine($"[CDP:JS-ERR] {msg}{(line >= 0 ? $" (line {line})" : "")}");
+        }
+
+        var valueNode = result?["result"]?["value"];
+        if (valueNode == null) return null;
+
+        // Prefer GetValue<string> for string results (avoids double-escaping JSON.stringify output)
+        try { return valueNode.GetValue<string>(); }
+        catch
+        {
+            // Non-string values (numbers, bools, objects): serialize to JSON
+            var json = valueNode.ToJsonString();
+            return json?.Trim('"');
+        }
+    }
+
+    /// <summary>
+    /// Click an element by CSS selector.
+    /// Primary path uses CDP mouse dispatch (trusted-like user gesture),
+    /// then falls back to DOM click for compatibility.
+    /// </summary>
+    public async Task ClickAsync(string selector)
+    {
+        var escapedSelector = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+
+        // Resolve a visible clickable point first.
+        var pointJson = await EvalAsync($$"""
+            (() => {
+                const el = document.querySelector('{{escapedSelector}}');
+                if (!el) return JSON.stringify({ ok:false, reason:'NOT_FOUND' });
+
+                el.scrollIntoView({ block:'center', inline:'center' });
+                const r = el.getBoundingClientRect();
+                if (!r || r.width <= 0 || r.height <= 0)
+                    return JSON.stringify({ ok:false, reason:'NO_RECT' });
+
+                const x = r.left + Math.min(r.width / 2, Math.max(1, r.width - 1));
+                const y = r.top + Math.min(r.height / 2, Math.max(1, r.height - 1));
+                return JSON.stringify({ ok:true, x, y });
+            })()
+            """);
+
+        if (string.IsNullOrWhiteSpace(pointJson))
+            throw new InvalidOperationException($"Failed to resolve click point: {selector}");
+
+        JsonNode? point;
+        try { point = JsonNode.Parse(pointJson); }
+        catch { point = null; }
+
+        var ok = point?["ok"]?.GetValue<bool>() ?? false;
+        var reason = point? ["reason"]?.GetValue<string>();
+        if (!ok)
+        {
+            if (reason == "NOT_FOUND")
+                throw new InvalidOperationException($"Element not found: {selector}");
+            throw new InvalidOperationException($"Element not clickable: {selector} ({reason ?? "unknown"})");
+        }
+
+        var x = point?["x"]?.GetValue<double>() ?? 0;
+        var y = point?["y"]?.GetValue<double>() ?? 0;
+
+        // Trusted-like path via CDP input events.
+        try
+        {
+            await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            {
+                ["type"] = "mouseMoved",
+                ["x"] = x,
+                ["y"] = y,
+                ["button"] = "none"
+            });
+
+            await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            {
+                ["type"] = "mousePressed",
+                ["x"] = x,
+                ["y"] = y,
+                ["button"] = "left",
+                ["clickCount"] = 1
+            });
+
+            await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            {
+                ["type"] = "mouseReleased",
+                ["x"] = x,
+                ["y"] = y,
+                ["button"] = "left",
+                ["clickCount"] = 1
+            });
+            return;
+        }
+        catch
+        {
+            // Fallback for pages where CDP click sequence fails.
+            var js = $$"""
+                (() => {
+                    const el = document.querySelector('{{escapedSelector}}');
+                    if (!el) return 'NOT_FOUND';
+                    el.click();
+                    return 'OK';
+                })()
+                """;
+            var result = await EvalAsync(js);
+            if (result == "NOT_FOUND")
+                throw new InvalidOperationException($"Element not found: {selector}");
+        }
+    }
+
+    /// <summary>
+    /// Double-click an element by CSS selector. Selects the word under cursor in text.
+    /// Uses CDP Input.dispatchMouseEvent with clickCount=2.
+    /// </summary>
+    public async Task DoubleClickAsync(string selector)
+    {
+        var escapedSelector = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+
+        var pointJson = await EvalAsync($$"""
+            (() => {
+                const el = document.querySelector('{{escapedSelector}}');
+                if (!el) return JSON.stringify({ ok:false, reason:'NOT_FOUND' });
+                el.scrollIntoView({ block:'center', inline:'center' });
+                const r = el.getBoundingClientRect();
+                if (!r || r.width <= 0 || r.height <= 0)
+                    return JSON.stringify({ ok:false, reason:'NO_RECT' });
+                const x = r.left + Math.min(r.width / 2, Math.max(1, r.width - 1));
+                const y = r.top + Math.min(r.height / 2, Math.max(1, r.height - 1));
+                return JSON.stringify({ ok:true, x, y });
+            })()
+            """);
+
+        if (string.IsNullOrWhiteSpace(pointJson))
+            throw new InvalidOperationException($"Failed to resolve click point: {selector}");
+
+        var point = JsonNode.Parse(pointJson);
+        var ok = point?["ok"]?.GetValue<bool>() ?? false;
+        if (!ok)
+        {
+            var reason = point?["reason"]?.GetValue<string>();
+            throw new InvalidOperationException(reason == "NOT_FOUND"
+                ? $"Element not found: {selector}"
+                : $"Element not clickable: {selector} ({reason})");
+        }
+
+        var x = point?["x"]?.GetValue<double>() ?? 0;
+        var y = point?["y"]?.GetValue<double>() ?? 0;
+
+        // Double-click = two rapid click sequences with clickCount=2
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mouseMoved", ["x"] = x, ["y"] = y, ["button"] = "none" });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mousePressed", ["x"] = x, ["y"] = y, ["button"] = "left", ["clickCount"] = 1 });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mouseReleased", ["x"] = x, ["y"] = y, ["button"] = "left", ["clickCount"] = 1 });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mousePressed", ["x"] = x, ["y"] = y, ["button"] = "left", ["clickCount"] = 2 });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mouseReleased", ["x"] = x, ["y"] = y, ["button"] = "left", ["clickCount"] = 2 });
+    }
+
+    /// <summary>
+    /// Type text into an element by CSS selector.
+    /// Supports both input/textarea and contentEditable editors (e.g., Quill).
+    /// </summary>
+    public async Task TypeAsync(string selector, string text)
+    {
+        var escapedSelector = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+        var escapedText = text.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n");
+        var js = $$"""
+            (() => {
+                const el = document.querySelector('{{escapedSelector}}');
+                if (!el) return 'NOT_FOUND';
+
+                const text = '{{escapedText}}';
+                const tag = (el.tagName || '').toLowerCase();
+                const isInputLike = tag === 'input' || tag === 'textarea';
+                const isContentEditable = !!el.isContentEditable;
+
+                el.focus();
+
+                if (isInputLike) {
+                    el.value = text;
+                    if (typeof el.setSelectionRange === 'function') {
+                        const n = text.length;
+                        el.setSelectionRange(n, n);
+                    }
+                    try {
+                        el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }));
+                    } catch {
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return 'OK_INPUT';
+                }
+
+                if (isContentEditable) {
+                    const doc = el.ownerDocument || document;
+                    const win = doc.defaultView || window;
+
+                    // Place caret inside editor and replace existing content.
+                    const sel = win.getSelection();
+                    const range = doc.createRange();
+                    range.selectNodeContents(el);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+
+                    // Framework-friendly path first.
+                    try { doc.execCommand('selectAll', false, null); } catch {}
+                    let inserted = false;
+                    try { inserted = doc.execCommand('insertText', false, text); } catch {}
+
+                    // Fallback for editors that block execCommand.
+                    if (!inserted) {
+                        el.textContent = text;
+                    }
+
+                    try {
+                        el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }));
+                    } catch {
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return 'OK_CONTENTEDITABLE';
+                }
+
+                return 'UNSUPPORTED';
+            })()
+            """;
+        var result = await EvalAsync(js);
+        if (result == "NOT_FOUND")
+            throw new InvalidOperationException($"Element not found: {selector}");
+        if (result == "UNSUPPORTED")
+            throw new InvalidOperationException($"Element is neither input/textarea nor contentEditable: {selector}");
+    }
+
+    /// <summary>Get text content of an element by CSS selector.</summary>
+    public async Task<string?> GetTextAsync(string selector)
+    {
+        var js = $$"""
+            (() => {
+                const el = document.querySelector('{{selector}}');
+                return el ? el.textContent : null;
+            })()
+            """;
+        return await EvalAsync(js);
+    }
+
+    /// <summary>Get value of a form element by CSS selector.</summary>
+    public async Task<string?> GetValueAsync(string selector)
+    {
+        var js = $$"""
+            (() => {
+                const el = document.querySelector('{{selector}}');
+                return el ? el.value : null;
+            })()
+            """;
+        return await EvalAsync(js);
+    }
+
+    /// <summary>Check/uncheck a checkbox by CSS selector.</summary>
+    public async Task SetCheckedAsync(string selector, bool @checked)
+    {
+        var js = $$"""
+            (() => {
+                const el = document.querySelector('{{selector}}');
+                if (!el) return 'NOT_FOUND';
+                if (el.checked !== {{(@checked ? "true" : "false")}}) {
+                    el.click();
+                }
+                return 'OK';
+            })()
+            """;
+        var result = await EvalAsync(js);
+        if (result == "NOT_FOUND")
+            throw new InvalidOperationException($"Element not found: {selector}");
+    }
+
+    /// <summary>Select an option in a &lt;select&gt; by value or text.</summary>
+    public async Task SelectAsync(string selector, string valueOrText)
+    {
+        var escaped = valueOrText.Replace("'", "\\'");
+        var js = $$"""
+            (() => {
+                const el = document.querySelector('{{selector}}');
+                if (!el) return 'NOT_FOUND';
+                for (const opt of el.options) {
+                    if (opt.value === '{{escaped}}' || opt.textContent.trim() === '{{escaped}}') {
+                        el.value = opt.value;
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        return 'OK';
+                    }
+                }
+                return 'NOT_FOUND_OPTION';
+            })()
+            """;
+        var result = await EvalAsync(js);
+        if (result?.Contains("NOT_FOUND") == true)
+            throw new InvalidOperationException($"Element or option not found: {selector} = {valueOrText}");
+    }
+
+    /// <summary>Take a screenshot and return PNG bytes.</summary>
+    public async Task<byte[]> ScreenshotAsync()
+    {
+        var result = await SendAsync("Page.captureScreenshot", new JsonObject
+        {
+            ["format"] = "png",
+        });
+        var base64 = result?["data"]?.GetValue<string>();
+        return base64 != null ? Convert.FromBase64String(base64) : [];
+    }
+
+    /// <summary>Get the Chrome window handle for external Win32 operations (capture, etc).</summary>
+    public IntPtr GetChromeWindowHandle() => FindChromeMainWindow();
+
+    /// <summary>Get the current page URL.</summary>
+    public async Task<string?> GetUrlAsync()
+    {
+        return await EvalAsync("window.location.href");
+    }
+
+    /// <summary>Get the page title.</summary>
+    public async Task<string?> GetTitleAsync()
+    {
+        return await EvalAsync("document.title");
+    }
+
+    /// <summary>
+    /// Activate this tab in Chrome (bring to front).
+    /// Makes Chrome's window title bar show this tab's title.
+    /// WARNING: This steals focus! Only call when user explicitly wants to see the window.
+    /// </summary>
+    public async Task BringToFrontAsync()
+    {
+        await SendAsync("Page.bringToFront");
+    }
+
+    /// <summary>
+    /// Bring this tab to the OS foreground (recovery use only — steals focus).
+    /// Uses Page.bringToFront which activates the tab AND brings Chrome to front.
+    /// </summary>
+    public async Task BringTabToFrontAsync()
+    {
+        try
+        {
+            await SendAsync("Page.bringToFront", new JsonObject());
+            Console.WriteLine("[CDP] Tab brought to front (recovery)");
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Activate this tab in Chrome WITHOUT stealing OS foreground window.
+    /// Uses Target.activateTarget which makes the tab active in Chrome internally
+    /// (Chrome-level tab switch) without triggering an OS SetForegroundWindow call.
+    /// Unlike Page.bringToFront which explicitly brings Chrome to front.
+    /// </summary>
+    public async Task ActivateTabAsync()
+    {
+        try
+        {
+            var tid = TargetId;
+            if (!string.IsNullOrEmpty(tid))
+            {
+                await SendAsync("Target.activateTarget", new JsonObject { ["targetId"] = tid });
+                Console.WriteLine($"[CDP] Tab activated (focusless): {tid[..8]}…");
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Intercept file chooser dialog and provide files programmatically (fully focusless).
+    /// Uses Input.dispatchMouseEvent (trusted gesture) so Chrome opens the file chooser,
+    /// which is intercepted by Page.setInterceptFileChooserDialog BEFORE the native OS dialog
+    /// appears → no focus stealing at all.
+    /// Steps: 1) Enable interception 2) Trusted-click upload button 3) Wait for fileChooserOpened
+    ///         4) If menu appeared, trusted-click menu item + wait again 5) handleFileChooser
+    /// </summary>
+    public async Task<bool> SetFileViaChooserAsync(string absolutePath, int timeoutMs = 5000)
+    {
+        try
+        {
+            // Enable file chooser interception BEFORE the click — intercepts before OS dialog opens
+            await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = true });
+            _fileChooserTcs = new TaskCompletionSource<JsonNode?>();
+
+            // Get upload button coords for trusted gesture
+            var btnInfo = await EvalAsync("""
+                (() => {
+                    var btn = document.querySelector('button[aria-label*="파일 업로드"]')
+                           || document.querySelector('button[aria-label*="Upload"]')
+                           || document.querySelector('button[aria-label*="Attach"]')
+                           || document.querySelector('button[aria-label*="첨부"]')
+                           || document.querySelector('button[aria-label*="Add file"]');
+                    if (!btn) return 'NO_BTN';
+                    var r = btn.getBoundingClientRect();
+                    return Math.round(r.x + r.width/2) + ',' + Math.round(r.y + r.height/2) + ':' + (btn.getAttribute('aria-label') || '');
+                })()
+            """);
+            Console.WriteLine($"[CDP] FileChooser btn: {btnInfo}");
+            if (btnInfo == "NO_BTN") return false;
+
+            // Trusted gesture click — Chrome treats this as real user input for file chooser
+            var btnCoords = btnInfo!.Split(':')[0].Split(',');
+            await TrustedClickAsync(int.Parse(btnCoords[0]), int.Parse(btnCoords[1]));
+
+            // Wait for file chooser event (direct open — no menu)
+            using var cts = new CancellationTokenSource(timeoutMs);
+            cts.Token.Register(() => _fileChooserTcs.TrySetCanceled());
+
+            try
+            {
+                await _fileChooserTcs.Task;
+            }
+            catch (TaskCanceledException)
+            {
+                // Menu opened instead of direct file chooser — find and trusted-click menu item
+                var menuInfo = await EvalAsync("""
+                    (() => {
+                        var items = document.querySelectorAll('[role=menuitem], [role=option]');
+                        for (var item of items) {
+                            var t = (item.textContent || '').trim();
+                            if (t === '파일 업로드' || t === 'Upload file' || t === 'Upload'
+                                || t.includes('컴퓨터') || t.includes('Computer') || t.includes('내 컴퓨터')) {
+                                var r = item.getBoundingClientRect();
+                                return Math.round(r.x + r.width/2) + ',' + Math.round(r.y + r.height/2) + ':' + t;
+                            }
+                        }
+                        // Broader fallback
+                        var all = document.querySelectorAll('[role=menuitem], [role=option], li, button');
+                        for (var item of all) {
+                            var t = (item.textContent || '').trim();
+                            if (t && (t.includes('업로드') || t.includes('Upload'))) {
+                                var r = item.getBoundingClientRect();
+                                return Math.round(r.x + r.width/2) + ',' + Math.round(r.y + r.height/2) + ':' + t;
+                            }
+                        }
+                        return 'NO_MENU_ITEM';
+                    })()
+                """);
+                Console.WriteLine($"[CDP] FileChooser menu: {menuInfo}");
+                if (menuInfo == "NO_MENU_ITEM") return false;
+
+                // Re-enable interception + reset TCS before trusted-click
+                await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = true });
+                _fileChooserTcs = new TaskCompletionSource<JsonNode?>();
+
+                var menuCoords = menuInfo!.Split(':')[0].Split(',');
+                await TrustedClickAsync(int.Parse(menuCoords[0]), int.Parse(menuCoords[1]));
+
+                using var cts2 = new CancellationTokenSource(12000); // 12s — React menu click may take time
+                cts2.Token.Register(() => _fileChooserTcs.TrySetCanceled());
+                try { await _fileChooserTcs.Task; }
+                catch (TaskCanceledException)
+                {
+                    Console.WriteLine("[CDP] FileChooser: no event after menu trusted-click — trying speculative handleFileChooser...");
+                    // Chrome may still be holding the pending chooser even after our TCS timed out.
+                    // Speculatively send handleFileChooser — if Chrome accepts it, the file is set.
+                    try
+                    {
+                        var fp2 = absolutePath.Replace('\\', '/');
+                        await SendAsync("Page.handleFileChooser", new JsonObject
+                        {
+                            ["action"] = "accept",
+                            ["files"] = new JsonArray { fp2 },
+                        });
+                        Console.WriteLine("[CDP] FileChooser: speculative accept sent — file likely set");
+                        return true;
+                    }
+                    catch (Exception ex2)
+                    {
+                        Console.WriteLine($"[CDP] FileChooser: speculative accept failed: {ex2.Message}");
+                    }
+                    return false;
+                }
+            }
+
+            // Accept — Chrome provides file to the page without opening native OS dialog
+            var filePath = absolutePath.Replace('\\', '/');
+            await SendAsync("Page.handleFileChooser", new JsonObject
+            {
+                ["action"] = "accept",
+                ["files"] = new JsonArray { filePath },
+            });
+            Console.WriteLine($"[CDP] FileChooser: accepted (focusless)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CDP] FileChooser error: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            _fileChooserTcs = null;
+            try { await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = false }); }
+            catch { }
+        }
+    }
+
+    /// <summary>Send a trusted mouse click via CDP Input.dispatchMouseEvent (page coords).</summary>
+    async Task TrustedClickAsync(int x, int y)
+    {
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+        {
+            ["type"] = "mousePressed", ["x"] = x, ["y"] = y,
+            ["button"] = "left", ["clickCount"] = 1
+        });
+        await Task.Delay(50);
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+        {
+            ["type"] = "mouseReleased", ["x"] = x, ["y"] = y,
+            ["button"] = "left", ["clickCount"] = 1
+        });
+    }
+
+    /// <summary>
+    /// Disable CDP file chooser interception so the native OS file dialog can open.
+    /// </summary>
+    public async Task DisableFileChooserInterception()
+    {
+        try { await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = false }); }
+        catch { }
+    }
+}
