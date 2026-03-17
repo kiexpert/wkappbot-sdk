@@ -206,11 +206,86 @@ public sealed class OcrSegmentCache
         return best;
     }
 
+    // ── Blob image store ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Save a Vision/Gemini-identified element crop as {pixelHash}={safeLabel}.png.
+    /// Filename acts as a lookup key: same pixel pattern → same hash → fast retrieval.
+    ///
+    /// If the label contains filename-unsafe chars or exceeds 60 chars,
+    /// a companion {pixelHash}={safeLabel}.txt is saved with the full original label.
+    ///
+    /// Storage: {cacheDir}/ocr_segs/blobs/
+    /// Returns saved PNG path, or null on failure.
+    /// </summary>
+    public string? SaveBlob(System.Drawing.Bitmap crop, string label)
+    {
+        try
+        {
+            var blobDir = Path.Combine(_cacheDir, "ocr_segs", "blobs");
+            Directory.CreateDirectory(blobDir);
+
+            var pixelHash = ComputeBitmapHash(crop);
+            var safeLabel = MakeSafeLabel(label);
+            var pngPath = Path.Combine(blobDir, $"{pixelHash}={safeLabel}.png");
+
+            if (!File.Exists(pngPath))
+                crop.Save(pngPath, System.Drawing.Imaging.ImageFormat.Png);
+
+            // Companion .txt when label was sanitized or truncated
+            if (safeLabel != label)
+            {
+                var txtPath = Path.Combine(blobDir, $"{pixelHash}={safeLabel}.txt");
+                if (!File.Exists(txtPath))
+                    File.WriteAllText(txtPath, label, Encoding.UTF8);
+            }
+
+            return pngPath;
+        }
+        catch { return null; }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────
 
     private static string ClassHash(string classPath)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(classPath));
         return Convert.ToHexString(bytes)[..16].ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Pixel hash of a bitmap — samples first 4 KB of raw pixel data for speed.
+    /// Identical visual blobs → same hash (fast lookup key).
+    /// </summary>
+    private static string ComputeBitmapHash(System.Drawing.Bitmap bmp)
+    {
+        var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
+        var data = bmp.LockBits(rect,
+            System.Drawing.Imaging.ImageLockMode.ReadOnly,
+            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        int byteCount = Math.Min(data.Stride * bmp.Height, 4096);  // sample up to 4 KB
+        var bytes = new byte[byteCount];
+        System.Runtime.InteropServices.Marshal.Copy(data.Scan0, bytes, 0, byteCount);
+        bmp.UnlockBits(data);
+        return Convert.ToHexString(MD5.HashData(bytes))[..16].ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Sanitize a label for use as a filename component.
+    /// Invalid chars → '_', max 60 chars, companion .txt when truncated/changed.
+    /// </summary>
+    private static string MakeSafeLabel(string label)
+    {
+        var invalid = Path.GetInvalidFileNameChars().ToHashSet();
+        // Also exclude '=' since we use it as separator
+        invalid.Add('=');
+
+        var sb = new StringBuilder();
+        foreach (var c in label)
+            sb.Append(invalid.Contains(c) ? '_' : c);
+
+        var safe = sb.ToString().Trim('_', ' ');
+        if (safe.Length > 60) safe = safe[..60].TrimEnd('_', ' ');
+        return string.IsNullOrEmpty(safe) ? "unknown" : safe;
     }
 }
