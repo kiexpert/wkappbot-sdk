@@ -1424,6 +1424,9 @@ internal partial class Program
         // [READINESS] Wire up InputReadiness for pre-action blocker/minimize check
         runner.ReadinessInstance = CreateInputReadiness();
 
+        // [VISION-ASK] Wire up Gemini fast-path for blob identification
+        runner.VisionAskFn = (bmp, desc) => AskGeminiForVisionLabelAsync(bmp, desc);
+
         var result = runner.Run(doc);
 
         // TODO: Generate HTML report if reportDir specified

@@ -209,6 +209,36 @@ public sealed class OcrSegmentCache
     // ── Blob image store ─────────────────────────────────────────────────
 
     /// <summary>
+    /// Look up a bitmap crop in the blob store by pixel hash.
+    /// Returns the previously-identified label if found, null if unseen.
+    ///
+    /// Same pixel pattern → same hash → instant label without any AI query.
+    /// Companion .txt (if exists) holds the full label when the filename was truncated.
+    /// </summary>
+    public string? LookupBlob(System.Drawing.Bitmap crop)
+    {
+        var hash = ComputeBitmapHash(crop);
+        var blobDir = Path.Combine(_cacheDir, "ocr_segs", "blobs");
+        if (!Directory.Exists(blobDir)) return null;
+
+        var matches = Directory.GetFiles(blobDir, $"{hash}=*.png");
+        if (matches.Length == 0) return null;
+
+        var baseName = Path.GetFileNameWithoutExtension(matches[0]);
+        var sep = baseName.IndexOf('=');
+        if (sep < 0) return null;
+        var safeLabel = baseName[(sep + 1)..];
+
+        // Check companion .txt for full unsanitized label
+        var txtPath = Path.Combine(blobDir, $"{baseName}.txt");
+        if (File.Exists(txtPath))
+        {
+            try { return File.ReadAllText(txtPath, Encoding.UTF8).Trim(); } catch { }
+        }
+        return safeLabel;
+    }
+
+    /// <summary>
     /// Save a Vision/Gemini-identified element crop as {pixelHash}={safeLabel}.png.
     /// Filename acts as a lookup key: same pixel pattern → same hash → fast retrieval.
     ///

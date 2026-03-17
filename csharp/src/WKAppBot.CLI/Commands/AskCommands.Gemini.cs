@@ -135,6 +135,104 @@ internal partial class Program
         return stillVisible != "1";
     }
 
+    /// <summary>
+    /// Lightweight Gemini vision ask for UI element identification.
+    /// Optimized for speed: dedicated tab, 500ms poll, 15s timeout, no Slack/streaming.
+    ///
+    /// Use as ActionExecutor.AskVisionFn delegate:
+    ///   executor.AskVisionFn = (bmp, desc) => AskGeminiForVisionLabelAsync(bmp, desc);
+    ///
+    /// Returns: short label string ("Button: 매수주문" etc.), or null on failure.
+    /// </summary>
+    static async Task<string?> AskGeminiForVisionLabelAsync(
+        System.Drawing.Bitmap screenshot, string description, int timeoutMs = 15000)
+    {
+        var tmpPath = Path.Combine(Path.GetTempPath(), $"wkappbot_vision_{Guid.NewGuid():N}.png");
+        try
+        {
+            screenshot.Save(tmpPath, System.Drawing.Imaging.ImageFormat.Png);
+
+            // Dedicated vision tab — never contaminates user's AI chat sessions
+            var cdp = EnsureCdpConnection(
+                preferredHost: "gemini.google.com", newTab: false,
+                targetTag: "vision-ask");
+            if (cdp == null) return null;
+
+            // Navigate if drifted
+            var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+            if (!currentUrl.Contains("gemini.google.com", StringComparison.OrdinalIgnoreCase))
+            {
+                await cdp.NavigateAsync("https://gemini.google.com/app");
+                await Task.Delay(2500);
+            }
+
+            // Wait for editor (shorter timeout than regular ask)
+            var editorSel = await WaitForEditorA11y(cdp,
+                ".ql-editor", "[role='textbox'][contenteditable='true']",
+                "div[contenteditable='true']", "rich-textarea [contenteditable]");
+            if (editorSel == null) return null;
+
+            await WaitWhileGeminiStopVisibleNoClickAsync(cdp, 5000);
+
+            using var tabLock = ChromeTabLock.Acquire("Gemini/vision-ask");
+            if (tabLock == null) return null;
+
+            // Baseline response count
+            var baseCountStr = await cdp.EvalAsync(
+                "(document.querySelectorAll('model-response').length||document.querySelectorAll('[role=\"article\"]').length||0).toString()") ?? "0";
+
+            // Attach screenshot via clipboard (fastest path)
+            await AttachFilesViaCdp(cdp, new List<string> { tmpPath }, editorSel);
+
+            // Minimal prompt — no padding, no context bloat
+            await ClearContentEditable(cdp, editorSel);
+            var prompt = $"UI element screenshot. What is this element? Reply: [type]: [label] (max 8 words). Looking for: {description}";
+            await InsertTextContentEditable(cdp, editorSel, prompt);
+            await Task.Delay(200);
+
+            // Send
+            await cdp.EvalAsync("""
+                (() => {
+                    var btn = document.querySelector('button[aria-label*="Send"]')
+                           || document.querySelector('button[aria-label="Send message"]')
+                           || document.querySelector('button.send-button');
+                    if (btn && !btn.disabled) btn.click();
+                })()
+                """);
+
+            // Poll 500ms intervals for response stability
+            var sw = Stopwatch.StartNew();
+            string? lastText = null;
+            while (sw.ElapsedMilliseconds < timeoutMs)
+            {
+                await Task.Delay(500);
+                var text = await cdp.EvalAsync(
+                    "(()=>{var r=document.querySelectorAll('model-response');if(!r.length)r=document.querySelectorAll('[role=\"article\"]');return r.length>0?(r[r.length-1].textContent||''):'';})()"
+                ) ?? "";
+                text = StripGeminiUiPrefix(text).Trim();
+                if (string.IsNullOrWhiteSpace(text)) continue;
+
+                if (text == lastText)
+                {
+                    if (!IsGeminiStoppedNotice(text))
+                        return text;
+                    return null;  // generation stopped abnormally
+                }
+                lastText = text;
+            }
+            return null;  // timeout
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[VISION-ASK] Gemini error: {ex.Message}");
+            return null;
+        }
+        finally
+        {
+            try { File.Delete(tmpPath); } catch { }
+        }
+    }
+
     static async Task<(bool ok, string? text)> RetryGeminiAfterStopAsync(CdpClient cdp, string editorSel, string question)
     {
         await WaitWhileGeminiStopVisibleAsync(cdp, 6000);
