@@ -650,8 +650,11 @@ internal partial class Program
             // 승인창으로 덮어쓰기 확인 요청
             var preview = existingInput.Length > 40 ? existingInput[..40] + "…" : existingInput;
             var actionInfo = $"기존: \"{preview}\"\n→ 슬랙 메시지로 교체 후 전달";
+            var idleMs = NativeMethods.GetUserIdleMs();
+            var yieldTimeout = idleMs >= 60_000 ? 3 : 20; // 1분+ idle → 3초, 활동 중 → 20초
+            Console.WriteLine($"  [SLACK→PROMPT] idle={idleMs}ms → yieldTimeout={yieldTimeout}s");
             var (approved, _, deniedByUser) = UserInputWaitOverlay.Show(
-                prompt.WindowHandle, userIdleMs: 0, timeoutSeconds: 20,
+                prompt.WindowHandle, userIdleMs: idleMs, timeoutSeconds: yieldTimeout,
                 positionHwnd: prompt.WindowHandle, noSound: true,
                 actionInfo: actionInfo);
 
