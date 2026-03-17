@@ -71,8 +71,9 @@ internal partial class Program
         var botToken = LoadSlackBotToken();
         if (!string.IsNullOrEmpty(botToken))
         {
-            // Use shared SlackSendViaApi (same as 'slack send')
-            var (ok, ts) = SlackSendViaApi(botToken, SuggestChannel, header).GetAwaiter().GetResult();
+            // Use shared SlackSendViaApi with sender's display name (same as 'slack send')
+            var senderName = GetSendReplyUsername();
+            var (ok, ts) = SlackSendViaApi(botToken, SuggestChannel, header, username: senderName).GetAwaiter().GetResult();
             if (ok)
             {
                 messageTs = ts;
@@ -81,7 +82,7 @@ internal partial class Program
                 if (overflow != null)
                 {
                     foreach (var chunk in ChunkText(overflow, 3900))
-                        SlackSendViaApi(botToken, SuggestChannel, chunk, threadTs: messageTs).GetAwaiter().GetResult();
+                        SlackSendViaApi(botToken, SuggestChannel, chunk, threadTs: messageTs, username: senderName).GetAwaiter().GetResult();
                     Console.WriteLine($"[SUGGEST] Thread: {overflow.Split('\n').Length} overflow line(s)");
                 }
                 // Upload files as thread replies
