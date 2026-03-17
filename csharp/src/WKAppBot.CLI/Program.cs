@@ -679,8 +679,8 @@ internal partial class Program
         {
             // Cut at first #/;/ — take main window token only
             main = pattern.Split('#', '/', ';')[0].Trim();
-            // Trim edge wildcards, then strip spaces/hyphens → compact keyword ("*영웅문*" → "영웅문")
-            main = main.Trim().Trim('*', '?').Replace(" ", "").Replace("-", "").Trim();
+            // Strip wildcards/spaces/hyphens → compact keyword ("*영웅문*" → "영웅문", "*Visual Studio*" → "VisualStudio")
+            main = main.Replace("*", "").Replace("?", "").Replace(" ", "").Replace("-", "").Trim();
         }
 
         // Strip filesystem-unsafe chars
