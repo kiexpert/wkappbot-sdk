@@ -16,6 +16,8 @@ internal partial class Program
     {
         if (args.Length > 0 && args[0] is "resolve")
             return SuggestResolveCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "list" or "ls")
+            return SuggestListCommand(args[1..]);
 
         if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
         {
@@ -31,12 +33,13 @@ internal partial class Program
             Console.ResetColor();
             Console.WriteLine();
             Console.WriteLine("Subcommands:");
-            Console.WriteLine("  resolve <ts> \"note\"  Mark suggestion as resolved + Slack reply");
+            Console.WriteLine("  list / ls              Show pending suggestions");
+            Console.WriteLine("  resolve <ts> \"note\"   Mark resolved + Slack thread reply");
             Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  wkappbot suggest \"Magnifier doesn't appear when form opens\"");
             Console.WriteLine("  wkappbot suggest \"Need UIA support for MDI child windows\" screenshot.png");
-            Console.WriteLine("  wkappbot suggest \"Bug found\" error.png \"Steps to reproduce: ...\"");
+            Console.WriteLine("  wkappbot suggest list");
             Console.WriteLine("  wkappbot suggest resolve 2026-03-17T05:00:00 \"Fixed in v4.4.5\"");
             return 0;
         }
@@ -145,6 +148,98 @@ internal partial class Program
             Console.Error.WriteLine($"[SUGGEST] Failed to save locally: {ex.Message}");
         }
 
+        return 0;
+    }
+
+    /// <summary>suggest list — show pending suggestions in a pretty format.</summary>
+    static int SuggestListCommand(string[] args)
+    {
+        var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+        var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
+
+        if (!File.Exists(jsonlPath))
+        {
+            Console.WriteLine("[SUGGEST] No suggestions.jsonl found.");
+            return 0;
+        }
+
+        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        if (lines.Count == 0)
+        {
+            Console.WriteLine("[SUGGEST] No pending suggestions. 🎉");
+            return 0;
+        }
+
+        Console.WriteLine($"[SUGGEST] Pending: {lines.Count} suggestion(s)");
+        Console.WriteLine(new string('─', 100));
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            try
+            {
+                var d = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(lines[i]);
+                var ts = d?["ts"]?.GetValue<string>() ?? "";
+                var from = d?["from"]?.GetValue<string>() ?? "?";
+                var text = d?["text"]?.GetValue<string>() ?? "";
+                var slackTs = d?["slack_ts"]?.GetValue<string>();
+                var files = d?["files"]?.AsArray();
+
+                // Date: ISO → MM-dd HH:mm
+                string dateStr = ts;
+                if (DateTime.TryParse(ts, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+                    dateStr = dt.ToLocalTime().ToString("MM-dd HH:mm");
+
+                // Slack link indicator
+                var slackMark = slackTs != null ? " 🔗" : "   ";
+
+                // First line of text as title, rest as body
+                var textLines = text.Split('\n');
+                var title = textLines[0];
+                var body = textLines.Length > 1 ? string.Join(" ", textLines[1..].Where(l => l.Trim().Length > 0)) : "";
+
+                // Trim title to fit
+                if (title.Length > 70) title = title[..70] + "…";
+                if (body.Length > 80) body = body[..80] + "…";
+
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Write($"  {i + 1,2}.");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($" {dateStr}");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($" [{from}]");
+                Console.Write(slackMark);
+                Console.ResetColor();
+                Console.WriteLine();
+
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine($"      {title}");
+                Console.ResetColor();
+
+                if (body.Length > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"      {body}");
+                    Console.ResetColor();
+                }
+
+                if (files != null && files.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"      📎 {string.Join(", ", files.Select(f => f?.GetValue<string>()))}");
+                    Console.ResetColor();
+                }
+
+                // ts prefix for resolve
+                var tsPrefix = ts.Length >= 16 ? ts[..16] : ts;
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"      ts={tsPrefix}");
+                Console.ResetColor();
+            }
+            catch { Console.WriteLine($"  {i + 1}. [parse error]"); }
+        }
+
+        Console.WriteLine(new string('─', 100));
+        Console.WriteLine($"  🔗 = Slack ts recorded  |  resolve: wkappbot suggest resolve <ts> \"note\"");
         return 0;
     }
 
