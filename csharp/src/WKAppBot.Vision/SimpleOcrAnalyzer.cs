@@ -242,6 +242,123 @@ public sealed class SimpleOcrAnalyzer : IDisposable
     }
 
     /// <summary>
+    /// Recognize ALL text in a screenshot as line-level segments.
+    /// Each OcrEngine line becomes one OcrSegment with relative coordinates.
+    /// Runs both primary + fallback engines; deduplicates by position overlap.
+    ///
+    /// Used to build the OcrSegmentCache (dynamic a11y tree from vision).
+    /// Coordinates are normalized against screenshot dimensions (0.0-1.0).
+    /// </summary>
+    public async Task<List<OcrSegment>> SegmentAll(
+        Bitmap screenshot,
+        CancellationToken ct = default)
+    {
+        var bmpToUse = screenshot;
+        int scale = 1;
+        bool needDispose = false;
+        if (screenshot.Height < 200 || screenshot.Width < 400)
+        {
+            scale = screenshot.Height < 80 ? 4 : screenshot.Height < 200 ? 3 : 2;
+            bmpToUse = UpscaleBitmap(screenshot, scale);
+            needDispose = true;
+        }
+
+        try
+        {
+            using var softwareBitmap = await ConvertToSoftwareBitmap(bmpToUse);
+            var result = await _ocrEngine.RecognizeAsync(softwareBitmap);
+            var segments = ExtractLineSegments(result, scale, bmpToUse.Width / scale, bmpToUse.Height / scale);
+
+            if (_ocrEngineFallback != null)
+            {
+                var fbResult = await _ocrEngineFallback.RecognizeAsync(softwareBitmap);
+                var fbSegs = ExtractLineSegments(fbResult, scale, bmpToUse.Width / scale, bmpToUse.Height / scale);
+                foreach (var seg in fbSegs)
+                {
+                    bool hasOverlap = segments.Any(s =>
+                        Math.Abs(s.RelX - seg.RelX) < 0.02 && Math.Abs(s.RelY - seg.RelY) < 0.02);
+                    if (!hasOverlap) segments.Add(seg);
+                }
+            }
+            return segments;
+        }
+        finally
+        {
+            if (needDispose) bmpToUse.Dispose();
+        }
+    }
+
+    private static List<OcrSegment> ExtractLineSegments(
+        Windows.Media.Ocr.OcrResult result, int scale, int imgW, int imgH)
+    {
+        var segments = new List<OcrSegment>();
+        if (imgW <= 0 || imgH <= 0) return segments;
+
+        foreach (var line in result.Lines)
+        {
+            var text = line.Text?.Trim();
+            if (string.IsNullOrEmpty(text)) continue;
+
+            double minX = double.MaxValue, minY = double.MaxValue;
+            double maxX = 0, maxY = 0;
+            foreach (var word in line.Words)
+            {
+                var r = word.BoundingRect;
+                if (r.X < minX) minX = r.X;
+                if (r.Y < minY) minY = r.Y;
+                if (r.X + r.Width > maxX) maxX = r.X + r.Width;
+                if (r.Y + r.Height > maxY) maxY = r.Y + r.Height;
+            }
+            minX /= scale; minY /= scale; maxX /= scale; maxY /= scale;
+
+            double cx = (minX + maxX) / 2;
+            double cy = (minY + maxY) / 2;
+            double w = maxX - minX;
+            double h = maxY - minY;
+
+            segments.Add(new OcrSegment
+            {
+                Text = text,
+                RelX = cx / imgW,
+                RelY = cy / imgH,
+                RelW = w / imgW,
+                RelH = h / imgH,
+                Confidence = 0.9,
+                Source = "ocr"
+            });
+        }
+        return segments;
+    }
+
+    /// <summary>
+    /// Fast form fingerprint: MD5 of 32×32 downscaled screenshot.
+    /// Used by OcrSegmentCache to detect UI changes (cache invalidation).
+    /// </summary>
+    public static string ComputeFormHash(Bitmap bmp)
+    {
+        using var small = new Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (var g = Graphics.FromImage(small))
+            g.DrawImage(bmp, 0, 0, 32, 32);
+
+        var rect = new Rectangle(0, 0, 32, 32);
+        var data = small.LockBits(rect,
+            System.Drawing.Imaging.ImageLockMode.ReadOnly,
+            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var bytes = new byte[data.Stride * 32];
+        System.Runtime.InteropServices.Marshal.Copy(data.Scan0, bytes, 0, bytes.Length);
+        small.UnlockBits(data);
+
+        return Convert.ToHexString(System.Security.Cryptography.MD5.HashData(bytes)).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Text match score (0.0 ~ 1.0) — public for use by OcrSegmentCache.BestMatch.
+    /// Supports exact, contains, starts-with, and Dice-coefficient fuzzy matching.
+    /// </summary>
+    public static double MatchScore(string ocrText, string description)
+        => CalculateMatchScore(ocrText, description);
+
+    /// <summary>
     /// Calculate text match score (0.0 ~ 1.0).
     /// Supports exact, contains, and fuzzy matching.
     /// </summary>

@@ -32,6 +32,7 @@ public sealed class ActionExecutor : IDisposable
     private VisionCache? _visionCache;
     private VisionAnalyzer? _visionAnalyzer;
     private SimpleOcrAnalyzer? _simpleOcr;
+    private OcrSegmentCache? _segmentCache;  // Tier 2.5: form-level dynamic a11y tree
 
     // [ZOOM] Overlay factory — set by CLI layer (ClickZoomAdapter)
     // Parameters: (screenRect, formHandle, actionName, label) → IActionZoom?
@@ -45,13 +46,15 @@ public sealed class ActionExecutor : IDisposable
 
     public ActionExecutor(RuntimeContext ctx, bool verbose = false,
                           VisionCache? visionCache = null, VisionAnalyzer? visionAnalyzer = null,
-                          SimpleOcrAnalyzer? simpleOcr = null)
+                          SimpleOcrAnalyzer? simpleOcr = null,
+                          OcrSegmentCache? segmentCache = null)
     {
         _ctx = ctx;
         _verbose = verbose;
         _uia = new UiaLocator();
         _visionCache = visionCache;
         _visionAnalyzer = visionAnalyzer;
+        _segmentCache = segmentCache;
         _simpleOcr = simpleOcr;
     }
 
@@ -1010,44 +1013,66 @@ public sealed class ActionExecutor : IDisposable
             Log($"  Vision capture error: {ex.Message}");
         }
 
-        // ── Tier 3: Simple OCR (Windows.Media.Ocr — free, offline) ──
+        // ── Tier 2.5: OcrSegmentCache — form-level dynamic a11y tree ──────
+        // Build full-form segments ONCE; reuse for all element lookups.
+        // Form hash detects UI changes → auto-rebuild on mismatch.
         if (_simpleOcr != null && bmp != null)
         {
             try
             {
-                Log($"  Simple OCR: searching for \"{step.Target.Description}\"...");
+                var formHash = SimpleOcrAnalyzer.ComputeFormHash(bmp);
 
-                var ocrMatch = _simpleOcr.FindElement(bmp, step.Target.Description)
-                    .GetAwaiter().GetResult();
+                // Check disk cache first
+                var cachedEntry = _segmentCache?.LoadIfFresh(classPath, formHash, winW, winH);
+                List<OcrSegment>? segments = cachedEntry?.Segments;
 
-                if (ocrMatch != null)
+                if (segments == null)
                 {
-                    int absX = rect.Left + ocrMatch.X;
-                    int absY = rect.Top + ocrMatch.Y;
+                    // Cache miss or stale — rebuild from OCR
+                    Log($"  OcrSeg: building segments (hash={formHash[..8]})...");
+                    segments = _simpleOcr.SegmentAll(bmp).GetAwaiter().GetResult();
 
-                    // Cache the result (경험치 축적!)
+                    if (_segmentCache != null)
+                    {
+                        _segmentCache.Save(classPath, winW, winH, new OcrSegmentCacheEntry
+                        {
+                            FormHash = formHash,
+                            BuildAt = DateTime.UtcNow,
+                            WindowWidth = winW,
+                            WindowHeight = winH,
+                            Segments = segments
+                        });
+                        Log($"  OcrSeg: cached {segments.Count} segments");
+                    }
+                }
+
+                var match = OcrSegmentCache.BestMatch(segments, step.Target.Description);
+                if (match != null)
+                {
+                    int absX = rect.Left + (int)(match.RelX * winW);
+                    int absY = rect.Top + (int)(match.RelY * winH);
+
+                    // Cross-populate VisionCache for fast per-element hits next time
                     if (_visionCache != null)
                     {
                         var entry = VisionCacheEntry.FromAbsolute(
                             classPath, step.Target.Description,
                             winW, winH, absX, absY, rect.Left, rect.Top,
-                            ocrMatch.Width, ocrMatch.Height,
-                            ocrMatch.Confidence, ocrMatch.MatchedText, "OcrText");
-
+                            (int)(match.RelW * winW), (int)(match.RelH * winH),
+                            match.Confidence, match.Text, match.ControlType ?? "OcrSeg");
                         _visionCache.Put(classPath, step.Target.Description, winW, winH, entry);
                     }
 
-                    Log($"  Simple OCR: found \"{ocrMatch.MatchedText}\" at ({absX},{absY}) conf={ocrMatch.Confidence:F2} [{ocrMatch.MatchType}]");
-                    return (absX, absY, $"simple_ocr, conf={ocrMatch.Confidence:F2}, \"{ocrMatch.MatchedText}\"");
+                    var cacheTag = cachedEntry != null ? "ocr_seg_cache" : "ocr_seg";
+                    Log($"  {cacheTag}: found \"{match.Text}\" at ({absX},{absY}) conf={match.Confidence:F2} src={match.Source}");
+                    return (absX, absY, $"{cacheTag}, conf={match.Confidence:F2}, \"{match.Text}\"");
                 }
-                else
-                {
-                    Log($"  Simple OCR: no matching text found");
-                }
+
+                Log($"  OcrSeg: \"{step.Target.Description}\" not found in {segments.Count} segments");
             }
             catch (Exception ex)
             {
-                Log($"  Simple OCR error: {ex.Message}");
+                Log($"  OcrSeg error: {ex.Message}");
             }
         }
 
@@ -1066,7 +1091,7 @@ public sealed class ActionExecutor : IDisposable
                     int absX = rect.Left + location.CenterX;
                     int absY = rect.Top + location.CenterY;
 
-                    // Cache the result (경험치 축적!)
+                    // Cross-populate both caches (경험치 축적!)
                     if (_visionCache != null)
                     {
                         var entry = VisionCacheEntry.FromAbsolute(
@@ -1074,8 +1099,25 @@ public sealed class ActionExecutor : IDisposable
                             winW, winH, absX, absY, rect.Left, rect.Top,
                             location.Width, location.Height,
                             location.Confidence, location.Label, location.ControlType);
-
                         _visionCache.Put(classPath, step.Target.Description, winW, winH, entry);
+                    }
+
+                    // Also teach OcrSegmentCache so this element is found next time without Vision API
+                    if (_segmentCache != null && bmp != null)
+                    {
+                        var formHash = SimpleOcrAnalyzer.ComputeFormHash(bmp);
+                        var seg = new OcrSegment
+                        {
+                            Text = location.Label ?? step.Target.Description,
+                            RelX = winW > 0 ? (double)(absX - rect.Left) / winW : 0,
+                            RelY = winH > 0 ? (double)(absY - rect.Top) / winH : 0,
+                            RelW = winW > 0 ? (double)location.Width / winW : 0,
+                            RelH = winH > 0 ? (double)location.Height / winH : 0,
+                            Confidence = location.Confidence,
+                            Source = "vision_api",
+                            ControlType = location.ControlType
+                        };
+                        _segmentCache.LearnSegment(classPath, formHash, winW, winH, seg);
                     }
 
                     Log($"  Vision API: found at ({absX},{absY}) conf={location.Confidence:F2}");
