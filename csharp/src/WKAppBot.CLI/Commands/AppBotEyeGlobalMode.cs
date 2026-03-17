@@ -292,10 +292,13 @@ internal partial class Program
                     Console.WriteLine("[EYE] Slack Socket Mode connected (GlobalMode)");
                     Console.ResetColor();
 
-                    // Startup: sweep ALL stale bot status/idle messages (not just saved ts)
+                    // Startup: sweep stale bot status/idle messages (not just saved ts)
                     // Fixes: hot-swap race leaves orphan idle messages in channel
+                    // NOTE: :gear: (executing) messages are NOT deleted — inherited as previousStatusTs
+                    //       so the streaming mechanism updates them rather than orphaning them.
                     {
                         int swept = 0;
+                        string? inheritedGearTs = null;
                         try
                         {
                             using var http = new HttpClient();
@@ -311,7 +314,7 @@ internal partial class Program
                                     var text = m?["text"]?.GetValue<string>() ?? "";
                                     var botId = m?["bot_id"]?.GetValue<string>();
                                     var subtype = m?["subtype"]?.GetValue<string>();
-                                    // Only delete bot messages that are status/idle patterns
+                                    // Only process bot messages that are status patterns
                                     if (botId != null || subtype == "bot_message")
                                     {
                                         bool isStatus = text.StartsWith(":zzz:") || text.StartsWith(":gear:")
@@ -320,13 +323,21 @@ internal partial class Program
                                         if (isStatus)
                                         {
                                             var ts = m?["ts"]?.GetValue<string>();
-                                            // Skip messages with replies — user may have commented
                                             var replyCount = m?["reply_count"]?.GetValue<int>() ?? 0;
                                             if (ts != null && replyCount == 0)
                                             {
-                                                Task.Run(async () => await SlackDeleteMessageAsync(
-                                                    slackBotToken!, slackChannel!, ts)).Wait(2000); // guardThreadStarter=true (default)
-                                                swept++;
+                                                if (text.StartsWith(":gear:"))
+                                                {
+                                                    // :gear: = executing status — inherit instead of delete
+                                                    // so the new Eye can update it (→ :zzz: if idle, or keep :gear:)
+                                                    inheritedGearTs ??= ts; // take the most recent one
+                                                }
+                                                else
+                                                {
+                                                    Task.Run(async () => await SlackDeleteMessageAsync(
+                                                        slackBotToken!, slackChannel!, ts)).Wait(2000);
+                                                    swept++;
+                                                }
                                             }
                                         }
                                     }
@@ -336,8 +347,17 @@ internal partial class Program
                         catch { }
                         if (swept > 0)
                             Console.WriteLine($"[EYE] Swept {swept} stale status message(s)");
-                        try { File.WriteAllText(statusTsFile, ""); } catch { }
-                        previousStatusTs = null;
+                        if (inheritedGearTs != null)
+                        {
+                            previousStatusTs = inheritedGearTs;
+                            try { File.WriteAllText(statusTsFile, inheritedGearTs); } catch { }
+                            Console.WriteLine($"[EYE] Inherited :gear: status ts={inheritedGearTs} (will update, not delete)");
+                        }
+                        else
+                        {
+                            try { File.WriteAllText(statusTsFile, ""); } catch { }
+                            previousStatusTs = null;
+                        }
                     }
                     string? startupTs = null;
 
