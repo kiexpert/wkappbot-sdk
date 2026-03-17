@@ -679,10 +679,8 @@ internal partial class Program
         {
             // Take part before # (main window), before ; (OR patterns)
             main = pattern.Split('#')[0].Split(';')[0].Trim();
-            main = main.Replace("*", "").Replace("?", "").Trim();
-            // If window name has spaces, cut at first space (avoid overly long folder names)
-            var spaceIdx = main.IndexOf(' ');
-            if (spaceIdx > 0) main = main[..spaceIdx];
+            // Strip wildcards, spaces, hyphens → compact keyword (e.g. "Visual Studio Code" → "VisualStudioCode")
+            main = main.Replace("*", "").Replace("?", "").Replace(" ", "").Replace("-", "").Trim();
         }
 
         // Strip filesystem-unsafe chars
