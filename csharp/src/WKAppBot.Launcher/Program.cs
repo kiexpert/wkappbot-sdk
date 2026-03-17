@@ -74,6 +74,28 @@ class Program
             prof($"busybox-prepend={prependCmd}");
         }
 
+        // --args-file <path>: read args from UTF-8 text file (one arg per line) to bypass
+        // bash→PowerShell CP949/UTF-8 mismatch that corrupts Korean command-line args.
+        // Scan after busybox prepend so implicit command is already present if needed.
+        // File format: one arg per line, empty lines ignored. No quoting needed.
+        // Usage: printf '%s\n' a11y type "한글입력" > /tmp/a.txt && wkappbot --args-file /tmp/a.txt
+        {
+            var argsFileIdx = Array.FindIndex(args, a => a == "--args-file");
+            if (argsFileIdx >= 0 && argsFileIdx + 1 < args.Length)
+            {
+                var argsFilePath = args[argsFileIdx + 1];
+                if (!File.Exists(argsFilePath))
+                {
+                    Console.Error.WriteLine($"[LAUNCHER] --args-file: not found: {argsFilePath}");
+                    return 1;
+                }
+                var fileArgs = File.ReadAllLines(argsFilePath, Encoding.UTF8)
+                    .Where(l => l.Length > 0).ToArray();
+                args = args[..argsFileIdx].Concat(fileArgs).Concat(args[(argsFileIdx + 2)..]).ToArray();
+                prof($"--args-file: {fileArgs.Length} args loaded");
+            }
+        }
+
         // grap/grep with no args (or --help/-h): print help directly in Launcher — no Core needed.
         // Must run BEFORE EnsureBusyboxAliases to avoid ~1.7s busybox symlink scan.
         // This avoids the bash/MSYS2→Launcher→Core startup hang that occurs when stdin/stdout/stderr
@@ -221,7 +243,7 @@ class Program
                 LDbg($"cleanup + TerminateSelf exitCode={_relayExitCode}");
                 foreach (var p in new[] { _relayFile, _readyPath, _ackPath, _exitCodePath }) try { File.Delete(p); } catch { }
                 prof("relay done, TerminateSelf");
-                TerminateSelf(_relayExitCode);
+                TerminateSelf((uint)_relayExitCode);
                 return _relayExitCode; // unreachable
             }
             // follow mode: run normally (streaming, no timeout)
