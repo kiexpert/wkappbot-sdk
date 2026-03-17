@@ -709,7 +709,7 @@ internal partial class Program
         Console.WriteLine($"  [Approach 3] SendInput double-click at screen ({pt.X},{pt.Y})...");
 
         // Bring window to front briefly
-        NativeMethods.SetForegroundWindow(hWnd);
+        NativeMethods.SmartSetForegroundWindow(hWnd); // [FOCUS-GUARD] CheckActiveGuard 적용
         Thread.Sleep(100);
 
         // Move cursor

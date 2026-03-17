@@ -330,7 +330,8 @@ public sealed class ScenarioRunner
             Arguments = launchParts.Length > 1 ? launchParts[1] : "",
             UseShellExecute = true
         };
-        var proc = Process.Start(psi)
+        // [FOCUS-GUARD] GuardedStart: 실행 전후 포커스 변화 감지 + 복원 + 강탈 기록
+        var proc = WKAppBot.Win32.Input.ProcessLaunchGuard.GuardedStart(psi, "ScenarioRunner")
             ?? throw new InvalidOperationException($"Failed to start: {app.Launch}");
 
         // Wait for the main window

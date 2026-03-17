@@ -113,6 +113,16 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
 
     static bool ShouldAutoApproveAll()
     {
+        // [FOCUS-GUARD] 환경변수로만 제어 — wkappbot-core.exe 자동 활성화 제거!
+        //
+        // 이전: wkappbot-core.exe 직접 실행 시 auto-approve-all=true (Eye 데몬 용도)
+        // 문제: prompt-probe --input 같은 유저 직접 실행 명령에도 적용 → yield popup 스킵
+        //        → 유저가 타이핑 중에도 포커스 강탈이 그냥 통과됨 (유저 입력 방해!)
+        //
+        // 올바른 방식: 자동화 케이스는 개별 Probe() 호출에서 AutoApproveYield=true 사용.
+        // 전체 프로세스 블랭킷 auto-approve는 유저 보호를 무력화하므로 금지.
+        //
+        // 필요하다면 환경변수로 명시적 설정: WKAPPBOT_AUTO_APPROVE_ALL=1
         var env = Environment.GetEnvironmentVariable("WKAPPBOT_AUTO_APPROVE_ALL");
         if (!string.IsNullOrWhiteSpace(env))
         {
@@ -122,8 +132,7 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
             return true;
         }
 
-        var exe = Path.GetFileName(Environment.ProcessPath ?? "");
-        return string.Equals(exe, "wkappbot-core.exe", StringComparison.OrdinalIgnoreCase);
+        return false; // 기본값: auto-approve-all 비활성화
     }
 }
 

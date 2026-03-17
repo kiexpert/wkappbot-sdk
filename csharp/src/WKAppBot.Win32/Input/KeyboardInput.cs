@@ -96,7 +96,7 @@ public static class KeyboardInput
             {
                 uint ourTid = NativeMethods.GetCurrentThreadId();
                 NativeMethods.AttachThreadInput(ourTid, FgThreadId, true);
-                try { NativeMethods.SetFocus(FocusedCtl); }
+                try { NativeMethods.SetFocusRaw(FocusedCtl); } // Raw: this is a RESTORE, not new acquisition
                 finally { NativeMethods.AttachThreadInput(ourTid, FgThreadId, false); }
             }
 
@@ -367,12 +367,14 @@ public static class KeyboardInput
     /// Type a text string using Unicode input events.
     /// Works with any language (Korean, etc.) without VK mapping.
     /// BLOCKED by FocuslessGuard (SendInput).
+    /// BLOCKED by CheckActiveGuard if user is actively typing.
     /// intendedHwnd: when non-zero, checks focus per-character and restores on drift.
     /// </summary>
     public static void TypeText(string text, IntPtr intendedHwnd = default, TypeInputContext? ctx = null)
     {
         FocuslessGuard.AssertAllowed("SendInput(keyboard TypeText)");
         InputReadiness.AssertReadiness("KeyboardInput.TypeText");
+        if (!InputReadiness.CheckActiveGuard("SendInput:TypeText")) return;
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
         // Acquire global input lock — first grabber wins, others yield SmartSetForegroundWindow
         bool lockAcquired = AcquireInputLock();
@@ -424,6 +426,7 @@ public static class KeyboardInput
     {
         if (hWnd == IntPtr.Zero || string.IsNullOrEmpty(text))
             return false;
+        if (!InputReadiness.CheckActiveGuard("PostMessage:WmChar")) return false;
 
         foreach (char ch in text)
         {
@@ -445,6 +448,7 @@ public static class KeyboardInput
     public static bool TypeTextViaWmSetText(IntPtr hWnd, string text)
     {
         if (hWnd == IntPtr.Zero) return false;
+        if (!InputReadiness.CheckActiveGuard("SendMessage:WmSetText")) return false;
 
         // WM_SETTEXT = 0x000C, uses string overload (marshalled by P/Invoke)
         NativeMethods.SendMessageW(hWnd, 0x000C, IntPtr.Zero, text);
@@ -460,6 +464,7 @@ public static class KeyboardInput
     public static bool TypeTextViaEmReplaceSel(IntPtr hWnd, string text)
     {
         if (hWnd == IntPtr.Zero) return false;
+        if (!InputReadiness.CheckActiveGuard("SendMessage:EmReplaceSel")) return false;
 
         // EM_REPLACESEL = 0x00C2, wParam=1 (can undo), string overload
         NativeMethods.SendMessageW(hWnd, 0x00C2, (IntPtr)1, text);
@@ -469,11 +474,13 @@ public static class KeyboardInput
     /// <summary>
     /// Press and release a single key by name.
     /// BLOCKED by FocuslessGuard (SendInput).
+    /// BLOCKED by CheckActiveGuard if user is actively typing.
     /// </summary>
     public static void PressKey(string keyName)
     {
         FocuslessGuard.AssertAllowed("SendInput(keyboard PressKey)");
         InputReadiness.AssertReadiness("KeyboardInput.PressKey");
+        if (!InputReadiness.CheckActiveGuard("SendInput:PressKey")) return;
         ushort vk = NameToVk(keyName);
         KeyDown(vk);
         Thread.Sleep(30);
@@ -483,11 +490,13 @@ public static class KeyboardInput
     /// <summary>
     /// Press a hotkey combination (e.g., ["ctrl", "s"]).
     /// BLOCKED by FocuslessGuard (SendInput).
+    /// BLOCKED by CheckActiveGuard if user is actively typing.
     /// </summary>
     public static void Hotkey(IReadOnlyList<string> keys)
     {
         FocuslessGuard.AssertAllowed("SendInput(keyboard Hotkey)");
         InputReadiness.AssertReadiness("KeyboardInput.Hotkey");
+        if (!InputReadiness.CheckActiveGuard("SendInput:Hotkey")) return;
         // Press modifiers first, then the final key
         var vks = keys.Select(NameToVk).ToList();
 
@@ -551,6 +560,7 @@ public static class KeyboardInput
     {
         FocuslessGuard.AssertAllowed("SendInput(keyboard SendKeys)");
         InputReadiness.AssertReadiness("KeyboardInput.SendKeys");
+        if (!InputReadiness.CheckActiveGuard("SendInput:SendKeys")) return;
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
         // Acquire global input lock — first grabber wins, others yield SmartSetForegroundWindow
         bool lockAcquired = AcquireInputLock();

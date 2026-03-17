@@ -20,6 +20,10 @@ internal partial class Program
         handlersDir ??= Path.Combine(DataDir, "handlers");
         var handlerMgr = Directory.Exists(handlersDir) ? new DialogHandlerManager(handlersDir) : null;
 
+        // [FOCUS-GUARD] 전역 ActiveGuardYieldCallback 설정 — CheckActiveGuard 차단 시 팝업 표시
+        // 앱 전역에 하나의 UserInputWaitAdapter 공유 (팝업 중복 방지)
+        InputReadiness.ActiveGuardYieldCallback ??= new UserInputWaitAdapter();
+
         return new InputReadiness
         {
             BlockerHandler = new BlockerHandlerAdapter(handlerMgr),

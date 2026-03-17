@@ -272,10 +272,55 @@ Then immediately:
     /// Set text via clipboard paste, then submit with Enter key.
     /// UIA Value.SetValue doesn't fire DOM input events in Chromium webview
     /// — clipboard paste (Ctrl+V) reliably triggers React/Svelte state updates.
+    /// Option 3 (focusless): TextPattern2.InsertTextAtSelection tried first.
     /// </summary>
     static bool SetValueAndSubmit(FlaUI.Core.AutomationElements.AutomationElement editEl, IntPtr hwnd, string text)
     {
         WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true;
+
+        // === Option 3: TextPattern2.InsertTextAtSelection (truly focusless!) ===
+        try
+        {
+            var tp2 = editEl.Patterns.Text2;
+            if (tp2.IsSupported)
+            {
+                // FlaUI 4.0 IText2Pattern interface omits InsertTextAtSelection — call via reflection
+                var insertMethod = tp2.Pattern.GetType().GetMethod("InsertTextAtSelection",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (insertMethod == null)
+                    throw new InvalidOperationException("FlaUI 4.0: InsertTextAtSelection not in IText2Pattern");
+                insertMethod.Invoke(tp2.Pattern, new object[] { text });
+                Console.WriteLine($"[NEWCHAT] TP2 InsertTextAtSelection OK ({text.Length} chars, focusless!)");
+
+                // Submit via renderer WM_KEYDOWN Enter (no focus steal needed)
+                var rendHwnd = NativeMethods.FindWindowExW(hwnd, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
+                if (rendHwnd == IntPtr.Zero)
+                {
+                    var ww = NativeMethods.FindWindowExW(hwnd, IntPtr.Zero, "Chrome_WidgetWin_1", null);
+                    if (ww != IntPtr.Zero)
+                        rendHwnd = NativeMethods.FindWindowExW(ww, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
+                }
+                if (rendHwnd != IntPtr.Zero)
+                {
+                    const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, VK_RETURN = 0x0D;
+                    uint sc = NativeMethods.MapVirtualKeyW(VK_RETURN, 0);
+                    IntPtr lpDown = (IntPtr)((sc << 16) | 1);
+                    IntPtr lpUp = (IntPtr)((sc << 16) | 1 | (1 << 30) | (1 << 31));
+                    NativeMethods.PostMessageW(rendHwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, lpDown);
+                    Thread.Sleep(20);
+                    NativeMethods.PostMessageW(rendHwnd, WM_KEYUP, (IntPtr)VK_RETURN, lpUp);
+                    Console.WriteLine("[NEWCHAT] TP2 + renderer Enter → submitted (focusless!)");
+                    return true;
+                }
+                Console.WriteLine("[NEWCHAT] TP2: renderer hwnd not found — fallback to focus-steal");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[NEWCHAT] TP2: {ex.Message} — fallback to focus-steal");
+        }
+
+        // === Fallback: focus-steal paste + Enter ===
         try
         {
             // Focus the edit element (required for SendInput)

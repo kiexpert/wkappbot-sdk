@@ -73,7 +73,7 @@ internal partial class Program
         try
         {
             Console.WriteLine("[A11Y] type — focusless failed, falling back to SendKeys (focus required)");
-            NativeMethods.SetForegroundWindow(hwnd);
+            NativeMethods.SmartSetForegroundWindow(hwnd); // [FOCUS-GUARD] CheckActiveGuard 적용
             Thread.Sleep(100);
             // Pass hwnd for per-token mid-input focus check+restore
             WKAppBot.Win32.Input.KeyboardInput.SendKeys(text, hwnd);

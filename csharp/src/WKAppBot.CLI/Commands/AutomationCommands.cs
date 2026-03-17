@@ -723,7 +723,8 @@ Examples:
             },
             ["send_input"] = () =>
             {
-                NativeMethods.SetForegroundWindow(hDialogOrParent);
+                WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // automation command — user-invoked
+                NativeMethods.SmartSetForegroundWindow(hDialogOrParent); // [FOCUS-GUARD] CheckActiveGuard 적용
                 Thread.Sleep(100);
                 MouseInput.MoveTo(cx, cy);
                 Thread.Sleep(150);

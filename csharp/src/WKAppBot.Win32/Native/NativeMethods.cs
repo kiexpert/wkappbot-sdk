@@ -184,8 +184,19 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern IntPtr WindowFromPoint(POINT point);
 
-    [DllImport("user32.dll")]
-    public static extern IntPtr SetFocus(IntPtr hWnd);
+    [DllImport("user32.dll", EntryPoint = "SetFocus")]
+    public static extern IntPtr SetFocusRaw(IntPtr hWnd);
+
+    /// <summary>
+    /// Smart SetFocus — [FOCUS-GUARD] blocks if user is actively typing.
+    /// Use for all NEW focus acquisitions (not restores).
+    /// For focus-restore patterns (FocusSnapshot.Restore, MidInputFocusCheck): use SetFocusRaw.
+    /// </summary>
+    public static IntPtr SetFocus(IntPtr hWnd)
+    {
+        if (!Input.InputReadiness.CheckActiveGuard("SetFocus")) return IntPtr.Zero;
+        return SetFocusRaw(hWnd);
+    }
 
     /// <summary>
     /// Raw SetForegroundWindow P/Invoke — NO guards, NO focusless check.
@@ -213,6 +224,18 @@ public static partial class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
+
+    /// <summary>
+    /// [FOCUS-GUARD] 현재 키보드 포커스를 가진 HWND 반환.
+    /// GetForegroundWindow()보다 정밀 — 같은 창 내에서도 컨트롤 간 포커스 이동을 감지.
+    /// 예: VS Code 코드 에디터 → Message input 이동 = 같은 hwnd이지만 hwndFocus 다름.
+    /// idThread=0 → 포그라운드 스레드의 키보드 포커스 반환.
+    /// </summary>
+    public static IntPtr GetKeyboardFocusHwnd()
+    {
+        var info = new GUITHREADINFO { cbSize = Marshal.SizeOf<GUITHREADINFO>() };
+        return GetGUIThreadInfo(0, ref info) ? info.hwndFocus : IntPtr.Zero;
+    }
 
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -429,6 +452,15 @@ public static partial class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetClipboardData(uint uFormat);
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr GlobalLock(IntPtr hMem);
+
+    [DllImport("kernel32.dll")]
+    public static extern bool GlobalUnlock(IntPtr hMem);
 
     // ── SendMessageTimeout (responsive check: SMTO_ABORTIFHUNG) ──
     public const uint WM_NULL = 0x0000;
@@ -729,6 +761,14 @@ public static partial class NativeMethods
                      : _idleMs >= 1000  ? $"{_idleMs / 1000.0:F1}s"
                      :                    $"{_idleMs}ms";
         Console.WriteLine($"[IDLE] user input {_idleStr} ago");
+
+        // [FOCUS-GUARD] Active-user guard: block if user typed/clicked recently.
+        // Probe() approved at T=0 (idle), but user may have started typing between
+        // Probe() and this focus steal → race condition → steal disrupts user input.
+        // CheckActiveGuard blocks (return false) if idleMs < threshold AND no grace period.
+        // Grace period: Probe yield-approval click itself resets idle → allowed for 3s.
+        if (!WKAppBot.Win32.Input.InputReadiness.CheckActiveGuard("SmartSetForegroundWindow"))
+            return false;
 
         // Keyboard input lock: if another session is currently sending keystrokes, yield focus.
         // "먼저 잡은 넘이 우선권" — don't interrupt ongoing typing in another process.

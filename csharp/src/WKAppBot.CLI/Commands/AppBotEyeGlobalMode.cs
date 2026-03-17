@@ -1300,16 +1300,13 @@ internal partial class Program
 
             var logEsc = logFilePath.Replace("'", "''");
             var psCmd  = $"Get-Content -Wait -Path '{logEsc}'";
-            // 포커스 탈취 방지: 탭 열기 전 현재 포커스 저장 → 즉시 복원
-            var prevFocus = NativeMethods.GetForegroundWindow();
-            var wtProc = Process.Start(new ProcessStartInfo
+            // [FOCUS-GUARD] GuardedStart: wt.exe (Windows Terminal) 실행 — 포커스 강탈 자동 감지+복원
+            var wtProc = WKAppBot.Win32.Input.ProcessLaunchGuard.GuardedStart(new ProcessStartInfo
             {
                 FileName        = "wt.exe",
                 Arguments       = $"-w {McpWtWindowName} new-tab --title \"{wtTitle}\" -- powershell -NoProfile -NonInteractive -NoExit -Command \"{psCmd}\"",
                 UseShellExecute = true,
-            });
-            if (prevFocus != IntPtr.Zero)
-                _ = Task.Delay(300).ContinueWith(_ => NativeMethods.SetForegroundWindowRaw(prevFocus));
+            }, "AppBotEye:wt");
             // 첫 탭 or apbot-mcp 창 없을 때만 위치 고정
             ScheduleWtWindowPosition(900, wtProc?.Id ?? 0);
             Console.WriteLine($"[EYE][CONSOLE] WT 탭 오픈: {wtTitle}");

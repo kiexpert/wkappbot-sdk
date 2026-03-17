@@ -139,7 +139,8 @@ internal partial class Program
 
             case "dismiss":
                 // Send ESC to close the dialog
-                NativeMethods.SetForegroundWindow(blockerHwnd);
+                WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // blocker dialog handler — automation-invoked
+                NativeMethods.SmartSetForegroundWindow(blockerHwnd); // [FOCUS-GUARD] CheckActiveGuard 적용
                 Thread.Sleep(100);
                 KeyboardInput.PressKey("escape");
                 Thread.Sleep(300);
@@ -779,7 +780,8 @@ internal partial class Program
                 Console.ResetColor();
 
                 // Use physical mouse click (need foreground)
-                NativeMethods.SetForegroundWindow(win.Handle);
+                WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // blocker dialog handler — automation-invoked
+                NativeMethods.SmartSetForegroundWindow(win.Handle); // [FOCUS-GUARD] CheckActiveGuard 적용
                 Thread.Sleep(200);
                 MouseInput.Click(cx, cy);
                 Thread.Sleep(500);

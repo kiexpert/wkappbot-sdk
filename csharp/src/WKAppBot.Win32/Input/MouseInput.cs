@@ -17,6 +17,7 @@ public static class MouseInput
     public static void MoveTo(int x, int y)
     {
         FocuslessGuard.AssertAllowed("SetCursorPos");
+        if (!InputReadiness.CheckActiveGuard("SetCursorPos")) return;
         NativeMethods.SetCursorPos(x, y);
     }
 
@@ -28,6 +29,7 @@ public static class MouseInput
     {
         FocuslessGuard.AssertAllowed("SendInput(mouse click)");
         InputReadiness.AssertReadiness("MouseInput.Click");
+        if (!InputReadiness.CheckActiveGuard("SendInput:MouseClick")) return;
         MoveTo(x, y);
         Thread.Sleep(30);
 
@@ -64,6 +66,7 @@ public static class MouseInput
     {
         FocuslessGuard.AssertAllowed("SendInput(mouse right-click)");
         InputReadiness.AssertReadiness("MouseInput.RightClick");
+        if (!InputReadiness.CheckActiveGuard("SendInput:MouseRightClick")) return;
         MoveTo(x, y);
         Thread.Sleep(30);
 
@@ -101,6 +104,7 @@ public static class MouseInput
     {
         FocuslessGuard.AssertAllowed("SendInput(mouse scroll)");
         InputReadiness.AssertReadiness("MouseInput.Scroll");
+        if (!InputReadiness.CheckActiveGuard("SendInput:MouseScroll")) return;
         var inputs = new INPUT[1];
         inputs[0].type = INPUT.INPUT_MOUSE;
         inputs[0].u.mi.mouseData = (uint)(clicks * 120); // WHEEL_DELTA = 120

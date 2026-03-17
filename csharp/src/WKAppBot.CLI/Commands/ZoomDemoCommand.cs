@@ -166,7 +166,8 @@ internal partial class Program
             Thread.Sleep(500);
 
             // Bring target to foreground and type via SendInput
-            NativeMethods.SetForegroundWindow(hWnd);
+            WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // user-invoked demo command
+            NativeMethods.SmartSetForegroundWindow(hWnd); // [FOCUS-GUARD] CheckActiveGuard 적용
             Thread.Sleep(300);
 
             // Click on the edit area to focus it
