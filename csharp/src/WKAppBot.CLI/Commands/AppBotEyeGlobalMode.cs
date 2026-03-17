@@ -1271,6 +1271,13 @@ internal partial class Program
                 });
             }
 
+            // 이미 같은 로그파일을 감시 중인 powershell.exe가 있으면 탭 중복 방지
+            if (IsAlreadyWatchingLog(logFilePath))
+            {
+                Console.WriteLine($"[EYE][CONSOLE] 이미 탭 열려있음 (PS 감시중): {wtTitle}");
+                return;
+            }
+
             var logEsc = logFilePath.Replace("'", "''");
             var psCmd  = $"Get-Content -Wait -Path '{logEsc}'";
             // 포커스 탈취 방지: 탭 열기 전 현재 포커스 저장 → 즉시 복원
@@ -1291,6 +1298,26 @@ internal partial class Program
         {
             Console.WriteLine($"[EYE][CONSOLE] WT 탭 오픈 실패: {ex.Message}");
         }
+    }
+
+    /// <summary>WMI로 powershell.exe 중 같은 로그파일을 Get-Content -Wait 중인 프로세스가 있는지 확인.</summary>
+    static bool IsAlreadyWatchingLog(string logFilePath)
+    {
+        try
+        {
+            var normalized = logFilePath.Replace("\\", "/").ToLowerInvariant();
+            using var searcher = new System.Management.ManagementObjectSearcher(
+                "SELECT CommandLine FROM Win32_Process WHERE Name='powershell.exe'");
+            foreach (System.Management.ManagementObject mo in searcher.Get())
+            {
+                var cmd = mo["CommandLine"]?.ToString() ?? "";
+                if (cmd.Replace("\\", "/").IndexOf(normalized, StringComparison.OrdinalIgnoreCase) >= 0
+                    && cmd.Contains("Get-Content", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        catch { }
+        return false;
     }
 
     static void TryDeleteOldExes()
