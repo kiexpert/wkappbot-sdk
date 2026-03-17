@@ -206,6 +206,119 @@ public sealed class OcrSegmentCache
         return best;
     }
 
+    // ── A11y JSON parsing ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Parse Gemini a11y JSON response → OcrSegment list.
+    ///
+    /// Accepts both single object {"type":...} and array [{...},{...}].
+    /// Strips markdown code fences if present (```json ... ```).
+    /// Returns empty list on any parse failure (never throws).
+    ///
+    /// Standard a11y format:
+    ///   type   — UIA ControlType name (Button|Edit|Text|CheckBox|...)
+    ///   label  — visible Name/text
+    ///   x, y   — center position 0.0-1.0 relative to image
+    ///   w, h   — width/height 0.0-1.0 relative to image
+    ///   state  — "enabled"|"disabled"|"checked"|"unchecked" (optional)
+    /// </summary>
+    public static List<OcrSegment> ParseA11yJson(string json)
+    {
+        var result = new List<OcrSegment>();
+        if (string.IsNullOrWhiteSpace(json)) return result;
+
+        // Strip markdown code fences
+        var text = json.Trim();
+        if (text.StartsWith("```"))
+        {
+            var end = text.LastIndexOf("```");
+            var start = text.IndexOf('\n');
+            if (start >= 0 && end > start)
+                text = text[(start + 1)..end].Trim();
+        }
+
+        // Extract first JSON object or array
+        text = ExtractFirstJson(text);
+        if (string.IsNullOrEmpty(text)) return result;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var el in root.EnumerateArray())
+                    TryParseElement(el, result);
+            }
+            else if (root.ValueKind == JsonValueKind.Object)
+            {
+                TryParseElement(root, result);
+            }
+        }
+        catch { /* malformed JSON — return empty */ }
+
+        return result;
+    }
+
+    private static void TryParseElement(JsonElement el, List<OcrSegment> result)
+    {
+        var label = el.TryGetProperty("label", out var lp) ? lp.GetString() ?? "" : "";
+        var type  = el.TryGetProperty("type",  out var tp) ? tp.GetString() ?? "" : "";
+        var state = el.TryGetProperty("state", out var sp) ? sp.GetString() : null;
+
+        double x = el.TryGetProperty("x", out var xp) ? xp.GetDouble() : 0;
+        double y = el.TryGetProperty("y", out var yp) ? yp.GetDouble() : 0;
+        double w = el.TryGetProperty("w", out var wp) ? wp.GetDouble() : 0;
+        double h = el.TryGetProperty("h", out var hp) ? hp.GetDouble() : 0;
+
+        // Skip unknown/not-found sentinel
+        if (type == "unknown" && string.IsNullOrEmpty(label) && x == 0 && y == 0) return;
+
+        // Append state to label for checkbox/radio (makes matching easier)
+        var fullLabel = string.IsNullOrWhiteSpace(label) ? type : label;
+        if (state is "checked" or "unchecked") fullLabel = $"{label}({state})";
+
+        result.Add(new OcrSegment
+        {
+            Text        = fullLabel,
+            RelX        = Math.Clamp(x, 0, 1),
+            RelY        = Math.Clamp(y, 0, 1),
+            RelW        = Math.Clamp(w, 0, 1),
+            RelH        = Math.Clamp(h, 0, 1),
+            Confidence  = 0.92,
+            Source      = "gemini",
+            ControlType = string.IsNullOrEmpty(type) ? null : type
+        });
+    }
+
+    private static string ExtractFirstJson(string text)
+    {
+        // Find first '[' or '{'
+        int arrIdx = text.IndexOf('[');
+        int objIdx = text.IndexOf('{');
+        if (arrIdx < 0 && objIdx < 0) return "";
+
+        char open, close;
+        int start;
+        if (arrIdx >= 0 && (objIdx < 0 || arrIdx < objIdx))
+        { open = '['; close = ']'; start = arrIdx; }
+        else
+        { open = '{'; close = '}'; start = objIdx; }
+
+        int depth = 0;
+        bool inStr = false;
+        for (int i = start; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (c == '"' && (i == 0 || text[i - 1] != '\\')) inStr = !inStr;
+            if (inStr) continue;
+            if (c == open)  depth++;
+            if (c == close) { depth--; if (depth == 0) return text[start..(i + 1)]; }
+        }
+        return "";
+    }
+
     // ── Blob image store ─────────────────────────────────────────────────
 
     /// <summary>
