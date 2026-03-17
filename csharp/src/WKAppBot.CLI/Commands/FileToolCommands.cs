@@ -427,6 +427,8 @@ internal partial class Program
                     : page.Text;
 
                 // OCR additions: render page → full-page OCR + deep-scan OCR → diff vs PdfPig
+                // Garble detection: if PdfPig output has >20% '?' chars (custom font encoding failure),
+                // OCR text replaces the page text entirely instead of being appended as additions.
                 string ocrAdditions = "";
                 if (useOcr && winPdf != null && ocr != null)
                 {
@@ -460,7 +462,20 @@ internal partial class Program
                             if (deepHits == 0) Console.WriteLine(" nothing new");
                             combined += " " + deepText;
                         }
-                        ocrAdditions = ComputePdfOcrAdditions(pageText, combined);
+
+                        // Garble check: PdfPig custom-font failure → '?' ratio > 20%
+                        // In this case OCR is the ground truth; replace pageText entirely.
+                        bool pdfGarbled = pageText.Length > 10 &&
+                            (double)pageText.Count(c => c == '?') / pageText.Length > 0.20;
+                        if (pdfGarbled)
+                        {
+                            Console.WriteLine($"[PDF+OCR] p{p} PdfPig garbled (custom font) — using OCR as primary text");
+                            pageText = combined.Trim();
+                        }
+                        else
+                        {
+                            ocrAdditions = ComputePdfOcrAdditions(pageText, combined);
+                        }
                     }
                     catch (Exception ocrEx) { Console.WriteLine($"[PDF+OCR] page {p} error: {ocrEx.GetType().Name}: {ocrEx.Message}"); }
                 }
