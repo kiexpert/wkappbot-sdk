@@ -887,11 +887,19 @@ public sealed class ClaudePromptHelper : IDisposable
     /// </summary>
     private bool TypeAndSubmitVSCodeClaudeCode(PromptInfo prompt, string text)
     {
-        // Option 3: TextPattern2.InsertTextAtSelection (truly focusless!)
+        // Option 1: WM_CHAR to renderer (Codex-proven focusless path) + renderer Enter
+        if (TryPostMessageTextToChromiumRenderer(prompt, text, submit: true))
+        {
+            Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR+Enter focusless OK");
+            return true;
+        }
+        Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR failed — trying TP2");
+
+        // Option 2: TextPattern2.InsertTextAtSelection (truly focusless!)
         if (TryVSCodeTextPattern2Insert(prompt, text, submit: true))
             return true;
 
-        Console.WriteLine("  [PROMPT:VSCODE-CC] TP2 unavailable — falling back to focus-steal");
+        Console.WriteLine("  [PROMPT:VSCODE-CC] focusless all paths failed — falling back to focus-steal");
 
         var prevForeground = NativeMethods.GetForegroundWindow();
 
@@ -995,10 +1003,24 @@ public sealed class ClaudePromptHelper : IDisposable
     {
         try
         {
-            var rendererHwnd = GetRendererHwnd(prompt.WindowHandle);
+            // [FOCUS-GUARD] 타겟 렌더러 확인 — prompt.PromptRect와 겹치는 렌더러만 사용
+            // VS Code에는 Chrome_RenderWidgetHostHWND가 다수 (에디터/사이드바/터미널 등)
+            // 첫 번째가 코드 에디터일 수 있으므로 rect 기반으로 올바른 패널 선택
+            var rendererHwnd = prompt.PromptRect != System.Drawing.Rectangle.Empty
+                ? GetRendererHwndByRect(prompt.WindowHandle, prompt.PromptRect)
+                : GetRendererHwnd(prompt.WindowHandle);
+
             if (rendererHwnd == IntPtr.Zero)
             {
-                Console.WriteLine("  [PROMPT] WM_CHAR: renderer hwnd not found");
+                Console.WriteLine("  [PROMPT] WM_CHAR: renderer hwnd not found (rect-match failed)");
+                return false;
+            }
+
+            // 렌더러가 키보드 포커스를 가지고 있는지 확인
+            var kbFocus = NativeMethods.GetKeyboardFocusHwnd();
+            if (kbFocus != IntPtr.Zero && kbFocus != rendererHwnd)
+            {
+                Console.WriteLine($"  [PROMPT] WM_CHAR: renderer=0x{rendererHwnd:X8} but kbFocus=0x{kbFocus:X8} — target mismatch, abort");
                 return false;
             }
 
@@ -1584,6 +1606,42 @@ public sealed class ClaudePromptHelper : IDisposable
         }
     }
 
+    /// <summary>
+    /// Find Chrome_RenderWidgetHostHWND whose screen rect overlaps with the given target rect.
+    /// Used for VS Code which has multiple renderers (editor/sidebar/panel etc.).
+    /// Falls back to GetRendererHwnd if no rect match found.
+    /// </summary>
+    private static IntPtr GetRendererHwndByRect(IntPtr topWindow, System.Drawing.Rectangle targetRect)
+    {
+        var candidates = new List<IntPtr>();
+        NativeMethods.EnumChildWindows(topWindow, (hwnd, _) =>
+        {
+            var sb = new System.Text.StringBuilder(64);
+            NativeMethods.GetClassNameW(hwnd, sb, 64);
+            if (sb.ToString() == "Chrome_RenderWidgetHostHWND")
+                candidates.Add(hwnd);
+            return true;
+        }, IntPtr.Zero);
+
+        Console.WriteLine($"  [PROMPT] WM_CHAR: found {candidates.Count} renderer(s) in window");
+
+        // Find renderer whose rect overlaps with the prompt rect
+        foreach (var hwnd in candidates)
+        {
+            NativeMethods.GetWindowRect(hwnd, out var wr);
+            var rendRect = System.Drawing.Rectangle.FromLTRB(wr.Left, wr.Top, wr.Right, wr.Bottom);
+            if (rendRect.IntersectsWith(targetRect))
+            {
+                Console.WriteLine($"  [PROMPT] WM_CHAR: renderer 0x{hwnd:X8} matches prompt rect ({rendRect} ∩ {targetRect})");
+                return hwnd;
+            }
+        }
+
+        // Fallback: first renderer
+        Console.WriteLine($"  [PROMPT] WM_CHAR: no rect match — using first renderer");
+        return candidates.Count > 0 ? candidates[0] : IntPtr.Zero;
+    }
+
     private static IntPtr GetRendererHwnd(IntPtr topWindow)
     {
         var rendererHwnd = NativeMethods.FindWindowExW(
@@ -1667,11 +1725,18 @@ public sealed class ClaudePromptHelper : IDisposable
     /// </summary>
     public bool TryTypeWithoutSubmitFocusless(PromptInfo prompt, string text)
     {
-        // VS Code: TextPattern2 focusless attempt
+        // VS Code: WM_CHAR to renderer first (Codex-proven path), then TP2 fallback
         if (prompt.HostType == HostVsCodeClaudeCode)
         {
+            if (TryPostMessageTextToChromiumRenderer(prompt, text, submit: false))
+            {
+                Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR focusless OK");
+                return true;
+            }
+            Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR failed — trying TP2");
             if (TryVSCodeTextPattern2Insert(prompt, text, submit: false))
                 return true;
+            Console.WriteLine("  [PROMPT:VSCODE-CC] focusless all paths failed");
         }
 
         // Try IA2 focusless text insertion first
