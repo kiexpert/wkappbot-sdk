@@ -71,6 +71,10 @@ internal partial class Program
             return Error("Usage: file read <path> [--offset N] [--limit N] [--encoding N]");
         if (!File.Exists(path)) { var nfd = path.Normalize(NormalizationForm.FormD); if (File.Exists(nfd)) path = nfd; else return Error($"File not found: {path}"); }
 
+        // Auto-route: .pdf → read-pdf (PdfPig text extraction, not raw bytes)
+        if (path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            return FileReadPdfCommand(new[] { path }.Concat(args.Where(a => a != path)).ToArray());
+
         try
         {
             var bytes = File.ReadAllBytes(path);
