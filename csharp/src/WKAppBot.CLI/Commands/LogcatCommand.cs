@@ -13,7 +13,8 @@ internal partial class Program
     //   -l                  filenames only (no content)
     //   -c                  count matches per file
     //   -m N                stop after N matches per file
-    //   -i / --no-ignore-case  case-sensitive (default: case-insensitive)
+    //   -i                     ignore case (grap default: case-sensitive; logcat default: insensitive)
+    //   -n                     show line numbers
     static int LogcatCommand(string[] args)
     {
         var selfPid = Environment.ProcessId;
@@ -33,7 +34,9 @@ internal partial class Program
         bool filesOnly = false;    // -l: filenames only
         bool countOnly = false;    // -c: count per file
         int maxCount = int.MaxValue; // -m N: max matches per file
-        bool caseSensitive = false;  // -i flips to case-sensitive (default: insensitive)
+        bool showLineNums = false; // -n: prepend line numbers
+        // Case: grap/grep default = case-sensitive (grep compat); logcat default = insensitive
+        bool ignoreCase = !GrapMode;
 
         // Parse positional + named args
         var positional = new List<string>();
@@ -60,7 +63,9 @@ internal partial class Program
             else if (a is "-c" or "--count")               { countOnly = true; }
             else if ((a == "-m" || a == "--max-count")     && i + 1 < args.Length && int.TryParse(args[++i], out var mx))  { maxCount = mx; }
             else if (a.StartsWith("-m")                    && int.TryParse(a[2..], out var mx2)) { maxCount = mx2; }
-            else if (a is "-i" or "--case-sensitive")      { caseSensitive = true; }
+            else if (a is "-i" or "--ignore-case")           { ignoreCase = true; }
+            else if (a is "--case-sensitive" or "--no-ignore-case") { ignoreCase = false; }
+            else if (a is "-n" or "--line-number")           { showLineNums = true; }
             else if (a == "--timeout" && i + 1 < args.Length) { timeoutSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--timeout=")) { timeoutSeconds = ParsePastDuration(a[10..]); }
             else { positional.Add(a); }
@@ -82,7 +87,7 @@ internal partial class Program
         Regex? msgRegex = null;
         if (!string.IsNullOrWhiteSpace(messageFilterArg) && messageFilterArg != "*")
         {
-            var rxOpts = RegexOptions.Compiled | (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase);
+            var rxOpts = RegexOptions.Compiled | (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None);
             msgRegex = new Regex(messageFilterArg, rxOpts);
         }
 
@@ -90,10 +95,17 @@ internal partial class Program
         var baseDir = baseDirOverride ?? Environment.CurrentDirectory;
         var dirs = new List<string> { baseDir };
 
-        // --hq: add wkappbot.hq/logs + openclaw dirs
+        // --hq: add wkappbot.hq/logs + all old-*/ subdirs + openclaw dirs
         if (includeHq)
         {
-            dirs.Add(Path.Combine(DataDir, "logs"));
+            var hqLogsDir = Path.Combine(DataDir, "logs");
+            dirs.Add(hqLogsDir);
+            // Add all old-*/ subdirs (new scheme) + legacy old/ (backward compat)
+            if (Directory.Exists(hqLogsDir))
+            {
+                foreach (var sub in Directory.GetDirectories(hqLogsDir, "old*"))
+                    dirs.Add(sub);
+            }
             dirs.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "agents", "main", "sessions"));
             dirs.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "logs"));
         }
@@ -101,13 +113,20 @@ internal partial class Program
         // Non-TTY (piped/redirected) without explicit watch flags → one-shot grep mode.
         // result=$(grap pattern *.txt) should work like grep: scan files, output matches, exit.
         // Diagnostic lines go to stderr so stdout contains only matches (grep-compatible).
-        bool autoOneShot = Console.IsOutputRedirected && pastSeconds == 0 && !follow && timeoutSeconds == 0;
+        // grep-compat: one-shot when piped OR when called as grap/grep (TTY or not)
+        bool autoOneShot = (Console.IsOutputRedirected || GrapMode) && pastSeconds == 0 && !follow && timeoutSeconds == 0;
 
         var depthLabel   = maxDepth == 0 ? "" : maxDepth == -1 ? " -r" : $" -r={maxDepth}";
         var pastLabel    = pastSeconds    > 0 ? $" --past {FormatDuration(pastSeconds)}" : "";
         var timeoutLabel = timeoutSeconds > 0 ? $" --timeout {FormatDuration(timeoutSeconds)}" : "";
         var diagOut = autoOneShot ? Console.Error : Console.Out;
-        diagOut.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")}{pastLabel}{timeoutLabel}{(autoOneShot ? " (grep-mode)" : " (Ctrl+C to stop)")}");
+        if (!autoOneShot || !GrapMode)
+            diagOut.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")}{pastLabel}{timeoutLabel}{(autoOneShot ? " (grep-mode)" : " (Ctrl+C to stop)")}");
+
+        // Debug: write timing to C:\Temp\grap_fast_exit.txt (shared with FastExit debug)
+        var _lcSw = System.Diagnostics.Stopwatch.StartNew();
+        void LcDbg(string s) { try { using var lf = System.IO.File.AppendText(@"C:\Temp\grap_fast_exit.txt"); lf.WriteLine($"LC {_lcSw.ElapsedMilliseconds}ms {s}"); } catch { } }
+        LcDbg($"entered autoOneShot={autoOneShot} pastSeconds={pastSeconds} isOutputRedirected={Console.IsOutputRedirected}");
 
         // Auto one-shot: scan all matching files, emit matches, exit (no watch loop)
         if (autoOneShot)
@@ -125,30 +144,41 @@ internal partial class Program
                 .ToList();
 
             var grepOut = OriginalStdout;
+            bool showFilename = allFiles.Count != 1; // grep: suppress filename for single file
             foreach (var filePath in allFiles)
-                EmitDeltaLines(filePath, oneShotOffsets, oneShotLineCounts, msgRegex, ref oneShotHeader, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount, grepOut);
+                EmitDeltaLines(filePath, oneShotOffsets, oneShotLineCounts, msgRegex, ref oneShotHeader, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount, grepOut, showFilename, showLineNums);
 
             try { grepOut.Flush(); } catch { }
-            return 0;
+            // grep exit code convention: 0=match found, 1=no match, 2=error
+            return oneShotLineCounts.Values.Sum() > 0 ? 0 : 1;
         }
 
+        LcDbg("before CancelKeyPress setup");
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
         if (timeoutSeconds > 0) cts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+        LcDbg("after CancelKeyPress setup");
 
         // --past: scan existing files modified within the window before entering live mode
         if (pastSeconds > 0)
         {
             var cutoff = DateTime.UtcNow.AddSeconds(-pastSeconds);
             var pastDirs = new List<string>(dirs);
-            // Always include HQ logs/old when --past is active (that's where finished logs live)
+            // Always include HQ logs/old* when --past is active (that's where finished logs live)
             if (includeHq)
-                pastDirs.Add(Path.Combine(DataDir, "logs", "old"));
+            {
+                var hqLogsDir = Path.Combine(DataDir, "logs");
+                // new scheme: old-{subkey}/ dirs; legacy: old/
+                if (Directory.Exists(hqLogsDir))
+                    foreach (var sub in Directory.GetDirectories(hqLogsDir, "old*"))
+                        pastDirs.Add(sub);
+            }
 
             var pastOffsets   = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             var pastLineCounts = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             string pastHeader = "";
 
+            LcDbg($"building pastFiles from dirs: {string.Join(", ", pastDirs)}");
             var pastFiles = pastDirs.Distinct(StringComparer.OrdinalIgnoreCase)
                 .Where(Directory.Exists)
                 .SelectMany(dir => { try { return Directory.GetFiles(dir, "*", SearchOption.TopDirectoryOnly); } catch { return Array.Empty<string>(); } })
@@ -166,24 +196,27 @@ internal partial class Program
                 .OrderBy(f => { try { return f.LastWriteTimeUtc; } catch { return DateTime.MinValue; } })
                 .ToList();
 
+            LcDbg($"pastFiles.Count={pastFiles.Count}");
             if (pastFiles.Count > 0)
             {
-                Console.WriteLine($"[LOGCAT] --past: scanning {pastFiles.Count} file(s) from last {FormatDuration(pastSeconds)}");
+                Console.Error.WriteLine($"[LOGCAT] --past: scanning {pastFiles.Count} file(s) from last {FormatDuration(pastSeconds)}");
                 foreach (var f in pastFiles)
                     EmitDeltaLines(f.FullName, pastOffsets, pastLineCounts, msgRegex, ref pastHeader, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount);
             }
             else
             {
-                Console.WriteLine($"[LOGCAT] --past: no files found in last {FormatDuration(pastSeconds)}");
+                Console.Error.WriteLine($"[LOGCAT] --past: no files found in last {FormatDuration(pastSeconds)}");
             }
 
+            LcDbg($"EmitDeltaLines done for {pastFiles.Count} files");
             // --past without --follow/--timeout: grep-style, exit after scan
             if (!follow && timeoutSeconds == 0)
             {
-                Console.WriteLine($"[LOGCAT] --past: done ({pastFiles.Count} file(s))");
-                return 0;
+                Console.Error.WriteLine($"[LOGCAT] --past: done ({pastFiles.Count} file(s))");
+                LcDbg("returning 0");
+                return pastLineCounts.Values.Sum() > 0 ? 0 : 1;
             }
-            Console.WriteLine("[LOGCAT] --past: done, entering live mode...");
+            Console.Error.WriteLine("[LOGCAT] --past: done, entering live mode...");
         }
 
         var watchers = new List<FileSystemWatcher>();
@@ -286,10 +319,11 @@ internal partial class Program
         return Regex.IsMatch(input, regex, RegexOptions.IgnoreCase);
     }
 
-    // Parse duration string: "30s" / "5m" / "1h" / "3600" (bare number = seconds)
+    // Parse duration string: "30s" / "5m" / "1h" / "2d" / "3600" (bare number = seconds)
     static double ParsePastDuration(string s)
     {
         s = s.Trim().ToLowerInvariant();
+        if (s.EndsWith("d") && double.TryParse(s[..^1], out var d)) return d * 86400;
         if (s.EndsWith("h") && double.TryParse(s[..^1], out var h)) return h * 3600;
         if (s.EndsWith("m") && double.TryParse(s[..^1], out var m)) return m * 60;
         if (s.EndsWith("s") && double.TryParse(s[..^1], out var sec)) return sec;
@@ -316,7 +350,9 @@ internal partial class Program
         int afterLines = 0, int beforeLines = 0,
         bool invertMatch = false, bool filesOnly = false,
         bool countOnly = false, int maxCount = int.MaxValue,
-        TextWriter? grepOut = null)  // non-null → grep-mode: clean output to this writer
+        TextWriter? grepOut = null,  // non-null → grep-mode: clean output to this writer
+        bool showFilename = true,    // false → suppress filename prefix (single-file grep compat)
+        bool showLineNums = false)   // -n: prepend line numbers
     {
         if (!File.Exists(path)) return;
 
@@ -348,7 +384,7 @@ internal partial class Program
             }
             if (grepOut != null)
             {
-                foreach (var line in tail) grepOut.WriteLine($"{path}:{line}");
+                foreach (var line in tail) grepOut.WriteLine(showFilename ? $"{path}:{line}" : line);
             }
             else
             {
@@ -361,14 +397,17 @@ internal partial class Program
             return;
         }
 
-        // Read all new lines into buffer (needed for before-context)
+        // Read all new lines into buffer (needed for before-context and -n line numbers)
         var buf = new List<string>();
+        var lineNums = new List<int>(); // actual line numbers (parallel to buf)
+        int lineNum = 0;
         while (!sr.EndOfStream)
         {
             string? line;
             try { line = sr.ReadLine(); } catch { break; }
+            lineNum++;
             if (line == null || line.Length > MaxLineLengthForEmit) break; // binary file guard
-            if (!string.IsNullOrWhiteSpace(line)) buf.Add(line);
+            if (!string.IsNullOrWhiteSpace(line)) { buf.Add(line); lineNums.Add(lineNum); }
         }
 
         // -l: filenames only
@@ -376,7 +415,7 @@ internal partial class Program
         {
             bool any = buf.Any(l => msgRegex == null ? !invertMatch : msgRegex.IsMatch(l) != invertMatch);
             if (any) (grepOut ?? Console.Out).WriteLine(path);
-            offsets[path] = fs.Length; lineCounts[path] = emitted;
+            offsets[path] = fs.Length; lineCounts[path] = any ? emitted + 1 : emitted;
             return;
         }
 
@@ -385,9 +424,19 @@ internal partial class Program
         if (countOnly)
         {
             matchCount = buf.Count(l => msgRegex == null ? !invertMatch : msgRegex.IsMatch(l) != invertMatch);
-            if (matchCount > 0) (grepOut ?? Console.Out).WriteLine($"{path}: {matchCount}");
-            offsets[path] = fs.Length; lineCounts[path] = emitted;
+            // Always output count (even 0) when showFilename; grep outputs "file:count"
+            var countOut = grepOut ?? Console.Out;
+            if (showFilename) countOut.WriteLine($"{path}:{matchCount}");
+            else countOut.WriteLine($"{matchCount}");
+            lineCounts[path] = (long)matchCount;
+            offsets[path] = fs.Length;
             return;
+        }
+
+        string FormatLine(int j, bool isMatch) {
+            var prefix = showFilename ? $"{path}:" : "";
+            var numPfx = showLineNums ? $"{lineNums[j]}:" : "";
+            return $"{prefix}{numPfx}{buf[j]}";
         }
 
         int printUntil = -1;
@@ -404,10 +453,11 @@ internal partial class Program
                 int aft  = Math.Max(afterLines, 0);
                 int from = Math.Max(printUntil + 1, i - bef);
                 int to   = Math.Min(buf.Count - 1, i + aft);
-                if ((bef > 0 || aft > 0) && from > printUntil + 1)
+                // -- separator only BETWEEN groups (not before first group)
+                if ((bef > 0 || aft > 0) && printUntil >= 0 && from > printUntil + 1)
                     grepOut.WriteLine("--");
                 for (int j = from; j <= to; j++)
-                    grepOut.WriteLine($"{path}:{buf[j]}");
+                    grepOut.WriteLine(FormatLine(j, j == i));
                 printUntil = to;
             }
             else

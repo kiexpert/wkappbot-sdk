@@ -29,10 +29,13 @@ public sealed class TeeTextWriter : TextWriter
     public override Encoding Encoding => Encoding.UTF8;
     public bool IsPipeBroken => _pipeBroken;
 
-    public TeeTextWriter(TextWriter console, string logPath, bool moveToOldOnDispose = true)
+    private readonly string _oldSubDir; // e.g. "newchat", "inspect", "web-github.com"
+
+    public TeeTextWriter(TextWriter console, string logPath, bool moveToOldOnDispose = true, string oldSubDir = "")
     {
         _console = console ?? throw new ArgumentNullException(nameof(console));
         _moveToOldOnDispose = moveToOldOnDispose;
+        _oldSubDir = oldSubDir;
         _logPath = logPath;
         _lastFlushTicks = Environment.TickCount64 * TimeSpan.TicksPerMillisecond;
 
@@ -193,7 +196,8 @@ public sealed class TeeTextWriter : TextWriter
                     var dir = Path.GetDirectoryName(_logPath);
                     if (!string.IsNullOrWhiteSpace(dir))
                     {
-                        var oldDir = Path.Combine(dir, "old");
+                        var subDirName = string.IsNullOrWhiteSpace(_oldSubDir) ? "old" : $"old-{_oldSubDir}";
+                        var oldDir = Path.Combine(dir, subDirName);
                         Directory.CreateDirectory(oldDir);
 
                         var fileName = Path.GetFileName(_logPath);

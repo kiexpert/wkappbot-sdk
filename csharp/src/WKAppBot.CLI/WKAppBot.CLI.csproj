@@ -51,7 +51,7 @@
     <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
     <!-- Step 2: Try direct copy first. If locked (Eye running), stage as .new.exe for hot-swap -->
     <!-- Eye FSW watches wkappbot-core.exe/.new.exe (uses Environment.ProcessPath dynamically) -->
-    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;W:\SDK\bin\wkappbot-core.exe&quot; &amp;&amp; (echo [Deploy] wkappbot-core.exe updated &amp; &quot;W:\SDK\bin\wkappbot-core.exe&quot; eye tick) || (copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;W:\SDK\bin\wkappbot-core.new.exe&quot; &amp;&amp; echo [Deploy] wkappbot-core.new.exe staged for hot-swap)" IgnoreExitCode="true" />
+    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;W:\SDK\bin\wkappbot-core.exe&quot; &amp;&amp; (echo [Deploy] wkappbot-core.exe updated &amp; &quot;W:\SDK\bin\wkappbot-core.exe&quot; eye tick &gt;nul 2&gt;&amp;1) || (copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;W:\SDK\bin\wkappbot-core.new.exe&quot; &amp;&amp; echo [Deploy] wkappbot-core.new.exe staged for hot-swap)" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
     <_HandlersPublish Include="$(PublishDir)handlers\**\*.*" />

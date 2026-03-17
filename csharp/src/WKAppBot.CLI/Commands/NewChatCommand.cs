@@ -133,18 +133,40 @@ Then immediately:
 
         Console.WriteLine($"[NEWCHAT] Found: [Edit] \"{editEl.Name}\" at ({editEl.BoundingRectangle.X},{editEl.BoundingRectangle.Y})");
 
-        // Guard: if input field already has content, user may be typing — abort
+        // Guard: if input field already has real user input, abort to avoid overwriting.
+        // Placeholder text detection:
+        //   1. Color: if TextPattern ForegroundColor is NOT white-ish → placeholder (gray) → skip
+        //   2. Length: >30 chars or contains newline → real user input → abort
         try
         {
             var existing = editEl.Patterns.Value.IsSupported
                 ? editEl.Patterns.Value.Pattern.Value.Value ?? ""
                 : "";
-            if (!string.IsNullOrWhiteSpace(existing))
+            if (existing.Length > 0)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[NEWCHAT] Input field has pending text ({existing.Length} chars) — aborting to avoid overwriting user input");
-                Console.ResetColor();
-                return Error("[NEWCHAT] Input not empty — user may be typing");
+                // Placeholder detection: HelpText often contains the placeholder string in web inputs.
+                // If Value == HelpText, it's a placeholder (not real user input).
+                bool isPlaceholder = false;
+                try
+                {
+                    var helpText = editEl.Properties.HelpText.ValueOrDefault ?? "";
+                    if (!string.IsNullOrEmpty(helpText))
+                    {
+                        isPlaceholder = string.Equals(existing.Trim(), helpText.Trim(), StringComparison.OrdinalIgnoreCase);
+                        Console.WriteLine($"[NEWCHAT] HelpText: \"{helpText}\" → {(isPlaceholder ? "IS placeholder" : "different from value")}");
+                    }
+                }
+                catch { }
+
+                Console.WriteLine($"[NEWCHAT] Input field value: \"{existing.Replace("\n","\\n")}\" ({existing.Length} chars){(isPlaceholder ? " [placeholder]" : "")}");
+
+                if (!isPlaceholder && (existing.Length > 30 || existing.Contains('\n')))
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[NEWCHAT] Input field has pending text ({existing.Length} chars) — aborting to avoid overwriting user input");
+                    Console.ResetColor();
+                    return Error("[NEWCHAT] Input not empty — user may be typing");
+                }
             }
         }
         catch { /* ignore — proceed if value check fails */ }
@@ -365,7 +387,8 @@ Then immediately:
             }
         }
 
-        // ── Priority 2: CWD folder match — exact one match required ──
+        // ── Priority 2: CWD folder match — ONLY within ancestor set if known ──
+        // Never match a window outside the ancestor set (would target wrong VS Code instance).
         var cwd = Environment.CurrentDirectory;
         var cwdFolder = Path.GetFileName(cwd.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         if (!string.IsNullOrEmpty(cwdFolder))
@@ -375,6 +398,15 @@ Then immediately:
             var cwdMatches = candidates
                 .Where(c => c.title.Contains(cwdPattern, StringComparison.OrdinalIgnoreCase))
                 .ToList();
+
+            // Guard: if ancestor PIDs known but match is outside ancestor set → wrong window → fail
+            if (cwdMatches.Count == 1 && ancestorCodePids.Count > 0 && !ancestorCodePids.Contains(cwdMatches[0].pid))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[NEWCHAT] ERROR: CWD match \"{cwdFolder}\" → \"{cwdMatches[0].title}\" but PID={cwdMatches[0].pid} is NOT an ancestor — refusing to target wrong window.");
+                Console.ResetColor();
+                return IntPtr.Zero;
+            }
 
             if (cwdMatches.Count == 1)
             {

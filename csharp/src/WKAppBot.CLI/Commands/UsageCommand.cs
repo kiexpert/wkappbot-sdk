@@ -279,6 +279,7 @@ Data Directory:
         var ic = System.Globalization.CultureInfo.InvariantCulture;
         var ns = System.Globalization.NumberStyles.Float;
         if (s.EndsWith("ms") && double.TryParse(s[..^2], ns, ic, out var ms))  return TimeSpan.FromMilliseconds(ms);
+        if (s.EndsWith("d")  && double.TryParse(s[..^1], ns, ic, out var d))   return TimeSpan.FromDays(d);
         if (s.EndsWith("h")  && double.TryParse(s[..^1], ns, ic, out var h))   return TimeSpan.FromHours(h);
         if (s.EndsWith("m")  && double.TryParse(s[..^1], ns, ic, out var m))   return TimeSpan.FromMinutes(m);
         if (s.EndsWith("s")  && double.TryParse(s[..^1], ns, ic, out var sec)) return TimeSpan.FromSeconds(sec);
@@ -330,7 +331,7 @@ Data Directory:
     {
         var isgrap = alias == "grap";
         Console.WriteLine($"""
-            {alias} — WKAppBot log search ({(isgrap ? "grab accessibility pattern, official WKAppBot name" : "legacy grep alias")})
+            {alias} — WKAppBot log search ({(isgrap ? "grab accessible pattern, official WKAppBot name" : "legacy grep alias")})
             Internally: {alias} <pattern> [files...] → logcat <files> <pattern>
 
             Usage:
@@ -433,6 +434,43 @@ Data Directory:
                 ? string.Join(";", positional.Skip(1))  // multiple files → ';' OR glob
                 : "*.txt";                               // no file arg → default logcat filter
         }
+
+        // If fileFilter contains path separators, extract --basedir so logcat searches the right dir.
+        bool hasBasedir = flags.Any(f => f == "--basedir");
+        if (!hasBasedir && (fileFilter.Contains('/') || fileFilter.Contains('\\')))
+        {
+            // Case 1: directory path (e.g. /tmp/testdir/) → use as basedir, filter=*
+            if (System.IO.Directory.Exists(fileFilter.TrimEnd('/', '\\')))
+            {
+                flags.Add("--basedir");
+                flags.Add(fileFilter.TrimEnd('/', '\\'));
+                fileFilter = "*";
+            }
+            else
+            {
+                // Case 2: one or more absolute file paths (shell-expanded glob or single path)
+                // Split on ';', extract common directory, keep filenames as filter
+                var parts    = fileFilter.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                var dirs2    = parts.Select(p => System.IO.Path.GetDirectoryName(p) ?? "").Distinct().ToArray();
+                var names    = parts.Select(p => System.IO.Path.GetFileName(p)).ToArray();
+                var commonDir = dirs2.Length == 1 ? dirs2[0] : "";
+                if (!string.IsNullOrEmpty(commonDir) && System.IO.Directory.Exists(commonDir))
+                {
+                    fileFilter = string.Join(";", names);
+                    flags.Add("--basedir");
+                    flags.Add(commonDir);
+                }
+            }
+        }
+
+        // grap/grep: GrapMode flag (set in Program.cs) triggers autoOneShot scan-and-exit in logcat.
+        // No --past needed: autoOneShot scans all files directly without a time cutoff.
+        // Only add --past if user explicitly requested it or wants follow mode (already in flags above).
+
+        // Translate grep BRE special sequences to .NET regex equivalents
+        // \| (BRE OR) → | ; \( \) (BRE groups) → ( )
+        if (!string.IsNullOrEmpty(pattern))
+            pattern = pattern.Replace("\\|", "|").Replace("\\(", "(").Replace("\\)", ")");
 
         return new[] { fileFilter, pattern }.Concat(flags).ToArray();
     }

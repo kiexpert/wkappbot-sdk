@@ -269,7 +269,7 @@ internal partial class Program
                     ["required"] = new JsonArray { "action" }
                 }),
             McpTool("grap",
-                "Search wkappbot logs — grep-compatible syntax (grap = GRab Accessibility Pattern).\n" +
+                "Search wkappbot logs — grep-compatible syntax (grap = GRab Accessible Pattern).\n" +
                 "Pattern comes first, files second — exactly like classic grep/rg.\n" +
                 "Internally rewrites to logcat with translated args.\n\n" +
                 "Examples:\n" +
