@@ -611,7 +611,13 @@ internal partial class Program
     /// </summary>
     static (string cmdTag, string oldSubDir) ComputeCmdTagAndSubDir(string[] args)
     {
-        if (args.Length == 0) return ("noargs", "noargs");
+        var dir = ComputeOldSubDir(args);
+        return (dir.Replace(" ", "-"), dir);
+    }
+
+    static string ComputeOldSubDir(string[] args)
+    {
+        if (args.Length == 0) return "noargs";
         var cmd = args[0].ToLowerInvariant();
         var sub = args.Length > 1 ? args[1].ToLowerInvariant() : "";
 
@@ -619,12 +625,10 @@ internal partial class Program
         {
             case "a11y":
             {
-                // a11y <action> <grap-pattern> → old {action} {mainWin}/
                 var action = sub.Length > 0 ? sub : "a11y";
                 var grap   = args.Length > 2 ? args[2] : "";
                 var win    = ExtractMainWindowFromGrap(grap);
-                var dir    = win != null ? $"a11y {action} {win}" : $"a11y {action}";
-                return (action, dir);
+                return win != null ? $"a11y {action} {win}" : $"a11y {action}";
             }
 
             case "web":
@@ -633,35 +637,21 @@ internal partial class Program
                 {
                     var url  = args.Length > 2 ? args[2] : "";
                     var host = ExtractUrlHost(url);
-                    if (host != null)
-                        return ($"web-{sub}-{host}", $"web {sub} {host}");
-                    return ($"web-{sub}", $"web {sub}");
+                    return host != null ? $"web {sub} {host}" : $"web {sub}";
                 }
-                var tag = sub.Length > 0 ? $"web-{sub}" : "web";
-                var dir = sub.Length > 0 ? $"web {sub}" : "web";
-                return (tag, dir);
+                return sub.Length > 0 ? $"web {sub}" : "web";
             }
 
             case "ask":
             case "agent":
-            {
-                var tag = sub.Length > 0 ? $"{cmd}-{sub}" : cmd;
-                var dir = sub.Length > 0 ? $"{cmd} {sub}" : cmd;
-                return (tag, dir);
-            }
-
             case "slack":
             case "file":
             case "schedule":
             case "knowhow":
-            {
-                var tag = sub.Length > 0 ? $"{cmd}-{sub}" : cmd;
-                var dir = sub.Length > 0 ? $"{cmd} {sub}" : cmd;
-                return (tag, dir);
-            }
+                return sub.Length > 0 ? $"{cmd} {sub}" : cmd;
 
             default:
-                return (cmd, cmd);
+                return cmd;
         }
     }
 
@@ -690,6 +680,9 @@ internal partial class Program
             // Take part before # (main window), before ; (OR patterns)
             main = pattern.Split('#')[0].Split(';')[0].Trim();
             main = main.Replace("*", "").Replace("?", "").Trim();
+            // If window name has spaces, cut at first space (avoid overly long folder names)
+            var spaceIdx = main.IndexOf(' ');
+            if (spaceIdx > 0) main = main[..spaceIdx];
         }
 
         // Strip filesystem-unsafe chars
