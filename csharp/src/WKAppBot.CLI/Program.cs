@@ -623,7 +623,7 @@ internal partial class Program
                 var action = sub.Length > 0 ? sub : "a11y";
                 var grap   = args.Length > 2 ? args[2] : "";
                 var win    = ExtractMainWindowFromGrap(grap);
-                var dir    = win != null ? $"{action} {win}" : action;
+                var dir    = win != null ? $"a11y {action} {win}" : $"a11y {action}";
                 return (action, dir);
             }
 
