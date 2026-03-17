@@ -32,6 +32,9 @@ internal partial class Program
     /// <summary>True when logcat runs in piped stdout (grep-mode): matches → OriginalStdout, diagnostics → stderr.</summary>
     internal static bool GrepModeActive = false;
     internal static bool GrapMode = false; // true when invoked as grap/grep → one-shot scan even on TTY
+    /// <summary>True when stdout is redirected (pipe/file). Suppresses diagnostic output ([ACT], cmd echo)
+    /// so downstream tools receive clean data only. Set early in Main, before TeeWriter.</summary>
+    internal static bool IsPipeMode = false;
     // Relay file path for grap/grep one-shot mode (WKAPPBOT_RELAY_FILE env var).
     // FastExit creates {relayFilePath}.done sentinel after closing the file.
     internal static string? RelayFilePath = null;
@@ -88,7 +91,8 @@ internal partial class Program
         prof("Main() entered");
         DbgFile("before OutputEncoding");
         // Force UTF-8 globally — console + child processes inherit codepage 65001
-        try { Console.OutputEncoding = Encoding.UTF8; } catch { }
+        // Use no-BOM variant: BOM is noise in pipes/relay, Console.Out is not a file
+        try { Console.OutputEncoding = new System.Text.UTF8Encoding(false); } catch { }
         DbgFile("after OutputEncoding");
         try { Console.InputEncoding = Encoding.UTF8; } catch { }
         DbgFile("after InputEncoding");
@@ -254,6 +258,10 @@ internal partial class Program
         // Track current command log path for auto-heal diagnostics (non-Eye mode only; Eye sets it in RunInEye)
         if (!RunningInEye) _currentLogPath = logFile;
 
+        // Pipe mode: stdout is redirected (pipe/file) — suppress diagnostic output for ALL commands.
+        // Must be captured before TeeWriter replaces Console.Out.
+        IsPipeMode = Console.IsOutputRedirected;
+
         // Grep-mode: logcat family (logcat/grap/grep) with stdout redirected (no watch flags).
         // result=$(grap pattern *.txt) must work like grep: matches to stdout, diagnostics to stderr.
         // Detected here (before TeeWriter) so TeeWriter can echo to stderr instead of stdout.
@@ -386,7 +394,7 @@ internal partial class Program
             if (!_fastExitAfterCommand)
             {
                 try { EmitEyeTick(command, cmdTag, "start"); } catch { }
-                if (!GrepModeActive) Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
+                if (!GrepModeActive && !IsPipeMode) Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
                 try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
                 try
                 {
@@ -411,7 +419,7 @@ internal partial class Program
             }
 
             if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
-            if (!GrepModeActive && !GrapMode) try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
+            if (!GrepModeActive && !GrapMode && !IsPipeMode) try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
             prof("dispatch");
 
             exitCode = command switch
@@ -489,7 +497,7 @@ internal partial class Program
 
             try
             {
-                if (!GrapMode)
+                if (!GrapMode && !IsPipeMode)
                 {
                     if (exitCode == 0) Console.WriteLine($"[ACT] result=ok cmd={command}");
                     else Console.WriteLine($"[FALLBACK] result=fail code={exitCode} cmd={command}");
