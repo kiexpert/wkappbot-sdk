@@ -49,20 +49,25 @@ internal partial class Program
         }
         else
         {
-            Console.WriteLine($"[A11Y] type — terminal ({winClass}): skipping WM_CHAR (ConPTY), using SendInput");
+            Console.WriteLine($"[A11Y] type — terminal ({winClass}): skipping WM_CHAR+LegacyIA (ConPTY), using SendInput directly");
+            // Terminal: LegacyIA.SetValue may report ok but doesn't reach ConPTY stdin.
+            // Skip straight to SendKeys (requires focus — only reliable path for terminal stdin).
         }
 
-        try
+        if (!isTerminal)
         {
-            var legacy = el.Patterns.LegacyIAccessible;
-            if (legacy.IsSupported)
+            try
             {
-                legacy.Pattern.SetValue(text);
-                Console.WriteLine($"[A11Y] type — LegacyIA SetValue ({text.Length} chars)");
-                return true;
+                var legacy = el.Patterns.LegacyIAccessible;
+                if (legacy.IsSupported)
+                {
+                    legacy.Pattern.SetValue(text);
+                    Console.WriteLine($"[A11Y] type — LegacyIA SetValue ({text.Length} chars)");
+                    return true;
+                }
             }
+            catch { }
         }
-        catch { }
 
         // Tier 4: SendKeys keystroke fallback (requires focus)
         try
