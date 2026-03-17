@@ -95,8 +95,10 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
         try
         {
             var actionArgs = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
-            var (approved, focusAcquired) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
+            var (approved, focusAcquired, deniedByUser) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
                 positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs);
+            if (deniedByUser)
+                Console.WriteLine("[READINESS] 사용자가 포커스 양보를 거부했습니다 — 중단");
             result = new UserYieldResult(approved, focusAcquired);
             return result;
         }

@@ -38,6 +38,9 @@ internal sealed class UserInputWaitWindow : Window
     /// <summary>Focus was actually transferred to target (verified).</summary>
     public bool FocusAcquired => _focusAcquired;
 
+    /// <summary>True if user explicitly clicked the deny button.</summary>
+    public bool DeniedByUser { get; private set; }
+
     public event Action? Confirmed;
 
     public bool UseChime { get; set; } // true = 차임벨, false(기본) = 카라오케
@@ -53,7 +56,7 @@ internal sealed class UserInputWaitWindow : Window
 
         Title = "UserInputWait";
         Width = 400;
-        Height = actionInfo != null ? 270 : 210;
+        Height = actionInfo != null ? 280 : 220;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -166,7 +169,42 @@ internal sealed class UserInputWaitWindow : Window
         _buttonBorder.MouseLeave += (_, _) =>
             _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xA0, 0x00));
 
-        stack.Children.Add(_buttonBorder);
+        // Deny button
+        var denyBorder = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(0x99, 0x22, 0x22)),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(20, 8, 20, 8),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Cursor = Cursors.Hand,
+        };
+        var denyText = new TextBlock
+        {
+            Text = "거부",
+            Foreground = Brushes.White,
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 13,
+            FontWeight = FontWeights.Bold,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        denyBorder.Child = denyText;
+        denyBorder.MouseLeftButtonDown += (_, _) => OnDeny();
+        denyBorder.MouseEnter += (_, _) =>
+            denyBorder.Background = new SolidColorBrush(Color.FromRgb(0xCC, 0x33, 0x33));
+        denyBorder.MouseLeave += (_, _) =>
+            denyBorder.Background = new SolidColorBrush(Color.FromRgb(0x99, 0x22, 0x22));
+
+        // Horizontal panel: [확인 (N)] [거부]
+        var buttonRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        buttonRow.Children.Add(_buttonBorder);
+        buttonRow.Children.Add(new Border { Width = 12 }); // gap
+        buttonRow.Children.Add(denyBorder);
+
+        stack.Children.Add(buttonRow);
         outerBorder.Child = stack;
         Content = outerBorder;
 
@@ -211,6 +249,16 @@ internal sealed class UserInputWaitWindow : Window
         }
 
         Confirmed?.Invoke();
+        Dispatcher.InvokeShutdown();
+    }
+
+    private void OnDeny()
+    {
+        if (_confirmed) return;
+        _confirmed = true;
+        _countdownTimer.Stop();
+        DeniedByUser = true;
+        // No focus transfer — user explicitly refused
         Dispatcher.InvokeShutdown();
     }
 
@@ -403,12 +451,13 @@ internal static class UserInputWaitOverlay
     /// - Auto-approve (idle): approved=true, focusAcquired=verified via GetForegroundWindow
     /// - Safety timeout (5min hard cap): approved=false, focusAcquired=false
     /// </summary>
-    public static (bool approved, bool focusAcquired) Show(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds,
+    public static (bool approved, bool focusAcquired, bool deniedByUser) Show(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds,
                                                             IntPtr positionHwnd = default, bool noSound = false,
                                                             string? actionInfo = null)
     {
         bool approved = false;
         bool focusAcquired = false;
+        bool deniedByUser = false;
         var done = new ManualResetEventSlim(false);
 
         // positionHwnd: 위치 기준 (타겟 컨트롤/폼), ownerHwnd: Win32 소유자 (메인 윈도우)
@@ -458,6 +507,10 @@ internal static class UserInputWaitOverlay
 
             window.Show();
             Dispatcher.Run(); // blocks until InvokeShutdown()
+            // Capture DeniedByUser after dispatcher exits (deny path doesn't call Confirmed)
+            if (window.DeniedByUser)
+                deniedByUser = true;
+            done.Set(); // ensure caller unblocks (deny path skips Confirmed event)
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.IsBackground = true;
@@ -468,7 +521,7 @@ internal static class UserInputWaitOverlay
         done.Wait(5 * 60 * 1000);
         done.Dispose();
 
-        return (approved, focusAcquired);
+        return (approved, focusAcquired, deniedByUser);
     }
 
     // P/Invoke for multi-monitor positioning
