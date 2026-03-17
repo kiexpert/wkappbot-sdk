@@ -823,6 +823,24 @@ public sealed class ClaudePromptHelper : IDisposable
         var titleY = wr.Top + 15; // 타이틀바 중앙
         MouseInput.Click(titleX, titleY);
         Thread.Sleep(150);
+
+        // ── Foreground verification — confirm this window actually got focus ──
+        // Multiple VS Code windows share the same process; if focus steal fails,
+        // keystrokes go to the wrong window. Verify before pasting.
+        var actualFg = NativeMethods.GetForegroundWindow();
+        if (actualFg != prompt.WindowHandle)
+        {
+            NativeMethods.GetWindowThreadProcessId(actualFg, out uint actualPid);
+            NativeMethods.GetWindowThreadProcessId(prompt.WindowHandle, out uint targetPid);
+            if (actualPid != targetPid)
+            {
+                // Completely wrong process — abort
+                Console.WriteLine($"  [PROMPT:VSCODE-CC] Focus steal FAILED (fg=0x{actualFg:X} vs target=0x{prompt.WindowHandle:X}) — abort");
+                return false;
+            }
+            // Same process but different window — might still be OK (VS Code internal focus)
+            Console.WriteLine($"  [PROMPT:VSCODE-CC] Focus on sibling window (same process) — proceeding");
+        }
         Console.WriteLine($"  [PROMPT:VSCODE-CC] Window activated via click ({titleX},{titleY})");
 
         // Escape → 입력창 포커스 → Paste → Enter (갭 최소화)
