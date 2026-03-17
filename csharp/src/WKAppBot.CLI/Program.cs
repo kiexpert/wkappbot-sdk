@@ -634,19 +634,20 @@ internal partial class Program
                     var url  = args.Length > 2 ? args[2] : "";
                     var host = ExtractUrlHost(url);
                     if (host != null)
-                        return ($"web-{sub}-{host}", $"web-{host}");
-                    return ($"web-{sub}", $"web-{sub}");
+                        return ($"web-{sub}-{host}", $"web {sub} {host}");
+                    return ($"web-{sub}", $"web {sub}");
                 }
-                // search or unknown sub
                 var tag = sub.Length > 0 ? $"web-{sub}" : "web";
-                return (tag, tag);
+                var dir = sub.Length > 0 ? $"web {sub}" : "web";
+                return (tag, dir);
             }
 
             case "ask":
             case "agent":
             {
                 var tag = sub.Length > 0 ? $"{cmd}-{sub}" : cmd;
-                return (tag, tag);
+                var dir = sub.Length > 0 ? $"{cmd} {sub}" : cmd;
+                return (tag, dir);
             }
 
             case "slack":
@@ -654,9 +655,9 @@ internal partial class Program
             case "schedule":
             case "knowhow":
             {
-                // include subcommand in both tag and dir
                 var tag = sub.Length > 0 ? $"{cmd}-{sub}" : cmd;
-                return (tag, cmd); // dir groups by top-level cmd
+                var dir = sub.Length > 0 ? $"{cmd} {sub}" : cmd;
+                return (tag, dir);
             }
 
             default:
@@ -756,10 +757,13 @@ internal partial class Program
         var afterTs = outIdx + ".out-".Length + 16; // "YYYYMMDD_HHMMSS."
         if (afterTs >= pidIdx) return "misc";
         var tag = fileName[afterTs..pidIdx].ToLowerInvariant();
-        if (tag.StartsWith("slack-"))     return "slack";
-        if (tag.StartsWith("file-"))      return "file";
-        if (tag.StartsWith("web-fetch-")) return "web-" + tag["web-fetch-".Length..];
-        if (tag.StartsWith("web-read-"))  return "web-" + tag["web-read-".Length..];
+        if (tag.StartsWith("slack-"))     return "slack " + tag["slack-".Length..];
+        if (tag.StartsWith("file-"))      return "file " + tag["file-".Length..];
+        if (tag.StartsWith("web-fetch-")) return "web fetch " + tag["web-fetch-".Length..];
+        if (tag.StartsWith("web-read-"))  return "web read " + tag["web-read-".Length..];
+        if (tag.StartsWith("web-"))       return "web " + tag["web-".Length..];
+        if (tag.StartsWith("ask-"))       return "ask " + tag["ask-".Length..];
+        if (tag.StartsWith("agent-"))     return "agent " + tag["agent-".Length..];
         return string.IsNullOrEmpty(tag) ? "misc" : tag;
     }
 
