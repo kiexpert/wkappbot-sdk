@@ -74,6 +74,7 @@ public sealed class ScenarioRunner
         VisionCache? visionCache = null;
         VisionAnalyzer? visionAnalyzer = null;
         SimpleOcrAnalyzer? simpleOcr = null;
+        OcrSegmentCache? segmentCache = null;
 
         try
         {
@@ -90,6 +91,7 @@ public sealed class ScenarioRunner
                 try
                 {
                     visionCache = new VisionCache(ctx.VisionCacheDir, ctx.VisionCacheTtlDays);
+                    segmentCache = new OcrSegmentCache(ctx.VisionCacheDir);
 
                     // Simple OCR first (free, fast, offline)
                     try
@@ -157,7 +159,7 @@ public sealed class ScenarioRunner
             }
 
             // 4. Run steps
-            using var executor = new ActionExecutor(ctx, _verbose, visionCache, visionAnalyzer, simpleOcr);
+            using var executor = new ActionExecutor(ctx, _verbose, visionCache, visionAnalyzer, simpleOcr, segmentCache);
             executor.CreateZoom = ZoomFactory; // [ZOOM] Pass through CLI layer factory
             executor.Readiness = ReadinessInstance; // [READINESS] Pre-action blocker/minimize check
 
