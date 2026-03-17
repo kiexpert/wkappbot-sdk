@@ -1918,6 +1918,81 @@ public sealed class ClaudePromptHelper : IDisposable
         }
     }
 
+    /// <summary>
+    /// Clear the prompt input area (focusless preferred, focus-steal fallback).
+    /// Must be called with AllowFocusSteal=true if focus-steal fallback is needed.
+    /// </summary>
+    public bool ClearCurrentInput(PromptInfo prompt)
+    {
+        try
+        {
+            var root = _automation.FromHandle(prompt.WindowHandle);
+            if (root == null) return false;
+
+            // VS Code / Codex: try Value.SetValue("") on [Edit] "Message input"
+            if (string.Equals(prompt.HostType, HostVsCodeClaudeCode, StringComparison.OrdinalIgnoreCase)
+             || string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                var editEl = root.FindFirst(TreeScope.Descendants, new AndCondition(
+                    new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Edit),
+                    new PropertyCondition(_automation.PropertyLibrary.Element.Name, "Message input")));
+
+                if (editEl != null)
+                {
+                    var vp = editEl.Patterns.Value;
+                    if (vp.IsSupported)
+                    {
+                        vp.Pattern.SetValue("");
+                        Console.WriteLine("  [PROMPT] ClearCurrentInput: Value.SetValue('') OK (focusless)");
+                        return true;
+                    }
+                }
+
+                // Fallback: focus-steal + Escape + Ctrl+A + Delete
+                if (!AllowFocusSteal)
+                {
+                    Console.WriteLine("  [PROMPT] ClearCurrentInput: focusless failed, AllowFocusSteal=false — skip");
+                    return false;
+                }
+
+                var prevFg = NativeMethods.GetForegroundWindow();
+                NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+                Thread.Sleep(150);
+                KeyboardInput.PressKey("escape");
+                Thread.Sleep(80);
+                KeyboardInput.Hotkey(new[] { "ctrl", "a" });
+                Thread.Sleep(30);
+                KeyboardInput.PressKey("delete");
+                Thread.Sleep(50);
+                Console.WriteLine("  [PROMPT] ClearCurrentInput: focus-steal Ctrl+A+Delete OK");
+                if (prevFg != IntPtr.Zero && prevFg != prompt.WindowHandle)
+                    NativeMethods.SmartSetForegroundWindow(prevFg);
+                return true;
+            }
+
+            // Claude Desktop: Value.SetValue("") on inputGroup
+            var turnForm = root.FindFirstDescendant(
+                new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+            if (turnForm == null) return false;
+            var inputGroup = turnForm.FindFirstChild(
+                new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Group));
+            if (inputGroup == null) return false;
+            var valPat = inputGroup.Patterns.Value;
+            if (valPat.IsSupported)
+            {
+                valPat.Pattern.SetValue("");
+                Console.WriteLine("  [PROMPT] ClearCurrentInput: Value.SetValue('') on inputGroup OK");
+                return true;
+            }
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] ClearCurrentInput error: {ex.Message}");
+            return false;
+        }
+    }
+
     public SubmitState ProbeSubmitState(PromptInfo prompt)
     {
         try
