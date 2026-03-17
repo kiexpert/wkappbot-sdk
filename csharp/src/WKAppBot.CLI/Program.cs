@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 using WKAppBot.Core.Scenario;
@@ -680,7 +681,7 @@ internal partial class Program
             // Cut at first #/;/ — take main window token only
             main = pattern.Split('#', '/', ';')[0].Trim();
             // Strip wildcards/spaces/hyphens → compact keyword ("*영웅문*" → "영웅문", "*Visual Studio*" → "VisualStudio")
-            main = main.Replace("*", "").Replace("?", "").Replace(" ", "").Replace("-", "").Trim();
+            main = Regex.Replace(main, @"[*?\s\-]+", "");
         }
 
         // Strip filesystem-unsafe chars
