@@ -1118,6 +1118,29 @@ public sealed class ActionExecutor : IDisposable
                             ControlType = location.ControlType
                         };
                         _segmentCache.LearnSegment(classPath, formHash, winW, winH, seg);
+
+                        // Save element crop as {pixelHash}={label}.png for pixel-based fast lookup
+                        if (location.Width > 4 && location.Height > 4)
+                        {
+                            try
+                            {
+                                int cx = location.CenterX - location.Width / 2;
+                                int cy = location.CenterY - location.Height / 2;
+                                int cw = Math.Min(location.Width, bmp.Width - Math.Max(0, cx));
+                                int ch = Math.Min(location.Height, bmp.Height - Math.Max(0, cy));
+                                cx = Math.Max(0, cx); cy = Math.Max(0, cy);
+                                if (cw > 0 && ch > 0)
+                                {
+                                    using var crop = bmp.Clone(
+                                        new System.Drawing.Rectangle(cx, cy, cw, ch), bmp.PixelFormat);
+                                    var blobPath = _segmentCache.SaveBlob(crop,
+                                        location.Label ?? step.Target.Description);
+                                    if (blobPath != null)
+                                        Log($"  Vision API: blob saved {Path.GetFileName(blobPath)}");
+                                }
+                            }
+                            catch { /* best-effort */ }
+                        }
                     }
 
                     Log($"  Vision API: found at ({absX},{absY}) conf={location.Confidence:F2}");
