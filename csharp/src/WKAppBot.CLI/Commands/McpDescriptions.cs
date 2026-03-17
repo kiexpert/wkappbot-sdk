@@ -12,7 +12,7 @@ internal partial class Program
         "Designed for focusless-first automation: controls apps WITHOUT stealing your keyboard focus.\n" +
         "MCP config: add to ~/.claude/mcp.json → { \"mcpServers\": { \"wkappbot\": { \"command\": \"wkappbot\", \"args\": [\"mcp\"] } } }\n\n" +
         "## Grap Pattern (window targeting)\n" +
-        "All tools use 'grap' (GRab Accessibility Pattern) to find windows:\n" +
+        "All tools use 'grap' (GRab Accessible Pattern) to find windows:\n" +
         "- Wildcard: \"*Notepad*\", \"*계산기*\" (glob-style * and ?)\n" +
         "- Literal: \"Calculator\" (exact title match)\n" +
         "- Regex: \"regex:btn_\\\\d+\" (prefix with regex:)\n" +

@@ -31,6 +31,10 @@ internal partial class Program
 
     /// <summary>True when logcat runs in piped stdout (grep-mode): matches → OriginalStdout, diagnostics → stderr.</summary>
     internal static bool GrepModeActive = false;
+    internal static bool GrapMode = false; // true when invoked as grap/grep → one-shot scan even on TTY
+    // Relay file path for grap/grep one-shot mode (WKAPPBOT_RELAY_FILE env var).
+    // FastExit creates {relayFilePath}.done sentinel after closing the file.
+    internal static string? RelayFilePath = null;
 
     /// <summary>Original Console.Out before TeeTextWriter is installed. Used by grep-mode to write matches to real stdout.</summary>
     internal static TextWriter OriginalStdout = Console.Out;
@@ -71,6 +75,8 @@ internal partial class Program
     internal static int Main(string[] args)
     {
         var _mainStarted = System.Diagnostics.Stopwatch.StartNew();
+        void DbgFile(string s) { try { System.IO.File.AppendAllText(@"C:\Temp\core_detach.txt", $"{_mainStarted.ElapsedMilliseconds}ms {s}\n"); } catch { } }
+        DbgFile($"Main entered args=[{string.Join(",", args)}] RELAY={Environment.GetEnvironmentVariable("WKAPPBOT_RELAY_FILE") ?? "(null)"}");
 
         // WKAPPBOT_PROFILE=1 → emit [PROFILE] Xms label to stderr for startup diagnostics.
         // Usage: WKAPPBOT_PROFILE=1 wkappbot grep foo
@@ -80,12 +86,15 @@ internal partial class Program
             : (_ => { });
 
         prof("Main() entered");
-
+        DbgFile("before OutputEncoding");
         // Force UTF-8 globally — console + child processes inherit codepage 65001
-        Console.OutputEncoding = Encoding.UTF8;
-        Console.InputEncoding = Encoding.UTF8;
+        try { Console.OutputEncoding = Encoding.UTF8; } catch { }
+        DbgFile("after OutputEncoding");
+        try { Console.InputEncoding = Encoding.UTF8; } catch { }
+        DbgFile("after InputEncoding");
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
+        DbgFile("after ConsoleCP");
 
         // MCP stdio server — must run BEFORE TeeTextWriter (stdout = JSON-RPC only)
         if (args.Length > 0 && args[0] == "mcp")
@@ -94,38 +103,39 @@ internal partial class Program
             return McpCommand(args.Skip(1).ToArray());
         }
 
-        // help: fast path — skip TeeWriter, RotateOldLogs, Eye tick, LaunchEye, OrphanGuard
-        // Skip fast path when profiling so all init stages are visible
+        // Fast path for grap/grep help (no args or --help/-h): print and exit immediately.
+        // Must run BEFORE CloseAllGhosts — ghost window cleanup can block if previous Core
+        // instances were force-killed, leaving WPF dispatcher threads in a hung state.
+        // FastExit (TerminateProcess) bypasses the 26s DLL-detach deadlock, so this is safe
+        // even when stdout is redirected to a file.
+        if (args.Length > 0 && args[0].ToLowerInvariant() is "grap" or "grep"
+            && (args.Length == 1 || args.Any(a => a is "--help" or "-h")))
         {
-            var argv0help = Environment.GetCommandLineArgs().FirstOrDefault() ?? "";
-            var exeBaseHelp = Path.GetFileNameWithoutExtension(argv0help).ToLowerInvariant();
-            var a0 = args.Length > 0 ? args[0].ToLowerInvariant() : "";
-            bool isGrapAlias   = exeBaseHelp == "grap" || exeBaseHelp == "grep" || a0 == "grap" || a0 == "grep";
-            bool hasHelpFlag   = args.Any(a => a == "--help" || a == "-h");
-            bool isHelpRequest = args.Length == 0 || a0 == "help" || a0 == "--help" || a0 == "-h"
-                              || (isGrapAlias && (args.Length == 1 || hasHelpFlag));
-            if (!_profiling && isHelpRequest)
-            {
-                if (isGrapAlias)
-                    PrintGrapHelp(a0 == "grep" || exeBaseHelp == "grep" ? "grep" : "grap");
-                else
-                    PrintUsage();
-                return 0;
-            }
+            try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
+            PrintGrapHelp(args[0].ToLowerInvariant());
+            Console.Out.Flush();
+            FastExit(0);
+            return 0; // unreachable
         }
 
         // Enable DPI awareness
+        DbgFile("before DpiAwareness");
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
-        prof("DpiAwareness set");
+        DbgFile("after DpiAwareness");
 
         // Kill ghost zoom overlays from previous invocations (keeps exe unlocked for publish)
         try { InputZoomHost.CloseAllGhosts(); } catch { }
-        prof("CloseAllGhosts done");
+        DbgFile("after CloseAllGhosts");
 
         // Auto-create busybox symlinks (a11y.exe, wka11y.exe → wkappbot.exe) if missing.
-        // Background: file ops (ResolveLinkTarget, CreateSymbolicLink) can block on VHD/network drives.
-        ThreadPool.QueueUserWorkItem(_ => { try { EnsureBusyboxAliases(); } catch { } });
-        prof("EnsureBusyboxAliases queued (background)");
+        // Skip for grap/grep fast-exit: symlink file ops on W:/ (SMB) leave pending kernel I/O
+        // that blocks TerminateProcess for ~27s (SMB cancel timeout).
+        bool _isGrapFastPath = args.Length > 0 && args[0].ToLowerInvariant() is "grap" or "grep" && args.Length > 1;
+        if (!_isGrapFastPath)
+        {
+            ThreadPool.QueueUserWorkItem(_ => { try { EnsureBusyboxAliases(); } catch { } });
+            prof("EnsureBusyboxAliases queued (background)");
+        }
 
         // Orphan guard: if parent dies, exit too (prevents ghost processes like stuck win-click).
         // Eye mode is intentionally long-running/detached → skip.
@@ -158,13 +168,39 @@ internal partial class Program
 
         prof("OrphanGuard started");
 
+        // ── Hang diagnostics (always-on for fast-exit paths) ──────────────────────────────────
+        // Problem: `grap` (no args) sometimes takes 26s despite Main() logic completing in ~14ms.
+        // Approach: string step name + background watchdog + ProcessExit marker to pinpoint WHERE.
+        // Writes to stderr so it's visible regardless of stdout redirect.
+        string _diagStep = "init";
+        var _diagSw = System.Diagnostics.Stopwatch.StartNew();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try { Console.Error.WriteLine($"[HANG-DIAG] ProcessExit: step={_diagStep} elapsed={_diagSw.ElapsedMilliseconds}ms"); } catch { }
+        };
+        var _diagThread = new Thread(() =>
+        {
+            // Fires only if process is still alive after threshold — normal fast exits won't see this.
+            Thread.Sleep(3_000);
+            try { Console.Error.WriteLine($"[HANG-DIAG] 3s: step={_diagStep} elapsed={_diagSw.ElapsedMilliseconds}ms"); } catch { }
+            Thread.Sleep(5_000);
+            try { Console.Error.WriteLine($"[HANG-DIAG] 8s: step={_diagStep} elapsed={_diagSw.ElapsedMilliseconds}ms"); } catch { }
+            Thread.Sleep(18_000);
+            try { Console.Error.WriteLine($"[HANG-DIAG] 26s: step={_diagStep} elapsed={_diagSw.ElapsedMilliseconds}ms"); } catch { }
+        }) { IsBackground = true, Name = "HangDiag" };
+        _diagThread.Start();
+        // ─────────────────────────────────────────────────────────────────────────────────────
+
         // Auto-log: tee all console output to file
         var exePath = Environment.ProcessPath ?? "wkappbot.exe";
         var exeName = Path.GetFileName(exePath);
         var logDir = Path.Combine(DataDir, "logs");
-        Directory.CreateDirectory(logDir);
-        RotateOldLogs(logDir, staleHours: 24);
+        // Delay CreateDirectory until we know this isn't a fast-exit path (grap/grep).
+        // Directory.CreateDirectory on W:/ (SMB) can leave pending kernel I/O that delays
+        // TerminateProcess exit by ~27s (SMB cancel timeout). Logcat can create it if needed.
+        _diagStep = "alias-rewrite";
         var pid = Environment.ProcessId;
+        bool _fastExitAfterCommand = false; // set when grap/grep alias → FastExit after logcat to skip DLL-detach 26s hang
 
         // ── Alias rewrite (runs BEFORE cmdTag/logFile so all downstream sees canonical command) ──
         // Step 1: busybox exe-name → prepend implicit command (symlink-friendly)
@@ -186,19 +222,34 @@ internal partial class Program
             // --help or no-args: show alias-specific help (before rewrite)
             if (args.Length == 1 || args.Any(a => a is "--help" or "-h"))
             {
+                _diagStep = "PrintGrapHelp";
                 prof("PrintGrapHelp");
                 PrintGrapHelp(alias);
-                return 0;
+                _diagStep = "stdout-flush";
+                prof("return 0");
+                Console.Out.Flush();
+                _diagStep = "FastExit";
+                FastExit(0); // TerminateProcess — skips loader-lock deadlock (~26s) from background symlink thread
+                return 0; // unreachable if FastExit works
             }
             args = new[] { "logcat" }.Concat(GrapArgsToLogcat(args.Skip(1).ToArray())).ToArray();
+            _fastExitAfterCommand = true; // skip DLL-detach 26s hang after logcat completes
+            GrapMode = true;             // grep-compatible one-shot behavior
+        }
+
+        // CreateDirectory + RotateOldLogs: skip for grap/grep fast-exit path — they call
+        // TerminateProcess after logcat, and any file I/O on W:/ (SMB network drive) leaves
+        // pending kernel I/O that blocks TerminateProcess for ~27s (SMB cancel timeout).
+        if (!_fastExitAfterCommand)
+        {
+            Directory.CreateDirectory(logDir);
+            ThreadPool.QueueUserWorkItem(_ => { try { RotateOldLogs(logDir, staleHours: 24); } catch { } });
+            prof("RotateOldLogs queued (background)");
         }
 
         // Include command name in log filename for easy identification via ls
         // e.g. "wkappbot.exe.out-20260221_211427.eye.pid=36944.txt"
-        var cmdTag = args.Length > 0 ? args[0].ToLowerInvariant().Replace(" ", "-") : "noargs";
-        // For multi-word commands like "slack send", include subcommand too
-        if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow" or "file")
-            cmdTag += $"-{args[1].ToLowerInvariant()}";
+        var (cmdTag, oldSubDir) = ComputeCmdTagAndSubDir(args);
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
         // Track current command log path for auto-heal diagnostics (non-Eye mode only; Eye sets it in RunInEye)
         if (!RunningInEye) _currentLogPath = logFile;
@@ -215,10 +266,32 @@ internal partial class Program
 
         // RunningInEye: skip Console.SetOut — log tee is handled by EyeCmdPipeServer (per-command, parallel-safe)
         // Grep-mode: echo diagnostics to stderr so stdout contains only match lines (grep-compat).
-        TeeTextWriter? tee = RunningInEye ? null : new TeeTextWriter(GrepModeActive ? Console.Error : Console.Out, logFile);
+        // Skip TeeWriter for grap/grep fast-exit: writing log file on W:/ (SMB) leaves kernel-level
+        // pending I/O that blocks TerminateProcess (STILL_ACTIVE) for ~27s (SMB cancel timeout).
+        TeeTextWriter? tee = (RunningInEye || _fastExitAfterCommand) ? null : new TeeTextWriter(GrepModeActive ? Console.Error : Console.Out, logFile, oldSubDir: oldSubDir);
         // Wrap tee in ThreadRoutingWriter so EyeCmdPipeServer.Route() can redirect per-command output.
         // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
+        // Print log path early — so if the caller times out, they know where to tail the live log.
+        if (tee != null && !GrepModeActive)
+            Console.Error.WriteLine($"[LOG] {logFile}");
+        // For grap/grep fast-exit: Launcher writes output path to WKAPPBOT_RELAY_FILE.
+        // Core redirects Console.Out to that file. FastExit signals WKAPPBOT_RELAY_EVENT (EventWaitHandle)
+        // after flushing — Launcher reads the file while Core is still alive (no 27s AV/SMB delay),
+        // then signals WKAPPBOT_RELAY_READ_EVENT so Core can proceed to TerminateProcess.
+        RelayFilePath = _fastExitAfterCommand ? Environment.GetEnvironmentVariable("WKAPPBOT_RELAY_FILE") : null;
+        if (RelayFilePath != null)
+        {
+            try
+            {
+                var relayStream = new System.IO.FileStream(RelayFilePath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read);
+                var _relayWriter = new System.IO.StreamWriter(relayStream, Console.OutputEncoding, bufferSize: 4096, leaveOpen: false) { AutoFlush = false };
+                Console.SetOut(_relayWriter);
+                OriginalStdout = _relayWriter;
+            }
+            catch { RelayFilePath = null; /* fallback to normal stdout */ }
+        }
+        if (_fastExitAfterCommand) SetupSyncStdout();
         prof("TeeWriter ready");
 
         // ── Crash handler: dump stack trace to log, DON'T move to old/ (crash evidence) ──
@@ -308,30 +381,37 @@ internal partial class Program
             prof($"command={command}");
 
             // Global Eye tick (for eye --global multi-parent monitor)
-            try { EmitEyeTick(command, cmdTag, "start"); } catch { }
-            if (!GrepModeActive) Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
-            try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
-            try
+            // Skip for grap/grep alias — EmitEyeTick calls FindLogicalHost which may leave pending
+            // I/O (UIA/WMI) that prevents TerminateProcess from completing for ~28s.
+            if (!_fastExitAfterCommand)
             {
-                var promptPreview = BuildPromptPreview(command, restArgs);
-                if (!string.IsNullOrWhiteSpace(promptPreview))
-                    EmitEyeTick(command, cmdTag, $"prompt:{promptPreview}");
+                try { EmitEyeTick(command, cmdTag, "start"); } catch { }
+                if (!GrepModeActive) Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
+                try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
+                try
+                {
+                    var promptPreview = BuildPromptPreview(command, restArgs);
+                    if (!string.IsNullOrWhiteSpace(promptPreview))
+                        EmitEyeTick(command, cmdTag, $"prompt:{promptPreview}");
+                }
+                catch { }
             }
-            catch { }
 
             // Auto-launch AppBotEye for ALL commands except help and eye-global commands
             // 앱봇이 뭔가 하면 눈은 항상 떠있어야! (도움말, eye 글로벌루프만 제외 — 무한 cascade 방지)
             // GlobalMode Eye 중복감지: Named mutex "Global\WKAppBotEyeGlobal" 사용 (LaunchAppBotEyeIfNeededCore)
             // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
             var isEyeGlobal = command == "eye" && (restArgs.Length == 0 || restArgs[0] != "tick");
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" || isEyeGlobal;
+            // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
+            // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" || isEyeGlobal || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
             }
 
-            try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
-            if (!GrepModeActive) try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
+            if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
+            if (!GrepModeActive && !GrapMode) try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
             prof("dispatch");
 
             exitCode = command switch
@@ -409,8 +489,11 @@ internal partial class Program
 
             try
             {
-                if (exitCode == 0) Console.WriteLine($"[ACT] result=ok cmd={command}");
-                else Console.WriteLine($"[FALLBACK] result=fail code={exitCode} cmd={command}");
+                if (!GrapMode)
+                {
+                    if (exitCode == 0) Console.WriteLine($"[ACT] result=ok cmd={command}");
+                    else Console.WriteLine($"[FALLBACK] result=fail code={exitCode} cmd={command}");
+                }
             }
             catch { }
 
@@ -472,6 +555,7 @@ internal partial class Program
         }
         finally
         {
+            if (!_fastExitAfterCommand)
             try
             {
                 var cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "noargs";
@@ -484,56 +568,157 @@ internal partial class Program
             tee?.Dispose(); // normal-exit atexit-style move to logs/old
             if (tee != null) Console.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
             timeoutTimer?.Dispose();
+            // grap/grep alias → FastExit to bypass EnsureBusyboxAliases DLL-detach deadlock (26s hang)
+            if (_fastExitAfterCommand)
+                FastExit(exitCode);
         }
+    }
+
+    /// <summary>
+    /// Compute (cmdTag, oldSubDir) for log filename and old-dir routing.
+    /// cmdTag  → embedded in the log filename  (e.g. "web-fetch-github.com")
+    /// oldSubDir → used as the old-{subDir}/ folder name (same value, sans redundant prefix)
+    /// Rules:
+    ///   a11y &lt;action&gt;       → tag=action,          dir=action         (a11y is a namespace)
+    ///   web fetch/read &lt;url&gt; → tag=web-fetch-{host}, dir=web-{host}
+    ///   web search           → tag=web-search,       dir=web-search
+    ///   ask/agent &lt;ai&gt;       → tag=ask-gpt etc,      dir=ask-gpt
+    ///   slack/file/…        → tag=cmd-sub,           dir=cmd(-sub)
+    ///   others              → tag=cmd,               dir=cmd
+    /// </summary>
+    static (string cmdTag, string oldSubDir) ComputeCmdTagAndSubDir(string[] args)
+    {
+        if (args.Length == 0) return ("noargs", "noargs");
+        var cmd = args[0].ToLowerInvariant();
+        var sub = args.Length > 1 ? args[1].ToLowerInvariant() : "";
+
+        switch (cmd)
+        {
+            case "a11y":
+            {
+                // a11y <action> → old-{action}/  (action is the real command)
+                var action = sub.Length > 0 ? sub : "a11y";
+                return (action, action);
+            }
+
+            case "web":
+            {
+                if (sub is "fetch" or "read")
+                {
+                    var url  = args.Length > 2 ? args[2] : "";
+                    var host = ExtractUrlHost(url);
+                    if (host != null)
+                        return ($"web-{sub}-{host}", $"web-{host}");
+                    return ($"web-{sub}", $"web-{sub}");
+                }
+                // search or unknown sub
+                var tag = sub.Length > 0 ? $"web-{sub}" : "web";
+                return (tag, tag);
+            }
+
+            case "ask":
+            case "agent":
+            {
+                var tag = sub.Length > 0 ? $"{cmd}-{sub}" : cmd;
+                return (tag, tag);
+            }
+
+            case "slack":
+            case "file":
+            case "schedule":
+            case "knowhow":
+            {
+                // include subcommand in both tag and dir
+                var tag = sub.Length > 0 ? $"{cmd}-{sub}" : cmd;
+                return (tag, cmd); // dir groups by top-level cmd
+            }
+
+            default:
+                return (cmd, cmd);
+        }
+    }
+
+    static string? ExtractUrlHost(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        try
+        {
+            if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                url = "https://" + url;
+            var host = new Uri(url).Host.ToLowerInvariant();
+            return string.IsNullOrEmpty(host) ? null : host;
+        }
+        catch { return null; }
     }
 
     static void RotateOldLogs(string logDir, int staleHours = 24)
     {
         try
         {
-            var oldDir = Path.Combine(logDir, "old");
+            var _rsw = System.Diagnostics.Stopwatch.StartNew();
+            bool _rprof = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1";
+            void rprof(string s) { if (_rprof) Console.Error.WriteLine($"[ROTATE] {_rsw.ElapsedMilliseconds}ms {s}"); }
+
             var now = DateTime.UtcNow;
 
+            // ── Phase 1: move stale live logs → old-{subkey}/ ──────────────────────
+            rprof("GetFiles start");
             var files = Directory
                 .GetFiles(logDir, "*.out-*.txt", SearchOption.TopDirectoryOnly)
                 .Select(p => new FileInfo(p))
                 .OrderBy(f => f.CreationTimeUtc)
                 .ToList();
+            rprof($"GetFiles done count={files.Count}");
 
             foreach (var f in files)
             {
-                // Only sweep logs older than threshold.
                 if ((now - f.CreationTimeUtc).TotalHours < staleHours)
                     continue;
-
-                // PID-based safety: move only when process is no longer alive.
                 if (!TryGetPidFromLogName(f.Name, out var pid))
                     continue;
+                rprof($"IsProcessAlive pid={pid} file={f.Name}");
                 if (IsProcessAlive(pid))
                     continue;
+                rprof($"IsProcessAlive done — moving {f.Name}");
 
                 try
                 {
-                    Directory.CreateDirectory(oldDir);
-                    var dest = Path.Combine(oldDir, f.Name);
+                    var destDir = Path.Combine(logDir, $"old-{OldSubDirFromCmdTag(f.Name)}");
+                    Directory.CreateDirectory(destDir);
+                    var dest = Path.Combine(destDir, f.Name);
                     if (File.Exists(dest))
                     {
                         var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                        dest = Path.Combine(oldDir, $"{Path.GetFileNameWithoutExtension(f.Name)}.{stamp}{f.Extension}");
+                        dest = Path.Combine(destDir, $"{Path.GetFileNameWithoutExtension(f.Name)}.{stamp}{f.Extension}");
                     }
-
                     File.Move(f.FullName, dest);
+                    rprof($"moved → {dest}");
                 }
-                catch
-                {
-                    // File may be in use or already moved by another process.
-                }
+                catch { }
             }
+
+            rprof("done");
         }
         catch
         {
             // Best-effort log housekeeping only.
         }
+    }
+
+    // Extract old-dir subkey from log filename: exe.out-YYYYMMDD_HHMMSS.{cmdTag}.pid=N.txt
+    static string OldSubDirFromCmdTag(string fileName)
+    {
+        var pidIdx = fileName.LastIndexOf(".pid=", StringComparison.OrdinalIgnoreCase);
+        var outIdx = fileName.IndexOf(".out-", StringComparison.OrdinalIgnoreCase);
+        if (pidIdx < 0 || outIdx < 0) return "misc";
+        var afterTs = outIdx + ".out-".Length + 16; // "YYYYMMDD_HHMMSS."
+        if (afterTs >= pidIdx) return "misc";
+        var tag = fileName[afterTs..pidIdx].ToLowerInvariant();
+        if (tag.StartsWith("slack-"))     return "slack";
+        if (tag.StartsWith("file-"))      return "file";
+        if (tag.StartsWith("web-fetch-")) return "web-" + tag["web-fetch-".Length..];
+        if (tag.StartsWith("web-read-"))  return "web-" + tag["web-read-".Length..];
+        return string.IsNullOrEmpty(tag) ? "misc" : tag;
     }
 
     static bool TryGetPidFromLogName(string fileName, out int pid)
@@ -1219,5 +1404,102 @@ internal partial class Program
             Console.ResetColor();
             return 1;
         }
+    }
+
+    // TerminateProcess: bypass ExitProcess / DLL detach / managed finalizers → immediate exit.
+    // ExitProcess (used by Environment.Exit) sends DLL_PROCESS_DETACH to all DLLs and waits for
+    // them — if a background thread holds a loader lock (e.g. inside CreateHardLink / CreateSymbolicLink),
+    // ExitProcess deadlocks for ~26s until the OS timeout. TerminateProcess skips all that.
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
+    private static extern IntPtr GetCurrentProcess();
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
+    private static extern uint GetLastError();
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
+    private static extern IntPtr GetStdHandle(int nStdHandle);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetStdHandle(int nStdHandle, IntPtr hHandle);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool FlushFileBuffers(IntPtr hFile);
+
+    /// <summary>
+    /// For grap/grep fast-exit: replace Console.Out with a synchronous (non-IOCP) pipe writer.
+    /// .NET 8's default Console.Out uses IOCP (async I/O) — Flush() only SCHEDULES the write;
+    /// actual delivery to the pipe happens during DLL_PROCESS_DETACH (~28s due to loader lock
+    /// deadlock). A synchronous FileStream bypasses IOCP: writes reach the pipe immediately.
+    /// Call this BEFORE command dispatch and update OriginalStdout so LogcatCommand also uses it.
+    /// </summary>
+    internal static void SetupSyncStdout()
+    {
+        // No-op: sync FileStream on overlapped pipe handles throws ArgumentException.
+        // FastExit() uses FlushFileBuffers + TerminateProcess instead — see FastExit comments.
+    }
+
+    /// <summary>
+    /// FastExit for grap/grep: flush stdout pipe to kernel buffer, then TerminateProcess.
+    ///
+    /// Why not Environment.Exit: ExitProcess → DLL_PROCESS_DETACH → loader lock deadlock for ~28s.
+    ///   If stdout is a pipe, .NET's IOCP async writes may not have committed to the kernel pipe
+    ///   buffer yet → TerminateProcess cancels them → data loss (relay sees bytes=0).
+    ///
+    /// Why not CloseHandle(STDOUT): Launcher uses overlapped (async) pipe handles. CloseHandle on
+    ///   the write end while IOCP writes are in-flight cancels those writes → data loss.
+    ///
+    /// Correct approach:
+    ///   1. Console.Out.Flush() — flushes StreamWriter char buffer to underlying FileStream
+    ///   2. FlushFileBuffers(hOut) — forces kernel to commit all pending pipe writes; blocks until
+    ///      all data is in the OS pipe buffer and visible to the reader.
+    ///   3. TerminateProcess(self) — kills immediately; all handles closed atomically.
+    ///      No DLL_PROCESS_DETACH → no loader lock deadlock. Relay reads committed data, then gets EOF.
+    /// </summary>
+    static void FastExit(int code = 0)
+    {
+        void Dbg(string s) { try { System.IO.File.AppendAllText(@"C:\Temp\fastexit_dbg.txt", $"{System.Diagnostics.Stopwatch.GetTimestamp()} {s}\n"); } catch { } }
+        Dbg($"FastExit enter code={code} relay={RelayFilePath ?? "(null)"}");
+        try
+        {
+            // Flush all buffered output to relay file (or stdout if no relay)
+            Dbg("before Flush");
+            Console.Out.Flush();
+            Dbg("after Flush");
+
+            if (RelayFilePath != null)
+            {
+                // Close relay file BEFORE signaling .ready so Launcher can read it without sharing conflicts.
+                Dbg("closing Console.Out (relay file)");
+                try { Console.Out.Close(); } catch { }
+                Console.SetOut(System.IO.TextWriter.Null); // prevent further writes
+
+                // File-based handshake: create .ready WHILE STILL ALIVE so Launcher can see it immediately.
+                // (Files created before TerminateProcess are visible to other processes without 27s delay.)
+                // Launcher reads relay file, then creates .ack. We wait for .ack (max 500ms) then terminate.
+                var _readyPath    = RelayFilePath + ".ready";
+                var _ackPath      = RelayFilePath + ".ack";
+                var _exitCodePath = RelayFilePath + ".exitcode";
+                Dbg($"writing .exitcode={code} .ready to {_readyPath}");
+                try { System.IO.File.WriteAllText(_exitCodePath, code.ToString()); } catch { }
+                try { System.IO.File.WriteAllText(_readyPath, "1"); Dbg(".ready written"); } catch (Exception ex) { Dbg($".ready FAILED: {ex.Message}"); }
+                // Wait for Launcher to signal .ack (relay file is closed — no sharing issue)
+                var _deadline = System.Diagnostics.Stopwatch.GetTimestamp()
+                              + (long)(500 * System.Diagnostics.Stopwatch.Frequency / 1000.0);
+                while (System.Diagnostics.Stopwatch.GetTimestamp() < _deadline)
+                {
+                    if (System.IO.File.Exists(_ackPath)) { Dbg(".ack found"); break; }
+                    System.Threading.Thread.Sleep(5);
+                }
+                Dbg(".ack wait done");
+            }
+        }
+        catch (Exception ex) { Dbg($"FastExit outer catch: {ex.Message}"); }
+        Dbg("calling TerminateProcess");
+        TerminateProcess(GetCurrentProcess(), (uint)code);
+        System.Threading.Thread.Sleep(500);
+        Environment.Exit(code);
     }
 }
