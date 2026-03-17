@@ -83,6 +83,25 @@ Examples:
         }
         catch { /* best-effort — proceed without experience DB */ }
 
+        // Debug images → experience DB form dir if available, else logs/ocr/
+        string DebugImagePath(string tag)
+        {
+            string dir;
+            string prefix;
+            if (expDb != null)
+            {
+                dir = Path.Combine(expDb.ExpDir, $"form_{targetFormId}");
+                prefix = "do_";
+            }
+            else
+            {
+                dir = Path.Combine(DataDir, "logs", "ocr");
+                prefix = "combo_";
+            }
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, $"{prefix}{tag}_{DateTime.Now:HHmmss}.png");
+        }
+
         // Find form
         var scanResult = AppScanner.Scan(win.Handle);
 
@@ -298,7 +317,7 @@ Examples:
             try
             {
                 using var bmp = ScreenCapture.CaptureWindow(win.Handle);
-                var ssPath = Path.Combine(DataDir, "logs", $"combo{comboNum}_opened.png");
+                var ssPath = DebugImagePath($"combo{comboNum}_opened");
                 bmp.Save(ssPath);
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write($"[screenshot: {Path.GetFileName(ssPath)}] ");

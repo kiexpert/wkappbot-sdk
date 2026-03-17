@@ -367,6 +367,25 @@ Examples:
         bool success = false;
         const bool RequireOcrForNonA11y = true;
 
+        // OCR debug images → experience DB form dir if available, else logs/ocr/
+        string OcrDebugPath(string tag)
+        {
+            string dir;
+            string prefix;
+            if (expDb != null)
+            {
+                dir = Path.Combine(expDb.ExpDir, $"form_{targetFormId}");
+                prefix = "ocr_";
+            }
+            else
+            {
+                dir = Path.Combine(DataDir, "logs", "ocr");
+                prefix = "input_";
+            }
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, $"{prefix}{tag}_{DateTime.Now:HHmmss}.png");
+        }
+
         bool ConfirmByOcrContains(string methodTag)
         {
             try
@@ -383,7 +402,7 @@ Examples:
                 if (rx < 0 || ry < 0 || rw <= 0 || rh <= 0) return false;
 
                 using var cropBmp = ScreenCapture.CropRegion(formBmp, rx, ry, rw, rh);
-                var ssPath = Path.Combine(DataDir, "logs", $"input_{methodTag}_ocr_{DateTime.Now:HHmmss}.png");
+                var ssPath = OcrDebugPath($"{methodTag}_ocr");
                 cropBmp.Save(ssPath);
                 var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
                 var ocrResult = ocr.RecognizeAll(cropBmp).GetAwaiter().GetResult();
@@ -741,7 +760,7 @@ Examples:
                         if (rx >= 0 && ry >= 0 && rw > 0 && rh > 0)
                         {
                             using var crop10 = ScreenCapture.CropRegion(bmp10, rx, ry, rw, rh);
-                            var ss10 = Path.Combine(DataDir, "logs", $"input_m10_pre_{DateTime.Now:HHmmss}.png");
+                            var ss10 = OcrDebugPath("m10_pre");
                             crop10.Save(ss10);
                             var ocr10 = new WKAppBot.Vision.SimpleOcrAnalyzer();
                             var res10 = ocr10.RecognizeAll(crop10).GetAwaiter().GetResult();
@@ -866,8 +885,7 @@ Examples:
                             if (zShotY < 0) zShotY = 0;
                             Thread.Sleep(100); // brief wait for WPF to render result state (reduced from 300ms)
                             using var zShotBmp = ScreenCapture.CaptureScreenRegion(zShotX, zShotY, zShotW, zShotH);
-                            // Save to logs
-                            var zShotPath = Path.Combine(DataDir, "logs", $"zoom_result_{DateTime.Now:HHmmss}.png");
+                            var zShotPath = OcrDebugPath("zoom_result");
                             ScreenCapture.SaveToFile(zShotBmp, zShotPath);
                             Console.Write($"[ZOOM:saved {zShotPath}] ");
 
@@ -2075,7 +2093,7 @@ Examples:
                 try
                 {
                     using var bmp = ScreenCapture.CaptureWindow(win.Handle);
-                    var ssPath = Path.Combine(DataDir, "logs", $"input_verify_{DateTime.Now:HHmmss}.png");
+                    var ssPath = OcrDebugPath("verify");
                     bmp.Save(ssPath);
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write($"[screenshot: {Path.GetFileName(ssPath)}] ");
