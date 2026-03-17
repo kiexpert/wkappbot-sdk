@@ -639,6 +639,32 @@ internal partial class Program
         bool result = false;
         report.Zoom?.Dispose();
 
+        // ── 기존 입력 내용 확인 ──
+        var existingInput = promptHelper.ReadCurrentInputText(prompt)?.Trim();
+        if (!string.IsNullOrEmpty(existingInput))
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  [SLACK→PROMPT] 기존 입력 내용 감지 ({existingInput.Length}자): \"{existingInput[..Math.Min(60, existingInput.Length)]}...\"");
+            Console.ResetColor();
+
+            // 승인창으로 덮어쓰기 확인 요청
+            var preview = existingInput.Length > 40 ? existingInput[..40] + "…" : existingInput;
+            var actionInfo = $"기존: \"{preview}\"\n→ 슬랙 메시지로 교체 후 전달";
+            var (approved, _, deniedByUser) = UserInputWaitOverlay.Show(
+                prompt.WindowHandle, userIdleMs: 0, timeoutSeconds: 20,
+                positionHwnd: prompt.WindowHandle, noSound: true,
+                actionInfo: actionInfo);
+
+            if (!approved || deniedByUser)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  [SLACK→PROMPT] 덮어쓰기 거부 — 전달 취소");
+                Console.ResetColor();
+                return false;
+            }
+            Console.WriteLine($"  [SLACK→PROMPT] 덮어쓰기 승인 — 기존 내용 저장 후 전달");
+        }
+
         var isCodexPrompt = string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
         var isVsCodePrompt = string.Equals(prompt.HostType, "vscode-claudecode", StringComparison.OrdinalIgnoreCase);
         if (isCodexPrompt || isVsCodePrompt)
@@ -653,6 +679,26 @@ internal partial class Program
                 result = promptHelper.TypeAndSubmit(prompt, text);
             }
             finally { ClaudePromptHelper.AllowFocusSteal = prevAllow; }
+
+            // ── 전달 완료 후 기존 내용 복구 ──
+            if (result && !string.IsNullOrEmpty(existingInput))
+            {
+                Thread.Sleep(300); // 전송 처리 대기
+                Console.WriteLine($"  [SLACK→PROMPT] 기존 입력 내용 복구 시도 ({existingInput.Length}자)");
+                try
+                {
+                    ClaudePromptHelper.AllowFocusSteal = true;
+                    var restored = promptHelper.TypeWithoutSubmit(prompt, existingInput);
+                    Console.WriteLine(restored
+                        ? $"  [SLACK→PROMPT] 기존 입력 복구 완료"
+                        : $"  [WARN] 기존 입력 복구 실패 (Claude 응답 처리 중일 수 있음)");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"  [WARN] 기존 입력 복구 예외: {ex.Message}");
+                }
+                finally { ClaudePromptHelper.AllowFocusSteal = prevAllow; }
+            }
         }
         else for (int attempt = 1; attempt <= 3; attempt++)
         {
