@@ -233,7 +233,8 @@ internal partial class Program
             if (!string.IsNullOrEmpty(botToken))
             {
                 var replyText = $":white_check_mark: *RESOLVED* — {note}";
-                var (ok, _) = SlackSendViaApi(botToken, SuggestChannel, replyText, threadTs: slackTs).GetAwaiter().GetResult();
+                var resolverName = GetSendReplyUsername();
+                var (ok, _) = SlackSendViaApi(botToken, SuggestChannel, replyText, threadTs: slackTs, username: resolverName).GetAwaiter().GetResult();
                 if (ok)
                     Console.WriteLine($"[RESOLVE] Slack reply sent to thread {slackTs}");
                 else
