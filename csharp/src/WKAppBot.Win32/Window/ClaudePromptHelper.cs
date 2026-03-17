@@ -901,6 +901,12 @@ public sealed class ClaudePromptHelper : IDisposable
 
         Console.WriteLine("  [PROMPT:VSCODE-CC] focusless all paths failed — falling back to focus-steal");
 
+        if (!AllowFocusSteal)
+        {
+            Console.WriteLine("  [PROMPT:VSCODE-CC] Focus steal not allowed (AllowFocusSteal=false) — abort");
+            return false;
+        }
+
         var prevForeground = NativeMethods.GetForegroundWindow();
 
         // 항상 타이틀바 클릭으로 윈도우 활성화 — GetForegroundWindow 결과 무관
@@ -1016,13 +1022,10 @@ public sealed class ClaudePromptHelper : IDisposable
                 return false;
             }
 
-            // 렌더러가 키보드 포커스를 가지고 있는지 확인
+            // kbFocus 체크 — 불일치 시 경고만 (abort X). GetRendererHwndByRect가 올바른 패널을 이미 선택함
             var kbFocus = NativeMethods.GetKeyboardFocusHwnd();
             if (kbFocus != IntPtr.Zero && kbFocus != rendererHwnd)
-            {
-                Console.WriteLine($"  [PROMPT] WM_CHAR: renderer=0x{rendererHwnd:X8} but kbFocus=0x{kbFocus:X8} — target mismatch, abort");
-                return false;
-            }
+                Console.WriteLine($"  [PROMPT] WM_CHAR: renderer=0x{rendererHwnd:X8} kbFocus=0x{kbFocus:X8} mismatch — trying anyway");
 
             const int WM_CHAR = 0x0102;
             var ok = true;
