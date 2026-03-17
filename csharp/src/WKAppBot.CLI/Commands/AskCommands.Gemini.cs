@@ -136,16 +136,125 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Lightweight Gemini vision ask for UI element identification.
+    /// Gemini vision ask — identifies a specific UI element, returns structured OcrSegment.
     /// Optimized for speed: dedicated tab, 500ms poll, 15s timeout, no Slack/streaming.
     ///
     /// Use as ActionExecutor.AskVisionFn delegate:
-    ///   executor.AskVisionFn = (bmp, desc) => AskGeminiForVisionLabelAsync(bmp, desc);
+    ///   executor.AskVisionFn = (bmp, desc) => AskGeminiForVisionAsync(bmp, desc);
     ///
-    /// Returns: short label string ("Button: 매수주문" etc.), or null on failure.
+    /// Prompt is verbose (Gemini tokens are free) — asks for JSON a11y object with x/y/w/h coords.
+    /// Returns: OcrSegment with position from Gemini JSON, or null on failure.
     /// </summary>
-    static async Task<string?> AskGeminiForVisionLabelAsync(
-        System.Drawing.Bitmap screenshot, string description, int timeoutMs = 15000)
+    static async Task<WKAppBot.Vision.OcrSegment?> AskGeminiForVisionAsync(
+        System.Drawing.Bitmap screenshot, string description, int timeoutMs = 20000)
+    {
+        var raw = await AskGeminiVisionRawAsync(screenshot, BuildVisionElementPrompt(description), timeoutMs);
+        if (raw == null) return null;
+
+        var segs = WKAppBot.Vision.OcrSegmentCache.ParseA11yJson(raw);
+        if (segs.Count == 0) return null;
+
+        // Best match by description, or first if only one result
+        return segs.Count == 1
+            ? segs[0]
+            : WKAppBot.Vision.OcrSegmentCache.BestMatch(segs, description) ?? segs[0];
+    }
+
+    /// <summary>
+    /// Full-form Gemini a11y scan — returns ALL visible UI elements as OcrSegment list.
+    /// Called once per form to build OcrSegmentCache entries.
+    /// Returns null on failure, empty list if no elements found.
+    /// </summary>
+    static async Task<List<WKAppBot.Vision.OcrSegment>?> AskGeminiForFormScanAsync(
+        System.Drawing.Bitmap screenshot, int timeoutMs = 30000)
+    {
+        var raw = await AskGeminiVisionRawAsync(screenshot, BuildVisionFormScanPrompt(), timeoutMs);
+        if (raw == null) return null;
+        return WKAppBot.Vision.OcrSegmentCache.ParseA11yJson(raw);
+    }
+
+    // ── Prompt builders (verbose — Gemini tokens are free) ───────────────
+
+    static string BuildVisionElementPrompt(string description) => $$"""
+        You are an accessibility inspector analyzing a Windows application screenshot.
+
+        TARGET: Find the UI element that matches this description: "{{description}}"
+
+        Examine the screenshot carefully. Look for:
+        - Visible text labels, button captions, field labels
+        - Icons, shapes, symbols that represent the target
+        - Input fields, dropdowns, checkboxes, radio buttons
+        - Scroll controls, sliders, progress bars
+        - Any clickable or interactive element matching the description
+
+        Return a SINGLE JSON object for the best matching element:
+        {
+          "type": "<ControlType>",
+          "label": "<visible text or icon description>",
+          "x": <center X, 0.0-1.0 relative to image width>,
+          "y": <center Y, 0.0-1.0 relative to image height>,
+          "w": <width, 0.0-1.0>,
+          "h": <height, 0.0-1.0>,
+          "state": "<enabled|disabled|checked|unchecked>"
+        }
+
+        ControlType must be one of:
+        Button, Edit, Text, CheckBox, RadioButton, ComboBox, List, ListItem,
+        Tab, TabItem, Image, DataGrid, DataItem, Group, Pane, ScrollBar,
+        ProgressBar, Slider, Spinner, MenuItem, ToolBar, StatusBar, Unknown
+
+        If the target element is not found, return:
+        {"type":"unknown","label":"","x":0,"y":0,"w":0,"h":0}
+
+        Return ONLY the JSON object, no explanation, no markdown fences.
+        """;
+
+    static string BuildVisionFormScanPrompt() => """
+        You are an accessibility inspector analyzing a Windows application screenshot.
+
+        Enumerate ALL visible UI elements in this form/window. Be thorough and detailed.
+
+        For each element include:
+        - Readable text paragraphs and labels (type: Text)
+        - All buttons and clickable controls (type: Button)
+        - Input fields and text boxes (type: Edit)
+        - Checkboxes with their checked/unchecked state
+        - Radio buttons with their checked/unchecked state
+        - Dropdown/combo controls (type: ComboBox)
+        - List items and data rows (type: ListItem / DataItem)
+        - Tab headers (type: TabItem)
+        - Icons and image shapes that are meaningful (type: Image)
+        - Scroll bars if visible (type: ScrollBar)
+        - Sliders, spinners, progress bars
+        - Group boxes and panel labels (type: Group / Pane)
+
+        Return a JSON ARRAY of all elements:
+        [
+          {
+            "type": "<ControlType>",
+            "label": "<visible text or description>",
+            "x": <center X, 0.0-1.0>,
+            "y": <center Y, 0.0-1.0>,
+            "w": <width, 0.0-1.0>,
+            "h": <height, 0.0-1.0>,
+            "state": "<enabled|disabled|checked|unchecked>"
+          },
+          ...
+        ]
+
+        ControlType must be one of:
+        Button, Edit, Text, CheckBox, RadioButton, ComboBox, List, ListItem,
+        Tab, TabItem, Image, DataGrid, DataItem, Group, Pane, ScrollBar,
+        ProgressBar, Slider, Spinner, MenuItem, ToolBar, StatusBar, Unknown
+
+        Return ONLY the JSON array, no explanation, no markdown fences.
+        Include every element you can see — the more detail the better.
+        """;
+
+    // ── Shared CDP vision transport ───────────────────────────────────────
+
+    static async Task<string?> AskGeminiVisionRawAsync(
+        System.Drawing.Bitmap screenshot, string prompt, int timeoutMs = 20000)
     {
         var tmpPath = Path.Combine(Path.GetTempPath(), $"wkappbot_vision_{Guid.NewGuid():N}.png");
         try
@@ -177,16 +286,9 @@ internal partial class Program
             using var tabLock = ChromeTabLock.Acquire("Gemini/vision-ask");
             if (tabLock == null) return null;
 
-            // Baseline response count
-            var baseCountStr = await cdp.EvalAsync(
-                "(document.querySelectorAll('model-response').length||document.querySelectorAll('[role=\"article\"]').length||0).toString()") ?? "0";
-
-            // Attach screenshot via clipboard (fastest path)
+            // Attach screenshot + prompt
             await AttachFilesViaCdp(cdp, new List<string> { tmpPath }, editorSel);
-
-            // Minimal prompt — no padding, no context bloat
             await ClearContentEditable(cdp, editorSel);
-            var prompt = $"UI element screenshot. What is this element? Reply: [type]: [label] (max 8 words). Looking for: {description}";
             await InsertTextContentEditable(cdp, editorSel, prompt);
             await Task.Delay(200);
 
@@ -200,7 +302,7 @@ internal partial class Program
                 })()
                 """);
 
-            // Poll 500ms intervals for response stability
+            // Poll 500ms intervals until response stabilizes
             var sw = Stopwatch.StartNew();
             string? lastText = null;
             while (sw.ElapsedMilliseconds < timeoutMs)
@@ -214,9 +316,7 @@ internal partial class Program
 
                 if (text == lastText)
                 {
-                    if (!IsGeminiStoppedNotice(text))
-                        return text;
-                    return null;  // generation stopped abnormally
+                    return IsGeminiStoppedNotice(text) ? null : text;
                 }
                 lastText = text;
             }

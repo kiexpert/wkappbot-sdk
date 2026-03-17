@@ -49,13 +49,14 @@ public sealed class ActionExecutor : IDisposable
     ///
     /// Called when OcrSegmentCache has no text match AND Vision API isn't configured.
     /// Parameters: (formScreenshot, elementDescription)
-    /// Returns: element label/description from AI, or null on failure.
+    /// Returns: OcrSegment with x/y/w/h from Gemini JSON, or null on failure.
     ///
+    /// Coordinates come directly from Gemini JSON — no BestMatch step needed.
     /// Result is used to:
-    ///   1. Label the blob crop → {pixelHash}={label}.png in blob store
+    ///   1. Save blob crop: {pixelHash}={label}.png
     ///   2. Teach OcrSegmentCache (source="gemini") for future lookups
     /// </summary>
-    public Func<System.Drawing.Bitmap, string, Task<string?>>? AskVisionFn { get; set; }
+    public Func<System.Drawing.Bitmap, string, Task<OcrSegment?>>? AskVisionFn { get; set; }
 
     public ActionExecutor(RuntimeContext ctx, bool verbose = false,
                           VisionCache? visionCache = null, VisionAnalyzer? visionAnalyzer = null,
@@ -1083,66 +1084,54 @@ public sealed class ActionExecutor : IDisposable
 
                 Log($"  OcrSeg: \"{step.Target.Description}\" not found in {segments.Count} segments");
 
-                // ── Tier 3: Ask Vision AI (Gemini) — label blob → re-match in segments ──
-                // Called when OCR text doesn't match description.
-                // Gemini identifies the element by visual context → its label may match a segment.
+                // ── Tier 3: Ask Vision AI (Gemini) — returns OcrSegment with coords from JSON ──
+                // Gemini identifies element AND provides x/y/w/h directly → no BestMatch step.
                 if (AskVisionFn != null)
                 {
                     try
                     {
                         Log($"  VisionAsk: asking Gemini to identify '{step.Target.Description}'...");
-                        var geminiLabel = AskVisionFn(bmp, step.Target.Description).GetAwaiter().GetResult();
-                        if (!string.IsNullOrWhiteSpace(geminiLabel))
+                        var seg = AskVisionFn(bmp, step.Target.Description).GetAwaiter().GetResult();
+                        if (seg != null)
                         {
-                            Log($"  VisionAsk: Gemini says '{geminiLabel}'");
-                            var geminiMatch = OcrSegmentCache.BestMatch(segments, geminiLabel);
-                            if (geminiMatch != null)
+                            Log($"  VisionAsk: Gemini found '{seg.Text}' at ({seg.RelX:F2},{seg.RelY:F2})");
+                            int absX = rect.Left + (int)(seg.RelX * winW);
+                            int absY = rect.Top + (int)(seg.RelY * winH);
+
+                            // Teach segment cache with Gemini-provided coords
+                            if (_segmentCache != null)
                             {
-                                int absX = rect.Left + (int)(geminiMatch.RelX * winW);
-                                int absY = rect.Top + (int)(geminiMatch.RelY * winH);
+                                var formHash2 = SimpleOcrAnalyzer.ComputeFormHash(bmp);
+                                _segmentCache.LearnSegment(classPath, formHash2, winW, winH, seg);
 
-                                // Teach segment cache: Gemini label for this position
-                                if (_segmentCache != null)
+                                // Save blob crop: {pixelHash}={label}.png
+                                int cx = Math.Max(0, (int)((seg.RelX - seg.RelW / 2) * bmp.Width));
+                                int cy = Math.Max(0, (int)((seg.RelY - seg.RelH / 2) * bmp.Height));
+                                int cw = Math.Min(Math.Max((int)(seg.RelW * bmp.Width), 4), bmp.Width - cx);
+                                int ch = Math.Min(Math.Max((int)(seg.RelH * bmp.Height), 4), bmp.Height - cy);
+                                if (cw > 4 && ch > 4)
                                 {
-                                    var formHash2 = SimpleOcrAnalyzer.ComputeFormHash(bmp);
-                                    _segmentCache.LearnSegment(classPath, formHash2, winW, winH, new OcrSegment
+                                    try
                                     {
-                                        Text = geminiLabel,
-                                        RelX = geminiMatch.RelX, RelY = geminiMatch.RelY,
-                                        RelW = geminiMatch.RelW, RelH = geminiMatch.RelH,
-                                        Confidence = 0.85, Source = "gemini"
-                                    });
-
-                                    // Save blob crop: {pixelHash}={geminiLabel}.png
-                                    int cx = Math.Max(0, (int)(geminiMatch.RelX * bmp.Width) - (int)(geminiMatch.RelW * bmp.Width / 2));
-                                    int cy = Math.Max(0, (int)(geminiMatch.RelY * bmp.Height) - (int)(geminiMatch.RelH * bmp.Height / 2));
-                                    int cw = Math.Min((int)(geminiMatch.RelW * bmp.Width), bmp.Width - cx);
-                                    int ch = Math.Min((int)(geminiMatch.RelH * bmp.Height), bmp.Height - cy);
-                                    if (cw > 4 && ch > 4)
-                                    {
-                                        try
-                                        {
-                                            using var crop = bmp.Clone(new System.Drawing.Rectangle(cx, cy, cw, ch), bmp.PixelFormat);
-                                            var blobPath = _segmentCache.SaveBlob(crop, geminiLabel);
-                                            if (blobPath != null) Log($"  VisionAsk: blob saved {Path.GetFileName(blobPath)}");
-                                        }
-                                        catch { }
+                                        using var crop = bmp.Clone(new System.Drawing.Rectangle(cx, cy, cw, ch), bmp.PixelFormat);
+                                        var blobPath = _segmentCache.SaveBlob(crop, seg.Text);
+                                        if (blobPath != null) Log($"  VisionAsk: blob saved {Path.GetFileName(blobPath)}");
                                     }
+                                    catch { }
                                 }
-
-                                if (_visionCache != null)
-                                {
-                                    var entry = VisionCacheEntry.FromAbsolute(
-                                        classPath, step.Target.Description,
-                                        winW, winH, absX, absY, rect.Left, rect.Top,
-                                        (int)(geminiMatch.RelW * winW), (int)(geminiMatch.RelH * winH),
-                                        0.85, geminiLabel, "Gemini");
-                                    _visionCache.Put(classPath, step.Target.Description, winW, winH, entry);
-                                }
-
-                                return (absX, absY, $"vision_ask, conf=0.85, \"{geminiLabel}\"");
                             }
-                            Log($"  VisionAsk: Gemini label '{geminiLabel}' not found in segments");
+
+                            if (_visionCache != null)
+                            {
+                                var entry = VisionCacheEntry.FromAbsolute(
+                                    classPath, step.Target.Description,
+                                    winW, winH, absX, absY, rect.Left, rect.Top,
+                                    (int)(seg.RelW * winW), (int)(seg.RelH * winH),
+                                    seg.Confidence, seg.Text, "Gemini");
+                                _visionCache.Put(classPath, step.Target.Description, winW, winH, entry);
+                            }
+
+                            return (absX, absY, $"vision_ask, conf={seg.Confidence:F2}, \"{seg.Text}\"");
                         }
                     }
                     catch (Exception ex) { Log($"  VisionAsk error: {ex.Message}"); }

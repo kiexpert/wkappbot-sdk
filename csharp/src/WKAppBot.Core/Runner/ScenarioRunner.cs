@@ -33,9 +33,9 @@ public sealed class ScenarioRunner
     /// <summary>
     /// Optional Vision AI ask delegate for blob identification.
     /// CLI wires this to Gemini/Claude for labeling unreadable UI elements.
-    /// Parameters: (formScreenshot, elementDescription) → label string or null.
+    /// Parameters: (formScreenshot, elementDescription) → OcrSegment with coords, or null.
     /// </summary>
-    public Func<System.Drawing.Bitmap, string, Task<string?>>? VisionAskFn { get; set; }
+    public Func<System.Drawing.Bitmap, string, Task<WKAppBot.Vision.OcrSegment?>>? VisionAskFn { get; set; }
 
     public ScenarioRunner(bool verbose = false, bool watch = true, int watchIntervalMs = 200)
     {
