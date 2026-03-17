@@ -681,10 +681,9 @@ internal partial class Program
             // adb://{device}/{winname}#scope → "adb {device} {winname}"
             var rest = pattern["adb://".Length..];
             var parts = rest.Split('/');
-            var device = parts.Length > 0 ? parts[0].Trim() : "";
-            var win    = parts.Length > 1 ? parts[1].Split('#')[0].Split(';')[0].Trim() : "";
+            var win = parts.Length > 1 ? parts[1].Split('#')[0].Split(';')[0].Trim() : "";
             win = win.Replace("*", "").Replace("?", "").Trim();
-            main = device.Length > 0 ? $"adb {device}{(win.Length > 0 ? " " + win : "")}" : "adb";
+            main = win.Length > 0 ? $"adb {win}" : "adb";
         }
         else
         {
