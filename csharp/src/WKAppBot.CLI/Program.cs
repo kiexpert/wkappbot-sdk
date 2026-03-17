@@ -1477,6 +1477,20 @@ internal partial class Program
             Console.Out.Flush();
             Dbg("after Flush");
 
+            if (RelayFilePath == null)
+            {
+                // Direct stdout path (no relay): FlushFileBuffers commits pending IOCP pipe writes
+                // to the kernel buffer BEFORE TerminateProcess. Without this, .NET 8 async writes
+                // may still be in-flight when TerminateProcess kills them → bash $() capture gets empty.
+                var hOut = GetStdHandle(-11); // STD_OUTPUT_HANDLE
+                if (hOut != IntPtr.Zero && hOut != new IntPtr(-1))
+                {
+                    Dbg("FlushFileBuffers(stdout)");
+                    FlushFileBuffers(hOut);
+                    Dbg("FlushFileBuffers done");
+                }
+            }
+
             if (RelayFilePath != null)
             {
                 // Close relay file BEFORE signaling .ready so Launcher can read it without sharing conflicts.
