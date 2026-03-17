@@ -30,6 +30,13 @@ public sealed class ScenarioRunner
     /// </summary>
     public InputReadiness? ReadinessInstance { get; set; }
 
+    /// <summary>
+    /// Optional Vision AI ask delegate for blob identification.
+    /// CLI wires this to Gemini/Claude for labeling unreadable UI elements.
+    /// Parameters: (formScreenshot, elementDescription) → label string or null.
+    /// </summary>
+    public Func<System.Drawing.Bitmap, string, Task<string?>>? VisionAskFn { get; set; }
+
     public ScenarioRunner(bool verbose = false, bool watch = true, int watchIntervalMs = 200)
     {
         _verbose = verbose;
@@ -162,6 +169,7 @@ public sealed class ScenarioRunner
             using var executor = new ActionExecutor(ctx, _verbose, visionCache, visionAnalyzer, simpleOcr, segmentCache);
             executor.CreateZoom = ZoomFactory; // [ZOOM] Pass through CLI layer factory
             executor.Readiness = ReadinessInstance; // [READINESS] Pre-action blocker/minimize check
+            executor.AskVisionFn = VisionAskFn;  // [VISION-ASK] Gemini/Claude blob labeling
 
             for (int i = 0; i < doc.Steps.Count; i++)
             {
