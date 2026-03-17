@@ -119,8 +119,8 @@ Output:
       Capture page screenshot as PNG (CDP — page content only).
   capture [-o output.png] [--port N]
       Capture Chrome window including title bar (Win32 PrintWindow).
-  html [--port N]
-      Get full page HTML source.
+  html [<url>] [-o out.html] [--port N]
+      Get full page HTML source. If <url> given, navigates to it first (sandbox tab).
 
 Batch:
   run <steps-file.txt> [--port N] [--delay N]
@@ -970,8 +970,16 @@ Options:
     {
         int port = GetPort(args);
         string? output = GetArgValue(args, "-o");
+        string? url = args.FirstOrDefault(a => !a.StartsWith("-") && (a.StartsWith("http://") || a.StartsWith("https://")));
 
-        using var cdp = ConnectCdp(port);
+        // Pass url as navigateUrl: ensures a dedicated web tab, never steals an AI chat tab
+        using var cdp = ConnectCdp(port, withBar: false, navigateUrl: url);
+
+        if (url != null)
+        {
+            Console.Error.WriteLine($"[HTML] Navigating: {url}");
+            cdp.NavigateAsync(url).GetAwaiter().GetResult();
+        }
 
         var html = cdp.GetHtmlAsync().GetAwaiter().GetResult();
 
