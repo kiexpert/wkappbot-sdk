@@ -666,16 +666,33 @@ internal partial class Program
     }
 
     /// <summary>Extract main window name from grap pattern for log folder naming.
-    /// "영웅문#실시간계좌" → "영웅문", "*메모장*" → "메모장", "regex:..." → null</summary>
+    /// "영웅문#실시간계좌"          → "영웅문"
+    /// "*메모장*"                   → "메모장"
+    /// "adb://Fold5/*heromts*#..."  → "adb Fold5 heromts"
+    /// "regex:..."                  → null</summary>
     static string? ExtractMainWindowFromGrap(string pattern)
     {
         if (string.IsNullOrWhiteSpace(pattern)) return null;
-        if (pattern.StartsWith("adb://", StringComparison.OrdinalIgnoreCase)) return null;
         if (pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase)) return null;
-        // Take part before # (main window), before ; (OR patterns)
-        var main = pattern.Split('#')[0].Split(';')[0].Trim();
-        // Strip wildcards
-        main = main.Replace("*", "").Replace("?", "").Trim();
+
+        string main;
+        if (pattern.StartsWith("adb://", StringComparison.OrdinalIgnoreCase))
+        {
+            // adb://{device}/{winname}#scope → "adb {device} {winname}"
+            var rest = pattern["adb://".Length..];
+            var parts = rest.Split('/');
+            var device = parts.Length > 0 ? parts[0].Trim() : "";
+            var win    = parts.Length > 1 ? parts[1].Split('#')[0].Split(';')[0].Trim() : "";
+            win = win.Replace("*", "").Replace("?", "").Trim();
+            main = device.Length > 0 ? $"adb {device}{(win.Length > 0 ? " " + win : "")}" : "adb";
+        }
+        else
+        {
+            // Take part before # (main window), before ; (OR patterns)
+            main = pattern.Split('#')[0].Split(';')[0].Trim();
+            main = main.Replace("*", "").Replace("?", "").Trim();
+        }
+
         // Strip filesystem-unsafe chars
         main = string.Concat(main.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
         return main.Length >= 2 ? main : null;
