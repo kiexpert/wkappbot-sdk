@@ -1837,13 +1837,8 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
                 var existingWb = await GetWindowForTargetAsync(existingTid);
                 if (existingWb != null && IsAtExpectedBounds(existingWb.Value, expX, expY, expW, expH))
                 {
-                    // Minimize Chrome before tab creation to prevent OS focus steal
-                    Console.WriteLine($"[ASK] Reusing window at ({existingWb.Value.left},{existingWb.Value.top}) for new tab (minimizing first)");
-                    await SendAsync("Browser.setWindowBounds", new JsonObject
-                    {
-                        ["windowId"] = existingWb.Value.windowId,
-                        ["bounds"]   = new JsonObject { ["windowState"] = "minimized" }
-                    });
+                    // CDP tab creation is focusless — no need to minimize before creating tab
+                    Console.WriteLine($"[ASK] Reusing window at ({existingWb.Value.left},{existingWb.Value.top}) for new tab");
                     var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
                     newTargetId = result?["targetId"]?.GetValue<string>();
                     break;
@@ -1882,8 +1877,6 @@ public sealed class CdpClient : IAsyncDisposable, IDisposable
         await Task.Delay(200);
         await SwitchToTargetAsync(newTargetId, port);
 
-        if (!minimizeAfter)
-            await MinimizeWindowAsync(newTargetId); // minimize to prevent focus steal — user restores manually
         return newTargetId;
     }
 
