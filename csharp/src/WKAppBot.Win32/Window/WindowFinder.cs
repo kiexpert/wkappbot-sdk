@@ -477,7 +477,7 @@ public static class WindowFinder
     public static void BringToFront(IntPtr hWnd)
     {
         NativeMethods.ShowWindow(hWnd, 9); // SW_RESTORE
-        NativeMethods.SetForegroundWindow(hWnd);
+        NativeMethods.SmartSetForegroundWindow(hWnd); // [FOCUS-GUARD] CheckActiveGuard 적용
     }
 
     /// <summary>

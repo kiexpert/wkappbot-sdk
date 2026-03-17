@@ -249,6 +249,19 @@ public sealed class InputReadiness
     }
 
     /// <summary>
+    /// [FOCUS-GUARD] CheckActiveGuard 그레이스 타임스탬프.
+    ///
+    /// Probe()에서 유저가 입력위치양보를 승인하는 순간 설정됨.
+    /// 오버레이 "승인" 클릭 자체가 유저 마우스 입력이므로, 클릭 직후 idleMs ≈ 0ms가 됨.
+    /// 이 타임스탬프가 없으면 CheckActiveGuard가 "유저 방금 활성!" 로 정당한 포커스 스틸을 차단함.
+    ///
+    /// 그레이스 3초: 승인→SmartSetForeground 사이에 유저가 다시 타이핑 시작하면 여전히 차단됨.
+    /// → Probe approved(T=0) → user starts typing(T=1s) → SmartSetForeground(T=5s) → 차단 O
+    /// → Probe approved(T=0) → SmartSetForeground(T=0.5s) → 차단 X (정상 승인 후 즉시 포커스)
+    /// </summary>
+    internal static DateTime _lastYieldApprovedAt = DateTime.MinValue;
+
+    /// <summary>
     /// Call from physical input entry points (SendInput, SetCursorPos, SmartSetForegroundWindow).
     /// Throws if Probe()/ProbeAtPoint() was not called first — forces all callers to set up readiness.
     /// "정식 입력확보 셋업절차 강제" — no warn-only, no exceptions.
@@ -260,10 +273,102 @@ public sealed class InputReadiness
         var idleStr = idleMs >= 60000 ? $"{idleMs / 60000}m {idleMs / 1000 % 60}s"
                     : idleMs >= 1000  ? $"{idleMs / 1000.0:F1}s"
                     :                   $"{idleMs}ms";
-        var msg = $"[NO-READINESS:{caller}] user input {idleStr} ago — call InputReadiness.Probe() before {caller}!";
+        // ── 코딩 가이드 출력: 후배 클롣이 원인과 수정방법을 바로 알 수 있도록 ──
+        var msg = $"[NO-READINESS:{caller}] user input {idleStr} ago — Probe() not called before {caller}!";
         Console.Error.WriteLine(msg);
+        Console.Error.WriteLine($"  → 이 함수({caller})는 유저 입력을 방해할 수 있는 focus-stealing 경로입니다.");
+        Console.Error.WriteLine($"  → 코딩 규칙: 포커스를 빼앗는 코드 앞에 반드시 InputReadiness.Probe() 호출 후 ReadinessCalled=true 설정!");
+        Console.Error.WriteLine($"  → 빠른 수정: 'ReadinessCalled = true;' 로 건너뛰는 것은 ✖ 금지. ProbeAndSubmit() 또는 Probe()를 호출할 것.");
         throw new InvalidOperationException(msg);
     }
+
+    /// <summary>
+    /// [FOCUS-GUARD] 유저 활성 중 포커스 스틸 차단 가드.
+    ///
+    /// ── 설계 의도 (후배 클롣 필독!) ──────────────────────────────────────────────
+    /// 앱봇이 focus-stealing 함수(SmartSetForegroundWindow, SendInput 등)를 호출하기 전,
+    /// "지금 유저가 타이핑/클릭 중인가?"를 확인해서 방해를 차단하는 가드.
+    ///
+    /// 문제의 시나리오:
+    ///   T=0s  Probe() 실행 → 유저 idle → 자동 승인 (ReadinessCalled=true)
+    ///   T=1s  유저가 타이핑 시작 (앱봇은 모름)
+    ///   T=5s  SmartSetForegroundWindow 실행 → 유저 타이핑 중인 창을 빼앗아 버림 ← BAD!
+    ///
+    /// 그레이스 예외 (_lastYieldApprovedAt):
+    ///   유저가 오버레이에서 "승인" 클릭 → 마우스 클릭 = 유저 입력 → idleMs ≈ 0ms
+    ///   타임스탬프 없으면 "승인 즉시 포커스 스틸"도 차단됨 → 이건 잘못된 차단!
+    ///   그래서 승인 후 3초 이내는 idleMs 무시하고 허용.
+    ///
+    /// Phase 2 예고:
+    ///   차단 시 타겟 hwnd에 WKAppBot_FocusPending 프로퍼티 스탬프 → 재진입 시 자동 팝업.
+    ///   현재는 error 출력 후 false 반환으로 호출자가 abort 처리함.
+    ///
+    /// ─────────────────────────────────────────────────────────────────────────────
+    /// ⚠ 이 함수를 호출하지 않는 새 focus-stealing 코드를 만들면 안 됩니다!
+    ///   포커스를 빼앗는 코드 → 반드시 AssertReadiness() + CheckActiveGuard() 쌍으로 호출.
+    /// ─────────────────────────────────────────────────────────────────────────────
+    ///
+    /// Returns true = safe to proceed, false = block (user is active, no approval obtained).
+    /// Call from every focus-stealing entry point AFTER AssertReadiness.
+    /// If ActiveGuardYieldCallback is set, shows yield popup synchronously and blocks main thread
+    /// until user approves (or times out). Approved → returns true + sets grace timestamp.
+    /// </summary>
+    public static bool CheckActiveGuard(string caller, int thresholdMs = 2000)
+    {
+        var idleMs = NativeMethods.GetUserIdleMs();
+        if (idleMs >= thresholdMs) return true; // user idle long enough — safe
+
+        // ── 그레이스 예외: Probe 승인 직후 3초 이내는 허용 ──
+        // 오버레이 "승인" 클릭 자체가 마우스 입력(idleMs≈0) → 이 예외 없으면 정당한 포커스 스틸도 차단됨.
+        var graceSec = (DateTime.UtcNow - _lastYieldApprovedAt).TotalSeconds;
+        if (graceSec < 3.0)
+        {
+            Console.WriteLine($"[FOCUS-GUARD:{caller}] grace {graceSec:F1}s since yield-approved — allow");
+            return true;
+        }
+
+        // ── 유저 활성 감지 — 팝업으로 승인 대기 (동기) ──
+        var idleStr = idleMs >= 1000 ? $"{idleMs / 1000.0:F1}s" : $"{idleMs}ms";
+        var kbFocusHwnd = NativeMethods.GetKeyboardFocusHwnd();
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[FOCUS-GUARD:{caller}] 유저 활성 ({idleStr} ago) — 포커스 스틸 전 승인 팝업");
+        Console.ResetColor();
+
+        // [PHASE 2] 팝업 콜백 있으면 동기 대기 — 메인 스레드 블로킹 승인
+        var cb = ActiveGuardYieldCallback;
+        if (cb != null)
+        {
+            var targetHwnd = NativeMethods.GetForegroundWindow(); // 현재 포그라운드를 타겟으로
+            var result = cb.WaitForUserYield(targetHwnd, userIdleMs: 0, timeoutSeconds: 30);
+            if (result.Approved)
+            {
+                if (result.FocusAcquired)
+                    _lastYieldApprovedAt = DateTime.UtcNow; // 유저가 오버레이 클릭 → grace 부여
+                Console.WriteLine($"[FOCUS-GUARD:{caller}] 승인됨 → proceed");
+                return true;
+            }
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[FOCUS-GUARD:{caller}] ✖ 취소됨 → abort");
+            Console.ResetColor();
+            return false;
+        }
+
+        // 콜백 없음 — 에러 출력 후 차단
+        Console.Error.WriteLine(
+            $"[FOCUS-GUARD:{caller}] ✖ BLOCKED — user input {idleStr} ago (threshold {thresholdMs}ms).");
+        Console.Error.WriteLine(
+            $"  → 키보드 포커스: 0x{kbFocusHwnd:X8} (fg=0x{NativeMethods.GetForegroundWindow():X8})");
+        Console.Error.WriteLine(
+            $"  → 입력위치확보(Probe) 후 유저가 다시 활성됨. 포커스 스틸 중단.");
+        return false;
+    }
+
+    /// <summary>
+    /// [FOCUS-GUARD] CheckActiveGuard 팝업 콜백 — CLI 레이어에서 설정.
+    /// 유저가 활성 중일 때 포커스 스틸 시도 시 동기 승인 팝업을 표시.
+    /// null이면 에러 출력 후 차단만.
+    /// </summary>
+    public static IUserInputWait? ActiveGuardYieldCallback { get; set; }
 
     // ── Probe: 전수조사 ──────────────────────────────────────────
 
@@ -401,6 +506,10 @@ public sealed class InputReadiness
         bool yieldRequested = false;
         bool yieldConfirmed = false;
         bool yieldFocusAcquired = false;
+        // [FOCUS-GUARD] 오버레이 클릭 여부 — 유저가 실제로 클릭했을 때만 grace 부여.
+        // 자동승인(AutoApproveYield, 3초 timeout)은 클릭 없으므로 grace 불필요.
+        // 오버레이 클릭 → 마우스 입력 → idleMs≈0ms → CheckActiveGuard가 오탐 차단하는 문제 방지용.
+        bool explicitUserClickApproved = false;
 
         // ── FocusStealer / MouseStealer prop check ──
         // ActionApi stamps these props when a nominally-focusless UIA action
@@ -520,6 +629,8 @@ public sealed class InputReadiness
                 msYield = swStep.ElapsedMilliseconds;
                 yieldConfirmed = yieldResult.Approved;
                 yieldFocusAcquired = yieldResult.FocusAcquired;
+                // 유저가 오버레이를 직접 클릭해서 포커스를 pre-acquire한 경우에만 grace 부여
+                if (yieldResult.FocusAcquired) explicitUserClickApproved = true;
 
                 if (yieldConfirmed)
                 {
@@ -543,6 +654,20 @@ public sealed class InputReadiness
                 try { NativeMethods.RemovePropW(mainHwnd, "WKAppBot_FocusStealer-midInput"); } catch { }
                 try { NativeMethods.RemovePropW(mainHwnd, "WKAppBot_FocusStealer"); } catch { }
             }
+
+            // ── CheckActiveGuard 그레이스 타임스탬프 ──
+            // [FOCUS-GUARD] 오직 유저가 오버레이를 직접 클릭한 경우에만 grace 부여!
+            //
+            // Grace가 필요한 이유:
+            //   오버레이 클릭 → 마우스 입력 → idleMs≈0ms → CheckActiveGuard가 오탐 차단
+            //   → 유저가 명시적으로 승인했는데 포커스 스틸이 막히는 문제
+            //
+            // Grace가 필요 없는 경우:
+            //   AutoApproveYield (유저 클릭 없음) → idle timer 미리셋 → 오탐 없음
+            //   3초 popup 자동 timeout → 유저 클릭 없음 → 오탐 없음
+            //   → 이 경우 grace를 주면 유저가 타이핑 시작해도 포커스 스틸 허용되는 버그!
+            if (explicitUserClickApproved)
+                _lastYieldApprovedAt = DateTime.UtcNow;
         }
 
         // ── 프로파일링 출력 ──

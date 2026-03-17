@@ -174,9 +174,9 @@ internal partial class Program
                             helper,
                             root,
                             knownPrompt,
-                            "☆",
+                            "abc",
                             focuslessOnly: false,
-                            mode: "auto-1char");
+                            mode: "replace");
                         Console.WriteLine($"    stage.input-roundtrip ok={okRoundTrip}");
                     }
                     else
@@ -520,9 +520,23 @@ internal partial class Program
                 ? beforeNorm + probeText
                 : probeText;
 
+            // [FOCUS-GUARD] write 전 키보드 포커스 스냅샷 — 강탈 즉시 감지
+            // GetForegroundWindow() 대신 GetKeyboardFocusHwnd() 사용:
+            //   같은 창 내에서도 코드에디터 → Message input 간 이동을 정밀하게 감지.
+            var kbFocusBefore = NativeMethods.GetKeyboardFocusHwnd();
             var writeOk = focuslessOnly
                 ? helper.TryTypeWithoutSubmitFocusless(prompt, writeText)
                 : TypeWithReadinessBridge(helper, prompt, writeText, "write");
+            var kbFocusAfterWrite = NativeMethods.GetKeyboardFocusHwnd();
+            if (kbFocusAfterWrite != kbFocusBefore && kbFocusBefore != IntPtr.Zero)
+            {
+                Console.Error.WriteLine($"    [FOCUS-GUARD] ✖ WRITE phase stole keyboard focus! before=0x{kbFocusBefore:X8} after=0x{kbFocusAfterWrite:X8}");
+                Console.Error.WriteLine($"    → 범인: TypeWithReadinessBridge write → focus-steal paste 경로 확인 필요!");
+                Console.Error.WriteLine($"    → 키보드 포커스 복원 중...");
+                NativeMethods.SetForegroundWindow(NativeMethods.GetForegroundWindow()); // 창 재활성
+                Console.Error.WriteLine($"    → roundtrip 중단.");
+                return false;
+            }
             Thread.Sleep(180);
 
             string afterInsert;
@@ -540,9 +554,21 @@ internal partial class Program
                 !string.IsNullOrWhiteSpace(afterInsert) &&
                 afterInsert.Contains(writeText, StringComparison.Ordinal);
 
+            // [FOCUS-GUARD] restore 전 키보드 포커스 스냅샷
+            var kbFocusBeforeRestore = NativeMethods.GetKeyboardFocusHwnd();
             var restoreOk = focuslessOnly
                 ? helper.TryTypeWithoutSubmitFocusless(prompt, beforeNorm)
                 : TypeWithReadinessBridge(helper, prompt, beforeNorm, "restore");
+            var kbFocusAfterRestore = NativeMethods.GetKeyboardFocusHwnd();
+            if (kbFocusAfterRestore != kbFocusBeforeRestore && kbFocusBeforeRestore != IntPtr.Zero)
+            {
+                Console.Error.WriteLine($"    [FOCUS-GUARD] ✖ RESTORE phase stole keyboard focus! before=0x{kbFocusBeforeRestore:X8} after=0x{kbFocusAfterRestore:X8}");
+                Console.Error.WriteLine($"    → 범인: TypeWithReadinessBridge restore → focus-steal paste 경로 확인 필요!");
+                Console.Error.WriteLine($"    → 키보드 포커스 복원 중...");
+                NativeMethods.SetForegroundWindow(NativeMethods.GetForegroundWindow());
+                Console.Error.WriteLine($"    → roundtrip 중단.");
+                return false;
+            }
             Thread.Sleep(180);
 
             string afterRestore;
@@ -586,12 +612,14 @@ internal partial class Program
         if (mainOk) return true;
 
         // Bridge: standard a11y/input-readiness protection stage.
+        // [FOCUS-GUARD] AutoApproveYield=false — 이전 포커스 상태와 관계없이 항상 유저 승인 필요.
+        // 창이 이미 포그라운드여도 "OK" 아님. Message input이 아닌 코드 에디터에 포커스가 있을 수 있음!
         var readiness = CreateInputReadiness();
         var report = readiness.Probe(new InputReadinessRequest
         {
             TargetHwnd = prompt.WindowHandle,
             IntendedAction = "key",
-            AutoApproveYield = true,
+            AutoApproveYield = false, // [FOCUS-GUARD] ALWAYS require explicit user approval
             SkipKnowhow = true,
         });
 
@@ -610,7 +638,7 @@ internal partial class Program
                 {
                     TargetHwnd = prompt.WindowHandle,
                     IntendedAction = "key",
-                    AutoApproveYield = true,
+                    AutoApproveYield = false, // [FOCUS-GUARD] ALWAYS require explicit user approval
                     SkipKnowhow = true,
                 });
             }
@@ -622,7 +650,10 @@ internal partial class Program
             report.FormVisible &&
             report.FormEnabled &&
             !report.FormIconic &&
-            (!report.UserYieldRequested || report.UserYieldConfirmed);
+            (!report.UserYieldRequested || report.UserYieldConfirmed) &&
+            // [FOCUS-GUARD] 포커스 실제 확보 여부 확인 — 유저가 타이핑 중이라 SmartSetForeground가
+            // CheckActiveGuard에 차단됐으면 FocusAcquired=false → fallback(TypeWithoutSubmit) 스킵.
+            (!report.UserYieldRequested || report.UserYieldFocusAcquired);
 
         Console.WriteLine($"    input.{phase}.bridge ok={bridgeOk} visible={report.FormVisible} enabled={report.FormEnabled} iconic={report.FormIconic} elevationMismatch={report.ElevationMismatch} blocker={(report.ActiveBlocker != null)}");
 

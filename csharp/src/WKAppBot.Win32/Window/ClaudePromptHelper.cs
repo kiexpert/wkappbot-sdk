@@ -719,7 +719,7 @@ public sealed class ClaudePromptHelper : IDisposable
     /// <summary>
     /// Inject text into prompt without submitting. Focusless-only.
     /// Codex: WM_CHAR to renderer. Claude Desktop: MSAA put_accValue.
-    /// VS Code Claude Code: clipboard paste only (no Enter).
+    /// VS Code Claude Code: TextPattern2 (truly focusless) → clipboard paste fallback.
     /// Returns false if focusless injection not possible for this host.
     /// </summary>
     public bool InjectTextOnly(PromptInfo prompt, string text)
@@ -728,6 +728,11 @@ public sealed class ClaudePromptHelper : IDisposable
             return TryPostMessageTextToChromiumRenderer(prompt, text, submit: false);
         if (prompt.HostType == HostVsCodeClaudeCode)
         {
+            // Option 3: TextPattern2 truly focusless
+            if (TryVSCodeTextPattern2Insert(prompt, text, submit: false))
+                return true;
+
+            Console.WriteLine("  [PROMPT:VSCODE-CC] TP2 inject failed — fallback focus-steal paste");
             SetClipboardText(text);
             var prevFg = NativeMethods.GetForegroundWindow();
             NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
@@ -806,13 +811,88 @@ public sealed class ClaudePromptHelper : IDisposable
     }
 
     /// <summary>
-    /// VS Code Claude Code extension: focus-steal + Escape (focus input) + paste + Enter.
+    /// Option 3: TextPattern2.InsertTextAtSelection — truly focusless for VS Code Claude Code.
+    /// Finds [Edit] "Message input" by ControlType+Name, then InsertTextAtSelection.
+    /// Submit (if requested) via renderer WM_KEYDOWN Enter.
+    /// Returns false if TextPattern2 not supported or element not found.
+    /// </summary>
+    private bool TryVSCodeTextPattern2Insert(PromptInfo prompt, string text, bool submit)
+    {
+        try
+        {
+            var root = _automation.FromHandle(prompt.WindowHandle);
+            if (root == null) return false;
+
+            // Filter by ControlType.Edit + Name to avoid matching text nodes containing "Message input"
+            var editEl = root.FindFirst(TreeScope.Descendants, new AndCondition(
+                new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Edit),
+                new PropertyCondition(_automation.PropertyLibrary.Element.Name, "Message input")));
+
+            if (editEl == null)
+            {
+                Console.WriteLine("  [PROMPT:VSCODE-CC] TP2: [Edit] 'Message input' not found");
+                return false;
+            }
+
+            var tp2 = editEl.Patterns.Text2;
+            if (!tp2.IsSupported)
+            {
+                Console.WriteLine("  [PROMPT:VSCODE-CC] TP2: TextPattern2 not supported on this element");
+                return false;
+            }
+
+            // FlaUI 4.0 IText2Pattern interface omits InsertTextAtSelection — call via reflection
+            var insertMethod = tp2.Pattern.GetType().GetMethod("InsertTextAtSelection",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (insertMethod == null)
+            {
+                Console.WriteLine("  [PROMPT:VSCODE-CC] TP2: InsertTextAtSelection not in FlaUI 4.0 API");
+                return false;
+            }
+            insertMethod.Invoke(tp2.Pattern, new object[] { text });
+            Console.WriteLine($"  [PROMPT:VSCODE-CC] TP2 InsertTextAtSelection OK ({text.Length} chars, focusless!)");
+
+            if (!submit) return true;
+
+            // Submit via renderer WM_KEYDOWN Enter — no focus steal needed
+            var rendHwnd = GetRendererHwnd(prompt.WindowHandle);
+            if (rendHwnd == IntPtr.Zero)
+            {
+                Console.WriteLine("  [PROMPT:VSCODE-CC] TP2: renderer hwnd not found for Enter submit");
+                return false;
+            }
+
+            const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, VK_RETURN = 0x0D;
+            uint sc = NativeMethods.MapVirtualKeyW(VK_RETURN, 0);
+            IntPtr lpDown = (IntPtr)((sc << 16) | 1);
+            IntPtr lpUp = (IntPtr)((sc << 16) | 1 | (1 << 30) | (1 << 31));
+            NativeMethods.PostMessageW(rendHwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, lpDown);
+            Thread.Sleep(20);
+            NativeMethods.PostMessageW(rendHwnd, WM_KEYUP, (IntPtr)VK_RETURN, lpUp);
+            Console.WriteLine("  [PROMPT:VSCODE-CC] TP2 + renderer Enter submitted (focusless!)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT:VSCODE-CC] TP2: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// VS Code Claude Code extension: TextPattern2 focusless first, then focus-steal fallback.
     /// UIA turn-form 없음 → 키보드 단축키로 입력 영역 포커싱.
     /// Escape: Claude Code 입력창 포커스 (VS Code 확장 기본 동작).
     /// 입력위치확보(Probe) 승인 후 호출되므로 포커스 전환 허용됨.
     /// </summary>
     private bool TypeAndSubmitVSCodeClaudeCode(PromptInfo prompt, string text)
     {
+        // Option 3: TextPattern2.InsertTextAtSelection (truly focusless!)
+        if (TryVSCodeTextPattern2Insert(prompt, text, submit: true))
+            return true;
+
+        Console.WriteLine("  [PROMPT:VSCODE-CC] TP2 unavailable — falling back to focus-steal");
+
         var prevForeground = NativeMethods.GetForegroundWindow();
 
         // 항상 타이틀바 클릭으로 윈도우 활성화 — GetForegroundWindow 결과 무관
@@ -1539,6 +1619,7 @@ public sealed class ClaudePromptHelper : IDisposable
         // Fallback: focus-steal to paste text, but no Enter
         Console.WriteLine("  [PROMPT] Falling back to focus-steal paste (no submit)...");
         var prevForeground = NativeMethods.GetForegroundWindow();
+        var prevClipboard = GetClipboardText(); // [CLIPBOARD-RESTORE] save before overwrite
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
         Thread.Sleep(200);
 
@@ -1569,15 +1650,30 @@ public sealed class ClaudePromptHelper : IDisposable
             Console.WriteLine("  [PROMPT] Focus restored");
         }
 
+        // [CLIPBOARD-RESTORE] restore original clipboard content after paste
+        if (prevClipboard != null)
+        {
+            Thread.Sleep(50);
+            SetClipboardText(prevClipboard);
+            Console.WriteLine("  [PROMPT] Clipboard restored");
+        }
+
         return true;
     }
 
     /// <summary>
     /// Focusless-only text insert (NO focus-steal fallback).
-    /// Returns false if IA2/LegacyIA focusless paths fail.
+    /// Returns false if IA2/LegacyIA/TextPattern2 focusless paths all fail.
     /// </summary>
     public bool TryTypeWithoutSubmitFocusless(PromptInfo prompt, string text)
     {
+        // VS Code: TextPattern2 focusless attempt
+        if (prompt.HostType == HostVsCodeClaudeCode)
+        {
+            if (TryVSCodeTextPattern2Insert(prompt, text, submit: false))
+                return true;
+        }
+
         // Try IA2 focusless text insertion first
         if (TryIA2InsertText(prompt, text))
         {
@@ -2240,6 +2336,33 @@ public sealed class ClaudePromptHelper : IDisposable
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join(3000);
+    }
+
+    /// <summary>
+    /// [CLIPBOARD-RESTORE] Get current clipboard text content (null if empty or non-text).
+    /// Used to save/restore clipboard around focus-steal paste operations.
+    /// </summary>
+    private static string? GetClipboardText()
+    {
+        string? result = null;
+        var thread = new Thread(() =>
+        {
+            if (!NativeMethods.OpenClipboard(IntPtr.Zero)) return;
+            try
+            {
+                var hData = NativeMethods.GetClipboardData(13 /* CF_UNICODETEXT */);
+                if (hData == IntPtr.Zero) return;
+                var ptr = NativeMethods.GlobalLock(hData);
+                if (ptr == IntPtr.Zero) return;
+                try { result = System.Runtime.InteropServices.Marshal.PtrToStringUni(ptr); }
+                finally { NativeMethods.GlobalUnlock(hData); }
+            }
+            finally { NativeMethods.CloseClipboard(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join(2000);
+        return result;
     }
 
     // ═══════════════════════════════════════════════════════════════

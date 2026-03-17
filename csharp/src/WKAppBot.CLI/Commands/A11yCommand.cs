@@ -1063,7 +1063,7 @@ internal partial class Program
     {
         if (NativeMethods.IsIconic(hwnd))
             NativeMethods.ShowWindow(hwnd, 9);
-        NativeMethods.SetForegroundWindow(hwnd);
+        NativeMethods.SmartSetForegroundWindow(hwnd); // [FOCUS-GUARD] CheckActiveGuard 적용
         NativeMethods.BringWindowToTop(hwnd);
         Console.WriteLine($"[A11Y] focus {tag} — SetForegroundWindow");
         return true;
@@ -1074,7 +1074,7 @@ internal partial class Program
         // Ensure target window has focus (SendInput requires foreground)
         if (NativeMethods.IsIconic(hwnd))
             NativeMethods.ShowWindow(hwnd, 9); // SW_RESTORE
-        NativeMethods.SetForegroundWindow(hwnd);
+        NativeMethods.SmartSetForegroundWindow(hwnd); // [FOCUS-GUARD] CheckActiveGuard 적용
         NativeMethods.BringWindowToTop(hwnd);
         Thread.Sleep(100); // let focus settle
 
