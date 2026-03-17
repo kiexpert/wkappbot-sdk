@@ -780,101 +780,85 @@ internal partial class Program
         string slackBotToken, string slackChannel, string instanceUsername,
         string statusTsFile, IntPtr claudeHwnd)
     {
-        bool sameType = state.LastStatusType == statusType && state.SlackStatusTs != null;
-
-        // Check if current status message has replies (user is engaging → never edit or delete it)
+        // ── Step 1: Is our status message still the latest in the channel? ──────────────────
+        // "Latest = ours" → edit in place (streaming).
+        // "Latest = someone else" → delete our old status + post new below.
+        bool latestIsOurs = false;
         bool hasReplies = false;
+
         if (state.SlackStatusTs != null)
         {
+            try
+            {
+                var (latestTs, _, _, _) = await GetChannelLatestMessageInfo(slackBotToken, slackChannel);
+                latestIsOurs = latestTs == state.SlackStatusTs;
+            }
+            catch { }
+
             try { hasReplies = await SlackMessageHasRepliesAsync(slackBotToken, slackChannel, state.SlackStatusTs); }
             catch { }
         }
 
-        // Same type + no replies → edit in place regardless of position.
-        // (Removed isLatest requirement: multiple instances would leapfrog each other
-        //  because each "post new" bumps the other off latest, causing infinite re-posting.)
-        bool canEdit = sameType && !hasReplies;
-        if (canEdit)
+        // ── Step 2: Edit in place if we are the latest (and no replies on our message) ──────
+        if (latestIsOurs && !hasReplies)
         {
-            // If text unchanged, skip API call entirely (no-op)
-            if (slackText == state.LastSlackStatusText) return;
+            if (slackText == state.LastSlackStatusText) return;  // no change — skip API
 
-            // Edit in place — no channel reorder spam (executing→executing text update, no user thread)
             var (ok, _) = await SlackUpdateMessageAsync(slackBotToken, slackChannel, state.SlackStatusTs!, slackText);
             if (ok)
             {
+                state.LastStatusType = statusType;
                 state.LastSlackStatusText = slackText;
                 SetWindowStringProp(hwnd, PropAiOut, slackText);
+                SetWindowStringProp(hwnd, PropStatusType, statusType);
                 Console.WriteLine($"[EYE] Edit [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
             }
+            return;
         }
-        else
+
+        // ── Step 3: Not latest (someone else posted after us) → delete old + post new ──────
+        // Idle: skip new post (don't push idle to bottom when not latest)
+        if (statusType == "idle")
         {
-            // Idle status → never post a new channel message (would push to "latest")
-            // Only edit in-place is allowed for idle; if nothing to edit, silently skip.
-            if (statusType == "idle")
-            {
-                Console.WriteLine($"[EYE] Skip new-post (idle): {slackText[..Math.Min(slackText.Length, 80)]}");
-                return;
-            }
-
-            // Not editable (type changed, has replies, or no longer latest) → post new message
-            if (!hasReplies && state.SlackStatusTs != null)
-            {
-                // Check if the latest channel message was written by someone else (non-bot).
-                // If so, our old status is already buried — skip delete, just post new below.
-                bool latestIsOurs = true;
-                try
-                {
-                    var (latestTs, _, latestUsername, latestBotId) =
-                        await GetChannelLatestMessageInfo(slackBotToken, slackChannel);
-                    // "Ours" = latest ts matches our status ts (or latest author is instanceUsername)
-                    if (latestTs != null && latestTs != state.SlackStatusTs)
-                    {
-                        // Someone else's message is more recent
-                        bool sameUsername = !string.IsNullOrEmpty(latestUsername)
-                            && latestUsername.Equals(instanceUsername, StringComparison.OrdinalIgnoreCase);
-                        latestIsOurs = sameUsername;  // only ours if another bot instance posted it
-                    }
-                }
-                catch { }
-
-                if (latestIsOurs)
-                {
-                    // Our status is still latest → delete old so new appears at bottom
-                    var oldTs = state.SlackStatusTs;
-                    state.SlackStatusTs = null;
-                    SetWindowStringProp(hwnd, PropSlackTs, null);
-                    await SlackDeleteMessageAsync(slackBotToken, slackChannel, oldTs);
-                }
-                else
-                {
-                    // Non-bot message is more recent — leave old intact, just post new below
-                    Console.WriteLine("[EYE] Latest message not ours → skip delete, post new status below");
-                    state.SlackStatusTs = null;
-                    SetWindowStringProp(hwnd, PropSlackTs, null);
-                }
-            }
-            // has replies → leave old message intact, post fresh stream below it
-
-            var (ok, ts) = await SlackSendViaApi(slackBotToken, slackChannel, slackText, username: instanceUsername);
-            if (ok && ts != null)
-            {
-                state.SlackStatusTs = ts;
-                state.LastStatusType = statusType;
-                if (hwnd == claudeHwnd)
-                    try { File.WriteAllText(statusTsFile, ts); } catch { }
-                SetWindowStringProp(hwnd, PropSlackTs, ts);
-                SetWindowStringProp(hwnd, PropAiOut, slackText);
-                SetWindowStringProp(hwnd, PropStatusType, statusType);
-                Console.WriteLine($"[EYE] Post [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
-            }
-            else if (!ok)
-            {
-                Console.WriteLine($"[EYE] Post FAILED [{statusType}]: {slackText[..Math.Min(slackText.Length, 60)]}");
-            }
-            state.LastSlackStatusText = slackText;
+            Console.WriteLine($"[EYE] Skip new-post (idle, not latest): {slackText[..Math.Min(slackText.Length, 80)]}");
+            return;
         }
+
+        // Delete our previous status (unless it has replies — never destroy a thread)
+        if (state.SlackStatusTs != null && !hasReplies)
+        {
+            var oldTs = state.SlackStatusTs;
+            state.SlackStatusTs = null;
+            SetWindowStringProp(hwnd, PropSlackTs, null);
+            await SlackDeleteMessageAsync(slackBotToken, slackChannel, oldTs);
+            Console.WriteLine($"[EYE] Deleted old status (not latest) → posting new");
+        }
+        else if (hasReplies)
+        {
+            // Thread started on old status → leave it, post fresh below
+            state.SlackStatusTs = null;
+            SetWindowStringProp(hwnd, PropSlackTs, null);
+        }
+
+        // Post new status at bottom
+        var (postOk, ts) = await SlackSendViaApi(slackBotToken, slackChannel, slackText, username: instanceUsername);
+        if (postOk && ts != null)
+        {
+            state.SlackStatusTs = ts;
+            state.LastStatusType = statusType;
+            state.LastSlackStatusText = slackText;
+            if (hwnd == claudeHwnd)
+                try { File.WriteAllText(statusTsFile, ts); } catch { }
+            SetWindowStringProp(hwnd, PropSlackTs, ts);
+            SetWindowStringProp(hwnd, PropAiOut, slackText);
+            SetWindowStringProp(hwnd, PropStatusType, statusType);
+            Console.WriteLine($"[EYE] Post [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
+        }
+        else if (!postOk)
+        {
+            Console.WriteLine($"[EYE] Post FAILED [{statusType}]: {slackText[..Math.Min(slackText.Length, 60)]}");
+        }
+        state.LastSlackStatusText = slackText;
     }
 
     // ── Homework injection ────────────────────────────────────────────────────────────────
