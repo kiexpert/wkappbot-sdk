@@ -1857,6 +1857,67 @@ public sealed class ClaudePromptHelper : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// Read current text in the prompt input area (focusless).
+    /// VS Code: [Edit] "Message input" → Text pattern DocumentRange.
+    /// Claude Desktop/others: turn-form inputGroup → Value pattern.
+    /// Returns null if unable to read.
+    /// </summary>
+    public string? ReadCurrentInputText(PromptInfo prompt)
+    {
+        try
+        {
+            var root = _automation.FromHandle(prompt.WindowHandle);
+            if (root == null) return null;
+
+            // VS Code Claude Code path: [Edit] "Message input"
+            if (string.Equals(prompt.HostType, HostVsCodeClaudeCode, StringComparison.OrdinalIgnoreCase)
+             || string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                var editEl = root.FindFirst(TreeScope.Descendants, new AndCondition(
+                    new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Edit),
+                    new PropertyCondition(_automation.PropertyLibrary.Element.Name, "Message input")));
+                if (editEl == null) return null;
+
+                // Try Text pattern first (most reliable for contentEditable)
+                var tp = editEl.Patterns.Text;
+                if (tp.IsSupported)
+                    return tp.Pattern.DocumentRange.GetText(-1);
+
+                // Fallback: Value pattern
+                var vp = editEl.Patterns.Value;
+                if (vp.IsSupported)
+                    return vp.Pattern.Value;
+
+                return null;
+            }
+
+            // Claude Desktop path: turn-form → inputGroup
+            var turnForm = root.FindFirstDescendant(
+                new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+            if (turnForm == null) return null;
+
+            var inputGroup = turnForm.FindFirstChild(
+                new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Group));
+            if (inputGroup == null) return null;
+
+            var valPat = inputGroup.Patterns.Value;
+            if (valPat.IsSupported)
+                return valPat.Pattern.Value;
+
+            var txtPat = inputGroup.Patterns.Text;
+            if (txtPat.IsSupported)
+                return txtPat.Pattern.DocumentRange.GetText(-1);
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] ReadCurrentInputText error: {ex.Message}");
+            return null;
+        }
+    }
+
     public SubmitState ProbeSubmitState(PromptInfo prompt)
     {
         try
