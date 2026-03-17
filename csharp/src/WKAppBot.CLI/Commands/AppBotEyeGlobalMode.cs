@@ -660,8 +660,8 @@ internal partial class Program
             if (frameCount % 100 == 50)
                 TryDeleteOldExes();
 
-            // ── Claude Desktop status detection (~every 5 sec) ──
-            if (frameCount % 50 == 0)
+            // ── Claude Desktop status detection (~every 1 sec) ──
+            if (frameCount % 10 == 0)
             {
                 cachedClaudeStatusText = RunClaudeStatusTick(
                     ref claudeHwnd, slackBotToken, slackChannel, botUsername,
