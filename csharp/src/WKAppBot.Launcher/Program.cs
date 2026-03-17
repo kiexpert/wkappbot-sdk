@@ -47,7 +47,7 @@ class Program
     [STAThread]
     static int Main(string[] args)
     {
-        Console.OutputEncoding = Encoding.UTF8;
+        Console.OutputEncoding = new UTF8Encoding(false); // no BOM — BOM is noise in pipes/relay
         Console.InputEncoding = Encoding.UTF8;
 
         // backward-compat local alias so existing prof("...") calls in Main still work
@@ -391,7 +391,7 @@ class Program
             {
                 try
                 {
-                    Console.OutputEncoding = Encoding.UTF8;
+                    Console.OutputEncoding = new UTF8Encoding(false); // no BOM
                     var content = File.ReadAllText(relayFile, Encoding.UTF8);
                     Console.Out.Write(content);
                     Console.Out.Flush();
@@ -665,7 +665,7 @@ class Program
                 // This ensures Core holds NO ConPTY handles → bash won't wait 27s after Core dies.
                 try { proc.StandardInput.Close(); } catch { }
                 // Relay Core's stdout and stderr to Launcher's stdout/stderr in background.
-                Console.OutputEncoding = System.Text.Encoding.UTF8;
+                Console.OutputEncoding = new System.Text.UTF8Encoding(false); // no BOM
                 var stdoutRelay = System.Threading.Tasks.Task.Run(() =>
                 {
                     try
@@ -733,8 +733,7 @@ class Program
                     {
                         try
                         {
-                            Console.OutputEncoding = System.Text.Encoding.UTF8;
-                            // Core holds relay file open (FileShare.Read) — readable while Core is alive
+                            Console.OutputEncoding = new System.Text.UTF8Encoding(false); // no BOM
                             var content = System.IO.File.ReadAllText(relayFilePath, System.Text.Encoding.UTF8);
                             Console.Out.Write(content);
                             Console.Out.Flush();
@@ -870,7 +869,7 @@ class Program
         var core = Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot-core.exe");
         if (!File.Exists(core)) { Console.Error.WriteLine($"[ERROR] wkappbot-core.exe not found at: {core}"); return 1; }
 
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false); // no BOM
 
         // DIAGNOSTIC: start Core with NO pipe, just env var, and see if it starts
         using var proc = new Process
