@@ -651,7 +651,7 @@ internal partial class Program
             var preview = existingInput.Length > 40 ? existingInput[..40] + "…" : existingInput;
             var actionInfo = $"기존: \"{preview}\"\n→ 슬랙 메시지로 교체 후 전달";
             var idleMs = NativeMethods.GetUserIdleMs();
-            var yieldTimeout = idleMs >= 60_000 ? 3 : 20; // 1분+ idle → 3초, 활동 중 → 20초
+            var yieldTimeout = idleMs >= 60_000 ? 3 : 30; // 1분+ idle → 3초, 활동 중 → 30초
             Console.WriteLine($"  [SLACK→PROMPT] idle={idleMs}ms → yieldTimeout={yieldTimeout}s");
             var (approved, _, deniedByUser) = UserInputWaitOverlay.Show(
                 prompt.WindowHandle, userIdleMs: idleMs, timeoutSeconds: yieldTimeout,
