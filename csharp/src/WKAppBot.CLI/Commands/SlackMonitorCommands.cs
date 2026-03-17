@@ -935,7 +935,7 @@ internal partial class Program
     /// Get the latest message in a channel: (ts, reply_count).
     /// Used to check if our status streaming message is still at the bottom and has no replies.
     /// </summary>
-    static async Task<(string? ts, int replyCount)> GetChannelLatestMessageInfo(string botToken, string channel)
+    static async Task<(string? ts, int replyCount, string? username, string? botId)> GetChannelLatestMessageInfo(string botToken, string channel)
     {
         using var http = new HttpClient();
         using var req = new HttpRequestMessage(HttpMethod.Get,
@@ -946,21 +946,23 @@ internal partial class Program
         var body = await resp.Content.ReadAsStringAsync();
         var json = JsonSerializer.Deserialize<JsonNode>(body);
         var ok = json?["ok"]?.GetValue<bool>() ?? false;
-        if (!ok) return (null, 0);
+        if (!ok) return (null, 0, null, null);
 
         var messages = json?["messages"]?.AsArray();
-        if (messages == null || messages.Count == 0) return (null, 0);
+        if (messages == null || messages.Count == 0) return (null, 0, null, null);
 
         var msg = messages[0];
         var ts = msg?["ts"]?.GetValue<string>();
         var replyCount = msg?["reply_count"]?.GetValue<int>() ?? 0;
-        return (ts, replyCount);
+        var username = msg?["username"]?.GetValue<string>();
+        var botId = msg?["bot_id"]?.GetValue<string>();
+        return (ts, replyCount, username, botId);
     }
 
     /// Backward-compat wrapper.
     static async Task<string?> GetChannelLatestMessageTs(string botToken, string channel)
     {
-        var (ts, _) = await GetChannelLatestMessageInfo(botToken, channel);
+        var (ts, _, _, _) = await GetChannelLatestMessageInfo(botToken, channel);
         return ts;
     }
 

@@ -821,11 +821,39 @@ internal partial class Program
             // Not editable (type changed, has replies, or no longer latest) → post new message
             if (!hasReplies && state.SlackStatusTs != null)
             {
-                // No replies → delete old so new message appears at bottom (latest)
-                var oldTs = state.SlackStatusTs;
-                state.SlackStatusTs = null;
-                SetWindowStringProp(hwnd, PropSlackTs, null);
-                await SlackDeleteMessageAsync(slackBotToken, slackChannel, oldTs); // guardThreadStarter=true (default)
+                // Check if the latest channel message was written by someone else (non-bot).
+                // If so, our old status is already buried — skip delete, just post new below.
+                bool latestIsOurs = true;
+                try
+                {
+                    var (latestTs, _, latestUsername, latestBotId) =
+                        await GetChannelLatestMessageInfo(slackBotToken, slackChannel);
+                    // "Ours" = latest ts matches our status ts (or latest author is instanceUsername)
+                    if (latestTs != null && latestTs != state.SlackStatusTs)
+                    {
+                        // Someone else's message is more recent
+                        bool sameUsername = !string.IsNullOrEmpty(latestUsername)
+                            && latestUsername.Equals(instanceUsername, StringComparison.OrdinalIgnoreCase);
+                        latestIsOurs = sameUsername;  // only ours if another bot instance posted it
+                    }
+                }
+                catch { }
+
+                if (latestIsOurs)
+                {
+                    // Our status is still latest → delete old so new appears at bottom
+                    var oldTs = state.SlackStatusTs;
+                    state.SlackStatusTs = null;
+                    SetWindowStringProp(hwnd, PropSlackTs, null);
+                    await SlackDeleteMessageAsync(slackBotToken, slackChannel, oldTs);
+                }
+                else
+                {
+                    // Non-bot message is more recent — leave old intact, just post new below
+                    Console.WriteLine("[EYE] Latest message not ours → skip delete, post new status below");
+                    state.SlackStatusTs = null;
+                    SetWindowStringProp(hwnd, PropSlackTs, null);
+                }
             }
             // has replies → leave old message intact, post fresh stream below it
 
