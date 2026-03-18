@@ -9,6 +9,7 @@ using FlaUI.UIA3;
 using WKAppBot.WebBot;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Input;
+using WKAppBot.Win32.Window;
 using NativeMethods = WKAppBot.Win32.Native.NativeMethods;
 
 namespace WKAppBot.CLI;
@@ -209,12 +210,37 @@ Examples:
         var results = tasks.Select(t => t.Result).ToArray();
         Console.WriteLine($"[TRIAD] Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
-        // ── Post reminder for Claude to summarize in Korean ──
+        // ── Inject reminder directly into caller's Claude Code prompt (1s delay) ──
+        // Targets the Claude Code instance in the same CWD that ran `ask triad`.
+        // Also posts Slack reminder for visibility (so user sees it in thread too).
         var threadTs = _slackSessionThreadTs.Value;
+        var callerCwd = Environment.CurrentDirectory;
+        Task.Run(() =>
+        {
+            Thread.Sleep(1000);
+            try
+            {
+                var replyCmd = string.IsNullOrEmpty(threadTs) ? "" :
+                    $" → 슬랙 쓰레드에 reply: wkappbot slack reply \"종합의견...\" --msg {threadTs}";
+                var promptMsg = $"YOU MUST 위 삼두 답변을 꼼꼼히 읽고 반드시 한국어로 종합 의견을 작성하세요! 각 AI별 핵심 차이점과 본인 의견 포함{replyCmd}";
+                using var ph = new ClaudePromptHelper();
+                var pi = ph.FindPromptForCwd(callerCwd);
+                if (pi != null)
+                {
+                    ClaudePromptHelper.AllowFocusSteal = true;
+                    ph.TypeAndSubmit(pi, promptMsg);
+                    Console.WriteLine($"[TRIAD] Reminder injected → {callerCwd}");
+                }
+                else
+                    Console.WriteLine($"[TRIAD] Reminder: no prompt found for cwd={callerCwd}");
+            }
+            catch (Exception ex) { Console.WriteLine($"[TRIAD] Reminder inject error: {ex.Message}"); }
+            finally { ClaudePromptHelper.AllowFocusSteal = false; }
+        });
         if (!string.IsNullOrEmpty(threadTs))
         {
-            var reminder = $"🤖 *[AI에게]* `wkappbot slack reply \"YOU MUST 위 삼두 답변을 꼼꼼히 읽고 반드시 한국어로 종합 의견을 작성하세요! 각 AI별 핵심 차이점과 본인 의견을 포함해야 합니다. 절대 잊지 마세요!\" --msg {threadTs}`";
-            SlackPostToThread(reminder, "앱봇아이");
+            var slackReminder = $"🤖 *[AI에게]* `wkappbot slack reply \"YOU MUST 위 삼두 답변을 꼼꼼히 읽고 반드시 한국어로 종합 의견을 작성하세요! 각 AI별 핵심 차이점과 본인 의견을 포함해야 합니다. 절대 잊지 마세요!\" --msg {threadTs}`";
+            SlackPostToThread(slackReminder, "앱봇아이");
         }
 
         return results.Any(r => r == 0) ? 0 : 1; // success if at least one AI answered
