@@ -539,6 +539,10 @@ internal partial class Program
     // Each child Task inherits the value and posts to the same thread (no duplicate headers).
     internal static readonly System.Threading.AsyncLocal<string?> _slackSessionThreadTs = new();
 
+    // Suppress Slack for internal sub-calls (e.g. whisper study → AskAiForStudy).
+    // Set to true before calling AskCommand internally to prevent channel noise.
+    internal static readonly System.Threading.AsyncLocal<bool> _suppressSlackSession = new();
+
     // Per-session last-post tracker: sessionThreadTs → (msgTs, username, text).
     // Used to detect "latest comment is mine" and append via chat.update instead of new post.
     // Tool ⏳ markers update this too, so AI answers won't falsely append over tool messages.
@@ -637,6 +641,7 @@ internal partial class Program
     /// </summary>
     internal static string? EnsureSlackThread(string label, string question)
     {
+        if (_suppressSlackSession.Value) return null; // internal sub-call (e.g. whisper study)
         if (_slackSessionThreadTs.Value != null)
             return _slackSessionThreadTs.Value;   // already opened by triad parent
 

@@ -538,6 +538,7 @@ internal partial class Program
                     askArgs.Add("--new-session"); // clear stale tab context on retry
 
                 Console.WriteLine($"[STUDY] Calling: ask {engine} <{askArgs.Count - 2} lines> {Path.GetFileName(audioFile)} --timeout 120 --target-tag {engine}-whisper{(freshSession ? " --new-session" : "")}");
+                _suppressSlackSession.Value = true; // internal sub-call — no Slack channel noise
                 AskCommand(askArgs.ToArray());
             }
             finally
