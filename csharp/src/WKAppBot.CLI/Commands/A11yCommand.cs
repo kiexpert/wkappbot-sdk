@@ -213,6 +213,7 @@ internal partial class Program
             Console.WriteLine("[⚠ ALLOW-ANCESTORS] Ancestor process guard disabled — you may interact with your own parent process tree. Be careful not to interfere with other active sessions!");
         bool speak = args.Any(a => a == "--speak");
         bool repeat = args.Any(a => a == "--repeat");
+        bool hotkey = args.Any(a => a == "--hotkey"); // type: Win32 label/menu dispatch instead of text input
         int countN = 1;
         { var ci = Array.IndexOf(args, "--count"); if (ci >= 0 && ci + 1 < args.Length && int.TryParse(args[ci + 1], out var cv)) countN = Math.Max(1, cv); }
 
@@ -255,9 +256,26 @@ internal partial class Program
             return Error("resize requires --w N --h N");
         // keystroke/hotkey → type alias (통합)
         if (action is "hotkey" or "keystroke") action = "type";
-        // type/set-value/eval: allow positional arg (e.g., `a11y type "*app*" "F5"` without --text)
-        if ((action is "type" or "set-value" or "eval") && text == null && args.Length >= 3 && !args[2].StartsWith("--"))
-            text = args[2];
+        // type/set-value/eval: --text 없으면 잔여 위치 인수(index 2+, -- 미시작) 공백 합치기
+        // a11y type "*App*" hello world  →  text = "hello world"
+        // a11y type "*App*" 파일/저장 --hotkey  →  text = "파일/저장"
+        if ((action is "type" or "set-value" or "eval") && text == null && args.Length >= 3)
+        {
+            // -- 옵션의 값으로 소비된 인수 인덱스 제외
+            var valueOpts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { "--text", "--nth", "--n", "--depth", "--timeout", "--interval",
+                  "--value", "--x", "--y", "--w", "--h", "--encoding", "--count" };
+            var consumedIdx = new HashSet<int>();
+            for (int i = 2; i < args.Length - 1; i++)
+                if (args[i].StartsWith("--") && valueOpts.Contains(args[i]))
+                    consumedIdx.Add(i + 1);
+            var parts = args.Skip(2)
+                .Select((a, i) => (a, idx: i + 2))
+                .Where(t => !t.a.StartsWith("--") && !consumedIdx.Contains(t.idx))
+                .Select(t => t.a)
+                .ToArray();
+            if (parts.Length > 0) text = string.Join(" ", parts);
+        }
         if ((action is "type" or "set-value" or "eval") && text == null)
             return Error($"{action} requires text argument (e.g., a11y {action} \"target\" \"value\")");
 
@@ -607,7 +625,7 @@ internal partial class Program
                 if (isCssPattern)
                 {
                     // Telepathy: try CDP on any process that has a debugging port
-                    var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak);
+                    var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak, hotkey);
                     if (cdpResult != null)
                     {
                         success = cdpResult.Value;
@@ -636,7 +654,7 @@ internal partial class Program
                         if (!isCssPattern && !string.IsNullOrEmpty(uiaPath))
                         {
                             Console.WriteLine($"[A11Y] UIA scope failed, trying CDP telepathy with \"{uiaPath}\"");
-                            var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak);
+                            var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak, hotkey);
                             if (cdpResult != null)
                             {
                                 success = cdpResult.Value;
@@ -753,7 +771,7 @@ internal partial class Program
                         "collapse" => A11yCollapse(root),
                         "select" => A11ySelectItem(root),
                         "scroll" => A11yScrollAction(root, hwnd, scrollDir, scrollAmount),
-                        "type" => A11yType(root, hwnd, text!),
+                        "type" => A11yType(root, hwnd, text!, hotkey),
                         "set-value" => A11ySetValue(root, hwnd, text!),
                         "set-range" => A11ySetRange(root, rangeValue!.Value),
                         "focus" => A11yFocusElement(root, hwnd),
@@ -1791,7 +1809,7 @@ internal partial class Program
     /// Returns true/false on success/failure, or null if CDP is unavailable.
     /// </summary>
     static bool? TryWebViewCdpAction(IntPtr hwnd, string action, string cssSelector,
-        string? text, double? rangeValue, string scrollDir, string scrollAmount, int findDepth, bool speak = false)
+        string? text, double? rangeValue, string scrollDir, string scrollAmount, int findDepth, bool speak = false, bool hotkey = false)
     {
         try
         {
@@ -1848,6 +1866,7 @@ internal partial class Program
             bool result = action switch
             {
                 "click" or "invoke" => CdpClick(cdp, cssSelector),
+                "type" when hotkey  => CdpHotkey(cdp, text ?? ""),
                 "type" => CdpType(cdp, cssSelector, text ?? ""),
                 "set-value" => CdpSetValue(cdp, cssSelector, text ?? ""),
                 "read" or "find" => CdpReadElement(cdp, cssSelector),
@@ -1899,6 +1918,58 @@ internal partial class Program
     {
         cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
         return true;
+    }
+
+    /// <summary>
+    /// --hotkey 모드 CDP 발동:
+    /// 1. text에 '/' 포함 → aria-keyshortcuts / accesskey 직접 디스패치 (예: "Alt+S", "s")
+    /// 2. 그 외 → DOM 스캔(accesskey + aria-keyshortcuts)에서 grap 패턴으로 레이블 매칭 → 커버리지 최고 선택
+    /// </summary>
+    static bool CdpHotkey(WKAppBot.WebBot.CdpClient cdp, string text)
+    {
+        // ① 명시적 단축키 문자열 (예: "Ctrl+S", "Alt+F4", "s")
+        if (text.Contains('+') || (text.Length == 1 && char.IsLetterOrDigit(text[0])))
+        {
+            bool isAccessKey = text.Length == 1;
+            return cdp.DispatchShortcutAsync(text, isAccessKey).GetAwaiter().GetResult();
+        }
+
+        // ② DOM 핫키 맵 스캔 → grap 패턴 레이블 매칭
+        var hotkeyMap = cdp.GetHotkeyMapAsync().GetAwaiter().GetResult();
+        if (hotkeyMap.Count == 0)
+        {
+            Console.Error.WriteLine("[A11Y] type --hotkey CDP — no accesskey/aria-keyshortcuts found in DOM");
+            return false;
+        }
+
+        var matcher = PatternMatcher.Create(text);
+        var matches = hotkeyMap
+            .Where(e => !string.IsNullOrEmpty(e.Label) && matcher.IsMatch(e.Label))
+            .OrderBy(e => e.Label.Length) // 커버리지 높은 것 우선
+            .ToList();
+
+        if (matches.Count == 0)
+        {
+            Console.Error.WriteLine($"[A11Y] type --hotkey CDP — no label match for '{text}'");
+            return false;
+        }
+
+        var best = matches[0];
+        if (matches.Count > 1)
+            Console.WriteLine($"[A11Y] type --hotkey CDP — {matches.Count} matches, best: '{best.Label}'");
+
+        // accesskey 우선, 없으면 aria-keyshortcuts 첫 번째
+        if (!string.IsNullOrEmpty(best.Accesskey))
+            return cdp.DispatchShortcutAsync(best.Accesskey, isAccessKey: true).GetAwaiter().GetResult();
+
+        if (!string.IsNullOrEmpty(best.Keyshortcuts))
+        {
+            var first = best.Keyshortcuts.Split(' ')[0]; // 공백 구분 다중 단축키 중 첫 것
+            return cdp.DispatchShortcutAsync(first).GetAwaiter().GetResult();
+        }
+
+        Console.Error.WriteLine($"[A11Y] type --hotkey CDP — '{best.Label}' has no dispatchable shortcut");
+        return false;
     }
 
     static bool CdpSetValue(WKAppBot.WebBot.CdpClient cdp, string selector, string text)
