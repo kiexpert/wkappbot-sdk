@@ -192,9 +192,13 @@ internal partial class Program
 
             // Phase 7: Slack forwarding handled by OnMessage → slack route worker (no HTTP poll)
 
-            // Phase 8: Route retry flush — Eye-independent safety net (called by Task Scheduler one-shot)
+            // Phase 8: Eye watchdog + route retry flush (called by Task Scheduler every 10 min)
             try
             {
+                // Respawn Eye daemon if it was killed — watchdog core behavior
+                RouteRetryQueue.EnsureEyeRunning();
+
+                // Flush due retry items
                 var retryItems = RouteRetryQueue.GetDueItems();
                 if (retryItems.Count > 0)
                 {
@@ -204,12 +208,13 @@ internal partial class Program
                     foreach (var item in retryItems)
                         SlackRouteCommand([item]);
                 }
-                // Re-schedule next one-shot for any remaining items in queue
-                RouteRetryQueue.ScheduleNextTask();
+
+                // Sync precise one-shot for remaining items (if any)
+                RouteRetryQueue.ScheduleRetryTask();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EYE_TICK] Route retry error: {ex.Message}");
+                Console.WriteLine($"[EYE_TICK] Watchdog/retry error: {ex.Message}");
             }
 
             Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");

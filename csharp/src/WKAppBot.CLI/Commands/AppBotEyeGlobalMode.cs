@@ -206,9 +206,11 @@ internal partial class Program
 
         Console.WriteLine("[EYE] Global monitor active — press Ctrl+C to stop");
 
-        // ── Sync Windows Task Scheduler with actual retry queue ──
-        // If items survived a crash/kill, re-register one-shot at the soonest retryAt.
-        RouteRetryQueue.ScheduleNextTask();
+        // ── Windows Task Scheduler: dual watchdog structure ──
+        // 1. Permanent 10-min watchdog (Eye always comes back even if killed)
+        // 2. Precise one-shot retry task synced to actual queue (if items exist)
+        RouteRetryQueue.EnsureWatchdogTask();
+        RouteRetryQueue.ScheduleRetryTask();
 
         // ★ Default: pure focusless mode — Eye will not steal foreground focus
         // AllowFocusSteal is temporarily enabled for handoff nudges only
