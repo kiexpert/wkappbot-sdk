@@ -95,8 +95,17 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
         try
         {
             var actionArgs = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
+            // Capture call stack — WKAppBot frames only, skip internals
+            var stackFrames = new System.Diagnostics.StackTrace(fNeedFileInfo: false).GetFrames()
+                .Select(f => f.GetMethod())
+                .Where(m => m?.DeclaringType?.Namespace?.StartsWith("WKAppBot") == true)
+                .Select(m => $"{m!.DeclaringType!.Name}.{m.Name}")
+                .Where(s => !s.StartsWith("UserInputWait") && !s.StartsWith("ReadinessAdapter"))
+                .Take(6)
+                .ToArray();
+            var stackInfo = stackFrames.Length > 0 ? "\n[호출] " + string.Join(" ← ", stackFrames) : "";
             var (approved, focusAcquired, deniedByUser) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
-                positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs);
+                positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs + stackInfo);
             if (deniedByUser)
                 Console.WriteLine("[READINESS] 사용자가 포커스 양보를 거부했습니다 — 중단");
             result = new UserYieldResult(approved, focusAcquired);

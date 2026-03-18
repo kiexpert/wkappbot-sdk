@@ -56,7 +56,7 @@ internal sealed class UserInputWaitWindow : Window
 
         Title = "UserInputWait";
         Width = 400;
-        Height = actionInfo != null ? 280 : 220;
+        Height = actionInfo != null ? 320 : 220;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -134,7 +134,7 @@ internal sealed class UserInputWaitWindow : Window
                 BorderThickness = new Thickness(1),
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 10,
-                MaxHeight = 52,
+                MaxHeight = 80,
                 TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
