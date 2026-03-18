@@ -201,4 +201,28 @@ internal partial class Program
             Console.WriteLine($"[ROUTE] Ack send failed (thread={threadKey})");
         }
     }
+
+    /// <summary>
+    /// wkappbot slack route-flush
+    /// Processes all due retry items in the queue — intended for Windows Task Scheduler.
+    /// Runs standalone (no Eye required). Eye-independent safety net.
+    /// </summary>
+    static int SlackRouteFlushCommand()
+    {
+        var dueItems = RouteRetryQueue.GetDueItems();
+        if (dueItems.Count == 0)
+        {
+            Console.WriteLine("[ROUTE-FLUSH] No due items");
+            return 0;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"[ROUTE-FLUSH] Processing {dueItems.Count} due item(s)");
+        Console.ResetColor();
+
+        foreach (var item in dueItems)
+            SlackRouteCommand([item]);
+
+        return 0;
+    }
 }
