@@ -99,14 +99,21 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
             var stackFrames = new System.Diagnostics.StackTrace(fNeedFileInfo: false).GetFrames()
                 .Select(f => f.GetMethod())
                 .Where(m => m?.DeclaringType?.Namespace?.StartsWith("WKAppBot") == true)
-                .Select(m => $"{m!.DeclaringType!.Name}.{m.Name}")
-                .Where(s => !s.StartsWith("UserInputWait") && !s.StartsWith("ReadinessAdapter"))
+                .Select(m => Program.CleanAsyncMethodName(m!.DeclaringType!.Name, m.Name))
+                .Where(s => s != null && !s.StartsWith("UserInputWait") && !s.StartsWith("ReadinessAdapter"))
+                .Distinct()
                 .Take(6)
                 .ToArray();
             var stackInfo = stackFrames.Length > 0 ? "\n[호출] " + string.Join(" ← ", stackFrames) : "";
-            Console.WriteLine($"[READINESS] cmd={actionArgs}{stackInfo}");
+            // Caller display name (who triggered this approval)
+            var callerHwnd = EyeCmdPipeServer.CallerHwnd.Value;
+            var callerName = callerHwnd.HasValue
+                ? Program.GetPromptDisplayInfo(callerHwnd.Value).displayName
+                : null;
+            var callerInfo = callerName != null ? $"\n[요청자] {callerName}" : "";
+            Console.WriteLine($"[READINESS] cmd={actionArgs}{callerInfo}{stackInfo}");
             var (approved, focusAcquired, deniedByUser) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
-                positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs + stackInfo);
+                positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs + callerInfo + stackInfo);
             if (deniedByUser)
                 Console.WriteLine("[READINESS] 사용자가 포커스 양보를 거부했습니다 — 중단");
             result = new UserYieldResult(approved, focusAcquired);
@@ -277,5 +284,23 @@ internal sealed class ReadinessZoomAdapter : IReadinessZoom
                                                    "readiness", label);
         if (_lastZoom == null) return null;
         return new ClickZoomAdapter(_lastZoom);
+    }
+}
+
+internal static partial class Program
+{
+    /// <summary>
+    /// Strip async state machine noise from stack frame names.
+    /// "&lt;AskClaude&gt;d__409" + "MoveNext" → "AskClaude"
+    /// </summary>
+    internal static string? CleanAsyncMethodName(string typeName, string methodName)
+    {
+        if (methodName == "MoveNext")
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(typeName, @"<([A-Za-z][A-Za-z0-9_]*)>");
+            return m.Success ? m.Groups[1].Value : null;
+        }
+        if (methodName.StartsWith('<') || typeName.StartsWith('<')) return null;
+        return methodName;
     }
 }
