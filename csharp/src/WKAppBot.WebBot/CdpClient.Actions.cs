@@ -380,15 +380,32 @@ public sealed partial class CdpClient
     /// Bring this tab to the OS foreground (recovery use only — steals focus).
     /// Uses Page.bringToFront which activates the tab AND brings Chrome to front.
     /// </summary>
-    public async Task BringTabToFrontAsync()
+    /// <summary>
+    /// Make Chrome window visible WITHOUT stealing OS focus (SW_SHOWNOACTIVATE).
+    /// Renderer becomes active + compositor runs, but foreground stays with caller.
+    /// Use before CDP input that needs a visible (non-minimized) renderer.
+    /// Call MinimizeChromeAsync() when done to restore minimized state.
+    /// </summary>
+    public void RestoreChromeNoActivate()
     {
-        try
-        {
-            await SendAsync("Page.bringToFront", new JsonObject());
-            Console.WriteLine("[CDP] Tab brought to front (recovery)");
-        }
-        catch { }
+        var hwnd = GetChromeWindowHandle();
+        if (hwnd == IntPtr.Zero) return;
+        // SW_SHOWNOACTIVATE=4: visible, not minimized, does NOT steal focus
+        ShowWindowNative(hwnd, 4);
+        Console.WriteLine("[CDP] Chrome restored (SW_SHOWNOACTIVATE — no focus steal)");
     }
+
+    public void MinimizeChrome()
+    {
+        var hwnd = GetChromeWindowHandle();
+        if (hwnd == IntPtr.Zero) return;
+        // SW_MINIMIZE=6
+        ShowWindowNative(hwnd, 6);
+        Console.WriteLine("[CDP] Chrome minimized");
+    }
+
+    /// <summary>Legacy recovery — replaced by RestoreChromeNoActivate. Kept as no-op.</summary>
+    public Task BringTabToFrontAsync() => Task.CompletedTask;
 
     /// <summary>
     /// Activate this tab in Chrome.
@@ -649,6 +666,9 @@ public sealed partial class CdpClient
         Console.WriteLine($"  [CDP-HOTKEY] '{shortcut}' → key={key} mods={mods}");
         return true;
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ShowWindowNative(IntPtr hWnd, int nCmdShow);
 }
 
 /// <summary>DOM 핫키 스캔 결과 엔트리.</summary>

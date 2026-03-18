@@ -159,6 +159,11 @@ internal partial class Program
                 catch { }
             }
 
+            // Restore Chrome (SW_SHOWNOACTIVATE) so renderer is active for input
+            // without stealing OS focus from the user's current window.
+            if (action is "input-cdp" or "send" or "type")
+                cdp.RestoreChromeNoActivate();
+
             Console.WriteLine($"[AAR:CDP] Ready: {action}");
             return (true, prevFg, zoom);
         }

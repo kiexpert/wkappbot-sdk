@@ -216,6 +216,11 @@ public sealed partial class CdpClient
     /// </summary>
     public async Task<bool> SwitchToTargetAsync(string targetId, int port)
     {
+        // Minimize Chrome before switching tab — prevents OS focus fight during tab switch.
+        // Chrome processes tab changes internally fine while minimized.
+        MinimizeChrome();
+        await Task.Delay(80);
+
         // Find new target's WebSocket URL
         string? wsUrl = null;
         try
