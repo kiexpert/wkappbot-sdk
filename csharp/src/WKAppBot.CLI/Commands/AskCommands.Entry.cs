@@ -215,7 +215,7 @@ Examples:
         // Targets the Claude Code instance in the same CWD that ran `ask triad`.
         // Also posts Slack reminder for visibility (so user sees it in thread too).
         var threadTs = _slackSessionThreadTs.Value;
-        var callerCwd = Environment.CurrentDirectory;
+        var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
         Task.Run(() =>
         {
             Thread.Sleep(1000);
