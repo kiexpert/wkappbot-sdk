@@ -265,6 +265,9 @@ internal partial class Program
                 // would immediately satisfy the DONE check, returning the persona response as the answer.
                 int preStreamingCount = int.Parse(await cdp.EvalAsync(
                     "document.querySelectorAll('[data-is-streaming]').length") ?? "0");
+                // Fallback: also track assistant-message count (Claude.ai alternate DOM structure)
+                int preAssistantCount = int.Parse(await cdp.EvalAsync(
+                    "document.querySelectorAll('[data-testid=\"assistant-message\"]').length") ?? "0");
                 var sendResult = "PENDING";
 
                 // Tier 1: JS click on send button (multi-selector fallback for DOM changes)
@@ -365,12 +368,18 @@ internal partial class Program
                     var detectResult = await cdp.EvalAsync($$"""
                         (() => {
                             var msgs = document.querySelectorAll('[data-is-streaming]');
-                            if (msgs.length <= {{preStreamingCount}}) {
-                                var userMsgs = document.querySelectorAll('[data-testid="user-message"]');
-                                return 'WAITING_' + userMsgs.length;
+                            if (msgs.length > {{preStreamingCount}}) {
+                                var last = msgs[msgs.length - 1];
+                                return last.getAttribute('data-is-streaming') === 'true' ? 'STREAMING' : 'DONE';
                             }
-                            var last = msgs[msgs.length - 1];
-                            return last.getAttribute('data-is-streaming') === 'true' ? 'STREAMING' : 'DONE';
+                            // Fallback: assistant-message count increase (alternate DOM structure)
+                            var asstMsgs = document.querySelectorAll('[data-testid="assistant-message"]');
+                            if (asstMsgs.length > {{preAssistantCount}}) return 'DONE';
+                            // Fallback: thinking/generating indicator
+                            var thinking = document.querySelector('[data-testid*="thinking"],[aria-label*="generating"],[aria-label*="loading"],[data-testid="streaming-indicator"]');
+                            if (thinking) return 'STREAMING';
+                            var userMsgs = document.querySelectorAll('[data-testid="user-message"]');
+                            return 'WAITING_' + userMsgs.length;
                         })()
                         """) ?? "WAITING_0";
 
@@ -405,9 +414,15 @@ internal partial class Program
                         (() => {
                             var msgs = document.querySelectorAll('[data-is-streaming]');
                             var last = msgs.length > {{preStreamingCount}} ? msgs[msgs.length - 1] : null;
+                            // Fallback: assistant-message alternate structure
+                            if (!last) {
+                                var asstMsgs = document.querySelectorAll('[data-testid="assistant-message"]');
+                                if (asstMsgs.length > {{preAssistantCount}}) last = asstMsgs[asstMsgs.length - 1];
+                            }
                             if (!last) return JSON.stringify({state: 'WAITING', len: 0, text: ''});
                             var text = last.textContent;
-                            var state = last.getAttribute('data-is-streaming') === 'true' ? 'STREAMING' : 'DONE';
+                            var streaming = last.getAttribute('data-is-streaming');
+                            var state = streaming === 'true' ? 'STREAMING' : 'DONE';
                             return JSON.stringify({state: state, len: text.length, text: text.substring(0, 3000)});
                         })()
                         """) ?? "{}";

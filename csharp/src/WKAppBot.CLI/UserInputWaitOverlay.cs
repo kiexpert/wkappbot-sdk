@@ -139,9 +139,31 @@ internal sealed class UserInputWaitWindow : Window
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 Padding = new Thickness(4, 2, 4, 2),
+                Margin = new Thickness(0, 0, 0, 2),
+            };
+            // 📋 Copy button
+            var copyBtn = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(0x40, 0x80, 0xFF, 0x80)),
+                CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(6, 2, 6, 2),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Cursor = Cursors.Hand,
                 Margin = new Thickness(0, 0, 0, 8),
+                Child = new TextBlock
+                {
+                    Text = "📋",
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0xFF, 0x80)),
+                    ToolTip = "콜스택 복사",
+                },
+            };
+            copyBtn.MouseLeftButtonUp += (_, _) =>
+            {
+                try { Clipboard.SetText(actionInfo); } catch { }
             };
             stack.Children.Add(infoBox);
+            stack.Children.Add(copyBtn);
         }
 
         // Confirm button (Border + TextBlock for clean look, no ugly chrome)
