@@ -432,40 +432,47 @@ Then immediately:
             }
         }
 
-        // ── Priority 2: CWD folder match — ONLY within ancestor set if known ──
-        // Never match a window outside the ancestor set (would target wrong VS Code instance).
+        // ── Priority 2: CWD folder match — walk up path hierarchy ──
+        // VS Code title = "{activeFile} - {workspaceRoot} - Visual Studio Code"
+        // CWD may be a subdirectory of the workspace root, so try each ancestor folder.
         var cwd = Environment.CurrentDirectory;
         var cwdFolder = Path.GetFileName(cwd.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        if (!string.IsNullOrEmpty(cwdFolder))
         {
-            // Match " - {folder} - " pattern (VS Code title format) — avoids partial substring hits
-            var cwdPattern = $" - {cwdFolder} - ";
-            var cwdMatches = candidates
-                .Where(c => c.title.Contains(cwdPattern, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            var searchDir = new DirectoryInfo(cwd);
+            while (searchDir != null && searchDir.Parent != null) // stop at drive root
+            {
+                var folderName = searchDir.Name;
+                var pattern = $" - {folderName} - ";
+                var cwdMatches = candidates
+                    .Where(c => c.title.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
 
-            // Guard: if ancestor PIDs known but match is outside ancestor set → wrong window → fail
-            if (cwdMatches.Count == 1 && ancestorCodePids.Count > 0 && !ancestorCodePids.Contains(cwdMatches[0].pid))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[NEWCHAT] ERROR: CWD match \"{cwdFolder}\" → \"{cwdMatches[0].title}\" but PID={cwdMatches[0].pid} is NOT an ancestor — refusing to target wrong window.");
-                Console.ResetColor();
-                return IntPtr.Zero;
-            }
+                if (cwdMatches.Count == 0) { searchDir = searchDir.Parent; continue; }
 
-            if (cwdMatches.Count == 1)
-            {
-                Console.WriteLine($"[NEWCHAT] CWD match \"{cwdFolder}\": \"{cwdMatches[0].title}\"");
-                return cwdMatches[0].hWnd;
-            }
-            if (cwdMatches.Count > 1)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[NEWCHAT] ERROR: {cwdMatches.Count} VS Code windows match CWD \"{cwdFolder}\" — ambiguous, aborting.");
-                Console.WriteLine("  Use a more specific title or close duplicate windows.");
-                foreach (var m in cwdMatches) Console.WriteLine($"    hwnd=0x{m.hWnd:X} \"{m.title}\"");
-                Console.ResetColor();
-                return IntPtr.Zero;
+                // Guard: if ancestor PIDs known but match is outside ancestor set → wrong window → fail
+                if (cwdMatches.Count == 1 && ancestorCodePids.Count > 0 && !ancestorCodePids.Contains(cwdMatches[0].pid))
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[NEWCHAT] ERROR: CWD match \"{folderName}\" → \"{cwdMatches[0].title}\" but PID={cwdMatches[0].pid} is NOT an ancestor — refusing to target wrong window.");
+                    Console.ResetColor();
+                    return IntPtr.Zero;
+                }
+
+                if (cwdMatches.Count == 1)
+                {
+                    Console.WriteLine($"[NEWCHAT] CWD match \"{folderName}\" (from path): \"{cwdMatches[0].title}\"");
+                    return cwdMatches[0].hWnd;
+                }
+                if (cwdMatches.Count > 1)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[NEWCHAT] ERROR: {cwdMatches.Count} VS Code windows match \"{folderName}\" — ambiguous, aborting.");
+                    foreach (var m in cwdMatches) Console.WriteLine($"    hwnd=0x{m.hWnd:X} \"{m.title}\"");
+                    Console.ResetColor();
+                    return IntPtr.Zero;
+                }
+
+                searchDir = searchDir.Parent;
             }
         }
 
