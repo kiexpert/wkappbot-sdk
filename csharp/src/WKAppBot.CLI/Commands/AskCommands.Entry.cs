@@ -165,6 +165,7 @@ Examples:
     {
         // Triad always starts fresh per-AI — prevents stale session cross-contamination.
         var freshSession = true;
+        Interlocked.Exchange(ref _slackPersonaPostedFlag, 0); // reset: only first AI posts persona
         Console.WriteLine("[TRIAD] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
 
         // ── Unified Slack thread ──────────────────────────────────────────────────────────
