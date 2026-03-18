@@ -211,37 +211,29 @@ Examples:
         var results = tasks.Select(t => t.Result).ToArray();
         Console.WriteLine($"[TRIAD] Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
-        // ── Inject reminder directly into caller's Claude Code prompt (1s delay) ──
-        // Targets the Claude Code instance in the same CWD that ran `ask triad`.
-        // Also posts Slack reminder for visibility (so user sees it in thread too).
+        // ── Schedule reminder into caller's Claude Code prompt via `wkappbot prompt send` ──
+        // Uses the scheduler (independent process) so TeeTextWriter lifetime is irrelevant.
         var threadTs = _slackSessionThreadTs.Value;
         var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
-        Task.Run(() =>
+        var replyCmd = string.IsNullOrEmpty(threadTs) ? "" :
+            $" → 슬랙 쓰레드에 reply: wkappbot slack reply \"종합의견...\" --msg {threadTs}";
+        var promptMsg = $"YOU MUST 위 삼두 답변을 꼼꼼히 읽고 반드시 한국어로 종합 의견을 작성하세요! 각 AI별 핵심 차이점과 본인 의견 포함{replyCmd}";
+        try
         {
-            Thread.Sleep(1000);
-            try
+            var cwdTag = AbbreviateCwd(callerCwd);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                var replyCmd = string.IsNullOrEmpty(threadTs) ? "" :
-                    $" → 슬랙 쓰레드에 reply: wkappbot slack reply \"종합의견...\" --msg {threadTs}";
-                var promptMsg = $"YOU MUST 위 삼두 답변을 꼼꼼히 읽고 반드시 한국어로 종합 의견을 작성하세요! 각 AI별 핵심 차이점과 본인 의견 포함{replyCmd}";
-                using var ph = new ClaudePromptHelper();
-                var pi = ph.FindPromptForCwd(callerCwd);
-                if (pi != null)
-                {
-                    ClaudePromptHelper.AllowFocusSteal = true;
-                    ph.TypeAndSubmit(pi, promptMsg);
-                    Console.WriteLine($"[TRIAD] Reminder injected → {callerCwd}");
-                }
-                else
-                    Console.WriteLine($"[TRIAD] Reminder: no prompt found for cwd={callerCwd}");
-            }
-            catch (Exception ex) { Console.WriteLine($"[TRIAD] Reminder inject error: {ex.Message}"); }
-            finally { ClaudePromptHelper.AllowFocusSteal = false; }
-        });
+                FileName = System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName,
+                Arguments = $"prompt send \"{cwdTag}\" \"{promptMsg.Replace("\"", "\\\"")}\" --after 5s",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            Console.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) → {cwdTag}");
+        }
+        catch (Exception ex) { Console.WriteLine($"[TRIAD] Reminder schedule error: {ex.Message}"); }
         if (!string.IsNullOrEmpty(threadTs))
         {
-            // Post full content as thread reply — keeps channel clean, no noise
-            var body = $"🔔 *삼두 완료* — Claude Code에 종합의견 리마인더 직접 주입 완료\n💬 _YOU MUST 위 삼두 답변을 꼼꼼히 읽고 한국어로 종합 의견을 작성하세요!_\n📌 `--msg {threadTs}`";
+            var body = $"🔔 *삼두 완료* — 종합의견 리마인더 예약됨 (5s)\n📌 `--msg {threadTs}`";
             SlackPostToThread(body, "앱봇아이");
         }
 
