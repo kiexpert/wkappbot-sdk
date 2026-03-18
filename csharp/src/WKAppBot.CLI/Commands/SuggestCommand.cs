@@ -74,8 +74,7 @@ internal partial class Program
         var botToken = LoadSlackBotToken();
         if (!string.IsNullOrEmpty(botToken))
         {
-            // Use shared SlackSendViaApi with sender's display name (same as 'slack send')
-            var senderName = GetSendReplyUsername();
+            var senderName = string.IsNullOrEmpty(cwdTag) ? "앱봇건의" : $"앱봇건의[{cwdTag}]";
             var (ok, ts) = SlackSendViaApi(botToken, SuggestChannel, header, username: senderName).GetAwaiter().GetResult();
             if (ok)
             {
