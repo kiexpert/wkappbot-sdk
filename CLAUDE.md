@@ -105,9 +105,8 @@ wkappbot eye / eye tick                       # AppBotEye 루프 / one-shot
 wkappbot newchat "prompt" [--file f.txt]      # Claude Desktop 새채팅 (focusless)
 wkappbot ask gpt|gemini|claude "line1" [file.png]  # CDP 웹 AI 질문 (MCP도 동일 명령)
 wkappbot speak / suggest / claude-usage / schedule / readiness ...
-wkappbot logcat <fileGlob[;glob2]> [regex1 regex2 ...] [--hq] [--past Ns/Nm/Nh] [-f] [--timeout N] [-r]
-  # fileGlob: glob + ';' OR  (e.g. "*.file.*;*.eye.*" / "**" = all)
-  # regex args: pure regex, multiple = AND  (e.g. "OCR-DEEP" "block(len|size)")
+wkappbot logcat [regex] [fileGlob1] [fileGlob2 ...] [--hq] [--past Ns/Nm/Nh] [-f] [--timeout N] [-r]
+  # grep-style: first arg = content regex, remaining args = file globs (OR, e.g. "*.file.*" "*.eye.*" / "**" = all)
   # --past only      → grep-style: scan and exit
   # --past + -f      → scan then live follow
   # --past + --timeout N → scan then live, auto-exit after N
