@@ -239,8 +239,7 @@ Examples:
         });
         if (!string.IsNullOrEmpty(threadTs))
         {
-            var slackReminder = $"🤖 *[AI에게]* `wkappbot slack reply \"YOU MUST 위 삼두 답변을 꼼꼼히 읽고 반드시 한국어로 종합 의견을 작성하세요! 각 AI별 핵심 차이점과 본인 의견을 포함해야 합니다. 절대 잊지 마세요!\" --msg {threadTs}`";
-            SlackPostToThread(slackReminder, "앱봇아이");
+            SlackPostToThread("🔔 삼두 완료 — 종합의견 리마인더를 Claude Code에 직접 전송했어요", "앱봇아이");
         }
 
         return results.Any(r => r == 0) ? 0 : 1; // success if at least one AI answered
