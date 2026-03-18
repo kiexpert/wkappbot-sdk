@@ -123,14 +123,14 @@ internal static class AppBotEyeWatcher
             {
                 _logWatcher = new FileSystemWatcher(logDir)
                 {
-                    Filter = "*.txt",
+                    Filter = "*.log",
                     IncludeSubdirectories = false,
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
                     EnableRaisingEvents = true
                 };
                 _logWatcher.Changed += (_, _) => _logDirty = true;
                 _logWatcher.Created += (_, _) => _logDirty = true;
-                Console.WriteLine($"[EYE][FSW] Logs watcher: {logDir}/*.txt");
+                Console.WriteLine($"[EYE][FSW] Logs watcher: {logDir}/*.log");
             }
         }
         catch (Exception ex)

@@ -72,7 +72,7 @@ internal partial class Program
             var capturedLogPath = _currentLogPath;
 
             // ── 실패 로그 → 경험DB 자동 저장 (삼두 무관) ──────────────────────────────
-            var failLogPath = Path.Combine(expDir, $"faillog-click-{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            var failLogPath = Path.Combine(expDir, $"faillog-click-{DateTime.Now:yyyyMMdd_HHmmss}.log");
             var tried = _autoHealTiers;
             var triedStr = tried is { Count: > 0 }
                 ? string.Join("\n", tried.Select((t, i) => $"  {i + 1}. {t}"))

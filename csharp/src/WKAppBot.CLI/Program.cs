@@ -270,7 +270,7 @@ internal partial class Program
         // Include command name in log filename for easy identification via ls
         // e.g. "wkappbot.exe.out-20260221_211427.eye.pid=36944.txt"
         var (cmdTag, oldSubDir) = ComputeCmdTagAndSubDir(args);
-        var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.txt");
+        var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.log");
         // Track current command log path for auto-heal diagnostics (non-Eye mode only; Eye sets it in RunInEye)
         if (!RunningInEye) _currentLogPath = logFile;
 
@@ -715,7 +715,7 @@ internal partial class Program
             // ── Phase 1: move stale live logs → old-{subkey}/ ──────────────────────
             rprof("GetFiles start");
             var files = Directory
-                .GetFiles(logDir, "*.out-*.txt", SearchOption.TopDirectoryOnly)
+                .GetFiles(logDir, "*.out-*.log", SearchOption.TopDirectoryOnly)
                 .Select(p => new FileInfo(p))
                 .OrderBy(f => f.CreationTimeUtc)
                 .ToList();

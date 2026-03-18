@@ -38,7 +38,7 @@ internal static class EyeCmdPipeServer
         Directory.CreateDirectory(logDir);
         var cmdTag = args.Length > 0 ? args[0] : "bg";
         if (args.Length > 1 && cmdTag is "slack" or "ask") cmdTag += $"-{args[1]}";
-        var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.txt");
+        var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.log");
         var tee = new TeeTextWriter(TextWriter.Null, logFile);
         _ = Task.Run(() =>
         {
@@ -135,7 +135,7 @@ internal static class EyeCmdPipeServer
         var cmdTag = args.Length > 0 ? args[0].ToLowerInvariant() : "noargs";
         if (args.Length > 1 && cmdTag is "slack" or "web" or "schedule" or "knowhow" or "ask")
             cmdTag += $"-{args[1].ToLowerInvariant()}";
-        var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.txt");
+        var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.log");
         Program._currentLogPath = logFile; // track for auto-heal diagnostics
 
         // TeeTextWriter wraps pipeWriter: output goes to pipe (real-time) AND log file.

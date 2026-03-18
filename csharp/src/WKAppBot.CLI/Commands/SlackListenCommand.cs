@@ -727,7 +727,7 @@ internal partial class Program
         }
 
         var exePath = Environment.ProcessPath ?? "wkappbot.exe";
-        var logFile = Path.Combine(DataDir, "logs", $"slack-listen-{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+        var logFile = Path.Combine(DataDir, "logs", $"slack-listen-{DateTime.Now:yyyyMMdd_HHmmss}.log");
 
         // Ensure log dir exists
         Directory.CreateDirectory(Path.GetDirectoryName(logFile)!);

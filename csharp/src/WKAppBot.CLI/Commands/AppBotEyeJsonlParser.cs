@@ -357,7 +357,7 @@ internal partial class Program
             var logDir = Path.Combine(DataDir, "logs");
             if (!Directory.Exists(logDir)) return ("", "", "");
 
-            var files = Directory.GetFiles(logDir, "*.txt", SearchOption.TopDirectoryOnly)
+            var files = Directory.GetFiles(logDir, "*.log", SearchOption.TopDirectoryOnly)
                 .Where(p => !Path.GetFileName(p).Contains(".eye."))
                 .OrderByDescending(p => File.GetLastWriteTimeUtc(p))
                 .Take(3)
