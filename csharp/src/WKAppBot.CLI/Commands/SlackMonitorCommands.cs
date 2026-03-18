@@ -832,8 +832,9 @@ internal partial class Program
                 if (msgTs == currentMsgTs) continue; // skip current message
 
                 var candidateText = messages[i]?["text"]?.GetValue<string>();
-                // Skip ack messages (not useful context for Claude)
+                // Skip ack messages and bot reminders (not useful context for Claude)
                 if (candidateText != null && candidateText.StartsWith("Claude에 전달했습니다!")) continue;
+                if (candidateText != null && candidateText.Contains("[AI에게]")) continue;
 
                 prevText = candidateText;
                 prevIsBot = messages[i]?["bot_id"] != null;
