@@ -435,7 +435,7 @@ Then immediately:
         // ── Priority 2: CWD folder match — walk up path hierarchy ──
         // VS Code title = "{activeFile} - {workspaceRoot} - Visual Studio Code"
         // CWD may be a subdirectory of the workspace root, so try each ancestor folder.
-        var cwd = Environment.CurrentDirectory;
+        var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
         var cwdFolder = Path.GetFileName(cwd.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         {
             var searchDir = new DirectoryInfo(cwd);
