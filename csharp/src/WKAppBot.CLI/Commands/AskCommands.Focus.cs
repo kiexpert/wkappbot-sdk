@@ -176,11 +176,18 @@ internal partial class Program
     {
         if (prevFg == IntPtr.Zero) return;
         var curFg = NativeMethods.GetForegroundWindow();
-        if (curFg == prevFg) return;
-
-        NativeMethods.GetWindowThreadProcessId(curFg, out uint curPid);
         var chromeHwnd = cdp.GetChromeWindowHandle();
+
+        if (curFg == prevFg)
+        {
+            // No steal — clear the prop so next ask doesn't require approval unnecessarily
+            if (chromeHwnd != IntPtr.Zero)
+                try { NativeMethods.RemovePropW(chromeHwnd, $"{ActionApi.FocusStealerPropPrefix}ask"); } catch { }
+            return;
+        }
+
         if (chromeHwnd == IntPtr.Zero) return;
+        NativeMethods.GetWindowThreadProcessId(curFg, out uint curPid);
         NativeMethods.GetWindowThreadProcessId(chromeHwnd, out uint chromePid);
 
         if (curPid == chromePid)
