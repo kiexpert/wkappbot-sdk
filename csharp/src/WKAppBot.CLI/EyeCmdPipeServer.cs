@@ -145,6 +145,7 @@ internal static class EyeCmdPipeServer
         // CallerCwd + CallerHwnd stored in AsyncLocal — propagates to all async continuations of this command
         CallerCwd.Value = callerCwd;
         CallerHwnd.Value = callerHwnd;
+        if (callerCwd != null) Console.WriteLine($"[EYECMD] cwd={callerCwd}");
         // RunningInEye=true prevents Program.cs from creating a second TeeTextWriter (duplicate log)
         Program.RunningInEye = true;
         using (ThreadRoutingWriter.Route(tee))
