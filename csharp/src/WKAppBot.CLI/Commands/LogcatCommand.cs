@@ -5,9 +5,9 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // wkappbot logcat <fileFilter> [regex ...] [grep-opts] [--hq] [--past N] [-f] [--timeout N] [-r]
-    // fileFilter : glob + ';' OR  (e.g. "*.file.*;*.eye.*" / "**" = all)
-    // regex args : pure regex, multiple = AND. grep-compatible options:
+    // wkappbot logcat [regex] [file1.glob] [file2.glob ...] [grep-opts] [--hq] [--past N] [-f] [--timeout N] [-r]
+    // grep-style: first positional = content regex, remaining = file globs (OR joined, "**" = all)
+    // grep-compatible options:
     //   -A N / -B N / -C N  after/before/context lines
     //   -v                  invert match
     //   -l                  filenames only (no content)
@@ -70,13 +70,9 @@ internal partial class Program
             else if (a.StartsWith("--timeout=")) { timeoutSeconds = ParsePastDuration(a[10..]); }
             else { positional.Add(a); }
         }
-        if (positional.Count > 0) fileFilterArg = positional[0];
-        // positional[1..] = regex patterns → AND lookahead: (?=.*pat1)(?=.*pat2)...
-        var keywords = positional.Skip(1).ToList();
-        if (keywords.Count == 1)
-            messageFilterArg = keywords[0];
-        else if (keywords.Count > 1)
-            messageFilterArg = string.Concat(keywords.Select(k => $"(?=.*(?:{k}))"));
+        // grep-style: positional[0] = regex pattern, positional[1..] = file globs (OR)
+        if (positional.Count > 0) messageFilterArg = positional[0];
+        if (positional.Count > 1) fileFilterArg = string.Join(";", positional.Skip(1));
 
         var filePatterns = fileFilterArg.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (filePatterns.Length == 0) filePatterns = new[] { "*.txt" };
@@ -87,8 +83,12 @@ internal partial class Program
         Regex? msgRegex = null;
         if (!string.IsNullOrWhiteSpace(messageFilterArg) && messageFilterArg != "*")
         {
+            // ';' = grap-style OR separator → convert to regex '|'
+            var rxPat = messageFilterArg.Contains(';')
+                ? string.Join("|", messageFilterArg.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(p => $"(?:{p})"))
+                : messageFilterArg;
             var rxOpts = RegexOptions.Compiled | (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None);
-            msgRegex = new Regex(messageFilterArg, rxOpts);
+            msgRegex = new Regex(rxPat, rxOpts);
         }
 
         // Build watch directories: default = CWD (or --basedir)
