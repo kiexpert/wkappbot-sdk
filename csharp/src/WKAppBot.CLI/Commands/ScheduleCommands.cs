@@ -25,7 +25,7 @@ internal partial class Program
 
     static int ScheduleAddCommand(string[] args)
     {
-        string? atTime = null, prompt = null, promptFile = null;
+        string? atTime = null, prompt = null, promptFile = null, command = null;
         string? every = null, maxRunsStr = null, expiresAt = null;
         bool onLimitReset = false;
 
@@ -36,6 +36,7 @@ internal partial class Program
                 case "--at" when i + 1 < args.Length: atTime = args[++i]; break;
                 case "--prompt" when i + 1 < args.Length: prompt = args[++i]; break;
                 case "--prompt-file" when i + 1 < args.Length: promptFile = args[++i]; break;
+                case "--cmd" when i + 1 < args.Length: command = args[++i]; break;
                 case "--every" when i + 1 < args.Length: every = args[++i]; break;
                 case "--on-limit-reset": onLimitReset = true; break;
                 case "--max-runs" when i + 1 < args.Length: maxRunsStr = args[++i]; break;
@@ -43,8 +44,8 @@ internal partial class Program
             }
         }
 
-        if (string.IsNullOrEmpty(prompt) && string.IsNullOrEmpty(promptFile))
-            return Error("schedule add: --prompt or --prompt-file required");
+        if (string.IsNullOrEmpty(prompt) && string.IsNullOrEmpty(promptFile) && string.IsNullOrEmpty(command))
+            return Error("schedule add: --prompt, --prompt-file, or --cmd required");
 
         // Validate prompt file exists
         if (!string.IsNullOrEmpty(promptFile) && !File.Exists(promptFile))
@@ -60,6 +61,7 @@ internal partial class Program
         {
             Prompt = prompt,
             PromptFile = promptFile,
+            Command = command,
             CreatedBy = "cli",
         };
 

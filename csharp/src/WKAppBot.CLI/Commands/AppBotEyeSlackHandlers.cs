@@ -1247,6 +1247,33 @@ internal partial class Program
 
         try
         {
+            // 0. Shell command mode
+            if (!string.IsNullOrEmpty(item.Command))
+            {
+                if (item.NotifySlack)
+                    ScheduleNotifySlack(slackBotToken, slackChannel,
+                        $":rocket: 스케줄 커맨드 실행: `{item.Command}`");
+                var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c {item.Command}")
+                {
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    WorkingDirectory = item.Cwd ?? Environment.CurrentDirectory,
+                };
+                using var proc = System.Diagnostics.Process.Start(psi)!;
+                var stdout = proc.StandardOutput.ReadToEnd();
+                var stderr = proc.StandardError.ReadToEnd();
+                proc.WaitForExit(30_000);
+                var output = (stdout + stderr).Trim();
+                Console.WriteLine($"[SCHEDULE:CMD] exit={proc.ExitCode} output={output.Length}ch");
+                ScheduleManager.UpdateStatus(item.Id, proc.ExitCode == 0 ? "done" : "failed", output.Length > 0 ? output[..Math.Min(200, output.Length)] : null);
+                if (item.NotifySlack)
+                    ScheduleNotifySlack(slackBotToken, slackChannel,
+                        $"{(proc.ExitCode == 0 ? ":white_check_mark:" : ":x:")} 커맨드 완료 (exit={proc.ExitCode}){(output.Length > 0 ? $"\n```{output[..Math.Min(300, output.Length)]}```" : "")}");
+                if (item.Type == "recurring") ScheduleManager.AdvanceRecurring(item.Id);
+                return;
+            }
+
             // 1. Resolve prompt text
             string? promptText = item.Prompt;
             if (!string.IsNullOrEmpty(item.PromptFile))

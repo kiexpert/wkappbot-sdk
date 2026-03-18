@@ -27,6 +27,9 @@ public sealed class ScheduleItem
     /// <summary>Path to file containing prompt text (overrides Prompt if present).</summary>
     public string? PromptFile { get; set; }
 
+    /// <summary>Shell command to execute (alternative to Prompt). e.g. "cmd /c echo hi"</summary>
+    public string? Command { get; set; }
+
     /// <summary>"pending" | "done" | "failed" | "expired"</summary>
     public string Status { get; set; } = "pending";
 
