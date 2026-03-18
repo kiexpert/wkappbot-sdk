@@ -909,7 +909,8 @@ internal partial class Program
         var suggPath = Path.Combine(DataDir, "suggestions.jsonl");
         if (!File.Exists(suggPath)) return;
 
-        // Count non-done/non-archived items
+        // Count non-done/non-archived items that belong to this instance's CWD
+        var instanceCwd = state.FullCwd ?? state.CwdLabel;
         var pending = new List<string>();
         foreach (var line in File.ReadAllLines(suggPath))
         {
@@ -919,6 +920,15 @@ internal partial class Program
                 var node = System.Text.Json.Nodes.JsonNode.Parse(line);
                 var status = node?["status"]?.GetValue<string>() ?? "pending";
                 if (status is "done" or "archived") continue;
+                // Route to submitter's CWD — skip items not meant for this instance
+                var suggCwd = node?["cwd"]?.GetValue<string>();
+                if (!string.IsNullOrEmpty(suggCwd) && !string.IsNullOrEmpty(instanceCwd))
+                {
+                    // Match if suggCwd starts with or equals instanceCwd (handles trailing slash variance)
+                    if (!suggCwd.StartsWith(instanceCwd, StringComparison.OrdinalIgnoreCase) &&
+                        !instanceCwd.StartsWith(suggCwd, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
                 var text = node?["text"]?.GetValue<string>() ?? "";
                 // First line only for summary
                 var summary = text.Split('\n')[0];
