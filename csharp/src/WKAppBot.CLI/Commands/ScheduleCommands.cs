@@ -26,18 +26,19 @@ internal partial class Program
     static int ScheduleAddCommand(string[] args)
     {
         string? atTime = null, prompt = null, promptFile = null, command = null;
-        string? every = null, maxRunsStr = null, expiresAt = null;
+        string? every = null, everyDay = null, maxRunsStr = null, expiresAt = null;
         bool onLimitReset = false;
 
         for (int i = 1; i < args.Length; i++)
         {
             switch (args[i])
             {
-                case "--at" when i + 1 < args.Length: atTime = args[++i]; break;
+                case "--at" or "--after" when i + 1 < args.Length: atTime = args[++i]; break;
                 case "--prompt" when i + 1 < args.Length: prompt = args[++i]; break;
                 case "--prompt-file" when i + 1 < args.Length: promptFile = args[++i]; break;
                 case "--cmd" when i + 1 < args.Length: command = args[++i]; break;
                 case "--every" when i + 1 < args.Length: every = args[++i]; break;
+                case "--every-day" when i + 1 < args.Length: everyDay = args[++i]; break;
                 case "--on-limit-reset": onLimitReset = true; break;
                 case "--max-runs" when i + 1 < args.Length: maxRunsStr = args[++i]; break;
                 case "--expires" when i + 1 < args.Length: expiresAt = args[++i]; break;
@@ -69,6 +70,18 @@ internal partial class Program
         {
             item.Type = "on_limit_reset";
         }
+        else if (!string.IsNullOrEmpty(everyDay))
+        {
+            // --every-day 13:00 → daily recurring at fixed time
+            if (!TimeOnly.TryParse(everyDay, out var dailyTime))
+                return Error($"Invalid time for --every-day: {everyDay} (use HH:mm like 13:00)");
+            item.Type = "recurring";
+            item.Interval = "24h";
+            var execDt = DateTime.Today.Add(dailyTime.ToTimeSpan());
+            if (execDt <= DateTime.Now) execDt = execDt.AddDays(1);
+            item.ExecuteAt = execDt.ToString("O");
+            if (maxRunsStr != null && int.TryParse(maxRunsStr, out var mr)) item.MaxRuns = mr;
+        }
         else if (!string.IsNullOrEmpty(every))
         {
             item.Type = "recurring";
@@ -87,13 +100,19 @@ internal partial class Program
                     item.ExpiresAt = expDt.ToString("O");
                 }
                 else
-                    item.ExpiresAt = expiresAt; // assume ISO 8601
+                    item.ExpiresAt = expiresAt;
             }
         }
         else if (!string.IsNullOrEmpty(atTime))
         {
             item.Type = "once";
-            if (TimeOnly.TryParse(atTime, out var time))
+            // Relative: "1m", "30m", "2h" etc.
+            var rel = ScheduleManager.ParseInterval(atTime.TrimStart('+'));
+            if (rel != null)
+            {
+                item.ExecuteAt = DateTime.Now.Add(rel.Value).ToString("O");
+            }
+            else if (TimeOnly.TryParse(atTime, out var time))
             {
                 var execDt = DateTime.Today.Add(time.ToTimeSpan());
                 if (execDt <= DateTime.Now) execDt = execDt.AddDays(1);
@@ -105,12 +124,12 @@ internal partial class Program
             }
             else
             {
-                return Error($"Invalid time: {atTime} (use HH:mm like 16:00 or ISO datetime)");
+                return Error($"Invalid time: {atTime} (use 1m/30m/2h, HH:mm, or ISO datetime)");
             }
         }
         else
         {
-            return Error("schedule add: --at, --every, or --on-limit-reset required");
+            return Error("schedule add: --at/--after, --every, --every-day, or --on-limit-reset required");
         }
 
         var id = ScheduleManager.Add(item);
