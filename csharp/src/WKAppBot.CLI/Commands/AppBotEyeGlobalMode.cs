@@ -206,9 +206,9 @@ internal partial class Program
 
         Console.WriteLine("[EYE] Global monitor active — press Ctrl+C to stop");
 
-        // ── Register/refresh Windows Task Scheduler task for route retry ──
-        // Eye-independent safety net: runs 'wkappbot eye tick' every 10 min even if Eye is dead.
-        RegisterRouteRetryScheduledTask();
+        // ── Sync Windows Task Scheduler with actual retry queue ──
+        // If items survived a crash/kill, re-register one-shot at the soonest retryAt.
+        RouteRetryQueue.ScheduleNextTask();
 
         // ★ Default: pure focusless mode — Eye will not steal foreground focus
         // AllowFocusSteal is temporarily enabled for handoff nudges only
@@ -1356,47 +1356,6 @@ internal partial class Program
         }
         catch { }
         return false;
-    }
-
-    /// <summary>
-    /// Registers (or refreshes) a Windows Task Scheduler task that runs 'wkappbot eye tick'
-    /// every 10 minutes. Acts as an Eye-independent safety net for the route retry queue.
-    /// If Eye dies and is forgotten, Task Scheduler still flushes pending retries.
-    /// Runs silently via PowerShell — failure is logged but non-fatal.
-    /// </summary>
-    static void RegisterRouteRetryScheduledTask()
-    {
-        try
-        {
-            var exePath = Environment.ProcessPath;
-            if (string.IsNullOrEmpty(exePath)) return;
-
-            // PowerShell script: register/update task (Force overwrites existing)
-            var ps = $@"
-$action   = New-ScheduledTaskAction -Execute '{exePath}' -Argument 'eye tick'
-$trigger  = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 10)
-$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -MultipleInstances IgnoreNew -Hidden
-Register-ScheduledTask -TaskName 'WKAppBot Route Retry' -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
-";
-            var psi = new ProcessStartInfo
-            {
-                FileName               = "powershell.exe",
-                Arguments              = $"-NoProfile -NonInteractive -Command \"{ps.Replace("\"", "\\\"")}\"",
-                UseShellExecute        = false,
-                CreateNoWindow         = true,
-                RedirectStandardOutput = false,
-                RedirectStandardError  = false,
-            };
-            var proc = Process.Start(psi);
-            proc?.WaitForExit(5000);
-            Console.WriteLine(proc?.ExitCode == 0
-                ? "[EYE] Task Scheduler 'WKAppBot Route Retry' registered (10-min eye tick)"
-                : $"[EYE] Task Scheduler register: exit={proc?.ExitCode} (non-fatal)");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[EYE] Task Scheduler register error: {ex.Message} (non-fatal)");
-        }
     }
 
     static void TryDeleteOldExes()
