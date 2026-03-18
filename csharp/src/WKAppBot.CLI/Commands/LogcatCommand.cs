@@ -72,9 +72,10 @@ internal partial class Program
         }
         // grep-style: positional[0] = regex pattern, positional[1..] = file globs (OR)
         if (positional.Count > 0) messageFilterArg = positional[0];
-        if (positional.Count > 1) fileFilterArg = string.Join(";", positional.Skip(1));
-
-        var filePatterns = fileFilterArg.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        // Each positional[1..] is a file glob; ';' within a segment = OR at that path level
+        // e.g. "logs/가;나;다/*.txt" → ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
+        var rawFileArgs = positional.Count > 1 ? positional.Skip(1).ToList() : new List<string> { fileFilterArg };
+        var filePatterns = rawFileArgs.SelectMany(ExpandGlobSegments).ToArray();
         if (filePatterns.Length == 0) filePatterns = new[] { "*.txt" };
 
         // -C overrides -A/-B
@@ -285,6 +286,24 @@ internal partial class Program
 
         diagOut.WriteLine("[LOGCAT] stopped");
         return 0;
+    }
+
+    /// <summary>
+    /// Expand ';'-OR within each path segment into multiple glob patterns.
+    /// "logs/가;나;다/*.txt" → ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
+    /// Can be applied universally to any glob-based file search.
+    /// </summary>
+    internal static IEnumerable<string> ExpandGlobSegments(string pattern)
+    {
+        var segments = pattern.Replace('\\', '/').Split('/');
+        IEnumerable<string> results = [""];
+        foreach (var seg in segments)
+        {
+            var alts = seg.Split(';', StringSplitOptions.RemoveEmptyEntries);
+            results = results.SelectMany(prefix =>
+                alts.Select(a => prefix.Length == 0 ? a : prefix + "/" + a));
+        }
+        return results;
     }
 
     // grap-style file pattern: "regex:..." for regex, "*" wildcard, ";" OR
