@@ -130,16 +130,20 @@ internal partial class Program
 
         try
         {
+            // ';' in path segments = OR expansion: "W:/A;B/logs" → two roots
+            var searchRoots = ExpandGlobSegments(searchRoot).ToList();
             IEnumerable<string> files;
-            if (File.Exists(searchRoot))
-                files = [searchRoot];
-            else if (Directory.Exists(searchRoot))
+            if (searchRoots.Count == 1 && File.Exists(searchRoots[0]))
+                files = searchRoots;
+            else
             {
                 var ext = typeFilter != null ? $"*.{typeFilter}" : "*";
-                files = Directory.EnumerateFiles(searchRoot, ext, SearchOption.AllDirectories);
+                files = searchRoots
+                    .Where(Directory.Exists)
+                    .SelectMany(r => Directory.EnumerateFiles(r, ext, SearchOption.AllDirectories));
+                if (!files.Any() && searchRoots.All(r => !Directory.Exists(r) && !File.Exists(r)))
+                    return Error($"Path not found: {searchRoot}");
             }
-            else
-                return Error($"Path not found: {searchRoot}");
 
             int matchCount = 0, fileCount = 0;
 
@@ -211,7 +215,10 @@ internal partial class Program
 
         try
         {
-            var results = GlobFiles(root, pattern);
+            // ';' in path segments = OR expansion: "src/가;나;다/*.cs" → 3 patterns
+            var results = ExpandGlobSegments(pattern)
+                .SelectMany(p => GlobFiles(root, p))
+                .Distinct().OrderBy(f => f).ToList();
             if (results.Count == 0)
             {
                 Console.WriteLine($"[GLOB] No files matching: {pattern}");
