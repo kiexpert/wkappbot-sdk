@@ -558,8 +558,7 @@ internal partial class Program
                         if (state.IdleMessageSent && !state.HomeworkNotified
                             && state.IdleStartedAt != null
                             && (DateTime.UtcNow - state.IdleStartedAt.Value).TotalMinutes >= 1
-                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalHours >= 1)
-                            && state.CwdLabel.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase))
+                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalHours >= 1))
                         {
                             try { CheckAndSendHomework(state, hwnd, label); }
                             catch { }
@@ -895,7 +894,7 @@ internal partial class Program
     }
 
     // Fired once per idle session (HomeworkNotified guard) when Claude has been idle 1+ min.
-    // Only for WKAppBot instances (CwdLabel check). Reads suggestions.jsonl for pending items,
+    // All idle instances (Codex, Claude Desktop, OpenClaw, etc.). Reads suggestions.jsonl for pending items,
     // types prompt directly via TypeAndSubmit (NO /clear, NO policy injection).
     static void CheckAndSendHomework(ClaudeInstanceState state, IntPtr hwnd, string label)
     {
