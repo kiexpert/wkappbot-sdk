@@ -1403,6 +1403,39 @@ public sealed class UiaLocator : IDisposable
 
                 sb.AppendLine($"  {indent}{arrow}[{ctStr}] \"{displayName}\"{aidStr} {rectStr}");
 
+                // TextPattern selection/caret for focused element
+                if (i == 0)
+                {
+                    try
+                    {
+                        if (el.Patterns.Text.IsSupported)
+                        {
+                            var textPat = el.Patterns.Text.Pattern;
+                            var ranges = textPat.GetSelection();
+                            if (ranges != null && ranges.Length > 0)
+                            {
+                                var rects = ranges[0].GetBoundingRectangles();
+                                if (rects != null && rects.Length > 0)
+                                {
+                                    string label = rects.Length == 1 ? "caret" : $"selection[{rects.Length}]";
+                                    var rectSb = new System.Text.StringBuilder();
+                                    foreach (var r in rects)
+                                    {
+                                        if (rectSb.Length > 0) rectSb.Append(' ');
+                                        rectSb.Append($"({r.X},{r.Y} {r.Width}x{r.Height})");
+                                    }
+                                    sb.AppendLine($"  ┆ TextPattern {label}: {rectSb}");
+                                }
+                                else
+                                {
+                                    sb.AppendLine("  ┆ TextPattern: caret (no bounding rect)");
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
                 // Dump Win32 Props on hwnd-bearing elements in focus chain
                 try
                 {

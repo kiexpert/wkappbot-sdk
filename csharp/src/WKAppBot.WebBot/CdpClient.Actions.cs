@@ -391,24 +391,17 @@ public sealed partial class CdpClient
     }
 
     /// <summary>
-    /// Activate this tab in Chrome WITHOUT stealing OS foreground window.
-    /// Uses Target.activateTarget which makes the tab active in Chrome internally
-    /// (Chrome-level tab switch) without triggering an OS SetForegroundWindow call.
-    /// Unlike Page.bringToFront which explicitly brings Chrome to front.
+    /// Activate this tab in Chrome.
+    /// WARNING: Target.activateTarget DOES steal OS foreground window when Chrome is in background —
+    /// Chrome calls SetForegroundWindow internally as part of tab activation.
+    /// Unlike Page.bringToFront (even more aggressive), but still NOT truly focusless.
+    ///
+    /// Truly focusless alternative: skip this call entirely.
+    /// CDP Runtime.evaluate / DOM commands work on background tabs via targetId WebSocket.
+    /// Only call this when the tab MUST be visible (e.g. rendering-dependent operations).
     /// </summary>
-    public async Task ActivateTabAsync()
-    {
-        try
-        {
-            var tid = TargetId;
-            if (!string.IsNullOrEmpty(tid))
-            {
-                await SendAsync("Target.activateTarget", new JsonObject { ["targetId"] = tid });
-                Console.WriteLine($"[CDP] Tab activated (focusless): {tid[..8]}…");
-            }
-        }
-        catch { }
-    }
+    /// <summary>No-op — tab activation not needed; CDP operates on background tabs via targetId.</summary>
+    public Task ActivateTabAsync() => Task.CompletedTask;
 
     /// <summary>
     /// Intercept file chooser dialog and provide files programmatically (fully focusless).

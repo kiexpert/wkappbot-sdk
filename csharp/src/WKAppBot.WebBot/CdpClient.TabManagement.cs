@@ -275,7 +275,47 @@ public sealed partial class CdpClient
         }
         catch { }
 
+        // Proactive focusless measures — best-effort, non-fatal
+        await EmulateActiveTabAsync();
+
         return true;
+    }
+
+    /// <summary>
+    /// Emulate active/focused tab without OS SetForegroundWindow.
+    /// Applies three layers:
+    ///   1. Emulation.setFocusEmulationEnabled — Chrome accepts input events as if focused
+    ///   2. Page.setWebLifecycleState("active") — unthrottle timers/RAF in background
+    ///   3. JS visibility fake — visibilityState="visible" so page JS doesn't pause streaming
+    /// All best-effort; failures are silently ignored.
+    /// </summary>
+    public async Task EmulateActiveTabAsync()
+    {
+        try { await SendAsync("Emulation.setFocusEmulationEnabled", new JsonObject { ["enabled"] = true }); }
+        catch { }
+
+        try { await SendAsync("Page.setWebLifecycleState", new JsonObject { ["state"] = "active" }); }
+        catch { }
+
+        try
+        {
+            await SendAsync("Runtime.evaluate", new JsonObject
+            {
+                ["expression"] = """
+                    (() => {
+                        try {
+                            Object.defineProperty(document, 'visibilityState',
+                                { value: 'visible', configurable: true, writable: false });
+                            Object.defineProperty(document, 'hidden',
+                                { value: false, configurable: true, writable: false });
+                            document.dispatchEvent(new Event('visibilitychange'));
+                        } catch {}
+                    })()
+                    """,
+                ["silent"] = true
+            });
+        }
+        catch { }
     }
 
     /// <summary>

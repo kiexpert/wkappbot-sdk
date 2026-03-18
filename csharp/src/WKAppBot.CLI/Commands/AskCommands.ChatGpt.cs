@@ -64,7 +64,7 @@ internal partial class Program
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
-        { var prevFgGpt = NativeMethods.GetForegroundWindow(); Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgGpt:X8}"); if (!newTab && !triadMode) cdp.ActivateTabAsync().GetAwaiter().GetResult(); LogRestoreFocus(prevFgGpt, "ActivateTab-GPT"); }
+        // No tab activation — CDP works on background tabs via targetId. Truly focusless.
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -412,36 +412,16 @@ internal partial class Program
         Console.WriteLine($"[ASK] After insert: {(inserted ? "OK" : "FAIL")}, editor=[{editorContent}]");
         if (!inserted)
         {
-            // ?? Tier 2: CDP Input.insertText (needs focus) ??
-            Console.WriteLine("[ASK] Focusless insert failed, trying CDP Input.insertText...");
-            await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
-            await Task.Delay(100);
-            await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
-            {
-                ["type"] = "keyDown", ["key"] = "a", ["code"] = "KeyA",
-                ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2 // Ctrl
-            });
-            await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
-            {
-                ["type"] = "keyUp", ["key"] = "a", ["code"] = "KeyA",
-                ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
-            });
-            await Task.Delay(50);
-            await cdp.SendAsync("Input.insertText", new System.Text.Json.Nodes.JsonObject
-            {
-                ["text"] = message
-            });
-            await Task.Delay(200);
-
-            var verify = await cdp.EvalAsync(
-                $"document.querySelector('{editorSel}')?.textContent?.length ?? 0") ?? "0";
-            if (verify == "0")
+            // Tier 2: DOM.focus (Chrome-internal, no OS focus) + execCommand/DOM mutation
+            Console.WriteLine("[ASK] Tier 1 failed, trying DOM.focus tier 2...");
+            inserted = await InsertTextViaDomFocus(cdp, editorSel, message);
+            if (!inserted)
             {
                 Console.WriteLine("[ASK] Failed to insert text");
                 return (false, null);
             }
-        }
 
+        }
         // ?? Send: JS click ??verify ??CDP Enter fallback ??
         // With file attachments, wait for send button to become enabled
         if (attachFiles?.Count > 0)
@@ -1041,8 +1021,9 @@ internal partial class Program
         {
             _aiName = aiName;
             _sem = sem;
-            // Auto-release after 9 seconds (safety net — prevents deadlock)
-            _autoRelease = new Timer(_ => Release("auto-9s"), null, 9000, Timeout.Infinite);
+            // Auto-release after 60 seconds (safety net — prevents deadlock)
+            // NOTE: must be > approval popup timeout (30s) + input time
+            _autoRelease = new Timer(_ => Release("auto-60s"), null, 60000, Timeout.Infinite);
         }
 
         public static ChromeTabLock? Acquire(string aiName, int timeoutMs = 90000)

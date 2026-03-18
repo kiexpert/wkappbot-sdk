@@ -84,6 +84,14 @@ public record InputReadinessRequest
     /// 슬랙 요청 등 유저가 명시적으로 요청한 액션에서 사용.
     /// 돋보기/포커스확보는 정상 수행됨 — 승인만 자동.</summary>
     public bool AutoApproveYield { get; init; }
+
+    /// <summary>
+    /// 선택: 입력위치 확보 콜백. yield 승인 후 Probe 마지막 단계에서 호출.
+    /// 반환 true = 확보 성공, false = 실패 (report.InputPositionEnsured에 기록).
+    /// 호출자가 클로저로 컨텍스트 캡처 (PromptInfo, rendererHwnd 등).
+    /// 예: EnsureInputPosition = () => promptHelper.EnsureCaretInPrompt(prompt, renderer)
+    /// </summary>
+    public Func<bool>? EnsureInputPosition { get; init; }
 }
 
 // ── Report ────────────────────────────────────────────────────────
@@ -141,6 +149,12 @@ public record InputReadinessReport
     /// Manual click = always true, auto-approve = verified via GetForegroundWindow.
     /// </summary>
     public bool FocusPreAcquired => UserYieldConfirmed && UserYieldFocusAcquired;
+
+    /// <summary>
+    /// 입력위치 확보 콜백 결과. EnsureInputPosition 콜백이 없으면 null.
+    /// true = 캐럿 PromptRect 안에 확보됨, false = 확보 실패.
+    /// </summary>
+    public bool? InputPositionEnsured { get; init; }
 
     // 돋보기 세션 (호출자가 ShowPass/ShowFail 가능)
     public IActionZoom? Zoom { get; init; }
@@ -670,6 +684,23 @@ public sealed class InputReadiness
                 _lastYieldApprovedAt = DateTime.UtcNow;
         }
 
+        // ── 입력위치 확보 콜백 (yield 승인 후) ──
+        bool? inputPositionEnsured = null;
+        if (req.EnsureInputPosition != null)
+        {
+            swStep.Restart();
+            try
+            {
+                inputPositionEnsured = req.EnsureInputPosition();
+                Console.WriteLine($"  [READINESS] EnsureInputPosition: {(inputPositionEnsured.Value ? "✓ secured" : "✗ failed")} [{swStep.ElapsedMilliseconds}ms]");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [READINESS] EnsureInputPosition error: {ex.Message}");
+                inputPositionEnsured = false;
+            }
+        }
+
         // ── 프로파일링 출력 ──
         swProbe.Stop();
         Console.WriteLine($"  [PROF:PROBE] init={msInit}ms zoom={msZoom}ms uia={msUia}ms win32={msWin32}ms send={msSendInput}ms blocker={msBlocker}ms knowhow={msKnowhow}ms yield={msYield}ms TOTAL={swProbe.ElapsedMilliseconds}ms");
@@ -708,6 +739,7 @@ public sealed class InputReadiness
             UserYieldRequested = yieldRequested,
             UserYieldConfirmed = yieldConfirmed,
             UserYieldFocusAcquired = yieldFocusAcquired,
+            InputPositionEnsured = inputPositionEnsured,
             Zoom = zoom,
         };
     }

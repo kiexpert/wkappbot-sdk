@@ -386,12 +386,8 @@ internal partial class Program
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
-        // CDP tab activation (focusless) ??replaces UIA EnsureTabViaGrap
-        // Target.activateTarget does Chrome-internal tab switch without OS SetForegroundWindow
+        // No tab activation — CDP works on background tabs via targetId. Truly focusless.
         var prevFgGemini = NativeMethods.GetForegroundWindow();
-        Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgGemini:X8}");
-        if (!newTab && !triadMode) cdp.ActivateTabAsync().GetAwaiter().GetResult();
-        LogRestoreFocus(prevFgGemini, "ActivateTab");
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -633,38 +629,18 @@ internal partial class Program
                 var inserted = await InsertTextContentEditable(cdp, editorSel, question);
                 if (!inserted)
                 {
-                    // ?? Tier 2: CDP Input.insertText (needs focus) ??
-                    Console.WriteLine("[ASK] Focusless insert failed, trying CDP Input.insertText...");
-                    await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.focus()");
-                    await Task.Delay(100);
-                    await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
-                    {
-                        ["type"] = "keyDown", ["key"] = "a", ["code"] = "KeyA",
-                        ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
-                    });
-                    await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
-                    {
-                        ["type"] = "keyUp", ["key"] = "a", ["code"] = "KeyA",
-                        ["windowsVirtualKeyCode"] = 65, ["modifiers"] = 2
-                    });
-                    await Task.Delay(50);
-                    await cdp.SendAsync("Input.insertText", new System.Text.Json.Nodes.JsonObject
-                    {
-                        ["text"] = question
-                    });
-                    await Task.Delay(200);
-
-                    var verify = await cdp.EvalAsync(
-                        $"document.querySelector(\"{editorSel}\")?.textContent?.length ?? 0") ?? "0";
-                    if (verify == "0")
+                    // Tier 2: DOM.focus (Chrome-internal, no OS focus) + execCommand/DOM mutation
+                    Console.WriteLine("[ASK] Tier 1 failed, trying DOM.focus tier 2...");
+                    inserted = await InsertTextViaDomFocus(cdp, editorSel, question);
+                    if (!inserted)
                     {
                         zoom?.ShowFail("insert failed");
                         zoom?.Dispose();
                         Console.WriteLine("[ASK] Failed to insert text");
                         return (false, (string?)null);
                     }
-                }
 
+                }
                 // ?? Focus theft detection: restore if Chrome stole focus ??
                 GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
 
@@ -965,6 +941,19 @@ internal partial class Program
                             bool hasToolCall = text.Contains("[APPBOT_TOOL_CALL_BEGIN]");
                             if (!hasToolCall && IsGeminiStoppedNotice(text))
                             {
+                                // Check if meaningful content exists before the stop notice
+                                var preStop = text;
+                                foreach (var kw in GeminiStopNoticeKeywords)
+                                {
+                                    var ki = preStop.IndexOf(kw, StringComparison.OrdinalIgnoreCase);
+                                    if (ki >= 0) { preStop = preStop[..ki].TrimEnd(); break; }
+                                }
+                                preStop = StripGeminiUiPrefix(preStop);
+                                if (!string.IsNullOrWhiteSpace(preStop) && preStop.Length >= 3)
+                                {
+                                    Console.WriteLine($"[ASK] Stop notice but answer found before it ({preStop.Length} chars) — accepting");
+                                    return (true, preStop);
+                                }
                                 Console.WriteLine("[ASK] Gemini stopped response notice detected; retrying once...");
                                 var retryResult = await RetryGeminiAfterStopAsync(cdp, editorSel, question);
                                 if (retryResult.ok && !string.IsNullOrWhiteSpace(retryResult.text))

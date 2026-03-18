@@ -278,24 +278,41 @@ internal static class FocuslessWarningOverlay
                 }
             };
 
-            // Position: 타겟 윈도우 상단에 표시
+            // Position: 타겟 윈도우 상단 — 가상화면 바운드 클램핑 필수 (멀티모니터)
             try
             {
-                if (ownerHwnd != IntPtr.Zero && GetWindowRect(ownerHwnd, out var rect))
+                int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+                int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+                int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+                int vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+                if (vw <= 0) { vw = GetSystemMetrics(SM_CXSCREEN); vx = 0; }
+                if (vh <= 0) { vh = GetSystemMetrics(SM_CYSCREEN); vy = 0; }
+
+                double left, top;
+                if (ownerHwnd != IntPtr.Zero && GetWindowRect(ownerHwnd, out var rect)
+                    && rect.Right > rect.Left && rect.Bottom > rect.Top)
                 {
-                    window.Left = rect.Left + 20;
-                    window.Top = rect.Top + 20;
+                    left = rect.Left + 20;
+                    top  = rect.Top  + 20;
                 }
                 else
                 {
-                    window.Left = 100;
-                    window.Top = 100;
+                    // 주 모니터 우상단 근처
+                    left = GetSystemMetrics(SM_CXSCREEN) - (int)window.Width - 40;
+                    top  = 60;
                 }
+
+                // 클램핑: 화면 안에 들어오도록
+                left = Math.Max(vx, Math.Min(left, vx + vw - window.Width  - 10));
+                top  = Math.Max(vy, Math.Min(top,  vy + vh - window.Height - 10));
+
+                window.Left = left;
+                window.Top  = top;
             }
             catch
             {
                 window.Left = 100;
-                window.Top = 100;
+                window.Top  = 100;
             }
 
             Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -325,6 +342,13 @@ internal static class FocuslessWarningOverlay
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
+    private const int SM_CXSCREEN = 0, SM_CYSCREEN = 1;
+    private const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77;
+    private const int SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
