@@ -688,7 +688,7 @@ internal partial class Program
                     slackClient, statusTsFile, contextWarnedPcts);
             }
 
-            // ── Schedule executor (~every 10 seconds) ──
+            // ── Schedule executor + Route retry (~every 10 seconds) ──
             if (frameCount % 100 == 50)
             {
                 try
@@ -700,6 +700,23 @@ internal partial class Program
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[SCHEDULE] Error: {ex.Message}");
+                }
+
+                // Route retry queue: re-dispatch failed route attempts
+                try
+                {
+                    var retryItems = RouteRetryQueue.GetDueItems();
+                    foreach (var item in retryItems)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"[RETRY] Re-dispatching route: {item[..Math.Min(item.Length, 80)]}...");
+                        Console.ResetColor();
+                        EyeCmdPipeServer.DispatchBg(["slack", "route", item]);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[RETRY] Route retry error: {ex.Message}");
                 }
             }
 
