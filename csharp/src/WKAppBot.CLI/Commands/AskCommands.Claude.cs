@@ -196,7 +196,8 @@ internal partial class Program
                         ? "[ASK] Fresh Claude -- injecting persona..."
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
                     var personaTextClaude = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
-                    SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextClaude.Length > 800 ? personaTextClaude[..800] + "…" : personaTextClaude)}\n```", "System");
+                    if (Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
+                        SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextClaude.Length > 800 ? personaTextClaude[..800] + "…" : personaTextClaude)}\n```", "System");
                     var (personaOk, personaResp) = await ClaudeSendAndWaitAsync(
                         cdp,
                         personaTextClaude,
@@ -542,6 +543,9 @@ internal partial class Program
     // Suppress Slack for internal sub-calls (e.g. whisper study → AskAiForStudy).
     // Set to true before calling AskCommand internally to prevent channel noise.
     internal static readonly System.Threading.AsyncLocal<bool> _suppressSlackSession = new();
+
+    // Persona posted flag — triad posts persona once (first AI wins), others skip.
+    static int _slackPersonaPostedFlag = 0; // Interlocked: 0=not posted, 1=posted
 
     // Per-session last-post tracker: sessionThreadTs → (msgTs, username, text).
     // Used to detect "latest comment is mine" and append via chat.update instead of new post.

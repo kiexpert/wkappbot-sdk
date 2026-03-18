@@ -481,7 +481,8 @@ internal partial class Program
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
                     await ClearContentEditable(cdp, editorSel);
                     var personaText = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
-                    SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "…" : personaText)}\n```", "System");
+                    if (Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
+                        SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "…" : personaText)}\n```", "System");
                     await InsertTextContentEditable(cdp, editorSel, personaText);
                     await Task.Delay(300);
 
