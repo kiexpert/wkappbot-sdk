@@ -30,11 +30,12 @@ internal partial class Program
         var node = JsonNode.Parse(args[0]);
         if (node == null) { Console.Error.WriteLine("[ROUTE] Invalid JSON"); return 1; }
 
-        var text     = node["text"]?.GetValue<string>() ?? "";
-        var user     = node["user"]?.GetValue<string>() ?? "";
-        var ts       = node["ts"]?.GetValue<string>() ?? "";
-        var threadTs = node["threadTs"]?.GetValue<string>();
-        var channel  = node["channel"]?.GetValue<string>() ?? "";
+        var text       = node["text"]?.GetValue<string>() ?? "";
+        var user       = node["user"]?.GetValue<string>() ?? "";
+        var ts         = node["ts"]?.GetValue<string>() ?? "";
+        var threadTs   = node["threadTs"]?.GetValue<string>();
+        var channel    = node["channel"]?.GetValue<string>() ?? "";
+        var retryCount = node["retryCount"]?.GetValue<int>() ?? 0;
 
         if (!File.Exists(SlackConfigPath)) { Console.WriteLine("[ROUTE] No Slack config — skip"); return 0; }
         var cfg = JsonNode.Parse(File.ReadAllText(SlackConfigPath));
@@ -115,11 +116,9 @@ internal partial class Program
         if (targets.Count == 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("[ROUTE] No target prompts found");
+            Console.WriteLine($"[ROUTE] No target prompts found — scheduling retry #{retryCount + 1} in 1 min");
             Console.ResetColor();
-            Task.Run(async () => await SlackSendViaApi(botToken, channel,
-                ":warning: AI prompt not found — Claude 창을 찾을 수 없습니다",
-                replyTs, username: RouteAckUsername)).Wait(5000);
+            RouteRetryQueue.Enqueue(node, retryCount + 1);
             return 0;
         }
 
@@ -148,6 +147,15 @@ internal partial class Program
         Console.ForegroundColor = sent > 0 ? ConsoleColor.Cyan : ConsoleColor.Yellow;
         Console.WriteLine($"[ROUTE] Delivered {sent}/{targets.Count}");
         Console.ResetColor();
+
+        if (sent == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[ROUTE] All deliveries failed — scheduling retry #{retryCount + 1} in 1 min");
+            Console.ResetColor();
+            RouteRetryQueue.Enqueue(node, retryCount + 1);
+            return 0;
+        }
 
         // ── Send ack ──
         SendRouteAck(botToken, channel, replyTs, sent, targets.Count, results);
