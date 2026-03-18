@@ -564,4 +564,103 @@ public sealed partial class CdpClient
         try { await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = false }); }
         catch { }
     }
+
+    // ── Hotkey / Keyboard dispatch ────────────────────────────────
+
+    /// <summary>
+    /// CDP Input.dispatchKeyEvent — 포커스리스 키 이벤트 발송 (탭 내 포커스 기준).
+    /// modifiers: 0=none, 1=Alt, 2=Ctrl, 4=Meta, 8=Shift (OR 조합)
+    /// </summary>
+    public async Task DispatchKeyAsync(string key, int modifiers = 0, string code = "")
+    {
+        var obj = new JsonObject
+        {
+            ["type"] = "keyDown", ["key"] = key,
+            ["modifiers"] = modifiers,
+        };
+        if (!string.IsNullOrEmpty(code)) obj["code"] = code;
+        await SendAsync("Input.dispatchKeyEvent", obj);
+        await Task.Delay(20);
+        obj["type"] = "keyUp";
+        await SendAsync("Input.dispatchKeyEvent", obj);
+    }
+
+    /// <summary>
+    /// DOM 전체에서 accesskey + aria-keyshortcuts 속성을 스캔하여 핫키 맵 반환.
+    /// 반환: List of (label, accessKey, keyshortcuts, selector)
+    /// label = innerText / aria-label / title 순으로 추출.
+    /// </summary>
+    public async Task<List<CdpHotkeyEntry>> GetHotkeyMapAsync()
+    {
+        const string js = """
+            (function() {
+              var all = document.querySelectorAll('[accesskey],[aria-keyshortcuts]');
+              var result = [];
+              all.forEach(function(el) {
+                var label = (el.innerText || el.getAttribute('aria-label') ||
+                             el.getAttribute('title') || el.getAttribute('value') || '').trim()
+                              .replace(/\s+/g,' ').substring(0, 80);
+                var ak  = el.getAttribute('accesskey') || '';
+                var aks = el.getAttribute('aria-keyshortcuts') || '';
+                var sel = '';
+                if (el.id) sel = '#' + el.id;
+                else if (el.className) sel = el.tagName.toLowerCase() + '.' + el.className.trim().split(/\s+/)[0];
+                else sel = el.tagName.toLowerCase();
+                result.push({ label: label, accesskey: ak, keyshortcuts: aks, selector: sel });
+              });
+              return JSON.stringify(result);
+            })()
+            """;
+        var json = await EvalAsync(js);
+        if (string.IsNullOrWhiteSpace(json) || json == "null") return [];
+        json = json.Trim('"').Replace("\\\"", "\"").Replace("\\\\", "\\");
+        try
+        {
+            var arr = System.Text.Json.JsonSerializer.Deserialize<List<CdpHotkeyEntry>>(json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return arr ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>
+    /// aria-keyshortcuts / accesskey 문자열을 파싱하여 CDP DispatchKeyAsync 호출.
+    /// "Alt+S", "Ctrl+Shift+S", "s" (accesskey → Alt+key) 등 지원.
+    /// </summary>
+    public async Task<bool> DispatchShortcutAsync(string shortcut, bool isAccessKey = false)
+    {
+        // accesskey는 브라우저가 Alt(+Shift)로 발동 — 여기선 Alt 조합으로 처리
+        if (isAccessKey && shortcut.Length == 1)
+        {
+            await DispatchKeyAsync(shortcut.ToUpperInvariant(), modifiers: 1); // Alt=1
+            Console.WriteLine($"  [CDP-HOTKEY] accesskey '{shortcut}' → Alt+{shortcut.ToUpperInvariant()}");
+            return true;
+        }
+
+        // "Alt+S", "Ctrl+Shift+F5" 파싱
+        var parts = shortcut.Split('+');
+        var key = parts[^1].Trim();
+        int mods = 0;
+        foreach (var p in parts[..^1])
+        {
+            mods |= p.Trim().ToLowerInvariant() switch
+            {
+                "alt"   => 1,
+                "ctrl" or "control" => 2,
+                "meta" or "cmd"     => 4,
+                "shift" => 8,
+                _ => 0
+            };
+        }
+        await DispatchKeyAsync(key, mods);
+        Console.WriteLine($"  [CDP-HOTKEY] '{shortcut}' → key={key} mods={mods}");
+        return true;
+    }
 }
+
+/// <summary>DOM 핫키 스캔 결과 엔트리.</summary>
+public record CdpHotkeyEntry(
+    string Label,
+    string Accesskey,
+    string Keyshortcuts,
+    string Selector);

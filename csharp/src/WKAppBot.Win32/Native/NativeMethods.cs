@@ -28,6 +28,59 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hWnd);
 
+    // ── Menu API ─────────────────────────────────────────────────
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetMenu(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern int GetMenuItemCount(IntPtr hMenu);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetMenuItemID(IntPtr hMenu, int nPos);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetSubMenu(IntPtr hMenu, int nPos);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetMenuStringW(IntPtr hMenu, uint uIDItem, StringBuilder lpString, int nMaxCount, uint uFlag);
+
+    public const uint MF_BYPOSITION = 0x00000400u;
+    public const uint MF_SEPARATOR  = 0x00000800u;
+    public const uint MF_GRAYED     = 0x00000001u;
+    public const uint MF_DISABLED   = 0x00000002u;
+
+    // ── Menu resource scanning (multi-language) ───────────────────
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern uint GetWindowModuleFileNameW(IntPtr hwnd, StringBuilder pszFileName, uint cchFileNameMax);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern IntPtr LoadLibraryExW(string lpFileName, IntPtr hFile, uint dwFlags);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool FreeLibrary(IntPtr hModule);
+
+    public delegate bool EnumResNameProc(IntPtr hModule, IntPtr lpType, IntPtr lpName, IntPtr lParam);
+    public delegate bool EnumResLangProc(IntPtr hModule, IntPtr lpType, IntPtr lpName, ushort wLanguage, IntPtr lParam);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool EnumResourceNamesW(IntPtr hModule, IntPtr lpType, EnumResNameProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool EnumResourceLanguagesW(IntPtr hModule, IntPtr lpType, IntPtr lpName, EnumResLangProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindResourceExW(IntPtr hModule, IntPtr lpType, IntPtr lpName, ushort wLanguage);
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr LoadResource(IntPtr hModule, IntPtr hResInfo);
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr LockResource(IntPtr hResData);
+
+    public static readonly IntPtr RT_MENU = (IntPtr)4;
+    public const uint LOAD_LIBRARY_AS_DATAFILE       = 0x00000002u;
+    public const uint LOAD_LIBRARY_AS_IMAGE_RESOURCE = 0x00000020u;
+
     [DllImport("user32.dll")]
     public static extern bool IsWindow(IntPtr hWnd);
 
@@ -237,6 +290,16 @@ public static partial class NativeMethods
         return GetGUIThreadInfo(0, ref info) ? info.hwndFocus : IntPtr.Zero;
     }
 
+    /// <summary>
+    /// 특정 스레드의 키보드 포커스 hwnd 반환.
+    /// 전경 여부 무관 — 백그라운드 창의 per-thread focus 조회 가능.
+    /// </summary>
+    public static IntPtr GetThreadFocusHwnd(uint tid)
+    {
+        var info = new GUITHREADINFO { cbSize = Marshal.SizeOf<GUITHREADINFO>() };
+        return GetGUIThreadInfo(tid, ref info) ? info.hwndFocus : IntPtr.Zero;
+    }
+
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
@@ -318,6 +381,7 @@ public static partial class NativeMethods
     public const int WS_CHILD       = 0x40000000;
     public const int WS_VISIBLE     = 0x10000000;
     public const int WS_DISABLED    = 0x08000000;
+    public const int WS_TABSTOP     = 0x00010000;  // tab stop (dialog navigation)
     public const int WS_CAPTION     = 0x00C00000;  // WS_BORDER | WS_DLGFRAME
     public const int WS_THICKFRAME  = 0x00040000;  // resizable
     public const int WS_VSCROLL     = 0x00200000;
@@ -478,9 +542,15 @@ public static partial class NativeMethods
     public const uint WM_GETTEXTLENGTH = 0x000E;
     public const uint WM_SETTEXT = 0x000C;
     public const uint WM_MDIGETACTIVE = 0x0229;
-    public const uint WM_CHAR = 0x0102;
-    public const uint WM_KEYDOWN = 0x0100;
-    public const uint WM_KEYUP = 0x0101;
+    public const uint WM_CHAR       = 0x0102;
+    public const uint WM_KEYDOWN    = 0x0100;
+    public const uint WM_KEYUP      = 0x0101;
+    public const uint WM_SYSKEYDOWN = 0x0104;
+    public const uint WM_SYSKEYUP   = 0x0105;
+
+    public const uint VK_SHIFT   = 0x10;
+    public const uint VK_CONTROL = 0x11;
+    public const uint VK_MENU    = 0x12; // Alt
     public const uint WM_MOUSEMOVE = 0x0200;
     public const uint WM_LBUTTONDOWN = 0x0201;
     public const uint WM_LBUTTONUP = 0x0202;

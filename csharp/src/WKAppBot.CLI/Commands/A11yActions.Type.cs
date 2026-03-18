@@ -18,8 +18,134 @@ internal partial class Program
     };
 
     // -- Type: UIA Value -> WM_CHAR -> LegacyIA SetValue --
-    static bool A11yType(AutomationElement el, IntPtr hwnd, string text)
+    static bool A11yType(AutomationElement el, IntPtr hwnd, string text, bool hotkey = false)
     {
+        // Tier 0: 포커스리스 컨트롤/메뉴 발동 (--hotkey 옵션 시에만 활성화)
+        // - [파일/모두저장] 명시 경로 문법: 체이닝 가능, 잔여 text도 동일 규칙 재시도
+        // - 레이블 매칭: text 전체가 컨트롤/메뉴 레이블과 정확히 일치할 때만 발동 (노이즈 방지)
+        //   "저장" → "&저장" 버튼 발동 OK / "저장하기" → 매칭 없음, 이후 tiers 처리
+        if (hotkey)
+        {
+            var elHwnd = GetElementHwnd(el);
+            var parentHwnd = elHwnd != IntPtr.Zero
+                ? NativeMethods.GetParent(elHwnd)
+                : NativeMethods.GetParent(hwnd);
+            if (parentHwnd != IntPtr.Zero)
+            {
+                // 프로세스명 추출 (경험 DB 키)
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                var procName = "";
+                try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+
+                // 경험 DB 조회 → Verify → 스태일이면 재스캔 후 재조회
+                if (!string.IsNullOrEmpty(procName))
+                {
+                    var lookupPattern = text.Contains('/') ? text.Split('/')[^1] : text;
+
+                    // 첫 접근 시 풀스캔 → DB 누적
+                    if (!HotkeyExperienceDb.IsSessionScanned(procName))
+                        A11yHotkeyScanner.ScanAndMerge(hwnd, el, procName);
+
+                    var dbEntry = HotkeyExperienceDb.Match(procName, lookupPattern);
+                    if (dbEntry != null)
+                    {
+                        // 발동 전 라이브 검증 (스태일 항목은 DB에서 제거)
+                        if (!A11yHotkeyScanner.Verify(dbEntry, hwnd, parentHwnd, procName))
+                        {
+                            // 검증 실패 → 재스캔 후 재조회 (앱 업데이트 등)
+                            Console.WriteLine($"[A11Y] type --hotkey — stale, rescanning '{procName}'...");
+                            HotkeyExperienceDb.MarkSessionScanned(procName); // 무한루프 방지
+                            A11yHotkeyScanner.ScanAndMerge(hwnd, el, procName);
+                            dbEntry = HotkeyExperienceDb.Match(procName, lookupPattern);
+                        }
+                    }
+
+                    if (dbEntry != null)
+                    {
+                        Console.WriteLine($"[A11Y] type --hotkey — DB '{dbEntry.Label}' ({dbEntry.Source}/{dbEntry.Method})");
+                        return A11yHotkeyScanner.Dispatch(dbEntry, hwnd, parentHwnd);
+                    }
+                    Console.WriteLine($"[A11Y] type --hotkey — DB miss '{text}', falling to live scan");
+                }
+
+                List<(string Label, Func<bool> Activate)>? combinedMap = null;
+                List<(string Label, Func<bool> Activate)> GetCombinedMap()
+                {
+                    var list = new List<(string Label, Func<bool> Activate)>();
+                    foreach (var (label, ctrlHwnd) in Win32ShortcutActivator.BuildTextMap(parentHwnd))
+                        list.Add((label, () => Win32ShortcutActivator.ActivateFocusless(ctrlHwnd, parentHwnd)));
+                    foreach (var (label, itemId) in Win32ShortcutActivator.BuildMenuTextMapAllLangs(hwnd))
+                        list.Add((label, () => Win32ShortcutActivator.DispatchMenuItem(hwnd, itemId)));
+                    return list;
+                }
+
+                // ① 슬래시 포함 → 메뉴 경로 탐색 (경로 세그먼트별 grap 패턴 지원)
+                // "파일/저장"  → 정확 경로  /  "파일/*저장*" → 와일드카드 세그먼트
+                if (text.Contains('/'))
+                {
+                    var segments = text.Split('/');
+                    var itemId = Win32ShortcutActivator.ResolveMenuPath(hwnd, segments);
+                    if (itemId != 0)
+                    {
+                        Console.WriteLine($"[A11Y] type --hotkey — menu path '{text}' → WM_COMMAND 0x{itemId:X4}");
+                        Win32ShortcutActivator.DispatchMenuItem(hwnd, itemId);
+                        return true;
+                    }
+                    Console.Error.WriteLine($"[A11Y] type --hotkey — menu path '{text}' not found, aborting");
+                    return false;
+                }
+
+                // ② grap 패턴으로 레이블 매칭 — 커버리지 최고 우선 선택
+                // 커버리지 = 패턴길이 / 레이블길이 → 짧은 레이블이 더 구체적 매칭
+                // "저장" 패턴: "저장"(100%) > "다른이름으로저장"(25%) → "저장" 선택
+                {
+                    combinedMap ??= GetCombinedMap();
+                    var matcher = PatternMatcher.Create(text);
+                    // 전체 매칭 수집 → 레이블 길이 오름차순 (커버리지 내림차순)
+                    var matches = combinedMap
+                        .Where(e => matcher.IsMatch(e.Label))
+                        .OrderBy(e => e.Label.Length)
+                        .ToList();
+                    if (matches.Count == 0)
+                    {
+                        // CDP 없는 Electron/WPF 폴백: UIA AccessKey / AcceleratorKey 스캔
+                        Console.WriteLine($"[A11Y] type --hotkey — no Win32 label match, trying UIA AccessKey scan");
+                        var uiaMatcher = PatternMatcher.Create(text);
+                        try
+                        {
+                            foreach (var desc in el.FindAllDescendants())
+                            {
+                                var name = desc.Properties.Name.ValueOrDefault ?? "";
+                                if (!uiaMatcher.IsMatch(name)) continue;
+                                var accessKey = desc.Properties.AccessKey.ValueOrDefault ?? "";
+                                var accelKey  = desc.Properties.AcceleratorKey.ValueOrDefault ?? "";
+                                var shortcut  = !string.IsNullOrEmpty(accessKey) ? accessKey
+                                              : !string.IsNullOrEmpty(accelKey)  ? accelKey : null;
+                                if (shortcut == null) continue;
+                                Console.WriteLine($"[A11Y] type --hotkey — UIA '{name}' → '{shortcut}' → PostMessage");
+                                return Win32ShortcutActivator.DispatchShortcutViaPostMessage(hwnd, shortcut);
+                            }
+                        }
+                        catch { }
+                        Console.Error.WriteLine($"[A11Y] type --hotkey — no label match for '{text}', aborting");
+                        return false;
+                    }
+                    var (bestLabel, bestActivate) = matches[0];
+                    if (matches.Count > 1)
+                        Console.WriteLine($"[A11Y] type --hotkey — {matches.Count} matches, best coverage: '{bestLabel}' ({(double)text.Length / bestLabel.Length:P0})");
+                    else
+                        Console.WriteLine($"[A11Y] type --hotkey — matched '{bestLabel}'");
+                    if (!bestActivate())
+                    {
+                        Console.Error.WriteLine("[A11Y] type --hotkey — dispatch failed, aborting");
+                        return false;
+                    }
+                    return true;
+                }
+            }
+            return false; // parentHwnd 없음
+        }
+
         // Check if target is a terminal window — WM_CHAR bypasses ConPTY stdin
         var winClass = WindowFinder.GetClassName(hwnd);
         bool isTerminal = TerminalClasses.Contains(winClass);

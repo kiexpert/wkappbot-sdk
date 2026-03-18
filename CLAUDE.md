@@ -1,4 +1,4 @@
-# WKAppBot v4.4.5 - Windows + Android App Automation Test Framework
+# WKAppBot v4.5.0 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -119,7 +119,10 @@ wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령
   # Discovery: inspect, find, windows, screenshot, ocr
   # Window (7): close, minimize, maximize, restore, focus, move, resize
   # Element (13): find, read, highlight, invoke, click, toggle, expand, collapse,
-  #               select, scroll, type(--text), set-value(--text), set-range(--value)
+  #               select, scroll, type [--hotkey] [text...], set-value(--text), set-range(--value)
+  # type --hotkey: focusless label/menu dispatch (Experience DB → live scan → UIA AccessKey → CDP)
+  #   메뉴경로: "파일/저장" (slash syntax), grap 패턴: "*저장*", 커버리지최고 자동선택
+  #   실패 시 중단 (순수 타이핑 폴백 없음)
   # Async (2): wait(--timeout --interval), eval(--text "js")
   # Utility (3): clipboard, clipboard-read, clipboard-write
   # --all, --nth N, --depth N, --force, --force-close-ancestors, --timeout N, --speak
