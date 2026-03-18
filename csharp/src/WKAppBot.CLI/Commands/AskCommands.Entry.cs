@@ -22,7 +22,6 @@ internal partial class Program
 
         var ai = args[0].ToLowerInvariant();
         string? modelHint = null;
-        bool slackReport = false;
         bool newTab = false;
         bool newSession = false;
         bool noWait = false;
@@ -36,9 +35,7 @@ internal partial class Program
         var remaining = new List<string>();
         for (int i = 1; i < args.Length; i++)
         {
-            if (args[i] == "--slack")
-                slackReport = true;
-            else if (args[i] == "--new-tab")
+            if (args[i] == "--new-tab")
                 newTab = true;
             else if (args[i] == "--new-session")
                 newSession = true;
@@ -105,10 +102,10 @@ internal partial class Program
 
         return ai switch
         {
-            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
-            "gpt" or "chatgpt" => AskChatGpt(question, slackReport, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
-            "claude" => AskClaude(question, slackReport, timeoutSec, newTab, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
-            "triad" or "all" => AskTriadParallel(question, slackReport, timeoutSec, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait),
+            "gemini" => AskGemini(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
+            "gpt" or "chatgpt" => AskChatGpt(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
+            "claude" => AskClaude(question, true, timeoutSec, newTab, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
+            "triad" or "all" => AskTriadParallel(question, timeoutSec, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait),
             _ => Error($"Unknown AI: {ai} (use gemini, gpt, claude, or triad)")
         };
     }
@@ -125,12 +122,11 @@ internal partial class Program
 WKAppBot Ask ??one-command AI Q&A via WebBot
 
 Usage:
-  wkappbot ask gemini ""question"" [files...] [--slack] [--timeout 30] [--new-tab] [--new-session] [--loop [N]] [--max-steps N] [--retry N] [--triad]
-  wkappbot ask gpt ""question"" [files...]   [--slack] [--timeout 30] [--new-tab] [--new-session] [--loop [N]] [--max-steps N] [--retry N] [--triad]
-  wkappbot ask claude ""question""            [--slack] [--timeout 30] [--new-tab] [--new-session] [--loop [N]] [--max-steps N] [--retry N] [--triad]
+  wkappbot ask gemini ""question"" [files...] [--timeout 30] [--new-tab] [--new-session] [--loop [N]] [--max-steps N] [--retry N] [--triad]
+  wkappbot ask gpt ""question"" [files...]   [--timeout 30] [--new-tab] [--new-session] [--loop [N]] [--max-steps N] [--retry N] [--triad]
+  wkappbot ask claude ""question""            [--timeout 30] [--new-tab] [--new-session] [--loop [N]] [--max-steps N] [--retry N] [--triad]
 
 Options:
-  --slack         Report answer to Slack channel
   --timeout N     Max seconds to wait for response (default: 30)
   --new-tab       Open in a new tab (default: reuse existing tab)
   --new-session   Start fresh conversation in existing tab (navigate to new chat URL)
@@ -148,7 +144,7 @@ File attachment:
 
 Examples:
   wkappbot ask gemini ""?ㅻ뒛 肄붿뒪???뱀쭠二??뚮젮以?""
-  wkappbot ask gpt ""???⑦꽩 遺꾩꽍?댁쨾"" --slack
+  wkappbot ask gpt ""???⑦꽩 遺꾩꽍?댁쨾""
   wkappbot ask gpt ""??UI 遺꾩꽍?댁쨾"" screenshot.png
   wkappbot ask gpt ""肄붾뱶 由щ럭?댁쨾"" main.cs test.log
   wkappbot ask gemini ""???몄뀡?쇰줈 吏덈Ц"" --new-session
@@ -162,7 +158,7 @@ Examples:
     /// to the same thread (AsyncLocal _slackSessionThreadTs inheritance).
     /// If an AI fails, RunTriadAiWithRecovery retries once with context from the other AIs.
     /// </summary>
-    static int AskTriadParallel(string question, bool slackReport, int timeoutSec, List<string>? attachFiles,
+    static int AskTriadParallel(string question, int timeoutSec, List<string>? attachFiles,
         bool newSession, bool loopMode, int loopMaxSteps, int loopRetry, int loopMaxParallel,
         string? modelHint, bool noWait)
     {
@@ -174,7 +170,6 @@ Examples:
         // Set _slackSessionThreadTs.Value BEFORE spawning Task.Run children.
         // AsyncLocal inheritance: each child task sees this value from the moment it starts.
         // EnsureSlackThread inside each AI is idempotent — returns immediately if already set.
-        if (slackReport)
         {
             var qTrunc = question.Length > 120 ? question[..120] + "..." : question;
             var config = LoadSlackConfig();
@@ -203,11 +198,11 @@ Examples:
 
         var tasks = new[]
         {
-            Task.Run(() => RunTriadAiWithRecovery("gemini", question, slackReport, timeoutSec, attachFiles,
+            Task.Run(() => RunTriadAiWithRecovery("gemini", question, timeoutSec, attachFiles,
                 freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gemini] ")),
-            Task.Run(() => RunTriadAiWithRecovery("gpt", question, slackReport, timeoutSec, attachFiles,
+            Task.Run(() => RunTriadAiWithRecovery("gpt", question, timeoutSec, attachFiles,
                 freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gpt] ")),
-            Task.Run(() => RunTriadAiWithRecovery("claude", question, slackReport, timeoutSec, attachFiles,
+            Task.Run(() => RunTriadAiWithRecovery("claude", question, timeoutSec, attachFiles,
                 freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[claude] ")),
         };
         Task.WaitAll(tasks);
