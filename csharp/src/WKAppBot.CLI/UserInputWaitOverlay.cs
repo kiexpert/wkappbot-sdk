@@ -29,6 +29,7 @@ internal sealed class UserInputWaitWindow : Window
     private readonly TextBlock _idleText;
     private readonly DispatcherTimer _countdownTimer;
     private readonly IntPtr _ownerHwnd;
+    private readonly IntPtr _prevFg;  // foreground before overlay shown — restore on deny/ESC
     private readonly int _resetSeconds;
     private int _remainingSeconds;
     private uint _lastInputTick;
@@ -46,10 +47,11 @@ internal sealed class UserInputWaitWindow : Window
     public bool UseChime { get; set; } // true = 차임벨, false(기본) = 카라오케
     public bool NoSound  { get; set; } // true = 음성 완전 생략 (ask 등 백그라운드 용도)
 
-    public UserInputWaitWindow(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds, int resetSeconds = 30,
-                               string? actionInfo = null)
+    public UserInputWaitWindow(IntPtr ownerHwnd, uint userIdleMs, int timeoutSeconds, IntPtr prevFg = default,
+                               int resetSeconds = 30, string? actionInfo = null)
     {
         _ownerHwnd = ownerHwnd;
+        _prevFg = prevFg;
         _remainingSeconds = timeoutSeconds;
         _resetSeconds = resetSeconds;
         _lastInputTick = GetLastInputTick();
@@ -235,8 +237,11 @@ internal sealed class UserInputWaitWindow : Window
         _countdownTimer.Tick += OnCountdownTick;
         _countdownTimer.Start();
 
-        // 음성 안내: 카라오케(기본) or 차임벨(UseChime), NoSound=true면 TTS speak만 생략(차임은 유지)
-        Loaded += (_, _) => { if (UseChime) PlayChime(); else if (!NoSound) PlaySpeakAnnounce(); };
+        // 음성 안내: 멜로디 먼저 → 완료 후 speak (NoSound=true면 둘 다 생략)
+        Loaded += (_, _) => { if (!NoSound) PlayChimeThenSpeak(); };
+
+        // ESC = deny (restore focus to prevFg, don't give Chrome a chance)
+        PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; OnDeny(); } };
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -250,9 +255,10 @@ internal sealed class UserInputWaitWindow : Window
             SetWindowLongPtr(helper.Handle, GWL_HWNDPARENT, _ownerHwnd);
 
         // WS_EX_NOACTIVATE: clicking won't steal focus from any app
+        // WS_EX_TOOLWINDOW: excluded from alt-tab / taskbar (less OS focus-arbitration interference)
         var exStyle = GetWindowLongPtr(helper.Handle, GWL_EXSTYLE);
         SetWindowLongPtr(helper.Handle, GWL_EXSTYLE,
-            new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE));
+            new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW));
     }
 
     private void OnConfirm()
@@ -263,11 +269,12 @@ internal sealed class UserInputWaitWindow : Window
 
         // 핵심: 유저가 우리 창을 클릭했으므로 foreground right 보유 중!
         // 즉시 타겟 윈도우에 포커스 이전 → 호출자가 EnsureFocus 스킵 가능
+        // AttachThreadInput for symmetry — SetForegroundWindow can still fail without it
         if (_ownerHwnd != IntPtr.Zero)
         {
-            SetForegroundWindow(_ownerHwnd);
-            Thread.Sleep(80); // Windows가 포커스 전환 처리할 시간
-            _focusAcquired = true; // 클릭 = foreground right 보장
+            RestoreFocus(_ownerHwnd);
+            Thread.Sleep(80);
+            _focusAcquired = GetForegroundWindow() == _ownerHwnd;
         }
 
         Confirmed?.Invoke();
@@ -280,7 +287,8 @@ internal sealed class UserInputWaitWindow : Window
         _confirmed = true;
         _countdownTimer.Stop();
         DeniedByUser = true;
-        // No focus transfer — user explicitly refused
+        // Restore focus to original window (user said no — don't let Chrome steal it)
+        RestoreFocus(_prevFg != IntPtr.Zero ? _prevFg : _ownerHwnd);
         Dispatcher.InvokeShutdown();
     }
 
@@ -293,18 +301,24 @@ internal sealed class UserInputWaitWindow : Window
         _buttonText.Text = "자동 진행!";
         _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0x40, 0xC0, 0x40));
 
-        // User idle → safe to grab focus (no foreground right, but no contention)
+        // User idle → safe to grab focus (weaker foreground entitlement — no fresh click)
+        // Must restore before InvokeShutdown: teardown itself does not preserve focus
         if (_ownerHwnd != IntPtr.Zero)
         {
-            SetForegroundWindow(_ownerHwnd);
+            RestoreFocus(_ownerHwnd);
             Thread.Sleep(80);
             _focusAcquired = GetForegroundWindow() == _ownerHwnd;
         }
 
         Confirmed?.Invoke();
-        // Brief green flash then close
+        // Brief green flash then close — restore again right before shutdown (double-guard)
         var close = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
-        close.Tick += (_, _) => { close.Stop(); Dispatcher.InvokeShutdown(); };
+        close.Tick += (_, _) =>
+        {
+            close.Stop();
+            RestoreFocus(_ownerHwnd != IntPtr.Zero ? _ownerHwnd : _prevFg);
+            Dispatcher.InvokeShutdown();
+        };
         close.Start();
     }
 
@@ -342,7 +356,18 @@ internal sealed class UserInputWaitWindow : Window
         }
     }
 
-    // ── Speak: 카라오케 음성 안내 (기본) ──
+    // ── 멜로디 → speak 순서 재생 ──
+
+    private static void PlayChimeThenSpeak()
+    {
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            PlayChimeSync();
+            PlaySpeakAnnounce();
+        });
+    }
+
+    // ── Speak: TTS 음성 안내 ──
 
     private static void PlaySpeakAnnounce()
     {
@@ -359,15 +384,13 @@ internal sealed class UserInputWaitWindow : Window
         catch { /* best effort — fallback to silent */ }
     }
 
-    // ── Chime: 정중한 요청 멜로디 (C5→E5→G5→C6 메이저 아르페지오, 옵션) ──
+    // ── Chime: 정중한 요청 멜로디 (C5→E5→G5→C6 메이저 아르페지오) — blocking ──
 
-    private static void PlayChime()
+    private static void PlayChimeSync()
     {
-        ThreadPool.QueueUserWorkItem(_ =>
+        try
         {
-            try
-            {
-                const int rate = 22050;
+            const int rate = 22050;
                 // Ascending major arpeggio — polite "attention please~" chime
                 (double hz, int ms)[] melody =
                 {
@@ -414,12 +437,11 @@ internal sealed class UserInputWaitWindow : Window
                 bw.Write(dataLen);
                 foreach (var s in pcm) bw.Write(s);
 
-                wav.Position = 0;
-                using var player = new SoundPlayer(wav);
-                player.PlaySync();
-            }
-            catch { /* audio not available — silent fallback */ }
-        });
+            wav.Position = 0;
+            using var player = new SoundPlayer(wav);
+            player.PlaySync();
+        }
+        catch { /* audio not available — silent fallback */ }
     }
 
     // ── GetLastInputInfo: user activity detection ──
@@ -441,10 +463,35 @@ internal sealed class UserInputWaitWindow : Window
     [DllImport("user32.dll")]
     private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
+    /// <summary>
+    /// Restore foreground to target using AttachThreadInput (bypasses foreground lock).
+    /// Called on deny/ESC so the OS doesn't fall back to Chrome in Z-order.
+    /// </summary>
+    private static void RestoreFocus(IntPtr target)
+    {
+        if (target == IntPtr.Zero) return;
+        var curThread = GetCurrentThreadId();
+        var prevThread = GetWindowThreadProcessId(target, out _);
+        bool attached = false;
+        try
+        {
+            if (curThread != prevThread)
+                attached = AttachThreadInput(curThread, prevThread, true);
+            SetForegroundWindow(target);
+        }
+        catch { /* non-fatal — best effort */ }
+        finally
+        {
+            if (attached)
+                AttachThreadInput(curThread, prevThread, false);
+        }
+    }
+
     // ── Win32 P/Invoke ──
     private const int GWL_EXSTYLE = -20;
     private const int GWL_HWNDPARENT = -8;
-    private const int WS_EX_NOACTIVATE = 0x08000000;
+    private const int WS_EX_NOACTIVATE  = 0x08000000;
+    private const int WS_EX_TOOLWINDOW  = 0x00000080;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
@@ -457,6 +504,15 @@ internal sealed class UserInputWaitWindow : Window
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
 }
 
 /// <summary>
@@ -485,9 +541,13 @@ internal static class UserInputWaitOverlay
         // positionHwnd: 위치 기준 (타겟 컨트롤/폼), ownerHwnd: Win32 소유자 (메인 윈도우)
         var posHwnd = positionHwnd != IntPtr.Zero ? positionHwnd : ownerHwnd;
 
+        // Capture prevFg on calling thread before STA thread starts (used for deny/ESC restore)
+        var prevFgForRestore = GetForegroundWindowStatic();
+
         var thread = new Thread(() =>
         {
-            var window = new UserInputWaitWindow(ownerHwnd, userIdleMs, timeoutSeconds, actionInfo: actionInfo);
+            var window = new UserInputWaitWindow(ownerHwnd, userIdleMs, timeoutSeconds,
+                prevFg: prevFgForRestore, actionInfo: actionInfo);
             if (noSound) window.NoSound = true;
 
             // Position: centered inside target window (multi-monitor safe)
@@ -555,4 +615,7 @@ internal static class UserInputWaitOverlay
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "GetForegroundWindow")]
+    private static extern IntPtr GetForegroundWindowStatic();
 }

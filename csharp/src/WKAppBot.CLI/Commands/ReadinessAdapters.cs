@@ -94,7 +94,12 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
         var result = new UserYieldResult(false, false);
         try
         {
-            var actionArgs = string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
+            // CallerArgs: actual command (e.g. "ask gemini ...") when running inside Eye pipe.
+            // Fallback to process args when running standalone (non-Eye mode).
+            var callerArgs = EyeCmdPipeServer.CallerArgs.Value;
+            var actionArgs = callerArgs != null
+                ? string.Join(" ", callerArgs)
+                : string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
             // Capture call stack — WKAppBot frames only, skip internals
             var stackFrames = new System.Diagnostics.StackTrace(fNeedFileInfo: false).GetFrames()
                 .Select(f => f.GetMethod())

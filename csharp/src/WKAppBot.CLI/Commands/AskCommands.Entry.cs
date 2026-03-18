@@ -464,14 +464,32 @@ Examples:
             }
         }
 
-        // Registry miss — use EnsureCorrectWindowAsync (handles window positioning + creation)
+        // Registry miss — ALWAYS create a fresh isolated tab.
+        // Do NOT call EnsureCorrectWindowAsync here: its Step 3 steals any host-matching tab,
+        // breaking sandbox isolation (e.g. whisper-study grabs the regular ask tab, or vice-versa).
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"[SANDBOX] Miss: {key} — creating via EnsureCorrectWindowAsync");
+        Console.WriteLine($"[SANDBOX] Miss: {key} — creating fresh tab for {expectedHost}");
         Console.ResetColor();
-        var targetId = await cdp.EnsureCorrectWindowAsync(port, key, $"https://{expectedHost}", savedTargetId: null);
-        if (targetId != null)
-            AskTargetRegistry.SetEntry(key, targetId, expectedHost);
-        return targetId;
+        try
+        {
+            var result = await cdp.SendAsync("Target.createTarget",
+                new System.Text.Json.Nodes.JsonObject { ["url"] = $"https://{expectedHost}" });
+            var newId = result?["targetId"]?.GetValue<string>();
+            if (newId != null)
+            {
+                await cdp.SwitchToTargetAsync(newId, port);
+                AskTargetRegistry.SetEntry(key, newId, expectedHost);
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"[SANDBOX] ✓ Fresh tab: {newId[..Math.Min(8, newId.Length)]}");
+                Console.ResetColor();
+                return newId;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SANDBOX] Create failed: {ex.Message}");
+        }
+        return null;
     }
 
     static CdpClient? EnsureCdpConnection(int port = 9222, string? preferredHost = null, bool newTab = false, string? targetTag = null)

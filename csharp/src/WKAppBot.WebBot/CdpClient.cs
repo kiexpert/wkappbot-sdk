@@ -580,11 +580,15 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
 
     public async Task ApplyTargetTagAsync(string? tag)
     {
-        if (string.IsNullOrWhiteSpace(tag) || _ws == null || _ws.State != WebSocketState.Open)
+        if (_ws == null || _ws.State != WebSocketState.Open)
             return;
         try
         {
-            await EvalAsync($"window.__wk_ask_tag = '{tag.Replace("'", "\'")}';");
+            // Re-apply focus emulation on every ask entry (tab may have been backgrounded since connect)
+            await EmulateActiveTabAsync();
+
+            if (!string.IsNullOrWhiteSpace(tag))
+                await EvalAsync($"window.__wk_ask_tag = '{tag.Replace("'", "\'")}';");
         }
         catch
         {

@@ -25,6 +25,8 @@ internal static class EyeCmdPipeServer
     internal static readonly AsyncLocal<string?> CallerCwd = new();
     /// <summary>Per-command caller foreground HWND hint (set by Launcher for direct prompt window lookup)</summary>
     internal static readonly AsyncLocal<IntPtr?> CallerHwnd = new();
+    /// <summary>Per-command actual args passed to Program.Main (e.g. ["ask","gemini","..."]) — for approval popup display</summary>
+    internal static readonly AsyncLocal<string[]?> CallerArgs = new();
 
     public static void StartServer() => Task.Run(ServerLoop);
 
@@ -43,6 +45,7 @@ internal static class EyeCmdPipeServer
         _ = Task.Run(() =>
         {
             CallerCwd.Value = null;
+            CallerArgs.Value = args;
             Program.RunningInEye = true;
             using (ThreadRoutingWriter.Route(tee))
             {
@@ -145,6 +148,7 @@ internal static class EyeCmdPipeServer
         // CallerCwd + CallerHwnd stored in AsyncLocal — propagates to all async continuations of this command
         CallerCwd.Value = callerCwd;
         CallerHwnd.Value = callerHwnd;
+        CallerArgs.Value = args;
         if (callerCwd != null) Console.WriteLine($"[EYECMD] cwd={callerCwd}");
         // RunningInEye=true prevents Program.cs from creating a second TeeTextWriter (duplicate log)
         Program.RunningInEye = true;

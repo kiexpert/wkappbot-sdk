@@ -145,7 +145,7 @@ internal partial class Program
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
-        { var prevFgClaude = NativeMethods.GetForegroundWindow(); Console.WriteLine($"[ASK:FOCUS] pre-activate fg={prevFgClaude:X8}"); if (!newTab && !triadMode) cdp.ActivateTabAsync().GetAwaiter().GetResult(); LogRestoreFocus(prevFgClaude, "ActivateTab-Claude"); }
+        // No tab activation — CDP works on background tabs via targetId. Truly focusless.
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
