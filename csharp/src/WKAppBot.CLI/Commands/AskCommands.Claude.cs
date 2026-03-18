@@ -259,6 +259,11 @@ internal partial class Program
                 // ── Send: click button ──
                 await Task.Delay(500);
                 int preSendTurns = await CountClaudeTurns(cdp);
+                // Capture existing streaming element count so Phase 5/6 only reacts to NEW elements.
+                // Bug: after persona injection, stale [data-is-streaming="false"] from "READY" response
+                // would immediately satisfy the DONE check, returning the persona response as the answer.
+                int preStreamingCount = int.Parse(await cdp.EvalAsync(
+                    "document.querySelectorAll('[data-is-streaming]').length") ?? "0");
                 var sendResult = "PENDING";
 
                 // Tier 1: JS click on send button (multi-selector fallback for DOM changes)
@@ -356,12 +361,15 @@ internal partial class Program
                         return (false, FormatClaudeLimitResponse(limitText));
                     }
 
-                    var detectResult = await cdp.EvalAsync("""
+                    var detectResult = await cdp.EvalAsync($$"""
                         (() => {
-                            if (document.querySelector('[data-is-streaming="true"]')) return 'STREAMING';
-                            if (document.querySelector('[data-is-streaming="false"]')) return 'DONE';
-                            var msgs = document.querySelectorAll('[data-testid="user-message"]');
-                            return 'WAITING_' + msgs.length;
+                            var msgs = document.querySelectorAll('[data-is-streaming]');
+                            if (msgs.length <= {{preStreamingCount}}) {
+                                var userMsgs = document.querySelectorAll('[data-testid="user-message"]');
+                                return 'WAITING_' + userMsgs.length;
+                            }
+                            var last = msgs[msgs.length - 1];
+                            return last.getAttribute('data-is-streaming') === 'true' ? 'STREAMING' : 'DONE';
                         })()
                         """) ?? "WAITING_0";
 
@@ -392,13 +400,13 @@ internal partial class Program
                     await Task.Delay(1500);
 
                     // Get streaming state + latest response text
-                    var pollResult = await cdp.EvalAsync("""
+                    var pollResult = await cdp.EvalAsync($$"""
                         (() => {
-                            var streaming = document.querySelector('[data-is-streaming="true"]');
                             var msgs = document.querySelectorAll('[data-is-streaming]');
-                            var last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
-                            var text = last ? last.textContent : '';
-                            var state = streaming ? 'STREAMING' : 'DONE';
+                            var last = msgs.length > {{preStreamingCount}} ? msgs[msgs.length - 1] : null;
+                            if (!last) return JSON.stringify({state: 'WAITING', len: 0, text: ''});
+                            var text = last.textContent;
+                            var state = last.getAttribute('data-is-streaming') === 'true' ? 'STREAMING' : 'DONE';
                             return JSON.stringify({state: state, len: text.length, text: text.substring(0, 3000)});
                         })()
                         """) ?? "{}";
@@ -460,10 +468,10 @@ internal partial class Program
                 }
 
                 // Timeout — return what we have
-                var finalText = await cdp.EvalAsync("""
+                var finalText = await cdp.EvalAsync($$"""
                     (() => {
                         var msgs = document.querySelectorAll('[data-is-streaming]');
-                        var last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+                        var last = msgs.length > {{preStreamingCount}} ? msgs[msgs.length - 1] : null;
                         return last ? last.textContent.substring(0, 3000) : '';
                     })()
                     """) ?? "";
