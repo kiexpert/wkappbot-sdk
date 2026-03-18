@@ -1131,6 +1131,10 @@ internal partial class Program
         slack.OnMessage += (msg) =>
         {
             if (string.IsNullOrEmpty(msg.Text)) return;
+            // Fire-and-forget: don't block WebSocket receive thread
+            // (InputReadiness approval can take 30s+ → next messages would stall)
+            _ = Task.Run(() =>
+            {
 
             // Debug: log thread info for diagnosis
             Console.WriteLine($"[EYE][SLACK] MSG from={msg.User} ch={msg.Channel} thread={msg.ThreadTs ?? "(none)"} text={msg.Text[..Math.Min(msg.Text.Length, 40)]}");
@@ -1227,6 +1231,7 @@ internal partial class Program
                 threadTs = msg.ThreadTs, channel = msg.Channel
             });
             EyeCmdPipeServer.DispatchBg(["slack", "route", routeJson]);
+            }); // end Task.Run — WebSocket thread now free for next message
         };
     }
 
