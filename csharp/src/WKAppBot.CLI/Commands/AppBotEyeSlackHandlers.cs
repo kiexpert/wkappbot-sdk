@@ -1239,7 +1239,7 @@ internal partial class Program
     /// Execute a single schedule item: resolve prompt text, find Claude prompt, type and submit.
     /// Updates schedule status to done/failed. Sends Slack notification.
     /// </summary>
-    private static void ExecuteScheduleItem(ScheduleItem item, string? slackBotToken, string? slackChannel)
+    internal static void ExecuteScheduleItem(ScheduleItem item, string? slackBotToken, string? slackChannel)
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine($"[SCHEDULE] Executing: {item.Id} ({item.Type})");

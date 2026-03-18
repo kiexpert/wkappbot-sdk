@@ -19,6 +19,7 @@ internal partial class Program
             "list" or "ls" => ScheduleListCommand(),
             "remove" or "rm" => ScheduleRemoveCommand(args),
             "clear" => ScheduleClearCommand(args),
+            "exec" => ScheduleExecCommand(args),
             _ => ScheduleUsage()
         };
     }
@@ -145,10 +146,85 @@ internal partial class Program
         if (!string.IsNullOrEmpty(item.Interval))
             Console.WriteLine($"[SCHEDULE] Interval: {item.Interval}");
 
-        var promptPreview = item.Prompt ?? $"(file: {item.PromptFile})";
+        var promptPreview = item.Command ?? item.Prompt ?? $"(file: {item.PromptFile})";
         if (promptPreview.Length > 60) promptPreview = promptPreview[..57] + "...";
         Console.WriteLine($"[SCHEDULE] Prompt: {promptPreview}");
         Console.WriteLine($"[SCHEDULE] File: {ScheduleManager.FilePath}");
+
+        // Register with Windows Task Scheduler for once/recurring — survives Eye kill
+        if (item.Type is "once" or "recurring" && !string.IsNullOrEmpty(item.ExecuteAt)
+            && DateTime.TryParse(item.ExecuteAt, out var schtaskDt))
+        {
+            RegisterSchtask(id, schtaskDt, item.Type == "recurring" ? item.Interval : null);
+        }
+        return 0;
+    }
+
+    /// <summary>Register (or re-register) a Windows Task Scheduler entry for this schedule item.</summary>
+    static void RegisterSchtask(string id, DateTime executeAt, string? interval = null)
+    {
+        var exePath = (Environment.ProcessPath ?? "wkappbot.exe").Replace('/', '\\');
+        var taskName = $"WKAppBot_{id}";
+        var tr = $"\"{exePath}\" schedule exec {id}";
+        var date = executeAt.ToString("MM/dd/yyyy");
+        var time = executeAt.ToString("HH:mm");
+        // For recurring, use /sc daily as a baseline — Eye will re-register on next run
+        var sc = interval != null ? "daily" : "once";
+        var schtasksArgs = $"/create /tn \"{taskName}\" /tr \"{tr}\" /sc {sc} /sd {date} /st {time} /f";
+        try
+        {
+            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                "schtasks.exe", schtasksArgs) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })!;
+            p.WaitForExit(5000);
+            Console.WriteLine($"[SCHEDULE] schtasks registered: {taskName} at {executeAt:HH:mm}");
+        }
+        catch (Exception ex) { Console.WriteLine($"[SCHEDULE] schtasks register failed: {ex.Message}"); }
+    }
+
+    /// <summary>Delete Windows Task Scheduler entry for this schedule item.</summary>
+    static void DeleteSchtask(string id)
+    {
+        try
+        {
+            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                "schtasks.exe", $"/delete /tn \"WKAppBot_{id}\" /f") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })!;
+            p.WaitForExit(3000);
+        }
+        catch { /* schtask may not exist — ignore */ }
+    }
+
+    /// <summary>wkappbot schedule exec &lt;id&gt; — directly execute a scheduled item (called by schtasks, no Eye needed).</summary>
+    static int ScheduleExecCommand(string[] args)
+    {
+        if (args.Length < 2) return Error("Usage: wkappbot schedule exec <id>");
+        var id = args[1];
+        var file = ScheduleManager.Load();
+        var item = file.Schedules.FirstOrDefault(s => s.Id == id);
+        if (item == null) return Error($"[SCHEDULE] Not found: {id}");
+
+        // Load Slack config (same as Eye)
+        string? slackBotToken = null, slackChannel = null;
+        try
+        {
+            var configPath = System.IO.Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
+            if (System.IO.File.Exists(configPath))
+            {
+                var json = System.Text.Json.Nodes.JsonNode.Parse(System.IO.File.ReadAllText(configPath));
+                slackBotToken = json?["bot_token"]?.GetValue<string>();
+                slackChannel = json?["channel"]?.GetValue<string>();
+            }
+        }
+        catch { }
+
+        ExecuteScheduleItem(item, slackBotToken, slackChannel);
+
+        // Re-register schtask for next run if recurring
+        if (item.Type == "recurring" && !string.IsNullOrEmpty(item.ExecuteAt)
+            && DateTime.TryParse(item.ExecuteAt, out var nextDt))
+            RegisterSchtask(id, nextDt, item.Interval);
+        else
+            DeleteSchtask(id); // one-shot — remove from schtasks
+
         return 0;
     }
 
@@ -215,6 +291,7 @@ internal partial class Program
         var id = args[1];
         if (ScheduleManager.Remove(id))
         {
+            DeleteSchtask(id);
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine($"[SCHEDULE] Removed: {id}");
             Console.ResetColor();
