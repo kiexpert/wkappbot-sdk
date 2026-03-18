@@ -191,6 +191,25 @@ internal partial class Program
             Console.Out.Flush();
 
             // Phase 7: Slack forwarding handled by OnMessage → slack route worker (no HTTP poll)
+
+            // Phase 8: Route retry flush — Eye-independent safety net (also called by Task Scheduler)
+            try
+            {
+                var retryItems = RouteRetryQueue.GetDueItems();
+                if (retryItems.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"[EYE_TICK] Route retry flush: {retryItems.Count} item(s)");
+                    Console.ResetColor();
+                    foreach (var item in retryItems)
+                        SlackRouteCommand([item]);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EYE_TICK] Route retry error: {ex.Message}");
+            }
+
             Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 

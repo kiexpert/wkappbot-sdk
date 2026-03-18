@@ -38,6 +38,7 @@ internal partial class Program
             "upload" => SlackUploadCommand(args),
             "screenshot" => SlackScreenshotCommand(args),
             "route" => SlackRouteCommand(args[1..]),
+            "route-flush" or "routeflush" => SlackRouteFlushCommand(),
             "catch-up" or "catchup" => SlackCatchUpCommand(args),
             "prompt" => SlackPromptCommand(args),
             "schedule" => SlackScheduleCommand(args),
