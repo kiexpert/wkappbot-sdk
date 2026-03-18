@@ -22,14 +22,16 @@ internal partial class Program
     /// </summary>
     static string SlackReplySuffix(string user, string replyTs, string? label = null)
     {
-        var tag = string.IsNullOrEmpty(label) ? $"Slack @{user}" : $"Slack {label} @{user}";
+        var displayName = ResolveSlackDisplayName(user);
+        var tag = string.IsNullOrEmpty(label) ? $"Slack @{displayName}" : $"Slack {label} @{displayName}";
         return $"({tag} → \"{ExePath}\" slack reply \"MUST reply your answer here\" --msg {replyTs})";
     }
 
     /// <summary>채널 브로드캐스트용 suffix — reply 대신 send (채널에 답장).</summary>
     static string SlackSendSuffix(string user)
     {
-        return $"(Slack @{user} → \"{ExePath}\" slack send \"퐁~! 지금 뭐뭐 완료하고 머머 하고있습니다~!\")";
+        var displayName = ResolveSlackDisplayName(user);
+        return $"(Slack @{displayName} → \"{ExePath}\" slack send \"퐁~! 지금 뭐뭐 완료하고 머머 하고있습니다~!\")";
     }
 
     /// <summary>Per-target delivery result for ack message.</summary>
@@ -568,6 +570,7 @@ internal partial class Program
             IntendedAction = "key", // 키보드 입력 → 항상 포커스 필요
             AutoApproveYield = true, // 슬랙 요청 → 양보 자동승인
             SkipKnowhow = true, // 프롬프트는 노하우 불필요
+            EnsureInputPosition = () => promptHelper.EnsureCaretInPrompt(prompt),
         });
 
         // ── 최소화 감지 → 포커스리스 리스토어 후 재 Probe ──
@@ -595,6 +598,7 @@ internal partial class Program
                     IntendedAction = "key",
                     AutoApproveYield = true,
                     SkipKnowhow = true,
+                    EnsureInputPosition = () => promptHelper.EnsureCaretInPrompt(prompt),
                 });
             }
             else
@@ -1084,7 +1088,7 @@ internal partial class Program
                     Console.WriteLine(diagDetail);
                     try
                     {
-                        var diagPath = Path.Combine(DataDir, "logs", $"prompt_diag_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                        var diagPath = Path.Combine(DataDir, "logs", $"prompt_diag_{DateTime.Now:yyyyMMdd_HHmmss}.log");
                         File.WriteAllText(diagPath, $"{statusInfo}\n{diagDetail}\n받은 메시지: {cleanText}");
                         Console.WriteLine($"[EYE] Diagnosis saved: {diagPath}");
                     }

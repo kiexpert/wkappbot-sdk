@@ -283,7 +283,7 @@ internal partial class Program
                     ["type"] = "object",
                     ["properties"] = new JsonObject {
                         ["pattern"]        = Prop("string",  "Regex pattern to search (case-insensitive by default). Required."),
-                        ["files"]          = Prop("string",  "File glob(s). ';' OR. e.g. \"*.log\" / \"*.log;*.txt\" / \"**\". Default: *.txt"),
+                        ["files"]          = Prop("string",  "File glob(s). ';' OR. e.g. \"*.log\" / \"*.log;*.txt\" / \"**\". Default: *.log"),
                         ["past"]           = Prop("string",  "Scan files modified within duration (1h / 30m / 2d). Without follow: exits after scan."),
                         ["follow"]         = Prop("boolean", "Follow new entries after --past scan (tail -f style)."),
                         ["timeout"]        = Prop("string",  "Watch for duration then exit (e.g. 30s, 5m). Implies follow."),
@@ -308,7 +308,7 @@ internal partial class Program
                 new JsonObject {
                     ["type"] = "object",
                     ["properties"] = new JsonObject {
-                        ["files"]          = Prop("string",  "File glob(s). ';' OR. e.g. \"*.log\" / \"*.file.*\" / \"**\" (all). Default: *.txt"),
+                        ["files"]          = Prop("string",  "File glob(s). ';' OR. e.g. \"*.log\" / \"*.file.*\" / \"**\" (all). Default: *.log"),
                         ["pattern"]        = Prop("string",  "Regex pattern to search (case-insensitive). Default: match all."),
                         ["past"]           = Prop("string",  "Scan files modified within duration (1h / 30m / 2d). Without follow: exits after scan."),
                         ["follow"]         = Prop("boolean", "Follow new entries after --past scan."),

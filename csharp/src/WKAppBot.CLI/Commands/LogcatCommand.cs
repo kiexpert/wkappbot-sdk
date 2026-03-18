@@ -18,8 +18,8 @@ internal partial class Program
     static int LogcatCommand(string[] args)
     {
         var selfPid = Environment.ProcessId;
-        var selfLogMarker = $"pid={selfPid}.txt";
-        var fileFilterArg = "*.txt";
+        var selfLogMarker = $"pid={selfPid}.log";
+        var fileFilterArg = "*.log";
         var messageFilterArg = "*";
         string? baseDirOverride = null;
         int maxDepth = 0; // 0 = current dir only, -1 = unlimited, N = depth limit
@@ -76,7 +76,7 @@ internal partial class Program
         // e.g. "logs/가;나;다/*.txt" → ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
         var rawFileArgs = positional.Count > 1 ? positional.Skip(1).ToList() : new List<string> { fileFilterArg };
         var filePatterns = rawFileArgs.SelectMany(ExpandGlobSegments).ToArray();
-        if (filePatterns.Length == 0) filePatterns = new[] { "*.txt" };
+        if (filePatterns.Length == 0) filePatterns = new[] { "*.log" };
 
         // -C overrides -A/-B
         if (contextLines > 0) { afterLines = contextLines; beforeLines = contextLines; }

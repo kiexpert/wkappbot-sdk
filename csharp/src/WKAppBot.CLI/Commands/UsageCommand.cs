@@ -345,8 +345,8 @@ Data Directory:
 
             Arguments:
               <pattern>     Regex pattern to search (case-insensitive by default)
-              [files...]    File glob(s) to search, ';' OR  e.g. "*.log;*.txt"
-                            Default: *.txt in current directory
+              [files...]    File glob(s) to search, ';' OR  e.g. "*.log;*.eye.*"
+                            Default: *.log in current directory
 
             Options:
               -r, --recursive       Recursive (unlimited depth)
@@ -438,7 +438,7 @@ Data Directory:
             pattern    = positional[0];
             fileFilter = positional.Count > 1
                 ? string.Join(";", positional.Skip(1))  // multiple files → ';' OR glob
-                : "*.txt";                               // no file arg → default logcat filter
+                : "*.log";                               // no file arg → default logcat filter
         }
 
         // If fileFilter contains path separators, extract --basedir so logcat searches the right dir.
