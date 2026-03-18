@@ -237,32 +237,11 @@ Examples:
             catch (Exception ex) { Console.WriteLine($"[TRIAD] Reminder inject error: {ex.Message}"); }
             finally { ClaudePromptHelper.AllowFocusSteal = false; }
         });
+        if (!string.IsNullOrEmpty(threadTs))
         {
-            // Send as channel message (not thread reply) — short header to channel,
-            // long body auto-posted as thread comment underneath.
-            var config = LoadSlackConfig();
-            var botToken = config?["bot_token"]?.GetValue<string>();
-            var channel  = config?["channel"]?.GetValue<string>();
-            if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
-            {
-                const int MaxInline = 150;
-                var header = "🔔 *삼두 완료* — Claude Code에 종합의견 리마인더 직접 주입 완료";
-                var body   = $"💬 _YOU MUST 위 삼두 답변을 꼼꼼히 읽고 한국어로 종합 의견을 작성하세요!_{(string.IsNullOrEmpty(threadTs) ? "" : $"\n📌 `--msg {threadTs}`")}";
-                var full   = $"{header}\n{body}";
-
-                if (full.Length <= MaxInline)
-                {
-                    // Short enough — single channel message
-                    SlackSendViaApi(botToken, channel, full, username: BotUsername).GetAwaiter().GetResult();
-                }
-                else
-                {
-                    // Long — header to channel, body as thread comment
-                    var (ok, newTs) = SlackSendViaApi(botToken, channel, header, username: BotUsername).GetAwaiter().GetResult();
-                    if (ok && newTs != null)
-                        SlackSendViaApi(botToken, channel, body, threadTs: newTs, username: BotUsername).GetAwaiter().GetResult();
-                }
-            }
+            // Post full content as thread reply — keeps channel clean, no noise
+            var body = $"🔔 *삼두 완료* — Claude Code에 종합의견 리마인더 직접 주입 완료\n💬 _YOU MUST 위 삼두 답변을 꼼꼼히 읽고 한국어로 종합 의견을 작성하세요!_\n📌 `--msg {threadTs}`";
+            SlackPostToThread(body, "앱봇아이");
         }
 
         return results.Any(r => r == 0) ? 0 : 1; // success if at least one AI answered
