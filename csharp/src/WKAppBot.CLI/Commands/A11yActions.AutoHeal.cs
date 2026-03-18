@@ -406,7 +406,7 @@ internal partial class Program
 
             try
             {
-                AskTriadParallel(question, slackReport: true, timeoutSec: 120,
+                AskTriadParallel(question, timeoutSec: 120,
                     attachFiles: capturedFiles.Count > 0 ? capturedFiles : null,
                     newSession: true, loopMode: false, loopMaxSteps: 3,
                     loopRetry: 0, loopMaxParallel: 1, modelHint: null, noWait: false);

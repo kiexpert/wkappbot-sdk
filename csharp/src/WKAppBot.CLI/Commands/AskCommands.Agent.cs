@@ -79,7 +79,6 @@ internal partial class Program
         int loopRetry     = 2;
         int loopMaxParallel = 4;
         int verifyDelayMs = 400;
-        bool slackReport  = false;
         bool newSession   = false;    // --fresh
         bool triadMode    = false;
         string? modelHint = null;
@@ -88,9 +87,7 @@ internal partial class Program
         var remaining = new List<string>();
         for (int i = 1; i < args.Length; i++)
         {
-            if (args[i] == "--slack")
-                slackReport = true;
-            else if (args[i] == "--fresh" || args[i] == "--new-session")
+            if (args[i] == "--fresh" || args[i] == "--new-session")
                 newSession = true;
             else if (args[i] == "--triad")
                 triadMode = true;
@@ -152,14 +149,13 @@ internal partial class Program
             Console.WriteLine("[AGENT] Triad mode — launching Gemini + GPT + Claude agents in parallel...");
 
             // Pre-open a shared Slack thread so all 3 AI answers land in one thread
-            if (slackReport)
-                EnsureSlackThread("Triad", question);
+            EnsureSlackThread("Triad", question);
 
             var tasks = new[]
             {
-                Task.Run(() => AskGemini(question, slackReport, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gemini-agent-{tabSuffix}", linePrefix: "[gemini] ")),
-                Task.Run(() => AskChatGpt(question, slackReport, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gpt-agent-{tabSuffix}",    linePrefix: "[gpt] ")),
-                Task.Run(() => AskClaude(question, slackReport, timeoutSec, newTab: false, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"claude-agent-{tabSuffix}", linePrefix: "[claude] ")),
+                Task.Run(() => AskGemini(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gemini-agent-{tabSuffix}", linePrefix: "[gemini] ")),
+                Task.Run(() => AskChatGpt(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gpt-agent-{tabSuffix}",    linePrefix: "[gpt] ")),
+                Task.Run(() => AskClaude(question, true, timeoutSec, newTab: false, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"claude-agent-{tabSuffix}", linePrefix: "[claude] ")),
             };
             Task.WaitAll(tasks);
             Console.WriteLine($"[AGENT] Triad done — gemini={tasks[0].Result} gpt={tasks[1].Result} claude={tasks[2].Result}");
@@ -168,9 +164,9 @@ internal partial class Program
 
         return ai switch
         {
-            "gemini"            => AskGemini(question, slackReport, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[gemini] "),
-            "gpt" or "chatgpt"  => AskChatGpt(question, slackReport, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[gpt] "),
-            "claude"            => AskClaude(question, slackReport, timeoutSec, newTab: false, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[claude] "),
+            "gemini"            => AskGemini(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[gemini] "),
+            "gpt" or "chatgpt"  => AskChatGpt(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[gpt] "),
+            "claude"            => AskClaude(question, true, timeoutSec, newTab: false, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[claude] "),
             _                   => Error($"Unknown AI: {ai}")
         };
     }

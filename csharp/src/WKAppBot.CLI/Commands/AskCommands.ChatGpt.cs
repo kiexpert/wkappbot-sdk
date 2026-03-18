@@ -53,7 +53,7 @@ internal partial class Program
         "If asked to generate/create/draw an image, USE your image generation tool (DALL-E/Imagen). Do NOT make ASCII art. " +
         "Confirm you understood with exactly: READY";
 
-    static int AskChatGpt(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
+    static int AskChatGpt(string question, bool slackReport = true, int timeoutSec = 30, bool newTab = false, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] ChatGPT: {question}");
@@ -69,7 +69,7 @@ internal partial class Program
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
 
-        if (slackReport) EnsureSlackThread("ChatGPT", question);
+        EnsureSlackThread("ChatGPT", question);
 
         var task = Task.Run(async () =>
         {
@@ -161,7 +161,6 @@ internal partial class Program
                     await Task.Delay(9000);
                     (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, returnAfterSend: noWait);
                 }
-                if (slackReport)
                 {
                     EnsureSlackThread("ChatGPT", question);
                     if (ok && !string.IsNullOrWhiteSpace(answer))
@@ -177,13 +176,11 @@ internal partial class Program
                 if (ok && !string.IsNullOrWhiteSpace(answer))
                     triadCtx?.LogStep("ChatGPT", answer);
 
-                Action<string, string?>? onStepReport = slackReport || triadCtx != null
-                    ? (msg, uname) =>
-                    {
-                        if (slackReport) SlackPostToThread(msg, uname ?? "ChatGPT");
-                        triadCtx?.LogStep("ChatGPT", msg);
-                    }
-                    : null;
+                Action<string, string?> onStepReport = (msg, uname) =>
+                {
+                    SlackPostToThread(msg, uname ?? "ChatGPT");
+                    triadCtx?.LogStep("ChatGPT", msg);
+                };
                 if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
                     (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport);
                 return (ok, answer);

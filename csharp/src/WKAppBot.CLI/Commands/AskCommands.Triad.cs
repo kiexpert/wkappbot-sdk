@@ -161,7 +161,7 @@ internal partial class Program
     /// Pass linePrefix:null to the AI functions so they inherit rather than override this prefix.
     /// </summary>
     static int RunTriadAiWithRecovery(
-        string ai, string question, bool slackReport, int timeoutSec,
+        string ai, string question, int timeoutSec,
         List<string>? attachFiles, bool newSession, bool loopMode, int loopMaxSteps,
         int loopRetry, int loopMaxParallel, string? modelHint, bool noWait,
         TriadSharedContext ctx, string linePrefix)
@@ -170,15 +170,15 @@ internal partial class Program
 
         int result = ai switch
         {
-            "gemini" => AskGemini(question, slackReport, timeoutSec, newTab: false, attachFiles,
+            "gemini" => AskGemini(question, true, timeoutSec, newTab: false, attachFiles,
                 newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
                 triadMode: true, modelHint, noWait, targetTagOverride: null,
                 linePrefix: null, triadCtx: ctx),
-            "gpt" => AskChatGpt(question, slackReport, timeoutSec, newTab: false, attachFiles,
+            "gpt" => AskChatGpt(question, true, timeoutSec, newTab: false, attachFiles,
                 newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
                 triadMode: true, modelHint, noWait, targetTagOverride: null,
                 linePrefix: null, triadCtx: ctx),
-            "claude" => AskClaude(question, slackReport, timeoutSec, newTab: false,
+            "claude" => AskClaude(question, true, timeoutSec, newTab: false,
                 newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
                 triadMode: true, modelHint, noWait, targetTagOverride: null,
                 linePrefix: null, triadCtx: ctx),
@@ -191,8 +191,7 @@ internal partial class Program
             Console.WriteLine($"[TRIAD:{ai}] ⚠ Failed — attempting recovery with shared context");
             Console.ResetColor();
 
-            if (slackReport)
-                SlackPostToThread($"🔄 *[복구]* `{ai}` 실패 감지 — 컨텍스트 재주입 후 재시작 중...", ai);
+            SlackPostToThread($"🔄 *[복구]* `{ai}` 실패 감지 — 컨텍스트 재주입 후 재시작 중...", ai);
 
             var recoveryCtx = ctx.BuildRecoveryContext(ai);
             var recoveryQuestion = recoveryCtx + "\n\nResume task:\n" + question;
@@ -202,22 +201,21 @@ internal partial class Program
 
             result = ai switch
             {
-                "gemini" => AskGemini(recoveryQuestion, slackReport, timeoutSec, newTab: false,
+                "gemini" => AskGemini(recoveryQuestion, true, timeoutSec, newTab: false,
                     attachFiles, newSession: true, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
                     triadMode: true, modelHint, noWait, targetTagOverride: null,
                     linePrefix: null, triadCtx: ctx),
-                "gpt" => AskChatGpt(recoveryQuestion, slackReport, timeoutSec, newTab: false,
+                "gpt" => AskChatGpt(recoveryQuestion, true, timeoutSec, newTab: false,
                     attachFiles, newSession: true, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
                     triadMode: true, modelHint, noWait, targetTagOverride: null,
                     linePrefix: null, triadCtx: ctx),
-                "claude" => AskClaude(recoveryQuestion, slackReport, timeoutSec, newTab: false,
+                "claude" => AskClaude(recoveryQuestion, true, timeoutSec, newTab: false,
                     newSession: true, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
                     triadMode: true, modelHint, noWait, targetTagOverride: null,
                     linePrefix: null, triadCtx: ctx),
                 _ => 1
             };
 
-            if (slackReport)
             {
                 var status = result == 0
                     ? $"✅ *[복구 성공]* `{ai}` 응답 완료"

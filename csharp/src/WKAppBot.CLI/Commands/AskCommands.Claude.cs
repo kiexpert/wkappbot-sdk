@@ -134,7 +134,7 @@ internal partial class Program
         return int.TryParse(result, out var v) ? v : 0;
     }
 
-    static int AskClaude(string question, bool slackReport, int timeoutSec, bool newTab, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
+    static int AskClaude(string question, bool slackReport = true, int timeoutSec = 30, bool newTab = false, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] Claude: {question}");
@@ -150,7 +150,7 @@ internal partial class Program
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
 
-        if (slackReport) EnsureSlackThread("Claude", question);
+        EnsureSlackThread("Claude", question);
 
         var task = Task.Run(async () =>
         {
@@ -481,7 +481,7 @@ internal partial class Program
         var (ok, answer) = task.GetAwaiter().GetResult();
 
         // Open Slack thread early (before loop) so every step lands in same thread
-        if (slackReport && ok && !string.IsNullOrWhiteSpace(answer))
+        if (ok && !string.IsNullOrWhiteSpace(answer))
         {
             EnsureSlackThread("Claude", question);
             SlackPostToThread(answer.Length > 2000 ? answer[..2000] + "…" : answer, "Claude");
@@ -491,24 +491,22 @@ internal partial class Program
         if (ok && !string.IsNullOrWhiteSpace(answer))
             triadCtx?.LogStep("Claude", answer);
 
-        Action<string, string?>? onStepReport = slackReport || triadCtx != null
-            ? (msg, uname) =>
-            {
-                if (slackReport) SlackPostToThread(msg, uname ?? "Claude");
-                triadCtx?.LogStep("Claude", msg);
-            }
-            : null;
+        Action<string, string?> onStepReport = (msg, uname) =>
+        {
+            SlackPostToThread(msg, uname ?? "Claude");
+            triadCtx?.LogStep("Claude", msg);
+        };
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
             (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport)).GetAwaiter().GetResult();
         bool isLimit = IsClaudeLimitResponse(answer);
         if (isLimit) ok = false;
 
-        if (slackReport && isLimit)
+        if (isLimit)
         {
             EnsureSlackThread("Claude", question);
             SlackPostToThread("❌ _Claude 메시지 한도 초과_ — claude.ai 사용량 확인 필요", "Claude");
         }
-        else if (slackReport && !ok)
+        else if (!ok)
         {
             EnsureSlackThread("Claude", question);
             SlackPostToThread("❌ _Claude 응답 실패_", "Claude");

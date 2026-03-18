@@ -375,7 +375,7 @@ internal partial class Program
         return (false, retryText);
     }
 
-    static int AskGemini(string question, bool slackReport, int timeoutSec, bool newTab, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
+    static int AskGemini(string question, bool slackReport = true, int timeoutSec = 30, bool newTab = false, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] Gemini: {question}");
@@ -397,7 +397,7 @@ internal partial class Program
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
 
         // Pre-open Slack thread before task so inside-task code (persona injection etc.) can post to it
-        if (slackReport) EnsureSlackThread("Gemini", question);
+        EnsureSlackThread("Gemini", question);
 
         var task = Task.Run(async () =>
         {
@@ -1069,7 +1069,7 @@ internal partial class Program
         var (ok, answer) = task.GetAwaiter().GetResult();
         if (answer != null) answer = StripGeminiUiPrefix(answer); // safety net: catches any missed return path
 
-        if (slackReport && !string.IsNullOrWhiteSpace(answer))
+        if (!string.IsNullOrWhiteSpace(answer))
         {
             EnsureSlackThread("Gemini", question);
             var forSlack = answer; // already stripped of "Gemini의 응답" prefix by StripGeminiUiPrefix at source
@@ -1091,13 +1091,11 @@ internal partial class Program
         if (ok && !string.IsNullOrWhiteSpace(answer))
             triadCtx?.LogStep("Gemini", answer);
 
-        Action<string, string?>? onStepReport = slackReport || triadCtx != null
-            ? (msg, uname) =>
-            {
-                if (slackReport) SlackPostToThread(msg, uname ?? "Gemini");
-                triadCtx?.LogStep("Gemini", msg);
-            }
-            : null;
+        Action<string, string?> onStepReport = (msg, uname) =>
+        {
+            SlackPostToThread(msg, uname ?? "Gemini");
+            triadCtx?.LogStep("Gemini", msg);
+        };
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
             (ok, answer) = Task.Run(() => RunGeminiLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport)).GetAwaiter().GetResult();
 
