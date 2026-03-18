@@ -104,6 +104,7 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
                 .Take(6)
                 .ToArray();
             var stackInfo = stackFrames.Length > 0 ? "\n[호출] " + string.Join(" ← ", stackFrames) : "";
+            Console.WriteLine($"[READINESS] cmd={actionArgs}{stackInfo}");
             var (approved, focusAcquired, deniedByUser) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
                 positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs + stackInfo);
             if (deniedByUser)
