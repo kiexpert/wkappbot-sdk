@@ -198,14 +198,19 @@ Examples:
         _triadLastSessionDir = sessionDir;
         Console.WriteLine($"[TRIAD] Session dir: {sessionDir}");
 
+        var triadCwd = EyeCmdPipeServer.CallerCwd.Value;
+        var triadHwnd = EyeCmdPipeServer.CallerHwnd.Value;
         var tasks = new[]
         {
-            Task.Run(() => RunTriadAiWithRecovery("gemini", question, timeoutSec, attachFiles,
-                freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gemini] ")),
-            Task.Run(() => RunTriadAiWithRecovery("gpt", question, timeoutSec, attachFiles,
-                freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gpt] ")),
-            Task.Run(() => RunTriadAiWithRecovery("claude", question, timeoutSec, attachFiles,
-                freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[claude] ")),
+            Task.Run(() => { EyeCmdPipeServer.CallerArgs.Value = new[]{"ask","gemini",question}; EyeCmdPipeServer.CallerCwd.Value = triadCwd; EyeCmdPipeServer.CallerHwnd.Value = triadHwnd;
+                return RunTriadAiWithRecovery("gemini", question, timeoutSec, attachFiles,
+                freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gemini] "); }),
+            Task.Run(() => { EyeCmdPipeServer.CallerArgs.Value = new[]{"ask","gpt",question}; EyeCmdPipeServer.CallerCwd.Value = triadCwd; EyeCmdPipeServer.CallerHwnd.Value = triadHwnd;
+                return RunTriadAiWithRecovery("gpt", question, timeoutSec, attachFiles,
+                freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gpt] "); }),
+            Task.Run(() => { EyeCmdPipeServer.CallerArgs.Value = new[]{"ask","claude",question}; EyeCmdPipeServer.CallerCwd.Value = triadCwd; EyeCmdPipeServer.CallerHwnd.Value = triadHwnd;
+                return RunTriadAiWithRecovery("claude", question, timeoutSec, attachFiles,
+                freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[claude] "); }),
         };
         Task.WaitAll(tasks);
         var results = tasks.Select(t => t.Result).ToArray();
