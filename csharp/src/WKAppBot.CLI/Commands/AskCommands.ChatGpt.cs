@@ -873,9 +873,11 @@ internal partial class Program
 
     static async Task TryRecoverChatGptTabAsync(CdpClient cdp, string reason)
     {
-        Console.WriteLine($"[ASK] Recovery: {reason} → restore Chrome + bring tab to front");
+        Console.WriteLine($"[ASK] Recovery: {reason} → SW_SHOWNOACTIVATE (focusless restore)");
         ShowChromeAnswer(cdp);
-        await cdp.BringTabToFrontAsync();
+        cdp.RestoreChromeNoActivate();
+        await cdp.EmulateActiveTabAsync(); // unthrottle renderer
+        await Task.Delay(200);
     }
 
     // ?? UIA Send Button ??
