@@ -5,14 +5,15 @@ using System.Text.Json.Nodes;
 namespace WKAppBot.CLI;
 
 // Route retry queue — persists failed route attempts to disk.
-// Resilience layers:
-//   1. Eye loop (~10s polling)
-//   2. Windows Task Scheduler one-shot at exact retryAt time (Eye-independent)
-//   3. Enqueue() EnsureEyeRunning — respawns Eye if dead
+// Dual Task Scheduler structure:
+//   [WKAppBot Eye Watchdog]  permanent 10-min repeat — keeps Eye alive regardless
+//   [WKAppBot Route Retry]   precise one-shot at retryAt — fast retry when item queued
+// Plus Eye loop (~10s) and EnsureEyeRunning() as additional layers.
 // Infinite retry: no max retryCount ("사용자의 요청은 한개도 허투로 듣지 않게").
 internal static class RouteRetryQueue
 {
-    const string TaskName = "WKAppBot Route Retry";
+    const string WatchdogTaskName = "WKAppBot Eye Watchdog";
+    const string RetryTaskName    = "WKAppBot Route Retry";
 
     static string QueuePath
     {
@@ -29,8 +30,8 @@ internal static class RouteRetryQueue
 
     /// <summary>
     /// Persists a failed route attempt for retry after 1 minute.
-    /// Registers a Windows Task Scheduler one-shot at the exact retryAt time.
-    /// Also ensures Eye is running as a fallback.
+    /// Registers a precise one-shot Task Scheduler at retryAt.
+    /// Also ensures Eye is running as an immediate fallback.
     /// </summary>
     public static void Enqueue(JsonNode msgNode, int retryCount)
     {
@@ -38,7 +39,6 @@ internal static class RouteRetryQueue
         {
             var retryAt = DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeSeconds();
 
-            // Clone to avoid mutating caller's node
             var clone = JsonNode.Parse(msgNode.ToJsonString())!;
             clone["retryCount"] = retryCount;
             clone["retryAt"]    = retryAt;
@@ -51,13 +51,12 @@ internal static class RouteRetryQueue
                 File.AppendAllText(QueuePath, line + "\n");
             }
 
-            var fireAt = DateTimeOffset.FromUnixTimeSeconds(retryAt);
-            Console.WriteLine($"[RETRY] Queued retry #{retryCount} at {fireAt.LocalDateTime:HH:mm:ss}");
+            Console.WriteLine($"[RETRY] Queued retry #{retryCount} at {DateTimeOffset.FromUnixTimeSeconds(retryAt).LocalDateTime:HH:mm:ss}");
 
-            // Register one-shot task at exact retryAt (or earlier if another item is sooner)
-            ScheduleNextTask();
+            // Schedule precise one-shot at soonest retryAt
+            ScheduleRetryTask();
 
-            // Fallback: ensure Eye is also running
+            // Immediate fallback: spawn Eye if it's dead
             EnsureEyeRunning();
         }
         catch (Exception ex)
@@ -68,8 +67,7 @@ internal static class RouteRetryQueue
 
     /// <summary>
     /// Returns all due items (retryAt &lt;= now) and removes them from the queue file.
-    /// After returning due items, re-schedules the next one-shot for any remaining items.
-    /// Thread-safe. Returns empty list if queue file doesn't exist.
+    /// After returning, re-schedules the retry task for remaining items (or removes it).
     /// </summary>
     public static List<string> GetDueItems()
     {
@@ -93,15 +91,11 @@ internal static class RouteRetryQueue
                 {
                     var node = JsonNode.Parse(line);
                     if (node == null) continue;
-
                     var retryAt = node["retryAt"]?.GetValue<long>() ?? 0;
-                    if (retryAt <= nowEpoch)
-                        due.Add(line);
-                    else
-                        pending.Add(line);
+                    if (retryAt <= nowEpoch) due.Add(line);
+                    else pending.Add(line);
                 }
 
-                // Rewrite file with only non-due items
                 if (due.Count > 0)
                     File.WriteAllLines(QueuePath, pending);
 
@@ -116,33 +110,77 @@ internal static class RouteRetryQueue
     }
 
     /// <summary>
-    /// Reads the queue and registers a Windows Task Scheduler one-shot at the soonest retryAt.
-    /// Called by Eye startup and after each flush — keeps the task in sync with the actual queue.
-    /// If queue is empty, deletes the task (no-op if already gone).
+    /// Reads the queue and schedules a precise one-shot at the soonest retryAt.
+    /// If queue is empty, removes the retry task (watchdog still runs every 10 min).
+    /// Called after flush and on Eye startup to keep the task in sync.
     /// </summary>
-    public static void ScheduleNextTask()
+    public static void ScheduleRetryTask()
     {
         try
         {
             var soonest = GetSoonestRetryAt();
             if (soonest == null)
             {
-                // Queue empty — remove task if it exists
-                DeleteScheduledTask();
+                // Queue empty — remove one-shot retry task (watchdog continues independently)
+                RunPowerShell($"Unregister-ScheduledTask -TaskName '{RetryTaskName}' -Confirm:$false -ErrorAction SilentlyContinue", out _);
                 return;
             }
 
-            // Add a small buffer so eye tick runs after retryAt, not before
+            // Fire slightly after retryAt to ensure item is actually due
             var fireAt = soonest.Value.AddSeconds(5);
             if (fireAt < DateTimeOffset.Now.AddSeconds(10))
-                fireAt = DateTimeOffset.Now.AddSeconds(10); // minimum 10s from now
+                fireAt = DateTimeOffset.Now.AddSeconds(10);
 
-            RegisterOneshotTask(fireAt);
+            var fireLocal = fireAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
+            var exePath = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exePath)) return;
+
+            var ps = $"""
+$action   = New-ScheduledTaskAction -Execute '{exePath}' -Argument 'eye tick'
+$trigger  = New-ScheduledTaskTrigger -Once -At '{fireLocal}'
+$settings = New-ScheduledTaskSettingsSet `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 2) `
+    -MultipleInstances IgnoreNew `
+    -Hidden `
+    -StartWhenAvailable $true `
+    -DeleteExpiredTaskAfter (New-TimeSpan -Seconds 30)
+Register-ScheduledTask -TaskName '{RetryTaskName}' -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+""";
+            RunPowerShell(ps, out var exitCode);
+            Console.WriteLine(exitCode == 0
+                ? $"[RETRY] One-shot task at {fireLocal}"
+                : $"[RETRY] One-shot task register exit={exitCode} (non-fatal)");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[RETRY] ScheduleNextTask error: {ex.Message}");
+            Console.WriteLine($"[RETRY] ScheduleRetryTask error: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Registers (or refreshes) the permanent Eye watchdog task.
+    /// Runs 'eye tick' every 10 min — respawns Eye if dead, flushes retry queue.
+    /// Called on Eye startup. Never deleted — permanent watchdog.
+    /// </summary>
+    public static void EnsureWatchdogTask()
+    {
+        var exePath = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(exePath)) return;
+
+        var ps = $"""
+$action   = New-ScheduledTaskAction -Execute '{exePath}' -Argument 'eye tick'
+$trigger  = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 10)
+$settings = New-ScheduledTaskSettingsSet `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 2) `
+    -MultipleInstances IgnoreNew `
+    -Hidden `
+    -StartWhenAvailable $true
+Register-ScheduledTask -TaskName '{WatchdogTaskName}' -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+""";
+        RunPowerShell(ps, out var exitCode);
+        Console.WriteLine(exitCode == 0
+            ? $"[EYE] Watchdog task registered: '{WatchdogTaskName}' (10-min repeat)"
+            : $"[EYE] Watchdog task register exit={exitCode} (non-fatal)");
     }
 
     // ── Internals ───────────────────────────────────────────────────────────────
@@ -166,48 +204,11 @@ internal static class RouteRetryQueue
         catch { return null; }
     }
 
-    /// <summary>
-    /// Registers a one-shot Windows Task Scheduler task at the given time.
-    /// Uses -Force to overwrite if already exists. Task auto-deletes 30s after firing.
-    /// </summary>
-    static void RegisterOneshotTask(DateTimeOffset fireAt)
-    {
-        var exePath = Environment.ProcessPath;
-        if (string.IsNullOrEmpty(exePath)) return;
-
-        // Format for PowerShell: local time string
-        var fireLocal = fireAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
-
-        var ps = $"""
-$action   = New-ScheduledTaskAction -Execute '{exePath}' -Argument 'eye tick'
-$trigger  = New-ScheduledTaskTrigger -Once -At '{fireLocal}'
-$settings = New-ScheduledTaskSettingsSet `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 2) `
-    -MultipleInstances IgnoreNew `
-    -Hidden `
-    -StartWhenAvailable $true `
-    -DeleteExpiredTaskAfter (New-TimeSpan -Seconds 30)
-Register-ScheduledTask -TaskName '{TaskName}' -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
-""";
-
-        RunPowerShell(ps, out var exitCode);
-        Console.WriteLine(exitCode == 0
-            ? $"[RETRY] Scheduled one-shot: {fireLocal} ({TaskName})"
-            : $"[RETRY] Task register exit={exitCode} (non-fatal)");
-    }
-
-    static void DeleteScheduledTask()
-    {
-        var ps = $"Unregister-ScheduledTask -TaskName '{TaskName}' -Confirm:$false -ErrorAction SilentlyContinue";
-        RunPowerShell(ps, out _);
-    }
-
     static void RunPowerShell(string script, out int exitCode)
     {
         exitCode = -1;
         try
         {
-            // Escape double-quotes inside the -Command argument
             var escaped = script.Replace("\"", "\\\"");
             var psi = new ProcessStartInfo
             {
@@ -231,20 +232,19 @@ Register-ScheduledTask -TaskName '{TaskName}' -Action $action -Trigger $trigger 
     /// <summary>
     /// Checks if Eye is alive via CmdPipe. If not, spawns it as a detached background process.
     /// </summary>
-    static void EnsureEyeRunning()
+    public static void EnsureEyeRunning()
     {
-        if (Program.RunningInEye) return; // we ARE Eye — no need to spawn
+        if (Program.RunningInEye) return;
 
         try
         {
             using var pipe = new NamedPipeClientStream(".", EyeCmdPipeServer.PipeName,
                 PipeDirection.InOut, PipeOptions.None);
             pipe.Connect(150);
-            return; // Eye is alive
+            return; // alive
         }
-        catch { } // timeout → Eye is not running
+        catch { }
 
-        // Eye is down — spawn it
         var exePath = Environment.ProcessPath;
         if (string.IsNullOrEmpty(exePath)) return;
 
