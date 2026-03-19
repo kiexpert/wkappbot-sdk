@@ -2019,6 +2019,7 @@ internal partial class Program
 
             // 2. Owned popup/dialog windows (other top-levels whose owner = hWnd)
             var popups = new List<IntPtr>();
+            WkStep.Call("popup-enum-start");
             NativeMethods.EnumWindows((h, _) =>
             {
                 if (h == hWnd) return true;
@@ -2028,6 +2029,7 @@ internal partial class Program
                     popups.Add(h);
                 return true;
             }, IntPtr.Zero);
+            WkStep.Call("popup-enum-done");
 
             foreach (var popup in popups)
             {
@@ -2122,8 +2124,10 @@ internal partial class Program
         int totalCount = 0;
         int uiaMatchWindows = 0;
 
+        WkStep.Call("focus-snapshot");
         // ── Hot Focus Line: focused child → parent → ... → top-level ──
         PrintHotFocusLine(fgWnd, focus, GetProcessName);
+        WkStep.Call("hot-focus-line-done");
 
         // EnumWindows enumerates in Z-order (front to back) — no re-sort needed!
         bool hasPathSearch = filterTitle != null && (filterTitle.Contains('/') || filterTitle.Contains("**"));
@@ -2265,6 +2269,7 @@ internal partial class Program
             return new Regex(rxStr, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         }
 
+        WkStep.Call("enum-windows-start");
         NativeMethods.EnumWindows((hWnd, _) =>
         {
             if (IsPipeBroken()) return false;
@@ -2408,6 +2413,7 @@ internal partial class Program
 
             return !(limit > 0 && totalCount >= limit);
         }, IntPtr.Zero);
+        WkStep.Done("enum-windows-done");
 
         Console.WriteLine();
         string uiaNote = uiaSearch ? $", UIA matched in {uiaMatchWindows} window(s)" : "";

@@ -159,7 +159,12 @@ class Program
             if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code))
             {
                 prof("Eye pipe: delegated");
-                return code;
+                // TerminateSelf: avoid 27s CLR/ConPTY handle cleanup delay that keeps bash waiting.
+                // All output is already flushed by TryDelegate; hard-kill Launcher immediately.
+                Console.Out.Flush();
+                Console.Error.Flush();
+                TerminateSelf((uint)code);
+                return code; // unreachable
             }
             prof("Eye pipe: unavailable, falling back to Core");
 
@@ -815,7 +820,13 @@ class Program
 
             _lDiagStep = $"proc-exited(code={proc.ExitCode})";
             Prof($"proc exited code={proc.ExitCode}");
-            return proc.ExitCode;
+            int coreExitCode = proc.ExitCode;
+            Console.Out.Flush();
+            Console.Error.Flush();
+            // TerminateSelf: avoid 27s CLR/ConPTY handle cleanup delay after Core exits.
+            // Core's output is already written (inherited handles); hard-kill Launcher immediately.
+            TerminateSelf((uint)coreExitCode);
+            return coreExitCode; // unreachable
         }
         catch (Exception ex)
         {
