@@ -460,14 +460,22 @@ internal partial class Program
                             if (claudeStatus.Item1 == "permission_prompt")
                                 goto skipStatusStreaming;
 
-                            string slackText;
+                            string slackText = "";
+                            bool wasIdle = false;
                             if (claudeStatus.Item1 == "prompt_ready")
                             {
                                 // VS Code: UIA-confirmed idle → post :zzz: message directly (no spinner)
                                 if (isVsCode && !state.IdleMessageSent
                                     && state.LastSlackStatusText?.Contains(":zzz:") != true)
                                 {
-                                    var idleSuffix = state.LastExecutingText != null ? $" after: {state.LastExecutingText}" : "";
+                                    // Extract last status text as idle suffix (fallback to LastSlackStatusText)
+                                    string? idleHint = state.LastExecutingText;
+                                    if (idleHint == null && state.LastSlackStatusText != null)
+                                    {
+                                        var idx = state.LastSlackStatusText.IndexOf("Claude: ", StringComparison.Ordinal);
+                                        if (idx >= 0) idleHint = state.LastSlackStatusText[(idx + 8)..];
+                                    }
+                                    var idleSuffix = !string.IsNullOrEmpty(idleHint) ? $" after: {idleHint}" : "";
                                     var idleMsg = $":zzz: {slackLabel}Idle{idleSuffix}";
                                     var instUser2 = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
                                     Task.Run(async () => await PostOrUpdateAiStatusAsync(
@@ -485,18 +493,20 @@ internal partial class Program
                             else
                             {
                                 // Active: only reset idle if spinner is animating again (VS Code: UIA-confirmed)
+                                wasIdle = state.IdleMessageSent;
                                 if (state.IdleMessageSent)
                                 {
                                     if (!isVsCode && DetectSpinnerIdle(hwnd, state)) goto skipStatusStreaming;
                                     // Spinner animating again (or VS Code executing) → activity resumed
                                     if (!isVsCode) ResetSpinnerDetection(state);
                                     state.IdleAfterText = null;
+                                    Console.WriteLine($"[EYE] {label}Idle badge cleared — activity detected");
                                 }
                                 state.IdleMessageSent = false;
                                 state.IdleStartedAt = null;
                                 var statusEmoji = claudeStatus.Item1 switch
                                 {
-                                    "executing" => ":gear:",
+                                    "executing" => ":runner:",
                                     "plan_approval_pending" => ":clipboard:",
                                     "plan_mode" => ":memo:",
                                     "rate_limit" => ":warning:",
@@ -505,20 +515,27 @@ internal partial class Program
                                 slackText = $"{statusEmoji} {slackLabel}Claude: {claudeStatus.Item2}";
                             }
 
-                            // File-size watermark: only stream if JSONL has grown since last successful post/edit
+                            // File-size watermark: only stream if JSONL has grown since last successful post/edit.
+                            // Exception: idle→active transition bypasses watermark to remove idle badge immediately.
                             var (_, _, _, curJsonlSize) = GetContextInfoForCwdEx(state.FullCwd);
-                            if (!state.JsonlSizeInitialized && curJsonlSize > 0)
+                            if (wasIdle)
                             {
-                                state.LastPostedJsonlSize = curJsonlSize;
-                                state.JsonlSizeInitialized = true;
-                                goto skipStatusStreaming;
+                                state.LastPostedJsonlSize = curJsonlSize; // advance watermark (avoid double-post next tick)
                             }
-                            if (curJsonlSize > 0 && curJsonlSize <= state.LastPostedJsonlSize) goto skipStatusStreaming;
+                            else
+                            {
+                                if (!state.JsonlSizeInitialized && curJsonlSize > 0)
+                                {
+                                    state.LastPostedJsonlSize = curJsonlSize;
+                                    state.JsonlSizeInitialized = true;
+                                    goto skipStatusStreaming;
+                                }
+                                if (curJsonlSize > 0 && curJsonlSize <= state.LastPostedJsonlSize) goto skipStatusStreaming;
+                            }
 
                             // Streaming dedup: skip if last Slack update was < 1s ago (prevents API spam on rapid JSONL changes)
                             if ((DateTime.UtcNow - state.LastSlackStreamAt).TotalSeconds < 1.0) goto skipStatusStreaming;
                             state.LastSlackStreamAt = DateTime.UtcNow;
-
 
                             {
                                 var instanceUsername = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
@@ -550,7 +567,13 @@ internal partial class Program
                                             state.IdleAfterText = state.LastExecutingText;
                                         state.LastExecutingText = null;
                                     }
-                                    var idleSuffix = state.IdleAfterText != null ? $" after: {state.IdleAfterText}" : "";
+                                    // Fallback: extract text from last Slack status if no executing hint available
+                                    if (state.IdleAfterText == null && state.LastSlackStatusText != null)
+                                    {
+                                        var cidx = state.LastSlackStatusText.IndexOf("Claude: ", StringComparison.Ordinal);
+                                        if (cidx >= 0) state.IdleAfterText = state.LastSlackStatusText[(cidx + 8)..];
+                                    }
+                                    var idleSuffix = !string.IsNullOrEmpty(state.IdleAfterText) ? $" after: {state.IdleAfterText}" : "";
                                     var idleMsg = $":zzz: {slackLabel}Idle{idleSuffix}";
 
                                     var instanceUsername2 = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
@@ -828,7 +851,10 @@ internal partial class Program
         }
 
         // ── Step 2: Edit in place if we are the latest (and no replies on our message) ──────
-        if (latestIsOurs && !hasReplies)
+        // EXCEPTION: idle↔active transition → always delete old + post new (shows exact transition time).
+        bool isIdleTransition = state.LastStatusType != null && state.LastStatusType != statusType
+                                && (statusType == "idle" || state.LastStatusType == "idle");
+        if (latestIsOurs && !hasReplies && !isIdleTransition)
         {
             var (ok, _, editError) = await SlackUpdateMessageAsync(slackBotToken, slackChannel, state.SlackStatusTs!, slackText);
             if (ok)
@@ -847,13 +873,7 @@ internal partial class Program
             return;
         }
 
-        // ── Step 3: Not latest (someone else posted after us) → delete old + post new ──────
-        // Idle: skip new post (don't push idle to bottom when not latest)
-        if (statusType == "idle")
-        {
-            Console.WriteLine($"[EYE] Skip new-post (idle, not latest): {slackText[..Math.Min(slackText.Length, 80)]}");
-            return;
-        }
+        // ── Step 3: Not latest (or idle↔active transition) → delete old + post new ──────
 
         // Delete our previous status (unless it has replies — never destroy a thread)
         if (state.SlackStatusTs != null && !hasReplies)

@@ -904,7 +904,31 @@ internal partial class Program
                     Arguments = argsStr,
                     UseShellExecute = false, // inherit admin token from parent
                 };
-                Process.Start(psi);
+                var newProc = Process.Start(psi);
+                if (newProc != null)
+                {
+                    // Wait for new Eye's window to appear (pipe server is up by then) before closing old Eye.
+                    // Both old+new Eye can listen on the same named pipe (MaxAllowedServerInstances) — no gap.
+                    Console.WriteLine($"[EYE:HOT-SWAP] New Eye PID={newProc.Id} — waiting for window...");
+                    var hsw = System.Diagnostics.Stopwatch.StartNew();
+                    var warnAt = 9.0;
+                    while (true)
+                    {
+                        newProc.Refresh();
+                        if (newProc.HasExited || newProc.Responding) break;
+                        if (hsw.Elapsed.TotalSeconds >= warnAt)
+                        {
+                            Console.WriteLine($"[EYE:HOT-SWAP] still waiting for new Eye message loop... ({warnAt:F0}s)");
+                            warnAt += 9.0;
+                        }
+                        Thread.Sleep(200);
+                    }
+                    Console.WriteLine($"[EYE:HOT-SWAP] New Eye responding ({hsw.Elapsed.TotalMilliseconds:F0}ms) — hiding old Eye window");
+                    TryHideConsoleWindow(); // hide immediately so new Eye window is unobscured
+                    Console.WriteLine("[EYE:HOT-SWAP] Draining active pipe connections...");
+                    EyeCmdPipeServer.StopAcceptingAndWaitForDrain();
+                    Console.WriteLine("[EYE:HOT-SWAP] Pipe drain complete — old Eye exiting");
+                }
             }
             catch (Exception ex)
             {

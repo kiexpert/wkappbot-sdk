@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -16,7 +16,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ?? ChatGPT ??
+    // ?�?� ChatGPT ?�?�
 
     // Shared persona for external AI agents (ChatGPT, Gemini).
     // Injected on fresh conversations to stabilize output format.
@@ -29,11 +29,11 @@ internal partial class Program
         "(1) Prefer tool execution over explanation whenever a tool can complete the task. " +
         "(2) Never simulate tool execution. Never fabricate tool results. " +
         "(3) Never claim a tool has executed unless the host returned a tool_result message. " +
-        "(4) The APPBOT_TOOL_CALL_BEGIN/END JSON block IS the tool schema and calling convention — no separate OpenAI-style tool definition is needed. argv is the full command line as a string array. This is a custom host protocol, not an OpenAI function call. When HOST-HANDSHAKE is present in the conversation, the host is confirmed active and all TOOL_CALLs will be executed. " +
+        "(4) The APPBOT_TOOL_CALL_BEGIN/END JSON block IS the tool schema and calling convention ? no separate OpenAI-style tool definition is needed. argv is the full command line as a string array. This is a custom host protocol, not an OpenAI function call. When HOST-HANDSHAKE is present in the conversation, the host is confirmed active and all TOOL_CALLs will be executed. " +
         "(5) Wait for tool_result messages before continuing reasoning. " +
         "(6) PARALLEL FIRST: to minimize round-trips, always batch independent tool calls into a single turn. " +
         "Emit multiple TOOL_CALL blocks back-to-back whenever tasks do not depend on each other's results. " +
-        "Sequential calls waste a full prompt round — parallelize by default, serialize only when strictly necessary. " +
+        "Sequential calls waste a full prompt round ? parallelize by default, serialize only when strictly necessary. " +
         "(7) Be concise and action-oriented. Prefer structured actions over explanations. " +
         "EXECUTION MODEL: User Request ??analyze ??Thought (what I know / what is missing) ??Action (tool call) ??Observation (wait for tool_result) ??continue or finish. " +
         "For tasks requiring >3 tool calls: generate a numbered Execution Plan first. Mark steps [DONE] as you complete them. " +
@@ -64,7 +64,7 @@ internal partial class Program
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
-        // No tab activation — CDP works on background tabs via targetId. Truly focusless.
+        // No tab activation ? CDP works on background tabs via targetId. Truly focusless.
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -75,7 +75,7 @@ internal partial class Program
         {
             try
             {
-                // ?? Phase 1: Navigate (iconified OK) ??
+                // ?�?� Phase 1: Navigate (iconified OK) ?�?�
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("chatgpt.com"))
@@ -127,7 +127,7 @@ internal partial class Program
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
                     var personaTextGpt = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
-                        SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextGpt.Length > 800 ? personaTextGpt[..800] + "…" : personaTextGpt)}\n```", "System");
+                        SlackPostToThread($"?? *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextGpt.Length > 800 ? personaTextGpt[..800] + "..." : personaTextGpt)}\n```", "System");
                     var (personaOk, personaResp) = await ChatGptSendAndWait(
                         cdp, personaTextGpt, timeoutSec: 20);
                     if (!personaOk)
@@ -167,10 +167,10 @@ internal partial class Program
                     if (ok && !string.IsNullOrWhiteSpace(answer))
                     {
                         var gptSlack = NormalizeBlankLines(answer);
-                        SlackPostToThread(gptSlack.Length > 2000 ? gptSlack[..2000] + "…" : gptSlack, "ChatGPT");
+                        SlackPostToThread(gptSlack.Length > 2000 ? gptSlack[..2000] + "..." : gptSlack, "ChatGPT");
                     }
                     else
-                        SlackPostToThread("❌ _응답 실패_ (timeout 또는 이미지 응답)", "ChatGPT");
+                         SlackPostToThread("[timeout or image failed]", "ChatGPT");
                 }
 
                 // Log initial answer to shared triad context (for recovery by other AIs if needed)
@@ -271,9 +271,9 @@ internal partial class Program
                          && (t?["type"]?.GetValue<string>() ?? "") == "page")
                 .ToList();
 
-            if (matching.Count <= 1) return; // ?섎굹硫?臾몄젣?놁쓬
+             if (matching.Count <= 1) return; // no issue
 
-            // registry????λ맂 ??씠 ?놁쑝硫?嫄대뱶由ъ? ?딆쓬 (?⑥쓽 ?몄뀡 ??蹂댄샇)
+            // registry???�?�된 ??�� ?�으�?건드리�? ?�음 (?�의 ?�션 ??보호)
             if (string.IsNullOrEmpty(keepTargetId)) return;
 
             var keepId = keepTargetId;
@@ -325,7 +325,7 @@ internal partial class Program
                 var esc = sel.Replace("\\", "\\\\").Replace("\"", "\\\"");
                 var found = await cdp.EvalAsync(
                     $"document.querySelector(\"{esc}\") ? 'yes' : 'no'");
-                if (found == "yes") { Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s → {sel}"); return sel; }
+                if (found == "yes") { Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s -> {sel}"); return sel; }
             }
             if (attempt % 2 == 0) { Console.Write("."); Console.Out.Flush(); }
             await Task.Delay(500);
@@ -364,31 +364,31 @@ internal partial class Program
     static async Task<(bool ok, string? text)> ChatGptSendAndWait(
         CdpClient cdp, string message, int timeoutSec, List<string>? attachFiles = null, bool returnAfterSend = false)
     {
-        // ?? Phase 0: URL check + turn count (iconified OK) ??
+        // ?�?� Phase 0: URL check + turn count (iconified OK) ?�?�
         var currentUrl = await cdp.EvalAsync("location.href") ?? "";
         if (!currentUrl.Contains("chatgpt.com", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"[ASK:LOOP] GPT tab drifted to {currentUrl[..Math.Min(80, currentUrl.Length)]} — navigating back to chatgpt.com");
+            Console.WriteLine($"[ASK:LOOP] GPT tab drifted to {currentUrl[..Math.Min(80, currentUrl.Length)]} ? navigating back to chatgpt.com");
             await cdp.NavigateAsync("https://chatgpt.com/");
             await Task.Delay(3000);
             currentUrl = await cdp.EvalAsync("location.href") ?? "";
         }
-        // prevTurns captured just before send (after lock) — avoids lazy-DOM false positives
+        // prevTurns captured just before send (after lock) ? avoids lazy-DOM false positives
         int prevTurns = 0;
         string prevLastFingerprint = string.Empty;
 
         // NOTE: BringToFront removed ??steals OS focus. CDP works on background tabs.
 
-        // ?? A11y-first: find editor via selector chain ??
+        // ?�?� A11y-first: find editor via selector chain ?�?�
         var editorSel = await WaitForChatGptEditorA11y(cdp);
         if (editorSel == null)
             return (false, null);
 
-        // ?? Browser exclusive zone: prompt input ??first response turn ??
+        // ?�?� Browser exclusive zone: prompt input ??first response turn ?�?�
         using var chatLock = ChromeTabLock.Acquire("ChatGPT");
         if (chatLock == null) return (false, null);
 
-        // Capture stable baseline AFTER lock — DOM fully settled, no stale prior-session answer.
+        // Capture stable baseline AFTER lock ? DOM fully settled, no stale prior-session answer.
         // Fixes: WKAppBot reading an old unread GPT reply as the new response (off-by-1 DOM timing).
         prevTurns = await CountChatGptTurns(cdp);
         prevLastFingerprint = await cdp.EvalAsync(
@@ -396,10 +396,10 @@ internal partial class Program
             " return els.length > 0 ? (els[els.length-1].textContent?.substring(0,80) ?? '') : ''; })()") ?? string.Empty;
         Console.WriteLine($"[ASK] Pre-send baseline: turns={prevTurns} tail=[{prevLastFingerprint[..Math.Min(50, prevLastFingerprint.Length)]}]");
 
-        // ?? CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ??
+        // ?�?� CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ?�?�
         var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "ChatGPT");
 
-        // ?? File attachments (before text) ??
+        // ?�?� File attachments (before text) ?�?�
         if (attachFiles?.Count > 0)
             await AttachFilesViaCdp(cdp, attachFiles, editorSel);
 
@@ -422,7 +422,7 @@ internal partial class Program
             }
 
         }
-        // ?? Send: JS click ??verify ??CDP Enter fallback ??
+        // ?�?� Send: JS click ??verify ??CDP Enter fallback ?�?�
         // With file attachments, wait for send button to become enabled
         if (attachFiles?.Count > 0)
         {
@@ -431,7 +431,7 @@ internal partial class Program
                 var btnState = await cdp.EvalAsync("""
                     (() => {
                         var btn = document.querySelector('button[data-testid="send-button"]')
-                               || document.querySelector('button[aria-label*="蹂대궡湲?]')
+                               || document.querySelector('button[aria-label*="보내�?]')
                                || document.querySelector('button[aria-label*="Send"]');
                         return btn ? (btn.disabled ? 'DISABLED' : 'ENABLED') : 'NOT_FOUND';
                     })()
@@ -443,7 +443,7 @@ internal partial class Program
         }
         await Task.Delay(500);
 
-        // Stop button visible = previous response still streaming → wait before sending
+        // Stop button visible = previous response still streaming �� wait before sending
         if (!await WaitWhileStopButtonVisible(cdp, maxWaitMs: 60000))
             return (false, null);
 
@@ -457,7 +457,7 @@ internal partial class Program
         var jsClick = await cdp.EvalAsync("""
             (() => {
                 var btn = document.querySelector('button[data-testid="send-button"]')
-                       || document.querySelector('button[aria-label*="蹂대궡湲?]')
+                       || document.querySelector('button[aria-label*="보내�?]')
                        || document.querySelector('button[aria-label*="Send"]');
                 if (!btn || btn.disabled) return 'NO_BTN';
                 btn.click();
@@ -597,7 +597,7 @@ internal partial class Program
             return (false, null);
         }
 
-        // ?? Poll Phase 1: wait for streaming/thinking to finish (iconified ??no rendering needed) ??
+        // ?�?� Poll Phase 1: wait for streaming/thinking to finish (iconified ??no rendering needed) ?�?�
         // Live flush: print new text as it arrives during streaming
         int streamExtensions = 0;
         int blankPageCount = 0;
@@ -619,7 +619,7 @@ internal partial class Program
                         return JSON.stringify({s:'BLANK',len:0,delta:''});
                     var stop = document.querySelector('button[data-testid="stop-button"]')
                             || document.querySelector('button[aria-label="Stop streaming"]')
-                            || document.querySelector('button[aria-label="?ㅽ듃由щ컢 以묒?"]');
+                            || document.querySelector('button[aria-label="?�트리밍 중�?"]');
                     var thinking = !!document.querySelector('.result-thinking');
                     // Detect DALL-E image generation in progress (spinner/progress within assistant message)
                     var lastAssist = document.querySelector('[data-message-author-role="assistant"]:last-of-type')
@@ -667,7 +667,7 @@ internal partial class Program
                 if (!liveHeaderPrinted)
                 {
                     Console.WriteLine();
-                    Console.WriteLine("?? ChatGPT (streaming) ??");
+                     Console.WriteLine("[ChatGPT] streaming...");
                     liveHeaderPrinted = true;
                 }
                 Console.Write(delta);
@@ -676,13 +676,13 @@ internal partial class Program
                 lastFlushTime = DateTime.UtcNow;
             }
 
-            // Early-exit: flush stopped for 1s and we have text → treat as DONE (don't wait for stop button)
+            // Early-exit: flush stopped for 1s and we have text �� treat as DONE (don't wait for stop button)
             bool isThinkingState = state == "THINKING" || state == "THINKING_HAS_TEXT";
             if (lastFlushedLen > 50 && state != "DONE" && state != "IMG_GEN"
                 && !isThinkingState && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 1.0)
             {
                 if (liveHeaderPrinted) Console.WriteLine();
-                Console.WriteLine($"[ASK] Flush idle 1s → early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                Console.WriteLine($"[ASK] Flush idle 1s -- early done ({sw.Elapsed.TotalSeconds:F0}s)");
                 break;
             }
 
@@ -696,7 +696,7 @@ internal partial class Program
                 if (!liveHeaderPrinted)
                 {
                     Console.WriteLine();
-                    Console.WriteLine("?? ChatGPT (streaming) ??");
+                     Console.WriteLine("[ChatGPT] streaming...");
                     liveHeaderPrinted = true;
                 }
                 Console.Write(".");
@@ -707,7 +707,7 @@ internal partial class Program
             if (state == "DONE" || state == "DONE_EMPTY")
             {
                 // If very little text and early in stream, wait a bit more
-                // (ChatGPT shows "?대?吏 遺꾩꽍 以? then goes idle briefly before actual response)
+                // (ChatGPT shows "?��?지 분석 �? then goes idle briefly before actual response)
                 if (textLen < 50 && sw.Elapsed.TotalSeconds < 60)
                 {
                     if (textLen > 0) Console.Write(".");
@@ -724,7 +724,7 @@ internal partial class Program
                 break;
             }
 
-            // Blank/broken page detection — ChatGPT navigates to /c/UUID after first message,
+            // Blank/broken page detection ? ChatGPT navigates to /c/UUID after first message,
             // causing brief BLANK during page load. Tolerate more blanks early on (navigation window).
             if (state == "BLANK" || string.IsNullOrEmpty(state))
             {
@@ -733,7 +733,7 @@ internal partial class Program
                 Console.WriteLine($"[ASK] Page blank/navigating ({blankPageCount}/{blankLimit}), {sw.Elapsed.TotalSeconds:F0}s");
                 if (blankPageCount >= blankLimit)
                 {
-                    Console.WriteLine("[ASK] Page unresponsive — aborting poll");
+                    Console.WriteLine("[ASK] Page unresponsive ? aborting poll");
                     break;
                 }
                 continue;
@@ -773,14 +773,14 @@ internal partial class Program
             {
                 streamExtensions++;
                 Console.WriteLine($"[ASK] Still {(isThinking ? "thinking" : "streaming")}, extending timeout... (ext #{streamExtensions})");
-                // ext #1: window may be hidden/minimized → restore + bring to front
+                // ext #1: window may be hidden/minimized �� restore + bring to front
                 if (streamExtensions == 1)
                     await TryRecoverChatGptTabAsync(cdp, $"thinking ext#{streamExtensions}");
                 sw.Restart();
             }
         }
 
-        // ?? Poll Phase 2: text extraction ??
+        // ?�?� Poll Phase 2: text extraction ?�?�
         // NOTE: BringToFront removed ??innerText works on background tabs too.
         await Task.Delay(300);
 
@@ -842,7 +842,7 @@ internal partial class Program
             // Done ??hand off tab to peer if still waiting
             await HandoffTabToPeer("chatgpt");
 
-            // ?? Final answer ready: focusless restore to show answer to user ??
+            // ?�?� Final answer ready: focusless restore to show answer to user ?�?�
             ShowChromeAnswer(cdp);
 
             return (true, finalText);
@@ -852,9 +852,9 @@ internal partial class Program
     }
 
     /// <summary>
-    /// 理쒖쥌 ?듬? ?쒖떆: Chrome???ъ빱?ㅻ━??由ъ뒪?좎뼱?섏뿬 ?ъ슜?먯뿉寃??듬? ?섏씠吏瑜?蹂댁뿬以??
-    /// ask ?뚮줈???꾩껜???꾩씠肄섑솕 ?곹깭濡?吏꾪뻾 (CDP??誘몃땲留덉씠利덉뿉???뺤긽 ?숈옉).
-    /// 理쒖쥌 ?듬? 異붿텧 ?꾩뿉留??몄텧?섏뿬 寃곌낵瑜??쒓컖?곸쑝濡??뺤씤?????덇쾶 ?쒕떎.
+    /// 최종 ?��? ?�시: Chrome???�커?�리??리스?�어?�여 ?�용?�에�??��? ?�이지�?보여준??
+    /// ask ?�로???�체???�이콘화 ?�태�?진행 (CDP??미니마이즈에???�상 ?�작).
+    /// 최종 ?��? 추출 ?�에�??�출?�여 결과�??�각?�으�??�인?????�게 ?�다.
     /// </summary>
     static void ShowChromeAnswer(CdpClient cdp)
     {
@@ -873,18 +873,18 @@ internal partial class Program
 
     static async Task TryRecoverChatGptTabAsync(CdpClient cdp, string reason)
     {
-        Console.WriteLine($"[ASK] Recovery: {reason} → SW_SHOWNOACTIVATE (focusless restore)");
+        Console.WriteLine($"[ASK] Recovery: {reason} -> SW_SHOWNOACTIVATE (focusless restore)");
         ShowChromeAnswer(cdp);
         cdp.RestoreChromeNoActivate();
         await cdp.EmulateActiveTabAsync(); // unthrottle renderer
         await Task.Delay(200);
     }
 
-    // ?? UIA Send Button ??
+    // ?�?� UIA Send Button ?�?�
     // Tier 2 fallback: find and invoke the send button via UIA (completely focusless).
     // Searches Chrome/ChatGPT windows for buttons matching send-related names.
     static readonly string[] SendButtonNames = ["Send message", "Send", "Submit"];
-    static readonly string[] StopButtonKeywords = ["Stop", "중지", "스트리밍 중지"];
+    static readonly string[] StopButtonKeywords = ["Stop", "����", "��Ʈ���� ����"];
 
     static async Task<bool> WaitWhileStopButtonVisible(CdpClient cdp, int maxWaitMs = 12000)
     {
@@ -896,7 +896,7 @@ internal partial class Program
                 (() => {
                     var stop = document.querySelector('button[data-testid="stop-button"]')
                             || document.querySelector('button[aria-label*="Stop"]')
-                            || document.querySelector('button[aria-label*="중지"]');
+                            || document.querySelector('button[aria-label*="����"]');
                     return stop ? '1' : '0';
                 })()
                 """) ?? "0";
@@ -912,13 +912,13 @@ internal partial class Program
         }
 
         Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
-        // Timed out — click stop to cancel ongoing generation, then wait briefly and proceed
-        Console.WriteLine("[ASK] GPT stop still visible — clicking stop to cancel generation...");
+        // Timed out ? click stop to cancel ongoing generation, then wait briefly and proceed
+        Console.WriteLine("[ASK] GPT stop still visible ? clicking stop to cancel generation...");
         await cdp.EvalAsync("""
             (() => {
                 var btn = document.querySelector('button[data-testid="stop-button"]')
                        || document.querySelector('button[aria-label*="Stop"]')
-                       || document.querySelector('button[aria-label*="중지"]');
+                       || document.querySelector('button[aria-label*="����"]');
                 if (btn) btn.click();
             })()
             """);
@@ -969,7 +969,7 @@ internal partial class Program
         return false;
     }
 
-    // ?? Tab Handoff: disabled ??
+    // ?�?� Tab Handoff: disabled ?�?�
     // BringToFront actually steals OS focus (not just Chrome-internal).
     // CDP eval/insertText work fine on background tabs, so handoff is unnecessary.
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string, CdpClient> _waitingTabs = new();
@@ -996,10 +996,10 @@ internal partial class Program
     /// </summary>
     static Task HandoffTabToPeer(string myName) => Task.CompletedTask;
 
-    // ?? Chrome Tab Lock ??
+    // ?�?� Chrome Tab Lock ?�?�
     // Per-AI tab lock: each AI provider (gemini, gpt, claude) gets its own semaphore.
-    // This allows Gemini, GPT, and Claude to send/receive in parallel — different tabs,
-    // different CDP connections — no shared browser resource that needs serialization.
+    // This allows Gemini, GPT, and Claude to send/receive in parallel ? different tabs,
+    // different CDP connections ? no shared browser resource that needs serialization.
     // Only operations on the SAME AI tab are serialized (send vs concurrent send).
     // Acquired before prompt input, auto-released after 9s or when first byte arrives.
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim>
@@ -1007,7 +1007,7 @@ internal partial class Program
 
     static SemaphoreSlim GetTabSemaphore(string aiName)
     {
-        // Normalize key: "Gemini/persona" → "gemini", "Claude" → "claude", "ChatGPT" → "chatgpt"
+        // Normalize key: "Gemini/persona" �� "gemini", "Claude" �� "claude", "ChatGPT" �� "chatgpt"
         var key = aiName.Split('/')[0].ToLowerInvariant();
         return _tabSemaphores.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
     }
@@ -1023,7 +1023,7 @@ internal partial class Program
         {
             _aiName = aiName;
             _sem = sem;
-            // Auto-release after 60 seconds (safety net — prevents deadlock)
+            // Auto-release after 60 seconds (safety net ? prevents deadlock)
             // NOTE: must be > approval popup timeout (30s) + input time
             _autoRelease = new Timer(_ => Release("auto-60s"), null, 60000, Timeout.Infinite);
         }

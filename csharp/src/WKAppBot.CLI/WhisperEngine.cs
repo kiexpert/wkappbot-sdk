@@ -195,6 +195,17 @@ internal sealed class WhisperEngine : IDisposable
 
     private void AnalysisLoop()
     {
+        // Outer guard: any unhandled exception here would terminate the process (background thread).
+        // Inner try/catch handles per-frame exceptions; this catches anything that slips through.
+        try { AnalysisLoopCore(); }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WHISPER:FATAL] AnalysisLoop unhandled — Eye continues without audio analysis: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private void AnalysisLoopCore()
+    {
         var fftBuffer = new Complex[FftSize];   // mono (backward compat pipeline)
         var fftL = new Complex[FftSize];        // stereo left
         var fftR = new Complex[FftSize];        // stereo right

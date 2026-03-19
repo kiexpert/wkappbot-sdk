@@ -37,13 +37,41 @@ internal static class EyeCmdPipeServer
     /// </summary>
     public static volatile string[]? CurrentCommandGlobal;
 
+    private static readonly CancellationTokenSource _acceptCts = new();
+    private static int _activeConnections = 0;
+
     public static void StartServer() => Task.Run(ServerLoop);
+
+    /// <summary>
+    /// Stop accepting new pipe connections and wait for all in-progress commands to finish.
+    /// Called during hot-swap after new Eye is confirmed responsive.
+    /// Logs a warning every 9s; hard-caps at 5 minutes.
+    /// </summary>
+    public static void StopAcceptingAndWaitForDrain()
+    {
+        _acceptCts.Cancel(); // unblocks WaitForConnectionAsync in ServerLoop
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var warnAt = 9.0;
+        while (Volatile.Read(ref _activeConnections) > 0)
+        {
+            if (sw.Elapsed.TotalSeconds >= warnAt)
+            {
+                int n = Volatile.Read(ref _activeConnections);
+                Console.WriteLine($"[EYE:HOT-SWAP] waiting for {n} active pipe service(s)... ({warnAt:F0}s)");
+                warnAt += 9.0;
+            }
+            if (sw.Elapsed.TotalMinutes >= 5) break; // 5 min hard cap
+            Thread.Sleep(200);
+        }
+    }
 
     /// <summary>
     /// Fire-and-forget: run args in background via the same in-process routing as __bg pipe commands.
     /// Output is isolated to a per-invocation log file (not mixed into Eye console).
+    /// callerHwnd: explicitly set CallerHwnd (use a fixed sentinel for non-pipe callers such as HoverAnalyzer
+    ///             so tab sandbox keys are deterministic — pass null to clear it).
     /// </summary>
-    internal static void DispatchBg(string[] args)
+    internal static void DispatchBg(string[] args, IntPtr? callerHwnd = null)
     {
         var logDir = Path.Combine(Program.DataDir, "logs");
         Directory.CreateDirectory(logDir);
@@ -54,6 +82,7 @@ internal static class EyeCmdPipeServer
         _ = Task.Run(() =>
         {
             CallerCwd.Value = null;
+            CallerHwnd.Value = callerHwnd; // explicit — never inherit parent AsyncLocal value
             CallerArgs.Value = args;
             CurrentCommandGlobal = args;
             Program.RunningInEye = true;
@@ -69,7 +98,8 @@ internal static class EyeCmdPipeServer
     static async Task ServerLoop()
     {
         Console.WriteLine("[EYE] CmdPipe server started — delegated commands run in-process (parallel)");
-        while (true)
+        var ct = _acceptCts.Token;
+        while (!ct.IsCancellationRequested)
         {
             try
             {
@@ -77,15 +107,20 @@ internal static class EyeCmdPipeServer
                     PipeName, PipeDirection.InOut,
                     NamedPipeServerStream.MaxAllowedServerInstances,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-                await pipe.WaitForConnectionAsync();
+                await pipe.WaitForConnectionAsync(ct);
                 _ = Task.Run(() => HandleClientAsync(pipe));
             }
+            catch (OperationCanceledException) { break; }
             catch { await Task.Delay(1000); }
         }
+        Console.WriteLine("[EYE] CmdPipe server stopped accepting new connections");
     }
 
     static async Task HandleClientAsync(NamedPipeServerStream pipe)
     {
+        Interlocked.Increment(ref _activeConnections);
+        try
+        {
         using (pipe)
         {
             StreamWriter? pw = null;
@@ -138,6 +173,8 @@ internal static class EyeCmdPipeServer
                 Console.WriteLine($"[EYE:PIPE] error: {ex.Message}");
             }
         }
+        }
+        finally { Interlocked.Decrement(ref _activeConnections); }
     }
 
     static int RunInEye(string[] args, TextWriter pipeWriter, string? callerCwd, IntPtr? callerHwnd = null)

@@ -120,7 +120,7 @@ internal partial class Program
     static int AskUsage()
     {
         Console.WriteLine(@"
-WKAppBot Ask ??one-command AI Q&A via WebBot
+WKAppBot Ask - one-command AI Q&A via WebBot
 
 Usage:
   wkappbot ask gemini ""question"" [files...] [--timeout 30] [--new-tab] [--new-session] [--loop [N]] [--max-steps N] [--retry N] [--triad]
@@ -140,22 +140,22 @@ Options:
 
 File attachment:
   Any argument that matches an existing file path is auto-attached.
-  Images (png/jpg/gif/webp/bmp) ??clipboard paste, other files ??file input.
-  Multiple files supported ??attached in order before sending the question.
+  Images (png/jpg/gif/webp/bmp) -> clipboard paste, other files -> file input.
+  Multiple files supported -> attached in order before sending the question.
 
 Examples:
-  wkappbot ask gemini ""?ㅻ뒛 肄붿뒪???뱀쭠二??뚮젮以?""
-  wkappbot ask gpt ""???⑦꽩 遺꾩꽍?댁쨾""
-  wkappbot ask gpt ""??UI 遺꾩꽍?댁쨾"" screenshot.png
-  wkappbot ask gpt ""肄붾뱶 由щ럭?댁쨾"" main.cs test.log
-  wkappbot ask gemini ""???몄뀡?쇰줈 吏덈Ц"" --new-session
+  wkappbot ask gemini latest market summary --new-session
+  wkappbot ask gpt summarize this article
+  wkappbot ask gpt analyze this UI screenshot.png
+  wkappbot ask gpt review this code main.cs test.log
+  wkappbot ask gemini translate to Korean --new-session
 ");
         return 1;
     }
 
     /// <summary>
     /// Run Gemini, GPT, Claude in parallel with per-AI output prefixes ([gemini], [gpt], [claude]).
-    /// Pre-creates a single unified Slack thread before spawning tasks — all three AIs post replies
+    /// Pre-creates a single unified Slack thread before spawning tasks ? all three AIs post replies
     /// to the same thread (AsyncLocal _slackSessionThreadTs inheritance).
     /// If an AI fails, RunTriadAiWithRecovery retries once with context from the other AIs.
     /// </summary>
@@ -163,15 +163,15 @@ Examples:
         bool newSession, bool loopMode, int loopMaxSteps, int loopRetry, int loopMaxParallel,
         string? modelHint, bool noWait)
     {
-        // Triad always starts fresh per-AI — prevents stale session cross-contamination.
+        // Triad always starts fresh per-AI ??prevents stale session cross-contamination.
         var freshSession = true;
         Interlocked.Exchange(ref _slackPersonaPostedFlag, 0); // reset: only first AI posts persona
         Console.WriteLine("[TRIAD] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
 
-        // ── Unified Slack thread ──────────────────────────────────────────────────────────
+        // ?�?� Unified Slack thread ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
         // Set _slackSessionThreadTs.Value BEFORE spawning Task.Run children.
         // AsyncLocal inheritance: each child task sees this value from the moment it starts.
-        // EnsureSlackThread inside each AI is idempotent — returns immediately if already set.
+        // EnsureSlackThread inside each AI is idempotent ??returns immediately if already set.
         {
             var qTrunc = question.Length > 120 ? question[..120] + "..." : question;
             var config = LoadSlackConfig();
@@ -180,7 +180,7 @@ Examples:
             if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
             {
                 var (ok, ts) = SlackSendViaApi(botToken, channel,
-                    $"*[🔱 TRIAD]* {qTrunc}", username: BotUsername).GetAwaiter().GetResult();
+                    $"*[?�� TRIAD]* {qTrunc}", username: BotUsername).GetAwaiter().GetResult();
                 if (ok && ts != null)
                 {
                     _slackSessionThreadTs.Value = ts;
@@ -189,8 +189,8 @@ Examples:
             }
         }
 
-        // ── Shared context for recovery (in-memory + JSONL files) ────────────────────────
-        // Session folder: {DataDir}/triad/{yyyyMMdd_HHmmss} — one folder per triad run.
+        // ?�?� Shared context for recovery (in-memory + JSONL files) ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
+        // Session folder: {DataDir}/triad/{yyyyMMdd_HHmmss} ??one folder per triad run.
         // Each AI writes its steps to {sessionDir}/{ai}.jsonl for crash-safe recovery.
         var sessionId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
         var sessionDir = Path.Combine(DataDir, "triad", sessionId);
@@ -214,15 +214,15 @@ Examples:
         };
         Task.WaitAll(tasks);
         var results = tasks.Select(t => t.Result).ToArray();
-        Console.WriteLine($"[TRIAD] Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+        Console.WriteLine($"[TRIAD] Done ??gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
-        // ── Schedule reminder into caller's Claude Code prompt via `wkappbot prompt send` ──
+        // ?�?� Schedule reminder into caller's Claude Code prompt via `wkappbot prompt send` ?�?�
         // Uses the scheduler (independent process) so TeeTextWriter lifetime is irrelevant.
         var threadTs = _slackSessionThreadTs.Value;
         var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
         var replyCmd = string.IsNullOrEmpty(threadTs) ? "" :
-            $" → 슬랙 쓰레드에 reply: wkappbot slack reply \"종합의견...\" --msg {threadTs}";
-        var promptMsg = $"YOU MUST 위 삼두 답변을 꼼꼼히 읽고 반드시 한국어로 종합 의견을 작성하세요! 각 AI별 핵심 차이점과 본인 의견 포함{replyCmd}";
+            $" ???�랙 ?�레?�에 reply: wkappbot slack reply \"종합?�견...\" --msg {threadTs}";
+        var promptMsg = $"YOU MUST ???�두 ?��???꼼꼼???�고 반드???�국?�로 종합 ?�견???�성?�세?? �?AI�??�심 차이?�과 본인 ?�견 ?�함{replyCmd}";
         try
         {
             var cwdTag = AbbreviateCwd(callerCwd);
@@ -233,13 +233,13 @@ Examples:
                 UseShellExecute = false,
                 CreateNoWindow = true,
             });
-            Console.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) → {cwdTag}");
+            Console.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) ??{cwdTag}");
         }
         catch (Exception ex) { Console.WriteLine($"[TRIAD] Reminder schedule error: {ex.Message}"); }
         if (!string.IsNullOrEmpty(threadTs))
         {
-            var body = $"🔔 *삼두 완료* — 종합의견 리마인더 예약됨 (5s)\n📌 `--msg {threadTs}`";
-            SlackPostToThread(body, "앱봇아이");
+            var body = $"?�� *?�두 ?�료* ??종합?�견 리마?�더 ?�약??(5s)\n?�� `--msg {threadTs}`";
+            SlackPostToThread(body, "?�봇?�이");
         }
 
         return results.Any(r => r == 0) ? 0 : 1; // success if at least one AI answered
@@ -311,7 +311,7 @@ Examples:
     /// <summary>
     /// Set the output line prefix for the current async execution context (e.g. "[gpt] ").
     /// Installs a single AsyncPrefixWriter on Console.Out the first time it is called.
-    /// Each parallel Task.Run context gets its own AsyncLocal value → correct per-AI prefix
+    /// Each parallel Task.Run context gets its own AsyncLocal value ??correct per-AI prefix
     /// even when multiple AIs stream output concurrently.
     /// </summary>
     static IDisposable? ApplyOutputPrefix(string? prefix)
@@ -341,7 +341,7 @@ Examples:
     /// <summary>
     /// Single global Console.Out replacement. Reads AsyncLocal prefix per async execution context.
     /// Buffers per-context line, flushes with prefix atomically when '\n' is seen.
-    /// Parallel Task.Run tasks each have their own AsyncLocal → correct AI label per output line.
+    /// Parallel Task.Run tasks each have their own AsyncLocal ??correct AI label per output line.
     /// </summary>
     sealed class AsyncPrefixWriter(TextWriter sink) : TextWriter
     {
@@ -380,7 +380,7 @@ Examples:
 
     /// <summary>
     /// Build a sandbox key: "{command}+{subcommand}+{hwnd:X8}".
-    /// HWND-based: each prompt window → isolated Chrome tab, guaranteed no cross-contamination.
+    /// HWND-based: each prompt window ??isolated Chrome tab, guaranteed no cross-contamination.
     /// Falls back to cwdHash if HWND not available (direct CLI mode, no Eye).
     /// </summary>
     static string BuildSandboxKey(string command, string subcommand)
@@ -393,27 +393,27 @@ Examples:
     }
 
     /// <summary>
-    /// GetOrCreateSandboxedTab — core sandboxing algorithm:
-    ///   ① Registry hit → validate URL against expectedHost
-    ///       match  → return existing tab (reconnect)
-    ///       mismatch → fast-fail: invalidate registry + create new tab (leave polluted tab for debugging)
-    ///   ② Registry miss → EnsureCorrectWindowAsync (existing positioning logic) → register
+    /// GetOrCreateSandboxedTab ??core sandboxing algorithm:
+    ///   ??Registry hit ??validate URL against expectedHost
+    ///       match  ??return existing tab (reconnect)
+    ///       mismatch ??fast-fail: invalidate registry + create new tab (leave polluted tab for debugging)
+    ///   ??Registry miss ??EnsureCorrectWindowAsync (existing positioning logic) ??register
     /// </summary>
     static async Task<string?> GetOrCreateSandboxedTabAsync(CdpClient cdp, int port, string key, string expectedHost)
     {
         var entry = AskTargetRegistry.GetEntry(key);
         if (entry != null)
         {
-            // Registry hit — validate URL
+            // Registry hit ??validate URL
             var targets = await GetPageTargetsAsync(port);
             var tab = targets.FirstOrDefault(t => t.Id == entry.TargetId);
             if (tab != null)
             {
                 if (tab.Url.Contains(expectedHost, StringComparison.OrdinalIgnoreCase))
                 {
-                    // ✓ URL OK — reconnect to this tab
+                    // ??URL OK ??reconnect to this tab
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"[SANDBOX] ✓ Hit: {key} → {entry.TargetId[..Math.Min(8,entry.TargetId.Length)]}");
+                    Console.WriteLine($"[SANDBOX] ??Hit: {key} ??{entry.TargetId[..Math.Min(8,entry.TargetId.Length)]}");
                     Console.ResetColor();
                     if (cdp.TargetId != entry.TargetId)
                         await cdp.SwitchToTargetAsync(entry.TargetId, port);
@@ -421,16 +421,16 @@ Examples:
                 }
                 else
                 {
-                    // ✗ URL mismatch — fast-fail: invalidate + new tab
+                    // ??URL mismatch ??fast-fail: invalidate + new tab
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[SANDBOX] ✗ Mismatch: {key}");
+                    Console.WriteLine($"[SANDBOX] ??Mismatch: {key}");
                     Console.WriteLine($"[SANDBOX]   expected host: {expectedHost}");
                     Console.WriteLine($"[SANDBOX]   actual url:    {tab.Url[..Math.Min(80, tab.Url.Length)]}");
-                    Console.WriteLine($"[SANDBOX]   → invalidating registry, creating clean tab");
+                    Console.WriteLine($"[SANDBOX]   ??invalidating registry, creating clean tab");
                     Console.ResetColor();
 
                     AskTargetRegistry.RemoveEntry(key);
-                    // Leave polluted tab alive (debugging) — create a new clean tab
+                    // Leave polluted tab alive (debugging) ??create a new clean tab
                     try
                     {
                         var result = await cdp.SendAsync("Target.createTarget",
@@ -441,7 +441,7 @@ Examples:
                             await cdp.SwitchToTargetAsync(newId, port);
                             AskTargetRegistry.SetEntry(key, newId, expectedHost);
                             Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine($"[SANDBOX] ✓ New tab after mismatch: {newId[..Math.Min(8,newId.Length)]}");
+                            Console.WriteLine($"[SANDBOX] ??New tab after mismatch: {newId[..Math.Min(8,newId.Length)]}");
                             Console.ResetColor();
                             return newId;
                         }
@@ -455,17 +455,17 @@ Examples:
             }
             else
             {
-                // Tab gone — remove stale entry, fall through to create
-                Console.WriteLine($"[SANDBOX] Stale entry {key} (tab no longer exists) — removing");
+                // Tab gone ??remove stale entry, fall through to create
+                Console.WriteLine($"[SANDBOX] Stale entry {key} (tab no longer exists) ??removing");
                 AskTargetRegistry.RemoveEntry(key);
             }
         }
 
-        // Registry miss — ALWAYS create a fresh isolated tab.
+        // Registry miss ??ALWAYS create a fresh isolated tab.
         // Do NOT call EnsureCorrectWindowAsync here: its Step 3 steals any host-matching tab,
         // breaking sandbox isolation (e.g. whisper-study grabs the regular ask tab, or vice-versa).
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"[SANDBOX] Miss: {key} — creating fresh tab for {expectedHost}");
+        Console.WriteLine($"[SANDBOX] Miss: {key} ??creating fresh tab for {expectedHost}");
         Console.ResetColor();
         try
         {
@@ -477,7 +477,7 @@ Examples:
                 await cdp.SwitchToTargetAsync(newId, port);
                 AskTargetRegistry.SetEntry(key, newId, expectedHost);
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[SANDBOX] ✓ Fresh tab: {newId[..Math.Min(8, newId.Length)]}");
+                Console.WriteLine($"[SANDBOX] ??Fresh tab: {newId[..Math.Min(8, newId.Length)]}");
                 Console.ResetColor();
                 return newId;
             }
@@ -507,8 +507,8 @@ Examples:
                 var cdp = new CdpClient();
                 await cdp.ConnectAsync(port, timeoutMs: 5000);
 
-                // Sandbox: Registry hit → URL validate → fast-fail on mismatch
-                // Registry miss → EnsureCorrectWindowAsync (positioning + creation)
+                // Sandbox: Registry hit ??URL validate ??fast-fail on mismatch
+                // Registry miss ??EnsureCorrectWindowAsync (positioning + creation)
                 string? resolvedId;
                 if (!string.IsNullOrWhiteSpace(preferredHost) && !string.IsNullOrWhiteSpace(targetTag))
                 {
@@ -516,7 +516,7 @@ Examples:
                 }
                 else
                 {
-                    // No host constraint — fall back to old EnsureCorrectWindowAsync path
+                    // No host constraint ??fall back to old EnsureCorrectWindowAsync path
                     var savedTargetId = !string.IsNullOrWhiteSpace(targetTag) ? AskTargetRegistry.GetTargetId(targetTag) : null;
                     await CloseBlankTabs(port);
                     var navigateUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
@@ -525,7 +525,7 @@ Examples:
                     {
                         AskTargetRegistry.SetTargetId(targetTag, resolvedId);
                         Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"[ASK] Target: {targetTag} → {resolvedId[..Math.Min(8, resolvedId.Length)]}");
+                        Console.WriteLine($"[ASK] Target: {targetTag} ??{resolvedId[..Math.Min(8, resolvedId.Length)]}");
                         Console.ResetColor();
                     }
                 }

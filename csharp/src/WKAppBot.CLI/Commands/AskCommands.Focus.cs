@@ -232,7 +232,7 @@ internal partial class Program
             NativeMethods.GetWindowThreadProcessId(cur, out uint thiefPid);
             string thiefName = "unknown";
             try { thiefName = System.Diagnostics.Process.GetProcessById((int)thiefPid).ProcessName; } catch { }
-            FocuslessWarningOverlay.Show(prevFg, $"@ {step} ??{thiefName}(0x{cur:X8}) ?ъ빱??媛뺥깉", thiefName);
+            FocuslessWarningOverlay.Show(prevFg, $"@ {step} focus stolen by {thiefName}(0x{cur:X8})", thiefName);
         }
         catch { }
 

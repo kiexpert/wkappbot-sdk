@@ -7,9 +7,10 @@ using WKAppBot.Vision;
 
 namespace WKAppBot.CLI;
 
-// partial class: wkappbot file <subcommand> — read-only filesystem tools for loop agents
+// partial class: wkappbot file <subcommand> — filesystem tools for loop agents
 // file read <path> [--offset N] [--limit N] [--encoding N]
 // file read-pdf <path> [--pages N-M] [--max-chars N] [--ocr]
+// file edit <path> <old> <new> [--replace-all] [--encoding N]
 // file grep <pattern> [--path dir/file] [--type ext] [-i] [-C N] [--max N] [--encoding N]
 // file glob <pattern> [--path dir]
 internal partial class Program
@@ -22,6 +23,7 @@ internal partial class Program
             "read"                   => FileReadCommand(args[1..]),
             "read-pdf"               => FileReadPdfCommand(args[1..]),
             "write"                  => FileWriteCommand(args[1..]),
+            "edit"                   => FileEditCommand(args[1..]),
             "grep"                   => FileGrepCommand(args[1..]),
             "glob"                   => FileGlobCommand(args[1..]),
             "--help" or "-h" or "help" => FileToolUsage(),
@@ -47,8 +49,49 @@ internal partial class Program
             return Encoding.Unicode;   // UTF-16 LE
         if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
             return Encoding.BigEndianUnicode; // UTF-16 BE
-        // Fallback: system ANSI codepage (CP949 on Korean Windows)
-        return Encoding.Default;
+        // No BOM: two-stage UTF-8 detection (avoids false positives for CP949 files).
+        // Stage 1 (zero-alloc): byte-scan for structural UTF-8 validity.
+        //   CP949 bytes can accidentally form valid UTF-8 sequences, so stage 1 alone is
+        //   insufficient — we add stage 2 to reject misidentified CP949.
+        // Stage 2 (string-alloc, only if stage 1 passes): decode as UTF-8 and check for
+        //   U+FFFD replacement characters. Their presence means the CP949 byte sequences
+        //   happened to be structurally valid UTF-8 but decoded to garbage/replacement chars
+        //   → treat as CP949.
+        // Helper: return CP949 encoding, falling back to system ANSI if CP949 unavailable.
+        static Encoding KoreanAnsi()
+        {
+            try { return Encoding.GetEncoding(949); }
+            catch { return Encoding.Default; }
+        }
+        if (!IsValidUtf8NoBom(bytes)) return KoreanAnsi();     // structural errors → CP949
+        var decoded = new UTF8Encoding(false).GetString(bytes);
+        return decoded.Contains('\uFFFD')
+            ? KoreanAnsi()                                      // U+FFFD in decoded → CP949
+            : new UTF8Encoding(false);                          // clean decode → UTF-8
+    }
+
+    /// <summary>
+    /// Byte-scan UTF-8 validity without allocating a string.
+    /// Returns true if every multi-byte sequence is structurally valid UTF-8.
+    /// Pure ASCII files (no bytes ≥ 0x80) also return true — use as UTF-8.
+    /// </summary>
+    static bool IsValidUtf8NoBom(byte[] b)
+    {
+        int i = 0;
+        while (i < b.Length)
+        {
+            byte c = b[i++];
+            if (c < 0x80) continue;                         // ASCII — ok
+            int extra;
+            if      (c < 0xC2) return false;                // invalid leader (0x80-0xBF / 0xC0-0xC1)
+            else if (c < 0xE0) extra = 1;
+            else if (c < 0xF0) extra = 2;
+            else if (c < 0xF5) extra = 3;
+            else               return false;                // > U+10FFFF
+            for (int j = 0; j < extra; j++)
+                if (i >= b.Length || (b[i++] & 0xC0) != 0x80) return false; // bad continuation
+        }
+        return true;
     }
 
     // ── file read ──────────────────────────────────────────────────────────
@@ -549,11 +592,226 @@ internal partial class Program
         return additions.Count == 0 ? "" : string.Join(" | ", additions);
     }
 
+    // In Eye pipe mode Console.Error is not forwarded to the Launcher; use Console.Out instead.
+    static void ErrOut(string? msg) {
+        if (Program.RunningInEye) Console.WriteLine(msg);
+        else Console.Error.WriteLine(msg);
+    }
+
+    // ── file edit ──────────────────────────────────────────────────────────
+    /// <summary>
+    /// file edit &lt;old_string&gt; &lt;new_string&gt; &lt;path&gt;... [--replace-all] [--regex] [--i-really-want-lossy-encoding] [--encoding N] [--context N]
+    /// Same interface as Claude Code Edit tool. Auto-detects encoding (BOM → system ANSI/CP949).
+    /// Fails if old_string not found (exact match). Preserves original encoding on save.
+    /// </summary>
+    static int FileEditCommand(string[] args)
+    {
+        var positional = new List<string>();
+        bool replaceAll = false;
+        bool useRegex = false;
+        bool force = false;
+        bool backup = true; // backup is ON by default; use --i-really-want-no-backup to skip
+        int? encoding = null;
+        int context = 1; // lines of context around each change (--context N to expand)
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--replace-all") { replaceAll = true; continue; }
+            if (args[i] == "--regex")       { useRegex   = true; continue; }
+            if (args[i] == "--i-really-want-lossy-encoding") { force  = true; continue; }
+            if (args[i] == "--i-really-want-no-backup")            { backup = false; continue; }
+            if (args[i] == "--encoding" && i + 1 < args.Length) { encoding = int.Parse(args[++i]); continue; }
+            if (args[i] == "--context"  && i + 1 < args.Length) { int.TryParse(args[++i], out context); continue; }
+            positional.Add(args[i]);
+        }
+
+        // sed/grep-style: first two positional args are old_string and new_string; rest are file paths/globs
+        if (positional.Count < 3)
+        {
+            Console.WriteLine("Usage: wkappbot file edit <old_string> <new_string> <path>... [--replace-all] [--regex] [--i-really-want-lossy-encoding] [--encoding N] [--context N]");
+            return 1;
+        }
+
+        string oldStr = positional[0];
+        string newStr = positional[1];
+        var pathPatterns = positional[2..];
+
+        // Expand globs for each path pattern
+        var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+        var paths = new List<string>();
+        foreach (var pat in pathPatterns)
+        {
+            var full = Path.IsPathRooted(pat) ? pat : Path.Combine(cwd, pat);
+            var dir  = Path.GetDirectoryName(full) ?? cwd;
+            var glob = Path.GetFileName(full);
+            if (glob.Contains('*') || glob.Contains('?'))
+            {
+                var matched = Directory.Exists(dir) ? Directory.GetFiles(dir, glob) : [];
+                if (matched.Length == 0) ErrOut($"[file edit] no files matched: {pat}");
+                paths.AddRange(matched);
+            }
+            else { paths.Add(full); }
+        }
+        if (paths.Count == 0) return Error("[file edit] no target files resolved");
+        bool multi = paths.Count > 1;
+
+        // All-or-nothing for multi-file edits: validate ALL files first, then write all.
+        // Phase 1: validate (dry-run) — produces edited content for each file but does not write
+        var pending = new List<FileEditPlan>();
+        foreach (var path in paths)
+        {
+            var (ok, plan, errMsg) = FileEditValidate(path, oldStr, newStr, replaceAll, useRegex, force, encoding);
+            if (!ok) { ErrOut(errMsg); if (multi) return Error("[file edit] validation failed — no files written"); else return 1; }
+            pending.Add(plan!);
+        }
+
+        // Phase 2: write all (backups first if enabled)
+        int totalEdited = 0;
+        foreach (var plan in pending)
+        {
+            if (FileEditWrite(plan, backup, context, multi) == 0) totalEdited++;
+        }
+
+        if (multi) Console.WriteLine($"[file edit] {totalEdited}/{paths.Count} file(s) edited");
+        return totalEdited == paths.Count ? 0 : 1;
+    }
+
+    record FileEditPlan(string Path, byte[] OutBytes, Encoding Enc, int Count,
+        List<int> MatchPositions, string OrigText, string Result, string OldStr, string NewStr,
+        bool HasUnmappable);
+
+    /// <summary>Validate a file edit without writing — returns plan on success or error message.</summary>
+    static (bool ok, FileEditPlan? plan, string? errMsg) FileEditValidate(
+        string path, string oldStr, string newStr, bool replaceAll, bool useRegex, bool force, int? encoding)
+    {
+        if (!File.Exists(path))
+            return (false, null, $"[file edit] not found: {path}");
+
+        var bytes = File.ReadAllBytes(path);
+        var enc   = DetectFileEncoding(bytes, encoding);
+        var text  = enc.GetString(bytes);
+
+        var matchPositions = new List<int>();
+        int count = 0;
+        string result;
+
+        if (useRegex)
+        {
+            Regex rx;
+            try { rx = new Regex(oldStr, RegexOptions.Multiline); }
+            catch (Exception ex) { return (false, null, $"[file edit] invalid regex: {ex.Message}"); }
+            var matches = rx.Matches(text);
+            count = matches.Count;
+            if (count == 0) return (false, null, $"[file edit] regex pattern not found in {Path.GetFileName(path)}");
+            if (!replaceAll && count > 1) return (false, null, $"[file edit] regex matches {count} locations — use --replace-all or narrow the pattern");
+            foreach (Match m in matches) matchPositions.Add(m.Index);
+            result = rx.Replace(text, newStr);
+        }
+        else if (replaceAll)
+        {
+            int pos = 0;
+            while ((pos = text.IndexOf(oldStr, pos, StringComparison.Ordinal)) >= 0)
+            { matchPositions.Add(pos); count++; pos += oldStr.Length; }
+            if (count == 0) return (false, null, $"[file edit] old_string not found in {Path.GetFileName(path)}");
+            result = text.Replace(oldStr, newStr, StringComparison.Ordinal);
+        }
+        else
+        {
+            int idx = text.IndexOf(oldStr, StringComparison.Ordinal);
+            if (idx < 0) return (false, null, $"[file edit] old_string not found in {Path.GetFileName(path)}");
+            int second = text.IndexOf(oldStr, idx + oldStr.Length, StringComparison.Ordinal);
+            if (second >= 0) return (false, null, $"[file edit] old_string matches multiple locations — use --replace-all or provide more context");
+            matchPositions.Add(idx);
+            result = text[..idx] + newStr + text[(idx + oldStr.Length)..];
+            count = 1;
+        }
+
+        // Check for unmappable characters via roundtrip.
+        // Use '?' (ASCII 0x3F) as fallback — always encodable in any codepage.
+        // U+FFFD would recurse if CP949 itself can't encode it.
+        var safeEnc = Encoding.GetEncoding(enc.CodePage,
+            new EncoderReplacementFallback("?"), DecoderFallback.ReplacementFallback);
+        var outBytes = safeEnc.GetBytes(result);
+        var roundtrip = safeEnc.GetString(outBytes);
+        int unmappable = 0;
+        for (int ci = 0; ci < result.Length; ci++)
+            if (ci < roundtrip.Length && roundtrip[ci] == '?' && result[ci] != '?') unmappable++;
+        if (unmappable > 0 && !force)
+            return (false, null, $"[file edit] {unmappable} character(s) in new_string cannot be encoded in {enc.WebName} — file NOT written. Use --i-really-want-lossy-encoding to allow '?' substitution, or --encoding to target a different charset.");
+
+        return (true, new FileEditPlan(path, outBytes, enc, count, matchPositions, text, result, oldStr, newStr, unmappable > 0), null);
+    }
+
+    /// <summary>Write a validated plan to disk (backup + write + print context). Returns 0 on success.</summary>
+    static int FileEditWrite(FileEditPlan plan, bool backup, int context, bool multi)
+    {
+        if (plan.HasUnmappable)
+            ErrOut($"[file edit] WARNING(--i-really-want-lossy-encoding): character(s) replaced with '?' in {plan.Enc.WebName} — data loss accepted");
+
+        // Print file path first so AI always sees which file is being edited
+        Console.WriteLine($"[file edit] {plan.Path}");
+
+        if (backup)
+        {
+            // Timestamp in backup name = original file's LastWriteTime (ms precision) — "파일타임표준"
+            var origMtime = File.GetLastWriteTime(plan.Path);
+            var ts = origMtime.ToString("yyyyMMdd-HHmmss.fff");
+            var bakPath = $"{plan.Path}.bak-{ts}.txt"; // .txt so build systems ignore it
+            try
+            {
+                File.Copy(plan.Path, bakPath, overwrite: true);
+                File.SetCreationTime(bakPath, File.GetCreationTime(plan.Path));
+                File.SetLastWriteTime(bakPath, File.GetLastWriteTime(plan.Path));
+                Console.WriteLine($"[file edit] backup → {bakPath}");
+            }
+            catch (Exception ex)
+            {
+                return Error($"[file edit] backup failed ({ex.Message}) — file NOT written. Use --i-really-want-no-backup to skip backup.");
+            }
+        }
+
+        // WriteAllBytes uses FileMode.Create (truncate-in-place) — no delete event fired
+        File.WriteAllBytes(plan.Path, plan.OutBytes);
+        Console.WriteLine($"[file edit] {plan.Count} replacement(s) — encoding={plan.Enc.WebName}");
+
+        // ── Context output: show ±{context} lines around each change ──
+        if (context > 0 && plan.MatchPositions.Count > 0)
+        {
+            var resultLines = plan.Result.ReplaceLineEndings("\n").Split('\n');
+            var newLineCount = plan.NewStr.Split('\n').Length - 1;
+            var oldLineCount = plan.OldStr.Split('\n').Length - 1;
+            int lineShift = 0;
+            var changedRanges = new List<(int start, int end)>();
+            foreach (var mpos in plan.MatchPositions)
+            {
+                int origLine   = plan.OrigText[..mpos].Count(c => c == '\n');
+                int resultLine = origLine + lineShift;
+                int resultEnd  = resultLine + newLineCount;
+                changedRanges.Add((resultLine, resultEnd));
+                lineShift += newLineCount - oldLineCount;
+            }
+            var toShow = new SortedSet<int>();
+            foreach (var (start, end) in changedRanges)
+                for (int li = Math.Max(0, start - context); li <= Math.Min(resultLines.Length - 1, end + context); li++)
+                    toShow.Add(li);
+            var changedSet = new HashSet<int>(changedRanges.SelectMany(r => Enumerable.Range(r.start, r.end - r.start + 1)));
+            int? prev = null;
+            foreach (var li in toShow)
+            {
+                if (prev.HasValue && li > prev + 1) Console.WriteLine("   ...");
+                bool changed = changedSet.Contains(li);
+                Console.WriteLine($"{(changed ? "→" : " ")} {li + 1,5}│ {resultLines[li]}");
+                prev = li;
+            }
+        }
+        return 0;
+    }
+
     // ── usage ──────────────────────────────────────────────────────────────
     static int FileToolUsage()
     {
         Console.WriteLine(@"
-wkappbot file — filesystem tools (read + write + PDF)
+wkappbot file — filesystem tools (read + write + edit + PDF)
 
 Usage:
   wkappbot file read <path> [--offset N] [--limit N] [--encoding N]
@@ -562,6 +820,15 @@ Usage:
   wkappbot file read-pdf <path> [--pages N-M] [--max-chars N] [--ocr]
       Extract text from PDF (Korean/CJK safe). --pages 1-5, --max-chars 50000.
       --ocr: also OCR each page via Windows OCR; appends [+OCR: ...] for content PdfPig missed.
+
+  wkappbot file edit <old_string> <new_string> <path>... [--replace-all] [--regex] [--i-really-want-lossy-encoding] [--encoding N] [--context N] [--backup]
+      Exact-match replace. sed/grep-style: old/new first, then one or more file paths/globs.
+      Auto-detects encoding (BOM > UTF-8 validity scan > system ANSI/CP949).
+      Without --replace-all: fails if old_string not found or matches multiple locations.
+      --regex: old_string is a .NET regex; new_string may use $1/$2 capture groups.
+      --i-really-want-lossy-encoding: allow '?' substitution for chars not encodable in target charset.
+      --i-really-want-no-backup: skip backup (default: backup ON — saves <file>.bak-HHMMSS.txt before writing).
+      --context N: lines of context around changes (default 1; 0 = header only).
 
   wkappbot file write <path> [--encoding N] (--stdin | --text ""..."" | --file <src>) [--append]
       Write content to file, re-encoding to target charset.
@@ -582,6 +849,9 @@ Examples:
   wkappbot file read-pdf report.pdf --pages 1-10
   wkappbot file write legacy.cpp --encoding 949 --file tmp_edit.txt
   wkappbot file write legacy.cpp --encoding 949 --stdin  < edited.txt
+  wkappbot file edit legacy.cpp 'old function body' 'new function body'
+  wkappbot file edit AskCommands.Entry.cs '??one-command' '- one-command'
+  wkappbot file edit config.cs 'DEBUG' 'RELEASE' --replace-all
   wkappbot file grep ""static int.*Command"" --path W:/GitHub/WKAppBot/csharp --type cs
   wkappbot file glob ""**/*.cs"" --path W:/GitHub/WKAppBot/csharp/src
 ");

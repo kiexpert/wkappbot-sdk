@@ -350,23 +350,29 @@ internal sealed class SpeakOverlayWindow : Window
             var exStyle = GetWindowLongW(hwnd, -20);
             SetWindowLongW(hwnd, -20, exStyle | 0x08000000); // WS_EX_NOACTIVATE
 
+            // Physical pixel coords from GetWindowRect → divide by DPI scale for WPF Left/Top (DIP)
+            uint dpi_ = GetDpiForWindow(hwnd);
+            double scale_ = dpi_ > 0 ? dpi_ / 96.0 : 1.0;
+
             if (_mousePos.HasValue)
             {
-                // 마우스 커서 위치: 오버레이를 커서 바로 위에 배치
-                Left = _mousePos.Value.X - Width / 2;
-                Top = _mousePos.Value.Y - 80;
+                // Mouse cursor position — already in physical pixels → convert to DIP
+                Left = _mousePos.Value.X / scale_ - Width / 2;
+                Top  = _mousePos.Value.Y / scale_ - 80;
             }
             else if (_ownerHwnd != IntPtr.Zero && NativeMethods.GetWindowRect(_ownerHwnd, out var ownerRect))
             {
-                // --target 또는 VS Code 윈도우 중앙
-                Left = (ownerRect.Left + ownerRect.Right) / 2.0 - Width / 2;
-                Top = (ownerRect.Top + ownerRect.Bottom) / 2.0 - 50;
+                // Center on target window (ownerRect is physical pixels → DIP)
+                double cx = (ownerRect.Left + ownerRect.Right) / 2.0 / scale_;
+                double cy = (ownerRect.Top  + ownerRect.Bottom) / 2.0 / scale_;
+                Left = cx - Width / 2;
+                Top  = cy - 50;
             }
             else if (_panelRect.HasValue && _panelRect.Value.Width > 50)
             {
                 var pr = _panelRect.Value;
-                Left = pr.X + (pr.Width - Width) / 2;
-                Top = pr.Y + (pr.Height - 100) / 2;
+                Left = pr.X / scale_ + (pr.Width / scale_ - Width) / 2;
+                Top  = pr.Y / scale_ + (pr.Height / scale_ - 100) / 2;
             }
             else
             {
@@ -488,4 +494,5 @@ internal sealed class SpeakOverlayWindow : Window
 
     [DllImport("user32.dll")] private static extern int GetWindowLongW(IntPtr hWnd, int nIndex);
     [DllImport("user32.dll")] private static extern int SetWindowLongW(IntPtr hWnd, int nIndex, int dwNewLong);
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
 }

@@ -1,6 +1,32 @@
 @echo off
 setlocal EnableExtensions
 
+rem ═══════════════════════════════════════════════════════════════════════════
+rem  WKAppBot build.cmd  —  Publish, copy, and hot-swap deploy
+rem
+rem  Usage:
+rem    build.cmd               Full build: compile + publish + copy + hot-swap
+rem    build.cmd --deploy-only Skip publish entirely; re-deploy from existing
+rem                            publish output (binaries must already be there)
+rem    build.cmd --no-build    Skip compile; just package + copy + hot-swap.
+rem                            Use when invoked from a csproj post-publish event
+rem                            (MSBuild already compiled; avoids double-compile).
+rem
+rem  Deploy target:  W:\SDK\bin\
+rem    wkappbot.exe       Launcher  (AOT, ~1 MB; starts core, relays pipe cmds,
+rem                                  handles hot-swap trigger)
+rem    wkappbot-core.exe  Core      (single-file ~25 MB; all CLI logic + Eye loop)
+rem
+rem  Hot-swap flow (Eye is running):
+rem    1. csproj post-publish target copies core  → wkappbot-core.new.exe
+rem    2. build.cmd copies launcher               → wkappbot.new.exe
+rem    3. Eye tick triggers self-detect: drains in-flight pipes, self-replaces
+rem    4. Watchdog (below): if .new.exe survives 3 s → taskkill + force-promote
+rem
+rem  AI note: never pass --no-verify or skip hooks; never force-push; always
+rem    use hot-swap path (do NOT taskkill manually before building).
+rem ═══════════════════════════════════════════════════════════════════════════
+
 set "SDK_DIR=W:\SDK\dotnet"
 set "DOTNET_EXE=%SDK_DIR%\dotnet.exe"
 set "SDK_VER=8.0.418"
@@ -14,7 +40,11 @@ set "CLI_OUT=%ROOT_DIR%\csharp\src\WKAppBot.CLI\bin\Release\net8.0-windows10.0.2
 set "LAUNCHER_OUT=%ROOT_DIR%\csharp\src\WKAppBot.Launcher\bin\Release\net8.0-windows\win-x64\publish"
 set "BIN_DIR=W:\SDK\bin"
 set "DEPLOY_ONLY=0"
+set "NO_BUILD=0"
 if /I "%~1"=="--deploy-only" set "DEPLOY_ONLY=1"
+if /I "%~1"=="--no-build"    set "NO_BUILD=1"
+if /I "%~2"=="--deploy-only" set "DEPLOY_ONLY=1"
+if /I "%~2"=="--no-build"    set "NO_BUILD=1"
 
 set "DOTNET_CLI_HOME=%ROOT_DIR%\.dotnet"
 set "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1"
@@ -36,7 +66,7 @@ if not exist "%DOTNET_EXE%" (
 )
 
 if "%DEPLOY_ONLY%"=="0" (
-  echo [1/4] Publish launcher (single-file, self-contained)
+  echo [1/4] Publish launcher (AOT, single-file, self-contained)
   call :publish_launcher
   if errorlevel 1 exit /b 1
 
@@ -56,8 +86,16 @@ if "%DEPLOY_ONLY%"=="0" (
   echo [BUILD] deploy-only mode (skip publish)
 )
 
-echo [3/4] Deploy binaries
-echo [BUILD] Deploy is handled by csproj post-publish targets.
+echo [3/4] Deploy binaries to %BIN_DIR%
+rem Core deploy: handled by csproj post-publish target (copies to .new.exe for hot-swap).
+rem Launcher deploy: no csproj target — copied explicitly here.
+echo [BUILD]   copy launcher: %LAUNCHER_OUT%\wkappbot.exe → %BIN_DIR%\wkappbot.new.exe
+copy /y "%LAUNCHER_OUT%\wkappbot.exe" "%BIN_DIR%\wkappbot.new.exe" >nul
+if errorlevel 1 (
+  echo [BUILD] launcher copy failed
+  exit /b 1
+)
+
 if not exist "%BIN_DIR%\wkappbot.exe" (
   if exist "%BIN_DIR%\wkappbot.new.exe" (
     echo [BUILD] launcher staged for hot-swap: "%BIN_DIR%\wkappbot.new.exe"
@@ -83,7 +121,7 @@ del /q "%BIN_DIR%\wkappbot.dll" >nul 2>nul
 del /q "%BIN_DIR%\wkappbot.deps.json" >nul 2>nul
 del /q "%BIN_DIR%\wkappbot.runtimeconfig.json" >nul 2>nul
 
-echo [4/4] Eye tick trigger
+echo [4/4] Eye tick trigger (hot-swap detect + pipe drain)
 call "%BIN_DIR%\wkappbot-core.exe" eye tick >nul 2>nul
 
 rem Hot-swap watchdog:
@@ -154,9 +192,18 @@ exit /b 0
 
 :publish_launcher
 rem AOT: PublishSingleFile must NOT be passed (AOT is already single-file; combining them errors)
+echo [BUILD]   proj : %LAUNCHER_PROJ%
+echo [BUILD]   out  : %LAUNCHER_OUT%\wkappbot.exe
+if "%NO_BUILD%"=="1" (
+  echo [BUILD]   step : dotnet publish --no-build --no-restore (package only^)
+  "%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore --no-build -m:1 -v minimal
+  if errorlevel 1 ( echo [BUILD] launcher publish failed & exit /b 1 )
+  exit /b 0
+)
+echo [BUILD]   step : dotnet publish (no-restore)
 "%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore -m:1 -v minimal
 if not errorlevel 1 exit /b 0
-echo [BUILD] launcher no-restore failed -> retry with restore
+echo [BUILD]   step : dotnet publish (with restore)
 "%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true -m:1 -v minimal
 if errorlevel 1 (
   echo [BUILD] launcher publish failed
@@ -165,9 +212,18 @@ if errorlevel 1 (
 exit /b 0
 
 :publish_core
+echo [BUILD]   proj : %CLI_PROJ%
+echo [BUILD]   out  : %CLI_OUT%\wkappbot-core.exe
+if "%NO_BUILD%"=="1" (
+  echo [BUILD]   step : dotnet publish --no-build --no-restore (package only^)
+  "%DOTNET_EXE%" publish "%CLI_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore --no-build -m:1 -v minimal /p:PublishSingleFile=true /p:PublishTrimmed=false /p:PublishReadyToRun=false /p:PublishAot=false
+  if errorlevel 1 ( echo [BUILD] core publish failed & exit /b 1 )
+  exit /b 0
+)
+echo [BUILD]   step : dotnet publish (no-restore)
 "%DOTNET_EXE%" publish "%CLI_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore -m:1 -v minimal /p:PublishSingleFile=true /p:PublishTrimmed=false /p:PublishReadyToRun=false /p:PublishAot=false
 if not errorlevel 1 exit /b 0
-echo [BUILD] core no-restore failed -> retry with restore
+echo [BUILD]   step : dotnet publish (with restore)
 "%DOTNET_EXE%" publish "%CLI_PROJ%" --configuration Release --runtime win-x64 --self-contained true -m:1 -v minimal /p:PublishSingleFile=true /p:PublishTrimmed=false /p:PublishReadyToRun=false /p:PublishAot=false
 if errorlevel 1 (
   echo [BUILD] core publish failed

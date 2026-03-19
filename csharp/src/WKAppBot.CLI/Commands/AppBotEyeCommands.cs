@@ -23,6 +23,9 @@ internal partial class Program
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    [DllImport("kernel32.dll")]
+    private static extern bool AllocConsole();
+
     private const int SW_HIDE = 0;
 
     static void TryHideConsoleWindow()
@@ -73,8 +76,12 @@ internal partial class Program
             }
         }
 
+        // When spawned as DETACHED_PROCESS (no console), allocate one so console APIs don't throw.
+        // Eye hides this console window immediately via TryHideConsoleWindow().
+        if (GetConsoleWindow() == IntPtr.Zero) AllocConsole();
+
         Console.Title = "AppBotEye"; // for a11y close targeting (avoid matching VS Code)
-        TryHideConsoleWindow();
+        WKAppBot.Win32.Input.ProcessLaunchGuard.IsEyeProcess = true; // Eye daemon — skip focus guard
 
         // Elevated proxy mode: if running as admin, start Named Pipe server alongside Eye
         bool elevated = args.Any(a => a == "--elevated") || ElevationHelper.IsElevated();

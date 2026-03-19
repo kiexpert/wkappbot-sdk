@@ -527,30 +527,37 @@ Options:
             }
             catch { } // timeout or not found → Eye not running, fall through to spawn
 
-            // Launch AppBotEye as detached background process
-            var exePath = Environment.ProcessPath;
-            if (string.IsNullOrEmpty(exePath)) return;
+            // Launch AppBotEye — use core exe directly (skip launcher overhead)
+            var launcherPath = Environment.ProcessPath ?? "";
+            var dir  = Path.GetDirectoryName(launcherPath) ?? "";
+            var name = Path.GetFileNameWithoutExtension(launcherPath); // e.g. "wkappbot" or "a11y"
+            // Core exe lives next to launcher: wkappbot-core.exe or a11y-core.exe
+            var corePath = Path.Combine(dir, name + "-core.exe");
+            if (!File.Exists(corePath)) corePath = launcherPath; // fallback to launcher if core not found
+            if (string.IsNullOrEmpty(corePath)) return;
 
-            // Default to global single-window monitor for stability.
-            var arguments = "eye";
+            // Core runs as DETACHED_PROCESS (no ConPTY handles, no MSYS2 vars).
+            // Eye also needs to be detached — redirect its stdio so it doesn't inherit Core's pipe handles.
+            // Eye calls AllocConsole() internally if it has no console.
             var psi = new ProcessStartInfo
             {
-                FileName = exePath,
-                Arguments = arguments,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = false,
-                RedirectStandardError = false,
+                FileName               = corePath,
+                Arguments              = "eye" + (extraArgs.Length > 0 ? " " + extraArgs : ""),
+                UseShellExecute        = false,
+                CreateNoWindow         = true,
+                RedirectStandardInput  = true,  // detach from Core's stdin pipe
+                RedirectStandardOutput = true,  // detach from Core's stdout pipe
+                RedirectStandardError  = true,  // detach from Core's stderr pipe
             };
-
-            // Set DOTNET_ROOT if we have it
-            var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
-            if (!string.IsNullOrEmpty(dotnetRoot))
-                psi.EnvironmentVariables["DOTNET_ROOT"] = dotnetRoot;
 
             var proc2 = Process.Start(psi);
             if (proc2 != null)
             {
+                // Close all pipe ends in Core — Eye is a daemon, we don't relay its output.
+                // Eye writes to its own console (via AllocConsole). Closing here is safe.
+                try { proc2.StandardInput.Close(); } catch { }
+                try { proc2.StandardOutput.Close(); } catch { }
+                try { proc2.StandardError.Close(); } catch { }
                 Console.WriteLine($"[EYE] Launched (PID={proc2.Id})");
                 // Policy broadcast when Eye first spawns (agent reads stdout)
                 AgentPolicy.StartPolicyBroadcast();

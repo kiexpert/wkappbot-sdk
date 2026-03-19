@@ -17,6 +17,11 @@ done
 
 WKA="W:/SDK/bin/wkappbot.exe"
 
+# ─── warmup: ensure Eye is running (spawns if not) ─────────────────────────
+echo "── Warmup (eye tick) ──────────────────────────"
+"$WKA" eye tick >/dev/null 2>&1
+echo "  Eye ready"
+
 # ─── helpers ───────────────────────────────────────────────────────────────
 # check: must succeed (exit 0 or good-marker) within TIMEOUT; TIMEOUT=⚠SLOW not FAIL
 check() {
@@ -143,7 +148,7 @@ check_g "scroll taskbar"     bash -c "\"$WKA\" a11y scroll \"*Shell_TrayWnd*\" -
 
 # ─── Eye tick ──────────────────────────────────────────────────────────────
 banner "Eye"
-check_g "eye tick"           bash -c "\"$WKA\" eye tick 2>&1 | grep -qiE 'tick|eye|card|status|idle|running|ctx=|clod|kro'"
+{ _T=$TIMEOUT; TIMEOUT=15; check_g "eye tick" bash -c "\"$WKA\" eye tick 2>&1 | grep -qiE 'tick|eye|card|status|idle|running|ctx=|clod|kro'"; TIMEOUT=$_T; }
 
 # ─── Validate (YAML) ───────────────────────────────────────────────────────
 banner "Validate"

@@ -28,6 +28,8 @@ internal partial class Program
     {
         if (args.Length > 0 && args[0] == "stats")
             return WhisperStatsCommand();
+        if (args.Length > 0 && args[0] == "prune-simple")
+            return WhisperPruneSimpleCommand(args[1..]);
 
         // Parse options
         int      batchSize = 10;
@@ -289,8 +291,12 @@ internal partial class Program
             {
                 WhisperIndexCommand(["--move"]);
                 // Delete source MP3s from labeled folders (sliced → phoneme_db, no longer needed)
+                // Keep: _unknown (pending), _requeue (needs retry), _mic (raw recordings)
+                // Delete: _noise, _music, _instrument, and any word-label folders (no _ prefix)
+                var keepFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    { "_unknown", "_requeue", "_mic" };
                 foreach (var labelDir in Directory.GetDirectories(wavDir)
-                             .Where(d => !Path.GetFileName(d).StartsWith("_")))
+                             .Where(d => !keepFolders.Contains(Path.GetFileName(d))))
                 {
                     foreach (var f in Directory.GetFiles(labelDir))
                         try { File.Delete(f); } catch { }
@@ -885,7 +891,74 @@ internal partial class Program
         return result.Length == 0 ? "_unknown" : result;
     }
 
+    // ── Prune-simple subcommand ──
+
+    /// <summary>
+    /// Delete _unknown/ MP3s with simple/trivial token sequences in their filenames.
+    /// "Simple" = very few tokens (noise/silence) OR highly repetitive (noise loop).
+    ///   --min-tokens N   : delete files with fewer than N tokens (default 7)
+    ///   --max-unique N   : delete files where unique token count ≤ N AND total ≥ 5 (default 3)
+    ///   --dry-run        : show what would be deleted without deleting
+    /// </summary>
+    static int WhisperPruneSimpleCommand(string[] args)
+    {
+        int  minTokens = 7;
+        int  maxUnique = 3;
+        bool dryRun    = false;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if      (args[i] == "--min-tokens" && i + 1 < args.Length) int.TryParse(args[++i], out minTokens);
+            else if (args[i] == "--max-unique" && i + 1 < args.Length) int.TryParse(args[++i], out maxUnique);
+            else if (args[i] == "--dry-run") dryRun = true;
+        }
+
+        var wavDir = Path.Combine(DataDir, "profiles", "whisper_exp", "wav", "_unknown");
+        if (!Directory.Exists(wavDir))
+        {
+            Console.WriteLine("[PRUNE] _unknown/ not found.");
+            return 1;
+        }
+
+        var files = Directory.GetFiles(wavDir, "*.mp3");
+        Console.WriteLine($"[PRUNE] Scanning {files.Length} files in _unknown/ (min-tokens={minTokens}, max-unique={maxUnique}{(dryRun ? ", DRY-RUN" : "")})");
+
+        int deleted = 0, kept = 0;
+        foreach (var f in files)
+        {
+            var nameNoExt = Path.GetFileNameWithoutExtension(f);
+            // Strip trailing _V or _W suffix
+            if (nameNoExt.EndsWith("_V") || nameNoExt.EndsWith("_W"))
+                nameNoExt = nameNoExt[..^2];
+
+            // Parse tokens: split on '-' and ' ' (pause marker), ignore empty
+            var tokens = nameNoExt.Split(new[] { '-', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                  .Where(t => int.TryParse(t, out _))
+                                  .ToList();
+            int total  = tokens.Count;
+            int unique = tokens.Distinct().Count();
+
+            bool tooShort    = total < minTokens;
+            bool tooRepetive = total >= 5 && unique <= maxUnique;
+
+            if (tooShort || tooRepetive)
+            {
+                var reason = tooShort ? $"tokens={total}<{minTokens}" : $"unique={unique}<={maxUnique} of {total}";
+                Console.WriteLine($"  [{(dryRun ? "DRY" : "DEL")}] {Path.GetFileName(f)}  ({reason})");
+                if (!dryRun)
+                    try { File.Delete(f); deleted++; } catch (Exception ex) { Console.WriteLine($"    WARN: {ex.Message}"); }
+                else
+                    deleted++;
+            }
+            else
+                kept++;
+        }
+
+        Console.WriteLine($"[PRUNE] Done — {(dryRun ? "would delete" : "deleted")} {deleted}, kept {kept}");
+        return 0;
+    }
+
     // ── Stats subcommand ──
+
 
     static int WhisperStatsCommand()
     {

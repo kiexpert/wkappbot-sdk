@@ -24,6 +24,13 @@ namespace WKAppBot.Win32.Input;
 /// </summary>
 public static class ProcessLaunchGuard
 {
+    /// <summary>
+    /// Set to true when this process IS the Eye daemon.
+    /// Eye manages its own focus intentionally — skip all guard checks.
+    /// Set once at Eye startup (AppBotEyeCommand).
+    /// </summary>
+    public static bool IsEyeProcess { get; set; }
+
     // 이미 포커스 강탈 전력이 확인된 EXE 이름 목록 (현재 세션 in-memory).
     // Phase 2에서 파일로 영속화 예정.
     private static readonly HashSet<string> _knownFocusStealers =
@@ -34,11 +41,15 @@ public static class ProcessLaunchGuard
 
     /// <summary>
     /// Process.Start() 대체 — 실행 전후 포커스 변화 감지 + 복원 + 강탈 기록.
+    /// Eye 프로세스에서는 가드 스킵 (IsEyeProcess=true).
     /// </summary>
     /// <param name="psi">ProcessStartInfo</param>
     /// <param name="callerName">로그에 표시할 호출자 이름 (예: "ScenarioRunner")</param>
     public static Process? GuardedStart(ProcessStartInfo psi, string callerName = "")
     {
+        // Eye daemon: skip guard entirely — Eye controls its own focus intentionally
+        if (IsEyeProcess) return Process.Start(psi);
+
         var exeName = Path.GetFileName(psi.FileName) ?? psi.FileName;
         var tag = string.IsNullOrEmpty(callerName) ? exeName : $"{callerName}:{exeName}";
 

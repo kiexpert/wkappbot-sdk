@@ -27,6 +27,9 @@ internal static class EyeCmdPipeClient
         exitCode = 0;
         bool connected = false;
         var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut);
+        // Write pipe output to raw stdout as UTF-8 — same as Core subprocess (StandardOutputEncoding=UTF8).
+        // Console.WriteLine uses Console.OutputEncoding which may differ; raw stream is reliable.
+        var rawOut = new StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true };
         try
         {
             pipe.Connect(300); // 300ms: Eye either answers instantly or isn't running
@@ -66,7 +69,7 @@ internal static class EyeCmdPipeClient
                         int.TryParse(line.AsSpan(EndMarker.Length).Trim(), out exitCode);
                         break;
                     }
-                    Console.WriteLine(line);
+                    rawOut.WriteLine(line);
                 }
                 if (timedOut) exitCode = timeoutExitCode;
             }

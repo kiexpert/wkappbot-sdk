@@ -78,9 +78,27 @@ internal partial class Program
 
     internal static int Main(string[] args)
     {
+        // Hook ALL exit paths — on CLR shutdown, call TerminateProcess to skip DLL-detach (~27s).
+        // AppDomain.ProcessExit fires when: return from Main, Environment.Exit(), or unhandled exception.
+        // NOTE: FastExit (TerminateProcess) already bypasses this hook, so no double-kill.
+        int _exitCode = 1;
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try { Console.Out.Flush(); } catch { }
+            // Signal Launcher to TerminateSelf immediately — don't wait for Core's ~30s OS cleanup.
+            // Launcher stdout relay detects "\0UIT" sentinel → TerminateSelf → bash gets control back.
+            // Core's SMB console handle cleanup (~30s) continues in background after Launcher exits.
+            try
+            {
+                var raw = Console.OpenStandardOutput();
+                raw.Write(new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' });
+                raw.Flush();
+            }
+            catch { }
+            TerminateProcess(GetCurrentProcess(), (uint)_exitCode);
+        };
+
         var _mainStarted = System.Diagnostics.Stopwatch.StartNew();
-        void DbgFile(string s) { try { System.IO.File.AppendAllText(@"C:\Temp\core_detach.txt", $"{_mainStarted.ElapsedMilliseconds}ms {s}\n"); } catch { } }
-        DbgFile($"Main entered args=[{string.Join(",", args)}] RELAY={Environment.GetEnvironmentVariable("WKAPPBOT_RELAY_FILE") ?? "(null)"}");
 
         // WKAPPBOT_PROFILE=1 → emit [PROFILE] Xms label to stderr for startup diagnostics.
         // Usage: WKAPPBOT_PROFILE=1 wkappbot grep foo
@@ -90,16 +108,48 @@ internal partial class Program
             : (_ => { });
 
         prof("Main() entered");
-        DbgFile("before OutputEncoding");
+
+        // ── FAST EXITS: must run BEFORE SetConsoleCP/SetConsoleOutputCP ──────────────────────────
+        // SetConsoleCP/SetConsoleOutputCP initialize SMB-backed console kernel objects.
+        // FastExit (TerminateProcess) after those calls causes OS SMB cleanup taking ~27-35s.
+        // By exiting before any console setup, cleanup is <200ms.
+        // Help/usage text is ASCII-only so no encoding setup is needed.
+        {
+            // grap/grep help: no args or --help/-h
+            if (args.Length > 0 && args[0].ToLowerInvariant() is "grap" or "grep"
+                && (args.Length == 1 || args.Any(a => a is "--help" or "-h")))
+            {
+                try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
+                PrintGrapHelp(args[0].ToLowerInvariant());
+                Console.Out.Flush();
+                FastExit(0);
+                return 0; // unreachable
+            }
+
+            // wkappbot no-args: print usage and exit
+            // GetUsageText() is ASCII-only — no Unicode/Korean → no SetConsoleOutputCP trigger.
+            // FastExit (TerminateProcess) is fast when SetConsoleOutputCP was never called (<200ms).
+            // DO NOT set Console.OutputEncoding here — that calls SetConsoleOutputCP(65001),
+            // initializing SMB-backed console kernel objects, making TerminateProcess take ~32s.
+            var _noArgsExeBase = Path.GetFileNameWithoutExtension(
+                Environment.GetCommandLineArgs().FirstOrDefault() ?? "").ToLowerInvariant();
+            if (args.Length == 0 && DetectCommandFromExeName(_noArgsExeBase) == null)
+            {
+                // No encoding setup here — avoids SetConsoleOutputCP(65001) which initializes
+                // SMB-backed console kernel objects causing ~30s OS cleanup on TerminateProcess.
+                // GetUsageText() is ASCII-only, so no encoding setup needed.
+                PrintUsage();
+                FastExit(1);
+                return 1; // unreachable
+            }
+        }
+
         // Force UTF-8 globally — console + child processes inherit codepage 65001
         // Use no-BOM variant: BOM is noise in pipes/relay, Console.Out is not a file
         try { Console.OutputEncoding = new System.Text.UTF8Encoding(false); } catch { }
-        DbgFile("after OutputEncoding");
         try { Console.InputEncoding = Encoding.UTF8; } catch { }
-        DbgFile("after InputEncoding");
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
-        DbgFile("after ConsoleCP");
 
         // --args-file <path>: UTF-8 file fallback for Korean args garbled via bash→PowerShell CP949
         {
@@ -123,29 +173,11 @@ internal partial class Program
             return McpCommand(args.Skip(1).ToArray());
         }
 
-        // Fast path for grap/grep help (no args or --help/-h): print and exit immediately.
-        // Must run BEFORE CloseAllGhosts — ghost window cleanup can block if previous Core
-        // instances were force-killed, leaving WPF dispatcher threads in a hung state.
-        // FastExit (TerminateProcess) bypasses the 26s DLL-detach deadlock, so this is safe
-        // even when stdout is redirected to a file.
-        if (args.Length > 0 && args[0].ToLowerInvariant() is "grap" or "grep"
-            && (args.Length == 1 || args.Any(a => a is "--help" or "-h")))
-        {
-            try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
-            PrintGrapHelp(args[0].ToLowerInvariant());
-            Console.Out.Flush();
-            FastExit(0);
-            return 0; // unreachable
-        }
-
         // Enable DPI awareness
-        DbgFile("before DpiAwareness");
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
-        DbgFile("after DpiAwareness");
 
         // Kill ghost zoom overlays from previous invocations (keeps exe unlocked for publish)
         try { InputZoomHost.CloseAllGhosts(); } catch { }
-        DbgFile("after CloseAllGhosts");
 
         // Auto-create busybox symlinks (a11y.exe, wka11y.exe → wkappbot.exe) if missing.
         // Skip for grap/grep fast-exit: symlink file ops on W:/ (SMB) leave pending kernel I/O
@@ -565,6 +597,7 @@ internal partial class Program
             }
             catch { }
 
+            _exitCode = exitCode;
             return exitCode;
         }
         catch (Exception ex)

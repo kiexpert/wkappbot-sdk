@@ -1,4 +1,4 @@
-ï»¿using System.Diagnostics;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -16,13 +16,13 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ?Â€?Â€ Gemini ?Â€?Â€
+    // ?€?€ Gemini ?€?€
     static readonly string[] GeminiStopNoticeKeywords =
     [
-        "ì‘ë‹µì´ ì¤‘ì§€ë˜ì—ˆìŠµë‹ˆë‹¤",
-        "ì‘ë‹µì´ ì¤‘ì§€",
-        "ëŒ€ë‹µì´ ì¤‘ì§€ë˜ì—ˆìŠµë‹ˆë‹¤",
-        "ì¤‘ì§€ë˜ì—ˆìŠµë‹ˆë‹¤",
+        "ÀÀ´äÀÌ ÁßÁöµÇ¾ú½À´Ï´Ù",
+        "ÀÀ´äÀÌ ÁßÁö",
+        "´ë´äÀÌ ÁßÁöµÇ¾ú½À´Ï´Ù",
+        "ÁßÁöµÇ¾ú½À´Ï´Ù",
         "response was stopped",
         "response stopped",
         "stopped response"
@@ -34,18 +34,18 @@ internal partial class Program
         return GeminiStopNoticeKeywords.Any(k => text.Contains(k, StringComparison.OrdinalIgnoreCase));
     }
 
-    /// Strip "Geminiì˜ ì‘ë‹µ" UI label prepended by Gemini web UI.
+    /// Strip "GeminiÀÇ ÀÀ´ä" UI label prepended by Gemini web UI.
     /// Applied at the source so it doesn't appear in loop context, Slack, or console.
     static string StripGeminiUiPrefix(string text)
     {
         if (!text.StartsWith("Gemini")) return text;
-        var eo = text.IndexOf('\uC751'); // ì‘
-        if (eo > 0 && eo < 15 && eo + 1 < text.Length && text[eo + 1] == '\uB2F5') // ë‹µ
+        var eo = text.IndexOf('\uC751'); // ÀÀ
+        if (eo > 0 && eo < 15 && eo + 1 < text.Length && text[eo + 1] == '\uB2F5') // ´ä
             return text[(eo + 2)..].TrimStart();
         return text;
     }
 
-    // Wait for stop to clear naturally â€” never clicks stop (preserves ongoing generation)
+    // Wait for stop to clear naturally ? never clicks stop (preserves ongoing generation)
     static async Task<bool> WaitWhileGeminiStopVisibleNoClickAsync(CdpClient cdp, int maxWaitMs = 30000)
     {
         var sw = Stopwatch.StartNew();
@@ -53,7 +53,7 @@ internal partial class Program
         {
             var stopVisible = await cdp.EvalAsync("""
                 (() => {
-                    if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ì¤‘ì§€"]')) return '1';
+                    if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ÁßÁö"]')) return '1';
                     var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
                     if (mat) { var b=mat.closest('button'); if(b&&(b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('stop')) return '1'; }
                     return '0';
@@ -63,7 +63,7 @@ internal partial class Program
             Console.WriteLine($"[ASK] Gemini generating... waiting ({sw.ElapsedMilliseconds}ms)");
             await Task.Delay(1000);
         }
-        Console.WriteLine("[ASK] Gemini still generating after wait â€” proceeding anyway");
+        Console.WriteLine("[ASK] Gemini still generating after wait ? proceeding anyway");
         return false;
     }
 
@@ -86,7 +86,7 @@ internal partial class Program
             var stopVisible = await cdp.EvalAsync("""
                 (() => {
                     var s1 = document.querySelector('button[aria-label*="Stop"]');
-                    var s2 = document.querySelector('button[aria-label*="ì¤‘ì§€"]');
+                    var s2 = document.querySelector('button[aria-label*="ÁßÁö"]');
                     if (s1) return 'BTN:' + (s1.getAttribute('aria-label') || '?');
                     if (s2) return 'BTN:' + (s2.getAttribute('aria-label') || '?');
                     // mat-icon stop_circle: only count if parent button has stop-related aria-label
@@ -95,7 +95,7 @@ internal partial class Program
                         var btn = mat.closest('button');
                         if (btn) {
                             var lbl = (btn.getAttribute('aria-label') || btn.title || '').toLowerCase();
-                            if (lbl.includes('stop') || lbl.includes('ì¤‘ì§€') || lbl.includes('halt'))
+                            if (lbl.includes('stop') || lbl.includes('ÁßÁö') || lbl.includes('halt'))
                                 return 'MAT:' + lbl;
                         }
                     }
@@ -109,12 +109,12 @@ internal partial class Program
             await Task.Delay(700);
         }
 
-        // Timed out â€” try clicking the stop button to cancel ongoing generation, then wait briefly
-        Console.WriteLine("[ASK] Gemini stop still visible â€” clicking stop to cancel generation...");
+        // Timed out ? try clicking the stop button to cancel ongoing generation, then wait briefly
+        Console.WriteLine("[ASK] Gemini stop still visible ? clicking stop to cancel generation...");
         await cdp.EvalAsync("""
             (() => {
                 var btn = document.querySelector('button[aria-label*="Stop"]')
-                       || document.querySelector('button[aria-label*="ì¤‘ì§€"]');
+                       || document.querySelector('button[aria-label*="ÁßÁö"]');
                 if (!btn) {
                     var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
                     if (mat) btn = mat.closest('button');
@@ -125,7 +125,7 @@ internal partial class Program
         await Task.Delay(1500);
         var stillVisible = await cdp.EvalAsync("""
             (() => {
-                if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ì¤‘ì§€"]')) return '1';
+                if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ÁßÁö"]')) return '1';
                 var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
                 if (mat) { var b=mat.closest('button'); if (b&&((b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('stop'))) return '1'; }
                 return '0';
@@ -136,13 +136,13 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Gemini vision ask â€” identifies a specific UI element, returns structured OcrSegment.
+    /// Gemini vision ask ? identifies a specific UI element, returns structured OcrSegment.
     /// Optimized for speed: dedicated tab, 500ms poll, 15s timeout, no Slack/streaming.
     ///
     /// Use as ActionExecutor.AskVisionFn delegate:
     ///   executor.AskVisionFn = (bmp, desc) => AskGeminiForVisionAsync(bmp, desc);
     ///
-    /// Prompt is verbose (Gemini tokens are free) â€” asks for JSON a11y object with x/y/w/h coords.
+    /// Prompt is verbose (Gemini tokens are free) ? asks for JSON a11y object with x/y/w/h coords.
     /// Returns: OcrSegment with position from Gemini JSON, or null on failure.
     /// </summary>
     static async Task<WKAppBot.Vision.OcrSegment?> AskGeminiForVisionAsync(
@@ -161,7 +161,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Full-form Gemini a11y scan â€” returns ALL visible UI elements as OcrSegment list.
+    /// Full-form Gemini a11y scan ? returns ALL visible UI elements as OcrSegment list.
     /// Called once per form to build OcrSegmentCache entries.
     /// Returns null on failure, empty list if no elements found.
     /// </summary>
@@ -173,7 +173,7 @@ internal partial class Program
         return WKAppBot.Vision.OcrSegmentCache.ParseA11yJson(raw);
     }
 
-    // â”€â”€ Prompt builders (verbose â€” Gemini tokens are free) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ¦¡¦¡ Prompt builders (verbose ? Gemini tokens are free) ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
 
     static string BuildVisionElementPrompt(string description) => $$"""
         You are an accessibility inspector analyzing a Windows application screenshot.
@@ -248,10 +248,10 @@ internal partial class Program
         ProgressBar, Slider, Spinner, MenuItem, ToolBar, StatusBar, Unknown
 
         Return ONLY the JSON array, no explanation, no markdown fences.
-        Include every element you can see â€” the more detail the better.
+        Include every element you can see ? the more detail the better.
         """;
 
-    // â”€â”€ Shared CDP vision transport â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ¦¡¦¡ Shared CDP vision transport ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
 
     static async Task<string?> AskGeminiVisionRawAsync(
         System.Drawing.Bitmap screenshot, string prompt, int timeoutMs = 20000)
@@ -261,7 +261,7 @@ internal partial class Program
         {
             screenshot.Save(tmpPath, System.Drawing.Imaging.ImageFormat.Png);
 
-            // Dedicated vision tab â€” never contaminates user's AI chat sessions
+            // Dedicated vision tab ? never contaminates user's AI chat sessions
             var cdp = EnsureCdpConnection(
                 preferredHost: "gemini.google.com", newTab: false,
                 targetTag: "vision-ask");
@@ -386,7 +386,7 @@ internal partial class Program
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
 
-        // No tab activation â€” CDP works on background tabs via targetId. Truly focusless.
+        // No tab activation ? CDP works on background tabs via targetId. Truly focusless.
         var prevFgGemini = NativeMethods.GetForegroundWindow();
 
         LaunchAppBotEyeIfNeeded(9222);
@@ -399,7 +399,7 @@ internal partial class Program
         {
             try
             {
-                // ?Â€?Â€ Phase 1: Navigate (iconified OK ??CDP works without rendering) ?Â€?Â€
+                // ?€?€ Phase 1: Navigate (iconified OK ??CDP works without rendering) ?€?€
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("gemini.google.com"))
@@ -456,7 +456,7 @@ internal partial class Program
                     return (false, (string?)null);
                 }
 
-                // ?Â€?Â€ Persona injection on fresh Gemini conversation ?Â€?Â€
+                // ?€?€ Persona injection on fresh Gemini conversation ?€?€
                 // If persona continuation already contains a tool call, skip question send entirely
                 string? personaEarlyToolCall = null;
                 var geminiTurnCount = await cdp.EvalAsync(
@@ -468,7 +468,7 @@ internal partial class Program
                     Console.WriteLine("[ASK] Loop marker found; MCP guidance will be included for fresh session persona.");
                 if (geminiTurnCount == "0" || (effectiveLoopPersona && !hasLoopPersonaState))
                 {
-                    // ?Â€?Â€ Browser exclusive: persona input ??send complete ?Â€?Â€
+                    // ?€?€ Browser exclusive: persona input ??send complete ?€?€
                     using var personaLock = ChromeTabLock.Acquire("Gemini/persona");
                     if (personaLock == null) return (false, (string?)null);
 
@@ -478,7 +478,7 @@ internal partial class Program
                     await ClearContentEditable(cdp, editorSel);
                     var personaText = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
-                        SlackPostToThread($"ðŸ“‹ *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "â€¦" : personaText)}\n```", "System");
+                        SlackPostToThread($"?? *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "..." : personaText)}\n```", "System");
                     await InsertTextContentEditable(cdp, editorSel, personaText);
                     await Task.Delay(300);
 
@@ -528,11 +528,11 @@ internal partial class Program
                                     })()
                                     """) ?? "";
                                 if (curText.Length == 0) continue;
-                                // Also check stop button â€” if still visible, Gemini is still generating (not truly stable)
+                                // Also check stop button ? if still visible, Gemini is still generating (not truly stable)
                                 var stopNowPersona = await cdp.EvalAsync("""
                                     (() => {
                                         if (document.querySelector('button[aria-label*="Stop"]') ||
-                                            document.querySelector('button[aria-label*="ì¤‘ì§€"]')) return '1';
+                                            document.querySelector('button[aria-label*="ÁßÁö"]')) return '1';
                                         var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
                                         if (mat) { var b=mat.closest('button'); if(b&&(b.getAttribute('aria-label')||'').toLowerCase().includes('stop')) return '1'; }
                                         return '0';
@@ -562,13 +562,13 @@ internal partial class Program
                             if (effectiveLoopPersona && stablePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                                 && ParseAllLoopToolCalls(stablePersonaResp).Count > 0)
                             {
-                                Console.WriteLine($"[ASK] Persona continuation has tool call ({stablePersonaResp.Length} chars) â€” skipping question send");
+                                Console.WriteLine($"[ASK] Persona continuation has tool call ({stablePersonaResp.Length} chars) ? skipping question send");
                                 personaEarlyToolCall = stablePersonaResp;
                             }
                         }
                         else
                         {
-                            Console.WriteLine("[ASK] Persona stability timeout â€” proceeding anyway");
+                            Console.WriteLine("[ASK] Persona stability timeout ? proceeding anyway");
                         }
                         // Re-find editor after persona exchange
                         editorSel = await WaitForEditorA11y(cdp,
@@ -587,17 +587,17 @@ internal partial class Program
                     }
                 }
 
-                // Persona continuation already had tool call â€” skip question send, go directly to loop
+                // Persona continuation already had tool call ? skip question send, go directly to loop
                 if (personaEarlyToolCall != null)
                     return (true, personaEarlyToolCall);
 
                 // Post-persona: if Gemini is still generating (tool call burst after READY),
-                // wait WITHOUT clicking stop â€” stop-click generates poisonous stop-notice responses.
+                // wait WITHOUT clicking stop ? stop-click generates poisonous stop-notice responses.
                 if (effectiveLoopPersona)
                 {
                     Console.WriteLine("[POST-PERSONA] waiting for generation to finish...");
                     var postStopVisible = await WaitWhileGeminiStopVisibleNoClickAsync(cdp, maxWaitMs: 30000);
-                    // Capture last response â€” may contain tool call that Gemini generated post-READY
+                    // Capture last response ? may contain tool call that Gemini generated post-READY
                     var latePersonaResp = await GetGeminiLastResponseAsync(cdp);
                     if (latePersonaResp.Length > 0)
                         Console.WriteLine($"[ASK] Post-persona resp ({latePersonaResp.Length}): {latePersonaResp.Replace('\n', ' ').Substring(0, Math.Min(80, latePersonaResp.Length))}");
@@ -608,7 +608,7 @@ internal partial class Program
                         return (true, latePersonaResp);
                     }
                 }
-                // ?Â€?Â€ Browser exclusive: question input ??send complete ?Â€?Â€
+                // ?€?€ Browser exclusive: question input ??send complete ?€?€
                 // Prepend host handshake proof for loop sessions so Gemini trusts the host is live
                 if (effectiveLoopPersona)
                     question = BuildHostHandshake() + question;
@@ -616,10 +616,10 @@ internal partial class Program
                 using var questionLock = ChromeTabLock.Acquire("Gemini");
                 if (questionLock == null) return (false, (string?)null);
 
-                // ?Â€?Â€ CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ?Â€?Â€
+                // ?€?€ CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ?€?€
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Gemini");
 
-                // ?Â€?Â€ File attachments (before text) ?Â€?Â€
+                // ?€?€ File attachments (before text) ?€?€
                 // Pass prevFgGemini so native file dialog tier can restore original user focus after close
                 if (attachFiles?.Count > 0)
                     await AttachFilesViaCdp(cdp, attachFiles, editorSel, prevFgGemini);
@@ -641,7 +641,7 @@ internal partial class Program
                     }
 
                 }
-                // ?Â€?Â€ Focus theft detection: restore if Chrome stole focus ?Â€?Â€
+                // ?€?€ Focus theft detection: restore if Chrome stole focus ?€?€
                 GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
 
                 // Send: a11y-first (CDP real click on button) ??focusless Enter fallback
@@ -652,14 +652,14 @@ internal partial class Program
                 {
                     var preStopped = await cdp.EvalAsync("""
                         (() => {
-                            if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ì¤‘ì§€"]')) return '1';
+                            if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ÁßÁö"]')) return '1';
                             var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
                             return (mat && mat.closest('button')) ? '1' : '0';
                         })()
                         """) ?? "0";
                     if (preStopped == "1")
                     {
-                        Console.WriteLine("[ASK] Gemini still generating pre-send â€” waiting without interrupt...");
+                        Console.WriteLine("[ASK] Gemini still generating pre-send ? waiting without interrupt...");
                         await WaitWhileGeminiStopVisibleNoClickAsync(cdp, maxWaitMs: 30000);
                         // After Gemini finishes, check if it generated a tool call (loop mode)
                         if (effectiveLoopPersona && personaEarlyToolCall == null)
@@ -675,7 +675,7 @@ internal partial class Program
                             if (lateResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                                 && ParseAllLoopToolCalls(lateResp).Count > 0)
                             {
-                                Console.WriteLine("[ASK] Late persona tool call captured â€” skipping question send");
+                                Console.WriteLine("[ASK] Late persona tool call captured ? skipping question send");
                                 zoom?.ShowPass("tool call");
                                 zoom?.Dispose();
                                 questionLock.Release("late-toolcall");
@@ -692,10 +692,10 @@ internal partial class Program
 
                 for (int sendAttempt = 0; sendAttempt < 5; sendAttempt++)
                 {
-                    // Fast-fail if Gemini is still generating â€” do NOT click stop (poisons response)
+                    // Fast-fail if Gemini is still generating ? do NOT click stop (poisons response)
                     var stopAtSend = await cdp.EvalAsync("""
                         (() => {
-                            if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ì¤‘ì§€"]')) return '1';
+                            if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ÁßÁö"]')) return '1';
                             var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
                             if (mat) { var b=mat.closest('button'); if(b) return '1'; }
                             return '0';
@@ -703,7 +703,7 @@ internal partial class Program
                         """) ?? "0";
                     if (stopAtSend == "1")
                     {
-                        // If editor is already empty, message was sent â€” Gemini is responding (stop = normal)
+                        // If editor is already empty, message was sent ? Gemini is responding (stop = normal)
                         if (sendAttempt > 0)
                         {
                             var editorLen = await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 0") ?? "0";
@@ -720,8 +720,8 @@ internal partial class Program
                             sendResult = $"RESPONSE_IN_PROGRESS(attempt={sendAttempt})";
                             break;
                         }
-                        // Gemini generating before send â€” fast-fail (attempt=0 only, or if editor not cleared)
-                        Console.WriteLine($"[ASK] Gemini still generating at send time (attempt={sendAttempt}) â€” fast-fail");
+                        // Gemini generating before send ? fast-fail (attempt=0 only, or if editor not cleared)
+                        Console.WriteLine($"[ASK] Gemini still generating at send time (attempt={sendAttempt}) ? fast-fail");
                         zoom?.ShowFail("still generating");
                         zoom?.Dispose();
                         questionLock.Release("fast-fail-gen");
@@ -758,7 +758,7 @@ internal partial class Program
                     // JS click() ??works even when Chrome is minimized (no viewport needed)
                     var clickResult = await cdp.EvalAsync("""
                         (() => {
-                            var btn = document.querySelector('button[aria-label="ï§Žë¶¿ë–†ï§žÂ€ è¹‚ëŒ€ê¶¡æ¹²?]')
+                            var btn = document.querySelector('button[aria-label="ë©”ì‹œì§€ ë³´ë‚´ê¸?]')
                                    || document.querySelector('button[aria-label="Send message"]')
                                    || document.querySelector('button.send-button');
                             if (!btn || btn.disabled) return 'NO_BUTTON';
@@ -771,9 +771,9 @@ internal partial class Program
                     {
                         var stopVisibleNow = await cdp.EvalAsync("""
                             (() => {
-                                if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ì¤‘ì§€"]')) return '1';
+                                if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="ÁßÁö"]')) return '1';
                                 var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                                if (mat) { var b=mat.closest('button'); if (b&&((b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('stop')||(b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('ì¤‘ì§€'))) return '1'; }
+                                if (mat) { var b=mat.closest('button'); if (b&&((b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('stop')||(b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('ÁßÁö'))) return '1'; }
                                 return '0';
                             })()
                             """) ?? "0";
@@ -814,7 +814,7 @@ internal partial class Program
 
                 // Count existing responses before polling (skip persona's READY etc.)
                 // Use pre-send count as baseline (preResponseCount already measured before send loop)
-                // If we measured post-send, Gemini may have already added the new response â†’ skipped!
+                // If we measured post-send, Gemini may have already added the new response ¡æ skipped!
                 bool responseAlreadyStarted = sendResult.StartsWith("RESPONSE_", StringComparison.OrdinalIgnoreCase);
                 int baseResponseCount = int.TryParse(preResponseCount, out var brc) ? brc : 0;
                 Console.WriteLine($"[POLL-WAIT] start (base={baseResponseCount}, timeout={timeoutSec}s)...");
@@ -871,7 +871,7 @@ internal partial class Program
                         var diagCount = await cdp.EvalAsync(
                             "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
                         if (diagCount != preResponseCount && sw.Elapsed.TotalSeconds < 10)
-                            Console.WriteLine($"[ASK] Poll: respCount={diagCount} base={baseResponseCount} â€” text empty (filter skipping? check baseline)");
+                            Console.WriteLine($"[ASK] Poll: respCount={diagCount} base={baseResponseCount} ? text empty (filter skipping? check baseline)");
                         continue;
                     }
 
@@ -881,7 +881,7 @@ internal partial class Program
                         if (!liveHeaderPrinted)
                         {
                             Console.WriteLine();
-                            Console.WriteLine("â”€â”€ Gemini (streaming) â”€â”€");
+                            Console.WriteLine("[Gemini] streaming...");
                             liveHeaderPrinted = true;
                         }
                         Console.Write(text.Substring(lastFlushedLen));
@@ -889,13 +889,13 @@ internal partial class Program
                         lastFlushedLen = text.Length;
                         lastFlushTime = DateTime.UtcNow;
 
-                        // Stream-time tool call detection: complete block visible â†’ fire immediately
-                        // No need to wait for 4s stability â€” [TOOL_CALL_END] = call is ready now
+                        // Stream-time tool call detection: complete block visible ¡æ fire immediately
+                        // No need to wait for 4s stability ? [TOOL_CALL_END] = call is ready now
                         if (effectiveLoopPersona
                             && text.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                             && text.Contains("[APPBOT_TOOL_CALL_END]"))
                         {
-                            Console.WriteLine("\nâ”€â”€ [STREAM-TOOLCALL] complete â€” firing immediately â”€â”€");
+                            Console.WriteLine("\n[STREAM-TOOLCALL] complete -- firing immediately");
                             return (true, StripGeminiUiPrefix(text));
                         }
                     }
@@ -911,19 +911,19 @@ internal partial class Program
                     else if (text.Length > 0)
                     { Console.Write($" [RUNNING {sw.Elapsed.TotalSeconds:F0}s]"); Console.Out.Flush(); }
 
-                    // Streaming handoff: text growing â†’ this tab is alive, give active tab to peer
+                    // Streaming handoff: text growing ¡æ this tab is alive, give active tab to peer
                     if (text.Length > lastTextLen && lastTextLen > 0)
                         await HandoffTabToPeer("gemini");
                     lastTextLen = text.Length;
 
                     // Check if response is still generating
-                    // Early-exit: flush idle 1s and enough text â†’ don't wait for full stability
+                    // Early-exit: flush idle 1s and enough text ¡æ don't wait for full stability
                     if (lastFlushedLen > 50 && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 1.0)
                     {
                         var gemEarlyImages = await DetectAndDownloadImages(cdp, geminiKnownImages, "gemini");
                         geminiSavedImages.AddRange(gemEarlyImages);
                         if (liveHeaderPrinted) Console.WriteLine();
-                        Console.WriteLine($"[ASK] Flush idle 1s â†’ early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                        Console.WriteLine($"[ASK] Flush idle 1s -- early done ({sw.Elapsed.TotalSeconds:F0}s)");
                         return (true, text!);
                     }
 
@@ -936,7 +936,7 @@ internal partial class Program
                             var gemFinalImages = await DetectAndDownloadImages(cdp, geminiKnownImages, "gemini");
                             geminiSavedImages.AddRange(gemFinalImages);
                             if (liveHeaderPrinted) Console.WriteLine(); // newline after streamed text
-                            // Tool call takes priority over stop notice â€” Gemini appends stop notice
+                            // Tool call takes priority over stop notice ? Gemini appends stop notice
                             // even when the response is a valid tool call (DOM artifact)
                             bool hasToolCall = text.Contains("[APPBOT_TOOL_CALL_BEGIN]");
                             if (!hasToolCall && IsGeminiStoppedNotice(text))
@@ -951,7 +951,7 @@ internal partial class Program
                                 preStop = StripGeminiUiPrefix(preStop);
                                 if (!string.IsNullOrWhiteSpace(preStop) && preStop.Length >= 3)
                                 {
-                                    Console.WriteLine($"[ASK] Stop notice but answer found before it ({preStop.Length} chars) â€” accepting");
+                                    Console.WriteLine($"[ASK] Stop notice but answer found before it ({preStop.Length} chars) ? accepting");
                                     return (true, preStop);
                                 }
                                 Console.WriteLine("[ASK] Gemini stopped response notice detected; retrying once...");
@@ -965,7 +965,7 @@ internal partial class Program
                                 return (false, retryResult.text ?? text);
                             }
                             if (hasToolCall && IsGeminiStoppedNotice(text))
-                                Console.WriteLine("[ASK] Stop notice present but tool call found â€” ignoring stop notice");
+                                Console.WriteLine("[ASK] Stop notice present but tool call found ? ignoring stop notice");
                             Console.WriteLine($"[ASK] Response received ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
                             if (geminiSavedImages.Count > 0)
                                 Console.WriteLine($"[ASK] Downloaded {geminiSavedImages.Count} generated image(s)");
@@ -1002,7 +1002,7 @@ internal partial class Program
                 await Task.Delay(300);
                 await cdp.EvalAsync("""
                     (() => {
-                        var btn = document.querySelector('button[aria-label="ï§Žë¶¿ë–†ï§žÂ€ è¹‚ëŒ€ê¶¡æ¹²?]')
+                        var btn = document.querySelector('button[aria-label="ë©”ì‹œì§€ ë³´ë‚´ê¸?]')
                                || document.querySelector('button[aria-label="Send message"]')
                                || document.querySelector('button.send-button');
                         if (btn && !btn.disabled) btn.click();
@@ -1062,8 +1062,8 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(answer))
         {
             EnsureSlackThread("Gemini", question);
-            var forSlack = answer; // already stripped of "Geminiì˜ ì‘ë‹µ" prefix by StripGeminiUiPrefix at source
-            // Strip stop notice suffix (e.g. "ëŒ€ë‹µì´ ì¤‘ì§€ë˜ì—ˆìŠµë‹ˆë‹¤") before posting to Slack
+            var forSlack = answer; // already stripped of "GeminiÀÇ ÀÀ´ä" prefix by StripGeminiUiPrefix at source
+            // Strip stop notice suffix (e.g. "´ë´äÀÌ ÁßÁöµÇ¾ú½À´Ï´Ù") before posting to Slack
             foreach (var kw in GeminiStopNoticeKeywords)
             {
                 var ki = forSlack.IndexOf(kw, StringComparison.OrdinalIgnoreCase);
@@ -1071,8 +1071,8 @@ internal partial class Program
             }
             if (!string.IsNullOrWhiteSpace(forSlack))
             {
-                var suffix = ok ? "" : "\nâš ï¸ _ì‘ë‹µ ì¤‘ì§€ë¨_";
-                var post = forSlack.Length > 2000 ? forSlack[..2000] + "â€¦" : forSlack;
+                var suffix = ok ? "" : "\n[send failed]";
+                var post = forSlack.Length > 2000 ? forSlack[..2000] + "..." : forSlack;
                 SlackPostToThread(post + suffix, "Gemini");
             }
         }
@@ -1094,7 +1094,7 @@ internal partial class Program
             // Print answer (truncate for console)
             Console.WriteLine();
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("?Â€?Â€ Gemini ?ë“¬? ?Â€?Â€");
+            Console.WriteLine("[Gemini] Answer:");
             Console.ResetColor();
             Console.WriteLine(answer.Length > 2000 ? answer[..2000] + "\n... (truncated)" : answer);
 

@@ -264,7 +264,13 @@ internal partial class Program
                         ["timeout"] = Prop("integer", "Timeout in ms for wait action (default: 10000)"),
                         ["interval"] = Prop("integer", "Polling interval in ms for wait action (default: 500)"),
                         ["parallel"] = Prop("boolean", "If true, run tools/call asynchronously so MCP loop stays responsive. Unsafe actions are internally queued with 100ms gate polling."),
-                        ["encoding"] = Prop("string", "File encoding for file-read/file-write: 949 (CP949/Korean), 932 (Shift-JIS/Japanese), 65001 (UTF-8, default), utf-16. Enables Claude to read/write CP949 Korean source files without encoding corruption.")
+                        ["encoding"] = Prop("string", "File encoding for file-read/file-write/file-edit: 949 (CP949/Korean), 932 (Shift-JIS/Japanese), 65001 (UTF-8, default), utf-16. Enables Claude to read/write CP949 Korean source files without encoding corruption."),
+                        ["old_string"] = Prop("string", "For file-edit: the exact string to search for in the file. Must match exactly once unless replace_all=true."),
+                        ["replace_all"] = Prop("boolean", "For file-edit: replace ALL occurrences instead of requiring exactly one match."),
+                        ["use_regex"] = Prop("boolean", "For file-edit: treat old_string as a .NET regex pattern. Use $1/$2 capture groups in text (new_string)."),
+                        ["i_really_want_lossy_encoding"] = Prop("boolean", "For file-edit: allow '?' substitution when new text contains chars not encodable in the target charset (e.g. emoji in CP949 file)."),
+                        ["i_really_want_no_backup"] = Prop("boolean", "For file-edit: skip creating a .bak-TIMESTAMP.txt backup file. Default: backup is ON."),
+                        ["context"] = Prop("integer", "For file-edit: number of context lines to show around each change in output (default: 1).")
                     },
                     ["required"] = new JsonArray { "action" }
                 }),
@@ -476,6 +482,13 @@ internal partial class Program
         if (args["interval"] is JsonNode iv) { list.Add("--interval"); list.Add(iv.ToString()); }
         if (args["all"]?.GetValue<bool>() == true) list.Add("--all");
         if (args["encoding"] is JsonNode enc) { list.Add("--encoding"); list.Add(enc.GetValue<string>()); }
+        // file-edit specific params
+        if (args["old_string"] is JsonNode os) { list.Add("--old-string"); list.Add(os.GetValue<string>()); }
+        if (args["replace_all"]?.GetValue<bool>()         == true) list.Add("--replace-all");
+        if (args["use_regex"]?.GetValue<bool>()           == true) list.Add("--regex");
+        if (args["i_really_want_lossy_encoding"]?.GetValue<bool>()== true) list.Add("--i-really-want-lossy-encoding");
+        if (args["i_really_want_no_backup"]?.GetValue<bool>()           == true) list.Add("--i-really-want-no-backup");
+        if (args["context"] is JsonNode ctx) { list.Add("--context"); list.Add(ctx.GetValue<int>().ToString()); }
         return list.ToArray();
     }
 

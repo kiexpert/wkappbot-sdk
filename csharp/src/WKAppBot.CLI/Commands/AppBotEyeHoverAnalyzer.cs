@@ -23,6 +23,10 @@ internal partial class Program
     const int MinUiaLines     = 8;     // UIA result below this → Gemini fallback
     const int HoverPollMs     = 300;   // mouse position poll interval
 
+    // Fixed sentinel HWND for HoverAnalyzer Gemini dispatches.
+    // Ensures all hover scans share a single Gemini tab (sandbox key = "ask+gemini+00A11EEE").
+    static readonly IntPtr HoverGeminiSentinel = new IntPtr(0x00A11EEE);
+
     static volatile Task? _hoverScanTask;        // current scan job (null = idle)
     static volatile IntPtr _lastAnalyzedHwnd;    // prevent re-scan same window
 
@@ -136,22 +140,32 @@ internal partial class Program
             }
             catch (Exception ex) { Console.WriteLine($"[HOVER] Screenshot failed: {ex.Message}"); }
 
-            // Build Gemini prompt
+            // Build Gemini prompt — JSON format for structured parsing
+            var uiaSnippet = uiaTree != null
+                ? string.Join("\n", uiaTree.Split('\n').Take(10))
+                : "(none)";
             var prompt =
-                $"A11Y analysis of window: \"{title}\" (hwnd=0x{hwnd:X8})\n" +
-                $"UIA tree returned only {uiaLines} element(s) — insufficient for automation.\n" +
-                (uiaTree != null ? $"UIA snippet:\n{uiaTree.Split('\n').Take(10).Aggregate((a, b) => a + "\n" + b)}\n\n" : "") +
-                "Please analyze the screenshot and describe:\n" +
-                "1. What kind of UI/app is this?\n" +
-                "2. What interactive elements are visible?\n" +
-                "3. Any a11y automation suggestions (WM_COMMAND IDs, class names, etc.)?";
+                $"A11Y analysis request. Respond ONLY with valid JSON — no markdown fences, no preamble.\n\n" +
+                $"Window: \"{title}\" (hwnd=0x{hwnd:X8}), UIA elements: {uiaLines} (sparse → visual analysis needed)\n" +
+                $"UIA snippet:\n{uiaSnippet}\n\n" +
+                "Return this exact JSON shape:\n" +
+                "{\n" +
+                "  \"ui_type\": \"<app/widget category>\",\n" +
+                "  \"summary\": \"<one sentence plain-text description>\",\n" +
+                "  \"elements\": [{\"name\": \"\", \"type\": \"button|edit|list|label|etc\", \"position\": \"top-left|center|etc\"}],\n" +
+                "  \"automation\": [{\"method\": \"WM_COMMAND|PostMessage|SendInput|UIA|CDP\", \"detail\": \"<specific hint>\"}],\n" +
+                "  \"class_names\": [\"<Win32 class if guessable>\"],\n" +
+                "  \"confidence\": \"high|medium|low\"\n" +
+                "}";
 
+            // --slack: result delivered to Slack so user can see structured JSON response
             var geminiArgs = screenshotPath != null
-                ? new[] { "ask", "gemini", prompt, screenshotPath }
-                : new[] { "ask", "gemini", prompt };
+                ? new[] { "ask", "gemini", prompt, screenshotPath, "--slack" }
+                : new[] { "ask", "gemini", prompt, "--slack" };
 
-            Console.WriteLine($"[HOVER] Dispatching Gemini query{(screenshotPath != null ? " + screenshot" : "")}...");
-            EyeCmdPipeServer.DispatchBg(geminiArgs);
+            Console.WriteLine($"[HOVER] Dispatching Gemini JSON query{(screenshotPath != null ? " + screenshot" : "")}...");
+            // HoverGeminiSentinel → fixed tab key "ask+gemini+00A11EEE" so all hover scans share one tab
+            EyeCmdPipeServer.DispatchBg(geminiArgs, HoverGeminiSentinel);
         }
         catch (Exception ex)
         {
