@@ -131,18 +131,30 @@ internal partial class Program
 
         var senderName = GetSendReplyUsername(printDecision: true);
 
-        // Split long replies: first 5 lines as primary reply, rest as follow-up replies in same thread
-        var (replyHeader, replyOverflow) = SplitMessageForChannel(replyText);
-        var (ok, replyTs) = SlackSendViaApi(botToken, channel, replyHeader, threadTs, username: senderName).GetAwaiter().GetResult();
-        if (ok && replyOverflow != null)
+        // Split only when no target thread: channel post → first paragraph as header, rest as thread.
+        // When replying to an existing thread (threadTs set), send as-is — no splitting needed.
+        bool hasTargetThread = !string.IsNullOrEmpty(threadTs);
+        string? replyOverflow = null;
+        bool ok;
+        if (hasTargetThread)
         {
-            var replyThreadTs = threadTs ?? replyTs; // stay in same thread
-            foreach (var chunk in ChunkText(replyOverflow, 3900))
-                SlackSendViaApi(botToken, channel, chunk, replyThreadTs, username: senderName).GetAwaiter().GetResult();
-            Console.WriteLine($"[SLACK] Thread: {replyOverflow.Split('\n').Length} lines → overflow posted");
+            (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName).GetAwaiter().GetResult();
+        }
+        else
+        {
+            var (replyHeader, overflow) = SplitMessageForChannel(replyText);
+            replyOverflow = overflow;
+            string? replyTs;
+            (ok, replyTs) = SlackSendViaApi(botToken, channel, replyHeader, null, username: senderName).GetAwaiter().GetResult();
+            if (ok && replyOverflow != null)
+            {
+                foreach (var chunk in ChunkText(replyOverflow, 3900))
+                    SlackSendViaApi(botToken, channel, chunk, replyTs, username: senderName).GetAwaiter().GetResult();
+                Console.WriteLine($"[SLACK] Thread: {replyOverflow.Split('\n').Length} lines → overflow posted");
+            }
         }
 
-        var threadNote = !string.IsNullOrEmpty(threadTs) ? " (in-thread)" : "";
+        var threadNote = hasTargetThread ? " (in-thread)" : "";
         if (ok)
         {
             Console.WriteLine($"[SLACK] Replied to #{channel}{threadNote}: {replyText.Split('\n')[0]}{(replyOverflow != null ? " (+thread)" : "")}");
