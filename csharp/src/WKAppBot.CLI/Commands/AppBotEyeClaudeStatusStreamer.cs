@@ -53,10 +53,22 @@ internal partial class Program
         public bool HomeworkNotified;
         public DateTime? LastHomeworkAt; // global cooldown — prevents re-fire across session resets
         public string? FullCwd;          // full workspace path (for JSONL new-session detection)
+
+        // ── Streaming dedup: minimum 1s between Slack chat.update calls ──
+        public DateTime LastSlackStreamAt;
+
+        // ── File-size watermark: only stream edit when JSONL has grown since last post ──
+        // On first tick with known CWD, watermark is calibrated to current size (skip re-streaming old state).
+        public long LastPostedJsonlSize;
+        public bool JsonlSizeInitialized;
     }
 
     // Per-hwnd instance state dictionary. Entries added on first encounter, purged when window gone.
     static readonly Dictionary<IntPtr, ClaudeInstanceState> _instanceStates = new();
+
+    // Stale status messages collected at Eye startup — deleted after first successful new post.
+    // Avoids the gap: "old deleted → 1s pause → new posted".
+    static readonly List<string> _staleStatusTsOnStartup = new();
 
     // Cached hwnd of appbot's own VS Code window (the WKAppBot project window).
     // Updated by status streaming loop. Used as routing fallback when title-based CWD match fails.
@@ -69,7 +81,7 @@ internal partial class Program
             state = new ClaudeInstanceState();
             // Try to find a CWD label from cached cards matching this hwnd's PID
             state.CwdLabel = ResolveInstanceCwdLabel(hwnd);
-            // Restore Slack TS + last text + status type from window props (persisted across Eye restart)
+            // Restore Slack TS + last text + status type + pending buffer from window props (persisted across Eye restart)
             state.SlackStatusTs = GetWindowStringProp(hwnd, PropSlackTs);
             state.LastSlackStatusText = GetWindowStringProp(hwnd, PropAiOut);
             state.LastStatusType = GetWindowStringProp(hwnd, PropStatusType);
@@ -493,14 +505,31 @@ internal partial class Program
                                 slackText = $"{statusEmoji} {slackLabel}Claude: {claudeStatus.Item2}";
                             }
 
-                            if (slackText == state.LastSlackStatusText) goto skipStatusStreaming;
+                            // File-size watermark: only stream if JSONL has grown since last successful post/edit
+                            var (_, _, _, curJsonlSize) = GetContextInfoForCwdEx(state.FullCwd);
+                            if (!state.JsonlSizeInitialized && curJsonlSize > 0)
+                            {
+                                state.LastPostedJsonlSize = curJsonlSize;
+                                state.JsonlSizeInitialized = true;
+                                goto skipStatusStreaming;
+                            }
+                            if (curJsonlSize > 0 && curJsonlSize <= state.LastPostedJsonlSize) goto skipStatusStreaming;
+
+                            // Streaming dedup: skip if last Slack update was < 1s ago (prevents API spam on rapid JSONL changes)
+                            if ((DateTime.UtcNow - state.LastSlackStreamAt).TotalSeconds < 1.0) goto skipStatusStreaming;
+                            state.LastSlackStreamAt = DateTime.UtcNow;
+
 
                             {
                                 var instanceUsername = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
-                                Task.Run(async () => await PostOrUpdateAiStatusAsync(
-                                    hwnd, state, slackText, claudeStatus.Item1,
-                                    slackBotToken!, slackChannel!, instanceUsername, statusTsFile, primaryHwnd))
-                                    .Wait(5000);
+                                var capturedJsonlSize = curJsonlSize;
+                                // Fire-and-forget — do NOT Wait() here; FSW can trigger status updates rapidly
+                                // and blocking the Eye loop for 5s per update causes visible streaming lag.
+                                _ = Task.Run(async () =>
+                                {
+                                    try { await PostOrUpdateAiStatusAsync(hwnd, state, slackText, claudeStatus.Item1, slackBotToken!, slackChannel!, instanceUsername, statusTsFile, primaryHwnd, capturedJsonlSize); }
+                                    catch (Exception ex) { Console.WriteLine($"[EYE] PostOrUpdateAiStatus error: {ex.Message}"); }
+                                });
                             }
                         }
                         catch { /* best-effort */ }
@@ -729,9 +758,9 @@ internal partial class Program
 
     // ── Window prop string helpers (GlobalAtom-based, survives Eye restart) ──────────
     // Prop names written to the AI app window (VS Code / Codex / Claude Desktop)
-    private const string PropAiOut    = "WKAppBot.AiOut";  // last AI output line
-    private const string PropSlackTs  = "WKAppBot.SlTs";  // last Slack status message TS
-    private const string PropStatusType = "WKAppBot.StType"; // last status type (executing/idle/etc.)
+    private const string PropAiOut      = "WKAppBot.AiOut";    // last AI output line
+    private const string PropSlackTs    = "WKAppBot.SlTs";     // last Slack status message TS
+    private const string PropStatusType = "WKAppBot.StType";   // last status type (executing/idle/etc.)
 
     /// <summary>Store a short string (≤240 chars) in a window property via GlobalAtom.</summary>
     static void SetWindowStringProp(IntPtr hwnd, string propName, string? value)
@@ -777,7 +806,7 @@ internal partial class Program
         IntPtr hwnd, ClaudeInstanceState state,
         string slackText, string statusType,
         string slackBotToken, string slackChannel, string instanceUsername,
-        string statusTsFile, IntPtr claudeHwnd)
+        string statusTsFile, IntPtr claudeHwnd, long jsonlSize = 0)
     {
         // ── Step 1: Is our status message still the latest in the channel? ──────────────────
         // "Latest = ours" → edit in place (streaming).
@@ -801,16 +830,19 @@ internal partial class Program
         // ── Step 2: Edit in place if we are the latest (and no replies on our message) ──────
         if (latestIsOurs && !hasReplies)
         {
-            if (slackText == state.LastSlackStatusText) return;  // no change — skip API
-
-            var (ok, _) = await SlackUpdateMessageAsync(slackBotToken, slackChannel, state.SlackStatusTs!, slackText);
+            var (ok, _, editError) = await SlackUpdateMessageAsync(slackBotToken, slackChannel, state.SlackStatusTs!, slackText);
             if (ok)
             {
                 state.LastStatusType = statusType;
                 state.LastSlackStatusText = slackText;
+                if (jsonlSize > 0) state.LastPostedJsonlSize = jsonlSize; // advance watermark
                 SetWindowStringProp(hwnd, PropAiOut, slackText);
                 SetWindowStringProp(hwnd, PropStatusType, statusType);
                 Console.WriteLine($"[EYE] Edit [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
+            }
+            else
+            {
+                Console.WriteLine($"[EYE] Edit failed ({editError}) {slackText.Length}B");
             }
             return;
         }
@@ -846,18 +878,48 @@ internal partial class Program
             state.SlackStatusTs = ts;
             state.LastStatusType = statusType;
             state.LastSlackStatusText = slackText;
+            if (jsonlSize > 0) state.LastPostedJsonlSize = jsonlSize; // advance watermark
             if (hwnd == claudeHwnd)
                 try { File.WriteAllText(statusTsFile, ts); } catch { }
             SetWindowStringProp(hwnd, PropSlackTs, ts);
             SetWindowStringProp(hwnd, PropAiOut, slackText);
             SetWindowStringProp(hwnd, PropStatusType, statusType);
             Console.WriteLine($"[EYE] Post [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
+
+            // Sweep stale startup messages now that the new post is visible (no gap).
+            // Delay 8s so all instances finish their first tick and populate _instanceStates —
+            // then read active ts from window atom props directly (most reliable source).
+            if (_staleStatusTsOnStartup.Count > 0)
+            {
+                var pendingStale = _staleStatusTsOnStartup.ToList();
+                _staleStatusTsOnStartup.Clear();
+                var newTs = ts;
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(8000); // let all instances load state
+                    // Read active ts from window atom props (authoritative, even if _instanceStates not yet populated)
+                    var activeFromProps = ClaudePromptHelper.GetAllCachedPrompts()
+                        .Select(p => GetWindowStringProp(p.WindowHandle, PropSlackTs))
+                        .Where(t => t != null)
+                        .ToHashSet()!;
+                    // Also include in-memory instance states (belt-and-suspenders)
+                    foreach (var s in _instanceStates.Values)
+                        if (s.SlackStatusTs != null) activeFromProps.Add(s.SlackStatusTs);
+                    activeFromProps.Add(newTs);
+                    var stale = pendingStale.Where(x => !activeFromProps.Contains(x)).ToList();
+                    if (stale.Count > 0)
+                    {
+                        foreach (var staleTs in stale)
+                            await SlackDeleteMessageAsync(slackBotToken, slackChannel, staleTs);
+                        Console.WriteLine($"[EYE] Swept {stale.Count} stale status message(s) after first post");
+                    }
+                });
+            }
         }
-        else if (!postOk)
+        else
         {
-            Console.WriteLine($"[EYE] Post FAILED [{statusType}]: {slackText[..Math.Min(slackText.Length, 60)]}");
+            Console.WriteLine($"[EYE] Post FAILED [{statusType}] ({slackText.Length}B)");
         }
-        state.LastSlackStatusText = slackText;
     }
 
     // ── Homework injection ────────────────────────────────────────────────────────────────
@@ -899,12 +961,9 @@ internal partial class Program
     static void CheckAndSendHomework(ClaudeInstanceState state, IntPtr hwnd, string label)
     {
         state.HomeworkNotified = true;  // set first — prevent double-fire even on exception
-        state.LastHomeworkAt = DateTime.UtcNow; // 1h global cooldown (see idle check condition)
-
-        // Persist to disk — survives Eye restarts
+        // NOTE: LastHomeworkAt (1h cooldown) is set only after successful delivery — not here.
+        // This allows skip-and-retry without waiting 1h.
         var cwdKey = state.FullCwd ?? state.CwdLabel;
-        if (!string.IsNullOrEmpty(cwdKey))
-            SaveHomeworkAt(cwdKey, state.LastHomeworkAt.Value);
 
         var suggPath = Path.Combine(DataDir, "suggestions.jsonl");
         if (!File.Exists(suggPath)) return;
@@ -961,8 +1020,22 @@ internal partial class Program
             var pi = ph.FindPromptForCwd(state.FullCwd ?? state.CwdLabel);
             if (pi != null)
             {
-                ClaudePromptHelper.AllowFocusSteal = true;
-                ph.TypeAndSubmit(pi, prompt);
+                // Snapshot situation and decide delivery strategy
+                var ctx = PromptDeliveryContext.Snapshot(pi.WindowHandle, PromptAction.TypeAndSubmit);
+                Console.WriteLine($"[EYE] {label}Homework ctx: {ctx}");
+                if (ctx.Decide() == PromptDeliveryDecision.Skip)
+                {
+                    state.HomeworkNotified = false; // re-arm for next idle cycle
+                    Console.WriteLine($"[EYE] {label}Homework skipped — user active (idle={ctx.IdleSeconds:F0}s), will retry next idle");
+                    return;
+                }
+
+                // Set 1h cooldown now (delivery confirmed) — persisted to disk
+                state.LastHomeworkAt = DateTime.UtcNow;
+                if (!string.IsNullOrEmpty(cwdKey))
+                    SaveHomeworkAt(cwdKey, state.LastHomeworkAt.Value);
+
+                ph.TypeAndSubmit(pi, prompt, ctx);
             }
             else
             {
@@ -975,4 +1048,5 @@ internal partial class Program
             Console.Error.WriteLine($"[EYE] Homework delivery failed: {ex.Message}");
         }
     }
+
 }

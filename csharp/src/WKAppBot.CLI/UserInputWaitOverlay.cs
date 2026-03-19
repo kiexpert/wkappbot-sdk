@@ -3,6 +3,7 @@ using System.Media;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using WKAppBot.Win32.Native;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -464,27 +465,16 @@ internal sealed class UserInputWaitWindow : Window
     private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
     /// <summary>
-    /// Restore foreground to target using AttachThreadInput (bypasses foreground lock).
-    /// Called on deny/ESC so the OS doesn't fall back to Chrome in Z-order.
+    /// Restore foreground to target window.
+    /// Called on confirm/deny so the OS doesn't fall back to Chrome in Z-order.
     /// </summary>
     private static void RestoreFocus(IntPtr target)
     {
         if (target == IntPtr.Zero) return;
-        var curThread = GetCurrentThreadId();
-        var prevThread = GetWindowThreadProcessId(target, out _);
-        bool attached = false;
-        try
-        {
-            if (curThread != prevThread)
-                attached = AttachThreadInput(curThread, prevThread, true);
-            SetForegroundWindow(target);
-        }
+        // Use raw SetForegroundWindow — SmartSetForeground would re-enter CheckActiveGuard
+        // and spawn another overlay on top of the one we just confirmed. [FOCUS-GUARD]
+        try { SetForegroundWindowRaw(target); }
         catch { /* non-fatal — best effort */ }
-        finally
-        {
-            if (attached)
-                AttachThreadInput(curThread, prevThread, false);
-        }
     }
 
     // ── Win32 P/Invoke ──
@@ -500,19 +490,10 @@ internal sealed class UserInputWaitWindow : Window
     private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 
     [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
 
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
-
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
-
-    [DllImport("user32.dll")]
-    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+    [DllImport("user32.dll", EntryPoint = "SetForegroundWindow")]
+    private static extern bool SetForegroundWindowRaw(IntPtr hWnd);
 }
 
 /// <summary>

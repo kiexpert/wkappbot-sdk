@@ -18,6 +18,8 @@ internal partial class Program
             return SuggestResolveCommand(args[1..]);
         if (args.Length > 0 && args[0] is "list" or "ls")
             return SuggestListCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "repost")
+            return SuggestRepostCommand(args[1..]);
 
         if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
         {
@@ -35,6 +37,7 @@ internal partial class Program
             Console.WriteLine("Subcommands:");
             Console.WriteLine("  list / ls              Show pending suggestions");
             Console.WriteLine("  resolve <ts> \"note\"   Mark resolved + Slack thread reply");
+            Console.WriteLine("  repost [ts]            Re-post to Slack entries missing slack_ts, write ID back");
             Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  wkappbot suggest \"Magnifier doesn't appear when form opens\"");
@@ -170,7 +173,15 @@ internal partial class Program
         }
 
         // ── Auto-sync slack_ts: fetch Slack messages since latest HQ entry ──
-        var entries = lines.Select(l => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(l)!).ToList();
+        var entries = lines
+            .Select(l => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(l)!)
+            .Where(e => e["review_status"]?.GetValue<string>() != "done") // skip resolved items
+            .ToList();
+        if (entries.Count == 0)
+        {
+            Console.WriteLine("[SUGGEST] No pending suggestions. 🎉");
+            return 0;
+        }
         var unsynced = entries.Where(e => e["slack_ts"] == null || e["slack_ts"]?.GetValue<string>() == null).ToList();
 
         if (unsynced.Count > 0)
@@ -311,6 +322,92 @@ internal partial class Program
 
         Console.WriteLine(new string('─', 100));
         Console.WriteLine($"  🔗 = Slack ts recorded  |  resolve: wkappbot suggest resolve <ts> \"note\"");
+        return 0;
+    }
+
+    /// <summary>suggest repost [ts] — re-post entries missing slack_ts and write the new ID back.</summary>
+    static int SuggestRepostCommand(string[] args)
+    {
+        var tsPrefix = args.Length > 0 ? args[0] : null;
+
+        var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+        var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
+
+        if (!File.Exists(jsonlPath))
+        {
+            Console.Error.WriteLine("[REPOST] suggestions.jsonl not found");
+            return 1;
+        }
+
+        var botToken = LoadSlackBotToken();
+        if (string.IsNullOrEmpty(botToken))
+        {
+            Console.Error.WriteLine("[REPOST] No bot_token — cannot send to Slack");
+            return 1;
+        }
+
+        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        bool changed = false;
+        int reposted = 0;
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            JsonNode? node;
+            try { node = JsonSerializer.Deserialize<JsonNode>(lines[i]); } catch { continue; }
+            if (node == null) continue;
+
+            var entryTs = node["ts"]?.GetValue<string>() ?? "";
+            var reviewStatus = node["review_status"]?.GetValue<string>() ?? "";
+            var existingSlackTs = node["slack_ts"]?.GetValue<string>();
+
+            // Skip resolved entries
+            if (reviewStatus == "done") continue;
+            // If ts filter given, skip non-matching
+            if (tsPrefix != null && !entryTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+            // Skip if already has slack_ts (unless explicit ts filter)
+            if (tsPrefix == null && existingSlackTs != null) continue;
+
+            var text = node["text"]?.GetValue<string>() ?? "";
+            var from = node["from"]?.GetValue<string>() ?? "unknown";
+            var preview = text.Split('\n')[0];
+            if (preview.Length > 60) preview = preview[..60] + "…";
+            Console.WriteLine($"[REPOST] {entryTs[..16]} [{from}] {preview}");
+
+            var msgLines = new List<string> { $":memo: *[건의]* from `{from}`" };
+            foreach (var part in text.Split('\n'))
+                msgLines.Add(part);
+            var slackMsg = string.Join("\n", msgLines);
+            var (header, overflow) = SplitMessageForChannel(slackMsg);
+            var senderName = $"앱봇건의[{from}]";
+
+            var (ok, newTs) = SlackSendViaApi(botToken, SuggestChannel, header, username: senderName).GetAwaiter().GetResult();
+            if (!ok || string.IsNullOrEmpty(newTs))
+            {
+                Console.Error.WriteLine($"[REPOST] Slack send failed for {entryTs}");
+                continue;
+            }
+
+            // Post overflow
+            if (overflow != null)
+            {
+                foreach (var chunk in ChunkText(overflow, 3900))
+                    SlackSendViaApi(botToken, SuggestChannel, chunk, threadTs: newTs, username: senderName).GetAwaiter().GetResult();
+            }
+
+            Console.WriteLine($"[REPOST] Sent → slack_ts={newTs}");
+
+            // Write slack_ts back into the line
+            var obj = JsonSerializer.Deserialize<Dictionary<string, object?>>(lines[i])!;
+            obj["slack_ts"] = (object?)newTs;
+            lines[i] = JsonSerializer.Serialize(obj);
+            changed = true;
+            reposted++;
+        }
+
+        if (changed)
+            File.WriteAllLines(jsonlPath, lines);
+
+        Console.WriteLine(reposted > 0 ? $"[REPOST] Done: {reposted} reposted, slack_ts saved." : "[REPOST] Nothing to repost.");
         return 0;
     }
 

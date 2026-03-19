@@ -14,12 +14,12 @@ internal static class A11yHotkeyScanner
 {
     // ── 풀스캔 + 누적 머지 ────────────────────────────────────────
 
-    public static void ScanAndMerge(IntPtr hwnd, AutomationElement? el, string processName)
+    public static void ScanAndMerge(IntPtr hwnd, AutomationElement? el, string processName, string? exeVersion = null)
     {
-        Console.WriteLine($"[HOTKEY-DB] Scanning '{processName}'...");
+        Console.WriteLine($"[HOTKEY-DB] Scanning '{processName}' (fast)...");
         var newEntries = new List<HotkeyDbEntry>();
 
-        // ① Win32 컨트롤 레이블
+        // ① Win32 컨트롤 레이블 (빠름)
         var parentHwnd = GetParentHwnd(hwnd, el);
         if (parentHwnd != IntPtr.Zero)
         {
@@ -30,18 +30,18 @@ internal static class A11yHotkeyScanner
             }
         }
 
-        // ② Win32 메뉴 (다국어 리소스 포함)
-        foreach (var (label, itemId) in Win32ShortcutActivator.BuildMenuTextMapAllLangs(hwnd))
+        // ② 라이브 HMENU — 현재 표시 언어만 (빠름, ~1ms)
+        foreach (var (label, itemId) in Win32ShortcutActivator.BuildMenuTextMapLive(hwnd))
             newEntries.Add(new HotkeyDbEntry(label, "win32_menu", "menu_cmd", itemId, null, null));
 
-        // ③ UIA AccessKey / AcceleratorKey
+        // ③ UIA AccessKey / AcceleratorKey (빠름)
         if (el != null)
         {
             try
             {
                 foreach (var desc in el.FindAllDescendants())
                 {
-                    var name     = desc.Properties.Name.ValueOrDefault ?? "";
+                    var name      = desc.Properties.Name.ValueOrDefault ?? "";
                     var accessKey = desc.Properties.AccessKey.ValueOrDefault ?? "";
                     var accelKey  = desc.Properties.AcceleratorKey.ValueOrDefault ?? "";
                     if (string.IsNullOrWhiteSpace(name)) continue;
@@ -54,9 +54,26 @@ internal static class A11yHotkeyScanner
             catch { }
         }
 
-        int added = HotkeyExperienceDb.Merge(processName, newEntries);
+        int added = HotkeyExperienceDb.Merge(processName, newEntries, exeVersion);
         HotkeyExperienceDb.MarkSessionScanned(processName);
-        Console.WriteLine($"[HOTKEY-DB] Scan done — {newEntries.Count} found, {added} new merged");
+        Console.WriteLine($"[HOTKEY-DB] Fast scan done — {newEntries.Count} found, {added} new merged");
+
+        // ④ 백그라운드: 다국어 리소스 스캔 (LoadLibraryExW, 느림)
+        // 메인 스레드 차단 없이 추가 언어팩 메뉴 항목 보충
+        var bgHwnd = hwnd; var bgProc = processName; var bgVer = exeVersion;
+        Task.Run(() =>
+        {
+            try
+            {
+                var bgEntries = Win32ShortcutActivator.BuildMenuResourceAllLangs(bgHwnd)
+                    .Select(t => new HotkeyDbEntry(t.Label, "win32_menu", "menu_cmd", t.ItemId, null, null))
+                    .ToList();
+                var bgAdded = HotkeyExperienceDb.Merge(bgProc, bgEntries, bgVer);
+                if (bgAdded > 0)
+                    Console.WriteLine($"[HOTKEY-DB] BG multi-lang scan — {bgAdded} additional entries merged");
+            }
+            catch (Exception ex) { Console.WriteLine($"[HOTKEY-DB] BG scan error: {ex.Message}"); }
+        });
     }
 
     // ── 발동 전 라이브 검증 ───────────────────────────────────────
@@ -66,7 +83,7 @@ internal static class A11yHotkeyScanner
     /// 스태일이면 DB에서 제거하고 false 반환.
     /// shortcut 타입은 항상 유효 (키 조합은 불변).
     /// </summary>
-    public static bool Verify(HotkeyDbEntry entry, IntPtr hwnd, IntPtr parentHwnd, string processName)
+    public static bool Verify(HotkeyDbEntry entry, IntPtr hwnd, IntPtr parentHwnd, string processName, string? exeVersion = null)
     {
         bool valid = entry.Method switch
         {
@@ -79,7 +96,7 @@ internal static class A11yHotkeyScanner
         if (!valid)
         {
             Console.WriteLine($"[HOTKEY-DB] Stale entry '{entry.Label}' ({entry.Method}) — removing");
-            HotkeyExperienceDb.RemoveStale(processName, [entry.Label]);
+            HotkeyExperienceDb.RemoveStale(processName, [entry.Label], exeVersion);
         }
         return valid;
     }

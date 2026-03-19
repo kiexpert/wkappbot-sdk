@@ -245,6 +245,8 @@ internal partial class Program
             }
             threadTs = ts;
             Console.WriteLine($"[SLACK] Sent: {header.Split('\n')[0]}{(overflow != null ? " (+thread)" : "")}");
+            if (GetCustomSlackIcon(EyeCmdPipeServer.CallerCwd.Value) == null)
+                Console.WriteLine("[SLACK] 💡 Tip: 프로필 이모찌 커스텀 → {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
 
             // Post overflow as thread reply (chunked at 3900 chars)
             if (overflow != null)
@@ -356,13 +358,43 @@ internal partial class Program
     /// Send message via chat.postMessage API. If threadTs is provided, replies in-thread.
     /// Returns (ok, message_ts) — message_ts is the timestamp of the sent message (for thread tracking).
     /// </summary>
+    /// <summary>Read custom icon from {callerCwd}/.wkappbot/slack_icon.txt.
+    /// First line: emoji (e.g. :hammer:) or https://... image URL.
+    /// Returns null when file absent — caller uses bot's default profile picture.</summary>
+    static string? GetCustomSlackIcon(string? callerCwd)
+    {
+        if (string.IsNullOrWhiteSpace(callerCwd)) return null;
+        try
+        {
+            var iconFile = Path.Combine(callerCwd, ".wkappbot", "slack_icon.txt");
+            if (!File.Exists(iconFile)) return null;
+            var line = File.ReadAllText(iconFile).Trim();
+            return string.IsNullOrEmpty(line) ? null : line;
+        }
+        catch { return null; }
+    }
+
     static async Task<(bool ok, string? ts)> SlackSendViaApi(string botToken, string channel, string text, string? threadTs = null, string? username = null)
     {
         using var http = new HttpClient();
         // Build payload with optional username override for multi-bot identification
         var dict = new Dictionary<string, object> { ["channel"] = channel, ["text"] = text };
         if (!string.IsNullOrEmpty(threadTs)) dict["thread_ts"] = threadTs;
-        if (!string.IsNullOrEmpty(username)) dict["username"] = username;
+        if (!string.IsNullOrEmpty(username))
+        {
+            dict["username"] = username;
+            // Custom icon from workspace .wkappbot/slack_icon.txt — absent = bot default profile
+            var callerCwd = EyeCmdPipeServer.CallerCwd.Value;
+            var icon = GetCustomSlackIcon(callerCwd);
+            if (icon != null)
+            {
+                if (icon.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                 || icon.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    dict["icon_url"] = icon;
+                else
+                    dict["icon_emoji"] = icon;
+            }
+        }
         var payload = JsonSerializer.Serialize(dict);
         var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
 
@@ -1035,8 +1067,13 @@ internal partial class Program
         Console.WriteLine("                        C0... = channel, 1234.5678 = message → auto thread");
         Console.WriteLine("                        reply ts → parent thread auto-detected");
         Console.WriteLine("                        --delete-pattern: delete matching r=0 messages");
+        Console.WriteLine("  delete <ts> [ts2 ...]  Delete message(s) by timestamp");
+        Console.WriteLine("                        Thread-starter messages (has replies) are protected by default");
+        Console.WriteLine("                        --i-really-want-to-delete-including-replies: override protection");
         Console.WriteLine();
         Console.WriteLine($"Config: {SlackConfigPath}");
+        Console.WriteLine();
+        Console.WriteLine("💡 Tip: 봇 프로필 이모찌/사진 커스텀 → {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
         return 1;
     }
 }

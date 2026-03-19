@@ -88,11 +88,13 @@ internal partial class Program
     static volatile bool _fswPromptDirty;
     static volatile string? _fswPromptChangedFile; // last changed file name for filtering
     static volatile bool _fswExeDirty; // hot-swap: exe binary changed
+    static volatile bool _fswClaudeJsonlDirty; // reserved (FSW removed — kept to avoid refactor)
     static FileSystemWatcher? _fswTick;
     static FileSystemWatcher? _fswPrompt;
     static FileSystemWatcher? _fswExe;
     static FileSystemWatcher? _fswExeNew; // hot-swap: .new.exe staged file
     static FileSystemWatcher? _fswMcp;
+    static FileSystemWatcher? _fswClaudeJsonl; // Claude Code projects JSONL (~/.claude/projects/**/*.jsonl)
     static readonly HashSet<string> _mcpTabsOpened = new(StringComparer.OrdinalIgnoreCase);
 
     // ── Memory tracking ──
@@ -224,6 +226,9 @@ internal partial class Program
         _ = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
         Console.WriteLine($"[EYE] Eye pipe server started (elevated={elevated})");
 
+        // ── A11Y Heal Scan: mouse still 7s → UIA dump → Gemini fallback ──
+        StartHoverAnalyzer(cts.Token);
+
         if (_lastTickActivityUtc == DateTime.MinValue) _lastTickActivityUtc = DateTime.UtcNow;
         if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
 
@@ -298,13 +303,11 @@ internal partial class Program
                     Console.WriteLine("[EYE] Slack Socket Mode connected (GlobalMode)");
                     Console.ResetColor();
 
-                    // Startup: sweep stale bot status/idle messages (not just saved ts)
-                    // Fixes: hot-swap race leaves orphan idle messages in channel
-                    // NOTE: :gear: (executing) messages are NOT deleted — inherited as previousStatusTs
-                    //       so the streaming mechanism updates them rather than orphaning them.
+                    // Startup: collect stale status messages (reply_count==0) — do NOT delete yet.
+                    // Deletion happens after first new post succeeds (PostOrUpdateAiStatusAsync),
+                    // so the old message stays visible until the new one appears — no gap.
                     {
-                        int swept = 0;
-                        string? inheritedGearTs = null;
+                        _staleStatusTsOnStartup.Clear();
                         try
                         {
                             using var http = new HttpClient();
@@ -320,7 +323,6 @@ internal partial class Program
                                     var text = m?["text"]?.GetValue<string>() ?? "";
                                     var botId = m?["bot_id"]?.GetValue<string>();
                                     var subtype = m?["subtype"]?.GetValue<string>();
-                                    // Only process bot messages that are status patterns
                                     if (botId != null || subtype == "bot_message")
                                     {
                                         bool isStatus = text.StartsWith(":zzz:") || text.StartsWith(":gear:")
@@ -331,39 +333,17 @@ internal partial class Program
                                             var ts = m?["ts"]?.GetValue<string>();
                                             var replyCount = m?["reply_count"]?.GetValue<int>() ?? 0;
                                             if (ts != null && replyCount == 0)
-                                            {
-                                                if (text.StartsWith(":gear:"))
-                                                {
-                                                    // :gear: = executing status — inherit instead of delete
-                                                    // so the new Eye can update it (→ :zzz: if idle, or keep :gear:)
-                                                    inheritedGearTs ??= ts; // take the most recent one
-                                                }
-                                                else
-                                                {
-                                                    Task.Run(async () => await SlackDeleteMessageAsync(
-                                                        slackBotToken!, slackChannel!, ts)).Wait(2000);
-                                                    swept++;
-                                                }
-                                            }
+                                                _staleStatusTsOnStartup.Add(ts);
                                         }
                                     }
                                 }
                             }
                         }
                         catch { }
-                        if (swept > 0)
-                            Console.WriteLine($"[EYE] Swept {swept} stale status message(s)");
-                        if (inheritedGearTs != null)
-                        {
-                            previousStatusTs = inheritedGearTs;
-                            try { File.WriteAllText(statusTsFile, inheritedGearTs); } catch { }
-                            Console.WriteLine($"[EYE] Inherited :gear: status ts={inheritedGearTs} (will update, not delete)");
-                        }
-                        else
-                        {
-                            try { File.WriteAllText(statusTsFile, ""); } catch { }
-                            previousStatusTs = null;
-                        }
+                        if (_staleStatusTsOnStartup.Count > 0)
+                            Console.WriteLine($"[EYE] {_staleStatusTsOnStartup.Count} stale status message(s) pending — will sweep after first post");
+                        try { File.WriteAllText(statusTsFile, ""); } catch { }
+                        previousStatusTs = null;
                     }
                     string? startupTs = null;
 
@@ -687,12 +667,11 @@ internal partial class Program
                 TryDeleteOldExes();
 
             // ── Claude Desktop status detection (~every 1 sec) ──
+            // Per-instance JSONL size watermark inside RunClaudeStatusTick handles dedup.
             if (frameCount % 10 == 0)
-            {
                 cachedClaudeStatusText = RunClaudeStatusTick(
                     ref claudeHwnd, slackBotToken, slackChannel, botUsername,
                     slackClient, statusTsFile, contextWarnedPcts);
-            }
 
             // ── Schedule executor + Route retry (~every 10 seconds) ──
             if (frameCount % 100 == 50)
@@ -1178,7 +1157,9 @@ internal partial class Program
             Console.WriteLine($"[EYE][FSW] Prompt watcher init failed: {ex.Message}");
         }
 
-        // ── 3. EXE file watcher (hot-swap: instant binary change detection) ──
+        // Claude Code JSONL: 1s polling only — FSW removed (per-instance watermark sufficient)
+
+        // ── 4. EXE file watcher (hot-swap: instant binary change detection) ──
         try
         {
             var selfExe = Environment.ProcessPath ?? "";
@@ -1271,6 +1252,8 @@ internal partial class Program
     /// </summary>
     static void EyeOpenConsoleWtTab(string logFilePath)
     {
+        // wt.exe 자동 탭 오픈 비활성화 — 포커스 간섭 없이 필요할 때 수동으로 열어서 사용
+        return;
         try
         {
             var fileName = Path.GetFileNameWithoutExtension(logFilePath);

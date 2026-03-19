@@ -101,6 +101,26 @@ internal partial class Program
                     return true;
                 }
             }
+            else
+            {
+                // Flutter FAB / nested-label pattern: matched element (e.g. Text child) has no
+                // InvokePattern, but ancestor (FloatingActionButton / Button) does.
+                // Walk up UIA parent chain up to 5 levels.
+                var ancestor = el;
+                for (int lvl = 0; lvl < 5; lvl++)
+                {
+                    try { ancestor = ancestor.Parent; } catch { break; }
+                    if (ancestor == null) break;
+                    try { if (ancestor.Properties.NativeWindowHandle.ValueOrDefault != IntPtr.Zero) break; } catch { }
+                    if (UiaLocator.TryInvoke(ancestor))
+                    {
+                        var aName = ancestor.Properties.Name.ValueOrDefault ?? "";
+                        Console.WriteLine($"[A11Y] invoke — UIA Invoke ancestor[+{lvl + 1}] '{aName}'");
+                        RecordTierSuccess(elHwnd, el, "invoke", "UIA Invoke (ancestor)", KnowhowCategory.MinFocus);
+                        return true;
+                    }
+                }
+            }
         }
 
         // Tier 2: BM_CLICK (focusless)

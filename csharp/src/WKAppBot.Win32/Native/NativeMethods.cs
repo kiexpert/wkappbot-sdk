@@ -630,6 +630,59 @@ public static partial class NativeMethods
         return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
     }
 
+    // ── UIPI integrity level ───────────────────────────────────
+
+    [DllImport("advapi32.dll", EntryPoint = "GetTokenInformation", SetLastError = true)]
+    private static extern bool GetTokenInformationPtr(
+        IntPtr TokenHandle, int TokenInformationClass,
+        IntPtr TokenInformation, uint TokenInformationLength, out uint ReturnLength);
+
+    private const int TokenIntegrityLevel = 25;
+
+    /// <summary>
+    /// Get integrity level of a process. Returns 0x1000=Low, 0x2000=Medium, 0x3000=High, 0x4000=System.
+    /// Returns 0x2000 (Medium) on any access failure.
+    /// </summary>
+    public static uint GetProcessIntegrityLevel(uint processId)
+    {
+        var hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+        if (hProcess == IntPtr.Zero) return 0x2000;
+        try
+        {
+            if (!OpenProcessToken(hProcess, TOKEN_QUERY, out var hToken)) return 0x2000;
+            try { return ReadIntegrityLevel(hToken); }
+            finally { CloseHandle(hToken); }
+        }
+        finally { CloseHandle(hProcess); }
+    }
+
+    /// <summary>Get integrity level of the current process.</summary>
+    public static uint GetCurrentProcessIntegrityLevel()
+    {
+        if (!OpenProcessToken(System.Diagnostics.Process.GetCurrentProcess().Handle, TOKEN_QUERY, out var hToken))
+            return 0x2000;
+        try { return ReadIntegrityLevel(hToken); }
+        finally { CloseHandle(hToken); }
+    }
+
+    private static uint ReadIntegrityLevel(IntPtr hToken)
+    {
+        GetTokenInformationPtr(hToken, TokenIntegrityLevel, IntPtr.Zero, 0, out uint size);
+        if (size == 0) return 0x2000;
+        var buf = Marshal.AllocHGlobal((int)size);
+        try
+        {
+            if (!GetTokenInformationPtr(hToken, TokenIntegrityLevel, buf, size, out _)) return 0x2000;
+            // TOKEN_MANDATORY_LABEL: SID_AND_ATTRIBUTES { PSID Sid; DWORD Attributes; }
+            // Sid ptr at buf+0, SID layout: Revision[1] SubAuthorityCount[1] IdentifierAuthority[6] SubAuthority[n][4]
+            var sidPtr = Marshal.ReadIntPtr(buf, 0);
+            byte subAuthCount = Marshal.ReadByte(sidPtr, 1);
+            int subAuthOffset = 8 + (subAuthCount - 1) * 4;
+            return (uint)Marshal.ReadInt32(sidPtr, subAuthOffset);
+        }
+        finally { Marshal.FreeHGlobal(buf); }
+    }
+
     // ── User idle detection ────────────────────────────────────
 
     [StructLayout(LayoutKind.Sequential)]

@@ -25,6 +25,8 @@ public sealed partial class ClaudePromptHelper
                 return true;
 
             Console.WriteLine("  [PROMPT:VSCODE-CC] TP2 inject failed — fallback focus-steal paste");
+            using var clipGuard = new ClipboardGuard();
+            if (!clipGuard.CanProceed) return false;
             SetClipboardText(text);
             var prevFg = NativeMethods.GetForegroundWindow();
             NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
@@ -45,11 +47,34 @@ public sealed partial class ClaudePromptHelper
     ///   1. Focusless: MSAA put_accValue via direct vtable (no focus steal!)
     ///   2. Fallback: SetForegroundWindow → Click → Paste → Enter → Restore previous foreground
     /// </summary>
-    public bool TypeAndSubmit(PromptInfo prompt, string text)
+    /// <summary>
+    /// Type text into prompt and (by default) submit it.
+    /// Pass a <see cref="PromptDeliveryContext"/> for explicit situation-aware strategy selection.
+    /// Falls back to <see cref="AllowFocusSteal"/> static when ctx is null (backward compat).
+    /// </summary>
+    public bool TypeAndSubmit(PromptInfo prompt, string text, PromptDeliveryContext? ctx = null)
     {
+        // Resolve delivery decision: context takes precedence over legacy static flag
+        bool focusStealAllowed;
+        if (ctx != null)
+        {
+            var decision = ctx.Decide();
+            Console.WriteLine($"  [PROMPT] DeliveryCtx: {ctx}");
+            if (decision == PromptDeliveryDecision.Skip || decision == PromptDeliveryDecision.Abort)
+            {
+                Console.WriteLine($"  [PROMPT] Delivery decision={decision} — abort");
+                return false;
+            }
+            focusStealAllowed = decision == PromptDeliveryDecision.FocusSteal;
+        }
+        else
+        {
+            focusStealAllowed = AllowFocusSteal;
+        }
+
         // === VS Code Claude Code (native extension): focus-steal + Escape + paste ===
         if (prompt.HostType == HostVsCodeClaudeCode)
-            return TypeAndSubmitVSCodeClaudeCode(prompt, text);
+            return TypeAndSubmitVSCodeClaudeCode(prompt, text, focusStealAllowed);
         if (prompt.HostType == HostCodexDesktop)
             return SubmitCodexDesktopPrompt(prompt, text);
 
@@ -58,11 +83,13 @@ public sealed partial class ClaudePromptHelper
             return true;
 
         // === Strategy 2: Focus-stealing with auto-restore (minimal disruption) ===
-        if (!AllowFocusSteal)
+        if (!focusStealAllowed)
         {
             Console.WriteLine("  [PROMPT] Focusless-only mode: focusless input failed, focus steal not allowed");
             return false;
         }
+        using var clipGuard2 = new ClipboardGuard();
+        if (!clipGuard2.CanProceed) return false;
         var prevForeground = NativeMethods.GetForegroundWindow();
         Console.WriteLine($"  [PROMPT] Activating: {prompt.WindowTitle} (will restore focus)");
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
@@ -177,7 +204,7 @@ public sealed partial class ClaudePromptHelper
     /// Escape: Claude Code 입력창 포커스 (VS Code 확장 기본 동작).
     /// 입력위치확보(Probe) 승인 후 호출되므로 포커스 전환 허용됨.
     /// </summary>
-    private bool TypeAndSubmitVSCodeClaudeCode(PromptInfo prompt, string text)
+    private bool TypeAndSubmitVSCodeClaudeCode(PromptInfo prompt, string text, bool focusStealAllowed = false)
     {
         // Option 1: WM_CHAR to renderer (Codex-proven focusless path) + renderer Enter
         if (TryPostMessageTextToChromiumRenderer(prompt, text, submit: true))
@@ -193,12 +220,14 @@ public sealed partial class ClaudePromptHelper
 
         Console.WriteLine("  [PROMPT:VSCODE-CC] focusless all paths failed — falling back to focus-steal");
 
-        if (!AllowFocusSteal)
+        if (!focusStealAllowed && !AllowFocusSteal)
         {
-            Console.WriteLine("  [PROMPT:VSCODE-CC] Focus steal not allowed (AllowFocusSteal=false) — abort");
+            Console.WriteLine("  [PROMPT:VSCODE-CC] Focus steal not allowed — abort");
             return false;
         }
 
+        using var clipGuardVscc = new ClipboardGuard();
+        if (!clipGuardVscc.CanProceed) return false;
         var prevForeground = NativeMethods.GetForegroundWindow();
 
         // 항상 타이틀바 클릭으로 윈도우 활성화 — GetForegroundWindow 결과 무관
@@ -269,6 +298,8 @@ public sealed partial class ClaudePromptHelper
             return false;
         }
 
+        using var clipGuardCodex = new ClipboardGuard();
+        if (!clipGuardCodex.CanProceed) return false;
         var prevForeground = NativeMethods.GetForegroundWindow();
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
         Thread.Sleep(120);
@@ -494,8 +525,9 @@ public sealed partial class ClaudePromptHelper
 
         // Fallback: focus-steal to paste text, but no Enter
         Console.WriteLine("  [PROMPT] Falling back to focus-steal paste (no submit)...");
+        using var clipGuardNoSubmit = new ClipboardGuard();
+        if (!clipGuardNoSubmit.CanProceed) return false;
         var prevForeground = NativeMethods.GetForegroundWindow();
-        var prevClipboard = GetClipboardText(); // [CLIPBOARD-RESTORE] save before overwrite
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
         Thread.Sleep(200);
 
@@ -524,14 +556,6 @@ public sealed partial class ClaudePromptHelper
             Thread.Sleep(200);
             NativeMethods.SmartSetForegroundWindow(prevForeground);
             Console.WriteLine("  [PROMPT] Focus restored");
-        }
-
-        // [CLIPBOARD-RESTORE] restore original clipboard content after paste
-        if (prevClipboard != null)
-        {
-            Thread.Sleep(50);
-            SetClipboardText(prevClipboard);
-            Console.WriteLine("  [PROMPT] Clipboard restored");
         }
 
         return true;
@@ -816,5 +840,39 @@ public sealed partial class ClaudePromptHelper
         thread.Start();
         thread.Join(2000);
         return result;
+    }
+
+    /// <summary>
+    /// Saves clipboard content on construction, restores it on Dispose.
+    /// Use with 'using' around any SetClipboardText + paste sequence to protect user's clipboard.
+    /// If save fails (clipboard locked etc.) → blocks SetClipboardText to avoid silent data loss.
+    /// </summary>
+    internal sealed class ClipboardGuard : IDisposable
+    {
+        private readonly string? _saved;
+        private readonly bool _saveOk;
+
+        public ClipboardGuard()
+        {
+            _saved = GetClipboardText();
+            _saveOk = true; // null is valid (empty clipboard)
+            Console.WriteLine(_saved != null
+                ? $"  [CLIPBOARD] Saved ({_saved.Length} chars)"
+                : "  [CLIPBOARD] Saved (empty)");
+        }
+
+        /// <summary>True when it's safe to proceed with clipboard injection.</summary>
+        public bool CanProceed => _saveOk;
+
+        public void Dispose()
+        {
+            if (!_saveOk) return;
+            if (_saved != null)
+            {
+                SetClipboardText(_saved);
+                Console.WriteLine($"  [CLIPBOARD] Restored ({_saved.Length} chars)");
+            }
+            // null = was empty → leave clipboard as-is (don't clear user's new copy if they pasted fast)
+        }
     }
 }

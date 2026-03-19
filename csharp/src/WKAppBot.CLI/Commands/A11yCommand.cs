@@ -647,7 +647,35 @@ internal partial class Program
 
                 if (!string.IsNullOrEmpty(uiaPath))
                 {
-                    var scoped = GrapHelper.FindUiaScope(root, uiaPath);
+                    AutomationElement? scoped = null;
+
+                    // --nth on element level: collect all matches, sort by coverage, pick nth
+                    if (nthRaw != null)
+                    {
+                        var allMatches = GrapHelper.FindUiaScopeAll(root, uiaPath);
+                        if (allMatches.Count > 0)
+                        {
+                            if (allMatches.Count > 1)
+                            {
+                                for (int mi = 0; mi < allMatches.Count; mi++)
+                                {
+                                    var (mel, mcov, mtxt) = allMatches[mi];
+                                    string melType = "?"; try { melType = mel.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                                    Console.WriteLine($"[A11Y]   #{mi + 1} {melType} \"{mtxt}\" cov={mcov:P0}");
+                                }
+                            }
+                            int elNth = 1;
+                            if (!int.TryParse(nthRaw, out elNth) || elNth < 1 || elNth > allMatches.Count)
+                            {
+                                Console.Error.WriteLine($"[A11Y] --nth {nthRaw}: out of bounds ({allMatches.Count} element match(es))");
+                                fail++; continue;
+                            }
+                            scoped = allMatches[elNth - 1].el;
+                        }
+                    }
+                    else
+                        scoped = GrapHelper.FindUiaScope(root, uiaPath);
+
                     if (scoped == null)
                     {
                         // UIA failed → try CDP telepathy as fallback (any browser with CDP port)

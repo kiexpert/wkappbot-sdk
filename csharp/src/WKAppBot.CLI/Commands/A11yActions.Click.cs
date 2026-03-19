@@ -62,16 +62,32 @@ internal partial class Program
             }
             else
             {
-                var pt = new POINT { X = cx, Y = cy };
-                NativeMethods.ScreenToClient(elHwnd, ref pt);
-                var lParam = (IntPtr)(pt.X | (pt.Y << 16));
-                NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_LBUTTONDOWN, (IntPtr)1, lParam);
-                Thread.Sleep(50);
-                NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_LBUTTONUP, IntPtr.Zero, lParam);
-                Console.WriteLine($"[A11Y] click — Win32 WM_LBUTTON at ({cx},{cy})");
-                RecordTierSuccess(elHwnd, el, "click", "Win32 WM_LBUTTON", KnowhowCategory.Focusless);
-                return true;
+                if (IsUipiBlocked(elHwnd))
+                {
+                    _autoHealTiers?.Add("Win32 WM_LBUTTON: UIPI blocked (target IL > current IL)");
+                }
+                else
+                {
+                    var pt = new POINT { X = cx, Y = cy };
+                    NativeMethods.ScreenToClient(elHwnd, ref pt);
+                    var lParam = (IntPtr)(pt.X | (pt.Y << 16));
+                    NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_LBUTTONDOWN, (IntPtr)1, lParam);
+                    Thread.Sleep(50);
+                    NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_LBUTTONUP, IntPtr.Zero, lParam);
+                    Console.WriteLine($"[A11Y] click — Win32 WM_LBUTTON at ({cx},{cy})");
+                    RecordTierSuccess(elHwnd, el, "click", "Win32 WM_LBUTTON", KnowhowCategory.Focusless);
+                    return true;
+                }
             }
+        }
+        else if (IsElectronWindow(hwnd))
+        {
+            // Electron/VS Code: elements have no NativeWindowHandle → treat window as surface.
+            // Send WM_LBUTTON to Chrome_RenderWidgetHostHWND (or root Chrome_WidgetWin_1).
+            // This is focusless and more reliable than SendInput for Chromium-based windows.
+            if (TryElectronSurfaceClick(hwnd, cx, cy, el))
+                return true;
+            _autoHealTiers?.Add("Electron surface WM_LBUTTON: no UI response");
         }
 
         // Physical click: last resort, or FLUTTERVIEW-no-response fallback.
@@ -131,6 +147,72 @@ internal partial class Program
             finally { sendBefore.Dispose(); }
         }
 
+        return true;
+    }
+
+    /// <summary>Returns true if hwnd is a Chrome_WidgetWin_1 (Electron/VS Code/Codex) window.</summary>
+    static bool IsElectronWindow(IntPtr hwnd)
+        => hwnd != IntPtr.Zero &&
+           WindowFinder.GetClassName(hwnd).Equals("Chrome_WidgetWin_1", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Electron surface click: WM_LBUTTON to Chrome_RenderWidgetHostHWND (or root Chrome_WidgetWin_1).
+    /// Chromium processes input via the renderer child — sending to root is unreliable;
+    /// prefer renderer hwnd with ScreenToClient conversion.
+    /// Returns true if pixel-diff confirms a UI response, false otherwise.
+    /// </summary>
+    static bool TryElectronSurfaceClick(IntPtr windowHwnd, int screenX, int screenY, AutomationElement? el)
+    {
+        // Walk up to true root Chrome_WidgetWin_1 (handles nested Electron frames)
+        var root = NativeMethods.GetAncestor(windowHwnd, 2); // GA_ROOT
+        if (root == IntPtr.Zero) root = windowHwnd;
+
+        // Find Chrome_RenderWidgetHostHWND (direct child, or one level deeper)
+        var rendHwnd = NativeMethods.FindWindowExW(root, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
+        if (rendHwnd == IntPtr.Zero)
+        {
+            var inner = NativeMethods.FindWindowExW(root, IntPtr.Zero, "Chrome_WidgetWin_1", null);
+            if (inner != IntPtr.Zero)
+                rendHwnd = NativeMethods.FindWindowExW(inner, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
+        }
+        var targetHwnd = rendHwnd != IntPtr.Zero ? rendHwnd : root;
+
+        var pt = new POINT { X = screenX, Y = screenY };
+        NativeMethods.ScreenToClient(targetHwnd, ref pt);
+        var lParam = (IntPtr)(pt.X | (pt.Y << 16));
+
+        // Before-screenshot for pixel-diff verification
+        System.Drawing.Bitmap? before = null;
+        var rect = el != null ? GetBoundingRect(el) : null;
+        if (rect != null && rect.Value.Width > 4 && rect.Value.Height > 4)
+            try { before = WKAppBot.Win32.Input.ScreenCapture.CaptureScreenRegion(rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height); } catch { }
+
+        NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONDOWN, (IntPtr)1, lParam);
+        Thread.Sleep(50);
+        NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONUP, IntPtr.Zero, lParam);
+        Console.WriteLine($"[A11Y] click — Electron surface WM_LBUTTON screen({screenX},{screenY}) client({pt.X},{pt.Y}) hwnd=0x{targetHwnd:X}");
+
+        if (before != null)
+        {
+            Thread.Sleep(250);
+            try
+            {
+                using var after = WKAppBot.Win32.Input.ScreenCapture.CaptureScreenRegion(rect!.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
+                double diff = ComputePixelDiffRatio(before, after);
+                Console.WriteLine($"[A11Y] click — Electron surface pixel-diff {diff:P1}");
+                if (diff > 0.02)
+                {
+                    RecordTierSuccess(windowHwnd, el!, "click", "Electron surface WM_LBUTTON", KnowhowCategory.Focusless);
+                    return true;
+                }
+                return false; // no response → caller falls through to SendInput
+            }
+            catch { }
+            finally { before.Dispose(); }
+        }
+
+        // No rect for pixel-diff → optimistic success
+        if (el != null) RecordTierSuccess(windowHwnd, el, "click", "Electron surface WM_LBUTTON", KnowhowCategory.Focusless);
         return true;
     }
 

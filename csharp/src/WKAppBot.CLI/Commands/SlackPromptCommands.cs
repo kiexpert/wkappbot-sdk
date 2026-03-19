@@ -784,9 +784,9 @@ internal partial class Program
     }
 
     /// <summary>
-    /// wkappbot slack delete &lt;ts&gt; [ts2 ts3 ...] [--force]
+    /// wkappbot slack delete &lt;ts&gt; [ts2 ts3 ...] [--i-really-want-to-delete-including-replies]
     /// Delete one or more Slack messages by timestamp.
-    /// Thread-starter messages (has replies) are refused unless --force is given.
+    /// Thread-starter messages (has replies) are refused unless --i-really-want-to-delete-including-replies is given.
     /// </summary>
     static int SlackDeleteCommand(string[] args)
     {
@@ -800,16 +800,16 @@ internal partial class Program
             return 1;
         }
 
-        bool force = args.Contains("--force");
+        bool force = args.Contains("--i-really-want-to-delete-including-replies");
         var tsList = args.Skip(1)
             .Where(a => !a.StartsWith("--") && a.Contains('.') && char.IsDigit(a[0]))
             .ToList();
 
         if (tsList.Count == 0)
         {
-            Console.WriteLine("Usage: wkappbot slack delete <ts> [ts2 ...] [--force]");
+            Console.WriteLine("Usage: wkappbot slack delete <ts> [ts2 ...] [--i-really-want-to-delete-including-replies]");
             Console.WriteLine("  ts: message timestamp (e.g. 1773554407.386809)");
-            Console.WriteLine("  --force: delete even if the message is a thread starter (has replies)");
+            Console.WriteLine("  --i-really-want-to-delete-including-replies: delete even if the message is a thread starter (has replies)");
             return 1;
         }
 
@@ -831,7 +831,7 @@ internal partial class Program
                 // SlackDeleteMessageAsync logs SKIP message itself when guardThreadStarter fires
                 Console.WriteLine($"  ✗ {ts}");
                 if (!force)
-                    skipped++;
+                    skipped++; // thread-starter protection fired — need --i-really-want-to-delete-including-replies to override
                 else
                     failed++;
             }

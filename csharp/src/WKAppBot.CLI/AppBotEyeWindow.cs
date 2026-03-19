@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using WKAppBot.Win32.Native;
 using WKAppBot.WebBot;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -332,7 +333,7 @@ internal sealed class AppBotEyeOverlay : Window
         if (_chromeHwnd != IntPtr.Zero && IsWindow(_chromeHwnd))
         {
             ShowWindow(_chromeHwnd, SW_RESTORE);
-            SetForegroundWindow(_chromeHwnd);
+            NativeMethods.SmartSetForegroundWindow(_chromeHwnd); // [FOCUS-GUARD] user-initiated restore
         }
     }
 
@@ -450,9 +451,6 @@ internal sealed class AppBotEyeOverlay : Window
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-    [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     private static extern bool IsWindow(IntPtr hWnd);

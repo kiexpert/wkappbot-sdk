@@ -202,13 +202,13 @@ Examples:
         var triadHwnd = EyeCmdPipeServer.CallerHwnd.Value;
         var tasks = new[]
         {
-            Task.Run(() => { EyeCmdPipeServer.CallerArgs.Value = new[]{"ask","gemini",question}; EyeCmdPipeServer.CallerCwd.Value = triadCwd; EyeCmdPipeServer.CallerHwnd.Value = triadHwnd;
+            Task.Run(() => { var a = new[]{"ask","gemini",question}; EyeCmdPipeServer.CallerArgs.Value = a; EyeCmdPipeServer.CurrentCommandGlobal = a; EyeCmdPipeServer.CallerCwd.Value = triadCwd; EyeCmdPipeServer.CallerHwnd.Value = triadHwnd;
                 return RunTriadAiWithRecovery("gemini", question, timeoutSec, attachFiles,
                 freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gemini] "); }),
-            Task.Run(() => { EyeCmdPipeServer.CallerArgs.Value = new[]{"ask","gpt",question}; EyeCmdPipeServer.CallerCwd.Value = triadCwd; EyeCmdPipeServer.CallerHwnd.Value = triadHwnd;
+            Task.Run(() => { var a = new[]{"ask","gpt",question}; EyeCmdPipeServer.CallerArgs.Value = a; EyeCmdPipeServer.CurrentCommandGlobal = a; EyeCmdPipeServer.CallerCwd.Value = triadCwd; EyeCmdPipeServer.CallerHwnd.Value = triadHwnd;
                 return RunTriadAiWithRecovery("gpt", question, timeoutSec, attachFiles,
                 freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[gpt] "); }),
-            Task.Run(() => { EyeCmdPipeServer.CallerArgs.Value = new[]{"ask","claude",question}; EyeCmdPipeServer.CallerCwd.Value = triadCwd; EyeCmdPipeServer.CallerHwnd.Value = triadHwnd;
+            Task.Run(() => { var a = new[]{"ask","claude",question}; EyeCmdPipeServer.CallerArgs.Value = a; EyeCmdPipeServer.CurrentCommandGlobal = a; EyeCmdPipeServer.CallerCwd.Value = triadCwd; EyeCmdPipeServer.CallerHwnd.Value = triadHwnd;
                 return RunTriadAiWithRecovery("claude", question, timeoutSec, attachFiles,
                 freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[claude] "); }),
         };

@@ -25,6 +25,14 @@ public sealed class TeeTextWriter : TextWriter
     private long _lastFlushTicks;  // for periodic console flush (~1s)
     private const long FlushIntervalTicks = TimeSpan.TicksPerSecond; // 1 second
 
+    // Stderr spinner: shows braille-dot animation while stdout is silent >100ms
+    private static readonly char[] SpinnerChars = { '⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷' };
+    private long _lastWriteMs; // accessed via Interlocked
+    private volatile bool _spinnerShowing;
+    private int _spinnerIdx;
+    private Thread? _spinnerThread;
+    private volatile bool _spinnerStopped;
+
     public TextWriter OriginalConsole => _console;
     public override Encoding Encoding => Encoding.UTF8;
     public bool IsPipeBroken => _pipeBroken;
@@ -54,6 +62,14 @@ public sealed class TeeTextWriter : TextWriter
         _file.WriteLine($"# WKAppBot Console Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss} (PID={Environment.ProcessId})");
         _file.WriteLine($"# Command: {Environment.CommandLine}");
         _file.WriteLine();
+
+        // Start spinner only when both stdout and stderr are a live TTY
+        Interlocked.Exchange(ref _lastWriteMs, Environment.TickCount64);
+        if (!Console.IsOutputRedirected && !Console.IsErrorRedirected)
+        {
+            _spinnerThread = new Thread(SpinnerLoop) { IsBackground = true, Name = "tee-spinner" };
+            _spinnerThread.Start();
+        }
     }
 
     public string LogPath => _logPath;
@@ -110,14 +126,60 @@ public sealed class TeeTextWriter : TextWriter
 
     // ── Core overrides ──────────────────────────────────────────
 
+    /// <summary>Update last-write timestamp and erase spinner if showing.</summary>
+    private void TouchWriteTime()
+    {
+        Interlocked.Exchange(ref _lastWriteMs, Environment.TickCount64);
+        if (_spinnerShowing)
+        {
+            _spinnerShowing = false;
+            try { Console.Error.Write("\b \b\x1b[?25h"); } catch { }
+        }
+    }
+
+    /// <summary>Background thread: write braille spinner to stderr when stdout is silent >100ms.</summary>
+    private void SpinnerLoop()
+    {
+        while (!_spinnerStopped)
+        {
+            Thread.Sleep(100);
+            if (_spinnerStopped || _pipeBroken) break;
+            var silentMs = Environment.TickCount64 - Interlocked.Read(ref _lastWriteMs);
+            if (silentMs >= 100 && !_spinnerShowing)
+            {
+                try
+                {
+                    Console.Error.Write("\x1b[?25l"); // hide cursor
+                    Console.Error.Write(SpinnerChars[_spinnerIdx % SpinnerChars.Length]);
+                    _spinnerIdx++;
+                    _spinnerShowing = true;
+                }
+                catch { _spinnerStopped = true; }
+            }
+            else if (_spinnerShowing && silentMs >= 100)
+            {
+                // Advance frame while still silent
+                try
+                {
+                    Console.Error.Write('\b');
+                    Console.Error.Write(SpinnerChars[_spinnerIdx % SpinnerChars.Length]);
+                    _spinnerIdx++;
+                }
+                catch { _spinnerStopped = true; }
+            }
+        }
+    }
+
     public override void Write(char value)
     {
+        TouchWriteTime();
         ConsoleWrite(value);
         if (!_fileClosed) try { _file.Write(value); } catch { }
     }
 
     public override void Write(string? value)
     {
+        TouchWriteTime();
         ConsoleWrite(value);
         if (!_fileClosed) try { _file.Write(value); } catch { }
         PeriodicFlush();
@@ -125,6 +187,7 @@ public sealed class TeeTextWriter : TextWriter
 
     public override void Write(char[] buffer, int index, int count)
     {
+        TouchWriteTime();
         ConsoleWrite(buffer, index, count);
         if (!_fileClosed) try { _file.Write(buffer, index, count); } catch { }
         PeriodicFlush();
@@ -132,12 +195,14 @@ public sealed class TeeTextWriter : TextWriter
 
     public override void WriteLine()
     {
+        TouchWriteTime();
         ConsoleWriteLine();
         if (!_fileClosed) try { _file.WriteLine(); } catch { }
     }
 
     public override void WriteLine(string? value)
     {
+        TouchWriteTime();
         ConsoleWriteLine(value);
         if (!_fileClosed) try { _file.WriteLine(value); } catch { }
         PeriodicFlush();
@@ -159,6 +224,8 @@ public sealed class TeeTextWriter : TextWriter
     /// Safe to call from UnhandledException handler (abort imminent).</summary>
     public void ForceCloseWithoutMove()
     {
+        _spinnerStopped = true;
+        if (_spinnerShowing) { _spinnerShowing = false; try { Console.Error.Write("\b \b\x1b[?25h"); } catch { } }
         if (_fileClosed) return;
         try
         {
@@ -175,6 +242,15 @@ public sealed class TeeTextWriter : TextWriter
 
     protected override void Dispose(bool disposing)
     {
+        if (disposing)
+        {
+            _spinnerStopped = true;
+            if (_spinnerShowing)
+            {
+                _spinnerShowing = false;
+                try { Console.Error.Write("\b \b\x1b[?25h"); } catch { }
+            }
+        }
         if (disposing && !_fileClosed)
         {
             try

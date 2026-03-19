@@ -87,6 +87,30 @@ internal partial class Program
     }
 
     /// <summary>
+    /// Returns true if UIPI would silently drop PostMessage/SendMessage to hwnd.
+    /// Target process IL > current process IL → Win32 cross-integrity messages silently dropped.
+    /// </summary>
+    static bool IsUipiBlocked(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return false;
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            if (pid == 0) return false;
+            uint targetIL  = NativeMethods.GetProcessIntegrityLevel(pid);
+            uint currentIL = NativeMethods.GetCurrentProcessIntegrityLevel();
+            if (targetIL > currentIL)
+            {
+                string ilName(uint il) => il switch { 0x1000 => "Low", 0x2000 => "Medium", 0x3000 => "High", 0x4000 => "System", _ => $"0x{il:X}" };
+                Console.WriteLine($"[A11Y] UIPI: target={ilName(targetIL)} > current={ilName(currentIL)} → PostMessage tiers skipped");
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
     /// Ensure target element's tab is active. Walks up UIA parent chain looking for
     /// unselected TabItem ancestors → auto-select them (focusless UIA SelectionItem).
     /// Returns true if a tab was activated (caller may need to re-resolve scope).

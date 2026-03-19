@@ -134,9 +134,27 @@ public sealed partial class ClaudePromptHelper
     /// Find prompt in VS Code with Claude Code extension.
     /// The Claude Code panel in VS Code may have different UIA structure.
     /// </summary>
-    private PromptInfo? FindVSCodePrompt(int processId)
+    private PromptInfo? FindVSCodePrompt(int processId, string? callerCwd = null)
     {
         var windows = FindWindowsByProcessId(processId);
+
+        // If callerCwd is known, prefer the window whose title contains the folder name.
+        // VS Code window title format: "filename - FolderName - Visual Studio Code"
+        if (!string.IsNullOrEmpty(callerCwd))
+        {
+            var folderName = System.IO.Path.GetFileName(callerCwd.TrimEnd('\\', '/'));
+            if (!string.IsNullOrEmpty(folderName))
+            {
+                var preferred = windows.FirstOrDefault(h =>
+                    WindowFinder.GetWindowText(h).Contains(folderName, StringComparison.OrdinalIgnoreCase));
+                if (preferred != IntPtr.Zero)
+                {
+                    // Move matching window to front so it's checked first
+                    windows.Remove(preferred);
+                    windows.Insert(0, preferred);
+                }
+            }
+        }
         foreach (var hWnd in windows)
         {
             try
@@ -429,6 +447,42 @@ public sealed partial class ClaudePromptHelper
         return ordered;
     }
 
+    /// <summary>
+    /// Try to find a VS Code Claude Code turn-form in a single window handle.
+    /// Returns PromptInfo if found, null otherwise.
+    /// Extracted so Strategy 3 in Finder can pool all windows and sort globally by callerCwd.
+    /// </summary>
+    internal PromptInfo? TryFindTurnFormInVSCodeWindow(IntPtr hWnd)
+    {
+        if (!NativeMethods.IsWindowVisible(hWnd)) return null;
+        try
+        {
+            var root = _automation.FromHandle(hWnd);
+            if (root == null) return null;
+
+            var turnForm = root.FindFirstDescendant(
+                new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
+            if (turnForm == null) return null;
+
+            var inputGroup = turnForm.FindFirstChild(
+                new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Group));
+            if (inputGroup == null)
+            {
+                var children = turnForm.FindAllChildren();
+                inputGroup = children.FirstOrDefault(c =>
+                    c.ControlType == ControlType.Group && c.BoundingRectangle.Width > 100);
+            }
+            if (inputGroup == null) return null;
+
+            var rect = inputGroup.BoundingRectangle;
+            var title = WindowFinder.GetWindowText(hWnd);
+            Console.WriteLine($"  [PROMPT] Found VS Code Claude prompt: aid=turn-form at ({rect.X},{rect.Y} {rect.Width}x{rect.Height}) \"{title}\"");
+            return new PromptInfo(hWnd, title, "Code",
+                new Rectangle(rect.X, rect.Y, rect.Width, rect.Height), "vscode");
+        }
+        catch { return null; }
+    }
+
     // Legacy private alias kept for merge safety with older branches.
     private bool TypeAndSubmitCodexDesktop(PromptInfo prompt, string text) => SubmitCodexDesktopPrompt(prompt, text);
 
@@ -518,11 +572,33 @@ public sealed partial class ClaudePromptHelper
             if (!NativeMethods.IsWindowVisible(hWnd)) return true;
 
             NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
-            if (pid == (uint)processId)
-                result.Add(hWnd);
+            if (pid != (uint)processId) return true;
 
+            // Root-only filter: skip child windows and owned popups.
+            // VS Code (Electron) creates many Chrome_WidgetWin_1 per process —
+            // tab renderers, sidebars, etc. GetAncestor(GA_ROOT) ensures we pick
+            // the true top-level frame, not a renderer child.
+            var root = NativeMethods.GetAncestor(hWnd, 2); // GA_ROOT = 2
+            if (root != hWnd) return true;
+
+            // Reject zero-size or tiny floating windows (e.g. tooltip overlays)
+            NativeMethods.GetWindowRect(hWnd, out var wr);
+            if ((wr.Right - wr.Left) < 200 || (wr.Bottom - wr.Top) < 100) return true;
+
+            result.Add(hWnd);
             return true;
         }, IntPtr.Zero);
+
+        // Sort by area descending — main window is almost always the largest
+        result.Sort((a, b) =>
+        {
+            NativeMethods.GetWindowRect(a, out var ra);
+            NativeMethods.GetWindowRect(b, out var rb);
+            int areaA = (ra.Right - ra.Left) * (ra.Bottom - ra.Top);
+            int areaB = (rb.Right - rb.Left) * (rb.Bottom - rb.Top);
+            return areaB.CompareTo(areaA); // descending
+        });
+
         return result;
     }
 }

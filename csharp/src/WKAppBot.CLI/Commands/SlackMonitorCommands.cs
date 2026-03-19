@@ -97,19 +97,35 @@ internal partial class Program
 
         EyeParentCard? best = null;
 
-        // 0. Direct hwnd match — fastest path when iterating prompt windows
+        // 0. Direct hwnd match — only trusted when callerCwd is unknown/system,
+        //    OR when the hwnd's CWD actually matches callerCwd.
+        //    Reason: GetForegroundWindow() (from Launcher) may return a different VS Code instance
+        //    than the one that actually ran the command → wrong CWD if accepted blindly.
         if (callerHwnd.HasValue && callerHwnd.Value != IntPtr.Zero)
         {
             var hwndPrompt = ClaudePromptHelper.GetAllCachedPrompts()
                 .FirstOrDefault(p => p.WindowHandle == callerHwnd.Value);
             if (hwndPrompt != null)
             {
-                var hwndPrefix = hwndPrompt.HostType?.Contains("codex") == true ? SlackCodexPrefix : SlackClaudePrefix;
                 var hwndCwd = hwndPrompt.HostType == "vscode-claudecode"
                     ? ExtractCwdFromVsCodeTitle(hwndPrompt.WindowTitle)
                     : callerCwd;
-                var hwndTag = !string.IsNullOrEmpty(hwndCwd) ? AbbreviateCwd(hwndCwd) : null;
-                return !string.IsNullOrWhiteSpace(hwndTag) ? $"{hwndPrefix}[{hwndTag}]" : hwndPrefix;
+                // Accept hwnd only when callerCwd is absent/system, or hwnd CWD matches callerCwd
+                bool cwdOk = string.IsNullOrWhiteSpace(callerCwd)
+                          || IsSystemOrInstallDirectory(callerCwd)
+                          || (!string.IsNullOrEmpty(hwndCwd) && string.Equals(
+                                 hwndCwd.TrimEnd('\\', '/'), callerCwd.TrimEnd('\\', '/'),
+                                 StringComparison.OrdinalIgnoreCase));
+                if (cwdOk)
+                {
+                    var hwndPrefix = hwndPrompt.HostType?.Contains("codex") == true ? SlackCodexPrefix : SlackClaudePrefix;
+                    var hwndTag = !string.IsNullOrEmpty(hwndCwd) ? AbbreviateCwd(hwndCwd) : null;
+                    var r0 = !string.IsNullOrWhiteSpace(hwndTag) ? $"{hwndPrefix}[{hwndTag}]" : hwndPrefix;
+                    Console.WriteLine($"[NAME] step=0(hwnd) → {r0} | cwd={callerCwd}");
+                    return r0;
+                }
+                // callerCwd is a real project dir that doesn't match the fg hwnd → ignore hwnd, fall through
+                Console.WriteLine($"[NAME] step=0 skip: hwnd-cwd={hwndCwd} ≠ caller-cwd={callerCwd}");
             }
         }
 
@@ -139,43 +155,64 @@ internal partial class Program
             {
                 var matchPrefix = matchPrompt.HostType?.Contains("codex") == true ? SlackCodexPrefix : SlackClaudePrefix;
                 var matchTag = AbbreviateCwd(callerCwd);
-                return !string.IsNullOrWhiteSpace(matchTag) ? $"{matchPrefix}[{matchTag}]" : matchPrefix;
+                var r1b = !string.IsNullOrWhiteSpace(matchTag) ? $"{matchPrefix}[{matchTag}]" : matchPrefix;
+                Console.WriteLine($"[NAME] step=1b(prompt-title) → {r1b} | cwd={callerCwd}");
+                return r1b;
             }
             // callerCwd is known but no card/window matched — build directly from callerCwd
             var directTag = AbbreviateCwd(callerCwd);
             if (!string.IsNullOrWhiteSpace(directTag))
-                return $"{SlackClaudePrefix}[{directTag}]";
+            {
+                var rDirect = $"{SlackClaudePrefix}[{directTag}]";
+                Console.WriteLine($"[NAME] step=1b(direct-cwd) → {rDirect} | cwd={callerCwd}");
+                return rDirect;
+            }
         }
 
         // 2. Most-recently-updated card (only when callerCwd is unknown)
         if (best == null && string.IsNullOrWhiteSpace(callerCwd))
             best = cards.OrderByDescending(c => c.LastTsUtc).FirstOrDefault();
 
-        if (best == null) return null;
+        if (best == null)
+        {
+            Console.WriteLine($"[NAME] step=? → null (no card match) | cwd={callerCwd}");
+            return null;
+        }
 
         var pname = (best.ParentName ?? "").ToLowerInvariant();
         // Skip cards from wkappbot itself (shouldn't drive username detection)
         if (pname == "wkappbot" || pname.Contains("wkappbot") || pname == "a11y" || pname.Contains("a11y"))
+        {
+            Console.WriteLine($"[NAME] step=? → null (wkappbot card skipped) | cwd={callerCwd}");
             return null;
+        }
         string prefix;
         if (pname == "claude" || pname.StartsWith("claude") || pname == "code" || pname.StartsWith("code"))
             prefix = SlackClaudePrefix;
         else if (pname == "codex" || pname.Contains("codex"))
             prefix = SlackCodexPrefix;
         else
+        {
+            Console.WriteLine($"[NAME] step=? → null (unknown parent={pname}) | cwd={callerCwd}");
             return null; // unknown ParentName — let caller fall through to other detection
+        }
 
         // claude-desktop: global instance, no CWD tag (install dir would abbreviate to "Claude")
         // VS Code (Code.exe): CWD tag meaningful, but skip system/install dirs
         if (pname == "claude" || pname == "claude.exe")
+        {
+            Console.WriteLine($"[NAME] step=1/2(card) → {prefix} | cwd={callerCwd}");
             return prefix;
+        }
 
         string? cwdTag = null;
         if (!string.IsNullOrWhiteSpace(best.Cwd) && !IsSystemOrInstallDirectory(best.Cwd))
             cwdTag = AbbreviateCwd(best.Cwd);
         if (cwdTag == null)
             cwdTag = GetSlackFolderTag();
-        return $"{prefix}[{cwdTag}]";
+        var rCard = $"{prefix}[{cwdTag}]";
+        Console.WriteLine($"[NAME] step=1/2(card) → {rCard} | cwd={callerCwd}");
+        return rCard;
     }
 
     /// <summary>
@@ -209,7 +246,7 @@ internal partial class Program
         return IntPtr.Zero;
     }
 
-    static string? GetSendReplyUsername(bool printDecision = false)
+    internal static string? GetSendReplyUsername(bool printDecision = false)
     {
         string username;
 
@@ -232,7 +269,7 @@ internal partial class Program
         }
 
         if (printDecision)
-            Console.WriteLine($"[SLACK] bot-name: {username}");
+            Console.WriteLine($"[SLACK] bot-name={username} cwd={callerCwd}");
 
         return username;
     }
@@ -873,7 +910,7 @@ internal partial class Program
     /// Update an existing Slack message via chat.update API.
     /// Returns (ok, ts) — ts is the message timestamp.
     /// </summary>
-    static async Task<(bool ok, string? ts)> SlackUpdateMessageAsync(
+    static async Task<(bool ok, string? ts, string? error)> SlackUpdateMessageAsync(
         string botToken, string channel, string ts, string text)
     {
         using var http = new HttpClient();
@@ -888,11 +925,12 @@ internal partial class Program
         var body = await resp.Content.ReadAsStringAsync();
         var json = JsonSerializer.Deserialize<JsonNode>(body);
         var ok = json?["ok"]?.GetValue<bool>() ?? false;
+        var error = ok ? null : (json?["error"]?.GetValue<string>() ?? "unknown");
 
         if (!ok)
-            Console.WriteLine($"[SLACK] chat.update error: {json?["error"]}");
+            Console.WriteLine($"[SLACK] chat.update error: {error}");
 
-        return (ok, json?["ts"]?.GetValue<string>());
+        return (ok, json?["ts"]?.GetValue<string>(), error);
     }
 
     /// <summary>

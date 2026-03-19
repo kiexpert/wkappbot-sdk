@@ -71,12 +71,45 @@ internal partial class Program
             else { positional.Add(a); }
         }
         // grep-style: positional[0] = regex pattern, positional[1..] = file globs (OR)
-        if (positional.Count > 0) messageFilterArg = positional[0];
+        // Exception: if positional[0] looks like a file path (absolute or contains path sep), treat it as file arg
+        static bool LooksLikePath(string s) =>
+            (s.Length >= 2 && s[1] == ':') || s.StartsWith('/') || s.StartsWith('\\')
+            || s.Contains('/') || s.Contains('\\');
+        if (positional.Count > 0 && !LooksLikePath(positional[0]))
+            messageFilterArg = positional[0];
+        else if (positional.Count > 0 && LooksLikePath(positional[0]))
+            positional.Insert(0, "*"); // shift: treat original [0] as file arg, pattern = match-all
         // Each positional[1..] is a file glob; ';' within a segment = OR at that path level
         // e.g. "logs/가;나;다/*.txt" → ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
+        // Absolute path args: "W:/foo/bar/*.log" → dir=W:/foo/bar, pattern=*.log (auto-added to dirs)
         var rawFileArgs = positional.Count > 1 ? positional.Skip(1).ToList() : new List<string> { fileFilterArg };
-        var filePatterns = rawFileArgs.SelectMany(ExpandGlobSegments).ToArray();
-        if (filePatterns.Length == 0) filePatterns = new[] { "*.log" };
+        var extraDirsFromArgs = new List<(string dir, string pattern)>();
+        var relativeFileArgs = new List<string>();
+        foreach (var raw in rawFileArgs)
+        {
+            // Detect absolute path: starts with drive letter (e.g. "C:/", "W:\") or UNC "//"
+            bool isAbs = (raw.Length >= 2 && raw[1] == ':') || raw.StartsWith('/') || raw.StartsWith('\\');
+            if (isAbs)
+            {
+                // Expand ';' OR segments first, then split each into dir + filename pattern
+                foreach (var expanded in ExpandGlobSegments(raw))
+                {
+                    var dir = Path.GetDirectoryName(expanded);
+                    var pat = Path.GetFileName(expanded);
+                    if (!string.IsNullOrEmpty(dir))
+                        extraDirsFromArgs.Add((dir, string.IsNullOrEmpty(pat) ? "*.log" : pat));
+                    else
+                        relativeFileArgs.Add(expanded); // fallback
+                }
+            }
+            else
+            {
+                relativeFileArgs.Add(raw);
+            }
+        }
+        var filePatterns = relativeFileArgs.SelectMany(ExpandGlobSegments).ToArray();
+        if (filePatterns.Length == 0 && extraDirsFromArgs.Count == 0)
+            filePatterns = new[] { "*.log", "*.txt", "*.out", "*.logcat", "*.jsonl", "*.json", "*.yaml", "*.csv" };
 
         // -C overrides -A/-B
         if (contextLines > 0) { afterLines = contextLines; beforeLines = contextLines; }
@@ -95,6 +128,24 @@ internal partial class Program
         // Build watch directories: default = CWD (or --basedir)
         var baseDir = baseDirOverride ?? Environment.CurrentDirectory;
         var dirs = new List<string> { baseDir };
+
+        // Absolute path args → add their dirs + filename patterns
+        if (extraDirsFromArgs.Count > 0)
+        {
+            foreach (var (absDir, absPat) in extraDirsFromArgs)
+                dirs.Add(absDir);
+            if (relativeFileArgs.Count == 0)
+            {
+                // Only absolute args given — search abs dirs only, don't flood baseDir
+                filePatterns = extraDirsFromArgs.Select(x => x.pattern).Distinct().ToArray();
+                dirs.Remove(baseDir);
+            }
+            else
+            {
+                // Mix of absolute + relative — merge patterns, search all dirs
+                filePatterns = filePatterns.Concat(extraDirsFromArgs.Select(x => x.pattern)).Distinct().ToArray();
+            }
+        }
 
         // --hq: add wkappbot.hq/logs + all old-*/ subdirs + openclaw dirs
         if (includeHq)
