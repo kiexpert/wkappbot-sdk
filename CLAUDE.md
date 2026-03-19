@@ -44,13 +44,8 @@
   ```
   a11y kill은 프로세스명 기반 — 창 제목에 WKAppBot 있는 VS Code 등은 매칭 안 됨 (안전)
 
-### 마이너 버전 bump 체크리스트
-마이너 버전 올릴 때 (예: 4.6 → 4.7) **반드시 아래 3개 함께 커밋**:
-1. `csharp/Directory.Build.props` — `WKAppBotBaseVersion` 값 변경
-2. `CLAUDE.md` 헤더 — `# WKAppBot vX.Y.0` 업데이트
-3. `memory/MEMORY.md` — 버전 관련 내용 있으면 업데이트
-> **왜?** git pickaxe가 Directory.Build.props에서 버전 문자열 첫 등장 커밋을 기점으로 패치 카운트.
-> bump 커밋 없이 코드만 쌓이면 이전 minor 버전으로 계속 표시됨.
+### 마이너 버전 bump
+→ **[VERSIONING.md](../VERSIONING.md) 참조** — 반드시 3개 파일 함께 커밋할 것
 
 ### Source File Size Policy
 - **Recommend ~400 lines per WKAppBot source file** — split by logical unit when it grows beyond
