@@ -120,7 +120,10 @@ class Program
         if (args.Length == 0)
         {
             prof("no-args → RunCore");
-            return RunCore(args);
+            int noArgCode = RunCore(args);
+            Console.Out.Flush(); Console.Error.Flush();
+            TerminateSelf((uint)noArgCode);
+            return noArgCode; // unreachable
         }
 
         var cmd = args[0].ToLowerInvariant();
@@ -155,8 +158,16 @@ class Program
         if (!onlyCore && cmd != "eye" && cmd != "file" && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
+            // Parse --timeout / --timeout-exit for Eye pipe enforcement
+            int eyeTimeoutMs = 0, eyeTimeoutExit = 2;
+            for (int i = 0; i < forwardArgs.Length - 1; i++)
+            {
+                if (forwardArgs[i] == "--timeout" && int.TryParse(forwardArgs[i + 1], out var t) && t > 0) eyeTimeoutMs = t * 1000;
+                if (forwardArgs[i] == "--timeout-exit" && int.TryParse(forwardArgs[i + 1], out var e)) eyeTimeoutExit = e;
+            }
+
             prof($"Eye pipe attempt cmd={cmd}");
-            if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code))
+            if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code, eyeTimeoutMs, eyeTimeoutExit))
             {
                 prof("Eye pipe: delegated");
                 // TerminateSelf: avoid 27s CLR/ConPTY handle cleanup delay that keeps bash waiting.
@@ -282,7 +293,10 @@ class Program
             return code; // unreachable
         }
 
-        return RunCore(forwardArgs);
+        int finalCode = RunCore(forwardArgs);
+        Console.Out.Flush(); Console.Error.Flush();
+        TerminateSelf((uint)finalCode);
+        return finalCode; // unreachable
     }
 
     // Shared step name for fast-exit watchdog — updated in both Main() and RunCore().
@@ -399,7 +413,7 @@ class Program
             if (hProc == IntPtr.Zero)
             {
                 Prof($"detached spawn failed (err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}), fallback");
-                return RunCore(args); // fallback to normal (slow 27s) path
+                { int fb = RunCore(args); Console.Out.Flush(); Console.Error.Flush(); TerminateSelf((uint)fb); return fb; } // fallback (was: slow 27s)
             }
             Prof($"detached core spawned pid=?, polling .ready");
 
@@ -810,7 +824,10 @@ class Program
                 {
                     Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s exceeded — killing core (pid={proc.Id})");
                     try { proc.Kill(entireProcessTree: true); } catch { }
-                    return timeoutExit;
+                    Console.Out.Flush();
+                    Console.Error.Flush();
+                    TerminateSelf((uint)timeoutExit); // avoid 27s CLR/ConPTY cleanup delay
+                    return timeoutExit; // unreachable
                 }
             }
             else
