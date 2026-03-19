@@ -18,14 +18,19 @@ internal static class EyeCmdPipeClient
     /// Try to delegate args to the running Eye process.
     /// Returns true + sets exitCode if delegation succeeded.
     /// Returns false only if Eye is not running/busy (caller should fall through to RunCore).
+    ///
+    /// timeoutMs: if >0, close the pipe after this many ms (enforces Launcher-level timeout
+    /// even for Eye in-process commands that don't implement their own timeout).
     /// </summary>
-    public static bool TryDelegate(string[] args, out int exitCode)
+    public static bool TryDelegate(string[] args, out int exitCode, int timeoutMs = 0, int timeoutExitCode = 2)
     {
         exitCode = 0;
+        bool connected = false;
+        var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut);
         try
         {
-            using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut);
             pipe.Connect(300); // 300ms: Eye either answers instantly or isn't running
+            connected = true;
 
             var w = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
             var r = new StreamReader(pipe, leaveOpen: true);
@@ -38,23 +43,51 @@ internal static class EyeCmdPipeClient
             var payload = prefixes.Concat(args).ToArray();
             w.WriteLine(JsonSerializer.Serialize(payload, LauncherJsonContext.Default.StringArray));
 
-            string? line;
-            while ((line = r.ReadLine()) != null)
+            // Timeout: fire timer closes pipe → unblocks ReadLine with IOException.
+            // Eye continues executing in background; Launcher returns timeout exit code.
+            bool timedOut = false;
+            Timer? timeoutTimer = null;
+            if (timeoutMs > 0)
             {
-                if (line.StartsWith(EndMarker))
+                timeoutTimer = new Timer(_ =>
                 {
-                    int.TryParse(line.AsSpan(EndMarker.Length).Trim(), out exitCode);
-                    break;
-                }
+                    timedOut = true;
+                    try { pipe.Close(); } catch { }
+                }, null, timeoutMs, Timeout.Infinite);
+            }
 
-                Console.WriteLine(line);
+            try
+            {
+                string? line;
+                while ((line = r.ReadLine()) != null)
+                {
+                    if (line.StartsWith(EndMarker))
+                    {
+                        int.TryParse(line.AsSpan(EndMarker.Length).Trim(), out exitCode);
+                        break;
+                    }
+                    Console.WriteLine(line);
+                }
+                if (timedOut) exitCode = timeoutExitCode;
+            }
+            catch (Exception) when (timedOut)
+            {
+                exitCode = timeoutExitCode;
+            }
+            finally
+            {
+                timeoutTimer?.Dispose();
             }
 
             return true;
         }
         catch
         {
-            return false; // Eye not running or busy -> caller falls through
+            return connected; // false = Eye not running; true = connected but read failed
+        }
+        finally
+        {
+            try { pipe.Dispose(); } catch { }
         }
     }
 

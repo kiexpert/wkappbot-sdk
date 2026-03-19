@@ -480,7 +480,10 @@ public sealed partial class CdpClient
                 var existingWb = await GetWindowForTargetAsync(existingTid);
                 if (existingWb != null && IsAtExpectedBounds(existingWb.Value, expX, expY, expW, expH))
                 {
-                    // CDP tab creation is focusless — no need to minimize before creating tab
+                    // Minimize Chrome BEFORE creating tab — Chrome may activate window on tab create.
+                    // SwitchToTargetAsync also minimizes; pre-minimize here closes the gap window.
+                    MinimizeChrome();
+                    await Task.Delay(100);
                     Console.WriteLine($"[ASK] Reusing window at ({existingWb.Value.left},{existingWb.Value.top}) for new tab");
                     var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
                     newTargetId = result?["targetId"]?.GetValue<string>();
