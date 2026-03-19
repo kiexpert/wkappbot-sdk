@@ -341,7 +341,11 @@ internal partial class Program
                         }
                         catch { }
                         if (_staleStatusTsOnStartup.Count > 0)
-                            Console.WriteLine($"[EYE] {_staleStatusTsOnStartup.Count} stale status message(s) pending — will sweep after first post");
+                        {
+                            Console.WriteLine($"[EYE] {_staleStatusTsOnStartup.Count} stale status message(s) pending — will sweep after first post or 20s timer");
+                            // Independent timer: sweep even if first ticks are all idle (no new post fired)
+                            _ = SweepStaleOnStartupAsync(slackBotToken!, slackChannel!);
+                        }
                         try { File.WriteAllText(statusTsFile, ""); } catch { }
                         previousStatusTs = null;
                     }
