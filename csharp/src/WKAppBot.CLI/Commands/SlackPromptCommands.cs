@@ -131,38 +131,26 @@ internal partial class Program
 
         var senderName = GetSendReplyUsername(printDecision: true);
 
-        // Split only when no target thread: channel post → first paragraph as header, rest as thread.
-        // When replying to an existing thread (threadTs set), send as-is — no splitting needed.
+        // Thread reply: send as-is (no splitting — already in thread context).
+        // Channel post (no threadTs): use PostWithOverflow — first paragraph + overflow as thread.
         bool hasTargetThread = !string.IsNullOrEmpty(threadTs);
-        string? replyOverflow = null;
         bool ok;
+        string? postedTs = null;
         if (hasTargetThread)
-        {
             (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName).GetAwaiter().GetResult();
-        }
         else
-        {
-            var (replyHeader, overflow) = SplitMessageForChannel(replyText);
-            replyOverflow = overflow;
-            string? replyTs;
-            (ok, replyTs) = SlackSendViaApi(botToken, channel, replyHeader, null, username: senderName).GetAwaiter().GetResult();
-            if (ok && replyOverflow != null)
-            {
-                foreach (var chunk in ChunkText(replyOverflow, 3900))
-                    SlackSendViaApi(botToken, channel, chunk, replyTs, username: senderName).GetAwaiter().GetResult();
-                Console.WriteLine($"[SLACK] Thread: {replyOverflow.Split('\n').Length} lines → overflow posted");
-            }
-        }
+            (ok, postedTs) = PostWithOverflow(botToken, channel, replyText, username: senderName);
 
         var threadNote = hasTargetThread ? " (in-thread)" : "";
         if (ok)
         {
-            Console.WriteLine($"[SLACK] Replied to #{channel}{threadNote}: {replyText.Split('\n')[0]}{(replyOverflow != null ? " (+thread)" : "")}");
+            Console.WriteLine($"[SLACK] Replied to #{channel}{threadNote}: {replyText.Split('\n')[0]}");
             // Upload files in the same thread
+            var uploadThreadTs = threadTs ?? postedTs;
             foreach (var fp in filePaths)
             {
                 var uploadArgs = new List<string> { "upload", fp };
-                if (!string.IsNullOrEmpty(threadTs)) { uploadArgs.Add("--msg"); uploadArgs.Add(threadTs); }
+                if (!string.IsNullOrEmpty(uploadThreadTs)) { uploadArgs.Add("--msg"); uploadArgs.Add(uploadThreadTs); }
                 else { uploadArgs.Add("--channel"); uploadArgs.Add(channel); }
                 SlackUploadCommand(uploadArgs.ToArray());
             }

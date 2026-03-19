@@ -229,33 +229,20 @@ internal partial class Program
             return 1;
         }
 
-        // Split message: short channel header + optional thread overflow
         string? threadTs = null;
         var senderName = GetSendReplyUsername(printDecision: true);
         if (!string.IsNullOrWhiteSpace(message))
         {
-            var (header, overflow) = SplitMessageForChannel(message);
-
-            // Post channel header
-            var (ok, ts) = SlackSendViaApi(botToken, channel, header, username: senderName).GetAwaiter().GetResult();
+            var (ok, ts) = PostWithOverflow(botToken, channel, message, username: senderName);
             if (!ok)
             {
                 Console.WriteLine("[SLACK] Failed to send message");
                 return 1;
             }
             threadTs = ts;
-            Console.WriteLine($"[SLACK] Sent: {header.Split('\n')[0]}{(overflow != null ? " (+thread)" : "")}");
+            Console.WriteLine($"[SLACK] Sent: {message.Split('\n')[0]}{(ts != null ? " (+thread)" : "")}");
             if (GetCustomSlackIcon(EyeCmdPipeServer.CallerCwd.Value) == null)
                 Console.WriteLine("[SLACK] 💡 Tip: 프로필 이모찌 커스텀 → {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
-
-            // Post overflow as thread reply (chunked at 3900 chars)
-            if (overflow != null)
-            {
-                var chunks = ChunkText(overflow, 3900);
-                foreach (var chunk in chunks)
-                    SlackSendViaApi(botToken, channel, chunk, threadTs: threadTs, username: senderName).GetAwaiter().GetResult();
-                Console.WriteLine($"[SLACK] Thread: {overflow.Split('\n').Length} lines → {chunks.Count} chunk(s)");
-            }
         }
 
         // Upload files (threaded to the message if we got a ts)
@@ -267,6 +254,27 @@ internal partial class Program
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Post a channel message with automatic overflow handling.
+    /// First paragraph (≤5 lines) goes to the channel; remainder is posted as thread replies.
+    /// Returns the ts of the primary channel message (use as threadTs for file uploads).
+    /// </summary>
+    static (bool ok, string? ts) PostWithOverflow(
+        string botToken, string channel, string message, string? username = null)
+    {
+        var (header, overflow) = SplitMessageForChannel(message);
+        var (ok, ts) = SlackSendViaApi(botToken, channel, header, username: username).GetAwaiter().GetResult();
+        if (!ok) return (false, null);
+        if (overflow != null)
+        {
+            var chunks = ChunkText(overflow, 3900);
+            foreach (var chunk in chunks)
+                SlackSendViaApi(botToken, channel, chunk, threadTs: ts, username: username).GetAwaiter().GetResult();
+            Console.WriteLine($"[SLACK] Thread: {overflow.Split('\n').Length} lines → {chunks.Count} chunk(s)");
+        }
+        return (true, ts);
     }
 
     /// <summary>Split text into chunks of at most maxLen characters, breaking on newlines.</summary>
