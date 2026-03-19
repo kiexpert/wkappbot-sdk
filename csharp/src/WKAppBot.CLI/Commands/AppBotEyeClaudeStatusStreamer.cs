@@ -922,6 +922,31 @@ internal partial class Program
         }
     }
 
+    // ── Independent startup stale sweep ──────────────────────────────────────────────────
+    // Runs 20s after Eye startup regardless of whether a new post was made.
+    // Fixes: if all ticks are "idle" at startup (idle → skip new post → sweep never fires).
+    internal static async Task SweepStaleOnStartupAsync(string slackBotToken, string slackChannel)
+    {
+        if (_staleStatusTsOnStartup.Count == 0) return;
+        await Task.Delay(20_000); // let all instances post their first status
+        if (_staleStatusTsOnStartup.Count == 0) return; // already swept by first-post mechanism
+        var pending = _staleStatusTsOnStartup.ToList();
+        _staleStatusTsOnStartup.Clear();
+        var activeFromProps = ClaudePromptHelper.GetAllCachedPrompts()
+            .Select(p => GetWindowStringProp(p.WindowHandle, PropSlackTs))
+            .Where(t => t != null)
+            .ToHashSet()!;
+        foreach (var s in _instanceStates.Values)
+            if (s.SlackStatusTs != null) activeFromProps.Add(s.SlackStatusTs);
+        var stale = pending.Where(x => !activeFromProps.Contains(x)).ToList();
+        if (stale.Count > 0)
+        {
+            foreach (var staleTs in stale)
+                await SlackDeleteMessageAsync(slackBotToken, slackChannel, staleTs);
+            Console.WriteLine($"[EYE] Startup sweep (timer): {stale.Count} stale status(es) deleted");
+        }
+    }
+
     // ── Homework injection ────────────────────────────────────────────────────────────────
     // Persisted homework cooldown file — survives Eye restarts (per CWD key).
     static string _homeworkStatePath => Path.Combine(DataDir, "homework_state.json");
