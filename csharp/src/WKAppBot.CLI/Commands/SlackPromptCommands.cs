@@ -130,12 +130,22 @@ internal partial class Program
             DeletePendingAckFromFile(botToken, threadTs);
 
         var senderName = GetSendReplyUsername(printDecision: true);
-        var (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName).GetAwaiter().GetResult();
+
+        // Split long replies: first 5 lines as primary reply, rest as follow-up replies in same thread
+        var (replyHeader, replyOverflow) = SplitMessageForChannel(replyText);
+        var (ok, replyTs) = SlackSendViaApi(botToken, channel, replyHeader, threadTs, username: senderName).GetAwaiter().GetResult();
+        if (ok && replyOverflow != null)
+        {
+            var replyThreadTs = threadTs ?? replyTs; // stay in same thread
+            foreach (var chunk in ChunkText(replyOverflow, 3900))
+                SlackSendViaApi(botToken, channel, chunk, replyThreadTs, username: senderName).GetAwaiter().GetResult();
+            Console.WriteLine($"[SLACK] Thread: {replyOverflow.Split('\n').Length} lines → overflow posted");
+        }
 
         var threadNote = !string.IsNullOrEmpty(threadTs) ? " (in-thread)" : "";
         if (ok)
         {
-            Console.WriteLine($"[SLACK] Replied to #{channel}{threadNote}: {replyText.Split('\n')[0]}{(textParts.Count > 1 ? $" (+{textParts.Count - 1} lines)" : "")}");
+            Console.WriteLine($"[SLACK] Replied to #{channel}{threadNote}: {replyText.Split('\n')[0]}{(replyOverflow != null ? " (+thread)" : "")}");
             // Upload files in the same thread
             foreach (var fp in filePaths)
             {
