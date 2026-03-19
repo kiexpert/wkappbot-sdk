@@ -1,4 +1,4 @@
-# WKAppBot v4.5.0 - Windows + Android App Automation Test Framework
+# WKAppBot v4.6.0 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -156,6 +156,18 @@ SendInput/Hotkey = EnsureFocus 필요
 ### 포커스 양보 승인 (UserInputWaitOverlay)
 - "input" 액션은 항상 yield 로직 진입
 - 타겟 전경+idle(30초) → 자동승인 / 비전경/활동 → 팝업(30초 카운트다운)
+
+### PromptDeliveryContext — 유저 방해 예방 상황실
+- **목적**: 프롬프트 주입 전, 유저가 그 창을 쓰고 있는지 미리 파악 → 작업 방해 예방
+- **범위**: 거창한 "전체 상황실" 아님. 딱 두 가지만 체크:
+  1. 타겟 창이 포그라운드? (유저가 거기 보고 있나)
+  2. 최근 30초 이내 키/마우스 입력? (유저가 타이핑 중인가)
+- **전략 결정**: `ctx.Decide()` → `Focusless` / `FocusSteal` / `Skip` / `Abort`
+  - 비포커스 창 → `Focusless` (조용히 주입, 포커스 안 빼앗음)
+  - 포커스+idle → `FocusSteal` (유저 자리 비웠으니 포커스 빼앗기 OK)
+  - 포커스+타이핑 중 → `Skip` (재무장 후 다음 idle 사이클 재시도)
+- **`AllowFocusSteal` static**: 레거시 fallback — 신규 코드는 `PromptDeliveryContext` 사용 권장
+- 참고: `PromptDeliveryContext.cs` (WKAppBot.Win32/Window/)
 
 ### 태그 규칙
 `[WATCH]` `[RUN]` `[FOCUS]` `[VERIFY]` `[BLOCK]` `[GUARD]` `[ZOOM]` `[SLACK]` `[EXP]` `[KNOWHOW]`
