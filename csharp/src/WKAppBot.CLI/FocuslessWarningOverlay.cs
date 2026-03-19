@@ -28,6 +28,8 @@ internal sealed class FocuslessWarningWindow : Window
     private readonly CheckBox _alertCheck;
 
     public event Action<bool>? Dismissed; // true = 다시 알림, false = 알림 억제
+    private int _physX = int.MinValue, _physY;
+    internal void SetPhysicalPosition(int x, int y) { _physX = x; _physY = y; }
 
     public FocuslessWarningWindow(IntPtr ownerHwnd, string detail, string processName)
     {
@@ -206,18 +208,30 @@ internal sealed class FocuslessWarningWindow : Window
         var exStyle = GetWindowLongPtr(helper.Handle, GWL_EXSTYLE);
         SetWindowLongPtr(helper.Handle, GWL_EXSTYLE,
             new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE));
+
+        // Re-apply physical position AFTER owner set — GWL_HWNDPARENT may reposition
+        if (_physX != int.MinValue)
+            SetWindowPos(helper.Handle, IntPtr.Zero, _physX, _physY, 0, 0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE_F);
     }
 
     // ── Win32 P/Invoke ──
     private const int GWL_EXSTYLE = -20;
     private const int GWL_HWNDPARENT = -8;
     private const int WS_EX_NOACTIVATE = 0x08000000;
+    private const uint SWP_NOSIZE        = 0x0001;
+    private const uint SWP_NOZORDER      = 0x0004;
+    private const uint SWP_NOACTIVATE_F  = 0x0010;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int X, int Y, int cx, int cy, uint uFlags);
 }
 
 /// <summary>
@@ -278,7 +292,7 @@ internal static class FocuslessWarningOverlay
                 }
             };
 
-            // Position: 타겟 윈도우 상단 — 가상화면 바운드 클램핑 필수 (멀티모니터)
+            // Position via SetPhysicalPosition (physical pixels) → SetWindowPos in OnSourceInitialized
             try
             {
                 int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
@@ -288,31 +302,33 @@ internal static class FocuslessWarningOverlay
                 if (vw <= 0) { vw = GetSystemMetrics(SM_CXSCREEN); vx = 0; }
                 if (vh <= 0) { vh = GetSystemMetrics(SM_CYSCREEN); vy = 0; }
 
-                double left, top;
+                int px, py;
                 if (ownerHwnd != IntPtr.Zero && GetWindowRect(ownerHwnd, out var rect)
                     && rect.Right > rect.Left && rect.Bottom > rect.Top)
                 {
-                    left = rect.Left + 20;
-                    top  = rect.Top  + 20;
+                    uint dpi = GetDpiForWindow(ownerHwnd);
+                    if (dpi == 0) dpi = 96;
+                    double scale = dpi / 96.0;
+                    int overlayW = (int)(window.Width * scale);
+                    int overlayH = (int)(window.Height * scale);
+                    px = rect.Left + 20;
+                    py = rect.Top  + 20;
+                    // Clamp to virtual screen
+                    px = Math.Max(vx, Math.Min(px, vx + vw - overlayW - 10));
+                    py = Math.Max(vy, Math.Min(py, vy + vh - overlayH - 10));
                 }
                 else
                 {
-                    // 주 모니터 우상단 근처
-                    left = GetSystemMetrics(SM_CXSCREEN) - (int)window.Width - 40;
-                    top  = 60;
+                    // Primary screen top-right area
+                    px = GetSystemMetrics(SM_CXSCREEN) - 480;
+                    py = 60;
                 }
 
-                // 클램핑: 화면 안에 들어오도록
-                left = Math.Max(vx, Math.Min(left, vx + vw - window.Width  - 10));
-                top  = Math.Max(vy, Math.Min(top,  vy + vh - window.Height - 10));
-
-                window.Left = left;
-                window.Top  = top;
+                window.SetPhysicalPosition(px, py);
             }
             catch
             {
-                window.Left = 100;
-                window.Top  = 100;
+                window.SetPhysicalPosition(100, 100);
             }
 
             Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -349,6 +365,9 @@ internal static class FocuslessWarningOverlay
     private const int SM_CXSCREEN = 0, SM_CYSCREEN = 1;
     private const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77;
     private const int SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79;
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT

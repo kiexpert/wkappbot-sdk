@@ -269,6 +269,12 @@ Data Directory:
 
     static int Error(string msg)
     {
+        // In Eye pipe mode, Console.Error is not forwarded to the pipe client — use Console.Out instead.
+        if (Program.RunningInEye)
+        {
+            Console.WriteLine(msg);
+            return 1;
+        }
         Console.ForegroundColor = ConsoleColor.Red;
         Console.Error.WriteLine(msg);
         Console.ResetColor();

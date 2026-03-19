@@ -36,6 +36,7 @@ internal sealed class UserInputWaitWindow : Window
     private uint _lastInputTick;
     private bool _confirmed;
     private bool _focusAcquired;
+    private int _physX = int.MinValue, _physY; // Physical pixel position (set before Show)
 
     /// <summary>Focus was actually transferred to target (verified).</summary>
     public bool FocusAcquired => _focusAcquired;
@@ -245,6 +246,8 @@ internal sealed class UserInputWaitWindow : Window
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; OnDeny(); } };
     }
 
+    internal void SetPhysicalPosition(int x, int y) { _physX = x; _physY = y; }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
@@ -260,6 +263,11 @@ internal sealed class UserInputWaitWindow : Window
         var exStyle = GetWindowLongPtr(helper.Handle, GWL_EXSTYLE);
         SetWindowLongPtr(helper.Handle, GWL_EXSTYLE,
             new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW));
+
+        // Re-apply physical position AFTER owner set — GWL_HWNDPARENT causes Windows to reposition
+        if (_physX != int.MinValue)
+            SetWindowPos(helper.Handle, IntPtr.Zero, _physX, _physY, 0, 0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
     private void OnConfirm()
@@ -482,12 +490,19 @@ internal sealed class UserInputWaitWindow : Window
     private const int GWL_HWNDPARENT = -8;
     private const int WS_EX_NOACTIVATE  = 0x08000000;
     private const int WS_EX_TOOLWINDOW  = 0x00000080;
+    private const uint SWP_NOSIZE     = 0x0001;
+    private const uint SWP_NOZORDER   = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int X, int Y, int cx, int cy, uint uFlags);
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
@@ -531,34 +546,42 @@ internal static class UserInputWaitOverlay
                 prevFg: prevFgForRestore, actionInfo: actionInfo);
             if (noSound) window.NoSound = true;
 
-            // Position: centered inside target window (multi-monitor safe)
+            // Position: physical pixel coords → SetWindowPos in OnSourceInitialized
+            // (GWL_HWNDPARENT causes Windows to reposition if we use WPF Left/Top)
             if (posHwnd != IntPtr.Zero && GetWindowRect(posHwnd, out var posRect)
                 && posRect.right - posRect.left > 0)
             {
+                uint dpi = GetDpiForWindow(posHwnd);
+                if (dpi == 0) dpi = 96;
+                double scale = dpi / 96.0;
+
                 int posW = posRect.right - posRect.left;
                 int posH = posRect.bottom - posRect.top;
-                // Center overlay on target window (upper 1/3 for visibility)
-                window.Left = posRect.left + (posW - window.Width) / 2;
-                window.Top = posRect.top + (posH - window.Height) / 3;
+                int overlayW = (int)(window.Width * scale);
+                int overlayH = (int)(window.Height * scale);
 
-                // Clamp to virtual screen bounds
+                int x = posRect.left + (posW - overlayW) / 2;
+                int y = posRect.top  + (posH - overlayH) / 3;
+
+                // Clamp to virtual screen bounds (physical pixels)
                 int vsLeft = GetSystemMetrics(76);  // SM_XVIRTUALSCREEN
                 int vsTop  = GetSystemMetrics(77);  // SM_YVIRTUALSCREEN
                 int vsW    = GetSystemMetrics(78);  // SM_CXVIRTUALSCREEN
                 int vsH    = GetSystemMetrics(79);  // SM_CYVIRTUALSCREEN
-                if (window.Left < vsLeft) window.Left = vsLeft;
-                if (window.Top  < vsTop)  window.Top  = vsTop;
-                if (window.Left + window.Width > vsLeft + vsW)
-                    window.Left = vsLeft + vsW - window.Width;
-                if (window.Top + window.Height > vsTop + vsH)
-                    window.Top = vsTop + vsH - window.Height;
+                x = Math.Max(vsLeft, Math.Min(x, vsLeft + vsW - overlayW));
+                y = Math.Max(vsTop,  Math.Min(y, vsTop  + vsH - overlayH));
+
+                window.SetPhysicalPosition(x, y);
             }
             else
             {
                 // Fallback: primary screen center
-                var screenW = SystemParameters.PrimaryScreenWidth;
-                window.Left = (screenW - window.Width) / 2;
-                window.Top = 120;
+                uint dpi = GetDpiForWindow(ownerHwnd);
+                if (dpi == 0) dpi = 96;
+                double scale = dpi / 96.0;
+                int overlayW = (int)(window.Width * scale);
+                int screenW  = GetSystemMetrics(0); // SM_CXSCREEN
+                window.SetPhysicalPosition((screenW - overlayW) / 2, (int)(120 * scale));
             }
 
             window.Confirmed += () =>
@@ -599,4 +622,7 @@ internal static class UserInputWaitOverlay
 
     [DllImport("user32.dll", EntryPoint = "GetForegroundWindow")]
     private static extern IntPtr GetForegroundWindowStatic();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
 }

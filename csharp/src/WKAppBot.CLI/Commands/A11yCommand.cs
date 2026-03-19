@@ -1,4 +1,4 @@
-using FlaUI.Core.AutomationElements;
+﻿using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
@@ -174,14 +174,14 @@ internal partial class Program
             Console.WriteLine(" 10. Result feedback    ✓ green OK / ✗ amber FAIL + fade");
             Console.WriteLine();
             Console.WriteLine("═══ Examples ══════════════════════════════════════════════");
-            Console.WriteLine("  a11y close 메모장                        Close Notepad");
-            Console.WriteLine("  a11y find 메모장 --depth 5               Explore element tree");
-            Console.WriteLine("  a11y invoke \"메모장#파일\"               Click '파일' menu");
-            Console.WriteLine("  a11y type \"영웅문#종목코드\" \"005930\"");
+            Console.WriteLine("  a11y close Notepad                       Close Notepad");
+            Console.WriteLine("  a11y find Notepad --depth 5              Explore element tree");
+            Console.WriteLine("  a11y invoke \"Notepad#File\"              Click 'File' menu");
+            Console.WriteLine("  a11y type \"HTS#StockCode\" \"005930\"");
             Console.WriteLine();
             Console.WriteLine("═══ Synthesized Full-Path (v3.0) — Unified Web+Native ═══");
             Console.WriteLine("  a11y find  \"Chrome#ChatGPT\"             Tab portal → web tree");
-            Console.WriteLine("  a11y invoke \"Chrome#Gemini#기본 메뉴\"    Tab → web button click");
+            Console.WriteLine("  a11y invoke \"Chrome#Gemini#Default Menu\"  Tab → web button click");
             Console.WriteLine("  a11y click \"Chrome#button.submit\"       CSS → CDP auto-fallback!");
             Console.WriteLine("  a11y type  \"Chrome#input[name=q]\" \"hello\"  CDP type");
             Console.WriteLine("  a11y read  \"Claude#.editor\"             Electron + CDP read");
@@ -190,11 +190,11 @@ internal partial class Program
             Console.WriteLine("  a11y eval \"Chrome#chatgpt.com\"   \"document.title\"             domain hint");
             Console.WriteLine();
             Console.WriteLine("  grap = Win32#a11y — unified native + web path");
-            Console.WriteLine("    메모장                 plain text = UIA Name match");
+            Console.WriteLine("    Notepad                plain text = UIA Name match");
             Console.WriteLine("    Chrome#ChatGPT#Send    UIA scope / tab portal");
             Console.WriteLine("    Chrome#button.submit   CSS selector → CDP auto-detect!");
             Console.WriteLine("    Chrome#[aria-label=X]  CSS attr → CDP");
-            Console.WriteLine("    영웅문/0338#실시간계좌  / = Win32 child, # = UIA scope");
+            Console.WriteLine("    HTS/0338#RealTimeAcct  / = Win32 child, # = UIA scope");
             Console.WriteLine("    */? wildcards · regex: · `;` OR · aid fallback");
             Console.WriteLine();
             Console.WriteLine("─── © 2026 WilKim · github.com/kiexpert/WKAppBot ──────────");
@@ -337,6 +337,29 @@ internal partial class Program
             if (string.IsNullOrEmpty(grap))
                 return Error($"{action} requires a file path: a11y {action} \"path/to/file.cpp\" [--encoding 949]");
             return FileReadWrite(action, grap, text, encodingArg, args);
+        }
+
+        // ═══ Special: file-edit (search-replace with backup, encoding-aware) ═══
+        if (action == "file-edit")
+        {
+            if (string.IsNullOrEmpty(grap))
+                return Error("file-edit requires a file path: a11y file-edit \"path.cs\" --old-string \"foo\" --text \"bar\"");
+            string? oldStr = null;
+            for (int i = 2; i < args.Length - 1; i++)
+                if (args[i].Equals("--old-string", StringComparison.OrdinalIgnoreCase)) { oldStr = args[i + 1]; break; }
+            if (oldStr == null)
+                return Error("file-edit requires --old-string <search_text>");
+            if (text == null)
+                return Error("file-edit requires --text <replacement_text>");
+            var editArgs = new List<string> { "edit", oldStr, text, grap };
+            if (args.Any(a => a.Equals("--replace-all", StringComparison.OrdinalIgnoreCase))) editArgs.Add("--replace-all");
+            if (args.Any(a => a.Equals("--regex", StringComparison.OrdinalIgnoreCase)))       editArgs.Add("--regex");
+            if (args.Any(a => a.Equals("--i-really-want-lossy-encoding", StringComparison.OrdinalIgnoreCase))) editArgs.Add("--i-really-want-lossy-encoding");
+            if (args.Any(a => a.Equals("--i-really-want-no-backup", StringComparison.OrdinalIgnoreCase)))   editArgs.Add("--i-really-want-no-backup");
+            if (encodingArg != null) { editArgs.Add("--encoding"); editArgs.Add(encodingArg); }
+            for (int i = 2; i < args.Length - 1; i++)
+                if (args[i].Equals("--context", StringComparison.OrdinalIgnoreCase)) { editArgs.Add("--context"); editArgs.Add(args[i + 1]); break; }
+            return FileCommand(editArgs.ToArray());
         }
 
         // ═══ Special: wait action (polls for window/element, early return) ═══
@@ -1009,23 +1032,23 @@ internal partial class Program
             if (File.Exists(generalPath))
                 ShowKnowhowBroadcast(generalPath, "KNOWHOW:OS");
             else
-                ShowKnowhowHint(generalPath, "앱 전반 자동화 특성 (MFC/WPF/Electron 등) 기록 권장");
+                ShowKnowhowHint(generalPath, "Record app-wide automation traits (MFC/WPF/Electron quirks etc.)");
 
-            // 2. knowhow-{action}.md (액션별)
+            // 2. knowhow-{action}.md (per action)
             var actionPath = Path.Combine(expDir, $"knowhow-{action}.md");
             if (File.Exists(actionPath))
                 ShowKnowhowBroadcast(actionPath, "KNOWHOW:OS");
             else
-                ShowKnowhowHint(actionPath, $"{action} 성공법·주의점·실패 패턴 기록 권장");
+                ShowKnowhowHint(actionPath, $"Record knowhow for {action}: success patterns, pitfalls, failures");
 
-            // 3. 실패 시 knowhow-failed-actions.md
+            // 3. On failure: knowhow-failed-actions.md
             if (!success)
             {
                 var failedPath = Path.Combine(expDir, "knowhow-failed-actions.md");
                 if (File.Exists(failedPath))
                     ShowKnowhowBroadcast(failedPath, "KNOWHOW:OS");
                 else
-                    ShowKnowhowHint(failedPath, "이번 실패 원인·우회법 기록 권장");
+                    ShowKnowhowHint(failedPath, "Record this failure: root cause and workaround");
             }
         }
         catch { /* best effort */ }

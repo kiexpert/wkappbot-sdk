@@ -30,7 +30,7 @@ internal partial class Program
             // ── Fast path: query running Eye loop via IPC pipe ──
             // Eye loop maintains all caches in memory — IPC response is ~5ms vs ~600ms legacy scan.
             // Fallback to legacy only when Eye is not running or pipe query fails.
-            var ipc = EyeIpcClient.QueryTickAsync(timeoutMs: 2000).GetAwaiter().GetResult();
+            var ipc = EyeIpcClient.QueryTickAsync(timeoutMs: 100).GetAwaiter().GetResult();
             if (ipc != null)
             {
                 Console.WriteLine($"[EYE] one-shot tick (IPC fast-path, cache age={ipc.CachedAgeMs}ms)");
@@ -54,36 +54,10 @@ internal partial class Program
                 return 0;
             }
 
-            // ── Eye not running: auto-launch + wait for pipe ──
-            Console.WriteLine("[EYE] IPC query failed — launching Eye and waiting for pipe...");
+            // ── Eye not running or refused: launch in background, immediately fall back to legacy scan ──
+            Console.WriteLine("[EYE] IPC query failed — launching Eye (background) and running legacy scan...");
             LaunchAppBotEyeIfNeeded();
-
-            // Wait ~3s for Eye pipe to be ready (Eye startup ~1-2s), then fall back
-            Thread.Sleep(3000);
-            var ipcRetry = EyeIpcClient.QueryTickAsync(timeoutMs: 1000).GetAwaiter().GetResult();
-
-            if (ipcRetry != null)
-            {
-                Console.WriteLine($"[EYE] one-shot tick (IPC after launch, cache age={ipcRetry.CachedAgeMs}ms)");
-                Console.WriteLine($"[EYE_TICK] ipc=ok total={swTotal.ElapsedMilliseconds}ms ctx={ipcRetry.ContextPct}%");
-                Console.WriteLine($"[EYE_TICK] hint promptLine={ipcRetry.PromptLineHint} tickLine={ipcRetry.TickLineHint}");
-                Console.WriteLine($"[EYE_TICK] cards={ipcRetry.CardCount} promptSource={ipcRetry.PromptSource}");
-                if (!string.IsNullOrWhiteSpace(ipcRetry.Prompt))
-                    Console.WriteLine($"[EYE_TICK] recent={ipcRetry.Prompt}");
-                foreach (var plan in ipcRetry.Plans)
-                    Console.WriteLine($"[EYE_PLAN] —:— {plan}");
-                Console.WriteLine($"[EYE_GUARD] armed={(ipcRetry.GuardArmed ? 1 : 0)} execIdle={ipcRetry.ExecIdleSec:F0}s aiIdle={ipcRetry.AiIdleSec:F0}s cooldown={ipcRetry.CooldownSec:F0}s");
-                Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipcRetry.KeepAwakeAgeSec < 0 ? "n/a" : ipcRetry.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipcRetry.PromptSource} latestTickAge={(ipcRetry.LatestTickAgeSec < 0 ? "n/a" : ipcRetry.LatestTickAgeSec.ToString("F0") + "s")}");
-                Console.WriteLine($"[EYE_TICK] ── card display ──");
-                foreach (var line in ipcRetry.Summary.Split('\n'))
-                    Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
-                Console.Out.Flush();
-                Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
-                Console.Out.Flush();
-                return 0;
-            }
-
-            Console.WriteLine("[EYE] Eye launch or pipe timeout — falling back to legacy scan");
+            Console.WriteLine("[EYE] falling back to legacy scan");
 
             // ── Phase 1: ReadLatestTick ──
             var swPhase = Stopwatch.StartNew();

@@ -12,8 +12,14 @@
 // (absorbed into OS startup time) and saves ~2.3s of visible delay in Main.
 //
 // Do NOT remove this file.
+using System.Text;
 namespace WKAppBot.CLI;
 internal partial class Program
 {
-    static Program() { } // removes beforefieldinit — see file header for why
+    static Program()
+    {
+        // removes beforefieldinit — see file header for why
+        // Also: register code-page provider so GetEncoding(949) etc. work in .NET Core.
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
 }

@@ -13,6 +13,8 @@
     <SelfContained>true</SelfContained>
     <PublishAot>true</PublishAot>
     <PublishTrimmed>true</PublishTrimmed>
+    <!-- UTF-8 active code page via manifest: OS sets CP65001 at process load, no runtime API call needed -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <!-- Post-publish: copy launcher EXE to SDK/bin (no hot-swap needed, rarely changes) -->
