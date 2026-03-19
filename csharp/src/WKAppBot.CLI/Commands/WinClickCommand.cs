@@ -28,8 +28,22 @@ internal partial class Program
         bool isRight = args.Any(a => a == "--right");
         bool forceFocusless = args.Any(a => a == "--fl" || a == "--focusless");
 
-        if (!int.TryParse(args[1], out int relX) || !int.TryParse(args[2], out int relY))
-            return Error("Invalid coordinates. Usage: wkappbot win-click <title> <x> <y>");
+        // Support both positional (<title> <x> <y>) and named (--x N --y N) coordinate syntax
+        int relX, relY;
+        string? xStr = GetArgValue(args, "--x") ?? GetArgValue(args, "--X");
+        string? yStr = GetArgValue(args, "--y") ?? GetArgValue(args, "--Y");
+        if (xStr != null || yStr != null)
+        {
+            // Named arg syntax: win-click <title> --x N --y N
+            if (!int.TryParse(xStr, out relX) || !int.TryParse(yStr, out relY))
+                return Error("Invalid coordinates. Usage: wkappbot win-click <title> --x N --y N");
+        }
+        else
+        {
+            // Positional syntax: win-click <title> <x> <y>
+            if (args.Length < 3 || !int.TryParse(args[1], out relX) || !int.TryParse(args[2], out relY))
+                return Error("Invalid coordinates. Usage: wkappbot win-click <title> <x> <y> or --x N --y N");
+        }
 
         // Resolve grap: "window/child" — '/' = Win32 child, '#' part ignored (coordinate-based click)
         var (win32Segments, _) = GrapHelper.SplitGrap(args[0]);
