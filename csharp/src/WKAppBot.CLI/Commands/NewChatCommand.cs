@@ -368,21 +368,45 @@ Then immediately:
     /// </summary>
     static IntPtr FindVSCodeWindowForNewChat()
     {
-        // ── Collect all VS Code main windows ──
+        // ── Collect all VS Code windows (top-level + child renderers) ──
+        // EnumWindows only returns top-level HWNDs. VS Code sometimes creates Chrome_WidgetWin_1
+        // as a SetParent'd child (e.g. "lucy_securepad" panel inside a multi-window frame).
+        // We do a 2-pass scan: top-level first, then child scan of each top-level result.
         var candidates = new List<(IntPtr hWnd, uint pid, string title)>();
-        NativeMethods.EnumWindows((hWnd, _) =>
+        var candidateSet = new HashSet<IntPtr>();
+        var procNameCache = new Dictionary<uint, string>();
+
+        bool AddCandidate(IntPtr hWnd)
         {
-            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
-            if (WindowFinder.GetClassName(hWnd) != "Chrome_WidgetWin_1") return true;
+            if (!candidateSet.Add(hWnd)) return false;
+            if (!NativeMethods.IsWindowVisible(hWnd)) return false;
+            if (WindowFinder.GetClassName(hWnd) != "Chrome_WidgetWin_1") return false;
             NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
-            string procName = "?";
-            try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
-            if (!procName.Equals("Code", StringComparison.OrdinalIgnoreCase)) return true;
+            if (!procNameCache.TryGetValue(pid, out var procName))
+            {
+                try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { procName = "?"; }
+                procNameCache[pid] = procName!;
+            }
+            if (!procName!.Equals("Code", StringComparison.OrdinalIgnoreCase)) return false;
             var title = WindowFinder.GetWindowText(hWnd);
-            if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)) return true;
+            if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)) return false;
             candidates.Add((hWnd, pid, title));
             return true;
-        }, IntPtr.Zero);
+        }
+
+        // Pass 1: top-level windows
+        NativeMethods.EnumWindows((hWnd, _) => { AddCandidate(hWnd); return true; }, IntPtr.Zero);
+
+        // Pass 2: child Chrome_WidgetWin_1 of each top-level Code window
+        // Covers the case where VS Code's renderer panel is a SetParent'd child window.
+        foreach (var (topHwnd, _, _) in candidates.ToList())
+        {
+            NativeMethods.EnumChildWindows(topHwnd, (hWnd, _) =>
+            {
+                if (WindowFinder.GetClassName(hWnd) == "Chrome_WidgetWin_1") AddCandidate(hWnd);
+                return true;
+            }, IntPtr.Zero);
+        }
 
         if (candidates.Count == 0) return IntPtr.Zero;
 

@@ -257,7 +257,13 @@ internal partial class Program
                     return (false, (string?)null);
                 }
 
-                // ── Send: click button ──
+                // ── Send ──
+                // Wait for any active response to finish (stop button = Claude is generating/tool-running).
+                // Clicking the send button during tool execution would interrupt it — Enter key is safer
+                // because Claude queues it in the editor without firing until generation completes.
+                if (!await WaitWhileStopButtonVisible(cdp, maxWaitMs: 60000))
+                    return (false, (string?)null);
+
                 await Task.Delay(500);
                 int preSendTurns = await CountClaudeTurns(cdp);
                 // Capture existing streaming element count so Phase 5/6 only reacts to NEW elements.
@@ -270,51 +276,60 @@ internal partial class Program
                     "document.querySelectorAll('[data-testid=\"assistant-message\"]').length") ?? "0");
                 var sendResult = "PENDING";
 
-                // Tier 1: JS click on send button (multi-selector fallback for DOM changes)
-                var jsClick = await cdp.EvalAsync("""
-                    (() => {
-                        var btn = document.querySelector('[data-testid="chat-input-grid-area"] button[type="submit"]')
-                               || document.querySelector('[data-testid="chat-input"] button[type="submit"]')
-                               || document.querySelector('button[aria-label="메시지 보내기"]')
-                               || document.querySelector('button[aria-label="Send Message"]')
-                               || document.querySelector('button[aria-label*="Send"]');
-                        if (!btn || btn.disabled) return 'NO_BTN';
-                        btn.click();
-                        return 'CLICKED';
-                    })()
-                    """) ?? "NO_BTN";
-
-                if (jsClick == "CLICKED")
+                // Tier 1: CDP Enter key — queues safely, does NOT interrupt tool execution
+                await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.focus()");
+                await Task.Delay(100);
+                await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
                 {
-                    await Task.Delay(1000);
-                    var postTurns = await CountClaudeTurns(cdp);
-                    if (postTurns > preSendTurns)
-                        sendResult = "JS_CLICK";
-                    else
-                    {
-                        var remaining = await cdp.EvalAsync(
-                            $"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 99") ?? "99";
-                        sendResult = remaining == "0" ? "JS_CLICK" : "CLICK_NOOP";
-                    }
+                    ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
+                    ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+                });
+                await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
+                {
+                    ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
+                    ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
+                });
+                await Task.Delay(1000);
+                var postTurnsEnter = await CountClaudeTurns(cdp);
+                if (postTurnsEnter > preSendTurns)
+                    sendResult = "CDP_ENTER";
+                else
+                {
+                    var remaining0 = await cdp.EvalAsync(
+                        $"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 99") ?? "99";
+                    if (remaining0 == "0") sendResult = "CDP_ENTER";
                 }
 
-                // Tier 2: CDP Enter key
-                if (sendResult != "JS_CLICK")
+                // Tier 2: JS click on send button (fallback — only when Enter had no effect)
+                if (sendResult == "PENDING")
                 {
-                    Console.WriteLine("[ASK] JS click didn't send, trying Enter key...");
-                    await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.focus()");
-                    await Task.Delay(100);
-                    await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
+                    Console.WriteLine("[ASK] Enter key didn't send, trying JS button click...");
+                    var jsClick = await cdp.EvalAsync("""
+                        (() => {
+                            var btn = document.querySelector('[data-testid="chat-input-grid-area"] button[type="submit"]')
+                                   || document.querySelector('[data-testid="chat-input"] button[type="submit"]')
+                                   || document.querySelector('button[aria-label="메시지 보내기"]')
+                                   || document.querySelector('button[aria-label="Send Message"]')
+                                   || document.querySelector('button[aria-label*="Send"]');
+                            if (!btn || btn.disabled) return 'NO_BTN';
+                            btn.click();
+                            return 'CLICKED';
+                        })()
+                        """) ?? "NO_BTN";
+
+                    if (jsClick == "CLICKED")
                     {
-                        ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
-                        ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
-                    });
-                    await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
-                    {
-                        ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
-                        ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
-                    });
-                    sendResult = "CDP_ENTER";
+                        await Task.Delay(1000);
+                        var postTurns = await CountClaudeTurns(cdp);
+                        if (postTurns > preSendTurns)
+                            sendResult = "JS_CLICK";
+                        else
+                        {
+                            var remaining = await cdp.EvalAsync(
+                                $"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 99") ?? "99";
+                            sendResult = remaining == "0" ? "JS_CLICK" : "CLICK_NOOP";
+                        }
+                    }
                 }
 
                 // Zoom feedback + focus guard
@@ -600,7 +615,7 @@ internal partial class Program
             var botToken = config?["bot_token"]?.GetValue<string>();
             var channel  = config?["channel"]?.GetValue<string>();
             if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return;
-            var (ok, _) = SlackUpdateMessageAsync(botToken, channel, msgTs, text).GetAwaiter().GetResult();
+            var (ok, _, _) = SlackUpdateMessageAsync(botToken, channel, msgTs, text).GetAwaiter().GetResult();
             if (!ok) Console.WriteLine($"[SLACK] SlackUpdateThreadMessage failed for ts={msgTs}");
         }
         catch { }
@@ -627,7 +642,7 @@ internal partial class Program
                 var combined = last.text + "\n\n" + msg;
                 if (combined.Length <= SlackMaxAppendLength)
                 {
-                    var (ok, _) = SlackUpdateMessageAsync(botToken, channel, last.msgTs, combined).GetAwaiter().GetResult();
+                    var (ok, _, _) = SlackUpdateMessageAsync(botToken, channel, last.msgTs, combined).GetAwaiter().GetResult();
                     if (ok)
                     {
                         _slackThreadLastPost[sessionTs] = (last.msgTs, uname, combined);

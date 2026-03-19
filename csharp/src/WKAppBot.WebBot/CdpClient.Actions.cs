@@ -398,10 +398,10 @@ public sealed partial class CdpClient
     public void MinimizeChrome()
     {
         var hwnd = GetChromeWindowHandle();
-        if (hwnd == IntPtr.Zero) return;
+        if (hwnd == IntPtr.Zero) { Console.WriteLine("[CDP] MinimizeChrome: hwnd=zero (Chrome not found)"); return; }
         // SW_MINIMIZE=6
         ShowWindowNative(hwnd, 6);
-        Console.WriteLine("[CDP] Chrome minimized");
+        Console.WriteLine($"[CDP] Chrome minimized (hwnd={hwnd:X8})");
     }
 
     /// <summary>Legacy recovery — replaced by RestoreChromeNoActivate. Kept as no-op.</summary>
@@ -667,7 +667,7 @@ public sealed partial class CdpClient
         return true;
     }
 
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "ShowWindow")]
     private static extern bool ShowWindowNative(IntPtr hWnd, int nCmdShow);
 }
 

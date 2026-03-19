@@ -345,9 +345,206 @@ internal partial class Program
                 Console.WriteLine("Hint: UIA tree is empty. Try --win32 for Win32 native child windows.");
                 Console.ResetColor();
             }
+
+            // Dynamic a11y: auto-trigger OCR+Gemini when UIA tree is sparse
+            TryDynamicA11yFallback(inspectHandle, tree, args);
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Evaluates UIA tree quality via composite score.
+    /// Triggers OCR+Gemini fallback automatically when tree is sparse.
+    /// Skipped when --no-vision flag is set or output is redirected.
+    /// </summary>
+    // In-process cache: hwnd → Gemini segments (survives across commands in the same session)
+    private static readonly Dictionary<IntPtr, List<WKAppBot.Vision.OcrSegment>> _dynA11yCache = new();
+
+    /// <summary>Print cached DYN-A11Y segments for a window (from a previous scan in this session).</summary>
+    static void PrintCachedDynA11y(IntPtr hWnd)
+    {
+        if (!_dynA11yCache.TryGetValue(hWnd, out var segments)) return;
+        if (!NativeMethods.IsWindow(hWnd)) { _dynA11yCache.Remove(hWnd); return; }
+
+        NativeMethods.GetWindowRect(hWnd, out var wr);
+        var winRect = new System.Drawing.Rectangle(wr.Left, wr.Top, wr.Right - wr.Left, wr.Bottom - wr.Top);
+
+        // Hot focus zone priority (same logic as TryDynamicA11yFallback)
+        System.Drawing.RectangleF focusRect = System.Drawing.RectangleF.Empty;
+        try
+        {
+            using var uiaFocus = new WKAppBot.Win32.Accessibility.UiaLocator();
+            var focused = uiaFocus.Automation.FocusedElement();
+            if (focused != null)
+            {
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint targetPid);
+                if (focused.Properties.ProcessId.ValueOrDefault == (int)targetPid)
+                {
+                    var fr = focused.BoundingRectangle;
+                    focusRect = new System.Drawing.RectangleF(
+                        (fr.X - winRect.Left) / (float)winRect.Width,
+                        (fr.Y - winRect.Top)  / (float)winRect.Height,
+                        fr.Width  / (float)winRect.Width,
+                        fr.Height / (float)winRect.Height);
+                }
+            }
+        }
+        catch { }
+
+        bool IsFocusHit(WKAppBot.Vision.OcrSegment s)
+        {
+            if (focusRect.IsEmpty) return false;
+            var expanded = System.Drawing.RectangleF.Inflate(focusRect, focusRect.Width * 0.2f, focusRect.Height * 0.2f);
+            return expanded.Contains((float)s.RelX, (float)s.RelY);
+        }
+
+        var hotSegs  = segments.Where(IsFocusHit).OrderBy(s => s.RelY).ThenBy(s => s.RelX).ToList();
+        var restSegs = segments.Where(s => !IsFocusHit(s)).OrderBy(s => s.RelY).ThenBy(s => s.RelX).ToList();
+
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.WriteLine($"  [DYN-A11Y] {segments.Count} cached Gemini element(s):");
+        Console.ResetColor();
+
+        foreach (var seg in hotSegs)
+        {
+            var cx = (int)(winRect.Left + seg.RelX * winRect.Width);
+            var cy = (int)(winRect.Top  + seg.RelY * winRect.Height);
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine($"    ★ [{(seg.ControlType ?? "?").PadRight(12)}] \"{seg.Text}\"  @({cx},{cy})");
+            Console.ResetColor();
+        }
+        foreach (var seg in restSegs)
+        {
+            var cx = (int)(winRect.Left + seg.RelX * winRect.Width);
+            var cy = (int)(winRect.Top  + seg.RelY * winRect.Height);
+            Console.WriteLine($"    [{(seg.ControlType ?? "?").PadRight(12)}] \"{seg.Text}\"  @({cx},{cy})");
+        }
+    }
+
+    static void TryDynamicA11yFallback(IntPtr hWnd, string uiaTree, string[] args)
+    {
+        if (args.Contains("--no-vision")) return;
+        if (Console.IsOutputRedirected) return;
+
+        // Composite quality score from tree string
+        var lines = uiaTree.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        int totalElements = lines.Length;
+
+        int maxDepth = 0;
+        int leafTextCount = 0;
+        foreach (var line in lines)
+        {
+            int indent = line.Length - line.TrimStart().Length;
+            int depth = indent / 2;
+            if (depth > maxDepth) maxDepth = depth;
+            // Leaf with visible text: line contains a non-empty quoted string
+            var m = System.Text.RegularExpressions.Regex.Match(line, "\"([^\"]+)\"");
+            if (m.Success && m.Groups[1].Value.Trim().Length > 0)
+                leafTextCount++;
+        }
+
+        // Fire if hollow OR sparse:
+        // - Hollow: tree has elements (≥3) but no meaningful text labels — Flutter [Group] blobs, custom renderers
+        // - Sparse: truly tiny tree — almost nothing loaded yet
+        bool isHollow = totalElements >= 3 && leafTextCount < 2;
+        bool isSparse = totalElements < 5 && maxDepth < 5 && leafTextCount < 2;
+        bool isPoor = isHollow || isSparse;
+        if (!isPoor) return;
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"\n[DYN-A11Y] Sparse UIA tree (elements={totalElements}, depth={maxDepth}, text={leafTextCount}) — auto-triggering OCR+Gemini...");
+        Console.ResetColor();
+
+        try
+        {
+            var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hWnd);
+            var segments = AskGeminiForFormScanAsync(bmp).GetAwaiter().GetResult();
+            if (segments == null || segments.Count == 0)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine("[DYN-A11Y] Gemini returned no elements.");
+                Console.ResetColor();
+                return;
+            }
+
+            NativeMethods.GetWindowRect(hWnd, out var wr);
+            var winRect = new System.Drawing.Rectangle(wr.Left, wr.Top, wr.Right - wr.Left, wr.Bottom - wr.Top);
+
+            // Store in session cache for windows --uia to pick up
+            _dynA11yCache[hWnd] = segments;
+
+            // Hot focus chain: get focused element rect for priority sorting
+            System.Drawing.RectangleF focusRect = System.Drawing.RectangleF.Empty;
+            try
+            {
+                using var uiaFocus = new WKAppBot.Win32.Accessibility.UiaLocator();
+                var focused = uiaFocus.Automation.FocusedElement();
+                if (focused != null)
+                {
+                    NativeMethods.GetWindowThreadProcessId(hWnd, out uint targetPid);
+                    if (focused.Properties.ProcessId.ValueOrDefault == (int)targetPid)
+                    {
+                        var fr = focused.BoundingRectangle;
+                        // Convert to relative coords within window
+                        focusRect = new System.Drawing.RectangleF(
+                            (fr.X - winRect.Left) / (float)winRect.Width,
+                            (fr.Y - winRect.Top)  / (float)winRect.Height,
+                            fr.Width  / (float)winRect.Width,
+                            fr.Height / (float)winRect.Height);
+                    }
+                }
+            }
+            catch { }
+
+            // Classify segments: focused-area hits first, then rest by Y/X
+            bool IsFocusHit(WKAppBot.Vision.OcrSegment s)
+            {
+                if (focusRect.IsEmpty) return false;
+                // Segment center overlaps focused element rect (with 20% expansion tolerance)
+                var expanded = System.Drawing.RectangleF.Inflate(focusRect, focusRect.Width * 0.2f, focusRect.Height * 0.2f);
+                return expanded.Contains((float)s.RelX, (float)s.RelY);
+            }
+
+            var hotSegs  = segments.Where(IsFocusHit).OrderBy(s => s.RelY).ThenBy(s => s.RelX).ToList();
+            var restSegs = segments.Where(s => !IsFocusHit(s)).OrderBy(s => s.RelY).ThenBy(s => s.RelX).ToList();
+
+            // Print as virtual a11y tree — hot nodes first
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"── [DYN-A11Y] Gemini Vision Tree ({segments.Count} elements) ──");
+            Console.ResetColor();
+
+            if (hotSegs.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"  ★ Focus-zone ({hotSegs.Count}):");
+                Console.ResetColor();
+                foreach (var seg in hotSegs)
+                {
+                    var cx = (int)(winRect.Left + seg.RelX * winRect.Width);
+                    var cy = (int)(winRect.Top  + seg.RelY * winRect.Height);
+                    var type = (seg.ControlType ?? "?").PadRight(12);
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine($"  ★ [{type}] \"{seg.Text}\"  @({cx},{cy})");
+                    Console.ResetColor();
+                }
+            }
+
+            foreach (var seg in restSegs)
+            {
+                var cx = (int)(winRect.Left + seg.RelX * winRect.Width);
+                var cy = (int)(winRect.Top  + seg.RelY * winRect.Height);
+                var type = (seg.ControlType ?? "?").PadRight(12);
+                Console.WriteLine($"  [{type}] \"{seg.Text}\"  @({cx},{cy})");
+            }
+            Console.WriteLine($"[DYN-A11Y] Cached {segments.Count} element(s) for hwnd=0x{hWnd:X}");
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkRed;
+            Console.WriteLine($"[DYN-A11Y] Failed: {ex.Message}");
+            Console.ResetColor();
+        }
     }
 
     /// <summary>
@@ -875,6 +1072,9 @@ internal partial class Program
         Console.ResetColor();
         Console.Write(tree);
 
+        // Dynamic a11y: auto Gemini fallback when UIA tree is sparse
+        TryDynamicA11yFallback(hWnd, tree, args);
+
         Console.WriteLine();
         return 0;
     }
@@ -887,6 +1087,7 @@ internal partial class Program
         int durationSec = int.TryParse(GetArgValue(args, "--duration"), out var dur) ? dur : 0;
         bool showWin32 = args.Contains("--win32");
         bool liveMode = args.Contains("--live");  // single-line overwrite mode
+        bool hoverAnalyze = args.Contains("--hover-analyze");
         string? saveFile = GetArgValue(args, "--save");
 
         // Header
@@ -897,12 +1098,15 @@ internal partial class Program
             Console.WriteLine($"║  Tracking for {durationSec}s. Move mouse over UI elements.    ║");
         else
             Console.WriteLine("║  Move mouse over UI elements. Press Ctrl+C to stop.     ║");
+        if (hoverAnalyze)
+            Console.WriteLine("║  [HOVER] 1s still → auto UIA tree dump                  ║");
         Console.WriteLine("╚══════════════════════════════════════════════════════════╝");
         Console.ResetColor();
         Console.WriteLine();
 
         using var uia = new UiaLocator();
         string lastElemKey = "";       // element identity (type+aid+name) — detect real element change
+        string lastFocusKey = "";      // keyboard focus identity — detect focus change
         var logEntries = new List<string>();
         var stopwatch = Stopwatch.StartNew();
         bool running = true;
@@ -949,6 +1153,8 @@ internal partial class Program
 
         int lastPtX = -1, lastPtY = -1;
         bool lineHasContent = false;  // tracks if current \r line has content
+        DateTime lastMoveTime = DateTime.Now;
+        IntPtr lastAnalyzedHwnd = IntPtr.Zero;
 
         while (running)
         {
@@ -1040,11 +1246,32 @@ internal partial class Program
                         }
                         catch { }
 
+                        // Keyboard focus node (snapshot at same moment)
+                        string? focusLine = null;
+                        try
+                        {
+                            var focused = uia.Automation.FocusedElement();
+                            if (focused != null)
+                            {
+                                var fName = focused.Properties.Name.ValueOrDefault ?? "";
+                                var fType = focused.Properties.ControlType.ValueOrDefault.ToString().Replace("ControlType.", "") ?? "";
+                                var fAid  = focused.Properties.AutomationId.ValueOrDefault ?? "";
+                                var focusKey = $"{fType}|{fAid}|{fName}";
+                                if (focusKey != elemKey) // only show if different from cursor element
+                                {
+                                    focusLine = $"[KB] {fType} \"{fName}\"{(fAid.Length > 0 ? $" #{fAid}" : "")}";
+                                    lastFocusKey = focusKey;
+                                }
+                            }
+                        }
+                        catch { }
+
                         // Collect log entry
                         var logLine = BuildPlainLine(ts, pt, elemInfo, hWndUnder, win32Class, ctrlId, showWin32);
                         if (hierarchyPath != null) logLine = $"{hierarchyPath}  " + logLine;
                         if (overlayDetected)
                             logLine += $"  !! overlay: 0x{hWndTop:X8} {topClass}";
+                        if (focusLine != null) logLine += $"  {focusLine}";
                         logEntries.Add(logLine);
 
                         if (liveMode)
@@ -1052,6 +1279,11 @@ internal partial class Program
                             ClearCurrentLine();
                             WritePosAndElement(pt, elemInfo, hWndUnder, win32Class, ctrlId, showWin32);
                             if (overlayDetected) WriteOverlayTag(hWndTop, topClass);
+                            if (focusLine != null)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write($"  {focusLine}");
+                            }
                         }
                         else
                         {
@@ -1087,6 +1319,14 @@ internal partial class Program
                             Console.Write($"({pt.X,5},{pt.Y,5})  ");
 
                             WritePosAndElement(null, elemInfo, hWndUnder, win32Class, ctrlId, showWin32);
+
+                            // Line 3: keyboard focus (if different from cursor element)
+                            if (focusLine != null)
+                            {
+                                Console.WriteLine();
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write($"  {focusLine}");
+                            }
                             lineHasContent = true;
                         }
                     }
@@ -1108,6 +1348,46 @@ internal partial class Program
                     {
                         ClearCurrentLine();
                         WritePosAndElement(pt, elemInfo, hWndUnder, win32Class, ctrlId, showWin32);
+                    }
+                }
+
+                // ── Hover-analyze: dump UIA tree after 1s of no movement ──
+                if (hoverAnalyze)
+                {
+                    if (posChanged)
+                    {
+                        lastMoveTime = DateTime.Now;
+                        lastAnalyzedHwnd = IntPtr.Zero;  // reset so new window gets analyzed
+                    }
+                    else if (hWndUnder != IntPtr.Zero
+                          && hWndUnder != lastAnalyzedHwnd
+                          && (DateTime.Now - lastMoveTime).TotalMilliseconds >= 1000)
+                    {
+                        lastAnalyzedHwnd = hWndUnder;
+                        if (lineHasContent) { Console.WriteLine(); lineHasContent = false; }
+
+                        var titleBuf = new System.Text.StringBuilder(256);
+                        NativeMethods.GetWindowTextW(hWndUnder, titleBuf, titleBuf.Capacity);
+                        var winTitle = titleBuf.ToString();
+
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"\n  [HOVER] Auto-analyzing: \"{winTitle}\" (0x{hWndUnder:X8})");
+                        Console.ResetColor();
+                        try
+                        {
+                            var tree = uia.DumpTree(hWndUnder, maxDepth: 6);
+                            Console.ForegroundColor = ConsoleColor.DarkGray;
+                            foreach (var line in tree.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                                Console.WriteLine($"    {line}");
+                            Console.ResetColor();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine($"  [HOVER] Tree dump failed: {ex.Message}");
+                            Console.ResetColor();
+                        }
+                        Console.WriteLine();
                     }
                 }
 
@@ -2036,6 +2316,7 @@ internal partial class Program
                         PrintUiaMatchesWithPath(uiaMatches);
                         uiaMatchWindows++;
                     }
+                    PrintCachedDynA11y(hWnd);
                 }
                 else
                 {
@@ -2046,7 +2327,8 @@ internal partial class Program
                         ? UiaLocator.QuickSearch(hWnd, filterTitle, maxDepth: 12, maxResults: 10, maxVisited: 1500, timeoutMs: 8000)
                         : UiaLocator.QuickSearch(hWnd, filterTitle);
 
-                    if (!titleMatch && uiaMatches.Count == 0) return true;
+                    bool hasCached = _dynA11yCache.ContainsKey(hWnd);
+                    if (!titleMatch && uiaMatches.Count == 0 && !hasCached) return true;
 
                     // Print window (Cyan if UIA-only match, normal if title match)
                     if (!titleMatch)
@@ -2069,6 +2351,7 @@ internal partial class Program
                         PrintUiaMatches(uiaMatches);
                         uiaMatchWindows++;
                     }
+                    PrintCachedDynA11y(hWnd);
                 }
 
                 totalCount++;

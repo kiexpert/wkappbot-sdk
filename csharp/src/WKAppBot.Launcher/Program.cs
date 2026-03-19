@@ -476,13 +476,21 @@ class Program
             var psCmd = $"Get-Content -Wait -Path '{wtLogFile}'";
             try
             {
+                // [FOCUS-GUARD] Capture foreground before wt.exe launch; restore if stolen.
+                var fgBeforeWt = FocusGuard.GetForegroundWindow();
                 Process.Start(new ProcessStartInfo
                 {
                     FileName        = "wt.exe",
                     Arguments       = $"--window 0 new-tab --title \"{wtTitle}\" -- powershell -NoExit -Command \"{psCmd}\"",
                     UseShellExecute = true,
-                }) ;
+                });
                 Console.Error.WriteLine($"[LAUNCHER:MCP] WT monitor tab opened → {wtLogFile}");
+                Thread.Sleep(600);
+                if (fgBeforeWt != IntPtr.Zero && FocusGuard.GetForegroundWindow() != fgBeforeWt)
+                {
+                    Console.Error.WriteLine("[LAUNCHER:MCP] wt.exe stole focus — restoring");
+                    FocusGuard.SetForegroundWindow(fgBeforeWt);
+                }
             }
             catch (Exception ex) { Console.Error.WriteLine($"[LAUNCHER:MCP] wt.exe failed: {ex.Message}"); wtLogFile = null; }
         }
@@ -967,4 +975,16 @@ class Program
               {alias} error --hq -r                  # recursive in HQ logs
             """);
     }
+}
+
+/// <summary>
+/// Minimal focus-restore helper for Launcher (no Win32 project reference available).
+/// Only use for restore patterns — not for acquiring focus.
+/// </summary>
+static class FocusGuard
+{
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
 }

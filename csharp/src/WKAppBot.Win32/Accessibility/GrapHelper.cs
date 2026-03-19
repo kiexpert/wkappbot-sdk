@@ -308,6 +308,89 @@ public static class GrapHelper
         return WalkFindByMatcher(root, matcher, maxDepth, depth: 0, containersOnly: false);
     }
 
+    /// <summary>
+    /// Find ALL UIA elements matching a name/aid pattern string, sorted by coverage descending.
+    /// Coverage = key length / matched text length — shorter/exact name = higher coverage.
+    /// Used for --nth element selection: --nth 1 = best coverage (most specific match).
+    /// </summary>
+    public static List<(AutomationElement el, double coverage, string matchedText)> FindAllByNameOrAid(
+        AutomationElement root, string pattern, int maxDepth = 25)
+    {
+        var matcher = PatternMatcher.Create(pattern);
+        // Strip wildcards/prefix to get the "key" length for coverage calculation
+        var key = pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase)
+            ? pattern[6..] : pattern.Replace("*", "").Replace("?", "");
+        var results = new List<(AutomationElement, double, string)>();
+        WalkCollectByMatcher(root, matcher, key, maxDepth, 0, results);
+        // Sort: higher coverage first (shorter name relative to pattern = more specific)
+        results.Sort((a, b) => b.Item2.CompareTo(a.Item2));
+        return results;
+    }
+
+    /// <summary>
+    /// Like FindUiaScope but returns ALL matches for the last segment, coverage-sorted.
+    /// Preceding segments are resolved normally (first match). The last segment collects all.
+    /// </summary>
+    public static List<(AutomationElement el, double coverage, string matchedText)> FindUiaScopeAll(
+        AutomationElement root, string uiaPath, int maxDepth = 25)
+    {
+        if (string.IsNullOrEmpty(uiaPath))
+            return new List<(AutomationElement, double, string)> { (root, 1.0, "") };
+
+        var segments = uiaPath.Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries);
+        var windowRoot = root;
+        var current = root;
+
+        // Resolve all but the last segment (same as FindUiaScope)
+        for (int i = 0; i < segments.Length - 1; i++)
+        {
+            var found = FindByNameOrAid(current, segments[i], maxDepth);
+            if (found == null) return new List<(AutomationElement, double, string)>();
+            if (IsTabItem(found))
+            {
+                var webRoot = SwitchToTabAndGetWebRoot(found, windowRoot);
+                if (webRoot == null) return new List<(AutomationElement, double, string)>();
+                current = webRoot;
+                continue;
+            }
+            current = found;
+        }
+
+        // Last segment: collect ALL matches, coverage-sorted
+        return FindAllByNameOrAid(current, segments[^1], maxDepth);
+    }
+
+    private static void WalkCollectByMatcher(
+        AutomationElement parent, PatternMatcher matcher, string key,
+        int maxDepth, int depth, List<(AutomationElement, double, string)> results)
+    {
+        if (depth > maxDepth) return;
+        try
+        {
+            foreach (var child in parent.FindAllChildren())
+            {
+                try
+                {
+                    var name = child.Properties.Name.ValueOrDefault ?? "";
+                    var aid = child.Properties.AutomationId.ValueOrDefault ?? "";
+                    bool nameMatch = !string.IsNullOrEmpty(name) && matcher.IsMatch(name);
+                    bool aidMatch = !nameMatch && !string.IsNullOrEmpty(aid) && matcher.IsMatch(aid);
+                    if (nameMatch || aidMatch)
+                    {
+                        var matched = nameMatch ? name : aid;
+                        double coverage = matched.Length > 0
+                            ? (double)Math.Max(key.Length, 1) / Math.Max(matched.Length, key.Length)
+                            : 0;
+                        results.Add((child, coverage, matched));
+                    }
+                }
+                catch { }
+                WalkCollectByMatcher(child, matcher, key, maxDepth, depth + 1, results);
+            }
+        }
+        catch { }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // Public API: Browser tab portal
     // ═══════════════════════════════════════════════════════════════════════

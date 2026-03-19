@@ -44,26 +44,23 @@ internal partial class Program
             // 議곌굔 A: "send"/"type" 吏곸쟾 + ?좎?媛 3珥??대궡 ?낅젰 以?
             // 議곌굔 B: Chrome??FocusStealer-ask prop??李랁? ?덉쓬 (?댁쟾 run?먯꽌 媛뺥깉 媛먯???
             //          ????梨꾪똿???쒕??섏씠???욎씠???ш퀬 諛⑹?
+            // Overlay only when Chrome previously stole focus (FocusStealer-ask prop set).
+            // userIsActive check removed — SW_SHOWNOACTIVATE handles background tabs without stealing focus.
             if (action is "send" or "type" or "input-cdp")
             {
-                var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
-                NativeMethods.GetLastInputInfo(ref lii);
-                var idleMs = unchecked((uint)Environment.TickCount) - lii.dwTime;
-
                 var chromeHwndEarly = cdp.GetChromeWindowHandle();
                 bool focusStealerKnown = chromeHwndEarly != IntPtr.Zero
                     && ActionApi.HasFocusStealerProp(chromeHwndEarly, "ask");
-                bool userIsActive = idleMs < 3000;
 
-                if (focusStealerKnown || userIsActive)
+                if (focusStealerKnown)
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine(focusStealerKnown
-                        ? $"[ASK:FOCUS] FocusStealer-ask prop detected -- yield confirmation required"
-                        : $"[ASK:FOCUS] foreground detected (idle={idleMs}ms) -- yield approval needed");
+                    Console.WriteLine($"[ASK:FOCUS] FocusStealer-ask prop detected -- yield confirmation required");
                     Console.ResetColor();
-                    uint preApprovalLastInput = lii.dwTime; // capture before popup (for post-approval re-check)
-                    var yieldResult = new UserInputWaitAdapter(noSound: !focusStealerKnown).WaitForUserYield(
+                    var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
+                    NativeMethods.GetLastInputInfo(ref lii);
+                    var idleMs = unchecked((uint)Environment.TickCount) - lii.dwTime;
+                    var yieldResult = new UserInputWaitAdapter(noSound: false).WaitForUserYield(
                         chromeHwndEarly, userIdleMs: idleMs, timeoutSeconds: 30,
                         positionHwnd: chromeHwndEarly);
                     if (!yieldResult.Approved)
@@ -72,26 +69,6 @@ internal partial class Program
                         Console.WriteLine($"[ASK:FOCUS] yield denied -- {action} aborted");
                         Console.ResetColor();
                         return (false, prevFg, null);
-                    }
-                    // Re-check: if user typed AFTER approving, re-ask (approval is stale)
-                    var lii2 = new NativeMethods.LASTINPUTINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
-                    NativeMethods.GetLastInputInfo(ref lii2);
-                    if (lii2.dwTime != preApprovalLastInput)
-                    {
-                        var freshIdleMs = unchecked((uint)Environment.TickCount) - lii2.dwTime;
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine($"[ASK:FOCUS] User typed after approval (idle={freshIdleMs}ms) — re-verifying");
-                        Console.ResetColor();
-                        var reVerify = new UserInputWaitAdapter(noSound: false).WaitForUserYield(
-                            chromeHwndEarly, userIdleMs: freshIdleMs, timeoutSeconds: 30,
-                            positionHwnd: chromeHwndEarly);
-                        if (!reVerify.Approved)
-                        {
-                            Console.ForegroundColor = ConsoleColor.Yellow;
-                            Console.WriteLine($"[ASK:FOCUS] Re-verify denied -- {action} aborted");
-                            Console.ResetColor();
-                            return (false, prevFg, null);
-                        }
                     }
                     Console.WriteLine($"[ASK:FOCUS] yield approved -- {action} running");
                 }
@@ -201,8 +178,7 @@ internal partial class Program
             Console.WriteLine($"[AAR:CDP:FOCUS] Chrome stole focus during {action}! Restoring...");
             Console.ResetColor();
             NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg
-            // Stamp FocusStealer prop so next entry triggers approval popup (focusStealerKnown=true)
-            try { NativeMethods.SetPropW(chromeHwnd, $"{ActionApi.FocusStealerPropPrefix}ask", (IntPtr)1); } catch { }
+            // FocusStealer prop NOT stamped — SW_SHOWNOACTIVATE prevents repeat steals
             ActionApi.OnFocusStealer?.Invoke(chromeHwnd, $"ask-{action}");
         }
     }
@@ -246,7 +222,7 @@ internal partial class Program
         // ?? Knowhow recording on the thief (Chrome) ??stamps WKAppBot_FocusStealer-ask-{step}
         ActionApi.OnFocusStealer?.Invoke(cur, $"ask-{step}");
         // Also stamp a generic "ask" marker ??EnsureCdpReadyAsync detects it ??forces yield popup next run
-        try { NativeMethods.SetPropW(cur, $"{ActionApi.FocusStealerPropPrefix}ask", (IntPtr)1); } catch { }
+        // FocusStealer prop NOT stamped — SW_SHOWNOACTIVATE prevents repeat steals; avoid false-positive overlays
 
         NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg
 

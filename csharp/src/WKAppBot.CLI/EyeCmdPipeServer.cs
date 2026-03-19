@@ -28,6 +28,15 @@ internal static class EyeCmdPipeServer
     /// <summary>Per-command actual args passed to Program.Main (e.g. ["ask","gemini","..."]) — for approval popup display</summary>
     internal static readonly AsyncLocal<string[]?> CallerArgs = new();
 
+    /// <summary>
+    /// Global (non-task-local) snapshot of the most recently dispatched command args.
+    /// Updated whenever CallerArgs is set. Safe for read from any thread/context.
+    /// Use for diagnostics, focus guards, and overlay decisions where async context is unavailable.
+    /// Note: concurrent commands may overwrite each other — this reflects the LATEST dispatch, not per-task.
+    /// For per-task isolation, use CallerArgs.Value.
+    /// </summary>
+    public static volatile string[]? CurrentCommandGlobal;
+
     public static void StartServer() => Task.Run(ServerLoop);
 
     /// <summary>
@@ -46,6 +55,7 @@ internal static class EyeCmdPipeServer
         {
             CallerCwd.Value = null;
             CallerArgs.Value = args;
+            CurrentCommandGlobal = args;
             Program.RunningInEye = true;
             using (ThreadRoutingWriter.Route(tee))
             {
@@ -149,11 +159,15 @@ internal static class EyeCmdPipeServer
         CallerCwd.Value = callerCwd;
         CallerHwnd.Value = callerHwnd;
         CallerArgs.Value = args;
-        if (callerCwd != null) Console.WriteLine($"[EYECMD] cwd={callerCwd}");
+        CurrentCommandGlobal = args;
         // RunningInEye=true prevents Program.cs from creating a second TeeTextWriter (duplicate log)
         Program.RunningInEye = true;
         using (ThreadRoutingWriter.Route(tee))
         {
+            // Print delegation header: name=... cmd=... cwd=...  (goes to pipe+log, easy to grep)
+            var delegName = Program.GetSendReplyUsername();
+            var cmdLine = string.Join(" ", args);
+            Console.WriteLine($"[CMD] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"}");
             try { code = Program.Main(args); }
             catch (Exception ex) { tee.WriteLine($"[EYECMD] error: {ex.Message}"); code = 1; }
         }

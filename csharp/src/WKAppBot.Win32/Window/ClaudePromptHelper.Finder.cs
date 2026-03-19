@@ -13,7 +13,7 @@ public sealed partial class ClaudePromptHelper
     /// Find the Claude Code prompt input by walking the process tree.
     /// Strategy: current process → parent → grandparent ... → find Electron/VSCode main window → UIA search.
     /// </summary>
-    public PromptInfo? FindPrompt()
+    public PromptInfo? FindPrompt(string? callerCwd = null)
     {
         // Strategy 1: Walk up process tree from current wkappbot.exe
         var ancestors = GetAncestorProcesses();
@@ -31,7 +31,7 @@ public sealed partial class ClaudePromptHelper
                      name.Equals("code - insiders", StringComparison.OrdinalIgnoreCase))
             {
                 // VS Code with Claude Code extension
-                var result = FindVSCodePrompt(pid);
+                var result = FindVSCodePrompt(pid, callerCwd);
                 if (result != null) return result;
             }
             else if (name.Equals("codex", StringComparison.OrdinalIgnoreCase))
@@ -63,14 +63,37 @@ public sealed partial class ClaudePromptHelper
             if (result != null) return result;
         }
 
-        // Strategy 3: Enumerate all VS Code windows
+        // Strategy 3: Enumerate all VS Code windows — pool ALL windows first, then sort by callerCwd.
+        // Important: multiple Code.exe processes exist (one per window). Iterating process-by-process
+        // means callerCwd preference only applies within each process, not globally.
+        // Pooling all windows and sorting globally ensures the right folder window wins.
         Console.WriteLine("  [PROMPT] Scanning VS Code windows...");
         var codeProcs = Process.GetProcessesByName("Code");
         Console.WriteLine($"  [PROMPT] Process.GetProcessesByName(\"Code\"): {codeProcs.Length} process(es)");
-        foreach (var proc in codeProcs)
         {
-            var result = FindVSCodePrompt(proc.Id);
-            if (result != null) return result;
+            var allCodeWindows = new List<IntPtr>();
+            foreach (var proc in codeProcs)
+                allCodeWindows.AddRange(FindWindowsByProcessId(proc.Id));
+
+            if (!string.IsNullOrEmpty(callerCwd))
+            {
+                var folderName = System.IO.Path.GetFileName(callerCwd.TrimEnd('\\', '/'));
+                if (!string.IsNullOrEmpty(folderName))
+                {
+                    // Sort: matching folder title first, then by area descending
+                    allCodeWindows = allCodeWindows
+                        .OrderByDescending(h => WindowFinder.GetWindowText(h)
+                            .Contains(folderName, StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                        .ToList();
+                    Console.WriteLine($"  [PROMPT]   callerCwd folder=\"{folderName}\" applied to {allCodeWindows.Count} window(s)");
+                }
+            }
+
+            foreach (var hWnd in allCodeWindows)
+            {
+                var result = TryFindTurnFormInVSCodeWindow(hWnd);
+                if (result != null) return result;
+            }
         }
 
         // Strategy 4: Brute-force — scan ALL Chrome_WidgetWin_1 windows for turn-form

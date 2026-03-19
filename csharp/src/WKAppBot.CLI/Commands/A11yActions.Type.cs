@@ -32,31 +32,32 @@ internal partial class Program
                 : NativeMethods.GetParent(hwnd);
             if (parentHwnd != IntPtr.Zero)
             {
-                // 프로세스명 추출 (경험 DB 키)
+                // 프로세스명 + EXE 버전 추출 (경험 DB 키)
                 NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
                 var procName = "";
                 try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+                var exeVersion = HotkeyExperienceDb.GetExeVersion(pid); // null = access denied (elevated)
 
                 // 경험 DB 조회 → Verify → 스태일이면 재스캔 후 재조회
                 if (!string.IsNullOrEmpty(procName))
                 {
                     var lookupPattern = text.Contains('/') ? text.Split('/')[^1] : text;
 
-                    // 첫 접근 시 풀스캔 → DB 누적
+                    // 첫 접근 시 풀스캔 → DB 누적 (버전 불일치 시 Load가 자동 캐시 무효화)
                     if (!HotkeyExperienceDb.IsSessionScanned(procName))
-                        A11yHotkeyScanner.ScanAndMerge(hwnd, el, procName);
+                        A11yHotkeyScanner.ScanAndMerge(hwnd, el, procName, exeVersion);
 
-                    var dbEntry = HotkeyExperienceDb.Match(procName, lookupPattern);
+                    var dbEntry = HotkeyExperienceDb.Match(procName, lookupPattern, exeVersion);
                     if (dbEntry != null)
                     {
                         // 발동 전 라이브 검증 (스태일 항목은 DB에서 제거)
-                        if (!A11yHotkeyScanner.Verify(dbEntry, hwnd, parentHwnd, procName))
+                        if (!A11yHotkeyScanner.Verify(dbEntry, hwnd, parentHwnd, procName, exeVersion))
                         {
                             // 검증 실패 → 재스캔 후 재조회 (앱 업데이트 등)
                             Console.WriteLine($"[A11Y] type --hotkey — stale, rescanning '{procName}'...");
                             HotkeyExperienceDb.MarkSessionScanned(procName); // 무한루프 방지
-                            A11yHotkeyScanner.ScanAndMerge(hwnd, el, procName);
-                            dbEntry = HotkeyExperienceDb.Match(procName, lookupPattern);
+                            A11yHotkeyScanner.ScanAndMerge(hwnd, el, procName, exeVersion);
+                            dbEntry = HotkeyExperienceDb.Match(procName, lookupPattern, exeVersion);
                         }
                     }
 
@@ -152,6 +153,7 @@ internal partial class Program
 
         if (!isTerminal)
         {
+            // Tier 1: UIA Value.SetValue (focusless, replaces all — works for standard Edit)
             try
             {
                 var vp = el.Patterns.Value;
@@ -165,7 +167,29 @@ internal partial class Program
             catch { }
 
             var elHwnd = GetElementHwnd(el);
-            if (elHwnd != IntPtr.Zero)
+            bool isElectron = IsElectronWindow(hwnd);
+
+            // Tier 2: LegacyIA SetValue — Electron 우선 (WM_CHAR은 Chromium renderer가 무시)
+            // 일반 Win32는 WM_CHAR 후 LegacyIA로 넘어오지 않으므로 순서 문제 없음
+            if (isElectron || elHwnd == IntPtr.Zero)
+            {
+                try
+                {
+                    var legacy = el.Patterns.LegacyIAccessible;
+                    if (legacy.IsSupported)
+                    {
+                        legacy.Pattern.SetValue(text);
+                        Console.WriteLine($"[A11Y] type — LegacyIA SetValue ({text.Length} chars){(isElectron ? " [Electron]" : "")}");
+                        return true;
+                    }
+                }
+                catch { }
+            }
+
+            // Tier 3: Win32 WM_CHAR — 네이티브 컨트롤 전용 (Electron 제외)
+            // TranslateMessage가 WM_CHAR 자동생성하는 MFC 컨트롤(CMaskEditEx 등)에서 유일한 방법
+            // Electron은 Tier 2(LegacyIA)로 처리됐으므로 여기 도달하면 네이티브 Win32
+            if (!isElectron && elHwnd != IntPtr.Zero)
             {
                 foreach (char c in text)
                     NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_CHAR, (IntPtr)c, IntPtr.Zero);
@@ -178,21 +202,6 @@ internal partial class Program
             Console.WriteLine($"[A11Y] type — terminal ({winClass}): skipping WM_CHAR+LegacyIA (ConPTY), using SendInput directly");
             // Terminal: LegacyIA.SetValue may report ok but doesn't reach ConPTY stdin.
             // Skip straight to SendKeys (requires focus — only reliable path for terminal stdin).
-        }
-
-        if (!isTerminal)
-        {
-            try
-            {
-                var legacy = el.Patterns.LegacyIAccessible;
-                if (legacy.IsSupported)
-                {
-                    legacy.Pattern.SetValue(text);
-                    Console.WriteLine($"[A11Y] type — LegacyIA SetValue ({text.Length} chars)");
-                    return true;
-                }
-            }
-            catch { }
         }
 
         // Tier 4: SendKeys keystroke fallback (requires focus)

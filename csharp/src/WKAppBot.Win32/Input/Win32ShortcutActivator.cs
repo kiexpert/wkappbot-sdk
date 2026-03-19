@@ -289,6 +289,66 @@ public static class Win32ShortcutActivator
     // ── Multi-language menu resource scan ────────────────────────
 
     /// <summary>
+    /// 라이브 HMENU(현재 표시 언어)만 수집 — 빠름 (~1ms).
+    /// ScanAndMerge 동기 단계에서 사용. 다국어 리소스는 BuildMenuResourceAllLangs로 별도 수집.
+    /// </summary>
+    public static List<(string Label, uint ItemId)> BuildMenuTextMapLive(IntPtr hwnd)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var list = new List<(string Label, uint ItemId)>();
+        var hMenu = NativeMethods.GetMenu(hwnd);
+        if (hMenu != IntPtr.Zero) CollectMenuItems(hMenu, list, seen);
+        list.Sort((a, b) => b.Label.Length.CompareTo(a.Label.Length));
+        return list;
+    }
+
+    /// <summary>
+    /// 앱 모듈 RT_MENU 리소스(모든 LANGID) 파싱 — 느림 (LoadLibraryExW).
+    /// ScanAndMerge 백그라운드 단계에서 사용.
+    /// </summary>
+    public static List<(string Label, uint ItemId)> BuildMenuResourceAllLangs(IntPtr hwnd)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var list = new List<(string Label, uint ItemId)>();
+
+        var sb = new StringBuilder(512);
+        if (NativeMethods.GetWindowModuleFileNameW(hwnd, sb, (uint)sb.Capacity) == 0) return list;
+        var modulePath = sb.ToString();
+        if (string.IsNullOrEmpty(modulePath)) return list;
+
+        var hMod = NativeMethods.LoadLibraryExW(modulePath, IntPtr.Zero,
+            NativeMethods.LOAD_LIBRARY_AS_DATAFILE | NativeMethods.LOAD_LIBRARY_AS_IMAGE_RESOURCE);
+        if (hMod == IntPtr.Zero) return list;
+
+        try
+        {
+            var resNames = new List<IntPtr>();
+            NativeMethods.EnumResourceNamesW(hMod, NativeMethods.RT_MENU,
+                (_, _, name, _) => { resNames.Add(name); return true; }, IntPtr.Zero);
+
+            foreach (var resName in resNames)
+            {
+                NativeMethods.EnumResourceLanguagesW(hMod, NativeMethods.RT_MENU, resName,
+                    (h, type, name, langId, _) =>
+                    {
+                        var hRes = NativeMethods.FindResourceExW(h, type, name, langId);
+                        if (hRes == IntPtr.Zero) return true;
+                        var hData = NativeMethods.LoadResource(h, hRes);
+                        if (hData == IntPtr.Zero) return true;
+                        var ptr = NativeMethods.LockResource(hData);
+                        if (ptr != IntPtr.Zero)
+                            ParseMenuResource(ptr, list, seen);
+                        return true;
+                    }, IntPtr.Zero);
+            }
+        }
+        finally { NativeMethods.FreeLibrary(hMod); }
+
+        list.Sort((a, b) => b.Label.Length.CompareTo(a.Label.Length));
+        return list;
+    }
+
+    /// <summary>
     /// 라이브 HMENU(현재 언어) + 앱 모듈 RT_MENU 리소스(모든 LANGID) 통합.
     /// 시스템에 설치된 모든 언어팩의 메뉴 문자열을 수집하여 언어 무관 매칭 지원.
     /// </summary>
