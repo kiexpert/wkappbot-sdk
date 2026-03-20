@@ -760,50 +760,104 @@ internal partial class Program
                 System.Drawing.Rectangle? elBounds = null;
                 try { var r = root.Properties.BoundingRectangle.ValueOrDefault; elBounds = new(r.X, r.Y, r.Width, r.Height); elRectStr = $" rect=({r.X},{r.Y} {r.Width}x{r.Height})"; } catch { }
 
-                // Enrichment: if UIA Name AND AutomationId are both empty → OCR fallback
-                bool needsEnrich = string.IsNullOrWhiteSpace(elName) && string.IsNullOrWhiteSpace(elAid) && elBounds is { Width: > 0, Height: > 0 };
-                Task<string?>? ocrEnrichTask = null;
-                if (needsEnrich)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkCyan;
-                    Console.Write($"[A11Y] Acquiring target context... ");
-                    Console.ResetColor();
-                    var capturedBounds = elBounds.Value;
-                    ocrEnrichTask = Task.Run(() =>
-                    {
-                        try
-                        {
-                            using var bmp = new System.Drawing.Bitmap(capturedBounds.Width, capturedBounds.Height);
-                            using (var g = System.Drawing.Graphics.FromImage(bmp))
-                                g.CopyFromScreen(capturedBounds.X, capturedBounds.Y, 0, 0, capturedBounds.Size);
-                            using var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
-                            var result = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
-                            var text = string.Join(" ", result.Words.Select(w => w.Text)).Trim();
-                            return string.IsNullOrWhiteSpace(text) ? null : text;
-                        }
-                        catch { return null; }
-                    });
-                }
-
                 Console.WriteLine($"[A11Y] element: {elType} \"{elName}\" (aid=\"{elAid}\"){elRectStr} in {tag}");
 
-                // Show OCR enrichment result (wait up to 2s)
-                if (ocrEnrichTask != null)
+                // ── OCR gap analysis: detect missing text in element rect ──
+                // Applies to all elements wider than one character (~14px)
+                bool needsOcrScan = elBounds is { Width: > 14, Height: > 0 };
+                bool ocrGapDetected = false;
+                if (needsOcrScan)
                 {
-                    var ocrText = ocrEnrichTask.Wait(2000) ? ocrEnrichTask.Result : null;
-                    if (!string.IsNullOrEmpty(ocrText))
+                    var capturedBounds = elBounds!.Value;
+                    try
                     {
-                        elName = ocrText!;
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"[A11Y] OCR → \"{elName}\"");
-                        Console.ResetColor();
+                        using var bmp = new System.Drawing.Bitmap(capturedBounds.Width, capturedBounds.Height);
+                        using (var g = System.Drawing.Graphics.FromImage(bmp))
+                            g.CopyFromScreen(capturedBounds.X, capturedBounds.Y, 0, 0, capturedBounds.Size);
+                        using var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
+                        var result = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
+
+                        if (result.Words.Count > 0)
+                        {
+                            // Build coverage map: which X-pixels are covered by OCR words
+                            int totalW = capturedBounds.Width;
+                            var covered = new bool[totalW];
+                            foreach (var w in result.Words)
+                            {
+                                int x0 = Math.Max(0, w.X);
+                                int x1 = Math.Min(totalW, w.X + w.Width);
+                                for (int px = x0; px < x1; px++) covered[px] = true;
+                            }
+
+                            // Find gaps wider than one char (~14px)
+                            const int charWidth = 14;
+                            var gaps = new List<(int start, int width)>();
+                            int gapStart = -1;
+                            for (int px = 0; px < totalW; px++)
+                            {
+                                if (!covered[px])
+                                {
+                                    if (gapStart < 0) gapStart = px;
+                                }
+                                else
+                                {
+                                    if (gapStart >= 0)
+                                    {
+                                        int gw = px - gapStart;
+                                        if (gw >= charWidth) gaps.Add((gapStart, gw));
+                                        gapStart = -1;
+                                    }
+                                }
+                            }
+                            if (gapStart >= 0 && (totalW - gapStart) >= charWidth)
+                                gaps.Add((gapStart, totalW - gapStart));
+
+                            // Build display: words sorted by X + [?] for gaps
+                            var sortedWords = result.Words.OrderBy(w => w.X).ToList();
+                            int expectedChars = totalW / charWidth;
+                            int actualChars = sortedWords.Sum(w => w.Text.Length);
+                            bool partial = gaps.Count > 0 || actualChars < expectedChars / 2;
+
+                            if (partial)
+                            {
+                                ocrGapDetected = true;
+                                // Interleave words and [?] gaps
+                                var parts = new List<string>();
+                                int cursor = 0;
+                                foreach (var w in sortedWords)
+                                {
+                                    if (w.X - cursor >= charWidth)
+                                        parts.Add("[?]");
+                                    parts.Add(w.Text);
+                                    cursor = w.X + w.Width;
+                                }
+                                if (totalW - cursor >= charWidth)
+                                    parts.Add("[?]");
+
+                                var displayText = string.Join("", parts);
+                                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                                Console.WriteLine($"[A11Y] Acquiring target context... \"{displayText}\"");
+                                Console.ResetColor();
+                            }
+                            else if (string.IsNullOrWhiteSpace(elName))
+                            {
+                                // Full OCR success on blind node
+                                elName = string.Join(" ", sortedWords.Select(w => w.Text));
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                                Console.WriteLine($"[A11Y] OCR → \"{elName}\"");
+                                Console.ResetColor();
+                            }
+                        }
+                        else if (string.IsNullOrWhiteSpace(elName) && string.IsNullOrWhiteSpace(elAid))
+                        {
+                            // No OCR words at all on blind node → definitely needs Vision
+                            ocrGapDetected = true;
+                            Console.ForegroundColor = ConsoleColor.DarkCyan;
+                            Console.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
+                            Console.ResetColor();
+                        }
                     }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"[A11Y] OCR → (no text detected)");
-                        Console.ResetColor();
-                    }
+                    catch { /* OCR is best-effort */ }
                 }
                 var _nodeBefore = default(NodeState); // 입력위치확보 진입 시 캡처 (elHwnd 계산 후)
 
