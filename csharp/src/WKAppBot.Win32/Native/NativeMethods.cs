@@ -395,6 +395,10 @@ public static partial class NativeMethods
     public const int WS_EX_NOACTIVATE = 0x08000000;
 
     [DllImport("user32.dll")]
+    public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+    public const uint LWA_ALPHA = 0x02;
+
+    [DllImport("user32.dll")]
     public static extern byte GetWindowBandID(IntPtr hWnd);  // undocumented, may not exist
 
     /// <summary>
