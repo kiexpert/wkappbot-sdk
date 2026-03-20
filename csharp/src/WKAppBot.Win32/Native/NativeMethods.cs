@@ -398,6 +398,41 @@ public static partial class NativeMethods
     public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
     public const uint LWA_ALPHA = 0x02;
 
+    // ── Cursor detection (EditCursor hint for DYN-A11Y) ──
+    [StructLayout(LayoutKind.Sequential)]
+    public struct CURSORINFO
+    {
+        public int cbSize;
+        public int flags;
+        public IntPtr hCursor;
+        public POINT ptScreenPos;
+    }
+    [DllImport("user32.dll")] public static extern bool GetCursorInfo(ref CURSORINFO pci);
+    [DllImport("user32.dll")] public static extern IntPtr LoadCursorW(IntPtr hInstance, int lpCursorName);
+    public const int IDC_IBEAM = 32513;
+    public const int IDC_HAND  = 32649;
+
+    /// <summary>
+    /// Check if current cursor is IBeam (text edit indicator).
+    /// Call during/after mouse-based actions (click, hover) for free Edit hint.
+    /// </summary>
+    public static bool IsCurrentCursorIBeam()
+    {
+        var ci = new CURSORINFO { cbSize = Marshal.SizeOf<CURSORINFO>() };
+        if (!GetCursorInfo(ref ci)) return false;
+        var ibeam = LoadCursorW(IntPtr.Zero, IDC_IBEAM);
+        return ci.hCursor == ibeam;
+    }
+
+    /// <summary>Check if current cursor is Hand (link/clickable indicator).</summary>
+    public static bool IsCurrentCursorHand()
+    {
+        var ci = new CURSORINFO { cbSize = Marshal.SizeOf<CURSORINFO>() };
+        if (!GetCursorInfo(ref ci)) return false;
+        var hand = LoadCursorW(IntPtr.Zero, IDC_HAND);
+        return ci.hCursor == hand;
+    }
+
     [DllImport("user32.dll")]
     public static extern byte GetWindowBandID(IntPtr hWnd);  // undocumented, may not exist
 

@@ -117,6 +117,21 @@ internal partial class Program
 
         NativeMethods.SetCursorPos(cx, cy);
         Thread.Sleep(30);
+
+        // Pre-click cursor diagnostics: position verify + EditCursor hint
+        {
+            NativeMethods.GetCursorPos(out var curPos);
+            bool onTarget = rect.Value.Contains(curPos.X, curPos.Y);
+            if (!onTarget)
+                Console.Error.Write($"[WARN:cursor@({curPos.X},{curPos.Y}) outside target rect] ");
+
+            if (NativeMethods.IsCurrentCursorIBeam())
+            {
+                NativeMethods.SetPropW(elHwnd, "WKAppBot.EditCursor", (IntPtr)1);
+                Console.Write("[HINT:EditCursor] ");
+            }
+        }
+
         var inputs = new INPUT[2];
         inputs[0].type = INPUT.INPUT_MOUSE;
         inputs[0].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTDOWN;
