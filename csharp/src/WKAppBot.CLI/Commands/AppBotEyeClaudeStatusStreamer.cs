@@ -850,6 +850,10 @@ internal partial class Program
         string slackBotToken, string slackChannel, string instanceUsername,
         string statusTsFile, IntPtr claudeHwnd, long jsonlSize = 0)
     {
+        // ── Step 0: idle→idle skip — no change, no spam ──
+        if (statusType == "idle" && state.LastStatusType == "idle" && state.SlackStatusTs != null)
+            return;
+
         // ── Step 1: Is our status message still the latest in the channel? ──────────────────
         // "Latest = ours" → edit in place (streaming).
         // "Latest = someone else" → delete our old status + post new below.
