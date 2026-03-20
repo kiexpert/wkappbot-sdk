@@ -59,6 +59,60 @@ internal partial class Program
     internal static void EyeColor(ConsoleColor c) { try { Console.ForegroundColor = c; } catch { } }
     internal static void EyeResetColor() { try { Console.ResetColor(); } catch { } }
 
+    // ── Eye Watchdog Task (Task Scheduler) ──────────────────────────────
+    // Eye 시작마다 자동 재등록 → 클롣이 까먹어도 자가 치유.
+    // 10분마다 `eye tick --timeout 15` 실행 → Eye 죽으면 재spawn + retry queue flush.
+    private const string EyeWatchdogTaskName = "WKAppBot Eye Watchdog";
+
+    /// <summary>
+    /// Register (or refresh) the Eye watchdog scheduled task.
+    /// Uses Launcher (wkappbot.exe) + powershell -WindowStyle Hidden to prevent console flash.
+    /// Called on every Eye startup — -Force handles duplicates automatically.
+    /// </summary>
+    internal static void EnsureEyeWatchdogTask()
+    {
+        // Derive Launcher path from Core path: wkappbot-core.exe → wkappbot.exe
+        var corePath = Environment.ProcessPath ?? "";
+        var dir = Path.GetDirectoryName(corePath) ?? "";
+        var launcherPath = Path.Combine(dir, "wkappbot.exe");
+        if (!File.Exists(launcherPath)) launcherPath = corePath; // fallback
+
+        // Wrap in powershell -WindowStyle Hidden to prevent console flash.
+        // Task Scheduler's -Hidden only hides from UI, not the process window!
+        var ps = $"""
+$action   = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-WindowStyle Hidden -NonInteractive -Command "& ''{launcherPath}'' eye tick --timeout 15"'
+$trigger  = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 10)
+$settings = New-ScheduledTaskSettingsSet `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 2) `
+    -MultipleInstances IgnoreNew `
+    -Hidden `
+    -StartWhenAvailable $true
+Register-ScheduledTask -TaskName '{EyeWatchdogTaskName}' -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+""";
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName               = "powershell.exe",
+                Arguments              = $"-NoProfile -NonInteractive -Command \"{ps.Replace("\"", "\\\"")}\"",
+                UseShellExecute        = false,
+                CreateNoWindow         = true,
+                RedirectStandardOutput = false,
+                RedirectStandardError  = false,
+            };
+            var proc = System.Diagnostics.Process.Start(psi);
+            proc?.WaitForExit(5000);
+            var exitCode = proc?.ExitCode ?? -1;
+            Console.WriteLine(exitCode == 0
+                ? $"[EYE] Watchdog task registered: '{EyeWatchdogTaskName}' (10-min, hidden, via Launcher)"
+                : $"[EYE] Watchdog task register exit={exitCode} (non-fatal)");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE] Watchdog task error: {ex.Message} (non-fatal)");
+        }
+    }
+
     /// <summary>
     /// Install a Ctrl handler that blocks console-close events.
     /// Logs the event type to console + eye.log so we can diagnose unexpected termination attempts.
