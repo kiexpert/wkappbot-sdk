@@ -211,8 +211,8 @@ internal partial class Program
         // ── Windows Task Scheduler: dual watchdog structure ──
         // 1. Permanent 10-min watchdog (Eye always comes back even if killed)
         // 2. Precise one-shot retry task synced to actual queue (if items exist)
-        RouteRetryQueue.EnsureWatchdogTask();
-        RouteRetryQueue.ScheduleRetryTask();
+        EnsureEyeWatchdogTask(); // 10-min watchdog (powershell -WindowStyle Hidden, via Launcher)
+        RouteRetryQueue.ScheduleRetryTask(); // precise one-shot retry task
 
         // ★ Default: pure focusless mode — Eye will not steal foreground focus
         // AllowFocusSteal is temporarily enabled for handoff nudges only
