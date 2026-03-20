@@ -798,8 +798,8 @@ internal partial class Program
             return 1;
         }
 
-        string oldStr = positional[0];
-        string newStr = positional[1];
+        string oldStr = UnescapeCString(positional[0]);
+        string newStr = UnescapeCString(positional[1]);
         var pathPatterns = positional[2..];
 
         // Expand globs for each path pattern
@@ -1031,6 +1031,30 @@ internal partial class Program
         var pattern = $@"( {{{tabSize},{tabSize}}}| +\t)";
         while (leading != (leading = System.Text.RegularExpressions.Regex.Replace(leading, pattern, "\t"))) ;
         return leading.Count(c => c == '\t');
+    }
+
+    /// <summary>C-style escape: \n \t \r \\ \" \0 → actual characters.</summary>
+    static string UnescapeCString(string s)
+    {
+        var sb = new System.Text.StringBuilder(s.Length);
+        for (int i = 0; i < s.Length; i++)
+        {
+            if (s[i] == '\\' && i + 1 < s.Length)
+            {
+                switch (s[i + 1])
+                {
+                    case 'n': sb.Append('\n'); i++; break;
+                    case 't': sb.Append('\t'); i++; break;
+                    case 'r': sb.Append('\r'); i++; break;
+                    case '\\': sb.Append('\\'); i++; break;
+                    case '"': sb.Append('"'); i++; break;
+                    case '0': sb.Append('\0'); i++; break;
+                    default: sb.Append(s[i]); break; // unknown escape → keep as-is
+                }
+            }
+            else sb.Append(s[i]);
+        }
+        return sb.ToString();
     }
 
     // ── usage ──────────────────────────────────────────────────────────────
