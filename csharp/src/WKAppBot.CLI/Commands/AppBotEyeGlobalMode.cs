@@ -68,6 +68,9 @@ internal partial class Program
     static DateTime _cachedPromptFileWriteUtc = DateTime.MinValue;
     static List<EyeParentCard> _cachedCards = new();
 
+    // ── Recovered status positions from Slack (username → (ts, text)) ──
+    static readonly Dictionary<string, (string ts, string text)> _recoveredStatusByUsername = new();
+
     // ── Dead card + health check ──
     static readonly HashSet<int> _reportedDeadPids = new();          // pids we've already alerted for
     static readonly Dictionary<int, string> _cardHealthCache = new(); // pid → "ok"/"slow"/"dead"
@@ -309,12 +312,13 @@ internal partial class Program
                     // so the old message stays visible until the new one appears — no gap.
                     {
                         _staleStatusTsOnStartup.Clear();
+                        _recoveredStatusByUsername.Clear();
                         try
                         {
                             using var http = new HttpClient();
                             http.DefaultRequestHeaders.Authorization =
                                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", slackBotToken);
-                            var histUrl = $"https://slack.com/api/conversations.history?channel={slackChannel}&limit=20";
+                            var histUrl = $"https://slack.com/api/conversations.history?channel={slackChannel}&limit=30";
                             var histResp = http.GetStringAsync(histUrl).GetAwaiter().GetResult();
                             var histJson = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(histResp);
                             if (histJson?["ok"]?.GetValue<bool>() == true && histJson["messages"] is System.Text.Json.Nodes.JsonArray msgs)
@@ -326,13 +330,23 @@ internal partial class Program
                                     var subtype = m?["subtype"]?.GetValue<string>();
                                     if (botId != null || subtype == "bot_message")
                                     {
-                                        bool isStatus = text.StartsWith(":zzz:") || text.StartsWith(":gear:")
-                                            || text.StartsWith(":clipboard:") || text.StartsWith(":memo:")
-                                            || text.StartsWith(":warning:") || text.StartsWith(":robot_face:");
-                                        if (isStatus)
+                                        var statusRx = System.Text.RegularExpressions.Regex.Match(text,
+                                            @"^(:zzz:|:runner:|:gear:|:clipboard:|:memo:|:warning:|:robot_face:)");
+                                        if (statusRx.Success)
                                         {
                                             var ts = m?["ts"]?.GetValue<string>();
                                             var replyCount = m?["reply_count"]?.GetValue<int>() ?? 0;
+                                            var username = m?["username"]?.GetValue<string>() ?? "";
+
+                                            // Recover: remember latest status ts per username (first hit = newest)
+                                            if (ts != null && !string.IsNullOrEmpty(username)
+                                                && !_recoveredStatusByUsername.ContainsKey(username))
+                                            {
+                                                _recoveredStatusByUsername[username] = (ts, text);
+                                                Console.WriteLine($"[EYE] Recovered status ts for '{username}': {ts}");
+                                            }
+
+                                            // Stale: only collect reply-less messages for sweep
                                             if (ts != null && replyCount == 0)
                                                 _staleStatusTsOnStartup.Add(ts);
                                         }
@@ -341,6 +355,8 @@ internal partial class Program
                             }
                         }
                         catch { }
+                        if (_recoveredStatusByUsername.Count > 0)
+                            Console.WriteLine($"[EYE] Recovered {_recoveredStatusByUsername.Count} status position(s) from Slack");
                         if (_staleStatusTsOnStartup.Count > 0)
                         {
                             Console.WriteLine($"[EYE] {_staleStatusTsOnStartup.Count} stale status message(s) pending — will sweep after first post or 20s timer");

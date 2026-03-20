@@ -81,10 +81,29 @@ internal partial class Program
             state = new ClaudeInstanceState();
             // Try to find a CWD label from cached cards matching this hwnd's PID
             state.CwdLabel = ResolveInstanceCwdLabel(hwnd);
-            // Restore Slack TS + last text + status type + pending buffer from window props (persisted across Eye restart)
+            // Restore Slack TS + last text + status type from window props (persisted across Eye restart)
             state.SlackStatusTs = GetWindowStringProp(hwnd, PropSlackTs);
             state.LastSlackStatusText = GetWindowStringProp(hwnd, PropAiOut);
             state.LastStatusType = GetWindowStringProp(hwnd, PropStatusType);
+
+            // Fallback: if window prop didn't have ts, try Slack history recovery by username
+            if (string.IsNullOrEmpty(state.SlackStatusTs) && !string.IsNullOrEmpty(state.CwdLabel))
+            {
+                // Build expected username pattern: "클롣[{cwdLabel}]" or "크로[{cwdLabel}]"
+                foreach (var prefix in new[] { SlackClaudePrefix, "크로" })
+                {
+                    var expectedUser = $"{prefix}[{state.CwdLabel}]";
+                    if (_recoveredStatusByUsername.TryGetValue(expectedUser, out var recovered))
+                    {
+                        state.SlackStatusTs = recovered.ts;
+                        state.LastSlackStatusText = recovered.text;
+                        Console.WriteLine($"[EYE] Restored status ts from Slack for '{expectedUser}': {recovered.ts}");
+                        _recoveredStatusByUsername.Remove(expectedUser); // consume — one-time recovery
+                        break;
+                    }
+                }
+            }
+
             _instanceStates[hwnd] = state;
         }
         else if (string.IsNullOrEmpty(state.CwdLabel))
