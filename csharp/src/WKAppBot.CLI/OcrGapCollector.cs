@@ -80,11 +80,13 @@ internal sealed class OcrGapCollector
         sb.AppendLine("Three images are attached. Each shows the SAME UI regions in DIFFERENT order.");
         sb.AppendLine("Read the text in each numbered region of ALL three images independently.");
         sb.AppendLine("Do NOT copy answers between images — read each one fresh.");
+        sb.AppendLine("If a region contains no readable text but has an icon, symbol, or image,");
+        sb.AppendLine("describe it in parentheses: (icon: description) or (image: description).");
         sb.AppendLine("Format your answer as:");
         sb.AppendLine();
         sb.AppendLine("Image A:");
         sb.AppendLine("[1] \"text\"");
-        sb.AppendLine("[2] \"text\"");
+        sb.AppendLine("[2] (icon: green play button)");
         sb.AppendLine("Image B:");
         sb.AppendLine("[1] \"text\"");
         sb.AppendLine("...");
@@ -161,22 +163,83 @@ internal sealed class OcrGapCollector
     }
 
     /// <summary>
-    /// Parse Vision API response: "[1] \"full text\"" lines → index→text map.
+    /// Parse Vision API response containing 3 image sections (A, B, C).
+    /// Returns per-image results: "A" → {1: "text", 2: "(icon: arrow)"}, etc.
     /// </summary>
-    public static Dictionary<int, string> ParseVisionResponse(string response)
+    public static Dictionary<string, Dictionary<int, string>> ParseTripleResponse(string response)
     {
-        var result = new Dictionary<int, string>();
+        var all = new Dictionary<string, Dictionary<int, string>>();
+        string currentImage = "A";
+        var currentMap = new Dictionary<int, string>();
+        all[currentImage] = currentMap;
+
         foreach (var line in response.Split('\n'))
         {
             var trimmed = line.Trim();
-            // Match: [N] "text" or [N] text
-            var match = System.Text.RegularExpressions.Regex.Match(trimmed, @"^\[(\d+)\]\s*""?([^""]+)""?");
-            if (match.Success && int.TryParse(match.Groups[1].Value, out int idx))
+
+            // Detect image section header: "Image A:", "Image B:", "Image C:"
+            var headerMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"^Image\s+([A-C])\s*:");
+            if (headerMatch.Success)
             {
-                result[idx] = match.Groups[2].Value.Trim();
+                currentImage = headerMatch.Groups[1].Value;
+                currentMap = new Dictionary<int, string>();
+                all[currentImage] = currentMap;
+                continue;
+            }
+
+            // Match: [N] "text" or [N] (icon: desc) or [N] text
+            var entryMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"^\[(\d+)\]\s*(.+)");
+            if (entryMatch.Success && int.TryParse(entryMatch.Groups[1].Value, out int idx))
+            {
+                var val = entryMatch.Groups[2].Value.Trim().Trim('"');
+                currentMap[idx] = val;
             }
         }
-        return result;
+        return all;
+    }
+
+    /// <summary>
+    /// Cross-verify triple results: score each region by consistency.
+    /// Returns region index → (bestText, score%) where:
+    ///   100% = 3/3 agree, 67% = 2/3 agree (majority wins), 0% = all different.
+    /// </summary>
+    public static Dictionary<int, (string text, int score)> CrossVerify(
+        Dictionary<string, Dictionary<int, string>> tripleResults)
+    {
+        var verified = new Dictionary<int, (string text, int score)>();
+
+        // Collect all region indices
+        var allIndices = tripleResults.Values.SelectMany(m => m.Keys).Distinct().OrderBy(i => i);
+
+        foreach (var idx in allIndices)
+        {
+            var answers = tripleResults.Values
+                .Where(m => m.ContainsKey(idx))
+                .Select(m => m[idx].Trim())
+                .ToList();
+
+            if (answers.Count == 0) continue;
+
+            // Group by normalized text (case-insensitive)
+            var groups = answers.GroupBy(a => a, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(g => g.Count())
+                .ToList();
+
+            var best = groups[0].Key;
+            int agreeing = groups[0].Count();
+            int total = answers.Count;
+
+            int score = total switch
+            {
+                3 when agreeing == 3 => 100, // unanimous
+                3 when agreeing == 2 => 67,  // majority
+                3 when agreeing == 1 => 0,   // all different
+                _ => agreeing * 100 / Math.Max(1, total)
+            };
+
+            verified[idx] = (best, score);
+        }
+        return verified;
     }
 
     public void Dispose()
