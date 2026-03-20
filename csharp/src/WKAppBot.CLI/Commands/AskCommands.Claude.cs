@@ -141,9 +141,11 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(modelHint))
             Console.WriteLine($"[ASK] Claude model hint: {modelHint}");
 
+        PulseStep.Init("ask-claude");
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "claude");
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+        PulseStep.Mark("cdp-connected");
 
         // No tab activation — CDP works on background tabs via targetId. Truly focusless.
 
@@ -157,6 +159,7 @@ internal partial class Program
             try
             {
                 // ── Phase 1: Navigate ──
+                PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("claude.ai"))
@@ -177,6 +180,7 @@ internal partial class Program
                 var editorSel = await WaitForClaudeEditorA11y(cdp);
                 if (editorSel == null)
                     return (false, (string?)null);
+                PulseStep.Mark("editor-found");
                 Console.WriteLine($"[ASK] Editor found: {editorSel}");
 
                 // ── Phase 3: Check existing turns ──
@@ -245,6 +249,7 @@ internal partial class Program
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Claude");
 
                 await ClearContentEditable(cdp, editorSel);
+                PulseStep.Mark("question-send");
                 var inserted = await InsertTextClaudeProseMirror(cdp, editorSel, question);
                 var editorContent = await cdp.EvalAsync(
                     $"document.querySelector(\"{editorSel}\")?.textContent?.substring(0,80) || 'EMPTY'") ?? "EMPTY";
@@ -560,6 +565,7 @@ internal partial class Program
             // Slack already handled above (initial answer) + loop onStepReport
         }
 
+        PulseStep.Done();
         cdp.Dispose();
         return ok ? 0 : 1;
     }
