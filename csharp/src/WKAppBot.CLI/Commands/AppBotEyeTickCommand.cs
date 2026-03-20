@@ -236,6 +236,10 @@ internal partial class Program
             }
             catch { }
             PulseStep.Done("eye-ensure");
+
+            // ── Safety net: always schedule next watchdog tick ──
+            // Even if Eye spawn fails, next tick will try again in 5 min.
+            try { EnsureEyeWatchdogTask(); } catch { }
         }
     }
 
