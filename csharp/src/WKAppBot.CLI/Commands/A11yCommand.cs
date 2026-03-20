@@ -844,11 +844,6 @@ internal partial class Program
                                     Console.ForegroundColor = ConsoleColor.DarkCyan;
                                     Console.WriteLine($"[A11Y] Acquiring target context... \"{displayText}\"");
                                     Console.ResetColor();
-                                    // Show magnifier on the gap region while analyzing
-                                    var elHwndForZoom = GetElementHwnd(root);
-                                    dynZoom = ClickZoomHelper.Begin(
-                                        elHwndForZoom != IntPtr.Zero ? elHwndForZoom : hwnd,
-                                        hwnd, "DYN-A11Y", $"Analyzing... \"{displayText}\"");
                                 }
                                 else if (cached1 != null)
                                 {
@@ -878,11 +873,6 @@ internal partial class Program
                                 Console.ForegroundColor = ConsoleColor.DarkCyan;
                                 Console.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
                                 Console.ResetColor();
-                                var elHwndForZoom2 = GetElementHwnd(root);
-                                dynZoom = ClickZoomHelper.Begin(
-                                    elHwndForZoom2 != IntPtr.Zero ? elHwndForZoom2 : hwnd,
-                                    hwnd, "DYN-A11Y", "Analyzing...");
-
                             }
                             else if (cached2 != null)
                             {
@@ -892,9 +882,27 @@ internal partial class Program
                                 Console.ResetColor();
                             }
                         }
+
+                        // ── Magnifier: 1 gap → zoom on segment, 2+ gaps → zoom on parent node ──
+                        if (gapCollector.HasGaps)
+                        {
+                            var zoomHwnd = GetElementHwnd(root);
+                            if (zoomHwnd == IntPtr.Zero) zoomHwnd = hwnd;
+                            int gapCount = gapCollector.Count;
+                            if (gapCount == 1)
+                            {
+                                // Single gap: zoom on the specific segment
+                                dynZoom = ClickZoomHelper.Begin(zoomHwnd, hwnd, "DYN-A11Y", "Analyzing 1 segment...");
+                            }
+                            else
+                            {
+                                // Multiple gaps: zoom on parent node (show full context)
+                                dynZoom = ClickZoomHelper.Begin(hwnd, hwnd, "DYN-A11Y", $"Analyzing {gapCount} segments...");
+                            }
+                        }
                     }
                     catch { /* OCR is best-effort */ }
-                    finally { dynZoom?.Dispose(); } // fade out magnifier after analysis
+                    finally { dynZoom?.Dispose(); }
                 }
                 var _nodeBefore = default(NodeState); // 입력위치확보 진입 시 캡처 (elHwnd 계산 후)
 
