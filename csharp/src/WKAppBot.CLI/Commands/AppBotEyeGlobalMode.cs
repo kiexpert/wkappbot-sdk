@@ -522,21 +522,22 @@ internal partial class Program
                 bool sttOk = whisperExp.StartStt();
 
                 // Auto-study: when _unknown/ reaches 10 files, run study in background
-                // Gate: skip for first 10 min after Eye starts, then enforce 10-min minimum interval
+                // Gate: skip for first 2 min after Eye starts, then enforce 2-min minimum interval
                 var expRef = whisperExp; // capture for closure
                 DateTime lastStudyTime = DateTime.MinValue;
+                const double StudyGateMinutes = 2.0; // was 10 — 5x faster now
                 whisperExp.OnAutoStudyNeeded += (count) =>
                 {
                     var now = DateTime.UtcNow;
-                    if ((now - eyeStartTime).TotalMinutes < 10)
+                    if ((now - eyeStartTime).TotalMinutes < StudyGateMinutes)
                     {
-                        Console.WriteLine($"[WHISPER] Auto-study deferred (Eye started {(now - eyeStartTime).TotalMinutes:F1} min ago, wait 10 min)");
+                        Console.WriteLine($"[WHISPER] Auto-study deferred (Eye started {(now - eyeStartTime).TotalMinutes:F1} min ago, wait {StudyGateMinutes} min)");
                         expRef.NotifyAutoStudyDone();
                         return;
                     }
-                    if ((now - lastStudyTime).TotalMinutes < 10)
+                    if ((now - lastStudyTime).TotalMinutes < StudyGateMinutes)
                     {
-                        Console.WriteLine($"[WHISPER] Auto-study deferred (last study {(now - lastStudyTime).TotalMinutes:F1} min ago, wait 10 min)");
+                        Console.WriteLine($"[WHISPER] Auto-study deferred (last study {(now - lastStudyTime).TotalMinutes:F1} min ago, wait {StudyGateMinutes} min)");
                         expRef.NotifyAutoStudyDone();
                         return;
                     }
