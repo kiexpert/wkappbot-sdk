@@ -150,6 +150,54 @@ internal sealed class ScreenSaverOverlay : IDisposable
         System.Windows.Controls.Canvas.SetTop(moonGlow, moonY - 20);
         canvas.Children.Add(moonGlow);
 
+        // Saturn (left side of sky)
+        var saturnX = vw * 0.18;
+        var saturnY = vh * 0.22;
+        var saturn = new System.Windows.Shapes.Ellipse
+        {
+            Width = 18, Height = 16,
+            Fill = new RadialGradientBrush(
+                Color.FromArgb(200, 210, 180, 120),
+                Color.FromArgb(150, 180, 150, 80)),
+            Opacity = 0,
+            Tag = "star", // fades with stars
+        };
+        System.Windows.Controls.Canvas.SetLeft(saturn, saturnX);
+        System.Windows.Controls.Canvas.SetTop(saturn, saturnY);
+        canvas.Children.Add(saturn);
+        // Saturn ring
+        var ring = new System.Windows.Shapes.Ellipse
+        {
+            Width = 36, Height = 8,
+            Stroke = new SolidColorBrush(Color.FromArgb(160, 210, 190, 130)),
+            StrokeThickness = 1.5,
+            Fill = Brushes.Transparent,
+            Opacity = 0,
+            Tag = "star",
+            RenderTransform = new RotateTransform(-20, 18, 4),
+        };
+        System.Windows.Controls.Canvas.SetLeft(ring, saturnX - 9);
+        System.Windows.Controls.Canvas.SetTop(ring, saturnY + 4);
+        canvas.Children.Add(ring);
+
+        // Ocean waves (3 layers at different speeds, bottom 15% of screen)
+        double waveBaseY = vh * 0.85;
+        for (int waveLayer = 0; waveLayer < 3; waveLayer++)
+        {
+            var wavePath = new System.Windows.Shapes.Path
+            {
+                Stroke = Brushes.Transparent,
+                Fill = new SolidColorBrush(Color.FromArgb(
+                    (byte)(40 + waveLayer * 20),     // deeper layers more opaque
+                    (byte)(20 + waveLayer * 15),     // blue tint varies
+                    (byte)(40 + waveLayer * 20),
+                    (byte)(80 + waveLayer * 30))),
+                Opacity = 0,
+                Tag = $"wave{waveLayer}",
+            };
+            canvas.Children.Add(wavePath);
+        }
+
         _window.SourceInitialized += (_, _) =>
         {
             var helper = new WindowInteropHelper(_window);
@@ -217,19 +265,53 @@ internal sealed class ScreenSaverOverlay : IDisposable
                         var color = InterpolateSunset(t);
                         _window.Background = new SolidColorBrush(color);
 
-                        // Stars + moon: fade in during twilight→night (t > 0.7)
+                        // Stars + moon + saturn: fade in during twilight→night (t > 0.7)
+                        // Waves: fade in during sunset (t > 0.3)
                         if (_window.Content is System.Windows.Controls.Canvas canvas)
                         {
-                            double nightAlpha = t > 0.7 ? (t - 0.7) / 0.3 : 0; // 0→1 during 70%→100%
+                            double nightAlpha = t > 0.7 ? (t - 0.7) / 0.3 : 0;
+                            double waveAlpha = t > 0.3 ? Math.Min(1.0, (t - 0.3) / 0.3) : 0;
+                            double now = DateTime.Now.Ticks / 10_000_000.0; // seconds
+
                             foreach (System.Windows.UIElement child in canvas.Children)
                             {
                                 if (child is System.Windows.Shapes.Ellipse el)
                                 {
                                     var tag = el.Tag as string;
                                     if (tag == "star")
-                                        el.Opacity = nightAlpha * (0.4 + 0.6 * Math.Sin(DateTime.Now.Ticks / 30_000_000.0 + el.Width * 100)); // twinkle!
+                                        el.Opacity = nightAlpha * (0.4 + 0.6 * Math.Sin(now * 1.5 + el.Width * 100));
                                     else if (tag == "moon")
                                         el.Opacity = nightAlpha;
+                                }
+                                else if (child is System.Windows.Shapes.Path wavePath)
+                                {
+                                    var tag = wavePath.Tag as string ?? "";
+                                    if (!tag.StartsWith("wave")) continue;
+                                    int layer = tag.Length > 4 && char.IsDigit(tag[4]) ? tag[4] - '0' : 0;
+
+                                    wavePath.Opacity = waveAlpha;
+
+                                    // Animate wave shape using sine curves
+                                    double speed = 0.4 + layer * 0.15;
+                                    double amp = 8 + layer * 4;
+                                    double freq = 0.008 - layer * 0.001;
+                                    double baseY = canvas.ActualHeight * 0.85 + layer * 20;
+                                    double w = Math.Max(1, canvas.ActualWidth);
+
+                                    var geo = new StreamGeometry();
+                                    using (var ctx = geo.Open())
+                                    {
+                                        ctx.BeginFigure(new System.Windows.Point(0, canvas.ActualHeight), true, true);
+                                        ctx.LineTo(new System.Windows.Point(0, baseY + amp * Math.Sin(now * speed)), true, false);
+                                        for (double px = 10; px <= w; px += 10)
+                                        {
+                                            double y = baseY + amp * Math.Sin(px * freq + now * speed);
+                                            ctx.LineTo(new System.Windows.Point(px, y), true, false);
+                                        }
+                                        ctx.LineTo(new System.Windows.Point(w, canvas.ActualHeight), true, false);
+                                    }
+                                    geo.Freeze();
+                                    wavePath.Data = geo;
                                 }
                             }
                         }
