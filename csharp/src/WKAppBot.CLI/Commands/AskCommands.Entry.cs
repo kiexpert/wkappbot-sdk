@@ -507,6 +507,17 @@ Examples:
                 var cdp = new CdpClient();
                 await cdp.ConnectAsync(port, timeoutMs: 5000);
 
+                // ── Pre-minimize Chrome BEFORE any tab action (prevent focus steal) ──
+                var preMinHwnd = cdp.GetChromeWindowHandle();
+                if (preMinHwnd != IntPtr.Zero && !NativeMethods.IsIconic(preMinHwnd))
+                {
+                    NativeMethods.ShowWindow(preMinHwnd, 6); // SW_MINIMIZE
+                    // Wait until actually iconic (up to 500ms) — tab action must not start before minimize completes
+                    for (int wi = 0; wi < 50 && !NativeMethods.IsIconic(preMinHwnd); wi++)
+                        await Task.Delay(10);
+                    Console.WriteLine("[ASK] Chrome minimized before tab action (focus-steal prevention)");
+                }
+
                 // Sandbox: Registry hit → URL validate → fast-fail on mismatch
                 // Registry miss → EnsureCorrectWindowAsync (positioning + creation)
                 string? resolvedId;
