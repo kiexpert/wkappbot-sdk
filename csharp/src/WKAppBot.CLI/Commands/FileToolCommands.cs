@@ -943,8 +943,10 @@ internal partial class Program
         File.WriteAllBytes(plan.Path, plan.OutBytes);
         Console.WriteLine($"[file edit] {plan.Count} replacement(s) — encoding={plan.Enc.WebName}");
 
-        // ── Context output: show ±{context} lines around each change ──
-        if (context > 0 && plan.MatchPositions.Count > 0)
+        // ── Context output: indent-based block expansion + N extra lines ──
+        // context = N means: expand to indent boundary, then show N more lines beyond.
+        // Default (context=1): show enclosing block + 1 line outside (method signature, etc.)
+        if (plan.MatchPositions.Count > 0)
         {
             var resultLines = plan.Result.ReplaceLineEndings("\n").Split('\n');
             var newLineCount = plan.NewStr.Split('\n').Length - 1;
@@ -959,10 +961,41 @@ internal partial class Program
                 changedRanges.Add((resultLine, resultEnd));
                 lineShift += newLineCount - oldLineCount;
             }
+
             var toShow = new SortedSet<int>();
             foreach (var (start, end) in changedRanges)
-                for (int li = Math.Max(0, start - context); li <= Math.Min(resultLines.Length - 1, end + context); li++)
+            {
+                // Find indent level of the match line
+                int matchIndent = GetLineIndent(resultLines, start);
+
+                // Expand upward: while indent >= matchIndent
+                int top = start;
+                while (top > 0)
+                {
+                    var line = resultLines[top - 1];
+                    if (line.Trim().Length > 0 && GetLineIndent(resultLines, top - 1) < matchIndent)
+                        break;
+                    top--;
+                }
+
+                // Expand downward: while indent >= matchIndent
+                int bot = end;
+                while (bot < resultLines.Length - 1)
+                {
+                    var line = resultLines[bot + 1];
+                    if (line.Trim().Length > 0 && GetLineIndent(resultLines, bot + 1) < matchIndent)
+                        break;
+                    bot++;
+                }
+
+                // Add N extra lines beyond indent boundary
+                top = Math.Max(0, top - context);
+                bot = Math.Min(resultLines.Length - 1, bot + context);
+
+                for (int li = top; li <= bot; li++)
                     toShow.Add(li);
+            }
+
             var changedSet = new HashSet<int>(changedRanges.SelectMany(r => Enumerable.Range(r.start, r.end - r.start + 1)));
             int? prev = null;
             foreach (var li in toShow)
@@ -974,6 +1007,20 @@ internal partial class Program
             }
         }
         return 0;
+    }
+
+    static int GetLineIndent(string[] lines, int idx)
+    {
+        if (idx < 0 || idx >= lines.Length) return 0;
+        var line = lines[idx];
+        int indent = 0;
+        foreach (var ch in line)
+        {
+            if (ch == ' ') indent++;
+            else if (ch == '\t') indent += 4;
+            else break;
+        }
+        return indent;
     }
 
     // ── usage ──────────────────────────────────────────────────────────────
