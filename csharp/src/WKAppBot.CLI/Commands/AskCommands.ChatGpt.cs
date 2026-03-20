@@ -60,9 +60,11 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(modelHint))
             Console.WriteLine($"[ASK] ChatGPT model hint: {modelHint}");
 
+        PulseStep.Init("ask-gpt");
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "gpt");
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+        PulseStep.Mark("cdp-connected");
 
         // No tab activation ? CDP works on background tabs via targetId. Truly focusless.
 
@@ -76,6 +78,7 @@ internal partial class Program
             try
             {
                 // ?�?� Phase 1: Navigate (iconified OK) ?�?�
+                PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.EvalAsync("location.href") ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("chatgpt.com"))
@@ -91,6 +94,7 @@ internal partial class Program
                 var editorSel = await WaitForChatGptEditorA11y(cdp);
                 if (editorSel == null)
                     return (false, (string?)null);
+                PulseStep.Mark("editor-found");
                 Console.WriteLine($"[ASK] Editor found: {editorSel}");
 
                 // Check if this is a fresh conversation ??try multiple selectors
@@ -154,6 +158,7 @@ internal partial class Program
                     question = BuildHostHandshake() + question;
 
                 // Send the actual question (with 9s-delay retry on timeout)
+                PulseStep.Mark("question-send");
                 var (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, attachFiles, returnAfterSend: noWait);
                 if (!ok && string.IsNullOrEmpty(answer))
                 {
@@ -206,6 +211,7 @@ internal partial class Program
             Console.WriteLine("[ASK_FULL_ANSWER_BEGIN]");
             Console.WriteLine(answer);
             Console.WriteLine("[ASK_FULL_ANSWER_END]");
+            PulseStep.Done();
 
             // Slack already handled above (initial answer) + loop onStepReport
         }
