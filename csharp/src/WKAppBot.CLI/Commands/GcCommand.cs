@@ -1,3 +1,6 @@
+using System.Text.RegularExpressions;
+using Microsoft.VisualBasic.FileIO;
+
 namespace WKAppBot.CLI;
 
 internal partial class Program
@@ -10,65 +13,103 @@ internal partial class Program
     {
         string? target = null;
         int overrideDays = 0; // 0 = use per-target defaults
-        bool dryRun = false;
+        bool sweep = false;   // default = dry-run (safe preview)
 
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--days" && i + 1 < args.Length) { int.TryParse(args[++i], out overrideDays); }
-            else if (args[i] is "--dry-run" or "-n") dryRun = true;
+            else if (args[i] is "--sweep" or "-s") sweep = true;
             else if (args[i] is "-h" or "--help" or "help") { GcUsage(); return 0; }
             else if (!args[i].StartsWith("-")) target = args[i].ToLowerInvariant();
         }
+        bool dryRun = !sweep;
 
-        // Per-target retention days (conservative defaults)
-        var targets = new (string name, string subDir, int defaultDays, string desc)[]
+        // Known retention overrides (days) for specific folder names
+        var retentionDays = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
-            ("logs",        "logs",             7,  "log files"),
-            ("whisper",     "whisper",         14,  "whisper mp3/wav recordings"),
-            ("cache",       "",                30,  "gap_cache + gap_screenshots"),  // LocalAppData
-            ("triad",       "triad",           30,  "triad session files"),
-            ("output",      "output",          30,  "command output files"),
-            ("temp",        "temp",            14,  "temporary files"),
-            ("experience",  "experience",      90,  "experience DB (knowhow, cca_params, dyn_a11y)"),
+            ["logs"]       = 7,
+            ["temp"]       = 14,
+            ["whisper"]    = 14,
+            ["triad"]      = 30,
+            ["output"]     = 30,
+            ["experience"] = 90,
         };
+        const int DefaultRetentionDays = 30;
+
+        // Scan all subdirectories under HQ + LocalAppData/WKAppBot
+        var roots = new List<string> { DataDir };
+        var localAppData = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WKAppBot");
+        if (Directory.Exists(localAppData)) roots.Add(localAppData);
 
         int totalDeleted = 0;
         long totalBytes = 0;
 
-        foreach (var (name, subDir, defaultDays, desc) in targets)
+        foreach (var root in roots)
         {
-            if (target != null && target != "all" && target != name) continue;
+            if (!Directory.Exists(root)) continue;
 
-            int days = overrideDays > 0 ? overrideDays : defaultDays;
-            var cutoff = DateTime.Now.AddDays(-days);
+            // Get immediate subdirectories
+            string[] subDirs;
+            try { subDirs = Directory.GetDirectories(root); }
+            catch { continue; }
 
-            // Determine root directory
-            string rootDir;
-            if (name == "cache")
+            foreach (var dir in subDirs)
             {
-                rootDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "WKAppBot");
+                var folderName = Path.GetFileName(dir);
+
+                // Filter by grap pattern if target specified
+                // "exp" → "*exp*" (auto-wrap for partial match)
+                if (!string.IsNullOrEmpty(target) && target != "all")
+                {
+                    var pattern = target.Contains('*') || target.Contains('?')
+                        ? target : $"*{target}*";
+                    var rxPattern = "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+                    if (!Regex.IsMatch(folderName, rxPattern, RegexOptions.IgnoreCase))
+                        continue;
+                }
+
+                // Determine retention
+                int days = overrideDays > 0 ? overrideDays
+                    : retentionDays.TryGetValue(folderName, out int known) ? known
+                    : DefaultRetentionDays;
+                var cutoff = DateTime.Now.AddDays(-days);
+
+                var (deleted, bytes) = PurgeOldFiles(dir, cutoff, dryRun);
+                if (deleted > 0)
+                {
+                    var action = dryRun ? "→ recycle" : "recycled";
+                    Console.WriteLine($"[GC] {folderName}/: {action} {deleted} file(s), {bytes / 1024.0:F0}KB (>{days}d)");
+                }
+                totalDeleted += deleted;
+                totalBytes += bytes;
+
+                if (!dryRun)
+                    PurgeEmptyDirs(dir);
             }
-            else
+
+            // Also scan loose files in root (not in subdirectories)
+            if (string.IsNullOrEmpty(target) || target == "all")
             {
-                rootDir = Path.Combine(DataDir, subDir);
+                try
+                {
+                    var cutoff = DateTime.Now.AddDays(-(overrideDays > 0 ? overrideDays : DefaultRetentionDays));
+                    foreach (var file in Directory.EnumerateFiles(root))
+                    {
+                        var fi = new FileInfo(file);
+                        var lastUsed = new[] { fi.CreationTime, fi.LastWriteTime, fi.LastAccessTime }.Max();
+                        if (lastUsed < cutoff)
+                        {
+                            totalBytes += fi.Length;
+                            totalDeleted++;
+                            if (!dryRun)
+                                FileSystem.DeleteFile(file, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                            Console.WriteLine($"[GC] {fi.Name}: {(dryRun ? "→ recycle" : "recycled")} {fi.Length / 1024.0:F0}KB");
+                        }
+                    }
+                }
+                catch { }
             }
-
-            if (!Directory.Exists(rootDir)) continue;
-
-            var (deleted, bytes) = PurgeOldFiles(rootDir, cutoff, dryRun);
-            if (deleted > 0 || dryRun)
-            {
-                var action = dryRun ? "would delete" : "deleted";
-                Console.WriteLine($"[GC] {name}: {action} {deleted} file(s), {bytes / 1024.0:F0}KB ({desc}, >{days}d)");
-            }
-            totalDeleted += deleted;
-            totalBytes += bytes;
-
-            // Clean empty folders (bottom-up)
-            if (!dryRun)
-                PurgeEmptyDirs(rootDir);
         }
 
         if (totalDeleted == 0 && !dryRun)
@@ -89,7 +130,7 @@ internal partial class Program
 
         try
         {
-            foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+            foreach (var file in Directory.EnumerateFiles(dir, "*", System.IO.SearchOption.AllDirectories))
             {
                 try
                 {
@@ -101,7 +142,7 @@ internal partial class Program
                         bytes += fi.Length;
                         deleted++;
                         if (!dryRun)
-                            fi.Delete();
+                            FileSystem.DeleteFile(file, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                     }
                 }
                 catch { /* skip locked/protected files */ }
@@ -117,7 +158,7 @@ internal partial class Program
         try
         {
             // Bottom-up: deepest first
-            foreach (var dir in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories)
+            foreach (var dir in Directory.EnumerateDirectories(root, "*", System.IO.SearchOption.AllDirectories)
                 .OrderByDescending(d => d.Length))
             {
                 try
@@ -134,24 +175,25 @@ internal partial class Program
     static void GcUsage()
     {
         Console.WriteLine(@"
-wkappbot gc [target] [--days N] [--dry-run]
+wkappbot gc [pattern] [--days N] [--sweep]
 
-Purge old files under wkappbot.hq/ and related caches.
-Empty folders are automatically deleted after file cleanup.
+Preview (dry-run) old files under wkappbot.hq/ for recycling.
+Add --sweep to actually move files to Recycle Bin.
+Empty folders are automatically deleted after sweep.
 
-Targets (default: all):
-  all          All targets below
-  logs         Log files (default: 7 days)
-  whisper      Whisper recordings mp3/wav (default: 14 days)
-  cache        Gap cache + screenshots in LocalAppData (default: 30 days)
-  triad        Triad session files (default: 30 days)
-  output       Command output files (default: 30 days)
-  temp         Temporary files (default: 14 days)
-  experience   Experience DB — knowhow, cca_params, dyn_a11y (default: 90 days)
+Pattern: partial match on HQ subdirectory names (auto-wrapped with *)
+  gc              All HQ subdirs (dry-run)
+  gc logs         logs/ only
+  gc exp          *exp* → experience/, kiwoom_exp/, com_exp/
+  gc tri*         triad/
+  gc all          Everything
+
+Retention (days, per folder — override with --days N):
+  logs=7  temp=14  whisper=14  triad=30  output=30  experience=90  others=30
 
 Options:
-  --days N     Override retention days for selected target(s)
-  --dry-run    Show what would be deleted without deleting
+  --sweep    Actually move to Recycle Bin (default: dry-run preview)
+  --days N   Override retention days
 ");
     }
 }
