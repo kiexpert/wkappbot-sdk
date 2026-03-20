@@ -8,15 +8,16 @@ using WKAppBot.Win32.Native;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Security screensaver: 90% opaque black overlay covering all monitors.
+/// Security screensaver: gradual black overlay covering all monitors.
 /// Click-through (WS_EX_TRANSPARENT) — does not block any input.
-/// Shows after 10s user idle; hides instantly on any keyboard/mouse input.
+/// 10s idle → fade starts, 3min idle → 95% opaque. Input → instant hide.
 /// Runs on a dedicated STA thread managed by Eye global loop.
 /// </summary>
 internal sealed class ScreenSaverOverlay : IDisposable
 {
-    private const uint IdleThresholdMs = 10_000;   // 10 seconds idle → show
-    private const double OverlayOpacity = 0.95;    // 95% opaque
+    private const uint FadeStartMs  = 10_000;      // 10s idle → fade begins
+    private const uint FadeEndMs    = 180_000;     // 3min idle → max opacity
+    private const double MaxOpacity = 0.95;        // 95% opaque at full fade
 
     private Thread? _thread;
     private Dispatcher? _dispatcher;
@@ -24,6 +25,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
     private readonly ManualResetEventSlim _ready = new(false);
     private volatile bool _isVisible;
     private volatile bool _disposed;
+    private double _currentOpacity;
 
     // Win32 extended styles for click-through
     private const int GWL_EXSTYLE = -20;
@@ -69,7 +71,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
             WindowStyle = WindowStyle.None,
             AllowsTransparency = true,
             Background = new SolidColorBrush(Colors.Black),
-            Opacity = OverlayOpacity,
+            Opacity = 0,
             Topmost = true,
             ShowInTaskbar = false,
             ShowActivated = false,
@@ -109,7 +111,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
 
     /// <summary>
     /// Called from Eye loop every frame (~100ms).
-    /// Checks user idle time and shows/hides the overlay accordingly.
+    /// Gradually fades in: 10s idle → 0%, 3min idle → 95%. Input → instant hide.
     /// </summary>
     public void Tick()
     {
@@ -117,27 +119,45 @@ internal sealed class ScreenSaverOverlay : IDisposable
 
         var idleMs = NativeMethods.GetUserIdleMs();
 
-        if (idleMs >= IdleThresholdMs && !_isVisible)
+        if (idleMs >= FadeStartMs)
         {
-            _isVisible = true;
+            // Linear interpolation: 0% at FadeStartMs → MaxOpacity at FadeEndMs
+            double t = Math.Min(1.0, (double)(idleMs - FadeStartMs) / (FadeEndMs - FadeStartMs));
+            double targetOpacity = t * MaxOpacity;
+
+            // Only update if opacity changed meaningfully (avoid spamming dispatcher)
+            if (Math.Abs(targetOpacity - _currentOpacity) >= 0.005)
+            {
+                _currentOpacity = targetOpacity;
+                bool wasHidden = !_isVisible;
+                _isVisible = true;
+
+                _dispatcher.BeginInvoke(() =>
+                {
+                    if (_window == null) return;
+                    if (wasHidden)
+                    {
+                        _window.Visibility = Visibility.Visible;
+                        var helper = new WindowInteropHelper(_window);
+                        SetWindowPos(helper.Handle, (IntPtr)HWND_TOPMOST, 0, 0, 0, 0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    }
+                    _window.Opacity = targetOpacity;
+                });
+
+                if (wasHidden)
+                    Console.WriteLine("[EYE] ScreenSaver fade start (user idle ≥10s)");
+            }
+        }
+        else if (_isVisible)
+        {
+            _isVisible = false;
+            _currentOpacity = 0;
             _dispatcher.BeginInvoke(() =>
             {
                 if (_window == null) return;
-                _window.Visibility = Visibility.Visible;
-
-                // Re-assert topmost on show
-                var helper = new WindowInteropHelper(_window);
-                SetWindowPos(helper.Handle, (IntPtr)HWND_TOPMOST, 0, 0, 0, 0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-            });
-            Console.WriteLine("[EYE] ScreenSaver ON (user idle ≥10s)");
-        }
-        else if (idleMs < IdleThresholdMs && _isVisible)
-        {
-            _isVisible = false;
-            _dispatcher.BeginInvoke(() =>
-            {
-                if (_window != null) _window.Visibility = Visibility.Hidden;
+                _window.Opacity = 0;
+                _window.Visibility = Visibility.Hidden;
             });
             Console.WriteLine("[EYE] ScreenSaver OFF (user input detected)");
         }
