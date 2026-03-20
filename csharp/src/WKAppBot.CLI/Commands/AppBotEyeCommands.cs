@@ -14,6 +14,7 @@ namespace WKAppBot.CLI;
 /// GlobalMode loop: AppBotEyeGlobalMode.cs
 /// Claude Desktop detection: AppBotEyeClaudeDetector.cs
 /// Shared Slack handlers: AppBotEyeSlackHandlers.cs
+/// Eye auto-launch: LaunchAppBotEyeIfNeeded / LaunchAppBotEyeIfNeededCore (this file)
 /// </summary>
 internal partial class Program
 {
@@ -26,6 +27,12 @@ internal partial class Program
     [DllImport("kernel32.dll")]
     private static extern bool AllocConsole();
 
+    [DllImport("kernel32.dll")]
+    private static extern bool SetConsoleCtrlHandler(ConsoleCtrlHandlerDelegate? handler, bool add);
+    delegate bool ConsoleCtrlHandlerDelegate(int ctrlType);
+    // Keep a static reference — GC must not collect it while Eye is running
+    static ConsoleCtrlHandlerDelegate? _eyeCtrlHandler;
+
     private const int SW_HIDE = 0;
 
     static void TryHideConsoleWindow()
@@ -37,6 +44,218 @@ internal partial class Program
                 ShowWindow(h, SW_HIDE);
         }
         catch { }
+    }
+
+    /// <summary>
+    /// Write a log line to stderr — Eye's stderr is captured and logged by the host (Launcher relay).
+    /// Safe to call from any thread; swallows all exceptions.
+    /// </summary>
+    internal static void EyeLog(string message)
+    {
+        try { Console.Error.WriteLine($"[EYE] {message}"); } catch { }
+    }
+
+    /// <summary>
+    /// Install a Ctrl handler that blocks console-close events.
+    /// Logs the event type to console + eye.log so we can diagnose unexpected termination attempts.
+    /// </summary>
+    static void InstallEyeCtrlHandler()
+    {
+        _eyeCtrlHandler = ctrlType =>
+        {
+            // 0=C, 1=BREAK, 2=CLOSE, 5=LOGOFF, 6=SHUTDOWN
+            var name = ctrlType switch { 0 => "CTRL_C", 1 => "CTRL_BREAK", 2 => "CTRL_CLOSE",
+                5 => "CTRL_LOGOFF", 6 => "CTRL_SHUTDOWN", _ => $"CTRL_{ctrlType}" };
+            EyeLog($"[EYE] Console event: {name} — Eye is a daemon, blocking termination");
+            return true; // returning true blocks default action (kill process)
+        };
+        SetConsoleCtrlHandler(_eyeCtrlHandler, true);
+    }
+
+    // ── Eye auto-launch (called from Program.cs for every command) ──
+
+    /// <summary>
+    /// Auto-launch AppBotEye in unified mode (ActionState IPC) if not already running.
+    /// Called fire-and-forget from Program.Main for every command.
+    /// </summary>
+    internal static void LaunchAppBotEyeIfNeeded() => LaunchAppBotEyeIfNeededCore("");
+
+    /// <summary>
+    /// Auto-launch AppBotEye with --port (web mode). Called from web commands.
+    /// </summary>
+    internal static void LaunchAppBotEyeIfNeeded(int port) => LaunchAppBotEyeIfNeededCore($"--port {port}");
+
+    // "Eye alive" mutex: Eye holds this for its entire lifetime.
+    // Callers use WaitOne(0) — if it fails, Eye is alive; if it succeeds, Eye is dead.
+    internal const string EyeAliveMutexName = "Global\\WKAppBotEyeAlive";
+    // Static reference so GC never collects the mutex while Eye is running.
+    private static System.Threading.Mutex? _eyeAliveMutex;
+    // Spawn mutex: prevents concurrent spawn attempts
+    private const string EyeSpawnMutexName = "Global\\WKAppBotEyeSpawn";
+
+    /// <summary>
+    /// Eye auto-launch — called from Program.Main for every CLI command.
+    ///
+    /// ┌─────────────────────────────────────────────────────────────────┐
+    /// │  Eye Launch Flow (single-instance guarantee)                   │
+    /// │                                                                │
+    /// │  Step 1: Guard checks (RunningInEye, LOOP_CALLER)             │
+    /// │  Step 2: Alive mutex fast check — is Eye already running?      │
+    /// │  Step 3: Spawn mutex acquire — serialize concurrent spawners   │
+    /// │          ⚠ If timeout (3s) → another spawner active → bail    │
+    /// │  Step 4: Alive mutex re-check — Eye may have started while    │
+    /// │          we waited for spawn mutex                             │
+    /// │  Step 5: Process.Start("wkappbot-core.exe eye")               │
+    /// │          ⚠ CreateProcess hooks / AV can add 1-5s delay here   │
+    /// │  Step 6: Poll alive mutex (max 5s) — wait for Eye to signal   │
+    /// │          "I'm alive" before releasing spawn mutex              │
+    /// │  Step 7: Release spawn mutex → other callers can proceed      │
+    /// └─────────────────────────────────────────────────────────────────┘
+    ///
+    /// Why spawn mutex is held during Step 6:
+    ///   Without this, caller B sees "alive mutex free" during Eye's init
+    ///   window (between Process.Start and Eye acquiring alive mutex) and
+    ///   spawns a duplicate. CreateProcess hooks widen this gap.
+    /// </summary>
+    internal static void LaunchAppBotEyeIfNeededCore(string extraArgs)
+    {
+        // ── Step 1: Guard checks ──
+        if (RunningInEye) return;
+        // Loop subprocess mode: Eye inherits stdout pipe handle → blocks parent's ReadToEndAsync.
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WKAPPBOT_LOOP_CALLER"))) return;
+
+        PulseStep.Init("eye-launch");
+
+        // ── Step 2: Alive mutex fast check ──
+        // WaitOne(0) fails → Eye holds it → alive → skip.
+        // WaitOne(0) succeeds → Eye dead → release + proceed to spawn.
+        try
+        {
+            using var aliveMutex = new System.Threading.Mutex(false, EyeAliveMutexName);
+            if (!aliveMutex.WaitOne(0))
+            {
+                PulseStep.Done("eye-already-alive");
+                return;
+            }
+            aliveMutex.ReleaseMutex();
+        }
+        catch (System.Threading.AbandonedMutexException) { } // Eye crashed — fall through
+
+        PulseStep.Mark("alive-check-passed");
+        EyeLog("Eye not running — attempting spawn");
+
+        // ── Step 3: Spawn mutex acquire ──
+        // Serializes concurrent spawn attempts across all wkappbot processes.
+        // 3s timeout: if another process is already spawning, trust it and bail.
+        using var spawnMutex = new System.Threading.Mutex(false, EyeSpawnMutexName);
+        bool acquired = false;
+        try
+        {
+            acquired = spawnMutex.WaitOne(3000);
+        }
+        catch (System.Threading.AbandonedMutexException) { acquired = true; }
+
+        if (!acquired)
+        {
+            EyeLog("Spawn mutex timeout — another spawner active, skipping");
+            PulseStep.Done("spawn-mutex-timeout");
+            return;
+        }
+
+        PulseStep.Mark("spawn-mutex-acquired");
+
+        try
+        {
+            // ── Step 4: Alive mutex re-check ──
+            // Eye may have started while we waited for the spawn mutex.
+            try
+            {
+                using var aliveMutex2 = new System.Threading.Mutex(false, EyeAliveMutexName);
+                if (!aliveMutex2.WaitOne(0))
+                {
+                    EyeLog("Eye appeared during spawn-mutex wait — skipping");
+                    PulseStep.Done("eye-appeared-during-wait");
+                    return;
+                }
+                aliveMutex2.ReleaseMutex();
+            }
+            catch (System.Threading.AbandonedMutexException) { } // Eye crashed — spawn
+
+            // ── Step 5: Resolve core exe path and spawn ──
+            var launcherPath = Environment.ProcessPath ?? "";
+            var dir  = Path.GetDirectoryName(launcherPath) ?? "";
+            var exeName = Path.GetFileNameWithoutExtension(launcherPath); // e.g. "wkappbot" or "a11y"
+            var corePath = Path.Combine(dir, exeName + "-core.exe");
+            if (!File.Exists(corePath)) corePath = launcherPath;
+            if (string.IsNullOrEmpty(corePath)) return;
+
+            // CRITICAL: Do NOT redirect stdin/stdout/stderr!
+            // .NET Process.Start with UseShellExecute=false + no redirects →
+            //   CreateProcess(bInheritHandles=FALSE) → child gets NO parent handles.
+            // This prevents Eye from inheriting bash's PTY handles (which caused
+            // `eye tick` to hang forever — bash waits for all PTY handle holders to exit).
+            // Eye creates its own console via AllocConsole() — no stdio from parent needed.
+            // Previously used UseShellExecute=true, but ShellExecuteEx fails silently
+            // in DETACHED_PROCESS context (no shell/console to work with).
+            var psi = new ProcessStartInfo
+            {
+                FileName       = corePath,
+                Arguments      = "eye" + (extraArgs.Length > 0 ? " " + extraArgs : ""),
+                UseShellExecute = false,
+                CreateNoWindow  = true,
+                // NO RedirectStandard* → bInheritHandles=false → no PTY leak
+            };
+
+            EyeLog($"Spawning: {corePath} {psi.Arguments}");
+            var proc2 = Process.Start(psi);
+            if (proc2 != null)
+            {
+
+                Console.WriteLine($"[EYE] Launched (PID={proc2.Id})");
+                PulseStep.Mark("process-started");
+
+                // Policy broadcast when Eye first spawns (agent reads stdout)
+                AgentPolicy.StartPolicyBroadcast();
+
+                // ── Step 6: Wait for Eye to acquire alive mutex ──
+                // CRITICAL: Hold spawn mutex during this wait!
+                // Without this, another caller sees "alive mutex free" during Eye's
+                // init window and spawns a duplicate. CreateProcess hooks / AV scans
+                // can widen this gap to several seconds.
+                for (int wait = 0; wait < 2000; wait += 200)
+                {
+                    System.Threading.Thread.Sleep(200);
+                    try
+                    {
+                        using var probe = new System.Threading.Mutex(false, EyeAliveMutexName);
+                        if (!probe.WaitOne(0))
+                        {
+                            EyeLog($"Eye alive mutex confirmed after {wait + 200}ms");
+                            break;
+                        }
+                        probe.ReleaseMutex();
+                    }
+                    catch (System.Threading.AbandonedMutexException) { break; }
+
+                    if (proc2.HasExited)
+                    {
+                        EyeLog($"Eye process exited during init (exit={proc2.ExitCode})");
+                        break;
+                    }
+                }
+
+                PulseStep.Done("eye-launch-complete");
+            }
+        }
+        catch (Exception ex)
+        {
+            EyeLog($"Spawn failed: {ex.Message}");
+        }
+        finally
+        {
+            // ── Step 7: Release spawn mutex ──
+            if (acquired) try { spawnMutex.ReleaseMutex(); } catch { }
+        }
     }
 
     static int AppBotEyeCommand(string[] args)
@@ -76,9 +295,26 @@ internal partial class Program
             }
         }
 
-        // When spawned as DETACHED_PROCESS (no console), allocate one so console APIs don't throw.
-        // Eye hides this console window immediately via TryHideConsoleWindow().
+        // Eye is a background daemon — always hide the console window.
+        // AllocConsole() if none exists (DETACHED_PROCESS context: console APIs would throw otherwise).
+        // TryHideConsoleWindow() hides it unconditionally — also hides the terminal if user ran `wkappbot eye` manually.
+        // InstallEyeCtrlHandler() blocks CTRL_CLOSE and other termination events, logging them.
         if (GetConsoleWindow() == IntPtr.Zero) AllocConsole();
+        TryHideConsoleWindow();
+        InstallEyeCtrlHandler();
+
+        // Acquire Eye-alive mutex for this process's lifetime — signals to callers that Eye is running.
+        // Single-instance guard: if another Eye holds it, exit immediately.
+        _eyeAliveMutex = new System.Threading.Mutex(true, EyeAliveMutexName, out bool createdNew);
+        if (!createdNew)
+        {
+            // Another Eye already running — this is a duplicate, exit cleanly
+            EyeLog("[EYE] Another Eye instance is already running — exiting duplicate");
+            _eyeAliveMutex.Dispose();
+            _eyeAliveMutex = null;
+            return 0;
+        }
+        // _eyeAliveMutex is static — held for process lifetime, GC will never collect it
 
         Console.Title = "AppBotEye"; // for a11y close targeting (avoid matching VS Code)
         WKAppBot.Win32.Input.ProcessLaunchGuard.IsEyeProcess = true; // Eye daemon — skip focus guard

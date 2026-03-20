@@ -30,7 +30,10 @@ internal partial class Program
             // ── Fast path: query running Eye loop via IPC pipe ──
             // Eye loop maintains all caches in memory — IPC response is ~5ms vs ~600ms legacy scan.
             // Fallback to legacy only when Eye is not running or pipe query fails.
-            var ipc = EyeIpcClient.QueryTickAsync(timeoutMs: 100).GetAwaiter().GetResult();
+            // RunningInEye=true: already inside Eye process — call BuildIpcTickResponse() directly (no pipe round-trip).
+            var ipc = Program.RunningInEye
+                ? BuildIpcTickResponse()
+                : EyeIpcClient.QueryTickAsync(timeoutMs: 100).GetAwaiter().GetResult();
             if (ipc != null)
             {
                 Console.WriteLine($"[EYE] one-shot tick (IPC fast-path, cache age={ipc.CachedAgeMs}ms)");
@@ -54,10 +57,10 @@ internal partial class Program
                 return 0;
             }
 
-            // ── Eye not running or refused: launch in background, immediately fall back to legacy scan ──
-            Console.WriteLine("[EYE] IPC query failed — launching Eye (background) and running legacy scan...");
-            LaunchAppBotEyeIfNeeded();
-            Console.WriteLine("[EYE] falling back to legacy scan");
+            // ── Eye not running or refused: fall back to legacy scan ──
+            // Eye는 간접 런칭만! tick에서 직접 spawn하지 않음.
+            // 다음 일반 명령(inspect, a11y 등) 실행 시 자동 spawn됨.
+            Console.WriteLine("[EYE] IPC query failed — falling back to legacy scan");
 
             // ── Phase 1: ReadLatestTick ──
             var swPhase = Stopwatch.StartNew();

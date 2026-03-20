@@ -154,14 +154,17 @@ class Program
             return RunMcpProxy(forwardArgs);
         }
 
-        // eye: IS the daemon, must run core directly
+        // eye (no subcommand / --elevated): IS the daemon, must run core directly
+        // eye tick: one-shot status query — can go through Eye pipe (fast-path if Eye running, falls to Core if not)
         // file read-pdf/ocr: may take several seconds — use --only-core for long PDF/OCR jobs
         // file edit/read/grep/glob: fast operations — route through Eye pipe for zero cold-start
         // help/no-args: fast path — skip Eye pipe, run Core directly (Core is ~22ms for help)
         // logcat/grep/grap: streaming log monitor — needs direct stdout, TeeConsole, full error handling
         var isSlowFileCmd = cmd == "file" && args.Length > 1
             && args[1].ToLowerInvariant() is "read-pdf";
-        if (!onlyCore && cmd != "eye" && !isSlowFileCmd && cmd != "logcat" && cmd != "grep" && cmd != "grap"
+        var isEyeDaemon = cmd == "eye"
+            && !(forwardArgs.Length > 1 && forwardArgs[1].ToLowerInvariant() == "tick");
+        if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
             // Parse --timeout / --timeout-exit for Eye pipe enforcement

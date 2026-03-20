@@ -230,40 +230,8 @@ Register-ScheduledTask -TaskName '{WatchdogTaskName}' -Action $action -Trigger $
     }
 
     /// <summary>
-    /// Checks if Eye is alive via CmdPipe. If not, spawns it as a detached background process.
+    /// Checks if Eye is alive via CmdPipe. If not, spawns it.
+    /// Delegates to Program.LaunchAppBotEyeIfNeededCore — single launch code path.
     /// </summary>
-    public static void EnsureEyeRunning()
-    {
-        if (Program.RunningInEye) return;
-
-        try
-        {
-            using var pipe = new NamedPipeClientStream(".", EyeCmdPipeServer.PipeName,
-                PipeDirection.InOut, PipeOptions.None);
-            pipe.Connect(150);
-            return; // alive
-        }
-        catch { }
-
-        var exePath = Environment.ProcessPath;
-        if (string.IsNullOrEmpty(exePath)) return;
-
-        try
-        {
-            var proc = Process.Start(new ProcessStartInfo
-            {
-                FileName        = exePath,
-                Arguments       = "eye",
-                UseShellExecute = false,
-                CreateNoWindow  = true,
-            });
-            Console.WriteLine(proc != null
-                ? $"[RETRY] Eye was down — respawned (PID={proc.Id})"
-                : "[RETRY] Eye spawn returned null");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[RETRY] Eye spawn error: {ex.Message}");
-        }
-    }
+    public static void EnsureEyeRunning() => Program.LaunchAppBotEyeIfNeededCore("");
 }

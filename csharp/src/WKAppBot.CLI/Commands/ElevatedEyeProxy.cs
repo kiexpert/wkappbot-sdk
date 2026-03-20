@@ -247,7 +247,7 @@ static class ElevatedEyeClient
                 ".", ElevatedEyeServer.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
 
             using var cts = new CancellationTokenSource(timeoutMs);
-            await pipe.ConnectAsync(3000, cts.Token);
+            await pipe.ConnectAsync(timeoutMs, cts.Token); // use caller's timeoutMs, not hardcoded 3000
 
             var req = new EyeProxyRequest
             {
