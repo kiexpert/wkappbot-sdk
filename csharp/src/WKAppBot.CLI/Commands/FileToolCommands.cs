@@ -1022,7 +1022,7 @@ internal partial class Program
             else if (ch == '\t') col += tabSize - (col % tabSize); // snap to next tab stop
             else break;
         }
-        return col;
+        return col / tabSize; // column → indent level
     }
 
     // ── usage ──────────────────────────────────────────────────────────────
