@@ -208,6 +208,34 @@ internal partial class Program
         finally
         {
             killTimer?.Dispose();
+
+            // ── atexit: Eye 살아있나 체크 → 없으면 spawn ──
+            // tick이 할 일 다 하고 퇴근 직전에 Eye 생존 확인.
+            // 워치독(10분)이 이걸 호출하므로 Eye 사망 시 최대 10분 안에 자동 복구.
+            PulseStep.Init("eye-ensure");
+            try
+            {
+                using var probe = new System.Threading.Mutex(false, EyeAliveMutexName);
+                if (probe.WaitOne(0))
+                {
+                    probe.ReleaseMutex();
+                    // Eye is dead — spawn it
+                    PulseStep.Mark("eye-dead-spawning");
+                    LaunchAppBotEyeIfNeededCore("");
+                }
+                else
+                {
+                    PulseStep.Mark("eye-alive-ok");
+                }
+            }
+            catch (System.Threading.AbandonedMutexException)
+            {
+                // Eye crashed — spawn
+                PulseStep.Mark("eye-crashed-spawning");
+                LaunchAppBotEyeIfNeededCore("");
+            }
+            catch { }
+            PulseStep.Done("eye-ensure");
         }
     }
 
