@@ -527,6 +527,7 @@ internal partial class Program
                 "clipboard" => ClipboardCommand(restArgs),
                 "claude-usage" => A11yClaudeUsage(),
                 "suggest" => SuggestCommand(restArgs),
+                "gc" => GcCommand(restArgs),
                 "zoom-demo" => ZoomDemoCommand(restArgs),
                 "tick" => TickCommand(restArgs),
                 // External
