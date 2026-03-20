@@ -27,8 +27,92 @@ public sealed class DynamicA11yAnalyzer
         public string Label { get; set; } = "";                  // visible text/label
         public string Description { get; set; } = "";            // brief description of what this control does
         public double Confidence { get; set; }                   // 0.0-1.0, from cross-verification
+        public string DynId { get; set; } = "";                  // generated ID: dyn_{type}_r{row}c{col}_{label}
         public DateTime AnalyzedAtUtc { get; set; }
         public string LayoutHash { get; set; } = "";
+    }
+
+    /// <summary>
+    /// Generate a dynamic AutomationId for a region based on:
+    ///   - Control type (lowercase short form)
+    ///   - Grid position (row, col from XY-Cut or spatial sorting)
+    ///   - Label text (sanitized, truncated)
+    /// Format: dyn_{type}_r{row}c{col}_{label}
+    /// </summary>
+    public static string GenerateDynId(A11yInfo info, int row, int col)
+    {
+        var type = info.ControlType.ToLowerInvariant() switch
+        {
+            "button"    => "btn",
+            "checkbox"  => "chk",
+            "combobox"  => "cmb",
+            "edit"      => "edt",
+            "label"     => "lbl",
+            "tab"       => "tab",
+            "scrollbar" => "scr",
+            "slider"    => "sld",
+            "grid" or "datagrid" => "grd",
+            "listitem"  => "lst",
+            "menuitem"  => "mnu",
+            "treeitem"  => "tre",
+            "image"     => "img",
+            "separator" => "sep",
+            "statusbar" => "stb",
+            _           => "unk",
+        };
+        var label = SanitizeIdLabel(info.Label);
+        return $"dyn_{type}_r{row}c{col}{(label.Length > 0 ? $"_{label}" : "")}";
+    }
+
+    /// <summary>
+    /// Assign row/col positions to regions by spatial sorting (top→bottom, left→right).
+    /// Groups regions into rows by Y-overlap, then sorts columns within each row.
+    /// </summary>
+    public static List<(int row, int col, T region)> AssignGridPositions<T>(
+        List<T> regions, Func<T, System.Drawing.Rectangle> getRect, int rowGap = 5)
+    {
+        var sorted = regions.Select((r, i) => (rect: getRect(r), idx: i, region: r))
+            .OrderBy(x => x.rect.Y).ThenBy(x => x.rect.X).ToList();
+
+        var result = new List<(int, int, T)>();
+        int currentRow = 0;
+        int lastRowBottom = int.MinValue;
+
+        var rowGroups = new List<List<(System.Drawing.Rectangle rect, int idx, T region)>>();
+        var currentGroup = new List<(System.Drawing.Rectangle, int, T)>();
+
+        foreach (var item in sorted)
+        {
+            if (currentGroup.Count > 0 && item.rect.Top > lastRowBottom + rowGap)
+            {
+                rowGroups.Add(currentGroup);
+                currentGroup = new();
+            }
+            currentGroup.Add(item);
+            lastRowBottom = Math.Max(lastRowBottom, item.rect.Bottom);
+        }
+        if (currentGroup.Count > 0) rowGroups.Add(currentGroup);
+
+        for (int r = 0; r < rowGroups.Count; r++)
+        {
+            var row = rowGroups[r].OrderBy(x => x.rect.Left).ToList();
+            for (int c = 0; c < row.Count; c++)
+                result.Add((r + 1, c + 1, row[c].region));
+        }
+        return result;
+    }
+
+    private static string SanitizeIdLabel(string label)
+    {
+        if (string.IsNullOrWhiteSpace(label)) return "";
+        // Keep Korean + alphanumeric, replace others with _
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in label.Take(20))
+        {
+            if (char.IsLetterOrDigit(ch)) sb.Append(ch);
+            else if (sb.Length > 0 && sb[^1] != '_') sb.Append('_');
+        }
+        return sb.ToString().Trim('_');
     }
 
     /// <summary>
