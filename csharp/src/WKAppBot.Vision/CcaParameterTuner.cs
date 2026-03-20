@@ -25,9 +25,11 @@ namespace WKAppBot.Vision;
 /// </summary>
 public sealed class CcaParameterTuner
 {
-    private const double LearningRate = 0.15;       // EMA α for misclassification
-    private const double ReinforcementRate = 0.02;   // EMA α for correct classification
-    private const int MinSamplesForStable = 15;      // min samples before parameters are "confident"
+    private const double InitialLearningRate = 0.15;  // EMA α start for misclassification
+    private const double ReinforcementRate = 0.02;    // EMA α for correct classification
+    private const double AlphaDecay = 0.995;          // per-sample decay (Claude recommendation)
+    private const double AlphaFloor = 0.005;          // minimum α — never stop learning entirely
+    private const int MinSamplesForStable = 15;       // min samples before parameters are "confident"
 
     public CcaParams Params { get; private set; } = new();
 
@@ -101,13 +103,17 @@ public sealed class CcaParameterTuner
     /// <param name="aspectRatio">Component's aspect ratio (w/h)</param>
     /// <param name="width">Component width in pixels</param>
     /// <param name="height">Component height in pixels</param>
+    /// <param name="solidity">Component's solidity (convex hull fill ratio, 0-1). -1 if unknown.</param>
     public void Feedback(
         ConnectedComponentAnalyzer.RegionType predicted,
         ConnectedComponentAnalyzer.RegionType actual,
-        double density, double aspectRatio, int width, int height)
+        double density, double aspectRatio, int width, int height, double solidity = -1)
     {
         Params.TotalSamples++;
         bool correct = predicted == actual;
+
+        // Decaying learning rate: α = max(floor, initial * decay^samples)
+        double alpha = Math.Max(AlphaFloor, InitialLearningRate * Math.Pow(AlphaDecay, Params.TotalSamples));
 
         if (correct)
         {
@@ -131,30 +137,41 @@ public sealed class CcaParameterTuner
                 // CCA said text but it's icon → tighten text boundaries to exclude this sample
                 // If density is low → raise min density; if density is high → lower max density
                 if (density < Params.TextMinDensity + 0.3)
-                    Params.TextMinDensity = Nudge(Params.TextMinDensity, density + 0.05, LearningRate, lower: false);
+                    Params.TextMinDensity = Nudge(Params.TextMinDensity, density + 0.05, alpha, lower: false);
                 else
-                    Params.TextMaxDensity = Nudge(Params.TextMaxDensity, density - 0.05, LearningRate, lower: true);
+                    Params.TextMaxDensity = Nudge(Params.TextMaxDensity, density - 0.05, alpha, lower: true);
 
                 if (aspectRatio < 1.0)
-                    Params.TextMinAR = Nudge(Params.TextMinAR, aspectRatio + 0.1, LearningRate, lower: false);
+                    Params.TextMinAR = Nudge(Params.TextMinAR, aspectRatio + 0.1, alpha, lower: false);
                 else
-                    Params.TextMaxAR = Nudge(Params.TextMaxAR, aspectRatio - 0.1, LearningRate, lower: true);
+                    Params.TextMaxAR = Nudge(Params.TextMaxAR, aspectRatio - 0.1, alpha, lower: true);
             }
             else if (predicted == ConnectedComponentAnalyzer.RegionType.Icon
                      && actual == ConnectedComponentAnalyzer.RegionType.Text)
             {
                 // CCA said icon but it's text → widen text boundaries to include this sample
                 if (density < Params.TextMinDensity)
-                    Params.TextMinDensity = Nudge(Params.TextMinDensity, density - 0.02, LearningRate, lower: true);
+                    Params.TextMinDensity = Nudge(Params.TextMinDensity, density - 0.02, alpha, lower: true);
                 if (aspectRatio < Params.TextMinAR)
-                    Params.TextMinAR = Nudge(Params.TextMinAR, aspectRatio - 0.1, LearningRate, lower: true);
+                    Params.TextMinAR = Nudge(Params.TextMinAR, aspectRatio - 0.1, alpha, lower: true);
                 if (aspectRatio > Params.TextMaxAR)
-                    Params.TextMaxAR = Nudge(Params.TextMaxAR, aspectRatio + 0.1, LearningRate, lower: false);
+                    Params.TextMaxAR = Nudge(Params.TextMaxAR, aspectRatio + 0.1, alpha, lower: false);
                 if (width > Params.TextMaxSize || height > Params.TextMaxSize)
                     Params.TextMaxSize = Math.Max(Params.TextMaxSize, Math.Max(width, height) + 5);
             }
         }
 
+        // Solidity feedback (if provided)
+        if (solidity >= 0 && solidity <= 1)
+        {
+            if (correct && actual == ConnectedComponentAnalyzer.RegionType.Text)
+                Params.TextMinSolidity = Nudge(Params.TextMinSolidity, solidity, ReinforcementRate, lower: true);
+            else if (!correct && predicted == ConnectedComponentAnalyzer.RegionType.Text
+                     && actual == ConnectedComponentAnalyzer.RegionType.Icon)
+                Params.TextMinSolidity = Nudge(Params.TextMinSolidity, solidity + 0.05, alpha, lower: false);
+        }
+
+        Params.CurrentAlpha = alpha; // track for diagnostics
         Params.LastUpdated = DateTime.UtcNow;
         Params.Accuracy = Params.TotalSamples > 0
             ? (double)Params.CorrectCount / Params.TotalSamples
@@ -215,12 +232,14 @@ public sealed class CcaParams
     public int TextMaxSize { get; set; } = 80;
     public int IconMinSize { get; set; } = 8;
     public int NoiseMaxPixels { get; set; } = 4;
+    public double TextMinSolidity { get; set; } = 0.30;  // convex hull fill ratio (Claude suggestion)
 
     // ── Tuning metadata ──
     public int TotalSamples { get; set; }
     public int CorrectCount { get; set; }
     public int MisclassifiedCount { get; set; }
     public double Accuracy { get; set; }
+    public double CurrentAlpha { get; set; }              // current decayed learning rate
     public DateTime LastUpdated { get; set; }
 
     [JsonIgnore]
