@@ -26,6 +26,22 @@ public sealed class ConnectedComponentAnalyzer
     /// <summary>Region type classification.</summary>
     public enum RegionType { Text, Icon, Noise, Separator, Container }
 
+    /// <summary>A detected table grid with row/column boundaries and cells.</summary>
+    public sealed class TableGrid
+    {
+        public List<int> RowBoundaries { get; init; } = new(); // Y coordinates of horizontal separators
+        public List<int> ColBoundaries { get; init; } = new(); // X coordinates of vertical separators
+        public int Rows => Math.Max(0, RowBoundaries.Count - 1);
+        public int Cols => Math.Max(0, ColBoundaries.Count - 1);
+        public Rectangle GetCellRect(int row, int col)
+        {
+            if (row < 0 || row >= Rows || col < 0 || col >= Cols) return Rectangle.Empty;
+            int x = ColBoundaries[col], y = RowBoundaries[row];
+            int w = ColBoundaries[col + 1] - x, h = RowBoundaries[row + 1] - y;
+            return new Rectangle(x, y, w, h);
+        }
+    }
+
     /// <summary>A detected region with bounding rect and classification.</summary>
     public sealed class Region
     {
@@ -48,6 +64,54 @@ public sealed class ConnectedComponentAnalyzer
 
     /// <summary>Optional tuned parameters (from CcaParameterTuner). Null = use defaults.</summary>
     public CcaParams? TunedParams { get; set; }
+
+    /// <summary>
+    /// Detect table grid from separator regions.
+    /// Horizontal separators → row boundaries, vertical separators → column boundaries.
+    /// Returns null if no table structure detected (need ≥2 rows or ≥2 cols).
+    /// </summary>
+    public TableGrid? DetectTable(List<Region> regions, int imgW, int imgH)
+    {
+        var hSeps = regions.Where(r => r.Type == RegionType.Separator && r.Bounds.Width > r.Bounds.Height)
+            .OrderBy(r => r.Bounds.Y).ToList();
+        var vSeps = regions.Where(r => r.Type == RegionType.Separator && r.Bounds.Height > r.Bounds.Width)
+            .OrderBy(r => r.Bounds.X).ToList();
+
+        if (hSeps.Count < 2 && vSeps.Count < 2) return null;
+
+        // Row boundaries: top edge (0), each horizontal separator Y center, bottom edge
+        var rows = new List<int> { 0 };
+        foreach (var s in hSeps)
+            rows.Add(s.Bounds.Y + s.Bounds.Height / 2);
+        rows.Add(imgH);
+
+        // Column boundaries: left edge (0), each vertical separator X center, right edge
+        var cols = new List<int> { 0 };
+        foreach (var s in vSeps)
+            cols.Add(s.Bounds.X + s.Bounds.Width / 2);
+        cols.Add(imgW);
+
+        // Deduplicate close boundaries (within 3px)
+        rows = DeduplicateBoundaries(rows, 3);
+        cols = DeduplicateBoundaries(cols, 3);
+
+        var grid = new TableGrid { RowBoundaries = { }, ColBoundaries = { } };
+        grid.RowBoundaries.AddRange(rows);
+        grid.ColBoundaries.AddRange(cols);
+
+        return (grid.Rows >= 1 && grid.Cols >= 1) ? grid : null;
+    }
+
+    private static List<int> DeduplicateBoundaries(List<int> sorted, int minGap)
+    {
+        var result = new List<int>();
+        foreach (var v in sorted)
+        {
+            if (result.Count == 0 || v - result[^1] > minGap)
+                result.Add(v);
+        }
+        return result;
+    }
 
     /// <summary>
     /// Analyze a screenshot region: find all connected components and classify them.
