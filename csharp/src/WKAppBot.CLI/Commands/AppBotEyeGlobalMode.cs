@@ -45,6 +45,7 @@ internal partial class Program
     static string _lastPromptSource = "none";
 
     static System.Windows.Forms.Form? _screenBlankForm;
+    static ScreenSaverOverlay? _screenSaver;
 
     static string _lastPromptSessionFile = "";
     static int _lastPromptLineIndex = -1;
@@ -592,6 +593,19 @@ internal partial class Program
             whisperEngine = null;
         }
 
+        // ── Screen Saver overlay (idle ≥10s → 90% black) ──
+        _screenSaver = new ScreenSaverOverlay();
+        try
+        {
+            _screenSaver.Start();
+            Console.WriteLine("[EYE] ScreenSaver overlay ready (idle ≥10s → 90% black, click-through)");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE] ScreenSaver init failed: {ex.Message}");
+            _screenSaver = null;
+        }
+
         // ── Context usage monitor (per-card) ──
         // Track last warned MB + JSONL path per CWD.
         // Path change = new session (ctime-new file) → reset MB counter so new session gets fresh warnings.
@@ -847,6 +861,9 @@ internal partial class Program
                 Console.WriteLine($"[EYE] frame #{frameCount} ({(slackClient != null ? "Socket+API" : "API-only")}{slackInfo})");
             }
 
+            // ── ScreenSaver idle check (every frame) ──
+            _screenSaver?.Tick();
+
             frameCount++;
             Thread.Sleep(Math.Max(100, intervalMs));
         }
@@ -864,6 +881,10 @@ internal partial class Program
             Thread.Sleep(1200);
             whisperRing?.Dispose();
         }
+
+        // ── Cleanup ScreenSaver ──
+        _screenSaver?.Dispose();
+        _screenSaver = null;
 
         // ── Cleanup FSW watchers ──
         DisposeFileWatchers();
