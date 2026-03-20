@@ -921,7 +921,7 @@ internal partial class Program
         bool noChange = plan.OldStr == plan.NewStr;
         if (noChange)
         {
-            Console.WriteLine($"[file edit] {plan.Count} match(es), no change — context only");
+            Console.WriteLine($"[file edit] {plan.Count} match(es), no change — skip backup & write (search only)");
         }
         else if (backup)
         {
