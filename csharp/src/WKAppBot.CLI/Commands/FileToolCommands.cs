@@ -917,7 +917,13 @@ internal partial class Program
         // Print file path first so AI always sees which file is being edited
         Console.WriteLine($"[file edit] {plan.Path}");
 
-        if (backup)
+        // No actual change → skip backup + write, show context only (search mode)
+        bool noChange = plan.OldStr == plan.NewStr;
+        if (noChange)
+        {
+            Console.WriteLine($"[file edit] {plan.Count} match(es), no change — context only");
+        }
+        else if (backup)
         {
             // Timestamp in backup name = original file's LastWriteTime (ms precision) — "파일타임표준"
             var origMtime = File.GetLastWriteTime(plan.Path);
@@ -936,14 +942,17 @@ internal partial class Program
             }
         }
 
-        // Sanity check: re-detect encoding of output bytes to catch accidental encoding change
-        var verifyEnc = DetectFileEncoding(plan.OutBytes, null);
-        if (verifyEnc.CodePage != plan.Enc.CodePage)
-            Console.Error.WriteLine($"[file edit] WARNING: output encoding changed! {plan.Enc.WebName} → {verifyEnc.WebName} — possible corruption");
+        if (!noChange)
+        {
+            // Sanity check: re-detect encoding of output bytes to catch accidental encoding change
+            var verifyEnc = DetectFileEncoding(plan.OutBytes, null);
+            if (verifyEnc.CodePage != plan.Enc.CodePage)
+                Console.Error.WriteLine($"[file edit] WARNING: output encoding changed! {plan.Enc.WebName} → {verifyEnc.WebName} — possible corruption");
 
-        // WriteAllBytes uses FileMode.Create (truncate-in-place) — no delete event fired
-        File.WriteAllBytes(plan.Path, plan.OutBytes);
-        Console.WriteLine($"[file edit] {plan.Count} replacement(s) — encoding={plan.Enc.WebName}");
+            // WriteAllBytes uses FileMode.Create (truncate-in-place) — no delete event fired
+            File.WriteAllBytes(plan.Path, plan.OutBytes);
+            Console.WriteLine($"[file edit] {plan.Count} replacement(s) — encoding={plan.Enc.WebName}");
+        }
 
         // ── Context output: indent-based block expansion + N extra lines ──
         // context = N means: expand to indent boundary, then show N more lines beyond.
