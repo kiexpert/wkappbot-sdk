@@ -1,4 +1,4 @@
-# WKAppBot v4.6.0 - Windows + Android App Automation Test Framework
+# WKAppBot v4.7.0 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -52,6 +52,7 @@
 - **NEVER split/refactor customer code!** This policy applies to our code (WKAppBot) only
 
 ### 금지 사항
+- Eye는 간접 런칭만! (일반 명령 실행 시 Core가 자동 spawn — eye tick에서 직접 spawn 금지)
 - 클롣에게 전달을 차단하는 옵션 절대 만들지 말 것
 - 앱봇의 눈을 안 띄우는 옵션 만들지 말 것
 - 유저에게 여기(프롬프트)에서만 질문하지 말 것 (반드시 슬랙 동시 발송)

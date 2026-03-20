@@ -453,14 +453,15 @@ internal partial class Program
                 catch { }
             }
 
-            // Auto-launch AppBotEye for ALL commands except help and eye-global commands
-            // 앱봇이 뭔가 하면 눈은 항상 떠있어야! (도움말, eye 글로벌루프만 제외 — 무한 cascade 방지)
-            // GlobalMode Eye 중복감지: Named mutex "Global\WKAppBotEyeGlobal" 사용 (LaunchAppBotEyeIfNeededCore)
+            // Auto-launch AppBotEye for ALL commands except help and eye commands.
+            // 앱봇이 뭔가 하면 눈은 항상 떠있어야! (도움말, eye 전체 제외 — 무한 cascade 방지)
+            // eye tick은 내부에서 자체적으로 LaunchAppBotEyeIfNeeded 호출함 → Main에서 중복 호출 금지.
+            // Eye는 간접 런칭만! (wkappbot inspect 등 일반 명령 실행 시 자동 spawn)
             // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
-            var isEyeGlobal = command == "eye" && (restArgs.Length == 0 || restArgs[0] != "tick");
+            var isEyeCommand = command == "eye"; // eye, eye tick, eye tick --timeout 등 전부 제외
             // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
             // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" || isEyeGlobal || _fastExitAfterCommand;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" || isEyeCommand || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });

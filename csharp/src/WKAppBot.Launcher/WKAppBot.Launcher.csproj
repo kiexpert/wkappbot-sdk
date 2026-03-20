@@ -17,13 +17,11 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
-  <!-- Post-publish: copy launcher EXE to SDK/bin (no hot-swap needed, rarely changes) -->
+  <!-- Post-publish: stage launcher EXE as wkappbot.new.exe for hot-swap (Eye daemon may hold wkappbot.exe) -->
+  <!-- build.cmd [4/4] watchdog promotes .new.exe → .exe after hot-swap or force-kill -->
   <Target Name="DeployLauncher" AfterTargets="CopyNativeBinary" Condition="'$(SkipDeployLauncher)' != 'true'">
-    <!-- Try native copy first (cmd), fall back to xcopy, then robocopy — bash compat -->
-    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\wkappbot.exe&quot;" IgnoreExitCode="true" />
-    <Exec Command="xcopy /Y &quot;$(PublishDir)wkappbot.exe&quot; &quot;W:\SDK\bin\&quot;" IgnoreExitCode="true" Condition="!Exists('W:\SDK\bin\wkappbot.exe')" />
-    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="W:\SDK\bin\wkappbot.exe" OverwriteReadOnlyFiles="true" />
-    <Message Text="[Launcher] wkappbot.exe deployed to W:\SDK\bin\" Importance="high" />
+    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="W:\SDK\bin\wkappbot.new.exe" OverwriteReadOnlyFiles="true" />
+    <Message Text="[Launcher] wkappbot.new.exe staged for hot-swap" Importance="high" />
   </Target>
 
 </Project>

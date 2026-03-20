@@ -1,16 +1,16 @@
-// StepProfiler.cs — zero-friction step profiler with full callstack tree
+// StepProfiler.cs — zero-friction step profiler with Init/Mark/Done lifecycle
 //
 // Usage (no instance needed):
-//   WkStep.Call("loop-start");
-//   ... work ...
-//   WkStep.Call("loop-done");
-//   WkStep.Done();
+//   PulseStep.Init("eye-launch");          // start session (always prints, resets timer)
+//   PulseStep.Mark("mutex-checked");       // checkpoint (prints only when delta ≥ threshold)
+//   PulseStep.Done("confirmed");           // end session (prints total, removes session)
 //
-// Output (stderr, only when step > 100ms):
-//   [PROF] WindowsCommand → PrintFocusAndPopup:2022 "enum-popup" +1234ms (total=1300ms @11:22:33.444)
-//          └ Program.WindowsCommand:2022
-//          └ Program.PrintFocusAndPopup:2028
-//          └ NativeMethods.EnumWindows
+// Output (stderr):
+//   [PULSE:eye-launch] ── init @11:22:33.444 ──
+//   [PULSE:eye-launch] LaunchEye:142 "mutex-checked" +234ms (total=234ms @11:22:33.444)
+//     callchain: LaunchEye:142 → Main:55
+//   [PULSE:eye-launch] LaunchEye:158 "confirmed" +500ms (total=734ms @11:22:33.444)
+//   [PULSE:eye-launch] ── total 734ms ──
 
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -19,16 +19,31 @@ using System.Text;
 namespace WKAppBot.CLI;
 
 // ── Static zero-instance entry point ────────────────────────────────────────
-internal static class WkStep
+// One implicit session per caller method. Lifecycle: Init → Mark* → Done.
+internal static class PulseStep
 {
     // One implicit session per caller method name
     private static readonly Dictionary<string, StepProfiler> _sessions = new();
 
     /// <summary>
-    /// Record a step in the implicit session for the calling method.
-    /// Prints callstack + elapsed to stderr only when delta ≥ threshold.
+    /// Start a new profiling session. Always prints the init line (no threshold).
+    /// Resets the session if one already exists for this caller.
     /// </summary>
-    public static void Call(
+    public static void Init(
+        string label,
+        [CallerMemberName] string caller = "",
+        [CallerLineNumber] int line = 0)
+    {
+        var prof = new StepProfiler(caller);
+        _sessions[caller] = prof;
+        prof.Init(label, callerHint: $"{caller}:{line}");
+    }
+
+    /// <summary>
+    /// Record a checkpoint in the current session.
+    /// Prints callstack + elapsed to stderr only when delta ≥ threshold (100ms).
+    /// </summary>
+    public static void Mark(
         string label,
         [CallerMemberName] string caller = "",
         [CallerLineNumber] int line = 0)
@@ -38,7 +53,9 @@ internal static class WkStep
         prof.Step(label, skipFrames: 1, callerHint: $"{caller}:{line}");
     }
 
-    /// <summary>Flush + remove the implicit session for the caller method.</summary>
+    /// <summary>
+    /// End the session: print final step + total elapsed, then remove session.
+    /// </summary>
     public static void Done(
         string label = "done",
         [CallerMemberName] string caller = "",
@@ -67,6 +84,13 @@ internal sealed class StepProfiler
         _thresholdMs = thresholdMs;
     }
 
+    /// <summary>Print init line unconditionally (no threshold). Resets last-step timer.</summary>
+    public void Init(string label, string callerHint = "")
+    {
+        _lastMs = _sw.ElapsedMilliseconds;
+        Console.Error.WriteLine($"[PULSE:{_name}] ── init \"{label}\" @{_startedAt} ──");
+    }
+
     public void Step(
         string label,
         [CallerMemberName] string caller = "",
@@ -82,7 +106,7 @@ internal sealed class StepProfiler
 
         var chain = BuildCallChain(skipFrames + 1);
         Console.Error.WriteLine(
-            $"[PROF:{_name}] {callerHint} \"{label}\" +{delta}ms (total={nowMs}ms @{_startedAt})");
+            $"[PULSE:{_name}] {callerHint} \"{label}\" +{delta}ms (total={nowMs}ms @{_startedAt})");
         Console.Error.WriteLine($"  callchain: {chain}");
     }
 
@@ -97,11 +121,11 @@ internal sealed class StepProfiler
         Step(label, skipFrames + 1, callerHint);
         var totalMs = _sw.ElapsedMilliseconds;
         if (totalMs >= _thresholdMs)
-            Console.Error.WriteLine($"[PROF:{_name}] ── total {totalMs}ms ──");
+            Console.Error.WriteLine($"[PULSE:{_name}] ── total {totalMs}ms ──");
     }
 
     /// <summary>
-    /// Walk StackTrace, skip StepProfiler/WkStep frames, return call chain as
+    /// Walk StackTrace, skip StepProfiler/PulseStep frames, return call chain as
     ///   main → WindowsCommand:2121 → PrintFocusAndPopup:2028
     /// </summary>
     private static string BuildCallChain(int extraSkip)
@@ -117,7 +141,7 @@ internal sealed class StepProfiler
             var declType = method.DeclaringType?.Name ?? "";
 
             // Skip our own profiler frames
-            if (skipping && (declType == nameof(StepProfiler) || declType == nameof(WkStep)))
+            if (skipping && (declType == nameof(StepProfiler) || declType == nameof(PulseStep)))
                 continue;
             skipping = false;
 

@@ -122,7 +122,7 @@ del /q "%BIN_DIR%\wkappbot.deps.json" >nul 2>nul
 del /q "%BIN_DIR%\wkappbot.runtimeconfig.json" >nul 2>nul
 
 echo [4/4] Eye tick trigger (hot-swap detect + pipe drain)
-call "%BIN_DIR%\wkappbot-core.exe" eye tick >nul 2>nul
+call "%BIN_DIR%\wkappbot-core.exe" eye tick --timeout 15 >nul 2>nul
 
 rem Hot-swap watchdog:
 rem If *.new.exe is still present after 3s, treat as failure, kill all, and promote .new -> .exe.
@@ -177,7 +177,7 @@ if exist "%BIN_DIR%\wkappbot-core.new.exe" (
     ) else (
       echo [BUILD] core .new disappeared after kill
     )
-    if exist "%BIN_DIR%\wkappbot-core.exe" call "%BIN_DIR%\wkappbot-core.exe" eye tick >nul 2>nul
+    if exist "%BIN_DIR%\wkappbot-core.exe" call "%BIN_DIR%\wkappbot-core.exe" eye tick --timeout 15 >nul 2>nul
   )
 )
 

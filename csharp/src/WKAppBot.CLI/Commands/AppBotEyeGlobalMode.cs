@@ -902,9 +902,20 @@ internal partial class Program
                 {
                     FileName = exePath,  // always original path (rename-swap already done)
                     Arguments = argsStr,
-                    UseShellExecute = false, // inherit admin token from parent
+                    UseShellExecute        = false, // inherit admin token from parent
+                    CreateNoWindow         = true,  // Eye is a daemon — no console window
+                    RedirectStandardInput  = true,  // detach from parent's stdin/stdout/stderr
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
                 };
                 var newProc = Process.Start(psi);
+                if (newProc != null)
+                {
+                    // Close pipe ends immediately — new Eye writes to its own AllocConsole (hidden).
+                    try { newProc.StandardInput.Close(); } catch { }
+                    try { newProc.StandardOutput.Close(); } catch { }
+                    try { newProc.StandardError.Close(); } catch { }
+                }
                 if (newProc != null)
                 {
                     // Wait for new Eye's window to appear (pipe server is up by then) before closing old Eye.
