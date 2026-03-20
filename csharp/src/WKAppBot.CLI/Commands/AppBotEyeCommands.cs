@@ -65,51 +65,41 @@ internal partial class Program
     private const string EyeWatchdogTaskName = "WKAppBot Eye Watchdog";
 
     /// <summary>
-    /// Register (or refresh) the Eye watchdog scheduled task.
-    /// Runs Launcher directly (no powershell wrapper) to avoid focus-stealing.
-    /// Called on every Eye startup — -Force handles duplicates automatically.
+    /// Schedule eye tick 5 minutes from now via schtasks.exe (no PowerShell = no focus steal).
+    /// Eye loop calls this every minute — keeps pushing 5 min forward while alive.
+    /// If Eye dies, last scheduled time fires 5 min later → tick checks + respawns Eye.
     /// </summary>
     internal static void EnsureEyeWatchdogTask()
     {
-        // Derive Launcher path from Core path: wkappbot-core.exe → wkappbot.exe
         var corePath = Environment.ProcessPath ?? "";
         var dir = Path.GetDirectoryName(corePath) ?? "";
         var launcherPath = Path.Combine(dir, "wkappbot.exe");
-        if (!File.Exists(launcherPath)) launcherPath = corePath; // fallback
+        if (!File.Exists(launcherPath)) launcherPath = corePath;
 
-        // Run Launcher directly — no powershell wrapper = no focus steal.
-        // Launcher handles DETACHED_PROCESS internally, no console window.
-        var ps = $"""
-$action   = New-ScheduledTaskAction -Execute '{launcherPath}' -Argument 'eye tick --timeout 15'
-$trigger  = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 10)
-$settings = New-ScheduledTaskSettingsSet `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 2) `
-    -MultipleInstances IgnoreNew `
-    -Hidden `
-    -StartWhenAvailable $true
-Register-ScheduledTask -TaskName '{EyeWatchdogTaskName}' -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
-""";
+        var fireAt = DateTime.Now.AddMinutes(5).ToString("HH:mm");
+        var fireDate = DateTime.Now.AddMinutes(5).ToString("yyyy/MM/dd");
+        // schtasks.exe: native, no console window with CreateNoWindow, no focus steal
+        var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"\\\"{launcherPath}\\\" eye tick --timeout 15\" /SC ONCE /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
         try
         {
             var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName               = "powershell.exe",
-                Arguments              = $"-NoProfile -NonInteractive -Command \"{ps.Replace("\"", "\\\"")}\"",
-                UseShellExecute        = false,
-                CreateNoWindow         = true,
-                RedirectStandardOutput = false,
-                RedirectStandardError  = false,
+                FileName        = "schtasks.exe",
+                Arguments       = args,
+                UseShellExecute = false,
+                CreateNoWindow  = true,
             };
             var proc = System.Diagnostics.Process.Start(psi);
-            proc?.WaitForExit(5000);
-            var exitCode = proc?.ExitCode ?? -1;
-            Console.WriteLine(exitCode == 0
-                ? $"[EYE] Watchdog task registered: '{EyeWatchdogTaskName}' (10-min, hidden, via Launcher)"
-                : $"[EYE] Watchdog task register exit={exitCode} (non-fatal)");
+            proc?.WaitForExit(3000);
+            var ok = proc?.ExitCode == 0;
+            if (ok)
+                Console.WriteLine($"[EYE] Watchdog: eye tick scheduled at {fireAt} (5 min from now)");
+            else
+                Console.WriteLine($"[EYE] Watchdog schtasks exit={proc?.ExitCode} (non-fatal)");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] Watchdog task error: {ex.Message} (non-fatal)");
+            Console.WriteLine($"[EYE] Watchdog error: {ex.Message} (non-fatal)");
         }
     }
 
