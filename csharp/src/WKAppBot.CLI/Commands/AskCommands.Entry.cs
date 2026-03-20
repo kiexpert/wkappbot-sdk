@@ -173,14 +173,14 @@ Examples:
         // AsyncLocal inheritance: each child task sees this value from the moment it starts.
         // EnsureSlackThread inside each AI is idempotent — returns immediately if already set.
         {
-            var qTrunc = question.Length > 120 ? question[..120] + "..." : question;
             var config = LoadSlackConfig();
             var botToken = config?["bot_token"]?.GetValue<string>();
             var channel  = config?["channel"]?.GetValue<string>();
             if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
             {
-                var (ok, ts) = SlackSendViaApi(botToken, channel,
-                    $"*[🔱 TRIAD]* {qTrunc}", username: BotUsername).GetAwaiter().GetResult();
+                // Use SlackSendWithThread: auto-splits long messages (header → channel, overflow → thread)
+                var (ok, ts) = PostWithOverflow(botToken, channel,
+                    $"*[🔱 TRIAD]* {question}", username: BotUsername);
                 if (ok && ts != null)
                 {
                     _slackSessionThreadTs.Value = ts;
