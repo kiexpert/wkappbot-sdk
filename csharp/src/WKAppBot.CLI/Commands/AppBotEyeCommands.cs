@@ -55,6 +55,10 @@ internal partial class Program
         try { Console.Error.WriteLine($"[EYE] {message}"); } catch { }
     }
 
+    /// <summary>Safe console color — no-op when no console (DETACHED_PROCESS).</summary>
+    internal static void EyeColor(ConsoleColor c) { try { Console.ForegroundColor = c; } catch { } }
+    internal static void EyeResetColor() { try { Console.ResetColor(); } catch { } }
+
     /// <summary>
     /// Install a Ctrl handler that blocks console-close events.
     /// Logs the event type to console + eye.log so we can diagnose unexpected termination attempts.
@@ -300,13 +304,40 @@ internal partial class Program
             }
         }
 
-        // Eye is a background daemon — always hide the console window.
-        // AllocConsole() if none exists (DETACHED_PROCESS context: console APIs would throw otherwise).
-        // TryHideConsoleWindow() hides it unconditionally — also hides the terminal if user ran `wkappbot eye` manually.
-        // InstallEyeCtrlHandler() blocks CTRL_CLOSE and other termination events, logging them.
-        if (GetConsoleWindow() == IntPtr.Zero) AllocConsole();
-        TryHideConsoleWindow();
-        InstallEyeCtrlHandler();
+        // Eye is a background daemon — console setup depends on context:
+        // DETACHED_PROCESS (spawned by Core): no console → redirect to log file.
+        //   AllocConsole is NOT called — it creates a visible window flash.
+        //   Console.Out/Error → log file so output is preserved (not lost to void).
+        //   ForegroundColor/ResetColor → safe no-op (no console handle).
+        // Manual run (user typed `wkappbot eye`): console exists → hide + install ctrl handler.
+        if (GetConsoleWindow() == IntPtr.Zero)
+        {
+            // DETACHED context: no console, no AllocConsole (flash 방지).
+            // Eye는 Core가 직접 spawn (Launcher 파이프 안 거침) → stdout/stderr 로그 파일로 보존.
+            var logDir = Path.Combine(
+                Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".",
+                "wkappbot.hq", "logs");
+            try { Directory.CreateDirectory(logDir); } catch { }
+            try
+            {
+                var logPath = Path.Combine(logDir, $"eye.pid={Environment.ProcessId}.log");
+                var logWriter = new StreamWriter(logPath, append: true) { AutoFlush = true };
+                Console.SetOut(logWriter);
+                Console.SetError(logWriter);
+            }
+            catch
+            {
+                // log 파일 못 열면 → Null (출력 유실이지만 Eye 동작엔 지장 없음)
+                Console.SetOut(TextWriter.Null);
+                Console.SetError(TextWriter.Null);
+            }
+        }
+        else
+        {
+            // Manual context: hide the terminal window + block CTRL_CLOSE
+            TryHideConsoleWindow();
+            InstallEyeCtrlHandler();
+        }
 
         // Acquire Eye-alive mutex for this process's lifetime — signals to callers that Eye is running.
         // Single-instance guard: if another Eye holds it, exit immediately.
@@ -328,9 +359,9 @@ internal partial class Program
         bool elevated = args.Any(a => a == "--elevated") || ElevationHelper.IsElevated();
         if (elevated)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
+            EyeColor(ConsoleColor.Yellow);
             Console.WriteLine("[EYE] Running as ADMIN — elevated proxy pipe will be available");
-            Console.ResetColor();
+            EyeResetColor();
         }
 
         // Hot-swap blue-green: --replace-pid <pid> → close old Eye after first render
