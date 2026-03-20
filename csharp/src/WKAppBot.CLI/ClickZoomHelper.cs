@@ -23,6 +23,7 @@ namespace WKAppBot.CLI;
 internal sealed class ClickZoomHelper : IDisposable
 {
     private InputZoomHost? _host;
+    private XRayHelper? _xray;
     private readonly IntPtr _formHandle;
     private readonly IntPtr _controlHandle;
     private readonly Rectangle? _captureRect; // fixed sub-rect for "too large" elements
@@ -35,9 +36,10 @@ internal sealed class ClickZoomHelper : IDisposable
     private const int FixedCapH = 60;
 
     private ClickZoomHelper(InputZoomHost host, IntPtr formHandle, IntPtr controlHandle,
-        Rectangle? captureRect = null)
+        Rectangle? captureRect = null, XRayHelper? xray = null)
     {
         _host = host;
+        _xray = xray;
         _formHandle = formHandle;
         _controlHandle = controlHandle;
         _captureRect = captureRect;
@@ -151,7 +153,11 @@ internal sealed class ClickZoomHelper : IDisposable
             }
             host.UpdateStatus($"Ready: {actionLabel}");
 
-            return new ClickZoomHelper(host, hFormOrParent, hControl, captureRect);
+            // X-Ray: ghost overlapping windows so user can see the target
+            XRayHelper? xray = null;
+            try { xray = XRayHelper.Begin(hControl); } catch { }
+
+            return new ClickZoomHelper(host, hFormOrParent, hControl, captureRect, xray);
         }
         catch (Exception ex)
         {
@@ -442,6 +448,8 @@ internal sealed class ClickZoomHelper : IDisposable
 
     public void Dispose()
     {
+        _xray?.Dispose();
+        _xray = null;
         _host?.Dispose();
         _host = null;
     }
