@@ -158,9 +158,9 @@ internal partial class Program
                 {
                     proc.Kill();
                     proc.WaitForExit(3000);
-                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    EyeColor(ConsoleColor.Yellow);
                     Console.WriteLine($"[EYE] Killed duplicate Eye (PID={proc.Id})");
-                    Console.ResetColor();
+                    EyeResetColor();
                 }
                 catch { /* already exited or access denied */ }
                 finally { proc.Dispose(); }
@@ -179,9 +179,9 @@ internal partial class Program
                     if (!old.HasExited)
                     {
                         old.Kill();
-                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        EyeColor(ConsoleColor.Yellow);
                         Console.WriteLine($"[EYE:HOT-SWAP] Force-killed zombie old Eye (PID={replacePid}) after 1min grace");
-                        Console.ResetColor();
+                        EyeResetColor();
                     }
                 }
                 catch { /* already exited — happy path */ }
@@ -238,9 +238,9 @@ internal partial class Program
         IntPtr claudeHwnd = FindClaudeDesktopWindow();
         if (claudeHwnd != IntPtr.Zero)
         {
-            Console.ForegroundColor = ConsoleColor.Cyan;
+            EyeColor(ConsoleColor.Cyan);
             Console.WriteLine($"[EYE] Found Claude Desktop (hwnd=0x{claudeHwnd:X8})");
-            Console.ResetColor();
+            EyeResetColor();
         }
         // Getter: re-detects if hwnd gone (Claude Desktop restarted or Electron recreated window).
         IntPtr GetCurrentClaudeHwnd()
@@ -299,9 +299,9 @@ internal partial class Program
                 {
                     slackClient = new SlackSocketClient();
                     slackClient.ConnectAsync(appToken, slackBotToken).GetAwaiter().GetResult();
-                    Console.ForegroundColor = ConsoleColor.Green;
+                    EyeColor(ConsoleColor.Green);
                     Console.WriteLine("[EYE] Slack Socket Mode connected (GlobalMode)");
-                    Console.ResetColor();
+                    EyeResetColor();
 
                     // Startup: collect stale status messages (reply_count==0) — do NOT delete yet.
                     // Deletion happens after first new post succeeds (PostOrUpdateAiStatusAsync),
@@ -360,9 +360,9 @@ internal partial class Program
                     // Block Kit button handler (plan approve/reject, permission buttons)
                     slackClient.OnBlockAction += (action) =>
                     {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        EyeColor(ConsoleColor.Cyan);
                         Console.WriteLine($"[EYE][SLACK] Button: {action.ActionId}={action.Value} by {action.UserName}");
-                        Console.ResetColor();
+                        EyeResetColor();
 
                         var thread = action.MessageTs ?? GetAnyPlanApprovalTs();
 
@@ -443,9 +443,9 @@ internal partial class Program
             var overdueItems = ScheduleManager.GetDueItems();
             if (overdueItems.Count > 0)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
+                EyeColor(ConsoleColor.Yellow);
                 Console.WriteLine($"[SCHEDULE] {overdueItems.Count} overdue schedule(s) from before restart");
-                Console.ResetColor();
+                EyeResetColor();
                 Thread.Sleep(5000);
                 foreach (var item in overdueItems)
                 {
@@ -521,9 +521,9 @@ internal partial class Program
                     {
                         try
                         {
-                            Console.ForegroundColor = ConsoleColor.Magenta;
+                            EyeColor(ConsoleColor.Magenta);
                             Console.WriteLine($"[WHISPER] Auto-study triggered: {count} files in _unknown/");
-                            Console.ResetColor();
+                            EyeResetColor();
                             WhisperStudyCommand(["--batch", count.ToString()]);
                         }
                         catch (Exception ex)
@@ -569,25 +569,25 @@ internal partial class Program
                     catch { /* best effort */ }
                 };
 
-                Console.ForegroundColor = ConsoleColor.Magenta;
+                EyeColor(ConsoleColor.Magenta);
                 Console.WriteLine($"[EYE] Whisper Ring started at ({ringX},{ringY})");
                 Console.WriteLine($"[EYE] Whisper ExpDB: logging=ON stt={( sttOk ? "ON" : "OFF" )}");
-                Console.ResetColor();
+                EyeResetColor();
             }
             else
             {
-                Console.ForegroundColor = ConsoleColor.DarkGray;
+                EyeColor(ConsoleColor.DarkGray);
                 Console.WriteLine("[EYE] Whisper Ring skipped (no microphone)");
-                Console.ResetColor();
+                EyeResetColor();
                 whisperEngine.Dispose();
                 whisperEngine = null;
             }
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.DarkGray;
+            EyeColor(ConsoleColor.DarkGray);
             Console.WriteLine($"[EYE] Whisper Ring init failed: {ex.Message}");
-            Console.ResetColor();
+            EyeResetColor();
             whisperEngine?.Dispose();
             whisperEngine = null;
         }
@@ -628,9 +628,9 @@ internal partial class Program
 
                     if (firstEyeHwnd != IntPtr.Zero && firstEyeHwnd != myEyeHwnd)
                     {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        EyeColor(ConsoleColor.Yellow);
                         Console.WriteLine($"[EYE] Not topmost Eye (top=0x{firstEyeHwnd:X} me=0x{myEyeHwnd:X}) — self-closing");
-                        Console.ResetColor();
+                        EyeResetColor();
                         cts.Cancel();
                         break;
                     }
@@ -657,9 +657,9 @@ internal partial class Program
             // ── Hot-swap blue-green: first render OK → old Eye exits on its own (return 0) ──
             if (replacePid > 0 && frameCount == 0)
             {
-                Console.ForegroundColor = ConsoleColor.Magenta;
+                EyeColor(ConsoleColor.Magenta);
                 Console.WriteLine($"[EYE:HOT-SWAP] First render OK — old Eye (PID={replacePid}) exiting on its own");
-                Console.ResetColor();
+                EyeResetColor();
                 replacePid = 0;
                 // Old Eye does return 0 right after Process.Start — 1s should be enough
                 Thread.Sleep(1000);
@@ -697,9 +697,9 @@ internal partial class Program
                     var retryItems = RouteRetryQueue.GetDueItems();
                     foreach (var item in retryItems)
                     {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        EyeColor(ConsoleColor.Cyan);
                         Console.WriteLine($"[RETRY] Re-dispatching route: {item[..Math.Min(item.Length, 80)]}...");
-                        Console.ResetColor();
+                        EyeResetColor();
                         EyeCmdPipeServer.DispatchBg(["slack", "route", item]);
                     }
                 }
@@ -726,9 +726,9 @@ internal partial class Program
             {
                 if (slackClient.IsConnected && slackClient.MessageCount <= 1)
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    EyeColor(ConsoleColor.Yellow);
                     Console.WriteLine("[EYE][SLACK] No events received in 5+ minutes — attempting reconnect...");
-                    Console.ResetColor();
+                    EyeResetColor();
                     try
                     {
                         slackClient.ReconnectAsync().GetAwaiter().GetResult();
@@ -757,9 +757,9 @@ internal partial class Program
                     if (File.Exists(newExePath))
                     {
                         // .new.exe staged — rename-swap (running exe CAN be renamed on Windows!)
-                        Console.ForegroundColor = ConsoleColor.Magenta;
+                        EyeColor(ConsoleColor.Magenta);
                         Console.WriteLine("[EYE:HOT-SWAP] .new.exe detected — rename-swap");
-                        Console.ResetColor();
+                        EyeResetColor();
                         try
                         {
                             // No pre-delete needed — timestamped name is always unique
@@ -780,9 +780,9 @@ internal partial class Program
                     else if (File.GetLastWriteTimeUtc(exePath) != exeStartTime)
                     {
                         // Direct overwrite succeeded (exe wasn't locked somehow)
-                        Console.ForegroundColor = ConsoleColor.Magenta;
+                        EyeColor(ConsoleColor.Magenta);
                         Console.WriteLine("[EYE:HOT-SWAP] EXE timestamp changed — binary updated!");
-                        Console.ResetColor();
+                        EyeResetColor();
                         hotReloadTriggered = true;
                         break;
                     }
@@ -798,9 +798,9 @@ internal partial class Program
                     var connAge = (DateTime.UtcNow - slackClient.LastConnectedUtc).TotalMinutes;
                     if (!slackClient.IsConnected || connAge >= 10)
                     {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        EyeColor(ConsoleColor.Yellow);
                         Console.WriteLine($"[EYE][SLACK] Health check: connected={slackClient.IsConnected} age={connAge:F0}m → force reconnect");
-                        Console.ResetColor();
+                        EyeResetColor();
                         Task.Run(async () =>
                         {
                             try
@@ -833,9 +833,9 @@ internal partial class Program
                 GC.WaitForPendingFinalizers();
                 GC.Collect(2, GCCollectionMode.Optimized);
                 var afterMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
-                Console.ForegroundColor = ConsoleColor.DarkGray;
+                EyeColor(ConsoleColor.DarkGray);
                 Console.WriteLine($"[EYE][GC] Gen2 collect: {beforeMB}MB → {afterMB}MB (freed {beforeMB - afterMB}MB)");
-                Console.ResetColor();
+                EyeResetColor();
             }
 
             // ── Stats logging ──
@@ -894,9 +894,9 @@ internal partial class Program
                 var argsStr = string.Join(" ", origArgs.Select(a =>
                     a.Contains(' ') ? $"\"{a}\"" : a));
 
-                Console.ForegroundColor = ConsoleColor.Magenta;
+                EyeColor(ConsoleColor.Magenta);
                 Console.WriteLine($"[EYE:HOT-SWAP] Launching new Eye: {Path.GetFileName(exePath)} {argsStr}");
-                Console.ResetColor();
+                EyeResetColor();
 
                 var psi = new ProcessStartInfo
                 {
@@ -1726,9 +1726,9 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
             File.WriteAllText(tmpPath, content, Encoding.UTF8);
             File.Move(tmpPath, claudeMdPath, overwrite: true);
 
-            Console.ForegroundColor = ConsoleColor.Green;
+            EyeColor(ConsoleColor.Green);
             Console.WriteLine($"[EYE] ✅ CLAUDE.md 인수인계 섹션 작성 완료 ({handoffSection.Length} chars)");
-            Console.ResetColor();
+            EyeResetColor();
         }
         catch (Exception ex)
         {
