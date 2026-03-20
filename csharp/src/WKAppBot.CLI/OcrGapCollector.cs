@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Security.Cryptography;
 
 namespace WKAppBot.CLI;
 
@@ -23,27 +24,122 @@ internal sealed class OcrGapCollector
     private const int Padding = 4;
     private const int LabelHeight = 18;
 
-    private record GapEntry(Rectangle Bounds, string? OcrPartial, Bitmap Screenshot);
+    private record GapEntry(Rectangle Bounds, string? OcrPartial, string? Aid, Bitmap Screenshot, string PixelHash);
 
     public bool HasGaps => _entries.Count > 0;
     public int Count => _entries.Count;
 
+    private static readonly string CacheDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "WKAppBot", "gap_cache");
+
     /// <summary>
-    /// Capture and store a gap screenshot.
+    /// Capture and store a gap screenshot. If pixel hash matches cache, returns cached description.
     /// </summary>
     /// <param name="screenRect">Element bounding rect in screen coordinates</param>
     /// <param name="ocrPartial">Partial OCR text with [?] markers, or null if fully blind</param>
-    public void Add(Rectangle screenRect, string? ocrPartial)
+    /// <param name="aid">UIA AutomationId (may be empty)</param>
+    /// <param name="cachedDescription">If cache hit, returns the stored description</param>
+    /// <returns>true if added to gap list (needs Vision), false if cache hit</returns>
+    public bool Add(Rectangle screenRect, string? ocrPartial, string? aid, out string? cachedDescription)
     {
+        cachedDescription = null;
         try
         {
-            if (screenRect.Width <= 0 || screenRect.Height <= 0) return;
+            if (screenRect.Width <= 0 || screenRect.Height <= 0) return false;
             var bmp = new Bitmap(screenRect.Width, screenRect.Height);
             using (var g = Graphics.FromImage(bmp))
                 g.CopyFromScreen(screenRect.X, screenRect.Y, 0, 0, screenRect.Size);
-            _entries.Add(new GapEntry(screenRect, ocrPartial, bmp));
+
+            var hash = ComputePixelHash(bmp);
+            var aidKey = SanitizeFileName(string.IsNullOrWhiteSpace(aid) ? "unk" : aid);
+
+            // Cache lookup: {aid}-{hash}=*.png
+            cachedDescription = LookupCache(aidKey, hash);
+            if (cachedDescription != null)
+                return false; // cache hit — no need for Vision
+
+            _entries.Add(new GapEntry(screenRect, ocrPartial, aid, bmp, hash));
+            return true;
         }
-        catch { /* best effort */ }
+        catch { return false; }
+    }
+
+    /// <summary>Backward compat: Add without cache check.</summary>
+    public void Add(Rectangle screenRect, string? ocrPartial)
+    {
+        Add(screenRect, ocrPartial, null, out _);
+    }
+
+    /// <summary>
+    /// Save Vision results to cache: {aid}-{hash}={description}.png
+    /// </summary>
+    public void SaveToCache(Dictionary<int, (string text, int score)> verified)
+    {
+        Directory.CreateDirectory(CacheDir);
+        for (int i = 0; i < _entries.Count; i++)
+        {
+            if (!verified.TryGetValue(i + 1, out var result)) continue;
+            if (result.score < 67) continue; // only cache reliable results
+
+            var e = _entries[i];
+            var aidKey = SanitizeFileName(string.IsNullOrWhiteSpace(e.Aid) ? "unk" : e.Aid);
+            var descKey = SanitizeFileName(result.text);
+            if (descKey.Length > 60) descKey = descKey[..60];
+            var fileName = $"{aidKey}'{e.PixelHash}={descKey}.png";
+            var filePath = Path.Combine(CacheDir, fileName);
+
+            try
+            {
+                if (!File.Exists(filePath))
+                    e.Screenshot.Save(filePath, ImageFormat.Png);
+            }
+            catch { /* best effort */ }
+        }
+    }
+
+    private static string? LookupCache(string aidKey, string hash)
+    {
+        if (!Directory.Exists(CacheDir)) return null;
+        // Pattern: {aid}-{hash}=*.png
+        var pattern = $"{aidKey}'{hash}=*.png";
+        var files = Directory.GetFiles(CacheDir, pattern);
+        if (files.Length == 0) return null;
+
+        // Extract description from filename: after '=' and before '.png'
+        var name = Path.GetFileNameWithoutExtension(files[0]);
+        var eqIdx = name.IndexOf('=');
+        return eqIdx >= 0 ? name[(eqIdx + 1)..] : null;
+    }
+
+    private static string ComputePixelHash(Bitmap bmp)
+    {
+        // Fast pixel hash: sample every 4th pixel, MD5 → 8-char hex
+        using var md5 = MD5.Create();
+        int step = 4;
+        int w = bmp.Width, h = bmp.Height;
+        var buf = new byte[((w / step) + 1) * ((h / step) + 1) * 3];
+        int bi = 0;
+        for (int y = 0; y < h; y += step)
+        for (int x = 0; x < w; x += step)
+        {
+            var c = bmp.GetPixel(x, y);
+            if (bi + 2 < buf.Length)
+            {
+                buf[bi++] = c.R; buf[bi++] = c.G; buf[bi++] = c.B;
+            }
+        }
+        var hash = md5.ComputeHash(buf, 0, bi);
+        return Convert.ToHexString(hash)[..8].ToLowerInvariant();
+    }
+
+    private static string SanitizeFileName(string s)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var sb = new System.Text.StringBuilder(s.Length);
+        foreach (var c in s)
+            sb.Append(invalid.Contains(c) || c == '=' ? '-' : c);
+        return sb.ToString().Trim('-');
     }
 
     /// <summary>
