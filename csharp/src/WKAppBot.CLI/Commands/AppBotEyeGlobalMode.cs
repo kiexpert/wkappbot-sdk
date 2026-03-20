@@ -215,7 +215,7 @@ internal partial class Program
         // ── Windows Task Scheduler: dual watchdog structure ──
         // 1. Permanent 10-min watchdog (Eye always comes back even if killed)
         // 2. Precise one-shot retry task synced to actual queue (if items exist)
-        EnsureEyeWatchdogTask(); // 10-min watchdog (powershell -WindowStyle Hidden, via Launcher)
+        EnsureEyeWatchdogTask(); // initial: eye tick in 5 min (pushed forward every ~1 min in loop)
         RouteRetryQueue.ScheduleRetryTask(); // precise one-shot retry task
 
         // ★ Default: pure focusless mode — Eye will not steal foreground focus
@@ -864,6 +864,11 @@ internal partial class Program
                     Console.WriteLine($"[EYE][SLACK] Health check error: {ex.Message}");
                 }
             }
+
+            // ── Watchdog refresh (~every 1 min = 600 frames @ 100ms) ──
+            // Push eye tick 5 min into the future. If Eye dies, fires 5 min after last push.
+            if (frameCount % 600 == 0 && frameCount > 0)
+                EnsureEyeWatchdogTask();
 
             // ── Periodic GC (~every 5 min = 3000 frames @ 100ms) ──
             if (frameCount % 3000 == 0 && frameCount > 0)
