@@ -66,7 +66,7 @@ internal partial class Program
 
     /// <summary>
     /// Register (or refresh) the Eye watchdog scheduled task.
-    /// Uses Launcher (wkappbot.exe) + powershell -WindowStyle Hidden to prevent console flash.
+    /// Runs Launcher directly (no powershell wrapper) to avoid focus-stealing.
     /// Called on every Eye startup — -Force handles duplicates automatically.
     /// </summary>
     internal static void EnsureEyeWatchdogTask()
@@ -77,10 +77,10 @@ internal partial class Program
         var launcherPath = Path.Combine(dir, "wkappbot.exe");
         if (!File.Exists(launcherPath)) launcherPath = corePath; // fallback
 
-        // Wrap in powershell -WindowStyle Hidden to prevent console flash.
-        // Task Scheduler's -Hidden only hides from UI, not the process window!
+        // Run Launcher directly — no powershell wrapper = no focus steal.
+        // Launcher handles DETACHED_PROCESS internally, no console window.
         var ps = $"""
-$action   = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-WindowStyle Hidden -NonInteractive -Command "& ''{launcherPath}'' eye tick --timeout 15"'
+$action   = New-ScheduledTaskAction -Execute '{launcherPath}' -Argument 'eye tick --timeout 15'
 $trigger  = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 10)
 $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 2) `
