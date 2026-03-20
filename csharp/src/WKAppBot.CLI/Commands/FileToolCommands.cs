@@ -1011,6 +1011,8 @@ internal partial class Program
             int? prev = null;
             foreach (var li in toShow)
             {
+                // Skip empty lines (waste of tokens, annoys AI agents)
+                if (resultLines[li].Trim().Length == 0) continue;
                 if (prev.HasValue && li > prev + 1) Console.WriteLine("   ...");
                 bool changed = changedSet.Contains(li);
                 Console.WriteLine($"{(changed ? "→" : " ")} {li + 1,5}│ {resultLines[li]}");
