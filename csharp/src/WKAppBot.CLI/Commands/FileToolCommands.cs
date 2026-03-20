@@ -776,7 +776,8 @@ internal partial class Program
         bool force = false;
         bool backup = true; // backup is ON by default; use --i-really-want-no-backup to skip
         int? encoding = null;
-        int context = 1; // lines of context around each change (--context N to expand)
+        int context = 1; // extra lines beyond indent boundary (--context N)
+        int tabSize = 4; // tab width for indent tracking (--tab-size N)
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -786,6 +787,7 @@ internal partial class Program
             if (args[i] == "--i-really-want-no-backup")            { backup = false; continue; }
             if (args[i] == "--encoding" && i + 1 < args.Length) { encoding = int.Parse(args[++i]); continue; }
             if (args[i] == "--context"  && i + 1 < args.Length) { int.TryParse(args[++i], out context); continue; }
+            if (args[i] == "--tab-size" && i + 1 < args.Length) { int.TryParse(args[++i], out tabSize); if (tabSize < 1) tabSize = 4; continue; }
             positional.Add(args[i]);
         }
 
@@ -833,7 +835,7 @@ internal partial class Program
         int totalEdited = 0;
         foreach (var plan in pending)
         {
-            if (FileEditWrite(plan, backup, context, multi) == 0) totalEdited++;
+            if (FileEditWrite(plan, backup, context, multi, tabSize) == 0) totalEdited++;
         }
 
         if (multi) Console.WriteLine($"[file edit] {totalEdited}/{paths.Count} file(s) edited");
@@ -907,7 +909,7 @@ internal partial class Program
     }
 
     /// <summary>Write a validated plan to disk (backup + write + print context). Returns 0 on success.</summary>
-    static int FileEditWrite(FileEditPlan plan, bool backup, int context, bool multi)
+    static int FileEditWrite(FileEditPlan plan, bool backup, int context, bool multi, int tabSize = 4)
     {
         if (plan.HasUnmappable)
             ErrOut($"[file edit] WARNING(--i-really-want-lossy-encoding): character(s) replaced with '?' in {plan.Enc.WebName} — data loss accepted");
@@ -966,14 +968,14 @@ internal partial class Program
             foreach (var (start, end) in changedRanges)
             {
                 // Find indent level of the match line
-                int matchIndent = GetLineIndent(resultLines, start);
+                int matchIndent = GetLineIndent(resultLines, tabSize, start);
 
                 // Expand upward: while indent >= matchIndent
                 int top = start;
                 while (top > 0)
                 {
                     var line = resultLines[top - 1];
-                    if (line.Trim().Length > 0 && GetLineIndent(resultLines, top - 1) < matchIndent)
+                    if (line.Trim().Length > 0 && GetLineIndent(resultLines, tabSize, top - 1) < matchIndent)
                         break;
                     top--;
                 }
@@ -983,7 +985,7 @@ internal partial class Program
                 while (bot < resultLines.Length - 1)
                 {
                     var line = resultLines[bot + 1];
-                    if (line.Trim().Length > 0 && GetLineIndent(resultLines, bot + 1) < matchIndent)
+                    if (line.Trim().Length > 0 && GetLineIndent(resultLines, tabSize, bot + 1) < matchIndent)
                         break;
                     bot++;
                 }
@@ -1009,7 +1011,7 @@ internal partial class Program
         return 0;
     }
 
-    static int GetLineIndent(string[] lines, int idx)
+    static int GetLineIndent(string[] lines, int tabSize, int idx)
     {
         if (idx < 0 || idx >= lines.Length) return 0;
         var line = lines[idx];
@@ -1017,7 +1019,7 @@ internal partial class Program
         foreach (var ch in line)
         {
             if (ch == ' ') indent++;
-            else if (ch == '\t') indent += 4;
+            else if (ch == '\t') indent += tabSize;
             else break;
         }
         return indent;
