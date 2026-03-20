@@ -767,6 +767,7 @@ internal partial class Program
                 // Applies to all elements wider than one character (~14px)
                 bool needsOcrScan = elBounds is { Width: > 14, Height: > 0 };
                 bool ocrGapDetected = false;
+                ClickZoomHelper? dynZoom = null; // magnifier for DYN-A11Y analysis
                 if (needsOcrScan)
                 {
                     var capturedBounds = elBounds!.Value;
@@ -843,6 +844,10 @@ internal partial class Program
                                     Console.ForegroundColor = ConsoleColor.DarkCyan;
                                     Console.WriteLine($"[A11Y] Acquiring target context... \"{displayText}\"");
                                     Console.ResetColor();
+                                    // Show magnifier on the gap region while analyzing
+                                    var elHwndForZoom = GetElementHwnd(root);
+                                    if (elHwndForZoom != IntPtr.Zero)
+                                        dynZoom = ClickZoomHelper.Begin(elHwndForZoom, hwnd, "DYN-A11Y", $"Analyzing... \"{displayText}\"");
                                 }
                                 else if (cached1 != null)
                                 {
@@ -872,6 +877,10 @@ internal partial class Program
                                 Console.ForegroundColor = ConsoleColor.DarkCyan;
                                 Console.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
                                 Console.ResetColor();
+                                var elHwndForZoom2 = GetElementHwnd(root);
+                                if (elHwndForZoom2 != IntPtr.Zero)
+                                    dynZoom = ClickZoomHelper.Begin(elHwndForZoom2, hwnd, "DYN-A11Y", "Analyzing...");
+
                             }
                             else if (cached2 != null)
                             {
@@ -883,6 +892,7 @@ internal partial class Program
                         }
                     }
                     catch { /* OCR is best-effort */ }
+                    finally { dynZoom?.Dispose(); } // fade out magnifier after analysis
                 }
                 var _nodeBefore = default(NodeState); // 입력위치확보 진입 시 캡처 (elHwnd 계산 후)
 
