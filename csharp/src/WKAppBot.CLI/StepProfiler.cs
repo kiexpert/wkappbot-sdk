@@ -119,9 +119,9 @@ internal sealed class StepProfiler
     internal void Done(string label, int skipFrames, string callerHint)
     {
         Step(label, skipFrames + 1, callerHint);
+        // Always print total — fast=홍보, slow=알림 ㅋ
         var totalMs = _sw.ElapsedMilliseconds;
-        if (totalMs >= _thresholdMs)
-            Console.Error.WriteLine($"[PULSE:{_name}] ── total {totalMs}ms ──");
+        Console.Error.WriteLine($"[PULSE:{_name}] ── total {totalMs}ms ──");
     }
 
     /// <summary>

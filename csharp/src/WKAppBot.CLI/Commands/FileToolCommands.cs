@@ -13,6 +13,7 @@ namespace WKAppBot.CLI;
 // file edit <path> <old> <new> [--replace-all] [--encoding N]
 // file grep <pattern> [--path dir/file] [--type ext] [-i] [-C N] [--max N] [--encoding N]
 // file glob <pattern> [--path dir]
+// file undo --at <timestamp> [--path dir] [--list] [--dry-run]
 internal partial class Program
 {
     static int FileCommand(string[] args)
@@ -24,6 +25,7 @@ internal partial class Program
             "read-pdf"               => FileReadPdfCommand(args[1..]),
             "write"                  => FileWriteCommand(args[1..]),
             "edit"                   => FileEditCommand(args[1..]),
+            "undo"                   => FileUndoCommand(args[1..]),
             "grep"                   => FileGrepCommand(args[1..]),
             "glob"                   => FileGlobCommand(args[1..]),
             "--help" or "-h" or "help" => FileToolUsage(),
@@ -590,6 +592,125 @@ internal partial class Program
         }
 
         return additions.Count == 0 ? "" : string.Join(" | ", additions);
+    }
+
+    // ── file undo ─────────────────────────────────────────────────────────
+    /// <summary>
+    /// file undo --at &lt;timestamp&gt; [--path dir] [--list] [--dry-run]
+    /// Batch-restore .bak files by timestamp prefix.
+    /// Searches current dir (or --path) recursively for *.bak-{timestamp}*.txt files,
+    /// strips the .bak-YYYYMMDD-HHmmss.fff.txt suffix to find the original path,
+    /// and copies backup → original.
+    ///
+    /// Examples:
+    ///   file undo --at 20260320-1126        # restore all edits from 11:26
+    ///   file undo --at 20260320-112611.500  # exact millisecond match
+    ///   file undo --at 20260320-1126 --list # just show what would be restored
+    /// </summary>
+    static int FileUndoCommand(string[] args)
+    {
+        string? atPrefix = null;
+        string? searchPath = null;
+        bool listOnly = false;
+        bool dryRun = false;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--at" && i + 1 < args.Length) { atPrefix = args[++i]; continue; }
+            if (args[i] == "--path" && i + 1 < args.Length) { searchPath = args[++i]; continue; }
+            if (args[i] == "--list") { listOnly = true; continue; }
+            if (args[i] == "--dry-run") { dryRun = true; continue; }
+        }
+
+        if (string.IsNullOrEmpty(atPrefix))
+        {
+            Console.WriteLine("Usage: wkappbot file undo --at <timestamp> [--path dir] [--list] [--dry-run]");
+            Console.WriteLine("  --at     timestamp prefix: YYYYMMDD-HHmmss or partial (e.g. 20260320-1126)");
+            Console.WriteLine("  --path   search directory (default: caller CWD)");
+            Console.WriteLine("  --list   show matching backups without restoring");
+            Console.WriteLine("  --dry-run  show what would be restored without writing");
+            return 1;
+        }
+
+        var baseDir = searchPath ?? FileDefaultDir();
+        if (!Directory.Exists(baseDir))
+        {
+            Console.WriteLine($"[file undo] directory not found: {baseDir}");
+            return 1;
+        }
+
+        // Search recursively for .bak-{atPrefix}*.txt files
+        var bakPattern = $".bak-{atPrefix}";
+        var bakFiles = Directory.EnumerateFiles(baseDir, "*.txt", SearchOption.AllDirectories)
+            .Where(f => Path.GetFileName(f).Contains(bakPattern))
+            .OrderBy(f => f)
+            .ToList();
+
+        if (bakFiles.Count == 0)
+        {
+            Console.WriteLine($"[file undo] no backups found matching .bak-{atPrefix}* in {baseDir}");
+            return 1;
+        }
+
+        Console.WriteLine($"[file undo] found {bakFiles.Count} backup(s) matching .bak-{atPrefix}*");
+
+        // Parse each backup → derive original file path
+        // Backup format: {original}.bak-YYYYMMDD-HHmmss.fff.txt
+        var restorePairs = new List<(string backup, string original)>();
+        foreach (var bak in bakFiles)
+        {
+            var fileName = bak;
+            // Find ".bak-" to split: everything before is the original path
+            var bakIdx = fileName.LastIndexOf(".bak-", StringComparison.Ordinal);
+            if (bakIdx < 0) continue;
+            var originalPath = fileName[..bakIdx];
+            restorePairs.Add((bak, originalPath));
+        }
+
+        if (restorePairs.Count == 0)
+        {
+            Console.WriteLine("[file undo] could not parse backup filenames");
+            return 1;
+        }
+
+        // Display matches
+        foreach (var (bak, orig) in restorePairs)
+        {
+            var bakName = Path.GetFileName(bak);
+            var origRel = Path.GetRelativePath(baseDir, orig);
+            if (listOnly || dryRun)
+                Console.WriteLine($"  {bakName} → {origRel}");
+            else
+                Console.WriteLine($"  → {origRel}");
+        }
+
+        if (listOnly) return 0;
+        if (dryRun)
+        {
+            Console.WriteLine($"[file undo] dry-run: {restorePairs.Count} file(s) would be restored");
+            return 0;
+        }
+
+        // Restore: copy backup → original
+        int restored = 0;
+        int errors = 0;
+        foreach (var (bak, orig) in restorePairs)
+        {
+            try
+            {
+                File.Copy(bak, orig, overwrite: true);
+                restored++;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [ERROR] {Path.GetFileName(orig)}: {ex.Message}");
+                errors++;
+            }
+        }
+
+        Console.WriteLine($"[file undo] restored {restored} file(s)" +
+            (errors > 0 ? $", {errors} error(s)" : ""));
+        return errors > 0 ? 1 : 0;
     }
 
     // In Eye pipe mode Console.Error is not forwarded to the Launcher; use Console.Out instead.
