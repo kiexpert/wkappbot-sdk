@@ -33,35 +33,13 @@ public sealed class DynamicA11yAnalyzer
     }
 
     /// <summary>
-    /// Generate a dynamic AutomationId for a region based on:
-    ///   - Control type (lowercase short form)
-    ///   - Grid position (row, col from XY-Cut or spatial sorting)
-    ///   - Label text (sanitized, truncated)
-    /// Format: dyn_{type}_r{row}c{col}_{label}
+    /// Generate a stable dynamic AutomationId from physical properties only.
+    /// No AI-inferred data (type, label) — those can change between queries.
+    /// Format: dyn_r{row}c{col}_{width}x{height}
     /// </summary>
-    public static string GenerateDynId(A11yInfo info, int row, int col)
+    public static string GenerateDynId(int row, int col, int width, int height)
     {
-        var type = info.ControlType.ToLowerInvariant() switch
-        {
-            "button"    => "btn",
-            "checkbox"  => "chk",
-            "combobox"  => "cmb",
-            "edit"      => "edt",
-            "label"     => "lbl",
-            "tab"       => "tab",
-            "scrollbar" => "scr",
-            "slider"    => "sld",
-            "grid" or "datagrid" => "grd",
-            "listitem"  => "lst",
-            "menuitem"  => "mnu",
-            "treeitem"  => "tre",
-            "image"     => "img",
-            "separator" => "sep",
-            "statusbar" => "stb",
-            _           => "unk",
-        };
-        var label = SanitizeIdLabel(info.Label);
-        return $"dyn_{type}_r{row}c{col}{(label.Length > 0 ? $"_{label}" : "")}";
+        return $"dyn_r{row}c{col}_{width}x{height}";
     }
 
     /// <summary>
@@ -102,18 +80,6 @@ public sealed class DynamicA11yAnalyzer
         return result;
     }
 
-    private static string SanitizeIdLabel(string label)
-    {
-        if (string.IsNullOrWhiteSpace(label)) return "";
-        // Keep Korean + alphanumeric, replace others with _
-        var sb = new System.Text.StringBuilder();
-        foreach (var ch in label.Take(20))
-        {
-            if (char.IsLetterOrDigit(ch)) sb.Append(ch);
-            else if (sb.Length > 0 && sb[^1] != '_') sb.Append('_');
-        }
-        return sb.ToString().Trim('_');
-    }
 
     /// <summary>
     /// Build the Vision API prompt for analyzing UI elements.
@@ -230,7 +196,8 @@ IMPORTANT:
         var label = !string.IsNullOrEmpty(info.Label) ? $" \"{info.Label}\"" : "";
         var desc = !string.IsNullOrEmpty(info.Description) ? $" — {info.Description}" : "";
         var conf = info.Confidence > 0 ? $" ({info.Confidence:P0})" : "";
-        return $"[DYN-A11Y] {info.ControlType}{label}{state}{desc}{conf}\n"
+        var dynId = !string.IsNullOrEmpty(info.DynId) ? $" aid=\"{info.DynId}\"" : "";
+        return $"[DYN-A11Y] {info.ControlType}{label}{state}{dynId}{desc}{conf}\n"
              + $"  [ACTIONS: {actions}]";
     }
 
