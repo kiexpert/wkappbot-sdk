@@ -765,7 +765,7 @@ internal partial class Program
 
                 // ── OCR gap analysis: detect missing text in element rect ──
                 // Applies to all elements wider than one character (~14px)
-                bool needsOcrScan = elBounds is { Width: > 14, Height: > 0 };
+                bool needsOcrScan = elBounds is { Width: > 0, Height: > 0 };
                 bool ocrGapDetected = false;
                 ClickZoomHelper? dynZoom = null; // magnifier for DYN-A11Y analysis
                 if (needsOcrScan)
@@ -846,8 +846,9 @@ internal partial class Program
                                     Console.ResetColor();
                                     // Show magnifier on the gap region while analyzing
                                     var elHwndForZoom = GetElementHwnd(root);
-                                    if (elHwndForZoom != IntPtr.Zero)
-                                        dynZoom = ClickZoomHelper.Begin(elHwndForZoom, hwnd, "DYN-A11Y", $"Analyzing... \"{displayText}\"");
+                                    dynZoom = ClickZoomHelper.Begin(
+                                        elHwndForZoom != IntPtr.Zero ? elHwndForZoom : hwnd,
+                                        hwnd, "DYN-A11Y", $"Analyzing... \"{displayText}\"");
                                 }
                                 else if (cached1 != null)
                                 {
@@ -878,8 +879,9 @@ internal partial class Program
                                 Console.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
                                 Console.ResetColor();
                                 var elHwndForZoom2 = GetElementHwnd(root);
-                                if (elHwndForZoom2 != IntPtr.Zero)
-                                    dynZoom = ClickZoomHelper.Begin(elHwndForZoom2, hwnd, "DYN-A11Y", "Analyzing...");
+                                dynZoom = ClickZoomHelper.Begin(
+                                    elHwndForZoom2 != IntPtr.Zero ? elHwndForZoom2 : hwnd,
+                                    hwnd, "DYN-A11Y", "Analyzing...");
 
                             }
                             else if (cached2 != null)
