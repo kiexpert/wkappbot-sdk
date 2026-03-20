@@ -366,17 +366,19 @@ internal partial class Program
         allMp3s.AddRange(Directory.GetFiles(wavDir, "*.mp3")
             .Where(f => !Path.GetFileName(f).StartsWith("study_batch_")));
 
-        // Sort by companion JSON age: no JSON = MinValue (oldest/first), then by JSON write time
-        return allMp3s
-            .Where(f => new FileInfo(f).Length > 0) // skip 0-byte files (incomplete recordings)
-            .OrderBy(f =>
-            {
-                var jp = Path.ChangeExtension(f, ".json");
-                return File.Exists(jp) ? File.GetLastWriteTime(jp) : DateTime.MinValue;
-            })
-            .ThenBy(f => f)
-            .Take(maxCount)
-            .ToList();
+        // Shuffle for diversity: avoid sending same files every batch.
+        // Prioritize: no companion JSON (never analyzed), then shuffle within each group.
+        var rng = new Random();
+        var valid = allMp3s.Where(f => new FileInfo(f).Length > 0).ToList();
+        var neverAnalyzed = valid.Where(f => !File.Exists(Path.ChangeExtension(f, ".json"))).ToList();
+        var analyzed = valid.Where(f => File.Exists(Path.ChangeExtension(f, ".json"))).ToList();
+
+        // Shuffle both groups
+        for (int i = neverAnalyzed.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (neverAnalyzed[i], neverAnalyzed[j]) = (neverAnalyzed[j], neverAnalyzed[i]); }
+        for (int i = analyzed.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (analyzed[i], analyzed[j]) = (analyzed[j], analyzed[i]); }
+
+        // Never-analyzed first, then analyzed (re-study candidates), take maxCount
+        return neverAnalyzed.Concat(analyzed).Take(maxCount).ToList();
     }
 
     /// <summary>
@@ -761,7 +763,27 @@ internal partial class Program
 
         try
         {
-            var arr = JsonSerializer.Deserialize<JsonArray>(json);
+            JsonArray? arr = null;
+            try { arr = JsonSerializer.Deserialize<JsonArray>(json); }
+            catch
+            {
+                // Truncated JSON recovery: find last complete object "}" before the end
+                // and close the array there
+                int lastClose = json.LastIndexOf('}');
+                if (lastClose > 0)
+                {
+                    var repaired = json[..(lastClose + 1)] + "]";
+                    try
+                    {
+                        arr = JsonSerializer.Deserialize<JsonArray>(repaired);
+                        Console.WriteLine($"[STUDY] JSON repaired: truncated at char {lastClose}, recovered {arr?.Count ?? 0} segment(s)");
+                    }
+                    catch (Exception ex2)
+                    {
+                        Console.WriteLine($"[STUDY] JSON parse error: {ex2.Message}");
+                    }
+                }
+            }
             if (arr == null) return null;
 
             var results = new List<StudyResult>();
