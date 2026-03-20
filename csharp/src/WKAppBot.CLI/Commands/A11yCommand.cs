@@ -584,6 +584,7 @@ internal partial class Program
         automation.TransactionTimeout = TimeSpan.FromSeconds(5);
         var readiness = CreateInputReadiness();
         var aar = CreateActionReadiness(readiness);
+        var gapCollector = new OcrGapCollector();
 
         foreach (var win in targets)
         {
@@ -838,6 +839,7 @@ internal partial class Program
                                 Console.ForegroundColor = ConsoleColor.DarkCyan;
                                 Console.WriteLine($"[A11Y] Acquiring target context... \"{displayText}\"");
                                 Console.ResetColor();
+                                gapCollector.Add(capturedBounds, displayText);
                             }
                             else if (string.IsNullOrWhiteSpace(elName))
                             {
@@ -855,6 +857,7 @@ internal partial class Program
                             Console.ForegroundColor = ConsoleColor.DarkCyan;
                             Console.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
                             Console.ResetColor();
+                            gapCollector.Add(capturedBounds, null);
                         }
                     }
                     catch { /* OCR is best-effort */ }
@@ -1132,6 +1135,42 @@ internal partial class Program
                 }
             }
         }
+
+        // ── Batch Vision fallback: composite gap screenshots → Gemini ──
+        if (gapCollector.HasGaps)
+        {
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine($"[A11Y] {gapCollector.Count} gap region(s) collected — building composite for Vision API...");
+            Console.ResetColor();
+            try
+            {
+                var (images, prompt) = gapCollector.BuildTripleComposite();
+                if (images.Count > 0)
+                {
+                    var gapDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "WKAppBot", "gap_screenshots");
+                    Directory.CreateDirectory(gapDir);
+                    var ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                    var labels = new[] { "A_forward", "B_reverse", "C_shuffle" };
+                    int totalKB = 0;
+                    for (int gi = 0; gi < images.Count; gi++)
+                    {
+                        var path = Path.Combine(gapDir, $"gap_{ts}_{labels[gi]}.png");
+                        File.WriteAllBytes(path, images[gi]);
+                        totalKB += images[gi].Length / 1024;
+                    }
+                    var promptPath = Path.Combine(gapDir, $"gap_{ts}.prompt.txt");
+                    File.WriteAllText(promptPath, prompt);
+                    Console.WriteLine($"[A11Y] Gap triple composite saved: {gapDir} ({totalKB}KB total, {gapCollector.Count} regions x3 variants)");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[A11Y] Gap composite failed: {ex.Message}");
+            }
+        }
+        gapCollector.Dispose();
 
         Console.WriteLine($"[A11Y] Done: {ok} ok, {fail} fail (total {targets.Count})");
         return fail > 0 ? 1 : 0;
