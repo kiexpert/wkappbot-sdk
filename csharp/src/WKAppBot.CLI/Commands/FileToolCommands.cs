@@ -1015,14 +1015,14 @@ internal partial class Program
     {
         if (idx < 0 || idx >= lines.Length) return 0;
         var line = lines[idx];
-        int indent = 0;
+        int col = 0;
         foreach (var ch in line)
         {
-            if (ch == ' ') indent++;
-            else if (ch == '\t') indent += tabSize;
+            if (ch == ' ') col++;
+            else if (ch == '\t') col += tabSize - (col % tabSize); // snap to next tab stop
             else break;
         }
-        return indent;
+        return col;
     }
 
     // ── usage ──────────────────────────────────────────────────────────────
