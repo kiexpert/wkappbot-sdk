@@ -346,9 +346,16 @@ internal partial class Program
                                                 Console.WriteLine($"[EYE] Recovered status ts for '{username}': {ts}");
                                             }
 
-                                            // Stale: only collect reply-less messages for sweep
+                                            // Stale: collect reply-less messages for sweep
+                                            // BUT keep the latest per username (already in _recoveredStatusByUsername)
                                             if (ts != null && replyCount == 0)
-                                                _staleStatusTsOnStartup.Add(ts);
+                                            {
+                                                bool isLatestForUser = !string.IsNullOrEmpty(username)
+                                                    && _recoveredStatusByUsername.TryGetValue(username, out var latest)
+                                                    && latest.ts == ts;
+                                                if (!isLatestForUser)
+                                                    _staleStatusTsOnStartup.Add(ts);
+                                            }
                                         }
                                     }
                                 }
