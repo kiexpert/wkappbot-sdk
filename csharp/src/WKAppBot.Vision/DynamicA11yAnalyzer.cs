@@ -143,7 +143,10 @@ Many controls are owner-drawn with NO accessibility information — you must inf
 
 The attached image contains {regionCount} numbered UI region(s).
 
-For EACH numbered region, analyze and respond in this EXACT JSON format:
+For EACH numbered region, analyze and respond in this EXACT JSON format.
+Wrap the entire JSON in a markdown code block (```json ... ```) for readability:
+
+```json
 [
   {{
     ""region"": 1,
@@ -154,6 +157,7 @@ For EACH numbered region, analyze and respond in this EXACT JSON format:
     ""description"": ""Order execution button""
   }}
 ]
+```
 
 Guidelines:
 - **controlType**: Use standard UIA control types: Button, CheckBox, ComboBox, Edit (text input),
