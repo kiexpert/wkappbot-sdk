@@ -35,11 +35,61 @@ public sealed class DynamicA11yAnalyzer
     /// <summary>
     /// Generate a stable dynamic AutomationId from physical properties only.
     /// No AI-inferred data (type, label) — those can change between queries.
-    /// Format: dyn_r{row}c{col}_{width}x{height}
+    /// Primary:  dyn_r{row}c{col}_{width}x{height}  (absolute pixels)
+    /// Fallback: dyn_r{row}c{col}_p{w%}x{h%}        (% of parent, for ratio-based layouts)
     /// </summary>
     public static string GenerateDynId(int row, int col, int width, int height)
     {
         return $"dyn_r{row}c{col}_{width}x{height}";
+    }
+
+    /// <summary>
+    /// Generate ratio-based fallback ID: percentage of parent container size.
+    /// Used when container resizes but internal layout maintains proportions.
+    /// </summary>
+    public static string GenerateDynIdRatio(int row, int col, int width, int height, int parentW, int parentH)
+    {
+        if (parentW <= 0 || parentH <= 0) return GenerateDynId(row, col, width, height);
+        int pw = width * 100 / parentW;
+        int ph = height * 100 / parentH;
+        return $"dyn_r{row}c{col}_p{pw}x{ph}";
+    }
+
+    /// <summary>
+    /// Try matching a dynId against a region. Tries absolute first, then ratio fallback.
+    /// Returns true if either matches within tolerance.
+    /// </summary>
+    public static bool MatchDynId(string dynId, int row, int col,
+        int width, int height, int parentW, int parentH, int sizeTolerance = 4, int ratioTolerance = 3)
+    {
+        // Parse dynId: dyn_r{R}c{C}_{W}x{H} or dyn_r{R}c{C}_p{W%}x{H%}
+        var match = System.Text.RegularExpressions.Regex.Match(dynId,
+            @"^dyn_r(\d+)c(\d+)_(p?)(\d+)x(\d+)$");
+        if (!match.Success) return false;
+
+        int idRow = int.Parse(match.Groups[1].Value);
+        int idCol = int.Parse(match.Groups[2].Value);
+        if (idRow != row || idCol != col) return false;
+
+        bool isRatio = match.Groups[3].Value == "p";
+        int idW = int.Parse(match.Groups[4].Value);
+        int idH = int.Parse(match.Groups[5].Value);
+
+        if (!isRatio)
+        {
+            // Absolute match: pixel size within tolerance
+            return Math.Abs(idW - width) <= sizeTolerance
+                && Math.Abs(idH - height) <= sizeTolerance;
+        }
+        else
+        {
+            // Ratio match: parent percentage within tolerance
+            if (parentW <= 0 || parentH <= 0) return false;
+            int pw = width * 100 / parentW;
+            int ph = height * 100 / parentH;
+            return Math.Abs(idW - pw) <= ratioTolerance
+                && Math.Abs(idH - ph) <= ratioTolerance;
+        }
     }
 
     /// <summary>
