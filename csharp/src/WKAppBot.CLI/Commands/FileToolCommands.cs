@@ -1017,11 +1017,8 @@ internal partial class Program
         var line = lines[idx];
         int leadEnd = line.Length - line.TrimStart().Length;
         var leading = line[..leadEnd];
-        // (N spaces | spaces+tab) → \t, repeat until stable
         var pattern = $@"({new string(' ', tabSize)}| +\t)";
-        string prev;
-        do { prev = leading; leading = System.Text.RegularExpressions.Regex.Replace(leading, pattern, "\t"); }
-        while (leading != prev);
+        while (leading != (leading = System.Text.RegularExpressions.Regex.Replace(leading, pattern, "\t"))) ;
         return leading.Count(c => c == '\t');
     }
 
