@@ -352,7 +352,7 @@ internal partial class Program
         }
         // _eyeAliveMutex is static — held for process lifetime, GC will never collect it
 
-        Console.Title = "AppBotEye"; // for a11y close targeting (avoid matching VS Code)
+        try { Console.Title = "AppBotEye"; } catch { } // for a11y close targeting (safe: no console in DETACHED)
         WKAppBot.Win32.Input.ProcessLaunchGuard.IsEyeProcess = true; // Eye daemon — skip focus guard
 
         // Elevated proxy mode: if running as admin, start Named Pipe server alongside Eye
