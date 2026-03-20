@@ -42,14 +42,54 @@ public sealed class CcaParameterTuner
     ///   {expDir}/form_{formId}/tree/{path}/
     /// Pass null for in-memory only (no persistence).
     /// </param>
-    public CcaParameterTuner(string? controlDir = null)
+    /// <summary>
+    /// Create tuner for a specific a11y node in the experience DB.
+    /// </summary>
+    /// <param name="controlDir">Experience DB control directory (null = in-memory only)</param>
+    /// <param name="layoutHash">
+    /// Hash of current segment layout (component count + relative positions).
+    /// Each layout variant gets its own params file: cca_params_{hash}.json
+    /// Pass null to use a single shared params file.
+    /// </param>
+    public CcaParameterTuner(string? controlDir = null, string? layoutHash = null)
     {
         if (!string.IsNullOrEmpty(controlDir))
         {
             Directory.CreateDirectory(controlDir);
-            _savePath = Path.Combine(controlDir, "cca_params.json");
+            var fileName = string.IsNullOrEmpty(layoutHash)
+                ? "cca_params.json"
+                : $"cca_params_{layoutHash}.json";
+            _savePath = Path.Combine(controlDir, fileName);
             Load();
         }
+    }
+
+    /// <summary>
+    /// Compute a layout hash from CCA regions: encodes component count,
+    /// relative positions, and size classes into a short hex string.
+    /// Same visual layout → same hash, even across sessions.
+    /// </summary>
+    public static string ComputeLayoutHash(List<ConnectedComponentAnalyzer.Region> regions, int imgW, int imgH)
+    {
+        // Quantize: bucket each component's center into a 8x8 grid
+        // + encode size class (S/M/L) + type
+        using var ms = new System.IO.MemoryStream();
+        using var bw = new System.IO.BinaryWriter(ms);
+        bw.Write((byte)regions.Count);
+        foreach (var r in regions.OrderBy(r => r.Bounds.Y).ThenBy(r => r.Bounds.X))
+        {
+            int cx = r.Bounds.X + r.Bounds.Width / 2;
+            int cy = r.Bounds.Y + r.Bounds.Height / 2;
+            byte gx = (byte)(imgW > 0 ? cx * 8 / imgW : 0);
+            byte gy = (byte)(imgH > 0 ? cy * 8 / imgH : 0);
+            byte sizeClass = (byte)(r.Bounds.Width * r.Bounds.Height < 200 ? 0   // S
+                                  : r.Bounds.Width * r.Bounds.Height < 2000 ? 1  // M
+                                  : 2);                                           // L
+            bw.Write((byte)((gx << 4) | gy));
+            bw.Write((byte)((sizeClass << 4) | (byte)r.Type));
+        }
+        var hash = System.Security.Cryptography.MD5.HashData(ms.ToArray());
+        return Convert.ToHexString(hash)[..8].ToLowerInvariant();
     }
 
     /// <summary>
