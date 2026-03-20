@@ -43,6 +43,9 @@ public sealed class ConnectedComponentAnalyzer
     private const double K = 0.2;           // Sauvola sensitivity (0.0-0.5)
     private const int MinComponentPixels = 4;  // ignore tiny noise
 
+    /// <summary>Optional tuned parameters (from CcaParameterTuner). Null = use defaults.</summary>
+    public CcaParams? TunedParams { get; set; }
+
     /// <summary>
     /// Analyze a screenshot region: find all connected components and classify them.
     /// </summary>
@@ -270,7 +273,7 @@ public sealed class ConnectedComponentAnalyzer
 
     // ── Classification ─────────────────────────────────────────────────────
 
-    private static List<Region> Classify(List<Region> regions, int imgW, int imgH)
+    private List<Region> Classify(List<Region> regions, int imgW, int imgH)
     {
         return regions.Select(r =>
         {
@@ -279,28 +282,36 @@ public sealed class ConnectedComponentAnalyzer
         }).ToList();
     }
 
-    private static RegionType ClassifyOne(Region r, int imgW, int imgH)
+    private RegionType ClassifyOne(Region r, int imgW, int imgH)
     {
         int w = r.Bounds.Width, h = r.Bounds.Height;
+        var p = TunedParams; // null = defaults
 
-        // Tiny: noise (< 3x3)
-        if (w < 3 || h < 3) return RegionType.Noise;
+        // Tiny: noise
+        int noiseMax = p?.NoiseMaxPixels ?? MinComponentPixels;
+        if (w < 3 || h < 3 || r.PixelCount <= noiseMax) return RegionType.Noise;
 
         // Separator: very elongated horizontal or vertical line
-        if (w > imgW * 0.6 && h <= 3) return RegionType.Separator;   // horizontal line
-        if (h > imgH * 0.6 && w <= 3) return RegionType.Separator;   // vertical line
+        if (w > imgW * 0.6 && h <= 3) return RegionType.Separator;
+        if (h > imgH * 0.6 && w <= 3) return RegionType.Separator;
 
-        // Text: roughly square-ish single glyph or small blob
-        // Korean chars ~12-18px, aspect ratio 0.5-2.0, density > 0.15
+        // Text: tunable thresholds
+        double minDensity = p?.TextMinDensity ?? 0.10;
+        double maxDensity = p?.TextMaxDensity ?? 0.85;
+        double minAR = p?.TextMinAR ?? 0.20;
+        double maxAR = p?.TextMaxAR ?? 5.0;
+        int maxSize = p?.TextMaxSize ?? 80;
+
         double ar = r.AspectRatio;
-        if (ar >= 0.2 && ar <= 5.0 && r.Density > 0.10 && w <= 80 && h <= 80)
+        if (ar >= minAR && ar <= maxAR && r.Density >= minDensity && r.Density <= maxDensity
+            && w <= maxSize && h <= maxSize)
             return RegionType.Text;
 
-        // Icon: larger, denser, more square
-        if (w >= 8 && h >= 8 && r.Density > 0.05)
+        // Icon: tunable min size
+        int iconMin = p?.IconMinSize ?? 8;
+        if (w >= iconMin && h >= iconMin && r.Density > 0.05)
             return RegionType.Icon;
 
-        // Fallback: noise
         return RegionType.Noise;
     }
 }
