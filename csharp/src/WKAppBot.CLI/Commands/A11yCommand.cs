@@ -757,8 +757,54 @@ internal partial class Program
                 try { elType = root.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                 var elAid = root.Properties.AutomationId.ValueOrDefault ?? "";
                 var elRectStr = "";
-                try { var r = root.Properties.BoundingRectangle.ValueOrDefault; elRectStr = $" rect=({r.X},{r.Y} {r.Width}x{r.Height})"; } catch { }
+                System.Drawing.Rectangle? elBounds = null;
+                try { var r = root.Properties.BoundingRectangle.ValueOrDefault; elBounds = new(r.X, r.Y, r.Width, r.Height); elRectStr = $" rect=({r.X},{r.Y} {r.Width}x{r.Height})"; } catch { }
+
+                // Enrichment: if UIA Name AND AutomationId are both empty → OCR fallback
+                bool needsEnrich = string.IsNullOrWhiteSpace(elName) && string.IsNullOrWhiteSpace(elAid) && elBounds is { Width: > 0, Height: > 0 };
+                Task<string?>? ocrEnrichTask = null;
+                if (needsEnrich)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.Write($"[A11Y] Acquiring target context... ");
+                    Console.ResetColor();
+                    var capturedBounds = elBounds.Value;
+                    ocrEnrichTask = Task.Run(() =>
+                    {
+                        try
+                        {
+                            using var bmp = new System.Drawing.Bitmap(capturedBounds.Width, capturedBounds.Height);
+                            using (var g = System.Drawing.Graphics.FromImage(bmp))
+                                g.CopyFromScreen(capturedBounds.X, capturedBounds.Y, 0, 0, capturedBounds.Size);
+                            using var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
+                            var result = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
+                            var text = string.Join(" ", result.Words.Select(w => w.Text)).Trim();
+                            return string.IsNullOrWhiteSpace(text) ? null : text;
+                        }
+                        catch { return null; }
+                    });
+                }
+
                 Console.WriteLine($"[A11Y] element: {elType} \"{elName}\" (aid=\"{elAid}\"){elRectStr} in {tag}");
+
+                // Show OCR enrichment result (wait up to 2s)
+                if (ocrEnrichTask != null)
+                {
+                    var ocrText = ocrEnrichTask.Wait(2000) ? ocrEnrichTask.Result : null;
+                    if (!string.IsNullOrEmpty(ocrText))
+                    {
+                        elName = ocrText!;
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"[A11Y] OCR → \"{elName}\"");
+                        Console.ResetColor();
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"[A11Y] OCR → (no text detected)");
+                        Console.ResetColor();
+                    }
+                }
                 var _nodeBefore = default(NodeState); // 입력위치확보 진입 시 캡처 (elHwnd 계산 후)
 
                 // Tab activation: if target is inside an unselected tab, activate it first
