@@ -591,6 +591,38 @@ internal partial class Program
             var title = win.Title;
             var tag = $"0x{hwnd.ToInt64():X} \"{title}\"";
 
+            // ── Diagnostic: foreground window + UIA focused element ──
+            {
+                var fgHwnd = NativeMethods.GetForegroundWindow();
+                var fgTitle = WindowFinder.GetWindowText(fgHwnd);
+                if (fgTitle.Length > 50) fgTitle = fgTitle[..50] + "...";
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint tPid);
+                NativeMethods.GetWindowThreadProcessId(fgHwnd, out uint fgPid);
+                var relation = fgHwnd == hwnd ? "SAME" : fgPid == tPid ? "SAME-PROC" : "DIFFERENT";
+                var idleMs = NativeMethods.GetUserIdleMs();
+                Console.Error.WriteLine($"[FOCUS] fg=0x{fgHwnd.ToInt64():X} \"{fgTitle}\" | target={tag} | {relation} | idle={idleMs}ms");
+
+                // UIA focused element chain
+                try
+                {
+                    using var uiaAuto = new UIA3Automation();
+                    var focused = uiaAuto.FocusedElement();
+                    if (focused != null)
+                    {
+                        var fType = "?"; try { fType = focused.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                        var fName = focused.Properties.Name.ValueOrDefault ?? "";
+                        if (fName.Length > 40) fName = fName[..40] + "...";
+                        var fAid = focused.Properties.AutomationId.ValueOrDefault ?? "";
+                        var fRect = "";
+                        try { var r = focused.Properties.BoundingRectangle.ValueOrDefault; fRect = $" rect=({r.X},{r.Y} {r.Width}x{r.Height})"; } catch { }
+                        NativeMethods.GetWindowThreadProcessId(focused.Properties.NativeWindowHandle.ValueOrDefault, out uint focPid);
+                        var focRelation = focPid == tPid ? "TARGET-PROC" : focPid == fgPid ? "FG-PROC" : "OTHER";
+                        Console.Error.WriteLine($"[FOCUS] uia-focused: {fType} \"{fName}\" (aid=\"{fAid}\"){fRect} | {focRelation}");
+                    }
+                }
+                catch { /* best effort */ }
+            }
+
             // Walk Win32 children (segments[1..])
             bool childError = false;
             for (int i = 1; i < win32Segments.Length; i++)
@@ -724,7 +756,9 @@ internal partial class Program
                 var elType = "?";
                 try { elType = root.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                 var elAid = root.Properties.AutomationId.ValueOrDefault ?? "";
-                Console.WriteLine($"[A11Y] element: {elType} \"{elName}\" (aid=\"{elAid}\") in {tag}");
+                var elRectStr = "";
+                try { var r = root.Properties.BoundingRectangle.ValueOrDefault; elRectStr = $" rect=({r.X},{r.Y} {r.Width}x{r.Height})"; } catch { }
+                Console.WriteLine($"[A11Y] element: {elType} \"{elName}\" (aid=\"{elAid}\"){elRectStr} in {tag}");
                 var _nodeBefore = default(NodeState); // 입력위치확보 진입 시 캡처 (elHwnd 계산 후)
 
                 // Tab activation: if target is inside an unselected tab, activate it first

@@ -620,6 +620,9 @@ internal partial class Program
         int frameCount = 0;
         while (host.IsAlive && !cts.IsCancellationRequested)
         {
+            // ── ScreenSaver idle check (first — instant wake on input) ──
+            _screenSaver?.Tick();
+
             // ── Duplicate Eye check (every 100 frames ≈ 10s) ──
             if (++duplicateCheckFrame >= 100)
             {
@@ -860,9 +863,6 @@ internal partial class Program
                     : "";
                 Console.WriteLine($"[EYE] frame #{frameCount} ({(slackClient != null ? "Socket+API" : "API-only")}{slackInfo})");
             }
-
-            // ── ScreenSaver idle check (every frame) ──
-            _screenSaver?.Tick();
 
             frameCount++;
             Thread.Sleep(Math.Max(100, intervalMs));
