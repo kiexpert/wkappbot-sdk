@@ -24,7 +24,7 @@ namespace WKAppBot.Vision;
 public sealed class ConnectedComponentAnalyzer
 {
     /// <summary>Region type classification.</summary>
-    public enum RegionType { Text, Icon, Noise, Separator }
+    public enum RegionType { Text, Icon, Noise, Separator, Container }
 
     /// <summary>A detected region with bounding rect and classification.</summary>
     public sealed class Region
@@ -32,10 +32,13 @@ public sealed class ConnectedComponentAnalyzer
         public Rectangle Bounds { get; init; }
         public RegionType Type { get; init; }
         public int PixelCount { get; init; }
+        public int Perimeter { get; init; }        // edge pixel count (border detection)
         public int Label { get; init; }
         public double AspectRatio => Bounds.Height == 0 ? 0 : (double)Bounds.Width / Bounds.Height;
         public double Density => Bounds.Width * Bounds.Height == 0 ? 0
             : (double)PixelCount / (Bounds.Width * Bounds.Height);
+        /// <summary>Perimeter/Area ratio — high = thin border, low = solid fill.</summary>
+        public double Thinness => PixelCount == 0 ? 0 : (double)Perimeter / PixelCount;
     }
 
     // Adaptive threshold parameters
@@ -241,6 +244,7 @@ public sealed class ConnectedComponentAnalyzer
         var maxX = new int[count + 1];
         var maxY = new int[count + 1];
         var pixels = new int[count + 1];
+        var perim = new int[count + 1]; // perimeter: pixels with at least one non-labeled neighbor
         Array.Fill(minX, int.MaxValue);
         Array.Fill(minY, int.MaxValue);
 
@@ -254,6 +258,12 @@ public sealed class ConnectedComponentAnalyzer
             if (x > maxX[lbl]) maxX[lbl] = x;
             if (y > maxY[lbl]) maxY[lbl] = y;
             pixels[lbl]++;
+
+            // Perimeter: has any 4-connected neighbor that's different label or edge
+            bool edge = x == 0 || x == w - 1 || y == 0 || y == h - 1
+                || labels[(y-1)*w+x] != lbl || labels[(y+1)*w+x] != lbl
+                || labels[y*w+x-1] != lbl || labels[y*w+x+1] != lbl;
+            if (edge) perim[lbl]++;
         }
 
         var regions = new List<Region>();
@@ -264,6 +274,7 @@ public sealed class ConnectedComponentAnalyzer
             {
                 Bounds = new Rectangle(minX[i], minY[i], maxX[i] - minX[i] + 1, maxY[i] - minY[i] + 1),
                 PixelCount = pixels[i],
+                Perimeter = perim[i],
                 Label = i,
                 Type = RegionType.Text, // classified later
             });
@@ -294,6 +305,11 @@ public sealed class ConnectedComponentAnalyzer
         // Separator: very elongated horizontal or vertical line
         if (w > imgW * 0.6 && h <= 3) return RegionType.Separator;
         if (h > imgH * 0.6 && w <= 3) return RegionType.Separator;
+
+        // Container: round border / frame — high thinness (mostly perimeter, little fill)
+        // Large component with perimeter/area ratio > 0.6 = hollow frame
+        if (r.Thinness > 0.6 && (w > 20 || h > 20) && r.Density < 0.3)
+            return RegionType.Container;
 
         // Text: tunable thresholds
         double minDensity = p?.TextMinDensity ?? 0.10;
