@@ -1015,14 +1015,14 @@ internal partial class Program
     {
         if (idx < 0 || idx >= lines.Length) return 0;
         var line = lines[idx];
-        int col = 0;
-        foreach (var ch in line)
-        {
-            if (ch == ' ') col++;
-            else if (ch == '\t') col += tabSize - (col % tabSize); // snap to next tab stop
-            else break;
-        }
-        return col / tabSize; // column → indent level
+        int leadEnd = line.Length - line.TrimStart().Length;
+        var leading = line[..leadEnd];
+        // (N spaces | spaces+tab) → \t, repeat until stable
+        var pattern = $@"({new string(' ', tabSize)}| +\t)";
+        string prev;
+        do { prev = leading; leading = System.Text.RegularExpressions.Regex.Replace(leading, pattern, "\t"); }
+        while (leading != prev);
+        return leading.Count(c => c == '\t');
     }
 
     // ── usage ──────────────────────────────────────────────────────────────
