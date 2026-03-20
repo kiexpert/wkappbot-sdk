@@ -837,9 +837,20 @@ internal partial class Program
 
                                 var displayText = string.Join("", parts);
                                 Console.ForegroundColor = ConsoleColor.DarkCyan;
-                                Console.WriteLine($"[A11Y] Acquiring target context... \"{displayText}\"");
                                 Console.ResetColor();
-                                gapCollector.Add(capturedBounds, displayText);
+                                if (gapCollector.Add(capturedBounds, displayText, elAid, out var cached1))
+                                {
+                                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                                    Console.WriteLine($"[A11Y] Acquiring target context... \"{displayText}\"");
+                                    Console.ResetColor();
+                                }
+                                else if (cached1 != null)
+                                {
+                                    elName = cached1;
+                                    Console.ForegroundColor = ConsoleColor.Green;
+                                    Console.WriteLine($"[A11Y] Cache hit → \"{cached1}\"");
+                                    Console.ResetColor();
+                                }
                             }
                             else if (string.IsNullOrWhiteSpace(elName))
                             {
@@ -855,9 +866,20 @@ internal partial class Program
                             // No OCR words at all on blind node → definitely needs Vision
                             ocrGapDetected = true;
                             Console.ForegroundColor = ConsoleColor.DarkCyan;
-                            Console.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
                             Console.ResetColor();
-                            gapCollector.Add(capturedBounds, null);
+                            if (gapCollector.Add(capturedBounds, null, elAid, out var cached2))
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                                Console.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
+                                Console.ResetColor();
+                            }
+                            else if (cached2 != null)
+                            {
+                                elName = cached2;
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine($"[A11Y] Cache hit → \"{cached2}\"");
+                                Console.ResetColor();
+                            }
                         }
                     }
                     catch { /* OCR is best-effort */ }
