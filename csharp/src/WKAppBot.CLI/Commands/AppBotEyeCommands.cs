@@ -199,11 +199,16 @@ internal partial class Program
             // in DETACHED_PROCESS context (no shell/console to work with).
             var psi = new ProcessStartInfo
             {
-                FileName       = corePath,
-                Arguments      = "eye" + (extraArgs.Length > 0 ? " " + extraArgs : ""),
+                FileName        = corePath,
+                Arguments       = "eye" + (extraArgs.Length > 0 ? " " + extraArgs : ""),
                 UseShellExecute = false,
                 CreateNoWindow  = true,
                 // NO RedirectStandard* → bInheritHandles=false → no PTY leak
+                // WindowStyle=Hidden → STARTF_USESHOWWINDOW + SW_HIDE in STARTUPINFO.
+                // When Eye calls AllocConsole(), the console window is created HIDDEN
+                // from the start — no visible flash. (CreateNoWindow prevents the initial
+                // console; WindowStyle=Hidden prevents AllocConsole's window from showing.)
+                WindowStyle     = ProcessWindowStyle.Hidden,
             };
 
             EyeLog($"Spawning: {corePath} {psi.Arguments}");
