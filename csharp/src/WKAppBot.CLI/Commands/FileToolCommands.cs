@@ -65,11 +65,54 @@ internal partial class Program
             try { return Encoding.GetEncoding(949); }
             catch { return Encoding.Default; }
         }
+        // Stage 0: pure ASCII — no multi-byte at all → UTF-8 (ASCII is a subset)
+        bool hasHighByte = false;
+        for (int bi = 0; bi < bytes.Length; bi++)
+            if (bytes[bi] >= 0x80) { hasHighByte = true; break; }
+        if (!hasHighByte) return new UTF8Encoding(false);       // pure ASCII → UTF-8, done
+
+        // Stage 1: structural UTF-8 validity
         if (!IsValidUtf8NoBom(bytes)) return KoreanAnsi();     // structural errors → CP949
+
+        // Stage 2: decode as UTF-8, then strip all known-good characters.
+        // Whatever remains = suspicious. If suspicious chars dominate → CP949.
         var decoded = new UTF8Encoding(false).GetString(bytes);
-        return decoded.Contains('\uFFFD')
-            ? KoreanAnsi()                                      // U+FFFD in decoded → CP949
-            : new UTF8Encoding(false);                          // clean decode → UTF-8
+        if (decoded.Contains('\uFFFD')) return KoreanAnsi();    // replacement char → not UTF-8
+
+        // Strip known-good chars → collapse runs to single space (preserves context)
+        // e.g. "abc뮤def" → " 뮤 "  (isolated = suspicious)
+        //      "뮤뮤뮤"   → "뮤뮤뮤" (clustered = possibly legit rare script)
+        var goodPattern = @"[\x00-\x7F"    // ASCII
+          + @"\u00A0-\u024F"                // Latin Extended
+          + @"\u0370-\u03FF"                // Greek
+          + @"\u2000-\u2BFF"                // Punctuation, Symbols, Arrows, Box Drawing
+          + @"\u3000-\u9FFF"                // CJK + Hangul Compat + Kana
+          + @"\uAC00-\uD7AF"               // Hangul Syllables
+          + @"\uD800-\uDFFF"               // Surrogates (emoji pairs)
+          + @"\uF900-\uFAFF"               // CJK Compatibility Ideographs
+          + @"\uFE00-\uFE0F"               // Variation Selectors
+          + @"\uFF00-\uFFEF]+";             // Halfwidth/Fullwidth — '+' collapses runs
+        var suspicious = System.Text.RegularExpressions.Regex.Replace(decoded, goodPattern, " ").Trim();
+
+        // Any PUA (U+E000-U+F8FF) or non-characters → instant CP949
+        if (System.Text.RegularExpressions.Regex.IsMatch(suspicious, @"[\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE\uFFFF]"))
+            return KoreanAnsi();
+
+        // Context: isolated suspicious chars (surrounded by spaces) are more suspect
+        // " X " = isolated → 2 penalty;  "XX" = clustered → 1 penalty each
+        int nonAscii = decoded.Count(c => c >= 0x80);
+        int suspCount = suspicious.Count(c => c != ' ');
+        int isolated = 0;
+        var parts = suspicious.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var p in parts)
+            if (p.Length == 1) isolated++;  // single char between good text = very suspicious
+
+        // Scoring: isolated chars count double
+        int score = suspCount + isolated;
+        if (nonAscii > 0 && score * 100 / nonAscii > 30)
+            return KoreanAnsi();
+
+        return new UTF8Encoding(false);                          // all checks passed → UTF-8
     }
 
     /// <summary>
@@ -890,6 +933,11 @@ internal partial class Program
                 return Error($"[file edit] backup failed ({ex.Message}) — file NOT written. Use --i-really-want-no-backup to skip backup.");
             }
         }
+
+        // Sanity check: re-detect encoding of output bytes to catch accidental encoding change
+        var verifyEnc = DetectFileEncoding(plan.OutBytes, null);
+        if (verifyEnc.CodePage != plan.Enc.CodePage)
+            Console.Error.WriteLine($"[file edit] WARNING: output encoding changed! {plan.Enc.WebName} → {verifyEnc.WebName} — possible corruption");
 
         // WriteAllBytes uses FileMode.Create (truncate-in-place) — no delete event fired
         File.WriteAllBytes(plan.Path, plan.OutBytes);
