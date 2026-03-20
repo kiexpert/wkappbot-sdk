@@ -131,7 +131,7 @@ internal partial class Program
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
                     var personaTextGpt = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
-                        SlackPostToThread($"?? *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextGpt.Length > 800 ? personaTextGpt[..800] + "..." : personaTextGpt)}\n```", "System");
+                        SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextGpt.Length > 800 ? personaTextGpt[..800] + "..." : personaTextGpt)}\n```", "System");
                     var (personaOk, personaResp) = await ChatGptSendAndWait(
                         cdp, personaTextGpt, timeoutSec: 20);
                     if (!personaOk)
