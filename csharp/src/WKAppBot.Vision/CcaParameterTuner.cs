@@ -33,15 +33,21 @@ public sealed class CcaParameterTuner
 
     private readonly string? _savePath;
 
-    public CcaParameterTuner(string? processName = null)
+    /// <summary>
+    /// Create tuner for a specific a11y node in the experience DB.
+    /// </summary>
+    /// <param name="controlDir">
+    /// Experience DB control directory, e.g.:
+    ///   {expDir}/form_{formId}/controls/cid_{N}/
+    ///   {expDir}/form_{formId}/tree/{path}/
+    /// Pass null for in-memory only (no persistence).
+    /// </param>
+    public CcaParameterTuner(string? controlDir = null)
     {
-        if (!string.IsNullOrEmpty(processName))
+        if (!string.IsNullOrEmpty(controlDir))
         {
-            var expDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "WKAppBot", "experience", SanitizeName(processName));
-            Directory.CreateDirectory(expDir);
-            _savePath = Path.Combine(expDir, "cca_params.json");
+            Directory.CreateDirectory(controlDir);
+            _savePath = Path.Combine(controlDir, "cca_params.json");
             Load();
         }
     }
