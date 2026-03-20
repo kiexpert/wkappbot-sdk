@@ -20,7 +20,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
 {
     private const uint FadeStartMs  = 10_000;      // 10s idle → fade begins
     private const uint FadeEndMs    = 180_000;     // 3min idle → max opacity
-    private const double MaxOpacity = 0.95;        // 95% opaque at full fade
+    private const double MaxOpacity = 0.99;        // 99% opaque at full fade
 
     // Sunset color stops: (progress 0.0-1.0, color, opacity at this stage)
     private static readonly (double t, Color color)[] SunsetStops =
