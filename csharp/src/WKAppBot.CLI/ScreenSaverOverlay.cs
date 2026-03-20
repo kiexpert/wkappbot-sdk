@@ -1,7 +1,10 @@
+using System.Drawing.Imaging;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using WKAppBot.Win32.Native;
 
@@ -96,9 +99,45 @@ internal sealed class ScreenSaverOverlay : IDisposable
             Title = "WKAppBot ScreenSaver",
         };
 
-        // Stars + moon canvas (drawn when night falls)
-        var canvas = new System.Windows.Controls.Canvas();
-        _window.Content = canvas;
+        // Load desktop wallpaper image file (no icons, just the pure wallpaper)
+        var grid = new System.Windows.Controls.Grid();
+        _window.Content = grid;
+
+        // Layer 0: wallpaper image
+        try
+        {
+            var wallpaperPath = GetDesktopWallpaperPath();
+            if (!string.IsNullOrEmpty(wallpaperPath) && File.Exists(wallpaperPath))
+            {
+                var bi = new BitmapImage();
+                bi.BeginInit();
+                bi.UriSource = new Uri(wallpaperPath);
+                bi.CacheOption = BitmapCacheOption.OnLoad;
+                bi.EndInit();
+                bi.Freeze();
+                var desktopImg = new System.Windows.Controls.Image
+                {
+                    Source = bi,
+                    Stretch = System.Windows.Media.Stretch.UniformToFill,
+                    Tag = "desktop",
+                };
+                grid.Children.Add(desktopImg);
+            }
+        }
+        catch { /* wallpaper unavailable — solid color fallback */ }
+
+        // Layer 1: sunset color overlay (on top of desktop)
+        var sunsetOverlay = new System.Windows.Controls.Border
+        {
+            Background = new SolidColorBrush(SunsetStops[0].color),
+            Opacity = 0,
+            Tag = "sunset",
+        };
+        grid.Children.Add(sunsetOverlay);
+
+        // Layer 2: stars + moon + waves canvas
+        var canvas = new System.Windows.Controls.Canvas { Tag = "sky" };
+        grid.Children.Add(canvas);
 
         // Pre-generate stars (random positions, sizes, opacities)
         var rng = new Random(42); // fixed seed = same constellation every time
@@ -258,16 +297,30 @@ internal sealed class ScreenSaverOverlay : IDisposable
                     }
                     _window.Opacity = targetOpacity;
 
-                    // Sunset color transition
+                    // Sunset color transition (on overlay layer, not window background)
                     if (Math.Abs(t - _lastT) >= 0.01)
                     {
                         _lastT = t;
                         var color = InterpolateSunset(t);
-                        _window.Background = new SolidColorBrush(color);
+                        // Update sunset overlay opacity + color
+                        if (_window.Content is System.Windows.Controls.Grid grid)
+                        {
+                            foreach (System.Windows.UIElement child in grid.Children)
+                            {
+                                if (child is System.Windows.Controls.Border border && border.Tag as string == "sunset")
+                                {
+                                    border.Background = new SolidColorBrush(color);
+                                    border.Opacity = 0.5 + t * 0.45; // 50%→95% — wallpaper always slightly visible early
+                                    break;
+                                }
+                            }
+                        }
 
                         // Stars + moon + saturn: fade in during twilight→night (t > 0.7)
                         // Waves: fade in during sunset (t > 0.3)
-                        if (_window.Content is System.Windows.Controls.Canvas canvas)
+                        var canvas = (_window.Content as System.Windows.Controls.Grid)
+                            ?.Children.OfType<System.Windows.Controls.Canvas>().FirstOrDefault();
+                        if (canvas != null)
                         {
                             double nightAlpha = t > 0.7 ? (t - 0.7) / 0.3 : 0;
                             double waveAlpha = t > 0.3 ? Math.Min(1.0, (t - 0.3) / 0.3) : 0;
@@ -334,6 +387,17 @@ internal sealed class ScreenSaverOverlay : IDisposable
             });
             Console.WriteLine("[EYE] ScreenSaver OFF (user input detected)");
         }
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool SystemParametersInfoW(uint uiAction, uint uiParam, System.Text.StringBuilder pvParam, uint fWinIni);
+    private const uint SPI_GETDESKWALLPAPER = 0x0073;
+
+    /// <summary>Get current desktop wallpaper file path from Windows.</summary>
+    private static string? GetDesktopWallpaperPath()
+    {
+        var sb = new System.Text.StringBuilder(260);
+        return SystemParametersInfoW(SPI_GETDESKWALLPAPER, 260, sb, 0) ? sb.ToString() : null;
     }
 
     /// <summary>Interpolate between sunset color stops based on progress t (0.0-1.0).</summary>
