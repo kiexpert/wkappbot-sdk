@@ -901,6 +901,34 @@ internal partial class Program
                                 dynZoom = ClickZoomHelper.Begin(hwnd, hwnd, "DYN-A11Y", $"Analyzing {gapCount} segments...");
                             }
                         }
+
+                        // Auto-hack: if blind nodes found, trigger lightweight CCA+cache lookup
+                        if (gapCollector.HasGaps && string.IsNullOrWhiteSpace(elName) && string.IsNullOrWhiteSpace(elAid))
+                        {
+                            Console.ForegroundColor = ConsoleColor.Magenta;
+                            Console.WriteLine($"[A11Y] Auto-hack: {gapCollector.Count} blind segment(s) — checking cache...");
+                            Console.ResetColor();
+                            // Cache lookup by pixel hash (instant — no Vision call)
+                            if (elBounds.HasValue)
+                            {
+                                try
+                                {
+                                    using var cropBmp = new System.Drawing.Bitmap(capturedBounds.Width, capturedBounds.Height);
+                                    using (var g = System.Drawing.Graphics.FromImage(cropBmp))
+                                        g.CopyFromScreen(capturedBounds.X, capturedBounds.Y, 0, 0, capturedBounds.Size);
+                                    var pixHash = OcrGapCollector.ComputePixelHash(cropBmp);
+                                    var cacheHit = LookupHackCache(hwnd, pixHash);
+                                    if (cacheHit != null)
+                                    {
+                                        elName = cacheHit;
+                                        Console.ForegroundColor = ConsoleColor.Green;
+                                        Console.WriteLine($"[A11Y] Hack cache hit → \"{elName}\"");
+                                        Console.ResetColor();
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
                     }
                     catch { /* OCR is best-effort */ }
                     finally { dynZoom?.Dispose(); }
@@ -2379,5 +2407,27 @@ internal partial class Program
         File.WriteAllBytes(filePath, encoded);
         Console.WriteLine($"[FILE-WRITE] {filePath} ({enc.WebName}, {content.Length} chars → {encoded.Length} bytes) ✓");
         return 0;
+    }
+
+    /// <summary>Lookup hack cache in experience DB by pixel hash. Returns description or null.</summary>
+    static string? LookupHackCache(IntPtr hwnd, string pixHash)
+    {
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            var proc = System.Diagnostics.Process.GetProcessById((int)pid);
+            var sb = new System.Text.StringBuilder(256);
+            NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
+            var expDir = Path.Combine(DataDir, "experience", proc.ProcessName, sb.ToString());
+            if (!Directory.Exists(expDir)) return null;
+            // Search all files matching *'{hash}=*.png
+            var pattern = $"*'{pixHash}=*.png";
+            var files = Directory.GetFiles(expDir, pattern, SearchOption.AllDirectories);
+            if (files.Length == 0) return null;
+            var name = Path.GetFileNameWithoutExtension(files[0]);
+            var eqIdx = name.IndexOf('=');
+            return eqIdx >= 0 ? name[(eqIdx + 1)..] : null;
+        }
+        catch { return null; }
     }
 }
