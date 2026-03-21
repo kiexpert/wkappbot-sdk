@@ -60,7 +60,7 @@ public sealed class ConnectedComponentAnalyzer
     // Adaptive threshold parameters
     private const int BlockSize = 15;       // local window size (must be odd)
     private const double K = 0.2;           // Sauvola sensitivity (0.0-0.5)
-    private const int MinComponentPixels = 12;  // ignore tiny noise (was 4 → too many fragments)
+    private const int MinComponentPixels = 7;   // ignore tiny noise (≤7px = dots/cursors, ≥8px = small chars like i,l,.)
 
     /// <summary>Optional tuned parameters (from CcaParameterTuner). Null = use defaults.</summary>
     public CcaParams? TunedParams { get; set; }
