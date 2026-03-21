@@ -21,12 +21,14 @@ internal partial class Program
             }, null, timeoutSec * 1000, System.Threading.Timeout.Infinite);
         }
 
+        PulseStep.Init("eye-tick");
         try
         {
             if (_lastTickActivityUtc == DateTime.MinValue) _lastTickActivityUtc = DateTime.UtcNow;
             if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
             var swTotal = Stopwatch.StartNew();
 
+            PulseStep.Mark("ipc-query");
             // ── Fast path: query running Eye loop via IPC pipe ──
             // Eye loop maintains all caches in memory — IPC response is ~5ms vs ~600ms legacy scan.
             // Fallback to legacy only when Eye is not running or pipe query fails.
@@ -52,7 +54,7 @@ internal partial class Program
                     Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
                 Console.Out.Flush();
                 // Slack forwarding handled by OnMessage → slack route worker (no HTTP poll on tick)
-                Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
+                PulseStep.Mark("ipc-done");
                 Console.Out.Flush();
                 return 0;
             }
@@ -60,6 +62,7 @@ internal partial class Program
             // ── Eye not running or refused: fall back to legacy scan ──
             // Eye는 간접 런칭만! tick에서 직접 spawn하지 않음.
             // 다음 일반 명령(inspect, a11y 등) 실행 시 자동 spawn됨.
+            PulseStep.Mark("ipc-failed-legacy");
             Console.WriteLine("[EYE] IPC query failed — falling back to legacy scan");
 
             // ── Phase 1: ReadLatestTick ──
@@ -212,7 +215,7 @@ internal partial class Program
             // ── atexit: Eye 살아있나 체크 → 없으면 spawn ──
             // tick이 할 일 다 하고 퇴근 직전에 Eye 생존 확인.
             // 워치독(10분)이 이걸 호출하므로 Eye 사망 시 최대 10분 안에 자동 복구.
-            PulseStep.Init("eye-ensure");
+            PulseStep.Mark("eye-check");
             try
             {
                 using var probe = new System.Threading.Mutex(false, EyeAliveMutexName);
@@ -250,11 +253,11 @@ internal partial class Program
                 }
             }
             catch { }
-            PulseStep.Done("eye-ensure");
-
             // ── Safety net: always schedule next watchdog tick ──
             // Even if Eye spawn fails, next tick will try again in 5 min.
+            PulseStep.Mark("watchdog-schedule");
             try { EnsureEyeWatchdogTask(); } catch { }
+            PulseStep.Done();
         }
     }
 
