@@ -384,15 +384,25 @@ internal partial class Program
         }
 
         // Acquire Eye-alive mutex for this process's lifetime — signals to callers that Eye is running.
-        // Single-instance guard: if another Eye holds it, exit immediately.
+        // Single-instance guard: if another Eye holds it, exit — UNLESS process is < 5 min old.
+        // Young processes never self-terminate (prevents hot-swap mutex race: old Eye holds mutex
+        // while new Eye starts → new Eye dies → old Eye exits → both dead).
         _eyeAliveMutex = new System.Threading.Mutex(true, EyeAliveMutexName, out bool createdNew);
         if (!createdNew)
         {
-            // Another Eye already running — this is a duplicate, exit cleanly
-            EyeLog("[EYE] Another Eye instance is already running — exiting duplicate");
-            _eyeAliveMutex.Dispose();
-            _eyeAliveMutex = null;
-            return 0;
+            var processAge = DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
+            if (processAge.TotalMinutes < 5)
+            {
+                EyeLog($"[EYE] Another Eye detected but process is young ({processAge.TotalSeconds:F0}s) — staying alive");
+                // Don't dispose mutex — will retry acquiring when other Eye exits
+            }
+            else
+            {
+                EyeLog("[EYE] Another Eye instance is already running — exiting duplicate");
+                _eyeAliveMutex.Dispose();
+                _eyeAliveMutex = null;
+                return 0;
+            }
         }
         // _eyeAliveMutex is static — held for process lifetime, GC will never collect it
 
