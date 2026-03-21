@@ -27,7 +27,7 @@ internal partial class Program
         if (args.Length >= 1)
         {
             var maybeAction = args[0].ToLowerInvariant();
-            if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr")
+            if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr" or "hack")
             {
                 var delegateArgs = args.Skip(1).ToArray();
                 return maybeAction switch
@@ -36,6 +36,7 @@ internal partial class Program
                     "windows"    => WindowsCommand(delegateArgs),
                     "screenshot" => CaptureCommand(delegateArgs),
                     "ocr"        => OcrCommand(delegateArgs),
+                    "hack"       => A11yHackCommand(delegateArgs),
                     _ => 1
                 };
             }
