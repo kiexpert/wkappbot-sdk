@@ -195,8 +195,19 @@ internal partial class Program
                 {
                     uiaLabel = !string.IsNullOrEmpty(uia.name) ? uia.name : uia.aid;
                     ocrOk++;
-                    // Cache UIA answer with pixel hash
                     CacheSegment(bmp, region.Bounds, w, h, dynId, uiaLabel);
+                    // Mismatch detection: CCA type vs UIA type → stderr for self-healing
+                    var ccaType = region.Type.ToString();
+                    var uiaType = uia.type;
+                    if (!string.IsNullOrEmpty(uiaType))
+                    {
+                        bool match = (ccaType == "Text" && uiaType is "Text" or "Edit" or "Document")
+                                  || (ccaType == "Icon" && uiaType is "Image" or "Button")
+                                  || (ccaType == "Container" && uiaType is "Group" or "Pane" or "Window")
+                                  || (ccaType == "Separator" && uiaType is "Separator");
+                        if (!match)
+                            Console.Error.WriteLine($"[MISMATCH] {dynId}: CCA={ccaType} UIA={uiaType} \"{uiaLabel}\" d={region.Density:F2} ar={region.AspectRatio:F1}");
+                    }
                 }
                 else if (region.Type == ConnectedComponentAnalyzer.RegionType.Text
                     || region.Type == ConnectedComponentAnalyzer.RegionType.Container)
