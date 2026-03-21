@@ -955,6 +955,23 @@ internal partial class Program
                 Win32.Input.KeyboardInput.OnMidInputAbort = (reason, ctx, intended) =>
                 {
                     PrintMidInputAbortNode(reason, ctx, intended, automation, _abortRoot, _abortElHwnd);
+
+                    // Auto bug report: capture callstack + last log line → suggest
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try
+                        {
+                            var stack = Environment.StackTrace;
+                            var fgHwnd = NativeMethods.GetForegroundWindow();
+                            var fgTitle = WindowFinder.GetWindowText(fgHwnd);
+                            var report = $"[BUG-AUTO] MidInputAbort reason={reason} fg=0x{fgHwnd.ToInt64():X} \"{fgTitle}\"\n" +
+                                $"intended=0x{intended.ToInt64():X} ctx={ctx}\n" +
+                                $"stack: {stack[..Math.Min(500, stack.Length)]}";
+                            SuggestCommand(new[] { report });
+                        }
+                        catch { }
+                    });
+
                     // FOCUS-DRIFT: show yield popup immediately and wait for user approval
                     // before the action fails and caller retries (so next Probe() auto-approves)
                     if (reason == "FOCUS-DRIFT" && readiness?.UserInputWait != null && intended != IntPtr.Zero)
