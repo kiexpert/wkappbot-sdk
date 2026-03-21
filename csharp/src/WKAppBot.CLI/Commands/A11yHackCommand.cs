@@ -85,6 +85,7 @@ internal partial class Program
             return 1;
         }
         Console.WriteLine($"[HACK] Captured: {w}x{h}");
+        InitHackExpDir(hwnd);
         PulseStep.Mark("captured");
 
         // CCA segmentation
@@ -195,7 +196,8 @@ internal partial class Program
                 {
                     uiaLabel = !string.IsNullOrEmpty(uia.name) ? uia.name : uia.aid;
                     ocrOk++;
-                    CacheSegment(bmp, region.Bounds, w, h, dynId, uiaLabel);
+                    CacheSegment(bmp, region.Bounds, w, h, dynId, uiaLabel,
+                        isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.Container);
                     // Mismatch detection: CCA type vs UIA type → stderr for self-healing
                     var ccaType = region.Type.ToString();
                     var uiaType = uia.type;
@@ -223,7 +225,8 @@ internal partial class Program
                             if (ocrText.Length > 0)
                             {
                                 ocrOk++;
-                                CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText);
+                                CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText,
+                                    isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.Container);
                             }
                             else
                             {
@@ -338,7 +341,15 @@ internal partial class Program
         return 0;
     }
 
-    static void CacheSegment(Bitmap source, Rectangle bounds, int imgW, int imgH, string dynId, string description)
+    /// <summary>
+    /// Cache segment to experience DB. Container segments become subdirectories.
+    /// Path: experience/{proc}/{class}/hack_{containerId}/{dynId}'{hash}={desc}.png
+    /// </summary>
+    static string? _hackExpDir; // set once per hack run
+    static string? _currentContainerDir; // current container subfolder
+
+    static void CacheSegment(Bitmap source, Rectangle bounds, int imgW, int imgH,
+        string dynId, string description, bool isContainer = false)
     {
         try
         {
@@ -346,18 +357,54 @@ internal partial class Program
             if (cropRect.Width <= 0 || cropRect.Height <= 0) return;
             using var crop = source.Clone(cropRect, source.PixelFormat);
             var hash = OcrGapCollector.ComputePixelHash(crop);
-            var cacheDir = Path.Combine(
+
+            // Build experience DB path
+            var baseDir = _hackExpDir ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "WKAppBot", "gap_cache");
-            Directory.CreateDirectory(cacheDir);
+
+            string targetDir;
+            if (isContainer)
+            {
+                // Container = subfolder in experience DB
+                targetDir = Path.Combine(baseDir, $"hack_{dynId}");
+                _currentContainerDir = targetDir;
+            }
+            else
+            {
+                // Child goes into current container folder, or root if no container
+                targetDir = _currentContainerDir ?? baseDir;
+            }
+
+            Directory.CreateDirectory(targetDir);
             var desc = description.Length > 50 ? description[..50] : description;
-            // Sanitize filename
             foreach (var c in Path.GetInvalidFileNameChars()) desc = desc.Replace(c, '_');
             desc = desc.Replace('=', '_').Replace('\'', '_');
             var fileName = $"{dynId}'{hash}={desc}.png";
-            var filePath = Path.Combine(cacheDir, fileName);
+            var filePath = Path.Combine(targetDir, fileName);
             if (!File.Exists(filePath))
                 crop.Save(filePath, ImageFormat.Png);
+        }
+        catch { }
+    }
+
+    static void InitHackExpDir(IntPtr hwnd)
+    {
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            var proc = System.Diagnostics.Process.GetProcessById((int)pid);
+            var procName = proc.ProcessName;
+            var className = "";
+            var sb = new System.Text.StringBuilder(256);
+            NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
+            className = sb.ToString();
+            _hackExpDir = Path.Combine(DataDir, "experience",
+                procName.Length > 0 ? procName : "unknown",
+                className.Length > 0 ? className : "unknown");
+            Directory.CreateDirectory(_hackExpDir);
+            _currentContainerDir = null;
+            Console.Error.WriteLine($"[HACK] ExpDB: {_hackExpDir}");
         }
         catch { }
     }
