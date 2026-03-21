@@ -194,7 +194,9 @@ internal partial class Program
                 if (regionIdx >= 0 && uiaAnswers.TryGetValue(regionIdx, out var uia))
                 {
                     uiaLabel = !string.IsNullOrEmpty(uia.name) ? uia.name : uia.aid;
-                    ocrOk++; // count as resolved
+                    ocrOk++;
+                    // Cache UIA answer with pixel hash
+                    CacheSegment(bmp, region.Bounds, w, h, dynId, uiaLabel);
                 }
                 else if (region.Type == ConnectedComponentAnalyzer.RegionType.Text
                     || region.Type == ConnectedComponentAnalyzer.RegionType.Container)
@@ -207,7 +209,11 @@ internal partial class Program
                             using var crop = bmp.Clone(cropRect, bmp.PixelFormat);
                             var result = ocr.RecognizeAll(crop).GetAwaiter().GetResult();
                             ocrText = string.Join(" ", result.Words.Select(x => x.Text)).Trim();
-                            if (ocrText.Length > 0) ocrOk++;
+                            if (ocrText.Length > 0)
+                            {
+                                ocrOk++;
+                                CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText);
+                            }
                             else
                             {
                                 ocrEmpty++;
@@ -319,5 +325,29 @@ internal partial class Program
         bmp.Dispose();
         PulseStep.Done();
         return 0;
+    }
+
+    static void CacheSegment(Bitmap source, Rectangle bounds, int imgW, int imgH, string dynId, string description)
+    {
+        try
+        {
+            var cropRect = Rectangle.Intersect(bounds, new Rectangle(0, 0, imgW, imgH));
+            if (cropRect.Width <= 0 || cropRect.Height <= 0) return;
+            using var crop = source.Clone(cropRect, source.PixelFormat);
+            var hash = OcrGapCollector.ComputePixelHash(crop);
+            var cacheDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "WKAppBot", "gap_cache");
+            Directory.CreateDirectory(cacheDir);
+            var desc = description.Length > 50 ? description[..50] : description;
+            // Sanitize filename
+            foreach (var c in Path.GetInvalidFileNameChars()) desc = desc.Replace(c, '_');
+            desc = desc.Replace('=', '_').Replace('\'', '_');
+            var fileName = $"{dynId}'{hash}={desc}.png";
+            var filePath = Path.Combine(cacheDir, fileName);
+            if (!File.Exists(filePath))
+                crop.Save(filePath, ImageFormat.Png);
+        }
+        catch { }
     }
 }
