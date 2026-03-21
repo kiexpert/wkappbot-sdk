@@ -25,7 +25,12 @@ internal partial class Program
         PulseStep.Init("a11y-hack");
 
         // Find target window
-        var grap = args[0];
+        // Parse grap#scope
+        var grapFull = string.Join(" ", args.TakeWhile(a => !a.StartsWith("--")));
+        var hashIdx = grapFull.IndexOf('#');
+        var grap = hashIdx >= 0 ? grapFull[..hashIdx] : grapFull;
+        var uiaScope = hashIdx >= 0 ? grapFull[(hashIdx + 1)..] : null;
+
         var targets = WindowFinder.FindByTitle(grap);
         if (!targets.Any())
         {
@@ -37,8 +42,25 @@ internal partial class Program
         Console.WriteLine($"[HACK] Target: 0x{hwnd.ToInt64():X} \"{win.Title}\"");
         PulseStep.Mark("target-found");
 
-        // Capture screenshot
+        // If #scope specified, find UIA element and use its BoundingRectangle
         NativeMethods.GetWindowRect(hwnd, out var wr);
+        if (!string.IsNullOrEmpty(uiaScope))
+        {
+            try
+            {
+                using var automation = new FlaUI.UIA3.UIA3Automation();
+                var root = automation.FromHandle(hwnd);
+                var scoped = WKAppBot.Win32.Accessibility.GrapHelper.FindUiaScope(root, uiaScope);
+                if (scoped != null)
+                {
+                    var r = scoped.Properties.BoundingRectangle.ValueOrDefault;
+                    wr.Left = r.X; wr.Top = r.Y; wr.Right = r.X + r.Width; wr.Bottom = r.Y + r.Height;
+                    Console.WriteLine($"[HACK] Scoped to: \"{uiaScope}\" rect=({r.X},{r.Y} {r.Width}x{r.Height})");
+                }
+                else Console.WriteLine($"[HACK] Scope \"{uiaScope}\" not found — using full window");
+            }
+            catch { Console.WriteLine($"[HACK] Scope error — using full window"); }
+        }
         int w = wr.Right - wr.Left, h = wr.Bottom - wr.Top;
         if (w <= 0 || h <= 0)
         {
