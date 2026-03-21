@@ -76,8 +76,8 @@ internal partial class Program
         var launcherPath = Path.Combine(dir, "wkappbot.exe");
         if (!File.Exists(launcherPath)) launcherPath = corePath;
 
-        var fireAt = DateTime.Now.AddMinutes(5).ToString("HH:mm");
-        var fireDate = DateTime.Now.AddMinutes(5).ToString("yyyy/MM/dd");
+        var fireAt = DateTime.Now.AddMinutes(2).ToString("HH:mm");
+        var fireDate = DateTime.Now.AddMinutes(2).ToString("yyyy/MM/dd");
         // schtasks.exe: native, no console window with CreateNoWindow, no focus steal
         var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"\\\"{launcherPath}\\\" eye tick --timeout 15\" /SC ONCE /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
         try

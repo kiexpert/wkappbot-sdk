@@ -74,8 +74,12 @@ internal partial class Program
     // ── Eye status message ts (앱봇아이 — edited in place, never idle-deleted) ──
     static string? _eyeStatusTs;
 
+    // ── Time-based loop timers ──
+    static DateTime _lastWatchdogRefresh = DateTime.MinValue;
+    static DateTime _lastEyeStatusEdit = DateTime.MinValue;
+    static DateTime _lastCcaAnalysis = DateTime.MinValue;
+
     // ── CCA live analysis cache ──
-    static int _ccaFrameCounter;
     static string _cachedCcaSummary = "";
 
     // ── Dead card + health check ──
@@ -886,10 +890,12 @@ internal partial class Program
                 }
             }
 
-            // ── Watchdog refresh (~every 1 min = 600 frames @ 100ms) ──
-            // Push eye tick 5 min into the future. If Eye dies, fires 5 min after last push.
-            if (frameCount % 600 == 0 && frameCount > 0)
+            // ── Watchdog refresh (every 1 min, time-based) ──
+            if ((DateTime.UtcNow - _lastWatchdogRefresh).TotalSeconds >= 60)
+            {
+                _lastWatchdogRefresh = DateTime.UtcNow;
                 EnsureEyeWatchdogTask();
+            }
 
             // ── Periodic GC (~every 5 min = 3000 frames @ 100ms) ──
             if (frameCount % 3000 == 0 && frameCount > 0)
@@ -913,10 +919,11 @@ internal partial class Program
                 Console.WriteLine($"[EYE] frame #{frameCount} ({(slackClient != null ? "Socket+API" : "API-only")}{slackInfo})");
             }
 
-            // ── Eye status edit (~every 50s = 500 frames) ──
-            if (frameCount % 500 == 0 && frameCount > 0
+            // ── Eye status edit (every 50s, time-based) ──
+            if ((DateTime.UtcNow - _lastEyeStatusEdit).TotalSeconds >= 50
                 && _eyeStatusTs != null && !string.IsNullOrEmpty(slackBotToken))
             {
+                _lastEyeStatusEdit = DateTime.UtcNow;
                 try
                 {
                     var summary = _cachedIpcSummary;
@@ -1118,10 +1125,11 @@ internal partial class Program
         var eyeSummary = BuildEyeSummary(cards, latest, promptPreview, promptDiag.FileWriteUtc);
 
         // ── CCA live analysis: capture active Claude window → segment → append to summary ──
-        if (_ccaFrameCounter++ % 10 == 0) // every ~10 ticks
+        if ((DateTime.UtcNow - _lastCcaAnalysis).TotalSeconds >= 10) // every 10s, time-based
         {
             try
             {
+                _lastCcaAnalysis = DateTime.UtcNow;
                 PulseStep.Init("cca-live");
                 var activePrompt = ClaudePromptHelper.GetAllCachedPrompts().FirstOrDefault();
                 if (activePrompt != null && activePrompt.WindowHandle != IntPtr.Zero
