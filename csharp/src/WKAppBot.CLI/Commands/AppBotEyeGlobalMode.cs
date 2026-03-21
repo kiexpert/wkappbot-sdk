@@ -695,6 +695,21 @@ internal partial class Program
                 }
             }
 
+            // ── First frame: announce Eye startup to Slack with card summary ──
+            if (frameCount == 0 && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+            {
+                try
+                {
+                    var cards = _cachedCards;
+                    var sb = new System.Text.StringBuilder();
+                    sb.AppendLine($"🟢 Eye started (PID={Environment.ProcessId}) — {cards.Count} card(s)");
+                    foreach (var c in cards)
+                        sb.AppendLine($"  • {c.LastTag} | {c.LastStatus} | PID={c.ParentPid} | {c.Cwd}");
+                    PostWithOverflow(slackBotToken, slackChannel, sb.ToString().TrimEnd(), username: "앱봇아이");
+                }
+                catch { }
+            }
+
             // ── Hot-swap blue-green: first render OK → old Eye exits on its own (return 0) ──
             if (replacePid > 0 && frameCount == 0)
             {
@@ -895,6 +910,19 @@ internal partial class Program
 
             frameCount++;
             Thread.Sleep(Math.Max(100, intervalMs));
+        }
+
+        // ── Shutdown announcement ──
+        if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+        {
+            try
+            {
+                var uptime = DateTime.UtcNow - eyeStartTime;
+                var reason = hotReloadTriggered ? "hot-swap" : "shutdown";
+                var msg = $"🔴 Eye stopped (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, reason={reason}, frames={frameCount})";
+                _ = SlackSendViaApi(slackBotToken, slackChannel, msg, username: "앱봇아이");
+            }
+            catch { }
         }
 
         // ── Cleanup ──
