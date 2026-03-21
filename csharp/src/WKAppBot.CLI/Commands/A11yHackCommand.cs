@@ -103,45 +103,87 @@ internal partial class Program
             Console.WriteLine($"[HACK] Table detected: {table.Rows} rows × {table.Cols} cols");
         PulseStep.Mark("table-detect");
 
-        // OCR on text regions
-        Console.WriteLine($"[HACK] ── Segments ──");
+        // OCR on text regions + tree output
         var positions = DynamicA11yAnalyzer.AssignGridPositions(
             regions, r => r.Bounds, rowGap: 5);
 
         using var ocr = new SimpleOcrAnalyzer();
+        var gapCollector = new OcrGapCollector();
         int ocrOk = 0, ocrEmpty = 0;
-        foreach (var (row, col, region) in positions)
+        int lastRow = -1;
+
+        // Group by row for tree display
+        var rowGroups = positions.GroupBy(p => p.row).OrderBy(g => g.Key).ToList();
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"[HACK] ── DYN-A11Y Tree ({w}×{h}) ──");
+        Console.ResetColor();
+
+        foreach (var rowGroup in rowGroups)
         {
-            var dynId = DynamicA11yAnalyzer.GenerateDynId(row, col, region.Bounds.Width, region.Bounds.Height);
-            string typeStr = region.Type.ToString();
-            string ocrText = "";
+            var items = rowGroup.OrderBy(p => p.col).ToList();
+            bool isLastRow = rowGroup.Key == rowGroups.Last().Key;
+            string rowPrefix = isLastRow ? "└── " : "├── ";
+            string childPrefix = isLastRow ? "    " : "│   ";
 
-            if (region.Type == ConnectedComponentAnalyzer.RegionType.Text
-                || region.Type == ConnectedComponentAnalyzer.RegionType.Container)
+            for (int ci = 0; ci < items.Count; ci++)
             {
-                try
-                {
-                    var cropRect = Rectangle.Intersect(region.Bounds, new Rectangle(0, 0, w, h));
-                    if (cropRect.Width > 0 && cropRect.Height > 0)
-                    {
-                        using var crop = bmp.Clone(cropRect, bmp.PixelFormat);
-                        var result = ocr.RecognizeAll(crop).GetAwaiter().GetResult();
-                        ocrText = string.Join(" ", result.Words.Select(x => x.Text)).Trim();
-                        if (ocrText.Length > 0) ocrOk++; else ocrEmpty++;
-                    }
-                }
-                catch { ocrEmpty++; }
-            }
+                var (row, col, region) = items[ci];
+                var dynId = DynamicA11yAnalyzer.GenerateDynId(row, col, region.Bounds.Width, region.Bounds.Height);
+                string ocrText = "";
+                bool isLastChild = ci == items.Count - 1;
+                string prefix = ci == 0 ? rowPrefix : childPrefix + (isLastChild ? "└ " : "├ ");
 
-            var label = ocrText.Length > 0 ? $" \"{(ocrText.Length > 40 ? ocrText[..40] + "..." : ocrText)}\"" : "";
-            var density = region.Density > 0 ? $" d={region.Density:F2}" : "";
-            var thin = region.Thinness > 0 ? $" thin={region.Thinness:F2}" : "";
-            Console.WriteLine($"  {dynId} [{typeStr}]{label} rect=({region.Bounds.X},{region.Bounds.Y} {region.Bounds.Width}x{region.Bounds.Height}){density}{thin}");
+                if (region.Type == ConnectedComponentAnalyzer.RegionType.Text
+                    || region.Type == ConnectedComponentAnalyzer.RegionType.Container)
+                {
+                    try
+                    {
+                        var cropRect = Rectangle.Intersect(region.Bounds, new Rectangle(0, 0, w, h));
+                        if (cropRect.Width > 0 && cropRect.Height > 0)
+                        {
+                            using var crop = bmp.Clone(cropRect, bmp.PixelFormat);
+                            var result = ocr.RecognizeAll(crop).GetAwaiter().GetResult();
+                            ocrText = string.Join(" ", result.Words.Select(x => x.Text)).Trim();
+                            if (ocrText.Length > 0) ocrOk++;
+                            else
+                            {
+                                ocrEmpty++;
+                                gapCollector.Add(cropRect, null);
+                            }
+                        }
+                    }
+                    catch { ocrEmpty++; }
+                }
+
+                // Tree line
+                var typeIcon = region.Type switch
+                {
+                    ConnectedComponentAnalyzer.RegionType.Text => "📝",
+                    ConnectedComponentAnalyzer.RegionType.Icon => "🎨",
+                    ConnectedComponentAnalyzer.RegionType.Container => "📦",
+                    ConnectedComponentAnalyzer.RegionType.Separator => "──",
+                    _ => "·"
+                };
+                if (region.Type == ConnectedComponentAnalyzer.RegionType.Noise) continue; // skip noise in tree
+
+                var label = ocrText.Length > 0
+                    ? $" \"{(ocrText.Length > 50 ? ocrText[..50] + "..." : ocrText)}\""
+                    : (region.Type == ConnectedComponentAnalyzer.RegionType.Text ? " [?]" : "");
+                Console.WriteLine($"{prefix}{typeIcon} {dynId}{label}  ({region.Bounds.Width}×{region.Bounds.Height})");
+            }
         }
         PulseStep.Mark("ocr-done");
 
-        Console.WriteLine($"[HACK] OCR: {ocrOk} recognized, {ocrEmpty} empty");
-        Console.WriteLine($"[HACK] Total: {positions.Count} nodes");
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"[HACK] ── Summary ──");
+        Console.ResetColor();
+        Console.WriteLine($"  Segments: {regions.Count} (Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount})");
+        Console.WriteLine($"  OCR: {ocrOk} ok, {ocrEmpty} failed");
+        if (table != null)
+            Console.WriteLine($"  Table: {table.Rows}×{table.Cols}");
+        if (gapCollector.HasGaps)
+            Console.WriteLine($"  Vision needed: {gapCollector.Count} blind region(s)");
 
         bmp.Dispose();
         PulseStep.Done();
