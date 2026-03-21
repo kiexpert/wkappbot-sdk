@@ -219,9 +219,17 @@ internal partial class Program
                 if (probe.WaitOne(0))
                 {
                     probe.ReleaseMutex();
-                    // Eye is dead — spawn it
+                    // Eye is dead — spawn and WAIT until confirmed alive
                     PulseStep.Mark("eye-dead-spawning");
                     LaunchAppBotEyeIfNeededCore("");
+                    // Wait up to 10s for Eye to acquire mutex (= alive)
+                    for (int wi = 0; wi < 100; wi++)
+                    {
+                        Thread.Sleep(100);
+                        using var check = new System.Threading.Mutex(false, EyeAliveMutexName);
+                        if (!check.WaitOne(0)) { PulseStep.Mark("eye-confirmed-alive"); break; }
+                        check.ReleaseMutex();
+                    }
                 }
                 else
                 {
@@ -230,9 +238,16 @@ internal partial class Program
             }
             catch (System.Threading.AbandonedMutexException)
             {
-                // Eye crashed — spawn
+                // Eye crashed — spawn and wait
                 PulseStep.Mark("eye-crashed-spawning");
                 LaunchAppBotEyeIfNeededCore("");
+                for (int wi = 0; wi < 100; wi++)
+                {
+                    Thread.Sleep(100);
+                    using var check = new System.Threading.Mutex(false, EyeAliveMutexName);
+                    if (!check.WaitOne(0)) { PulseStep.Mark("eye-confirmed-alive"); break; }
+                    check.ReleaseMutex();
+                }
             }
             catch { }
             PulseStep.Done("eye-ensure");
