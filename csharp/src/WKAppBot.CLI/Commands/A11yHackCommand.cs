@@ -16,15 +16,19 @@ internal partial class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot a11y hack <grap> [--depth N]");
+            Console.WriteLine("Usage: wkappbot a11y hack <grap>[#scope] [--engine gemini|gpt]");
             Console.WriteLine("  Force DYN-A11Y segmentation on target window or element.");
             Console.WriteLine("  Pipeline: capture → CCA → OCR → Vision → dynamic a11y tree");
             return 1;
         }
 
+        // Parse options
+        string visionEngine = "gemini";
+        for (int ai = 0; ai < args.Length; ai++)
+            if (args[ai] == "--engine" && ai + 1 < args.Length) visionEngine = args[++ai].ToLowerInvariant();
+
         PulseStep.Init("a11y-hack");
 
-        // Find target window
         // Parse grap#scope
         var grapFull = string.Join(" ", args.TakeWhile(a => !a.StartsWith("--")));
         var hashIdx = grapFull.IndexOf('#');
@@ -209,16 +213,38 @@ internal partial class Program
                     Console.ResetColor();
 
                     // Ask Gemini with composite image
-                    var exitCode = AskGemini(prompt, slackReport: false, timeoutSec: 60,
-                        attachFiles: new List<string> { compositePath }, noWait: false);
+                    Console.WriteLine($"[HACK] Engine: {visionEngine}");
+                    int exitCode = visionEngine switch
+                    {
+                        "gpt" => AskChatGpt(prompt, slackReport: false, timeoutSec: 60,
+                            attachFiles: new List<string> { compositePath }, noWait: false),
+                        "claude" => AskClaude(prompt, slackReport: false, timeoutSec: 60,
+                            noWait: false),
+                        _ => AskGemini(prompt, slackReport: false, timeoutSec: 60,
+                            attachFiles: new List<string> { compositePath }, noWait: false),
+                    };
 
                     PulseStep.Mark("vision-done");
-
-                    // TODO: parse response, cross-verify, update tree, cache with pixel hash
-                    // For now, Gemini response goes to console — user can see the analysis
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine($"[HACK] Vision query complete (exit={exitCode})");
                     Console.ResetColor();
+
+                    // Cache: save composite with pixel hash for future lookups
+                    try
+                    {
+                        var cacheDir = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "WKAppBot", "gap_cache");
+                        Directory.CreateDirectory(cacheDir);
+                        using var hashBmp = new Bitmap(compositePath);
+                        var hash = OcrGapCollector.ComputePixelHash(hashBmp);
+                        var cacheName = $"hack'{hash}={ts}.png";
+                        var cachePath = Path.Combine(cacheDir, cacheName);
+                        if (!File.Exists(cachePath))
+                            File.Copy(compositePath, cachePath);
+                        Console.WriteLine($"[HACK] Cached: {cacheName}");
+                    }
+                    catch { }
                 }
             }
             catch (Exception ex)

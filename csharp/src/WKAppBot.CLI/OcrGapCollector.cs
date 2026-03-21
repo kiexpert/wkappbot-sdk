@@ -112,7 +112,7 @@ internal sealed class OcrGapCollector
         return eqIdx >= 0 ? name[(eqIdx + 1)..] : null;
     }
 
-    private static string ComputePixelHash(Bitmap bmp)
+    internal static string ComputePixelHash(Bitmap bmp)
     {
         // Fast pixel hash: sample every 4th pixel, MD5 → 8-char hex
         using var md5 = MD5.Create();
