@@ -917,7 +917,8 @@ internal partial class Program
                 {
                     var summary = _cachedIpcSummary;
                     var uptime = DateTime.UtcNow - eyeStartTime;
-                    var msg = $"🟢 Eye alive (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, frame={frameCount})\n{summary}";
+                    var memMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+                    var msg = $"🟢 Eye alive (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, mem={memMB}MB, frame={frameCount})\n{summary}";
                     _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeStatusTs, msg);
                 }
                 catch { }
