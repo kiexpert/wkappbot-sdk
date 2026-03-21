@@ -379,7 +379,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
         {
             _isVisible = false;
             _currentOpacity = 0;
-            _dispatcher.Invoke(() =>
+            _dispatcher.BeginInvoke(() =>
             {
                 if (_window == null) return;
                 _window.Opacity = 0;
