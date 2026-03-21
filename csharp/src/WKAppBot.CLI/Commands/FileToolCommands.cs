@@ -734,13 +734,21 @@ internal partial class Program
             return 0;
         }
 
-        // Restore: copy backup → original
+        // Restore: backup current → copy bak → original
         int restored = 0;
         int errors = 0;
         foreach (var (bak, orig) in restorePairs)
         {
             try
             {
+                // Save current file before undo (undo-of-undo safety net)
+                if (File.Exists(orig))
+                {
+                    var undoTs = DateTime.Now.ToString("yyyyMMdd-HHmmss.fff");
+                    var undoBak = $"{orig}.undo-{undoTs}.txt";
+                    File.Copy(orig, undoBak);
+                    Console.WriteLine($"  [backup] {Path.GetFileName(undoBak)}");
+                }
                 File.Copy(bak, orig, overwrite: true);
                 restored++;
             }
