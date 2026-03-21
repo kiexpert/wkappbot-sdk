@@ -71,6 +71,9 @@ internal partial class Program
     // ── Recovered status positions from Slack (username → (ts, text)) ──
     static readonly Dictionary<string, (string ts, string text)> _recoveredStatusByUsername = new();
 
+    // ── Eye status message ts (앱봇아이 — edited in place, never idle-deleted) ──
+    static string? _eyeStatusTs;
+
     // ── Dead card + health check ──
     static readonly HashSet<int> _reportedDeadPids = new();          // pids we've already alerted for
     static readonly Dictionary<int, string> _cardHealthCache = new(); // pid → "ok"/"slow"/"dead"
@@ -700,12 +703,10 @@ internal partial class Program
             {
                 try
                 {
-                    var cards = _cachedCards;
-                    var sb = new System.Text.StringBuilder();
-                    sb.AppendLine($"🟢 Eye started (PID={Environment.ProcessId}) — {cards.Count} card(s)");
-                    foreach (var c in cards)
-                        sb.AppendLine($"  • {c.LastTag} | {c.LastStatus} | PID={c.ParentPid} | {c.Cwd}");
-                    PostWithOverflow(slackBotToken, slackChannel, sb.ToString().TrimEnd(), username: "앱봇아이");
+                    var summary = _cachedIpcSummary;
+                    var msg = $"🟢 Eye started (PID={Environment.ProcessId})\n{(summary.Length > 0 ? summary : "(no cards yet)")}";
+                    var (eyeOk, eyeTs) = PostWithOverflow(slackBotToken, slackChannel, msg, username: "앱봇아이");
+                    if (eyeOk && eyeTs != null) _eyeStatusTs = eyeTs;
                 }
                 catch { }
             }
@@ -906,6 +907,20 @@ internal partial class Program
                     ? $", Slack={slackClient.IsConnected}, msgs={slackClient.MessageCount}, reconn={slackClient.ReconnectCount}"
                     : "";
                 Console.WriteLine($"[EYE] frame #{frameCount} ({(slackClient != null ? "Socket+API" : "API-only")}{slackInfo})");
+            }
+
+            // ── Eye status edit (~every 50s = 500 frames) ──
+            if (frameCount % 500 == 0 && frameCount > 0
+                && _eyeStatusTs != null && !string.IsNullOrEmpty(slackBotToken))
+            {
+                try
+                {
+                    var summary = _cachedIpcSummary;
+                    var uptime = DateTime.UtcNow - eyeStartTime;
+                    var msg = $"🟢 Eye alive (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, frame={frameCount})\n{summary}";
+                    _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeStatusTs, msg);
+                }
+                catch { }
             }
 
             frameCount++;
