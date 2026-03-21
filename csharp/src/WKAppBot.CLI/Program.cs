@@ -366,6 +366,22 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine(crashMsg);
                 Console.ResetColor();
+                // Crash alert to Slack (best-effort, last gasp)
+                try
+                {
+                    var cfg = LoadSlackConfig();
+                    var bt = cfg?["bot_token"]?.GetValue<string>();
+                    var ch = cfg?["channel"]?.GetValue<string>();
+                    if (!string.IsNullOrEmpty(bt) && !string.IsNullOrEmpty(ch))
+                    {
+                        var stack = ex?.StackTrace?.Length > 500 ? ex.StackTrace[..500] + "..." : ex?.StackTrace;
+                        SlackSendViaApi(bt, ch,
+                            $"💥 Eye CRASH (PID={Environment.ProcessId})\n{ex?.GetType().Name}: {ex?.Message}\n```\n{stack}\n```",
+                            username: "앱봇아이").GetAwaiter().GetResult();
+                    }
+                }
+                catch { }
+
                 // Flush and close file WITHOUT moving to old/ — crash log stays in logs/
                 if (tee != null) Console.SetOut(tee.OriginalConsole);
                 tee?.ForceCloseWithoutMove();
