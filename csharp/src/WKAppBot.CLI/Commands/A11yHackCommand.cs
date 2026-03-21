@@ -107,6 +107,56 @@ internal partial class Program
             Console.WriteLine($"[HACK] Table detected: {table.Rows} rows × {table.Cols} cols");
         PulseStep.Mark("table-detect");
 
+        // UIA answer key: scan UIA tree, build rect→info map for cross-reference
+        var uiaAnswers = new Dictionary<int, (string name, string type, string aid)>();
+        var _uiaBestArea = new Dictionary<int, int>(); // track smallest match per region
+        try
+        {
+            PulseStep.Mark("uia-scan");
+            using var automation = new FlaUI.UIA3.UIA3Automation();
+            var uiaRoot = automation.FromHandle(hwnd);
+            var uiaElements = uiaRoot.FindAllDescendants();
+            int uiaMatched = 0;
+            for (int ri = 0; ri < regions.Count; ri++)
+            {
+                var seg = regions[ri];
+                // Convert segment rect to screen coordinates
+                var segScreen = new Rectangle(seg.Bounds.X + wr.Left, seg.Bounds.Y + wr.Top, seg.Bounds.Width, seg.Bounds.Height);
+                foreach (var el in uiaElements)
+                {
+                    try
+                    {
+                        var elRect = el.Properties.BoundingRectangle.ValueOrDefault;
+                        var elR = new Rectangle(elRect.X, elRect.Y, elRect.Width, elRect.Height);
+                        // Overlap > 50% of segment area = match
+                        // Pick smallest matching UIA element (most specific)
+                        var overlap = Rectangle.Intersect(segScreen, elR);
+                        if (overlap.Width * overlap.Height > seg.Bounds.Width * seg.Bounds.Height * 0.5)
+                        {
+                            var name = el.Properties.Name.ValueOrDefault ?? "";
+                            var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
+                            var ct = ""; try { ct = el.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                            if (!string.IsNullOrWhiteSpace(name) || !string.IsNullOrWhiteSpace(aid))
+                            {
+                                int elArea = elR.Width * elR.Height;
+                                bool existing = uiaAnswers.ContainsKey(ri);
+                                // Keep smallest (most specific) match
+                                if (!existing || elArea < _uiaBestArea.GetValueOrDefault(ri, int.MaxValue))
+                                {
+                                    uiaAnswers[ri] = (name, ct, aid);
+                                    _uiaBestArea[ri] = elArea;
+                                    if (!existing) uiaMatched++;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+            Console.WriteLine($"[HACK] UIA answer key: {uiaMatched}/{regions.Count} segments matched");
+        }
+        catch (Exception ex) { Console.WriteLine($"[HACK] UIA scan error: {ex.Message}"); }
+
         // OCR on text regions + tree output
         var positions = DynamicA11yAnalyzer.AssignGridPositions(
             regions, r => r.Bounds, rowGap: 5);
@@ -133,12 +183,20 @@ internal partial class Program
             for (int ci = 0; ci < items.Count; ci++)
             {
                 var (row, col, region) = items[ci];
+                int regionIdx = regions.IndexOf(region);
                 var dynId = DynamicA11yAnalyzer.GenerateDynId(row, col, region.Bounds.Width, region.Bounds.Height);
                 string ocrText = "";
+                string uiaLabel = "";
                 bool isLastChild = ci == items.Count - 1;
                 string prefix = ci == 0 ? rowPrefix : childPrefix + (isLastChild ? "└ " : "├ ");
 
-                if (region.Type == ConnectedComponentAnalyzer.RegionType.Text
+                // Check UIA answer key first — skip OCR if matched
+                if (regionIdx >= 0 && uiaAnswers.TryGetValue(regionIdx, out var uia))
+                {
+                    uiaLabel = !string.IsNullOrEmpty(uia.name) ? uia.name : uia.aid;
+                    ocrOk++; // count as resolved
+                }
+                else if (region.Type == ConnectedComponentAnalyzer.RegionType.Text
                     || region.Type == ConnectedComponentAnalyzer.RegionType.Container)
                 {
                     try
@@ -171,9 +229,13 @@ internal partial class Program
                 };
                 if (region.Type == ConnectedComponentAnalyzer.RegionType.Noise) continue; // skip noise in tree
 
-                var label = ocrText.Length > 0
-                    ? $" \"{(ocrText.Length > 50 ? ocrText[..50] + "..." : ocrText)}\""
-                    : (region.Type == ConnectedComponentAnalyzer.RegionType.Text ? " [?]" : "");
+                string label;
+                if (uiaLabel.Length > 0)
+                    label = $" ✓\"{(uiaLabel.Length > 50 ? uiaLabel[..50] + "..." : uiaLabel)}\"";
+                else if (ocrText.Length > 0)
+                    label = $" \"{(ocrText.Length > 50 ? ocrText[..50] + "..." : ocrText)}\"";
+                else
+                    label = region.Type == ConnectedComponentAnalyzer.RegionType.Text ? " [?]" : "";
                 Console.WriteLine($"{prefix}{typeIcon} {dynId}{label}  ({region.Bounds.Width}×{region.Bounds.Height})");
             }
         }
