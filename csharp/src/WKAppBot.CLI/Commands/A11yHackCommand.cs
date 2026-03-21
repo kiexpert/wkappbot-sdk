@@ -183,8 +183,51 @@ internal partial class Program
         if (table != null)
             Console.WriteLine($"  Table: {table.Rows}×{table.Cols}");
         if (gapCollector.HasGaps)
+        {
             Console.WriteLine($"  Vision needed: {gapCollector.Count} blind region(s)");
+            PulseStep.Mark("vision-query");
 
+            // Build triple composite → save → ask Gemini
+            try
+            {
+                var (images, prompt) = gapCollector.BuildTripleComposite();
+                if (images.Count > 0)
+                {
+                    var gapDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "WKAppBot", "gap_screenshots");
+                    Directory.CreateDirectory(gapDir);
+                    var ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                    // Save first image for Gemini ask
+                    var compositePath = Path.Combine(gapDir, $"hack_{ts}_A.png");
+                    File.WriteAllBytes(compositePath, images[0]);
+                    var promptPath = Path.Combine(gapDir, $"hack_{ts}.prompt.txt");
+                    File.WriteAllText(promptPath, prompt);
+
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.WriteLine($"[HACK] Asking Gemini Vision ({gapCollector.Count} regions)...");
+                    Console.ResetColor();
+
+                    // Ask Gemini with composite image
+                    var exitCode = AskGemini(prompt, slackReport: false, timeoutSec: 60,
+                        attachFiles: new List<string> { compositePath }, noWait: false);
+
+                    PulseStep.Mark("vision-done");
+
+                    // TODO: parse response, cross-verify, update tree, cache with pixel hash
+                    // For now, Gemini response goes to console — user can see the analysis
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"[HACK] Vision query complete (exit={exitCode})");
+                    Console.ResetColor();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[HACK] Vision error: {ex.Message}");
+            }
+        }
+
+        gapCollector.Dispose();
         bmp.Dispose();
         PulseStep.Done();
         return 0;
