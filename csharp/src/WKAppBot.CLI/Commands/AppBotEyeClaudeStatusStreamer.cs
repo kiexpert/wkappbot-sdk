@@ -929,6 +929,39 @@ internal partial class Program
             SetWindowStringProp(hwnd, PropStatusType, statusType);
             Console.WriteLine($"[EYE] Post [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
 
+            // Sweep same-username stale status messages (duplicates from Eye restart/hot-swap)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var http = new System.Net.Http.HttpClient();
+                    http.DefaultRequestHeaders.Authorization =
+                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", slackBotToken);
+                    var resp = await http.GetStringAsync($"https://slack.com/api/conversations.history?channel={slackChannel}&limit=15");
+                    var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(resp);
+                    if (json?["ok"]?.GetValue<bool>() != true) return;
+                    var msgs = json["messages"] as System.Text.Json.Nodes.JsonArray;
+                    if (msgs == null) return;
+                    foreach (var m in msgs)
+                    {
+                        var mTs = m?["ts"]?.GetValue<string>();
+                        var mUser = m?["username"]?.GetValue<string>();
+                        var mText = m?["text"]?.GetValue<string>() ?? "";
+                        if (mTs == null || mTs == ts || mUser != instanceUsername) continue;
+                        // Only delete status messages (emoji prefix), not user conversations
+                        bool isStatus = mText.StartsWith(":zzz:") || mText.StartsWith(":runner:")
+                            || mText.StartsWith(":gear:") || mText.StartsWith(":clipboard:")
+                            || mText.StartsWith(":memo:") || mText.StartsWith(":warning:");
+                        if (!isStatus) continue;
+                        var replyCount = m?["reply_count"]?.GetValue<int>() ?? 0;
+                        if (replyCount > 0) continue; // protect threads
+                        await SlackDeleteMessageAsync(slackBotToken, slackChannel, mTs);
+                        Console.WriteLine($"[EYE] Cleaned stale status for '{instanceUsername}': {mTs}");
+                    }
+                }
+                catch { /* best effort */ }
+            });
+
             // Sweep stale startup messages now that the new post is visible (no gap).
             // Delay 8s so all instances finish their first tick and populate _instanceStates —
             // then read active ts from window atom props directly (most reliable source).
