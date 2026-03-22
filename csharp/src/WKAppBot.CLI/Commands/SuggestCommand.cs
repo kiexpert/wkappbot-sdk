@@ -424,8 +424,8 @@ internal partial class Program
 
         // ── Resolve guard: require explicit confirmation flag ──
         const string ConfirmFlag = "--i-really-want-to-resolve-because-i-tested-and-confirmed-success-and-willkim-allowed-this";
-        const string ShortFlag = "--confirmed";
-        bool hasConfirm = args.Any(a => a == ConfirmFlag || a == ShortFlag);
+        // No short alias — force the long flag to make you think twice
+        bool hasConfirm = args.Any(a => a == ConfirmFlag);
         if (!hasConfirm)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
@@ -440,11 +440,11 @@ internal partial class Program
             Console.WriteLine("  □ 스크린샷/로그 증거 있음?");
             Console.WriteLine();
             Console.WriteLine("  모두 확인했으면 플래그 추가:");
-            Console.WriteLine($"  wkappbot suggest resolve <ts> \"note\" {ShortFlag}");
+            Console.WriteLine($"  wkappbot suggest resolve <ts> \"note\" {ConfirmFlag}");
             Console.ResetColor();
             return 1;
         }
-        args = args.Where(a => a != ConfirmFlag && a != ShortFlag).ToArray();
+        args = args.Where(a => a != ConfirmFlag).ToArray();
 
         var tsPrefix = args[0];
         var note = args.Length >= 2 ? string.Join(" ", args[1..]) : "resolved";
