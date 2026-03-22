@@ -101,10 +101,18 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
 - **Experience DB 사이클**: Mouse CCA(자동) + Probe(입력) + Find(액션) → fused_match.jsonl 축적 → 조회 폴백
 - **Zoom Cleanup**: 60초마다 1분+ InputZoom/InputHighlight 윈도우 자동 WM_CLOSE
 - **Eye 콘솔 UTF-8**: SetConsoleOutputCP(65001) + Console.OutputEncoding (스케줄러 포함)
+- **Process Separation**: ScreenSaver + WhisperRing → 별도 프로세스 (WPF 메모리 격리, 부모 PID 감시)
+- **analyze-hack**: CCA+UIA 분석 서버 프로세스 (one-shot + server mode, stdin/stdout JSON)
+- **Eye Startup PulseStep**: 6 체크포인트 + 메모리 워터마크 (54→710MB 범인 추적)
+- **PIPE-MEM**: 파이프 명령별 메모리 델타 로깅 (±5MB 이상)
+- **Slack Heartbeat**: 1분마다 IsConnected 체크 → 끊기면 자동 재접속
+- **suggest resolve guard**: `--i-completed-the-code-and-built-successfully-and-deployed-and-tested-with-real-scenarios-and-confirmed-meaningful-results-and-have-evidence-and-willkim-allowed-this` 필수
+- **claude-usage JSONL**: Session 라인에 JSONL 파일 크기 + context% 표시
 
 ### Sunset Screensaver
 10초 idle → 해질녘 색상 전환 (7-stop gradient) → 별/달/토성/파도 애니메이션
 바탕화면 벽지 배경 + 99% 불투명. WS_EX_TRANSPARENT 클릭 투과. GPU 전용 부하 0.
+**별도 프로세스**: `wkappbot screensaver` (자체 idle 감지, 부모 PID 감시 → Eye 종료 시 자동 종료)
 
 ### 프로젝트 구조
 ```
