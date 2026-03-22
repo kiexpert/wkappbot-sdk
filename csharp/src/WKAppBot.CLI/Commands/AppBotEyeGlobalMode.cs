@@ -863,11 +863,40 @@ internal partial class Program
                 }
             }
 
-            // ── Watchdog refresh (every 1 min, time-based) ──
+            // ── Watchdog refresh + Slack heartbeat (every 1 min, time-based) ──
             if ((DateTime.UtcNow - _lastWatchdogRefresh).TotalSeconds >= 60)
             {
                 _lastWatchdogRefresh = DateTime.UtcNow;
                 EnsureEyeWatchdogTask();
+
+                // Slack Socket heartbeat: reconnect if disconnected
+                if (slackClient != null && !slackClient.IsConnected)
+                {
+                    Console.WriteLine("[EYE] Slack disconnected — attempting reconnect...");
+                    try
+                    {
+                        slackClient.Dispose();
+                        slackClient = new SlackSocketClient();
+                        string? appTok = null;
+                        try
+                        {
+                            var cfg = Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
+                            if (File.Exists(cfg))
+                                appTok = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(cfg))?["app_token"]?.GetValue<string>();
+                        }
+                        catch { }
+                        if (appTok != null && slackBotToken != null)
+                        {
+                            slackClient.ConnectAsync(appTok, slackBotToken).GetAwaiter().GetResult();
+                            SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
+                                GetCurrentClaudeHwnd, GetAnyPlanApprovalTs,
+                                GetAnyPermissionTs, _eyeStatusTs, botUsername,
+                                GetAnyInstanceSlackStatusTs, () => ResetAllInstancesSlackStatus(statusTsFile));
+                            Console.WriteLine("[EYE] Slack reconnected!");
+                        }
+                    }
+                    catch (Exception ex) { Console.WriteLine($"[EYE] Slack reconnect failed: {ex.Message}"); }
+                }
             }
 
             // ── Periodic GC (~every 5 min = 3000 frames @ 100ms) ──
