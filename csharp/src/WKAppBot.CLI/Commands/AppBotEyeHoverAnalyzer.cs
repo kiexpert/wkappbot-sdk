@@ -87,11 +87,11 @@ internal partial class Program
     static string _lastHackNodeKey = ""; // change detection: hwnd+elName+elAid
 
     /// <summary>
-    /// Start mouse CCA worker using analyze-hack server process.
-    /// Event-driven: only analyze when mouse UIA node changes.
+    /// Start unified analysis worker: mouse CCA + keyboard focus in ONE loop.
+    /// Shares single analyze-hack server process, alternates requests.
     /// </summary>
     internal static void StartMouseCcaWorker(CancellationToken ct) =>
-        Task.Run(() => MouseCcaServerLoop(ct), ct);
+        Task.Run(() => UnifiedAnalysisLoop(ct), ct);
 
     static void EnsureHackServer()
     {
@@ -119,16 +119,16 @@ internal partial class Program
         catch (Exception ex) { Console.Error.WriteLine($"[MOUSE-CCA] Server spawn failed: {ex.Message}"); }
     }
 
-    static async Task MouseCcaServerLoop(CancellationToken ct)
+    static async Task UnifiedAnalysisLoop(CancellationToken ct)
     {
-        Console.WriteLine("[MOUSE-CCA] Event-driven analysis (analyze-hack server)");
+        Console.WriteLine("[ANALYSIS] Unified mouse+focus loop (analyze-hack server)");
         bool firstRun = true;
 
-        // Wait for Eye startup Slack message (need _eyeStatusTs for thread replies)
+        // Wait for Eye startup Slack message
         for (int wait = 0; wait < 30 && _eyeStatusTs == null && !ct.IsCancellationRequested; wait++)
             await Task.Delay(1000, ct);
 
-        // Post placeholder replies immediately
+        // Post placeholder replies: mouse first, then focus
         if (_eyeStatusTs != null && !string.IsNullOrEmpty(_eyeBotToken) && !string.IsNullOrEmpty(_eyeChannel))
         {
             try
@@ -141,7 +141,7 @@ internal partial class Program
                     threadTs: _eyeStatusTs, username: "앱봇아이");
                 if (ok2 && ts2 != null) _focusChainReplyTs = ts2;
 
-                Console.WriteLine("[MOUSE-CCA] Placeholder replies posted");
+                Console.WriteLine("[ANALYSIS] Placeholder replies posted (mouse → focus order)");
             }
             catch { }
         }
@@ -227,12 +227,63 @@ internal partial class Program
                 if (serverResult == _lastMouseCcaResult) continue;
                 _lastMouseCcaResult = serverResult;
 
-                // Post to Slack
+                // Post mouse to Slack
                 await UpdateMouseCcaSlack(serverResult);
-                Console.WriteLine($"[MOUSE-CCA] {serverResult.Split('\n')[0]}");
+                Console.WriteLine($"[ANALYSIS] mouse: {serverResult.Split('\n')[0]}");
+
+                // ── Keyboard focus (same server, same loop iteration) ──
+                try
+                {
+                    _hackServerStdin!.WriteLine("{\"type\":\"focus\"}");
+                    _hackServerStdin.Flush();
+                    var focusLine = await Task.Run(() => _hackServerProcess!.StandardOutput.ReadLine(), ct)
+                        .WaitAsync(TimeSpan.FromSeconds(5), ct);
+                    if (!string.IsNullOrEmpty(focusLine))
+                    {
+                        var fr = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(focusLine);
+                        if (fr?["error"] == null)
+                        {
+                            var fName = fr?["name"]?.GetValue<string>() ?? "";
+                            var fType = fr?["type"]?.GetValue<string>() ?? "?";
+                            var fValue = fr?["value"]?.GetValue<string>() ?? "";
+                            var fGrap = fr?["grapPath"]?.GetValue<string>() ?? "";
+                            var fWin = fr?["winTitle"]?.GetValue<string>() ?? "";
+                            var fPatterns = fr?["patterns"]?.GetValue<string>() ?? "";
+                            var fPid = fr?["pid"]?.GetValue<int>() ?? 0;
+                            if (fPid != Environment.ProcessId)
+                            {
+                                var fWinShort = fWin.Length > 30 ? fWin[..30] + "…" : fWin;
+                                var fsb = new StringBuilder();
+                                fsb.AppendLine($"⌨️ **grap**: `{fGrap}`");
+                                fsb.AppendLine($"**focus**: `[{fType}]` \"{fName}\"");
+                                if (!string.IsNullOrEmpty(fValue))
+                                    fsb.AppendLine($"**value**: \"{(fValue.Length > 50 ? fValue[..50] + "…" : fValue)}\"");
+                                fsb.AppendLine($"**win**: _{fWinShort}_");
+                                var chain = fr?["chain"] as System.Text.Json.Nodes.JsonArray;
+                                if (chain?.Count > 0)
+                                {
+                                    fsb.AppendLine("**chain**:");
+                                    foreach (var p in chain)
+                                        fsb.AppendLine($"  └ `[{p?["type"]}]` {p?["name"]}");
+                                }
+                                if (!string.IsNullOrEmpty(fPatterns))
+                                    fsb.AppendLine($"**patterns**: {fPatterns}");
+                                var focusResult = fsb.ToString().TrimEnd();
+                                if (focusResult != _lastFocusChainResult)
+                                {
+                                    _lastFocusChainResult = focusResult;
+                                    if (_focusChainReplyTs != null)
+                                        await SlackUpdateMessageAsync(_eyeBotToken!, _eyeChannel!, _focusChainReplyTs, focusResult);
+                                    Console.WriteLine($"[ANALYSIS] focus: {focusResult.Split('\n')[0]}");
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception ex) { Console.WriteLine($"[MOUSE-CCA] Error: {ex.Message}"); }
+            catch (Exception ex) { Console.WriteLine($"[ANALYSIS] Error: {ex.Message}"); }
         }
 
         // Cleanup server process
