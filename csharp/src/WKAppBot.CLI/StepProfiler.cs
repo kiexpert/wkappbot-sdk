@@ -76,6 +76,8 @@ internal sealed class StepProfiler
     private readonly Stopwatch _sw = Stopwatch.StartNew();
     private readonly string _startedAt = DateTime.Now.ToString("HH:mm:ss.fff");
     private long _lastMs;
+    private long _initMemMB;  // WS at Init time
+    private long _lastMemMB;  // WS at last step
     private readonly long _thresholdMs;
 
     public StepProfiler(string name, long thresholdMs = 100)
@@ -84,11 +86,15 @@ internal sealed class StepProfiler
         _thresholdMs = thresholdMs;
     }
 
+    private static long GetWsMB() => Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+
     /// <summary>Print init line unconditionally (no threshold). Resets last-step timer.</summary>
     public void Init(string label, string callerHint = "")
     {
         _lastMs = _sw.ElapsedMilliseconds;
-        Console.Error.WriteLine($"[PULSE:{_name}] ── init \"{label}\" @{_startedAt} ──");
+        _initMemMB = GetWsMB();
+        _lastMemMB = _initMemMB;
+        Console.Error.WriteLine($"[PULSE:{_name}] ── init \"{label}\" @{_startedAt} mem={_initMemMB}MB ──");
     }
 
     public void Step(
@@ -102,11 +108,15 @@ internal sealed class StepProfiler
         var nowMs = _sw.ElapsedMilliseconds;
         var delta = nowMs - _lastMs;
         _lastMs = nowMs;
-        if (delta < _thresholdMs) return;
+        var curMem = GetWsMB();
+        var memDelta = curMem - _lastMemMB;
+        _lastMemMB = curMem;
+        if (delta < _thresholdMs && memDelta < 10) return; // also trigger on +10MB
 
         var chain = BuildCallChain(skipFrames + 1);
+        var memStr = memDelta != 0 ? $" mem={curMem}MB({(memDelta >= 0 ? "+" : "")}{memDelta})" : "";
         Console.Error.WriteLine(
-            $"[PULSE:{_name}] {callerHint} \"{label}\" +{delta}ms (total={nowMs}ms @{_startedAt})");
+            $"[PULSE:{_name}] {callerHint} \"{label}\" +{delta}ms (total={nowMs}ms @{_startedAt}){memStr}");
         Console.Error.WriteLine($"  callchain: {chain}");
     }
 
@@ -119,9 +129,11 @@ internal sealed class StepProfiler
     internal void Done(string label, int skipFrames, string callerHint)
     {
         Step(label, skipFrames + 1, callerHint);
-        // Always print total — fast=홍보, slow=알림 ㅋ
         var totalMs = _sw.ElapsedMilliseconds;
-        Console.Error.WriteLine($"[PULSE:{_name}] ── total {totalMs}ms ──");
+        var finalMem = GetWsMB();
+        var totalMemDelta = finalMem - _initMemMB;
+        var memStr = totalMemDelta != 0 ? $" mem={finalMem}MB({(totalMemDelta >= 0 ? "+" : "")}{totalMemDelta})" : "";
+        Console.Error.WriteLine($"[PULSE:{_name}] ── total {totalMs}ms{memStr} ──");
     }
 
     /// <summary>
