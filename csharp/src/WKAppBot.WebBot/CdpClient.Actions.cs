@@ -275,6 +275,23 @@ public sealed partial class CdpClient
             throw new InvalidOperationException($"Element is neither input/textarea nor contentEditable: {selector}");
     }
 
+    /// <summary>
+    /// Type text using CDP Input.insertText — bypasses IME composition issues.
+    /// Best for CJK (Korean/Japanese/Chinese) input in contentEditable editors (Notion, Slack, etc.).
+    /// </summary>
+    public async Task TypeInsertTextAsync(string selector, string text)
+    {
+        var escapedSelector = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+
+        // Focus the element first
+        var focusResult = await EvalAsync($"(() => {{ const el = document.querySelector('{escapedSelector}'); if (!el) return 'NOT_FOUND'; el.focus(); return 'OK'; }})()");
+        if (focusResult == "NOT_FOUND")
+            throw new InvalidOperationException($"Element not found: {selector}");
+
+        // Use CDP Input.insertText — injects text directly without key events
+        await SendAsync("Input.insertText", new JsonObject { ["text"] = text });
+    }
+
     /// <summary>Get text content of an element by CSS selector.</summary>
     public async Task<string?> GetTextAsync(string selector)
     {
@@ -665,6 +682,123 @@ public sealed partial class CdpClient
         await DispatchKeyAsync(key, mods);
         Console.WriteLine($"  [CDP-HOTKEY] '{shortcut}' → key={key} mods={mods}");
         return true;
+    }
+
+    /// <summary>
+    /// Right-click an element by CSS selector (context menu).
+    /// Uses CDP Input.dispatchMouseEvent with button="right".
+    /// </summary>
+    public async Task RightClickAsync(string selector)
+    {
+        var escapedSelector = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+
+        var pointJson = await EvalAsync($$"""
+            (() => {
+                const el = document.querySelector('{{escapedSelector}}');
+                if (!el) return JSON.stringify({ ok:false, reason:'NOT_FOUND' });
+                el.scrollIntoView({ block:'center', inline:'center' });
+                const r = el.getBoundingClientRect();
+                if (!r || r.width <= 0 || r.height <= 0)
+                    return JSON.stringify({ ok:false, reason:'NO_RECT' });
+                const x = r.left + Math.min(r.width / 2, Math.max(1, r.width - 1));
+                const y = r.top + Math.min(r.height / 2, Math.max(1, r.height - 1));
+                return JSON.stringify({ ok:true, x, y });
+            })()
+            """);
+
+        if (string.IsNullOrWhiteSpace(pointJson))
+            throw new InvalidOperationException($"Failed to resolve click point: {selector}");
+
+        var point = JsonNode.Parse(pointJson);
+        var ok = point?["ok"]?.GetValue<bool>() ?? false;
+        if (!ok)
+        {
+            var reason = point?["reason"]?.GetValue<string>();
+            throw new InvalidOperationException(reason == "NOT_FOUND"
+                ? $"Element not found: {selector}"
+                : $"Element not clickable: {selector} ({reason})");
+        }
+
+        var x = point?["x"]?.GetValue<double>() ?? 0;
+        var y = point?["y"]?.GetValue<double>() ?? 0;
+
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mouseMoved", ["x"] = x, ["y"] = y, ["button"] = "none" });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mousePressed", ["x"] = x, ["y"] = y, ["button"] = "right", ["clickCount"] = 1 });
+        await SendAsync("Input.dispatchMouseEvent", new JsonObject
+            { ["type"] = "mouseReleased", ["x"] = x, ["y"] = y, ["button"] = "right", ["clickCount"] = 1 });
+    }
+
+    /// <summary>
+    /// Scroll an element or the page by CSS selector.
+    /// Uses Element.scrollBy for element scroll, window.scrollBy for page scroll.
+    /// </summary>
+    public async Task ScrollAsync(string? selector, string direction, string amount)
+    {
+        // Parse amount: "page" = viewport height, number = pixels, default = 300px
+        var amountJs = amount?.ToLowerInvariant() switch
+        {
+            "page" => direction is "up" or "down"
+                ? "(window.innerHeight * 0.85)"
+                : "(window.innerWidth * 0.85)",
+            null or "" => "300",
+            _ => int.TryParse(amount, out var px) ? px.ToString() : "300"
+        };
+
+        var (dx, dy) = direction?.ToLowerInvariant() switch
+        {
+            "up" => ("0", $"-{amountJs}"),
+            "down" => ("0", amountJs),
+            "left" => ($"-{amountJs}", "0"),
+            "right" => (amountJs, "0"),
+            _ => ("0", amountJs) // default = down
+        };
+
+        if (string.IsNullOrEmpty(selector) || selector == "window" || selector == "page")
+        {
+            await EvalAsync($"window.scrollBy({dx}, {dy})");
+        }
+        else
+        {
+            var esc = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+            var js = $"(() => {{ const el = document.querySelector('{esc}'); if (!el) return 'NOT_FOUND'; el.scrollBy({dx}, {dy}); return 'OK'; }})()";
+            var result = await EvalAsync(js);
+            if (result == "NOT_FOUND")
+                throw new InvalidOperationException($"Element not found: {selector}");
+        }
+    }
+
+    /// <summary>
+    /// Expand or collapse a details/disclosure element, or toggle aria-expanded.
+    /// </summary>
+    public async Task ExpandCollapseAsync(string selector, bool expand)
+    {
+        var esc = selector.Replace("\\", "\\\\").Replace("'", "\\'");
+        var js = $$"""
+            (() => {
+                const el = document.querySelector('{{esc}}');
+                if (!el) return 'NOT_FOUND';
+                // <details> element
+                if (el.tagName === 'DETAILS') {
+                    el.open = {{(expand ? "true" : "false")}};
+                    return 'OK';
+                }
+                // aria-expanded toggle
+                const cur = el.getAttribute('aria-expanded');
+                if (cur !== null) {
+                    el.setAttribute('aria-expanded', '{{(expand ? "true" : "false")}}');
+                    el.click();
+                    return 'OK';
+                }
+                // Fallback: just click (many accordions toggle on click)
+                el.click();
+                return 'OK_CLICK';
+            })()
+            """;
+        var result = await EvalAsync(js);
+        if (result == "NOT_FOUND")
+            throw new InvalidOperationException($"Element not found: {selector}");
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "ShowWindow")]

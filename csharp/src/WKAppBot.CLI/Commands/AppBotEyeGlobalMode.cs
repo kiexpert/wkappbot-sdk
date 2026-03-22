@@ -73,6 +73,8 @@ internal partial class Program
 
     // ── Eye status message ts (앱봇아이 — edited in place, never idle-deleted) ──
     static string? _eyeStatusTs;
+    static string? _eyeSummaryReplyTs; // thread reply for card summary
+    static string _lastPostedSummary = ""; // change detection: only post when summary differs
 
     // ── Time-based loop timers ──
     static DateTime _lastWatchdogRefresh = DateTime.MinValue;
@@ -241,8 +243,10 @@ internal partial class Program
         _ = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
         Console.WriteLine($"[EYE] Eye pipe server started (elevated={elevated})");
 
-        // ── A11Y Heal Scan: mouse still 7s → UIA dump → Gemini fallback ──
-        StartHoverAnalyzer(cts.Token);
+        // ── Mouse CCA: 1s interval → UIA element + CCA + Visual MD → Slack thread reply ──
+        StartMouseCcaWorker(cts.Token);
+        // ── Keyboard Focus Chain: 1s interval → focused element + parent chain → Slack thread reply ──
+        StartFocusChainWorker(cts.Token);
 
         if (_lastTickActivityUtc == DateTime.MinValue) _lastTickActivityUtc = DateTime.UtcNow;
         if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
@@ -712,9 +716,18 @@ internal partial class Program
                 try
                 {
                     var summary = _cachedIpcSummary;
-                    var msg = $"🟢 Eye started (PID={Environment.ProcessId})\n{(summary.Length > 0 ? summary : "(no cards yet)")}";
-                    var (eyeOk, eyeTs) = PostWithOverflow(slackBotToken, slackChannel, msg, username: "앱봇아이");
-                    if (eyeOk && eyeTs != null) _eyeStatusTs = eyeTs;
+                    var startMsg = $"🟢 Eye started (PID={Environment.ProcessId})";
+                    var (eyeOk, eyeTs) = SlackSendViaApi(slackBotToken, slackChannel, startMsg, username: "앱봇아이").GetAwaiter().GetResult();
+                    if (eyeOk && eyeTs != null)
+                    {
+                        _eyeStatusTs = eyeTs;
+                        // Post card summary as thread reply
+                        if (summary.Length > 0)
+                        {
+                            var (replyOk, replyTs) = SlackSendViaApi(slackBotToken, slackChannel, summary, threadTs: eyeTs, username: "앱봇아이").GetAwaiter().GetResult();
+                            if (replyOk && replyTs != null) _eyeSummaryReplyTs = replyTs;
+                        }
+                    }
                 }
                 catch { }
             }
@@ -919,20 +932,35 @@ internal partial class Program
                 Console.WriteLine($"[EYE] frame #{frameCount} ({(slackClient != null ? "Socket+API" : "API-only")}{slackInfo})");
             }
 
-            // ── Eye status edit (every 50s, time-based) ──
-            if ((DateTime.UtcNow - _lastEyeStatusEdit).TotalSeconds >= 50
-                && _eyeStatusTs != null && !string.IsNullOrEmpty(slackBotToken))
+            // ── Eye status edit (change-based: only when card summary differs, throttled 1s) ──
+            if (_eyeStatusTs != null && !string.IsNullOrEmpty(slackBotToken)
+                && (DateTime.UtcNow - _lastEyeStatusEdit).TotalSeconds >= 1.0)
             {
-                _lastEyeStatusEdit = DateTime.UtcNow;
-                try
+                var summary = _cachedIpcSummary;
+                if (summary != _lastPostedSummary)
                 {
-                    var summary = _cachedIpcSummary;
-                    var uptime = DateTime.UtcNow - eyeStartTime;
-                    var memMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
-                    var msg = $"🟢 Eye alive (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, mem={memMB}MB, frame={frameCount})\n{summary}";
-                    _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeStatusTs, msg);
+                    _lastEyeStatusEdit = DateTime.UtcNow;
+                    _lastPostedSummary = summary;
+                    try
+                    {
+                        var uptime = DateTime.UtcNow - eyeStartTime;
+                        var memMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+                        var mainMsg = $"🟢 Eye alive (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, mem={memMB}MB, frame={frameCount})";
+                        _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeStatusTs, mainMsg);
+                        // Update summary thread reply
+                        if (summary.Length > 0 && _eyeSummaryReplyTs != null)
+                            _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeSummaryReplyTs, summary);
+                        else if (summary.Length > 0 && _eyeSummaryReplyTs == null && _eyeStatusTs != null)
+                        {
+                            _ = Task.Run(async () =>
+                            {
+                                var (ok, ts) = await SlackSendViaApi(slackBotToken!, slackChannel!, summary, threadTs: _eyeStatusTs, username: "앱봇아이");
+                                if (ok && ts != null) _eyeSummaryReplyTs = ts;
+                            });
+                        }
+                    }
+                    catch { }
                 }
-                catch { }
             }
 
             frameCount++;
@@ -947,7 +975,11 @@ internal partial class Program
                 var uptime = DateTime.UtcNow - eyeStartTime;
                 var reason = hotReloadTriggered ? "hot-swap" : "shutdown";
                 var msg = $"🔴 Eye stopped (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, reason={reason}, frames={frameCount})";
-                _ = SlackSendViaApi(slackBotToken, slackChannel, msg, username: "앱봇아이");
+                // Edit main message to show stopped status
+                if (_eyeStatusTs != null)
+                    SlackUpdateMessageAsync(slackBotToken, slackChannel, _eyeStatusTs, msg).GetAwaiter().GetResult();
+                else
+                    SlackSendViaApi(slackBotToken, slackChannel, msg, username: "앱봇아이").GetAwaiter().GetResult();
             }
             catch { }
         }

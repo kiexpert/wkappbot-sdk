@@ -76,6 +76,8 @@ internal partial class Program
         }
         var (textParts, filePaths) = ParseTextAndFiles(remaining.ToArray());
         var replyText = string.Join("\n", textParts);
+        // C-style escape decode: \n → newline, \t → tab, \\ → backslash
+        replyText = DecodeCEscapes(replyText);
         // Bash history expansion escapes ! to \! even in single quotes — undo it
         replyText = replyText.Replace("\\!", "!");
         if (string.IsNullOrWhiteSpace(replyText))

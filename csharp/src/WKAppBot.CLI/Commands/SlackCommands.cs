@@ -215,6 +215,8 @@ internal partial class Program
         // Parse: text parts + file attachments (shared ParseTextAndFiles)
         var (textParts, filePaths) = ParseTextAndFiles(args, startIndex: 1);
         var message = string.Join("\n", textParts);
+        // C-style escape decode: \n → newline, \t → tab, \\ → backslash
+        message = DecodeCEscapes(message);
         // Bash history expansion escapes ! to \! even in single quotes — undo it
         message = message.Replace("\\!", "!");
 
@@ -254,6 +256,29 @@ internal partial class Program
         }
 
         return 0;
+    }
+
+    /// <summary>C-style escape decode: \n → newline, \t → tab, \\ → backslash.</summary>
+    static string DecodeCEscapes(string s)
+    {
+        if (!s.Contains('\\')) return s;
+        var sb = new System.Text.StringBuilder(s.Length);
+        for (int i = 0; i < s.Length; i++)
+        {
+            if (s[i] == '\\' && i + 1 < s.Length)
+            {
+                switch (s[i + 1])
+                {
+                    case 'n': sb.Append('\n'); i++; break;
+                    case 't': sb.Append('\t'); i++; break;
+                    case 'r': sb.Append('\r'); i++; break;
+                    case '\\': sb.Append('\\'); i++; break;
+                    default: sb.Append(s[i]); break;
+                }
+            }
+            else sb.Append(s[i]);
+        }
+        return sb.ToString();
     }
 
     /// <summary>
