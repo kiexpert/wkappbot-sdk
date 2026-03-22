@@ -244,6 +244,8 @@ internal partial class Program
         _ = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
         Console.WriteLine($"[EYE] Eye pipe server started (elevated={elevated})");
 
+        // ── Auto a11y hack on InputReadiness probe success ──
+        SetupAutoHackOnProbe();
         // ── Mouse CCA: 1s interval → UIA element + CCA + Visual MD → Slack thread reply ──
         StartMouseCcaWorker(cts.Token);
         // ── Keyboard Focus Chain: 1s interval → focused element + parent chain → Slack thread reply ──
