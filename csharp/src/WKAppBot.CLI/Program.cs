@@ -477,7 +477,7 @@ internal partial class Program
             var isEyeCommand = command == "eye"; // eye, eye tick, eye tick --timeout 등 전부 제외
             // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
             // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" || isEyeCommand || _fastExitAfterCommand;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" || isEyeCommand || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
@@ -537,6 +537,7 @@ internal partial class Program
                 "newchat" => NewChatCommand(restArgs),
                 "analyze-hack" => AnalyzeHackCommand(restArgs),
                 "screensaver" => ScreenSaverStandaloneCommand(),
+                "whisper-ring" => WhisperRingStandaloneCommand(restArgs),
                 "prompt"  => PromptCommand(restArgs),
                 "schedule" => ScheduleCommand(restArgs),
                 "knowhow" => KnowhowCommand(restArgs),

@@ -518,121 +518,27 @@ internal partial class Program
         // Eye 자체 콘솔 탭 오픈 (apbot-mcp 창 최초 생성 + 위치 고정)
         EyeOpenConsoleWtTab(eyeLogFile);
 
-        // ── Whisper Spectrum Ring (always-on mic → radial HUD overlay) ──
-        var eyeStartTime = DateTime.UtcNow; // gate: auto-study allowed only after 10 min
-        WhisperEngine? whisperEngine = null;
-        WhisperRingHost? whisperRing = null;
-        WhisperExperienceDb? whisperExp = null;
+        // ── Whisper Ring: separate process (WPF + audio model → memory isolated) ──
+        var eyeStartTime = DateTime.UtcNow;
         try
         {
-            whisperEngine = new WhisperEngine();
-            if (whisperEngine.Start())
+            var wrPath = Environment.ProcessPath ?? "wkappbot";
+            int ringX = Math.Max(0, posX - 190);
+            int ringY = posY;
+            var wrPsi = new System.Diagnostics.ProcessStartInfo
             {
-                whisperRing = new WhisperRingHost();
-                // Position: left of Eye window (Eye is at top-right corner)
-                int ringX = Math.Max(0, posX - 190);
-                int ringY = posY;
-                whisperRing.Start(ringX, ringY);
-
-                // Experience DB: token logging + STT auto-labeling
-                whisperExp = new WhisperExperienceDb();
-                whisperExp.StartLogging();
-                bool sttOk = whisperExp.StartStt();
-
-                // Auto-study: when _unknown/ reaches 10 files, run study in background
-                // Gate: skip for first 2 min after Eye starts, then enforce 2-min minimum interval
-                var expRef = whisperExp; // capture for closure
-                DateTime lastStudyTime = DateTime.MinValue;
-                const double StudyGateMinutes = 2.0; // was 10 — 5x faster now
-                whisperExp.OnAutoStudyNeeded += (count) =>
-                {
-                    var now = DateTime.UtcNow;
-                    if ((now - eyeStartTime).TotalMinutes < StudyGateMinutes)
-                    {
-                        Console.WriteLine($"[WHISPER] Auto-study deferred (Eye started {(now - eyeStartTime).TotalMinutes:F1} min ago, wait {StudyGateMinutes} min)");
-                        expRef.NotifyAutoStudyDone();
-                        return;
-                    }
-                    if ((now - lastStudyTime).TotalMinutes < StudyGateMinutes)
-                    {
-                        Console.WriteLine($"[WHISPER] Auto-study deferred (last study {(now - lastStudyTime).TotalMinutes:F1} min ago, wait {StudyGateMinutes} min)");
-                        expRef.NotifyAutoStudyDone();
-                        return;
-                    }
-                    lastStudyTime = now;
-                    ThreadPool.QueueUserWorkItem(_ =>
-                    {
-                        try
-                        {
-                            EyeColor(ConsoleColor.Magenta);
-                            Console.WriteLine($"[WHISPER] Auto-study triggered: {count} files in _unknown/");
-                            EyeResetColor();
-                            WhisperStudyCommand(["--batch", count.ToString()]);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[WHISPER] Auto-study error: {ex.Message}");
-                        }
-                        finally
-                        {
-                            expRef.NotifyAutoStudyDone();
-                        }
-                    });
-                };
-
-                whisperEngine.OnFrame += (frame) =>
-                {
-                    if (whisperRing.IsAlive)
-                    {
-                        var (lastStt, lastSttTicks, lastSttMode, _) = whisperExp?.GetStatus() ?? (null, 0, "QUIET", 0);
-                        long ageTicks = lastStt != null ? DateTime.UtcNow.Ticks - lastSttTicks : long.MaxValue;
-                        int segFrames = whisperExp?.SegmentFrames ?? 0;
-                        whisperRing.UpdateSpectrum(frame.Levels, frame.MaxLevel,
-                            frame.Mode, frame.Token, frame.RecentTokens, lastStt, ageTicks, lastSttMode,
-                            segFrames, frame.SoundCode, frame.VoiceLevels);
-                    }
-                    whisperExp?.LogFrame(frame);
-                };
-
-                // Mic PCM → parallel MP3 recording for Gemini STT
-                // Align channel count FIRST so LameMP3FileWriter uses correct WaveFormat
-                whisperExp?.SetMicChannels(whisperEngine.Channels);
-                whisperEngine.OnMicData += (buf, len) => whisperExp?.WriteMicData(buf, len);
-
-                // Mic segment ready → move to _unknown/ for batch Gemini STT (no real-time processing)
-                whisperExp!.OnMicSegmentReady += (mp3Path) =>
-                {
-                    try
-                    {
-                        var unknownDir = Path.Combine(Path.GetDirectoryName(mp3Path)!, "..", "_unknown");
-                        Directory.CreateDirectory(unknownDir);
-                        var dest = Path.Combine(unknownDir, Path.GetFileName(mp3Path));
-                        File.Move(mp3Path, dest);
-                    }
-                    catch { /* best effort */ }
-                };
-
-                EyeColor(ConsoleColor.Magenta);
-                Console.WriteLine($"[EYE] Whisper Ring started at ({ringX},{ringY})");
-                Console.WriteLine($"[EYE] Whisper ExpDB: logging=ON stt={( sttOk ? "ON" : "OFF" )}");
-                EyeResetColor();
-            }
-            else
-            {
-                EyeColor(ConsoleColor.DarkGray);
-                Console.WriteLine("[EYE] Whisper Ring skipped (no microphone)");
-                EyeResetColor();
-                whisperEngine.Dispose();
-                whisperEngine = null;
-            }
+                FileName = wrPath,
+                Arguments = $"whisper-ring {ringX} {ringY}",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            wrPsi.Environment["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString();
+            System.Diagnostics.Process.Start(wrPsi);
+            Console.WriteLine($"[EYE] Whisper Ring spawned as separate process");
         }
         catch (Exception ex)
         {
-            EyeColor(ConsoleColor.DarkGray);
-            Console.WriteLine($"[EYE] Whisper Ring init failed: {ex.Message}");
-            EyeResetColor();
-            whisperEngine?.Dispose();
-            whisperEngine = null;
+            Console.WriteLine($"[EYE] Whisper Ring spawn failed: {ex.Message}");
         }
 
         // ── Screen Saver: separate process (WPF isolation → Eye stays lightweight) ──
@@ -646,6 +552,7 @@ internal partial class Program
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
+            ssPsi.Environment["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString();
             System.Diagnostics.Process.Start(ssPsi);
             Console.WriteLine("[EYE] ScreenSaver spawned as separate process");
         }
@@ -1031,15 +938,7 @@ internal partial class Program
         WKAppBot.Win32.Native.NativeMethods.SetThreadExecutionState(
             WKAppBot.Win32.Native.NativeMethods.ES_CONTINUOUS);
 
-        // ── Cleanup Whisper Ring + ExpDB ──
-        if (whisperEngine != null)
-        {
-            whisperExp?.Stop();
-            whisperEngine.Dispose();
-            whisperRing?.BeginFadeOut();
-            Thread.Sleep(1200);
-            whisperRing?.Dispose();
-        }
+        // Whisper Ring runs as separate process — exits on its own
 
         // ScreenSaver runs as separate process — exits on its own
 
