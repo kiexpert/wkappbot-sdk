@@ -971,6 +971,11 @@ internal partial class Program
             }
 
             frameCount++;
+
+            // Prevent GC of critical objects used by Slack event handler closures
+            GC.KeepAlive(slackClient);
+            GC.KeepAlive(slackBotToken);
+            GC.KeepAlive(slackChannel);
             Thread.Sleep(Math.Max(100, intervalMs));
         }
 
