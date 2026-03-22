@@ -747,6 +747,35 @@ internal partial class Program
                                 continue;
                             }
                         }
+                        // Experience DB fallback: check fused_match.jsonl for cached coordinate
+                        if (!string.IsNullOrEmpty(uiaPath))
+                        {
+                            try
+                            {
+                                NativeMethods.GetWindowThreadProcessId(hwnd, out uint expPid);
+                                string expProc;
+                                try { expProc = System.Diagnostics.Process.GetProcessById((int)expPid).ProcessName; } catch { expProc = ""; }
+                                var expCls = WKAppBot.Win32.Window.WindowFinder.GetClassName(hwnd);
+                                var (expBounds, expScore) = WKAppBot.Vision.CcaUiaFusedMatcher.FindByNameInExperience(
+                                    DataDir + "/experience", expProc, expCls, uiaPath);
+                                if (expBounds.Width > 0 && expScore > 0.3)
+                                {
+                                    Console.WriteLine($"[A11Y] Experience DB hit: \"{uiaPath}\" → ({expBounds.X},{expBounds.Y} {expBounds.Width}x{expBounds.Height}) score={expScore:F2}");
+                                    // Use experience bounds for click/invoke actions
+                                    if (action is "click" or "invoke")
+                                    {
+                                        NativeMethods.GetWindowRect(hwnd, out var wr3);
+                                        int cx = wr3.Left + expBounds.X + expBounds.Width / 2;
+                                        int cy = wr3.Top + expBounds.Y + expBounds.Height / 2;
+                                        Console.WriteLine($"[A11Y] Experience click at ({cx},{cy})");
+                                        WKAppBot.Win32.Input.MouseInput.Click(cx, cy);
+                                        ok++;
+                                        continue;
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
                         Console.Error.WriteLine($"[A11Y] UIA scope not found: \"{uiaPath}\" in {tag}");
                         fail++;
                         continue;
