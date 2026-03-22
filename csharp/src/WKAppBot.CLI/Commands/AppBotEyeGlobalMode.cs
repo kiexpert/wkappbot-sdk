@@ -80,6 +80,7 @@ internal partial class Program
     static DateTime _lastWatchdogRefresh = DateTime.MinValue;
     static DateTime _lastEyeStatusEdit = DateTime.MinValue;
     static DateTime _lastCcaAnalysis = DateTime.MinValue;
+    static DateTime _lastZoomCleanup = DateTime.MinValue;
 
     // ── CCA live analysis cache ──
     static string _cachedCcaSummary = "";
@@ -754,6 +755,31 @@ internal partial class Program
                 cachedClaudeStatusText = RunClaudeStatusTick(
                     ref claudeHwnd, slackBotToken, slackChannel, botUsername,
                     slackClient, statusTsFile, contextWarnedPcts);
+
+            // ── Stale zoom overlay cleanup (every 60s, kill zooms older than 60s) ──
+            if ((DateTime.UtcNow - _lastZoomCleanup).TotalSeconds >= 60)
+            {
+                _lastZoomCleanup = DateTime.UtcNow;
+                try
+                {
+                    int cleaned = 0;
+                    NativeMethods.EnumWindows((hWnd, _) =>
+                    {
+                        var buf = new System.Text.StringBuilder(64);
+                        NativeMethods.GetWindowTextW(hWnd, buf, buf.Capacity);
+                        var title = buf.ToString();
+                        if (title is "InputZoom" or "InputHighlight")
+                        {
+                            NativeMethods.PostMessageW(hWnd, 0x0010, IntPtr.Zero, IntPtr.Zero); // WM_CLOSE
+                            cleaned++;
+                        }
+                        return true;
+                    }, IntPtr.Zero);
+                    if (cleaned > 0)
+                        Console.WriteLine($"[EYE] Cleaned {cleaned} stale zoom overlay(s)");
+                }
+                catch { }
+            }
 
             // ── Schedule executor + Route retry (~every 10 seconds) ──
             if (frameCount % 100 == 50)

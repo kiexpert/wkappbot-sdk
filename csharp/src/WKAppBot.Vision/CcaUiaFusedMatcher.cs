@@ -31,6 +31,13 @@ public sealed class CcaUiaFusedMatcher
         public Rectangle Bounds { get; init; }
     }
 
+    /// <summary>Optional OCR text for CCA regions (set before calling Match).</summary>
+    public sealed class CcaTextInfo
+    {
+        public int RegionIndex { get; init; }
+        public string OcrText { get; init; } = "";
+    }
+
     /// <summary>Match result: CCA region paired with UIA element + score.</summary>
     public sealed class MatchResult
     {
@@ -45,7 +52,8 @@ public sealed class CcaUiaFusedMatcher
     /// </summary>
     public static List<MatchResult> Match(
         List<ConnectedComponentAnalyzer.Region> ccaRegions,
-        List<UiaInfo> uiaElements)
+        List<UiaInfo> uiaElements,
+        List<CcaTextInfo>? ccaTexts = null)
     {
         var results = new List<MatchResult>();
         if (ccaRegions.Count == 0) return results;
@@ -89,9 +97,15 @@ public sealed class CcaUiaFusedMatcher
                     if (grid.TryGetValue((gx, gy), out var list))
                         foreach (var idx in list) candidateUia.Add(idx);
 
+            // Get OCR text for this CCA region (if available)
+            var ccaOcr = ccaTexts?.FirstOrDefault(t => t.RegionIndex == ci)?.OcrText ?? "";
+
             foreach (var ui in candidateUia)
             {
                 var score = ComputeScore(cr, uiaElements[ui].Bounds);
+                // Text similarity bonus (Claude: IoU > 0.1 gate)
+                if (score >= 0.1 && !string.IsNullOrEmpty(ccaOcr) && !string.IsNullOrEmpty(uiaElements[ui].Name))
+                    score += 0.15 * TextSimilarity(ccaOcr, uiaElements[ui].Name);
                 if (score >= MinScore)
                     candidates.Add((ci, ui, score));
             }
@@ -145,6 +159,15 @@ public sealed class CcaUiaFusedMatcher
         return results;
     }
 
+    /// <summary>Apply DPI normalization to a rectangle (Claude recommendation).</summary>
+    public static Rectangle NormalizeDpi(Rectangle r, double dpiScale)
+    {
+        if (dpiScale <= 0 || Math.Abs(dpiScale - 1.0) < 0.01) return r;
+        return new Rectangle(
+            (int)(r.X / dpiScale), (int)(r.Y / dpiScale),
+            (int)(r.Width / dpiScale), (int)(r.Height / dpiScale));
+    }
+
     /// <summary>
     /// Weighted spatial score (GPT formula):
     /// 0.40×IoU + 0.20×contain + 0.15×(1-centerDistNorm) + 0.15×(1-sizeDeltaNorm) + 0.10×rowColAlign
@@ -185,6 +208,30 @@ public sealed class CcaUiaFusedMatcher
         return 0.40 * iou + 0.20 * contain + 0.15 * (1 - centerDistNorm)
              + 0.15 * (1 - sizeDeltaNorm) + 0.10 * rowColAlign;
     }
+
+    /// <summary>
+    /// Text similarity: normalized exact → substring → token Jaccard.
+    /// Claude formula: exact=1.0, substring=0.85, else 0.6×tokenJaccard + 0.4×editSim.
+    /// Simplified for speed: exact/substring/token Jaccard only.
+    /// </summary>
+    static double TextSimilarity(string a, string b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return 0;
+        var na = Normalize(a);
+        var nb = Normalize(b);
+        if (na == nb) return 1.0;
+        if (na.Contains(nb) || nb.Contains(na)) return 0.85;
+        // Token Jaccard
+        var tokA = new HashSet<string>(na.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        var tokB = new HashSet<string>(nb.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        if (tokA.Count == 0 || tokB.Count == 0) return 0;
+        int intersect = tokA.Count(t => tokB.Contains(t));
+        int union = tokA.Count + tokB.Count - intersect;
+        return union > 0 ? (double)intersect / union : 0;
+    }
+
+    static string Normalize(string s) =>
+        new string(s.ToLowerInvariant().Where(c => char.IsLetterOrDigit(c) || c == ' ').ToArray()).Trim();
 
     static double IoU(Rectangle a, Rectangle b)
     {
