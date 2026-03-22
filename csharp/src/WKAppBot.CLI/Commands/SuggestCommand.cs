@@ -423,7 +423,7 @@ internal partial class Program
         }
 
         // ── Resolve guard: require explicit confirmation flag ──
-        const string ConfirmFlag = "--i-really-want-to-resolve-because-i-tested-and-confirmed-success-and-willkim-allowed-this";
+        const string ConfirmFlag = "--i-completed-the-code-and-built-successfully-and-deployed-and-tested-with-real-scenarios-and-confirmed-meaningful-results-and-have-evidence-and-willkim-allowed-this";
         // No short alias — force the long flag to make you think twice
         bool hasConfirm = args.Any(a => a == ConfirmFlag);
         if (!hasConfirm)
