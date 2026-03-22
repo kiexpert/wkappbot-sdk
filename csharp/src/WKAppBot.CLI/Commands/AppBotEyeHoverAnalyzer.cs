@@ -124,11 +124,33 @@ internal partial class Program
         Console.WriteLine("[MOUSE-CCA] Event-driven analysis (analyze-hack server)");
         bool firstRun = true;
 
+        // Wait for Eye startup Slack message (need _eyeStatusTs for thread replies)
+        for (int wait = 0; wait < 30 && _eyeStatusTs == null && !ct.IsCancellationRequested; wait++)
+            await Task.Delay(1000, ct);
+
+        // Post placeholder replies immediately
+        if (_eyeStatusTs != null && !string.IsNullOrEmpty(_eyeBotToken) && !string.IsNullOrEmpty(_eyeChannel))
+        {
+            try
+            {
+                var (ok1, ts1) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "🔍 분석 중...",
+                    threadTs: _eyeStatusTs, username: "앱봇아이");
+                if (ok1 && ts1 != null) _mouseCcaReplyTs = ts1;
+
+                var (ok2, ts2) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "⌨️ 분석 중...",
+                    threadTs: _eyeStatusTs, username: "앱봇아이");
+                if (ok2 && ts2 != null) _focusChainReplyTs = ts2;
+
+                Console.WriteLine("[MOUSE-CCA] Placeholder replies posted");
+            }
+            catch { }
+        }
+
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(firstRun ? 3000 : 1000, ct); // first run: 3s delay for Eye init
+                await Task.Delay(firstRun ? 2000 : 1000, ct);
 
                 NativeMethods.GetCursorPos(out var pt);
                 var hwnd = NativeMethods.WindowFromPoint(pt);
