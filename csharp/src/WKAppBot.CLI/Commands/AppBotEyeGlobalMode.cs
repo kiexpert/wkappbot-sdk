@@ -869,7 +869,25 @@ internal partial class Program
                 _lastWatchdogRefresh = DateTime.UtcNow;
                 EnsureEyeWatchdogTask();
 
-                // Slack Socket heartbeat: reconnect if disconnected
+                // Slack Socket heartbeat: auth.test API call + reconnect if dead
+                if (slackClient != null && !string.IsNullOrEmpty(slackBotToken))
+                {
+                    bool slackAlive = slackClient.IsConnected;
+                    // Active probe: call auth.test to verify token + server reachability
+                    if (slackAlive)
+                    {
+                        try
+                        {
+                            using var hc = new HttpClient();
+                            hc.DefaultRequestHeaders.Authorization =
+                                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", slackBotToken);
+                            var resp = hc.GetStringAsync("https://slack.com/api/auth.test").GetAwaiter().GetResult();
+                            slackAlive = resp.Contains("\"ok\":true");
+                            if (!slackAlive) Console.WriteLine($"[EYE] Slack auth.test failed: {resp[..Math.Min(100, resp.Length)]}");
+                        }
+                        catch (Exception ex) { slackAlive = false; Console.WriteLine($"[EYE] Slack probe failed: {ex.Message}"); }
+                    }
+                }
                 if (slackClient != null && !slackClient.IsConnected)
                 {
                     Console.WriteLine("[EYE] Slack disconnected — attempting reconnect...");
