@@ -365,7 +365,7 @@ internal partial class Program
             try
             {
                 var logPath = Path.Combine(logDir, $"eye.pid={Environment.ProcessId}.log");
-                var logWriter = new StreamWriter(logPath, append: true) { AutoFlush = true };
+                var logWriter = new StreamWriter(logPath, append: true, new System.Text.UTF8Encoding(false)) { AutoFlush = true };
                 Console.SetOut(logWriter);
                 Console.SetError(logWriter);
             }
@@ -378,7 +378,11 @@ internal partial class Program
         }
         else
         {
-            // Manual context: hide the terminal window + block CTRL_CLOSE
+            // Manual context (or scheduler-spawned): UTF-8 for Korean console output
+            try { Console.OutputEncoding = new System.Text.UTF8Encoding(false); } catch { }
+            try { Console.InputEncoding = System.Text.Encoding.UTF8; } catch { }
+            try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
+            try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
             TryHideConsoleWindow();
             InstallEyeCtrlHandler();
         }
