@@ -74,8 +74,11 @@ internal partial class Program
 
             // OnFrame → dispatch to WPF thread
             var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+            int frameCount = 0;
             engine.OnFrame += (frame) =>
             {
+                if (++frameCount % 100 == 0) // every ~10s
+                    Console.Error.WriteLine($"[WHISPER-RING] frame={frameCount} mode={frame.Mode} t={DateTime.Now:HH:mm:ss}");
                 dispatcher.BeginInvoke(() =>
                 {
                     var (lastStt, lastSttTicks, lastSttMode, _) = exp?.GetStatus() ?? (null, 0, "QUIET", 0);
