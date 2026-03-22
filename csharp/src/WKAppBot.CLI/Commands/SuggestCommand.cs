@@ -422,6 +422,30 @@ internal partial class Program
             return 0;
         }
 
+        // ── Resolve guard: require explicit confirmation flag ──
+        const string ConfirmFlag = "--i-really-want-to-resolve-because-i-tested-and-confirmed-success-and-willkim-allowed-this";
+        const string ShortFlag = "--confirmed";
+        bool hasConfirm = args.Any(a => a == ConfirmFlag || a == ShortFlag);
+        if (!hasConfirm)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("⚠️  RESOLVE GUARD — 졸속 완료 방지!");
+            Console.WriteLine();
+            Console.WriteLine("  resolve 전에 확인하세요:");
+            Console.WriteLine("  □ 코드 구현 완료?");
+            Console.WriteLine("  □ 빌드 성공 (0 에러)?");
+            Console.WriteLine("  □ 배포 (publish + hot-swap)?");
+            Console.WriteLine("  □ 실제 테스트 실행 + 결과 확인?");
+            Console.WriteLine("  □ 테스트 결과가 의미있는 수준? (matched=1/784 = 실패!)");
+            Console.WriteLine("  □ 스크린샷/로그 증거 있음?");
+            Console.WriteLine();
+            Console.WriteLine("  모두 확인했으면 플래그 추가:");
+            Console.WriteLine($"  wkappbot suggest resolve <ts> \"note\" {ShortFlag}");
+            Console.ResetColor();
+            return 1;
+        }
+        args = args.Where(a => a != ConfirmFlag && a != ShortFlag).ToArray();
+
         var tsPrefix = args[0];
         var note = args.Length >= 2 ? string.Join(" ", args[1..]) : "resolved";
 
