@@ -635,17 +635,23 @@ internal partial class Program
             whisperEngine = null;
         }
 
-        // ── Screen Saver overlay (idle ≥10s → 90% black) ──
-        _screenSaver = new ScreenSaverOverlay();
+        // ── Screen Saver: separate process (WPF isolation → Eye stays lightweight) ──
         try
         {
-            _screenSaver.Start();
-            Console.WriteLine("[EYE] ScreenSaver overlay ready (idle ≥10s → 90% black, click-through)");
+            var ssPath = Environment.ProcessPath ?? "wkappbot";
+            var ssPsi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = ssPath,
+                Arguments = "screensaver",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            System.Diagnostics.Process.Start(ssPsi);
+            Console.WriteLine("[EYE] ScreenSaver spawned as separate process");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] ScreenSaver init failed: {ex.Message}");
-            _screenSaver = null;
+            Console.WriteLine($"[EYE] ScreenSaver spawn failed: {ex.Message}");
         }
 
         // ── Context usage monitor (per-card) ──
@@ -662,8 +668,7 @@ internal partial class Program
         int frameCount = 0;
         while (host.IsAlive && !cts.IsCancellationRequested)
         {
-            // ── ScreenSaver idle check (first — instant wake on input) ──
-            _screenSaver?.Tick();
+            // ScreenSaver now runs as separate process — no Tick() needed in Eye
 
             // ── Duplicate Eye check (every 100 frames ≈ 10s) ──
             if (++duplicateCheckFrame >= 100)
@@ -1036,9 +1041,7 @@ internal partial class Program
             whisperRing?.Dispose();
         }
 
-        // ── Cleanup ScreenSaver ──
-        _screenSaver?.Dispose();
-        _screenSaver = null;
+        // ScreenSaver runs as separate process — exits on its own
 
         // ── Cleanup FSW watchers ──
         DisposeFileWatchers();
