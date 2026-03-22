@@ -1221,9 +1221,14 @@ internal partial class Program
             }
 
             // ── Dedup: already forwarded by OnMention → skip ──
-            if (handledByMention.Remove(msg.Timestamp)) return;
+            if (handledByMention.Remove(msg.Timestamp))
+            {
+                Console.WriteLine($"[EYE][SLACK] DEDUP skip (already by OnMention): {msg.Text[..Math.Min(msg.Text.Length, 30)]}");
+                return;
+            }
 
             // ── Dispatch to route worker (fire-and-forget) ──
+            Console.WriteLine($"[EYE][SLACK] → DispatchBg slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
             // slack route handles: thread reply / keyword / catch-all → inject + ack
             var routeJson = System.Text.Json.JsonSerializer.Serialize(new
             {
