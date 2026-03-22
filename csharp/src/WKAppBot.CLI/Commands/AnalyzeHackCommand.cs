@@ -235,22 +235,30 @@ internal partial class Program
                 try
                 {
                     var req = JsonSerializer.Deserialize<JsonNode>(line);
-                    var hwndStr = req?["hwnd"]?.GetValue<string>() ?? "0";
-                    var xVal = req?["x"]?.GetValue<int>() ?? 0;
-                    var yVal = req?["y"]?.GetValue<int>() ?? 0;
+                    var reqType = req?["type"]?.GetValue<string>() ?? "mouse";
 
-                    // Reuse AnalyzeHackCommand logic
-                    var hackArgs = new[] { hwndStr, xVal.ToString(), yVal.ToString() };
-                    // Capture stdout
-                    var oldOut = Console.Out;
-                    var sw = new System.IO.StringWriter();
-                    Console.SetOut(sw);
-                    AnalyzeHackCommand(hackArgs);
-                    Console.SetOut(oldOut);
-
-                    // Write result + newline delimiter
-                    Console.WriteLine(sw.ToString());
-                    Console.Out.Flush();
+                    if (reqType == "focus")
+                    {
+                        // Focus chain analysis
+                        var result = AnalyzeFocusChain();
+                        Console.WriteLine(result.ToJsonString());
+                        Console.Out.Flush();
+                    }
+                    else
+                    {
+                        // Mouse CCA analysis (default)
+                        var hwndStr = req?["hwnd"]?.GetValue<string>() ?? "0";
+                        var xVal = req?["x"]?.GetValue<int>() ?? 0;
+                        var yVal = req?["y"]?.GetValue<int>() ?? 0;
+                        var hackArgs = new[] { hwndStr, xVal.ToString(), yVal.ToString() };
+                        var oldOut = Console.Out;
+                        var sw = new System.IO.StringWriter();
+                        Console.SetOut(sw);
+                        AnalyzeHackCommand(hackArgs);
+                        Console.SetOut(oldOut);
+                        Console.WriteLine(sw.ToString());
+                        Console.Out.Flush();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -266,5 +274,43 @@ internal partial class Program
 
         Console.Error.WriteLine("[ANALYZE-HACK] Server exiting");
         return 0;
+    }
+
+    /// <summary>Analyze keyboard focus chain — focus node → parent chain → root.</summary>
+    static JsonObject AnalyzeFocusChain()
+    {
+        var result = new JsonObject();
+        try
+        {
+            using var uia = new UiaLocator();
+            var focused = uia.GetFocusedElementInfo();
+            if (focused == null) { result["error"] = "no focus"; return result; }
+
+            result["name"] = focused.Name;
+            result["type"] = focused.ControlType;
+            result["aid"] = focused.AutomationId;
+            result["value"] = focused.Value;
+            result["winTitle"] = focused.WindowTitle;
+            result["pid"] = focused.ProcessId;
+
+            if (focused.Patterns?.Count > 0)
+                result["patterns"] = string.Join(", ", focused.Patterns);
+
+            var chain = new JsonArray();
+            if (focused.ParentChain != null)
+                foreach (var (type, name) in focused.ParentChain)
+                    chain.Add(new JsonObject { ["type"] = type, ["name"] = name });
+            result["chain"] = chain;
+
+            // Build grap
+            var winTitle = focused.WindowTitle ?? "";
+            var grapWin = winTitle.Length > 20 ? $"*{winTitle[..20]}*" : $"*{winTitle}*";
+            var grapScope = !string.IsNullOrEmpty(focused.AutomationId) ? focused.AutomationId
+                : !string.IsNullOrEmpty(focused.Name) ? $"*{(focused.Name.Length > 20 ? focused.Name[..20] : focused.Name)}*"
+                : "";
+            result["grapPath"] = !string.IsNullOrEmpty(grapScope) ? $"{grapWin}#{grapScope}" : grapWin;
+        }
+        catch (Exception ex) { result["error"] = ex.Message; }
+        return result;
     }
 }

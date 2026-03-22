@@ -231,57 +231,64 @@ internal partial class Program
 
     static async Task FocusChainLoop(CancellationToken ct)
     {
-        Console.WriteLine("[FOCUS-CHAIN] Keyboard focus analysis worker started (1s interval)");
+        Console.WriteLine("[FOCUS-CHAIN] Keyboard focus (via analyze-hack server)");
         while (!ct.IsCancellationRequested)
         {
             try
             {
                 await Task.Delay(1000, ct);
 
+                // Send focus request to shared analyze-hack server
+                EnsureHackServer();
+                if (_hackServerProcess is not { HasExited: false } || _hackServerStdin == null) continue;
+
                 string chainResult;
                 try
                 {
-                    using var uia = new UiaLocator();
-                    var focused = uia.GetFocusedElementInfo();
-                    if (focused == null) continue;
+                    _hackServerStdin.WriteLine("{\"type\":\"focus\"}");
+                    _hackServerStdin.Flush();
+
+                    var responseLine = await Task.Run(() => _hackServerProcess.StandardOutput.ReadLine(), ct)
+                        .WaitAsync(TimeSpan.FromSeconds(5), ct);
+                    if (string.IsNullOrEmpty(responseLine)) continue;
+
+                    var resp = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(responseLine);
+                    if (resp?["error"] != null) continue;
+
+                    var focusName = resp?["name"]?.GetValue<string>() ?? "";
+                    var focusType = resp?["type"]?.GetValue<string>() ?? "?";
+                    var focusValue = resp?["value"]?.GetValue<string>() ?? "";
+                    var grapPath = resp?["grapPath"]?.GetValue<string>() ?? "";
+                    var winTitle = resp?["winTitle"]?.GetValue<string>() ?? "";
+                    var patterns = resp?["patterns"]?.GetValue<string>() ?? "";
+                    var focusPid = resp?["pid"]?.GetValue<int>() ?? 0;
 
                     // Skip our own process
-                    if (focused.ProcessId == Environment.ProcessId) continue;
+                    if (focusPid == Environment.ProcessId) continue;
 
-                    // Build grap path for focused element
-                    var winTitle = focused.WindowTitle ?? "";
                     var winShort = winTitle.Length > 30 ? winTitle[..30] + "…" : winTitle;
-                    var grapWin = winTitle.Length > 20 ? $"*{winTitle[..20]}*" : $"*{winTitle}*";
-                    var grapScope = !string.IsNullOrEmpty(focused.AutomationId)
-                        ? focused.AutomationId
-                        : !string.IsNullOrEmpty(focused.Name)
-                            ? $"*{(focused.Name.Length > 20 ? focused.Name[..20] : focused.Name)}*"
-                            : "";
-                    var grapPath = !string.IsNullOrEmpty(grapScope)
-                        ? $"{grapWin}#{grapScope}" : grapWin;
-
-                    // Build chain display (focused → parents → root)
                     var sb = new StringBuilder();
                     sb.AppendLine($"⌨️ **grap**: `{grapPath}`");
-                    sb.AppendLine($"**focus**: `[{focused.ControlType}]` \"{focused.Name}\"");
-                    if (!string.IsNullOrEmpty(focused.Value))
-                        sb.AppendLine($"**value**: \"{(focused.Value.Length > 50 ? focused.Value[..50] + "…" : focused.Value)}\"");
+                    sb.AppendLine($"**focus**: `[{focusType}]` \"{focusName}\"");
+                    if (!string.IsNullOrEmpty(focusValue))
+                        sb.AppendLine($"**value**: \"{(focusValue.Length > 50 ? focusValue[..50] + "…" : focusValue)}\"");
                     sb.AppendLine($"**win**: _{winShort}_");
 
                     // Parent chain
-                    if (focused.ParentChain?.Count > 0)
+                    var chain = resp?["chain"] as System.Text.Json.Nodes.JsonArray;
+                    if (chain?.Count > 0)
                     {
                         sb.AppendLine("**chain**:");
-                        foreach (var p in focused.ParentChain)
-                            sb.AppendLine($"  └ `[{p.type}]` {p.name}");
+                        foreach (var p in chain)
+                            sb.AppendLine($"  └ `[{p?["type"]}]` {p?["name"]}");
                     }
 
-                    // Patterns
-                    if (focused.Patterns?.Count > 0)
-                        sb.AppendLine($"**patterns**: {string.Join(", ", focused.Patterns)}");
+                    if (!string.IsNullOrEmpty(patterns))
+                        sb.AppendLine($"**patterns**: {patterns}");
 
                     chainResult = sb.ToString().TrimEnd();
                 }
+                catch (TimeoutException) { continue; }
                 catch { continue; }
 
                 // Change detection
