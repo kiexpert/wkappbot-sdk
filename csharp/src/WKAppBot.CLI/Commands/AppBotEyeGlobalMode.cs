@@ -783,6 +783,16 @@ internal partial class Program
                 catch { }
             }
 
+            // ── Periodic GC: every 5 min, reduce memory pressure from CCA/UIA workers ──
+            if (frameCount % 3000 == 1500) // ~5 min at 100ms interval
+            {
+                var memBefore = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+                GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
+                // Log only if memory is high
+                if (memBefore > 1024)
+                    Console.WriteLine($"[EYE] GC triggered: {memBefore}MB (non-blocking gen2)");
+            }
+
             // ── Schedule executor + Route retry (~every 10 seconds) ──
             if (frameCount % 100 == 50)
             {
