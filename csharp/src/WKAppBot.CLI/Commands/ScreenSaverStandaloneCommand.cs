@@ -9,7 +9,6 @@ internal partial class Program
 {
     static int ScreenSaverStandaloneCommand()
     {
-        // Parent PID passed via environment variable by Eye
         int parentPid = 0;
         int.TryParse(Environment.GetEnvironmentVariable("WKAPPBOT_PARENT_PID"), out parentPid);
         Console.WriteLine($"[SCREENSAVER] Standalone process (parent PID={parentPid})");
@@ -19,18 +18,18 @@ internal partial class Program
             ss.Start();
             Console.WriteLine("[SCREENSAVER] Overlay ready (idle ≥10s)");
 
-            // Self-contained tick loop — exit when parent dies
             int parentCheck = 0;
             while (true)
             {
                 ss.Tick();
                 Thread.Sleep(100);
-                if (++parentCheck % 50 == 0) // every 5s
+                if (parentPid > 0 && ++parentCheck % 50 == 0)
                 {
                     try { System.Diagnostics.Process.GetProcessById(parentPid); }
                     catch { Console.WriteLine("[SCREENSAVER] Parent gone — exiting"); break; }
                 }
             }
+            ss.Dispose();
         }
         catch (Exception ex)
         {
