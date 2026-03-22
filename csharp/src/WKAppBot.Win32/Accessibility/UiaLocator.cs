@@ -10,7 +10,7 @@ namespace WKAppBot.Win32.Accessibility;
 /// UI Automation element locator using FlaUI.
 /// Primary locator in the Chain of Responsibility (before Vision and Coordinate).
 /// </summary>
-public sealed class UiaLocator : IDisposable
+public sealed partial class UiaLocator : IDisposable
 {
     private readonly UIA3Automation _automation;
 
