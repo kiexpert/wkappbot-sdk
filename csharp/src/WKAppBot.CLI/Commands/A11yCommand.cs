@@ -731,7 +731,52 @@ internal partial class Program
                         }
                     }
                     else
+                    {
+                        // Fire parallel CCA analysis while UIA searches (non-blocking)
+                        Task? parallelCca = null;
+                        if (_autoHackSemaphore.Wait(0))
+                        {
+                            parallelCca = Task.Run(() =>
+                            {
+                                try
+                                {
+                                    NativeMethods.GetWindowRect(hwnd, out var wr4);
+                                    int pw = wr4.Right - wr4.Left, ph = wr4.Bottom - wr4.Top;
+                                    if (pw > 10 && ph > 10)
+                                    {
+                                        if (pw > 1200) pw = 1200; if (ph > 800) ph = 800;
+                                        using var bmp2 = new System.Drawing.Bitmap(pw, ph);
+                                        using (var g2 = System.Drawing.Graphics.FromImage(bmp2))
+                                            g2.CopyFromScreen(wr4.Left, wr4.Top, 0, 0, new System.Drawing.Size(pw, ph));
+                                        var cca3 = new WKAppBot.Vision.ConnectedComponentAnalyzer();
+                                        var regions3 = cca3.Analyze(bmp2);
+                                        NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid3);
+                                        string proc3; try { proc3 = System.Diagnostics.Process.GetProcessById((int)pid3).ProcessName; } catch { proc3 = "unknown"; }
+                                        var cls3 = WKAppBot.Win32.Window.WindowFinder.GetClassName(hwnd);
+                                        // Collect UIA for fused match
+                                        var uias3 = new List<WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo>();
+                                        try
+                                        {
+                                            using var uia3 = new UiaLocator();
+                                            var leaves3 = new List<(string text, int lx, int ly, int lw, int lh, int d)>();
+                                            UiaLocator.CollectTextLeaves(root, leaves3, 0, 6);
+                                            foreach (var l in leaves3)
+                                                uias3.Add(new WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo
+                                                { Name = l.text, Bounds = new System.Drawing.Rectangle(l.lx - wr4.Left, l.ly - wr4.Top, l.lw, l.lh) });
+                                        } catch { }
+                                        var mr3 = WKAppBot.Vision.CcaUiaFusedMatcher.Match(regions3, uias3);
+                                        WKAppBot.Vision.CcaUiaFusedMatcher.SaveToExperienceDb(
+                                            DataDir + "/experience", proc3, cls3, mr3);
+                                        Console.WriteLine($"[A11Y] Parallel CCA: {WKAppBot.Vision.CcaUiaFusedMatcher.Summarize(mr3)}");
+                                    }
+                                }
+                                catch { }
+                                finally { _autoHackSemaphore.Release(); }
+                            });
+                        }
+
                         scoped = GrapHelper.FindUiaScope(root, uiaPath);
+                    }
 
                     if (scoped == null)
                     {
