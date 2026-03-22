@@ -1,7 +1,6 @@
 // WhisperRingStandaloneCommand.cs — Standalone Whisper Ring process
 // Usage: wkappbot whisper-ring [x] [y]
 // Self-contained: WhisperEngine + WhisperRing + ExpDB in own process.
-// Eye spawns this → WPF + audio model memory isolated from Eye.
 
 namespace WKAppBot.CLI;
 
@@ -16,10 +15,27 @@ internal partial class Program
             int.TryParse(args[1], out ringY);
         }
 
-        Console.WriteLine($"[WHISPER-RING] Standalone process starting at ({ringX},{ringY})...");
+        int ppid = 0;
+        int.TryParse(Environment.GetEnvironmentVariable("WKAPPBOT_PARENT_PID"), out ppid);
+
+        Console.WriteLine($"[WHISPER-RING] Standalone (parent={ppid}, pos=({ringX},{ringY}))");
+
+        // Run on dedicated STA thread with WPF message pump
+        var thread = new Thread(() => RunWhisperRingSta(ringX, ringY, ppid));
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Name = "WhisperRing-Main-STA";
+        thread.Start();
+        thread.Join(); // block until done
+
+        Console.WriteLine("[WHISPER-RING] Exiting");
+        return 0;
+    }
+
+    static void RunWhisperRingSta(int ringX, int ringY, int ppid)
+    {
         WhisperEngine? engine = null;
-        WhisperRingHost? ring = null;
         WhisperExperienceDb? exp = null;
+        WhisperRingWindow? window = null;
         try
         {
             engine = new WhisperEngine();
@@ -27,11 +43,13 @@ internal partial class Program
             {
                 Console.WriteLine("[WHISPER-RING] No microphone — exiting");
                 engine.Dispose();
-                return 0;
+                return;
             }
 
-            ring = new WhisperRingHost();
-            ring.Start(ringX, ringY);
+            // Create WPF window directly on this STA thread
+            window = new WhisperRingWindow();
+            window.Left = ringX;
+            window.Top = ringY;
 
             exp = new WhisperExperienceDb();
             exp.StartLogging();
@@ -54,17 +72,20 @@ internal partial class Program
                 });
             };
 
+            // OnFrame → dispatch to WPF thread
+            var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
             engine.OnFrame += (frame) =>
             {
-                if (ring.IsAlive)
+                dispatcher.BeginInvoke(() =>
                 {
                     var (lastStt, lastSttTicks, lastSttMode, _) = exp?.GetStatus() ?? (null, 0, "QUIET", 0);
                     long ageTicks = lastStt != null ? DateTime.UtcNow.Ticks - lastSttTicks : long.MaxValue;
                     int segFrames = exp?.SegmentFrames ?? 0;
-                    ring.UpdateSpectrum(frame.Levels, frame.MaxLevel,
+                    window.UpdateSpectrum(frame.Levels, frame.MaxLevel,
                         frame.Mode, frame.Token, frame.RecentTokens, lastStt, ageTicks, lastSttMode,
                         segFrames, frame.SoundCode, frame.VoiceLevels);
-                }
+                    window.EnsureTopmost();
+                });
                 exp?.LogFrame(frame);
             };
 
@@ -82,21 +103,25 @@ internal partial class Program
                 catch { }
             };
 
-            Console.WriteLine($"[WHISPER-RING] Started (stt={sttOk})");
-
-            // Keep alive — exit when ring closes OR parent dies
-            int ppid = 0;
-            int.TryParse(Environment.GetEnvironmentVariable("WKAPPBOT_PARENT_PID"), out ppid);
-            int parentCheck = 0;
-            while (ring.IsAlive)
+            // Parent PID watchdog — timer on dispatcher
+            if (ppid > 0)
             {
-                Thread.Sleep(100);
-                if (ppid > 0 && ++parentCheck % 50 == 0)
+                var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+                timer.Tick += (s, e) =>
                 {
                     try { System.Diagnostics.Process.GetProcessById(ppid); }
-                    catch { Console.WriteLine("[WHISPER-RING] Parent gone — exiting"); break; }
-                }
+                    catch
+                    {
+                        Console.WriteLine("[WHISPER-RING] Parent gone — closing");
+                        window.Close();
+                    }
+                };
+                timer.Start();
             }
+
+            Console.WriteLine($"[WHISPER-RING] Started (stt={sttOk})");
+            window.Show();
+            System.Windows.Threading.Dispatcher.Run(); // WPF message pump
         }
         catch (Exception ex)
         {
@@ -106,12 +131,6 @@ internal partial class Program
         {
             exp?.Stop();
             engine?.Dispose();
-            ring?.BeginFadeOut();
-            Thread.Sleep(1000);
-            ring?.Dispose();
         }
-
-        Console.WriteLine("[WHISPER-RING] Exiting");
-        return 0;
     }
 }
