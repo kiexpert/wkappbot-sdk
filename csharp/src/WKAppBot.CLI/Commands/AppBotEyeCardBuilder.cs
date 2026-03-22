@@ -183,7 +183,9 @@ internal partial class Program
             var dir = cwd.Replace('/', '\\');
             while (!string.IsNullOrEmpty(dir))
             {
-                if (Directory.Exists(Path.Combine(dir, ".git")))
+                if (Directory.Exists(Path.Combine(dir, ".git"))
+                    || Directory.Exists(Path.Combine(dir, ".svn"))
+                    || File.Exists(Path.Combine(dir, ".wkappbot")))
                 { cwd = dir; break; }
                 var parent = Path.GetDirectoryName(dir);
                 if (parent == dir || parent == null) break;
