@@ -125,8 +125,12 @@ internal partial class Program
                     sb.AppendLine($"[{header}] {c.ParentName}:{c.ParentPid}");
                     // Context % per card (CWD → session JSONL size → ctx%)
                     var ctxTag = "";
-                    var (cardCtx, jsonlAge) = GetContextInfoForCwd(c.Cwd);
-                    if (cardCtx >= 0) ctxTag = $" ctx={cardCtx}%";
+                    var (cardCtx, jsonlAge, _, jsonlFileSize) = GetContextInfoForCwdEx(c.Cwd);
+                    if (cardCtx >= 0)
+                    {
+                        var sizeMB = jsonlFileSize / (1024.0 * 1024.0);
+                        ctxTag = sizeMB >= 1.0 ? $" ctx={cardCtx}% ({sizeMB:F0}MB)" : $" ctx={cardCtx}%";
+                    }
                     // For prompt-discovered cards, use JSONL age instead of tick age
                     if (c.LastTag == "prompt-discovered" && jsonlAge != null)
                     {

@@ -1,4 +1,4 @@
-# WKAppBot v4.7.0 - Windows + Android App Automation Test Framework
+# WKAppBot v4.8.0 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -84,6 +84,18 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
 4. 픽셀해시 캐시 (`aid'hash=description.png`) + Experience DB 레이아웃해시별 저장
 5. CCA 파라미터 자동 튜닝 (Gemini 피드백 → EMA α감쇠, 프로세스/컨트롤/레이아웃별)
 6. 테이블 그리드 자동 감지 (Separator → 행/열 경계 → 셀별 OCR)
+
+### Eye Live Analysis (v4.8)
+- **Mouse CCA Worker**: 1초마다 마우스 위치 → UIA 부모 → CCA 세그멘테이션 → Visual MD 변환 → Slack 쓰레드 갱신
+- **Keyboard Focus Chain**: 1초마다 포커스 노드 → 부모 체인 → 루트 윈도우 핫체인 표시
+- **RenderVisualMarkdown**: UIA 트리 → 텍스트 전용 MD (x좌표 들여쓰기, 고정폭 테이블, 아이콘 필터)
+- **CcaUiaFusedMatcher**: Grid Hash + 가중점수(IoU+contain+center+size+rowCol) + Greedy 매칭 (삼두 AI 자문 반영)
+- **Eye 시작글 1줄 + 카드 댓글**: 메인 = Eye alive, 카드 상세 = 쓰레드 댓글 (변경 감지 기반)
+- **웹 3티어 폴백**: CDP scroll/expand/collapse/right-click/double-click dispatcher
+- **CJK Input.insertText**: 한국어/일본어/중국어 자동 감지 → CDP Input.insertText
+- **Gemini 저작권 경고 자동 dismiss**: mat-dialog/role=dialog 감지 → 확인 버튼 자동 클릭
+- **grap search cache**: 5초 TTL + hwnd 유효성 검증
+- **Slack \n 디코딩**: C-style escape (\\n→줄바꿈) slack send/reply 적용
 
 ### Sunset Screensaver
 10초 idle → 해질녘 색상 전환 (7-stop gradient) → 별/달/토성/파도 애니메이션

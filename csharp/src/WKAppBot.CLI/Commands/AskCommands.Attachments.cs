@@ -169,6 +169,8 @@ internal partial class Program
         while (sw.ElapsedMilliseconds < maxWaitMs)
         {
             await Task.Delay(500);
+            // Auto-dismiss copyright/terms dialogs (Gemini image upload warning)
+            await DismissDialogIfPresent(cdp);
             var uploading = await cdp.EvalAsync("""
                 (() => {
                     var progress = document.querySelector('[class*="uploading"]')
@@ -179,11 +181,56 @@ internal partial class Program
                 """) ?? "DONE";
             if (uploading == "DONE")
             {
+                // Final check for delayed dialogs
+                await DismissDialogIfPresent(cdp);
                 Console.WriteLine($"[ASK] Image upload complete ({sw.ElapsedMilliseconds}ms)");
                 return;
             }
         }
-        Console.WriteLine("[ASK] Image upload wait timeout ??proceeding");
+        Console.WriteLine("[ASK] Image upload wait timeout — proceeding");
+    }
+
+    /// <summary>
+    /// Auto-dismiss copyright/terms/warning dialogs that appear after image upload.
+    /// Targets Gemini's mat-dialog and generic [role="dialog"] modals.
+    /// Clicks the primary/confirm/OK button to dismiss.
+    /// </summary>
+    static async Task DismissDialogIfPresent(CdpClient cdp)
+    {
+        try
+        {
+            var dismissed = await cdp.EvalAsync("""
+                (() => {
+                    // Gemini mat-dialog (Material Design)
+                    const dlg = document.querySelector('mat-dialog-container')
+                             || document.querySelector('[role="dialog"]')
+                             || document.querySelector('[role="alertdialog"]');
+                    if (!dlg) return 'NONE';
+                    // Find confirm/OK/Got it/I understand button
+                    const btns = dlg.querySelectorAll('button, [role="button"]');
+                    for (const btn of btns) {
+                        const txt = (btn.textContent || '').trim().toLowerCase();
+                        if (txt.includes('ok') || txt.includes('got it') || txt.includes('i understand')
+                            || txt.includes('confirm') || txt.includes('agree') || txt.includes('continue')
+                            || txt.includes('확인') || txt.includes('동의') || txt.includes('계속')
+                            || btn.classList.contains('primary') || btn.classList.contains('mat-primary')
+                            || btn.getAttribute('data-test-id')?.includes('confirm')) {
+                            btn.click();
+                            return 'DISMISSED:' + txt;
+                        }
+                    }
+                    // Fallback: click last button (usually the confirm one)
+                    if (btns.length > 0) {
+                        btns[btns.length - 1].click();
+                        return 'DISMISSED_LAST';
+                    }
+                    return 'NO_BUTTON';
+                })()
+                """) ?? "NONE";
+            if (dismissed?.StartsWith("DISMISSED") == true)
+                Console.WriteLine($"[ASK] Auto-dismissed dialog: {dismissed}");
+        }
+        catch { /* best effort */ }
     }
 
     static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -210,6 +257,7 @@ internal partial class Program
                 else Console.WriteLine($"[ASK] File attach failed: {Path.GetFileName(filePath)}");
             }
             await Task.Delay(500); // settle between attachments
+            await DismissDialogIfPresent(cdp); // catch late-appearing dialogs
         }
     }
 

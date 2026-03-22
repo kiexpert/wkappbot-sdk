@@ -12,6 +12,23 @@ namespace WKAppBot.Win32.Window;
 /// </summary>
 public static class WindowFinder
 {
+    // ── Grap search cache: pattern → (hwnds, timestamp) ──
+    // Lazy cache: only caches what was searched. hwnd validity checked on hit.
+    static readonly Dictionary<string, (List<IntPtr> hwnds, DateTime cachedAt)> _grapCache = new();
+    static readonly TimeSpan _grapCacheTtl = TimeSpan.FromSeconds(5);
+
+    /// <summary>Invalidate cache entries containing this hwnd (call after a11y action).</summary>
+    public static void InvalidateCache(IntPtr hwnd)
+    {
+        var keysToRemove = _grapCache
+            .Where(kv => kv.Value.hwnds.Contains(hwnd))
+            .Select(kv => kv.Key).ToList();
+        foreach (var key in keysToRemove) _grapCache.Remove(key);
+    }
+
+    /// <summary>Clear entire grap search cache.</summary>
+    public static void ClearCache() => _grapCache.Clear();
+
     /// <summary>
     /// Find all visible top-level windows matching a grap pattern.
     /// Supports: literal substring, glob (* ? **), regex: prefix, hwnd: prefix.
@@ -24,6 +41,13 @@ public static class WindowFinder
     /// </summary>
     public static List<WindowInfo> FindByTitle(string titlePattern)
     {
+        // ── Cache check: return cached if all hwnds still alive and within TTL ──
+        if (_grapCache.TryGetValue(titlePattern, out var cached)
+            && DateTime.UtcNow - cached.cachedAt < _grapCacheTtl
+            && cached.hwnds.All(NativeMethods.IsWindow))
+        {
+            return cached.hwnds.Select(WindowInfo.FromHwnd).ToList();
+        }
         // ★ hwnd: prefix — direct handle lookup (no enumeration needed)
         if (titlePattern.StartsWith("hwnd:", StringComparison.OrdinalIgnoreCase))
         {
@@ -80,6 +104,9 @@ public static class WindowFinder
         // Sort by focus priority: ★keyboard > ★mouse > ★foreground > Z-order
         if (results.Count > 1)
             results.Sort((a, b) => focus.GetPriority(b.Handle).CompareTo(focus.GetPriority(a.Handle)));
+
+        // ── Cache results for repeat searches ──
+        _grapCache[titlePattern] = (results.Select(r => r.Handle).ToList(), DateTime.UtcNow);
 
         return results;
     }

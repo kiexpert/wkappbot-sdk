@@ -2178,12 +2178,17 @@ internal partial class Program
             bool result = action switch
             {
                 "click" or "invoke" => CdpClick(cdp, cssSelector),
+                "double-click" or "double_click" => CdpDoubleClick(cdp, cssSelector),
+                "right-click" or "right_click" => CdpRightClick(cdp, cssSelector),
                 "type" when hotkey  => CdpHotkey(cdp, text ?? ""),
                 "type" => CdpType(cdp, cssSelector, text ?? ""),
                 "set-value" => CdpSetValue(cdp, cssSelector, text ?? ""),
                 "read" or "find" => CdpReadElement(cdp, cssSelector),
                 "toggle" => CdpToggle(cdp, cssSelector),
                 "select" => CdpSelect(cdp, cssSelector, text ?? ""),
+                "scroll" => CdpScroll(cdp, cssSelector, scrollDir, scrollAmount),
+                "expand" => CdpExpandCollapse(cdp, cssSelector, expand: true),
+                "collapse" => CdpExpandCollapse(cdp, cssSelector, expand: false),
                 _ => CdpEvalAction(cdp, cssSelector, action)
             };
 
@@ -2226,9 +2231,44 @@ internal partial class Program
         return true;
     }
 
+    static bool CdpDoubleClick(WKAppBot.WebBot.CdpClient cdp, string selector)
+    {
+        cdp.DoubleClickAsync(selector).GetAwaiter().GetResult();
+        return true;
+    }
+
+    static bool CdpRightClick(WKAppBot.WebBot.CdpClient cdp, string selector)
+    {
+        cdp.RightClickAsync(selector).GetAwaiter().GetResult();
+        return true;
+    }
+
+    static bool CdpScroll(WKAppBot.WebBot.CdpClient cdp, string selector, string direction, string amount)
+    {
+        cdp.ScrollAsync(selector, direction, amount).GetAwaiter().GetResult();
+        return true;
+    }
+
+    static bool CdpExpandCollapse(WKAppBot.WebBot.CdpClient cdp, string selector, bool expand)
+    {
+        cdp.ExpandCollapseAsync(selector, expand).GetAwaiter().GetResult();
+        return true;
+    }
+
     static bool CdpType(WKAppBot.WebBot.CdpClient cdp, string selector, string text)
     {
-        cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
+        // Auto-detect CJK text → use Input.insertText (bypasses IME composition issues)
+        if (text.Any(c => c >= 0x1100 && c <= 0xD7AF   // Korean (Hangul)
+                       || c >= 0x3000 && c <= 0x9FFF    // CJK Unified + Japanese Kana
+                       || c >= 0xF900 && c <= 0xFAFF))  // CJK Compatibility
+        {
+            Console.WriteLine("[A11Y] CJK text detected → using CDP Input.insertText");
+            cdp.TypeInsertTextAsync(selector, text).GetAwaiter().GetResult();
+        }
+        else
+        {
+            cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
+        }
         return true;
     }
 
