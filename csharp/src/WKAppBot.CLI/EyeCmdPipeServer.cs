@@ -86,11 +86,16 @@ internal static class EyeCmdPipeServer
             CallerArgs.Value = args;
             CurrentCommandGlobal = args;
             Program.RunningInEye = true;
+            var memBefore = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
             using (ThreadRoutingWriter.Route(tee))
             {
                 try { Program.Main(args); }
                 catch (Exception ex) { tee.WriteLine($"[DISPATCHBG] error: {ex.Message}"); }
             }
+            var memAfter = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+            var delta = memAfter - memBefore;
+            if (Math.Abs(delta) >= 5) // log only significant changes (±5MB)
+                Console.Error.WriteLine($"[PIPE-MEM] {cmdTag}: {memBefore}→{memAfter}MB ({(delta >= 0 ? "+" : "")}{delta})");
             tee.Dispose();
         });
     }
@@ -205,8 +210,13 @@ internal static class EyeCmdPipeServer
             var delegName = Program.GetSendReplyUsername();
             var cmdLine = string.Join(" ", args);
             Console.WriteLine($"[CMD] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"}");
+            var memBefore2 = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
             try { code = Program.Main(args); }
             catch (Exception ex) { tee.WriteLine($"[EYECMD] error: {ex.Message}"); code = 1; }
+            var memAfter2 = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+            var delta2 = memAfter2 - memBefore2;
+            if (Math.Abs(delta2) >= 5)
+                Console.Error.WriteLine($"[PIPE-MEM] {cmdTag}: {memBefore2}→{memAfter2}MB ({(delta2 >= 0 ? "+" : "")}{delta2})");
         }
         tee.Dispose(); // moves log to old/, updates tee.LogPath
         // "Log saved:" goes through pipeWriter directly (tee already disposed)
