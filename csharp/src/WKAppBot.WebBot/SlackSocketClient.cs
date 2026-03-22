@@ -337,6 +337,8 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         // Bot's own messages → fire OnSelfMessage for ack cleanup, then skip normal processing
         if (user == _botUserId || (subtype == "bot_message" && botId != null))
         {
+            Console.WriteLine($"[SLACK] Skip self/bot msg: user={user} botId={botId} subtype={subtype} text={text?[..Math.Min(text?.Length ?? 0, 30)]}");
+
             if (threadTs != null && OnSelfMessage != null)
             {
                 var username = eventNode["username"]?.GetValue<string>();
@@ -354,7 +356,11 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         }
 
         // Skip message subtypes (channel_join, etc.)
-        if (subtype != null) return;
+        if (subtype != null)
+        {
+            Console.WriteLine($"[SLACK] Skip subtype={subtype} user={user} text={text?[..Math.Min(text?.Length ?? 0, 30)]}");
+            return;
+        }
 
         // Fire raw event
         OnEvent?.Invoke(eventType ?? "", eventNode);
@@ -435,8 +441,21 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         var ack = JsonSerializer.Serialize(new { envelope_id = envelopeId });
         var bytes = Encoding.UTF8.GetBytes(ack);
 
-        // Fire and forget — must be fast
-        _ = _ws?.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+        if (_ws == null || _ws.State != WebSocketState.Open)
+        {
+            Console.Error.WriteLine($"[SLACK] ACK FAILED — ws={_ws?.State} envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
+            return;
+        }
+
+        try
+        {
+            _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SLACK] ACK ERROR — {ex.Message} envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
+        }
     }
 
     /// <summary>Reconnect by closing current WebSocket and opening a new one.
