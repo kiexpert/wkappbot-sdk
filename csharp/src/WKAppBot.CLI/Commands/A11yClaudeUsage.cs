@@ -376,7 +376,37 @@ internal partial class Program
 
         // Summary line
         Console.WriteLine();
-        Console.WriteLine($"  Session: {report.SessionPercent}% used ({sessionRemain}% left) — {report.SessionReset ?? "?"}");
+        // Session JSONL file size — try current CWD, then scan all sessions
+        string jsonlInfo = "";
+        try
+        {
+            var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+            var (pct, _, _, fileSize) = GetContextInfoForCwdEx(cwd);
+            if (fileSize <= 0)
+            {
+                // Fallback: find largest active session JSONL
+                var sessDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".claude", "projects");
+                if (Directory.Exists(sessDir))
+                {
+                    foreach (var jsonl in Directory.EnumerateFiles(sessDir, "*.jsonl", SearchOption.AllDirectories)
+                        .OrderByDescending(f => new FileInfo(f).Length).Take(1))
+                    {
+                        var fi = new FileInfo(jsonl);
+                        fileSize = fi.Length;
+                        pct = (int)(fileSize / (40.0 * 1024 * 1024) * 100);
+                    }
+                }
+            }
+            if (fileSize > 0)
+            {
+                var sizeMB = fileSize / (1024.0 * 1024.0);
+                jsonlInfo = sizeMB >= 1 ? $" | JSONL={sizeMB:F0}MB (ctx={pct}%)" : $" | ctx={pct}%";
+            }
+        }
+        catch { }
+
+        Console.WriteLine($"  Session: {report.SessionPercent}% used ({sessionRemain}% left) — {report.SessionReset ?? "?"}{jsonlInfo}");
         Console.WriteLine($"  Weekly:  {report.WeeklyAllPercent}% used ({weeklyRemain}% left) — {report.WeeklyAllReset ?? "?"}");
         Console.WriteLine($"  Sonnet:  {report.WeeklySonnetPercent}% used — {report.WeeklySonnetReset ?? "?"}");
         Console.WriteLine($"  URL:     {ClaudeUsageUrl}");
