@@ -96,6 +96,11 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
 - **Gemini 저작권 경고 자동 dismiss**: mat-dialog/role=dialog 감지 → 확인 버튼 자동 클릭
 - **grap search cache**: 5초 TTL + hwnd 유효성 검증
 - **Slack \n 디코딩**: C-style escape (\\n→줄바꿈) slack send/reply 적용
+- **Auto A11y Hack**: InputReadiness Probe 성공 → 자동 CCA+FusedMatcher+Experience DB 저장
+- **Parallel CCA on Find**: a11y 액션 FindUiaScope 시 병렬 CCA → UIA 실패 시 DB 즉시 폴백
+- **Experience DB 사이클**: Mouse CCA(자동) + Probe(입력) + Find(액션) → fused_match.jsonl 축적 → 조회 폴백
+- **Zoom Cleanup**: 60초마다 1분+ InputZoom/InputHighlight 윈도우 자동 WM_CLOSE
+- **Eye 콘솔 UTF-8**: SetConsoleOutputCP(65001) + Console.OutputEncoding (스케줄러 포함)
 
 ### Sunset Screensaver
 10초 idle → 해질녘 색상 전환 (7-stop gradient) → 별/달/토성/파도 애니메이션
