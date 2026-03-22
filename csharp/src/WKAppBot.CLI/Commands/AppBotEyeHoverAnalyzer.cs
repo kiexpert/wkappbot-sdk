@@ -1,8 +1,10 @@
 // AppBotEyeHoverAnalyzer.cs — Mouse CCA Live Analysis (화면 MD 변환기)
 // Background worker in Eye: 1s interval → mouse pos → UIA + CCA → Slack thread reply.
+// Auto a11y hack on InputReadiness probe success.
 
 using System.Text;
 using WKAppBot.Win32.Native;
+using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Accessibility;
 
 namespace WKAppBot.CLI;
@@ -12,6 +14,72 @@ internal partial class Program
     // ── Mouse CCA live analysis (1s interval, change-based Slack thread reply) ──
     static string? _mouseCcaReplyTs;            // Slack thread ts for CCA result
     static string _lastMouseCcaResult = "";      // change detection
+
+    // ── Auto a11y hack on InputReadiness (single worker, no parallel) ──
+    static readonly SemaphoreSlim _autoHackSemaphore = new(1, 1);
+
+    /// <summary>Subscribe to InputReadiness.OnProbeSuccess for auto a11y hack.</summary>
+    internal static void SetupAutoHackOnProbe()
+    {
+        InputReadiness.OnProbeSuccess += (targetHwnd, processName, className) =>
+        {
+            // Fire-and-forget, single worker (skip if already running)
+            if (!_autoHackSemaphore.Wait(0)) return;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    Console.WriteLine($"[AUTO-HACK] Probe success → analyzing {processName}/{className} (0x{targetHwnd:X8})");
+
+                    // Capture target parent region
+                    NativeMethods.GetWindowRect(targetHwnd, out var wr);
+                    int x = wr.Left, y = wr.Top, w = wr.Right - wr.Left, h = wr.Bottom - wr.Top;
+                    if (w < 10 || h < 10) return;
+                    if (w > 1200) w = 1200;
+                    if (h > 800) h = 800;
+
+                    using var bmp = new System.Drawing.Bitmap(w, h);
+                    using (var g = System.Drawing.Graphics.FromImage(bmp))
+                        g.CopyFromScreen(x, y, 0, 0, new System.Drawing.Size(w, h));
+
+                    // CCA analysis
+                    var cca = new WKAppBot.Vision.ConnectedComponentAnalyzer();
+                    var regions = cca.Analyze(bmp);
+
+                    // Collect UIA leaves for fused matching
+                    var uiaInfos = new List<WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo>();
+                    try
+                    {
+                        using var uia = new UiaLocator();
+                        var leaves = new List<(string text, int lx, int ly, int lw, int lh, int depth)>();
+                        var rootEl = uia.GetElementAndInfoAtPoint(x + w / 2, y + h / 2).element;
+                        if (rootEl?.Parent != null)
+                            UiaLocator.CollectTextLeaves(rootEl.Parent, leaves, 0, 8);
+                        foreach (var leaf in leaves)
+                            uiaInfos.Add(new WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo
+                            {
+                                Name = leaf.text,
+                                Bounds = new System.Drawing.Rectangle(leaf.lx - x, leaf.ly - y, leaf.lw, leaf.lh)
+                            });
+                    }
+                    catch { }
+
+                    // Fused match + save
+                    if (uiaInfos.Count > 0 || regions.Count > 0)
+                    {
+                        var matchResults = WKAppBot.Vision.CcaUiaFusedMatcher.Match(regions, uiaInfos);
+                        var summary = WKAppBot.Vision.CcaUiaFusedMatcher.Summarize(matchResults);
+                        WKAppBot.Vision.CcaUiaFusedMatcher.SaveToExperienceDb(
+                            Path.Combine(DataDir, "experience"), processName, className, matchResults);
+                        Console.WriteLine($"[AUTO-HACK] Done: {summary}");
+                    }
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[AUTO-HACK] Error: {ex.Message}"); }
+                finally { _autoHackSemaphore.Release(); }
+            });
+        };
+        Console.WriteLine("[AUTO-HACK] Subscribed to InputReadiness.OnProbeSuccess");
+    }
 
     /// <summary>
     /// Start mouse CCA live analysis worker.

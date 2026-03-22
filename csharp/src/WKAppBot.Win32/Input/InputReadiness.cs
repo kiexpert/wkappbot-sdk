@@ -249,6 +249,9 @@ public sealed class InputReadiness
     public IElevationRequester? ElevationRequester { get; set; }
 
     /// <summary>
+    /// <summary>Event fired after Probe() succeeds — for auto a11y hack trigger.</summary>
+    public static event Action<IntPtr, string, string>? OnProbeSuccess; // (targetHwnd, processName, className)
+
     /// Set to true when Probe() or ProbeAtPoint() is called for this invocation.
     /// SmartSetForegroundWindow and physical input entry points check this flag.
     /// Commands that skip readiness trigger [IDLE⚠] warning — "no-readiness detected".
@@ -719,7 +722,7 @@ public sealed class InputReadiness
                 zoom.UpdateStatus("No methods available");
         }
 
-        return new InputReadinessReport
+        var report = new InputReadinessReport
         {
             TargetHwnd = req.TargetHwnd,
             TargetClass = targetClass,
@@ -742,6 +745,11 @@ public sealed class InputReadiness
             InputPositionEnsured = inputPositionEnsured,
             Zoom = zoom,
         };
+
+        // Fire auto a11y hack event (non-blocking)
+        try { OnProbeSuccess?.Invoke(req.TargetHwnd, procName, targetClass); } catch { }
+
+        return report;
     }
 
     // ── DetectBlocker: 방해꾼 빠른 감지 (~5ms) ────────────────────
