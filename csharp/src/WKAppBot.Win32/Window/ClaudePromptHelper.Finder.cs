@@ -157,8 +157,19 @@ public sealed partial class ClaudePromptHelper
     /// Unlike FindPrompt (which returns first match), this returns every available prompt.
     /// Used for broadcast messages (e.g., ping → all Claude instances respond).
     /// </summary>
+    private static DateTime _lastFullScan = DateTime.MinValue;
+    private static List<PromptInfo> _cachedPromptResults = new();
+
     public List<PromptInfo> FindAllPrompts(bool includeHidden = false)
     {
+        // Fast path: return cached results if valid (all hwnds alive + <2s old)
+        if (_cachedPromptResults.Count > 0
+            && (DateTime.UtcNow - _lastFullScan).TotalSeconds < 2.0
+            && _cachedPromptResults.All(p => NativeMethods.IsWindow(p.WindowHandle)))
+        {
+            return _cachedPromptResults;
+        }
+
         var results = new List<PromptInfo>();
         var seen = new HashSet<IntPtr>();
         var scannedCodexPids = new HashSet<uint>();
@@ -242,7 +253,10 @@ public sealed partial class ClaudePromptHelper
             }
         }
 
-        Console.WriteLine($"  [PROMPT] FindAllPrompts: {results.Count} prompt(s) found");
+        var scanMs = (DateTime.UtcNow - _lastFullScan).TotalMilliseconds;
+        _lastFullScan = DateTime.UtcNow;
+        _cachedPromptResults = results;
+        Console.WriteLine($"  [PROMPT] FindAllPrompts: {results.Count} prompt(s) found ({scanMs:F0}ms)");
         foreach (var r in results)
         {
             var shortTitle = r.WindowTitle.Length > 60 ? r.WindowTitle[..57] + "..." : r.WindowTitle;
