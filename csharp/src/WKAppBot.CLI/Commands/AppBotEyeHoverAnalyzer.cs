@@ -191,6 +191,15 @@ internal partial class Program
                                 var regions2 = cca2.Analyze(bmp);
                                 var matchResults = WKAppBot.Vision.CcaUiaFusedMatcher.Match(regions2, uiaInfos);
                                 fusedSummary = WKAppBot.Vision.CcaUiaFusedMatcher.Summarize(matchResults);
+
+                                // Save to Experience DB
+                                NativeMethods.GetWindowThreadProcessId(hwnd, out uint procId);
+                                string procName2;
+                                try { procName2 = System.Diagnostics.Process.GetProcessById((int)procId).ProcessName; } catch { procName2 = "unknown"; }
+                                var clsBuf = new StringBuilder(64);
+                                NativeMethods.GetClassNameW(hwnd, clsBuf, clsBuf.Capacity);
+                                WKAppBot.Vision.CcaUiaFusedMatcher.SaveToExperienceDb(
+                                    Path.Combine(DataDir, "experience"), procName2, clsBuf.ToString(), matchResults);
                             }
                         }
                     }
