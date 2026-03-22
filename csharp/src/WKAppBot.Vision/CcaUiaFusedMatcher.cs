@@ -290,6 +290,67 @@ public sealed class CcaUiaFusedMatcher
         catch { /* best effort */ }
     }
 
+    /// <summary>
+    /// Load recent match results from Experience DB.
+    /// Returns latest entry's top matches (UIA name → CCA bounds mapping).
+    /// </summary>
+    public static List<(string uiaName, string ccaType, Rectangle bounds, double score)>
+        LoadFromExperienceDb(string experienceDir, string processName, string className)
+    {
+        var results = new List<(string, string, Rectangle, double)>();
+        try
+        {
+            var path = Path.Combine(experienceDir, processName, className, "fused_match.jsonl");
+            if (!File.Exists(path)) return results;
+
+            // Read last line (most recent)
+            var lines = File.ReadAllLines(path);
+            if (lines.Length == 0) return results;
+            var lastLine = lines[^1];
+
+            var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(lastLine);
+            var topMatches = json?["topMatches"] as System.Text.Json.Nodes.JsonArray;
+            if (topMatches == null) return results;
+
+            foreach (var m in topMatches)
+            {
+                var name = m?["uia"]?.GetValue<string>() ?? "";
+                var type = m?["ccaType"]?.GetValue<string>() ?? "";
+                var score = m?["score"]?.GetValue<double>() ?? 0;
+                var boundsStr = m?["bounds"]?.GetValue<string>() ?? "";
+                // Parse "x,y WxH"
+                Rectangle rect = Rectangle.Empty;
+                try
+                {
+                    var parts = boundsStr.Split(new[] { ',', ' ', 'x' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length == 4)
+                        rect = new Rectangle(int.Parse(parts[0]), int.Parse(parts[1]),
+                            int.Parse(parts[2]), int.Parse(parts[3]));
+                }
+                catch { }
+                results.Add((name, type, rect, score));
+            }
+        }
+        catch { }
+        return results;
+    }
+
+    /// <summary>
+    /// Find a match by UIA name from cached experience.
+    /// Returns best matching bounds or Rectangle.Empty if not found.
+    /// </summary>
+    public static (Rectangle bounds, double score) FindByNameInExperience(
+        string experienceDir, string processName, string className, string targetName)
+    {
+        var cached = LoadFromExperienceDb(experienceDir, processName, className);
+        foreach (var (name, type, bounds, score) in cached)
+        {
+            if (!string.IsNullOrEmpty(name) && TextSimilarity(name, targetName) > 0.7)
+                return (bounds, score);
+        }
+        return (Rectangle.Empty, 0);
+    }
+
     /// <summary>Summary stats for quick display.</summary>
     public static string Summarize(List<MatchResult> results)
     {
