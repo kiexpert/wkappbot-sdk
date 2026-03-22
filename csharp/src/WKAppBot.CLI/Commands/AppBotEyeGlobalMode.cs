@@ -1194,44 +1194,9 @@ internal partial class Program
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
         var eyeSummary = BuildEyeSummary(cards, latest, promptPreview, promptDiag.FileWriteUtc);
 
-        // ── CCA live analysis: capture active Claude window → segment → append to summary ──
-        if ((DateTime.UtcNow - _lastCcaAnalysis).TotalSeconds >= 10) // every 10s, time-based
-        {
-            try
-            {
-                _lastCcaAnalysis = DateTime.UtcNow;
-                PulseStep.Init("cca-live");
-                var activePrompt = ClaudePromptHelper.GetAllCachedPrompts().FirstOrDefault();
-                if (activePrompt != null && activePrompt.WindowHandle != IntPtr.Zero
-                    && NativeMethods.IsWindow(activePrompt.WindowHandle))
-                {
-                    NativeMethods.GetWindowRect(activePrompt.WindowHandle, out var wr);
-                    int w = wr.Right - wr.Left, h = wr.Bottom - wr.Top;
-                    if (w > 50 && h > 50 && !NativeMethods.IsIconic(activePrompt.WindowHandle))
-                    {
-                        PulseStep.Mark("capture");
-                        using var bmp = new System.Drawing.Bitmap(w, h);
-                        using (var g = System.Drawing.Graphics.FromImage(bmp))
-                            g.CopyFromScreen(wr.Left, wr.Top, 0, 0, new System.Drawing.Size(w, h));
-                        PulseStep.Mark("cca-analyze");
-                        var cca = new WKAppBot.Vision.ConnectedComponentAnalyzer();
-                        var regions = cca.Analyze(bmp);
-                        PulseStep.Mark("classify");
-                        int text = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Text);
-                        int icon = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Icon);
-                        int sep = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Separator);
-                        int cont = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Container);
-                        var table = cca.DetectTable(regions, w, h);
-                        var tableInfo = table != null ? $" table={table.Rows}x{table.Cols}" : "";
-                        _cachedCcaSummary = $"[CCA] {regions.Count} seg: T={text} I={icon} S={sep} C={cont}{tableInfo}";
-                    }
-                }
-                PulseStep.Done();
-            }
-            catch { _cachedCcaSummary = "[CCA] error"; }
-        }
-        if (!string.IsNullOrEmpty(_cachedCcaSummary))
-            eyeSummary = _cachedCcaSummary + "\n" + eyeSummary;
+        // CCA live analysis removed from Eye (v4.8) — now in analyze-hack server process.
+        // Eye only does read-only operations: card summary, UIA status, context %.
+        // No Bitmap/CCA/FlaUI in Eye → memory savings ~500MB+.
 
         host.UpdateAccessibilityText(eyeSummary);
         // Update IPC cache so eye tick one-shot gets instant response
