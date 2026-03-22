@@ -217,13 +217,16 @@ internal partial class Program
         // Thread-local console routing: command threads → pipe StringWriter, Eye threads → real console
         Console.SetOut(new ThreadRoutingWriter(Console.Out));
         // Start command pipe server — Launcher delegates commands here (zero cold-start)
+        PulseStep.Init("eye-startup");
         EyeCmdPipeServer.StartServer();
+        PulseStep.Mark("pipe-server");
 
         using var host = new AppBotEyeHost();
         host.Start(width, height, posX, posY, ownerHwnd: IntPtr.Zero);
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
         host.UpdateAccessibilityText(string.Empty);
 
+        PulseStep.Mark("host-started");
         Console.WriteLine("[EYE] Global monitor active — press Ctrl+C to stop");
 
         // ── Windows Task Scheduler: dual watchdog structure ──
@@ -244,9 +247,11 @@ internal partial class Program
         _ = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
         Console.WriteLine($"[EYE] Eye pipe server started (elevated={elevated})");
 
+        PulseStep.Mark("eye-pipe-server");
         // ── Auto a11y hack on InputReadiness probe success ──
         SetupAutoHackOnProbe();
         // ── Mouse CCA: 1s interval → UIA element + CCA + Visual MD → Slack thread reply ──
+        PulseStep.Mark("workers-init");
         StartMouseCcaWorker(cts.Token);
         // ── Keyboard Focus Chain: 1s interval → focused element + parent chain → Slack thread reply ──
         // FocusChain now handled inside unified MouseCcaWorker (same server process)
@@ -322,6 +327,7 @@ internal partial class Program
                     slackClient = new SlackSocketClient();
                     slackClient.ConnectAsync(appToken, slackBotToken).GetAwaiter().GetResult();
                     EyeColor(ConsoleColor.Green);
+                    PulseStep.Mark("slack-connected");
                     Console.WriteLine("[EYE] Slack Socket Mode connected (GlobalMode)");
                     EyeResetColor();
 
@@ -572,6 +578,7 @@ internal partial class Program
         IntPtr myEyeHwnd = IntPtr.Zero;
         int duplicateCheckFrame = 0;
 
+        PulseStep.Done("ready");
         int frameCount = 0;
         while (host.IsAlive && !cts.IsCancellationRequested)
         {
