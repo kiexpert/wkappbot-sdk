@@ -652,9 +652,9 @@ internal sealed class WhisperRingWindow : Window
             // Fade last STT word slowly (5~10s)
             _sttText.Opacity = Math.Max(0.3, 1.0 - (sttAgeSec - 5.0) / 5.0);
         }
-        else if (string.IsNullOrEmpty(_sttText.Text) || _sttText.Opacity < 0.1)
+        else
         {
-            // No STT ever received → show clock
+            // No active STT → always show live clock
             _sttText.Text = DateTime.Now.ToString("HH:mm:ss");
             _sttText.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
             _sttText.Opacity = mode == "QUIET" ? 0.7 : 0.5;
