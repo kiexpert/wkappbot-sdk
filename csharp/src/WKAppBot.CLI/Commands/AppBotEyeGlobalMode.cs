@@ -999,6 +999,32 @@ internal partial class Program
 
         // ScreenSaver runs as separate process — exits on its own
 
+        // ── Cleanup all WPF windows owned by this process (prevent zombie) ──
+        try
+        {
+            int closed = 0;
+            NativeMethods.EnumWindows((hWnd, _) =>
+            {
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint wpid);
+                if ((int)wpid == Environment.ProcessId)
+                {
+                    var buf = new System.Text.StringBuilder(64);
+                    NativeMethods.GetWindowTextW(hWnd, buf, buf.Capacity);
+                    var title = buf.ToString();
+                    // Close WPF windows that keep the process alive
+                    if (title is "FocuslessWarning" or "InputZoom" or "InputHighlight"
+                        or "UserInputWaitOverlay" or "Hidden Window")
+                    {
+                        NativeMethods.PostMessageW(hWnd, 0x0010, IntPtr.Zero, IntPtr.Zero); // WM_CLOSE
+                        closed++;
+                    }
+                }
+                return true;
+            }, IntPtr.Zero);
+            if (closed > 0) Console.WriteLine($"[EYE] Closed {closed} lingering WPF window(s)");
+        }
+        catch { }
+
         // ── Cleanup FSW watchers ──
         DisposeFileWatchers();
 
