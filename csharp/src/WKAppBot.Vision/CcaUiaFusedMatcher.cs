@@ -230,8 +230,12 @@ public sealed class CcaUiaFusedMatcher
         return union > 0 ? (double)intersect / union : 0;
     }
 
-    static string Normalize(string s) =>
-        new string(s.ToLowerInvariant().Where(c => char.IsLetterOrDigit(c) || c == ' ').ToArray()).Trim();
+    static string Normalize(string s)
+    {
+        // Unicode NFC normalization (Korean jamo composition: ㅎ+ㅏ+ㄴ → 한)
+        s = s.Normalize(System.Text.NormalizationForm.FormC);
+        return new string(s.ToLowerInvariant().Where(c => char.IsLetterOrDigit(c) || c == ' ').ToArray()).Trim();
+    }
 
     static double IoU(Rectangle a, Rectangle b)
     {
@@ -239,6 +243,51 @@ public sealed class CcaUiaFusedMatcher
         double interArea = Math.Max(0, inter.Width) * Math.Max(0, inter.Height);
         double unionArea = (double)a.Width * a.Height + (double)b.Width * b.Height - interArea;
         return unionArea > 0 ? interArea / unionArea : 0;
+    }
+
+    /// <summary>
+    /// Save match results to Experience DB as JSONL.
+    /// Path: experience/{processName}/{className}/fused_match.jsonl
+    /// </summary>
+    public static void SaveToExperienceDb(string experienceDir, string processName, string className,
+        List<MatchResult> results)
+    {
+        try
+        {
+            var dir = Path.Combine(experienceDir, processName, className);
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, "fused_match.jsonl");
+
+            int matched = results.Count(r => r.MatchType == "spatial");
+            int synthetic = results.Count(r => r.MatchType == "synthetic");
+            double avgScore = matched > 0 ? results.Where(r => r.MatchType == "spatial").Average(r => r.Score) : 0;
+
+            var entry = new System.Text.Json.Nodes.JsonObject
+            {
+                ["ts"] = DateTime.UtcNow.ToString("o"),
+                ["matched"] = matched,
+                ["synthetic"] = synthetic,
+                ["avgScore"] = Math.Round(avgScore, 3),
+                ["total"] = results.Count
+            };
+
+            // Top 5 best matches for reference
+            var topMatches = new System.Text.Json.Nodes.JsonArray();
+            foreach (var m in results.Where(r => r.MatchType == "spatial").OrderByDescending(r => r.Score).Take(5))
+            {
+                topMatches.Add(new System.Text.Json.Nodes.JsonObject
+                {
+                    ["score"] = Math.Round(m.Score, 3),
+                    ["uia"] = m.UiaElement?.Name ?? "",
+                    ["ccaType"] = m.CcaRegion?.Type.ToString() ?? "",
+                    ["bounds"] = $"{m.CcaRegion?.Bounds.X},{m.CcaRegion?.Bounds.Y} {m.CcaRegion?.Bounds.Width}x{m.CcaRegion?.Bounds.Height}"
+                });
+            }
+            entry["topMatches"] = topMatches;
+
+            File.AppendAllText(path, entry.ToJsonString() + "\n");
+        }
+        catch { /* best effort */ }
     }
 
     /// <summary>Summary stats for quick display.</summary>
