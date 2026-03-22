@@ -383,6 +383,13 @@ internal sealed class WhisperRingWindow : Window
         string? sttText = null, long sttAgeTicks = long.MaxValue, string sttMode = "QUIET",
         int segFrames = 0, ushort soundCode = 0, int[]? voiceLevels = null)
     {
+        // Ensure WPF UI thread (critical for separate process: OnFrame comes from audio thread)
+        if (!_canvas.Dispatcher.CheckAccess())
+        {
+            _canvas.Dispatcher.InvokeAsync(() => UpdateSpectrum(levels, maxLevel, mode, token, recentTokens,
+                sttText, sttAgeTicks, sttMode, segFrames, soundCode, voiceLevels));
+            return;
+        }
         double cx = _canvas.Width / 2, cy = _canvas.Height / 2;
         double arcSpan = (360.0 - BandCount * GapAngle) / BandCount;
 
