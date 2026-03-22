@@ -154,21 +154,30 @@ internal partial class Program
 
                 NativeMethods.GetCursorPos(out var pt);
                 var hwnd = NativeMethods.WindowFromPoint(pt);
-                if (hwnd == IntPtr.Zero) continue;
+                bool doMouse = false;
 
-                // Skip our own process
-                NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
-                if ((int)pid == Environment.ProcessId) continue;
-
-                // Change detection: only analyze when UIA node changes
-                var nodeKey = $"{hwnd:X8}_{pt.X / 20}_{pt.Y / 20}"; // 20px grid
-                if (!firstRun && nodeKey == _lastHackNodeKey) continue;
-                _lastHackNodeKey = nodeKey;
+                if (hwnd != IntPtr.Zero)
+                {
+                    NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                    if ((int)pid != Environment.ProcessId)
+                    {
+                        var nodeKey = $"{hwnd:X8}_{pt.X / 20}_{pt.Y / 20}";
+                        if (firstRun || nodeKey != _lastHackNodeKey)
+                        {
+                            _lastHackNodeKey = nodeKey;
+                            doMouse = true;
+                        }
+                    }
+                }
                 firstRun = false;
 
-                // Send request to analyze-hack server process
+                // Ensure server is running
                 EnsureHackServer();
                 if (_hackServerProcess is not { HasExited: false } || _hackServerStdin == null) continue;
+
+                // ── Mouse CCA (only if node changed) ──
+                if (doMouse)
+                {
 
                 string serverResult;
                 try
@@ -230,8 +239,9 @@ internal partial class Program
                 // Post mouse to Slack
                 await UpdateMouseCcaSlack(serverResult);
                 Console.WriteLine($"[ANALYSIS] mouse: {serverResult.Split('\n')[0]}");
+                } // end if (doMouse)
 
-                // ── Keyboard focus (same server, same loop iteration) ──
+                // ── Keyboard focus (always, regardless of mouse change) ──
                 try
                 {
                     _hackServerStdin!.WriteLine("{\"type\":\"focus\"}");
