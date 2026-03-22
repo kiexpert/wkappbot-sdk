@@ -122,13 +122,13 @@ internal partial class Program
     static async Task MouseCcaServerLoop(CancellationToken ct)
     {
         Console.WriteLine("[MOUSE-CCA] Event-driven analysis (analyze-hack server)");
-        var lastPos = new POINT();
+        bool firstRun = true;
 
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(1000, ct);
+                await Task.Delay(firstRun ? 3000 : 1000, ct); // first run: 3s delay for Eye init
 
                 NativeMethods.GetCursorPos(out var pt);
                 var hwnd = NativeMethods.WindowFromPoint(pt);
@@ -139,10 +139,10 @@ internal partial class Program
                 if ((int)pid == Environment.ProcessId) continue;
 
                 // Change detection: only analyze when UIA node changes
-                // Lightweight check: hwnd + cursor position (no UIA call in Eye!)
                 var nodeKey = $"{hwnd:X8}_{pt.X / 20}_{pt.Y / 20}"; // 20px grid
-                if (nodeKey == _lastHackNodeKey) continue;
+                if (!firstRun && nodeKey == _lastHackNodeKey) continue;
                 _lastHackNodeKey = nodeKey;
+                firstRun = false;
 
                 // Send request to analyze-hack server process
                 EnsureHackServer();
