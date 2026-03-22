@@ -249,7 +249,7 @@ internal partial class Program
         // ── Mouse CCA: 1s interval → UIA element + CCA + Visual MD → Slack thread reply ──
         StartMouseCcaWorker(cts.Token);
         // ── Keyboard Focus Chain: 1s interval → focused element + parent chain → Slack thread reply ──
-        StartFocusChainWorker(cts.Token);
+        // FocusChain now handled inside unified MouseCcaWorker (same server process)
 
         if (_lastTickActivityUtc == DateTime.MinValue) _lastTickActivityUtc = DateTime.UtcNow;
         if (_lastAiActivityUtc == DateTime.MinValue) _lastAiActivityUtc = DateTime.UtcNow;
