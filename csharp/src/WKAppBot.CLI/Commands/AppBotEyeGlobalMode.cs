@@ -232,8 +232,9 @@ internal partial class Program
         // ── Windows Task Scheduler: dual watchdog structure ──
         // 1. Permanent 10-min watchdog (Eye always comes back even if killed)
         // 2. Precise one-shot retry task synced to actual queue (if items exist)
-        EnsureEyeWatchdogTask(); // initial: eye tick in 5 min (pushed forward every ~1 min in loop)
-        RouteRetryQueue.ScheduleRetryTask(); // precise one-shot retry task
+        PulseStep.Mark("watchdog");
+        EnsureEyeWatchdogTask();
+        RouteRetryQueue.ScheduleRetryTask();
 
         // ★ Default: pure focusless mode — Eye will not steal foreground focus
         // AllowFocusSteal is temporarily enabled for handoff nudges only
@@ -540,6 +541,7 @@ internal partial class Program
             };
             wrPsi.Environment["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString();
             System.Diagnostics.Process.Start(wrPsi);
+            PulseStep.Mark("whisper-spawned");
             Console.WriteLine($"[EYE] Whisper Ring spawned as separate process");
         }
         catch (Exception ex)
@@ -560,6 +562,7 @@ internal partial class Program
             };
             ssPsi.Environment["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString();
             System.Diagnostics.Process.Start(ssPsi);
+            PulseStep.Mark("screensaver-spawned");
             Console.WriteLine("[EYE] ScreenSaver spawned as separate process");
         }
         catch (Exception ex)
