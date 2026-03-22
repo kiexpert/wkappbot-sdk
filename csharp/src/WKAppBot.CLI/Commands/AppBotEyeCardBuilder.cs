@@ -177,6 +177,20 @@ internal partial class Program
     static string AbbreviateCwd(string? cwd)
     {
         if (string.IsNullOrWhiteSpace(cwd)) return "";
+        // Walk up to git root (find .git directory)
+        try
+        {
+            var dir = cwd.Replace('/', '\\');
+            while (!string.IsNullOrEmpty(dir))
+            {
+                if (Directory.Exists(Path.Combine(dir, ".git")))
+                { cwd = dir; break; }
+                var parent = Path.GetDirectoryName(dir);
+                if (parent == dir || parent == null) break;
+                dir = parent;
+            }
+        }
+        catch { }
         var path = cwd.Replace('\\', '/').TrimEnd('/');
         var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0) return "";
