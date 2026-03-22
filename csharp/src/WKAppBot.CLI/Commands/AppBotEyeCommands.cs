@@ -93,7 +93,7 @@ internal partial class Program
             proc?.WaitForExit(3000);
             var ok = proc?.ExitCode == 0;
             if (ok)
-                Console.WriteLine($"[EYE] Watchdog: eye tick scheduled at {fireAt} (5 min from now)");
+                Console.WriteLine($"[EYE] Watchdog: eye tick scheduled at {fireAt} (2 min from now)");
             else
                 Console.WriteLine($"[EYE] Watchdog schtasks exit={proc?.ExitCode} (non-fatal)");
         }
