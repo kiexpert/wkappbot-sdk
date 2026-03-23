@@ -86,6 +86,7 @@ internal static class EyeCmdPipeServer
             CallerArgs.Value = args;
             CurrentCommandGlobal = args;
             Program.RunningInEye = true;
+            Program.ReadOnlyMode = true; // Eye = read-only, UIA writes must use separate process
             var memBefore = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
             using (ThreadRoutingWriter.Route(tee))
             {
