@@ -537,7 +537,7 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine($"  ✅ Evidence script PASSED (exit=0)");
                 Console.WriteLine();
-                Console.WriteLine("  All checks passed! Update CLAUDE.md, MEMORY.md, usage/MCP docs, then push — by WillKim");
+                Console.WriteLine("  All checks passed! Deploy (publish core+launcher if changed), update CLAUDE.md/MEMORY.md/usage/MCP docs, then push — by WillKim");
                 Console.ResetColor();
             }
             catch (Exception ex)
