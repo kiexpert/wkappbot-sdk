@@ -95,6 +95,10 @@ internal static class EyeCmdPipeServer
             "gc" => false,        // file cleanup
             "screen" => false,    // overlay management
             "validate" => false,  // config validation
+            "suggest" => false,   // Slack API + file I/O (no UIA)
+            "file" => false,      // file read/edit/grep/glob (no UIA)
+            "logcat" => false,    // log search (no UIA)
+            "web" => false,       // CDP web operations (no UIA)
             "help" or "--help" or "-h" => false,
             "mcp" => false,       // MCP server itself (avoid recursion)
             "newchat" => false,   // focusless clipboard-based
