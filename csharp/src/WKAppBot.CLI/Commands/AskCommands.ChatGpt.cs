@@ -408,8 +408,8 @@ internal partial class Program
         await ClearContentEditable(cdp, editorSel);
         var inserted = await InsertTextContentEditable(cdp, editorSel, message);
         // Verify what's actually in the editor
-        var editorContent = await cdp.EvalAsync(
-            $"document.querySelector('{editorSel}')?.textContent?.substring(0,80) || 'EMPTY'") ?? "EMPTY";
+        var editorRaw = await cdp.GetEditorContentAsync(editorSel);
+        var editorContent = editorRaw.Length > 80 ? editorRaw[..80] : editorRaw;
         Console.WriteLine($"[ASK] After insert: {(inserted ? "OK" : "FAIL")}, editor=[{editorContent}]");
         if (!inserted)
         {
@@ -527,8 +527,7 @@ internal partial class Program
         LogRestoreFocus(prevFg, "after-send-GPT");
 
         // Check editor after send ??should be empty if sent successfully
-        var afterSend = await cdp.EvalAsync(
-            $"document.querySelector('{editorSel}')?.textContent?.length ?? -1") ?? "-1";
+        var afterSend = (await cdp.GetTextLengthAsync(editorSel)).ToString();
         Console.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={prevTurns})");
         if (returnAfterSend)
         {
