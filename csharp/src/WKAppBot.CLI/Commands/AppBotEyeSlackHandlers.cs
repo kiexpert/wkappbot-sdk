@@ -966,45 +966,44 @@ internal partial class Program
                 }
             }
 
-            // ── Normal @mention: broadcast to ALL prompts (멘션=폴더구분 없음) ──
-            // Route through MCP to avoid FlaUI loading in Eye
+            // ── Normal @mention: dispatch to slack route subprocess (same as OnMessage) ──
+            // Route subprocess handles FindAllPrompts + ProbeAndSubmit with correct display names
             var allMentionPrompts = FindAllPromptsViaMcp(forceRefresh: true);
             if (allMentionPrompts.Count > 0)
             {
-                // Build thread context (starter + previous message) for Claude
-                var threadContext = "";
                 var ackThread = msg.ThreadTs ?? msg.Timestamp;
-                if (msg.ThreadTs != null)
-                {
-                    var ctx = GetThreadContext(botToken, msg.Channel, msg.ThreadTs, msg.Timestamp);
-                    if (!string.IsNullOrEmpty(ctx))
-                        threadContext = $"\n{ctx}\n";
-                }
+                handledByMention.Add(msg.Timestamp); // dedup: OnMessage won't re-forward
 
-                var replyThread = msg.ThreadTs ?? msg.Timestamp;
-                int mentionSent = 0;
-                var mentionResults = new List<DeliveryResult>();
-                foreach (var pi in allMentionPrompts)
+                Console.WriteLine($"[EYE][SLACK] @mention → spawn slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
+                var routeJson = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    text = msg.Text, user = msg.User, ts = msg.Timestamp,
+                    threadTs = msg.ThreadTs, channel = msg.Channel,
+                    isMention = true // signal to route: broadcast to all prompts
+                });
+                _ = Task.Run(() =>
                 {
                     try
                     {
-                        var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, replyThread)}";
-                        // Route through MCP subprocess — ProbeAndSubmit uses UIA
-                        var hwndGrap = $"*hwnd={pi.WindowHandle.ToInt64():X}*";
-                        var (mcpOut, mcpCode) = EyeMcpClient.CallAsync(
-                            ["prompt", "send", hwndGrap, promptText, "--timeout", "30s"],
-                            timeoutMs: 45_000).GetAwaiter().GetResult();
-                        var ok = mcpCode == 0;
-                        mentionResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
-                        if (ok) mentionSent++;
+                        var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
+                        File.WriteAllText(tmpFile, routeJson);
+                        var corePath = Environment.ProcessPath ?? "wkappbot";
+                        var psi = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = corePath,
+                            Arguments = $"slack route --file \"{tmpFile}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                        };
+                        var proc = System.Diagnostics.Process.Start(psi);
+                        proc?.WaitForExit(60000);
+                        try { File.Delete(tmpFile); } catch { }
                     }
-                    catch (Exception ex)
-                    {
-                        mentionResults.Add(new DeliveryResult(ExtractProjectName(pi), false));
-                        Console.WriteLine($"[EYE][SLACK] Mention broadcast error: {ex.Message}");
-                    }
-                }
-                handledByMention.Add(msg.Timestamp); // dedup: OnMessage won't re-forward
+                    catch (Exception ex) { Console.Error.WriteLine($"[EYE] Mention route spawn error: {ex.Message}"); }
+                });
+
+                int mentionSent = 1; // assumed success (subprocess handles actual delivery)
+                var mentionResults = new List<DeliveryResult> { new DeliveryResult("route", true) };
                 Console.WriteLine($"[EYE][SLACK] >> Mention broadcast: {mentionSent}/{allMentionPrompts.Count} prompts");
 
                 SendAndTrackAck(msg.Channel, ackThread, mentionSent, allMentionPrompts.Count, mentionResults);
