@@ -156,16 +156,24 @@ internal partial class Program
             if (!success || string.IsNullOrWhiteSpace(response))
             {
                 Console.WriteLine($"[STUDY] {engine} failed — keeping batch file for retry.");
-                // Notify via Slack (no GPT fallback — Gemini-only policy)
+                // Notify via Slack with failure details (no GPT fallback — Gemini-only policy)
                 try
                 {
                     var slackCfg = File.Exists(SlackConfigPath) ? JsonNode.Parse(File.ReadAllText(SlackConfigPath)) : null;
                     var slackToken = slackCfg?["bot_token"]?.GetValue<string>();
                     var slackCh = slackCfg?["channel"]?.GetValue<string>();
                     if (!string.IsNullOrEmpty(slackToken) && !string.IsNullOrEmpty(slackCh))
+                    {
+                        // Include debug file path if available
+                        var debugFile = Path.Combine(DataDir, "logs");
+                        var latestDebug = Directory.Exists(debugFile)
+                            ? Directory.GetFiles(debugFile, $"study_fail_{engine}_*.log")
+                                .OrderByDescending(f => f).FirstOrDefault() : null;
+                        var detail = latestDebug != null ? $"\nDebug log: `{Path.GetFileName(latestDebug)}`" : "";
                         SlackSendViaApi(slackToken, slackCh,
-                            $":warning: Whisper study {engine} failed: {Path.GetFileName(batchFile)}",
+                            $":warning: Whisper study `{engine}` failed: `{Path.GetFileName(batchFile)}`{detail}\n클롣이 디버그 로그 확인 후 자동 수정 필요!",
                             username: "앱봇위스퍼").GetAwaiter().GetResult();
+                    }
                 }
                 catch { }
                 if (timeout == TimeSpan.Zero) break; else continue;
@@ -561,6 +569,35 @@ internal partial class Program
             // Extract AI answer from captured output
             var output = capture.ToString();
             var response = ExtractGeminiAnswer(output);
+
+            // Debug logging: why did it fail?
+            if (response == null)
+            {
+                var outputLen = output.Length;
+                var hasBegin = output.Contains("[ASK_FULL_ANSWER_BEGIN]");
+                var hasEnd = output.Contains("[ASK_FULL_ANSWER_END]");
+                var hasError = output.Contains("[ASK] Error:");
+                var hasCopyright = output.Contains("저작권") || output.Contains("copyright") || output.Contains("대답이 중지");
+                var hasTimeout = output.Contains("timed out") || output.Contains("Timeout");
+                var hasBlank = output.Contains("BLANK") || output.Contains("blank page");
+                var lastLines = string.Join("\n", output.Split('\n').TakeLast(5).Select(l => l.Trim()));
+
+                Console.Error.WriteLine($"[STUDY-DEBUG] {engine} extraction FAILED:");
+                Console.Error.WriteLine($"  output={outputLen}ch begin={hasBegin} end={hasEnd}");
+                Console.Error.WriteLine($"  error={hasError} copyright={hasCopyright} timeout={hasTimeout} blank={hasBlank}");
+                Console.Error.WriteLine($"  last5lines: {lastLines[..Math.Min(lastLines.Length, 300)]}");
+
+                // Save full output for post-mortem
+                try
+                {
+                    var debugPath = Path.Combine(DataDir, "logs",
+                        $"study_fail_{engine}_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+                    File.WriteAllText(debugPath, output);
+                    Console.Error.WriteLine($"  saved: {debugPath}");
+                }
+                catch { }
+            }
+
             return (response != null, response);
         }
         finally
