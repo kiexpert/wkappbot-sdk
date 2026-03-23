@@ -1227,15 +1227,35 @@ internal partial class Program
                 return;
             }
 
-            // ── Dispatch to route worker (fire-and-forget) ──
-            Console.WriteLine($"[EYE][SLACK] → DispatchBg slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
-            // slack route handles: thread reply / keyword / catch-all → inject + ack
+            // ── Dispatch to route worker (separate process → memory isolation) ──
+            Console.WriteLine($"[EYE][SLACK] → spawn slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
             var routeJson = System.Text.Json.JsonSerializer.Serialize(new
             {
                 text = msg.Text, user = msg.User, ts = msg.Timestamp,
                 threadTs = msg.ThreadTs, channel = msg.Channel
             });
-            EyeCmdPipeServer.DispatchBg(["slack", "route", routeJson]);
+            // Separate process: UIA write ops (FindAllPrompts + TypeAndSubmit) run outside Eye
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    // Pass JSON via temp file (avoids shell escaping issues)
+                    var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
+                    File.WriteAllText(tmpFile, routeJson);
+                    var corePath = Environment.ProcessPath ?? "wkappbot";
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = corePath,
+                        Arguments = $"slack route --file \"{tmpFile}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                    };
+                    var proc = System.Diagnostics.Process.Start(psi);
+                    proc?.WaitForExit(60000);
+                    try { File.Delete(tmpFile); } catch { }
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[EYE] Route spawn error: {ex.Message}"); }
+            });
             }); // end Task.Run — WebSocket thread now free for next message
         };
     }

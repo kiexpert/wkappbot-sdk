@@ -23,11 +23,24 @@ internal partial class Program
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: slack route <msgJson>");
+            Console.Error.WriteLine("Usage: slack route <msgJson> | slack route --file <path>");
             return 1;
         }
 
-        var node = JsonNode.Parse(args[0]);
+        // Support --file for process-separated route (avoids shell escaping)
+        string jsonStr;
+        if (args.Length >= 2 && args[0] == "--file")
+        {
+            var filePath = args[1];
+            if (!File.Exists(filePath)) { Console.Error.WriteLine($"[ROUTE] File not found: {filePath}"); return 1; }
+            jsonStr = File.ReadAllText(filePath);
+        }
+        else
+        {
+            jsonStr = args[0];
+        }
+
+        var node = JsonNode.Parse(jsonStr);
         if (node == null) { Console.Error.WriteLine("[ROUTE] Invalid JSON"); return 1; }
 
         var text       = node["text"]?.GetValue<string>() ?? "";

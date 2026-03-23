@@ -36,6 +36,9 @@ internal partial class Program
     /// <summary>True when stdout is redirected (pipe/file). Suppresses diagnostic output ([ACT], cmd echo)
     /// so downstream tools receive clean data only. Set early in Main, before TeeWriter.</summary>
     internal static bool IsPipeMode = false;
+    /// <summary>When true, UIA write operations (TypeAndSubmit, Click, etc.) are blocked.
+    /// Set by Eye to enforce read-only mode. Write ops must run in separate process.</summary>
+    internal static bool ReadOnlyMode = false;
     // Relay file path for grap/grep one-shot mode (WKAPPBOT_RELAY_FILE env var).
     // FastExit creates {relayFilePath}.done sentinel after closing the file.
     internal static string? RelayFilePath = null;
