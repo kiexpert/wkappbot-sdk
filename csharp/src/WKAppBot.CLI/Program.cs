@@ -37,6 +37,28 @@ internal partial class Program
     /// so downstream tools receive clean data only. Set early in Main, before TeeWriter.</summary>
     internal static bool IsPipeMode = false;
     private static readonly HashSet<string> _autoBugDedup = new();
+
+    /// <summary>
+    /// [BUG-AUTO] Auto bug report — captures callstack + log tail, posts as suggest via Eye pipe.
+    /// Call from anywhere: Program.AutoBugReport("description").
+    /// Dedup per session (same context → once only). Zero process spawn.
+    /// </summary>
+    internal static void AutoBugReport(string context)
+    {
+        if (!_autoBugDedup.Add(context)) return;
+
+        var stack = new System.Diagnostics.StackTrace(1, true);
+        var callerFrame = stack.GetFrame(0);
+        var callerInfo = $"{callerFrame?.GetMethod()?.DeclaringType?.Name}.{callerFrame?.GetMethod()?.Name}:{callerFrame?.GetFileLineNumber()}";
+
+        var lastLog = _currentLogPath != null && File.Exists(_currentLogPath)
+            ? string.Join("\n", File.ReadLines(_currentLogPath).TakeLast(5)) : "(no log)";
+
+        var bugText = $"[BUG-AUTO] {context}\\ncaller: {callerInfo}\\ncommand: {string.Join(" ", EyeCmdPipeServer.CallerArgs.Value ?? [])}\\nlog tail:\\n{lastLog}";
+        Console.Error.WriteLine($"[BUG-AUTO] {context} at {callerInfo}");
+
+        EyeCmdPipeServer.DispatchBg(["suggest", bugText]);
+    }
     /// <summary>When true, UIA write operations (TypeAndSubmit, Click, etc.) are blocked.
     /// Set via --read-only CLI flag. Callers can pass this when they need read-only UIA access.</summary>
     internal static bool ReadOnlyMode = false;
@@ -418,40 +440,7 @@ internal partial class Program
             var command = args[0].ToLowerInvariant();
             var restArgs = args.Skip(1).ToArray();
 
-            // [BUG-AUTO] Auto bug report via separate process — captures callstack + context
-            void AutoBugReport(string context)
-            {
-                // Dedup: same context string → report once per session
-                if (!_autoBugDedup.Add(context)) return;
-
-                var stack = new System.Diagnostics.StackTrace(1, true);
-                var callerFrame = stack.GetFrame(0);
-                var callerInfo = $"{callerFrame?.GetMethod()?.DeclaringType?.Name}.{callerFrame?.GetMethod()?.Name}:{callerFrame?.GetFileLineNumber()}";
-
-                // Capture last log lines for context
-                var lastLog = _currentLogPath != null && File.Exists(_currentLogPath)
-                    ? string.Join("\n", File.ReadLines(_currentLogPath).TakeLast(5)) : "(no log)";
-
-                var bugText = $"[BUG-AUTO] {context}\ncaller: {callerInfo}\ncommand: {string.Join(" ", EyeCmdPipeServer.CallerArgs.Value ?? [])}\nlog tail:\n{lastLog}";
-                Console.Error.WriteLine($"[BUG-AUTO] {context} at {callerInfo}");
-
-                _ = Task.Run(() =>
-                {
-                    try
-                    {
-                        var exe = Environment.ProcessPath ?? "wkappbot";
-                        new System.Diagnostics.Process
-                        {
-                            StartInfo = new System.Diagnostics.ProcessStartInfo(exe)
-                            {
-                                ArgumentList = { "suggest", bugText },
-                                UseShellExecute = false, CreateNoWindow = true,
-                            }
-                        }.Start();
-                    }
-                    catch { }
-                });
-            }
+            // [BUG-AUTO] hooks wired below — AutoBugReport() is a class-level static method
 
             // [FL] Chrome focus theft → focusless warning overlay + auto bug report
             WKAppBot.WebBot.ChromeLauncher.OnFocusTheft ??= (chromeHwnd, prevFgHwnd) =>
@@ -468,24 +457,10 @@ internal partial class Program
                 AutoBugReport($"UIA focus steal: action={action} hwnd=0x{rootHwnd:X}");
             };
 
-            // [CDP-FALLBACK] Auto-suggest when CDP caller has no fallback (separate process — zero memory)
+            // [CDP-FALLBACK] Auto-suggest when CDP caller has no fallback (Eye pipe — zero spawn)
             WKAppBot.WebBot.CdpClient.OnFallbackSuggest ??= (text) =>
             {
-                _ = Task.Run(() =>
-                {
-                    try
-                    {
-                        var exe = Environment.ProcessPath ?? "wkappbot";
-                        var psi = new System.Diagnostics.ProcessStartInfo(exe)
-                        {
-                            ArgumentList = { "suggest", "[CDP-FALLBACK] " + text },
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                        };
-                        System.Diagnostics.Process.Start(psi)?.WaitForExit(10_000);
-                    }
-                    catch { }
-                });
+                EyeCmdPipeServer.DispatchBg(["suggest", "[CDP-FALLBACK] " + text]);
             };
 
             // Global option: disable zoom overlay — intentionally obnoxious name to discourage use
