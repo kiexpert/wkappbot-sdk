@@ -24,8 +24,12 @@ internal partial class Program
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
-    [DllImport("kernel32.dll")]
-    private static extern bool AllocConsole();
+    // AllocConsole BANNED — 콘솔 창 절대 생성 금지. 호출 시 즉시 에러 + 종료.
+    /// <summary>DO NOT USE. Throws + exits if called. Use log files instead.</summary>
+    [Obsolete("AllocConsole BANNED — use log files. Calling this will crash.", true)]
+    static bool AllocConsole() => throw new InvalidOperationException(
+        "AllocConsole is BANNED. 콘솔 창 생성 금지! 로그파일로 출력하세요. " +
+        "Call site: " + new System.Diagnostics.StackTrace(true).ToString());
 
     [DllImport("kernel32.dll")]
     private static extern bool SetConsoleCtrlHandler(ConsoleCtrlHandlerDelegate? handler, bool add);
