@@ -268,7 +268,7 @@ internal partial class Program
             if (cdp == null) return null;
 
             // Navigate if drifted
-            var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+            var currentUrl = await cdp.GetUrlAsync() ?? "";
             if (!currentUrl.Contains("gemini.google.com", StringComparison.OrdinalIgnoreCase))
             {
                 await cdp.NavigateAsync("https://gemini.google.com/app");
@@ -403,7 +403,7 @@ internal partial class Program
             {
                 // ?�?�?Phase 1: Navigate (iconified OK ??CDP works without rendering) ?�?�?
                 PulseStep.Mark("phase1-navigate");
-                var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+                var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("gemini.google.com"))
                 {
@@ -420,12 +420,12 @@ internal partial class Program
                 // CDP insertText/eval/setFileInputFiles all work on background tabs.
 
                 // Diagnose tab state before editor search
-                var hiddenState = await cdp.EvalAsync("document.hidden + '|' + document.title + '|' + document.querySelectorAll('*').length");
-                Console.WriteLine($"[ASK] Tab state: {hiddenState}");
+                var tabState = await cdp.GetTabStateAsync();
+                Console.WriteLine($"[ASK] Tab state: hidden={tabState.hidden} title={tabState.title} elements={tabState.elementCount}");
 
                 // If tab is hidden (background), dispatch visibility events to trigger deferred rendering
-                // (Gemini lazily initializes editor on hidden tabs ??fake visibility = focusless fix)
-                if (hiddenState?.StartsWith("true|") == true)
+                // (Gemini lazily initializes editor on hidden tabs — fake visibility = focusless fix)
+                if (tabState.hidden)
                 {
                     Console.WriteLine("[ASK] Tab hidden ??dispatching visibility events (focusless)...");
                     await cdp.EvalAsync(
@@ -463,8 +463,7 @@ internal partial class Program
                 // ?�?�?Persona injection on fresh Gemini conversation ?�?�?
                 // If persona continuation already contains a tool call, skip question send entirely
                 string? personaEarlyToolCall = null;
-                var geminiTurnCount = await cdp.EvalAsync(
-                    "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+                var geminiTurnCount = (await cdp.GetResponseCountAsync()).ToString();
                 var hasLoopPersonaState = await HasLoopPersonaStateAsync(cdp, "gemini");
                 var effectiveLoopPersona = loopMode || hasLoopPersonaState;
                 Console.WriteLine($"[ASK] Loop persona state: {(hasLoopPersonaState ? "present" : "missing")}");
@@ -490,9 +489,9 @@ internal partial class Program
                     var personaSent = false;
                     for (int ps = 0; ps < 5; ps++)
                     {
-                        var rem = await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 0") ?? "0";
+                        var rem = (await cdp.GetTextLengthAsync(editorSel)).ToString();
                         if (rem == "0" && ps > 0) { personaSent = true; break; }
-                        await cdp.EvalAsync("document.querySelector('button[aria-label=\"Send message\"], button[aria-label*=\"Send\"], .send-button, button.send-button')?.click()");
+                        await cdp.JsClickAsync("button[aria-label=\"Send message\"], button[aria-label*=\"Send\"], .send-button, button.send-button");
                         await Task.Delay(500);
                         await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
                         {
@@ -695,8 +694,7 @@ internal partial class Program
                 }
                 var sendResult = "PENDING";
                 // Count model-responses before sending ??detect response start as send confirmation
-                var preResponseCount = await cdp.EvalAsync(
-                    "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+                var preResponseCount = (await cdp.GetResponseCountAsync()).ToString();
 
                 for (int sendAttempt = 0; sendAttempt < 5; sendAttempt++)
                 {
@@ -714,7 +712,7 @@ internal partial class Program
                         // If editor is already empty, message was sent ? Gemini is responding (stop = normal)
                         if (sendAttempt > 0)
                         {
-                            var editorLen = await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 0") ?? "0";
+                            var editorLen = (await cdp.GetTextLengthAsync(editorSel)).ToString();
                             if (editorLen == "0")
                             {
                                 sendResult = $"SENT(attempt={sendAttempt})";
@@ -738,7 +736,7 @@ internal partial class Program
                     }
 
                     // Check if editor cleared OR response started (= already sent, don't re-send!)
-                    var remaining = await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 0") ?? "0";
+                    var remaining = (await cdp.GetTextLengthAsync(editorSel)).ToString();
                     if (remaining == "0" && sendAttempt > 0)
                     {
                         sendResult = $"SENT(attempt={sendAttempt})";

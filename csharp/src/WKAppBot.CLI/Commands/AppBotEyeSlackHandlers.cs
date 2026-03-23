@@ -1256,6 +1256,66 @@ internal partial class Program
             });
             }); // end Task.Run — WebSocket thread now free for next message
         };
+
+        // ── Handle emoji reactions → forward to prompt as text notification ──
+        slack.OnReaction += (rx) =>
+        {
+            // Only forward reaction_added (not removed)
+            if (rx.EventType != "reaction_added") return;
+            // Skip bot's own reactions
+            if (rx.User == slack.BotUserId) return;
+
+            Console.WriteLine($"[EYE][SLACK] Reaction :{rx.Reaction}: by {rx.User} on {rx.ItemTs}");
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    // Build route JSON with reaction info — reuses existing route subprocess
+                    var displayName = ResolveSlackDisplayName(rx.User);
+                    var reactionText = $":{rx.Reaction}: reaction by @{displayName} on message {rx.ItemTs}";
+
+                    var promptNames = new Dictionary<string, string>();
+                    foreach (var p in FindAllPromptsViaMcp())
+                    {
+                        var cwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
+                        if (string.IsNullOrEmpty(cwd)) continue;
+                        var tag = AbbreviateCwd(cwd);
+                        if (!string.IsNullOrEmpty(tag))
+                            promptNames[$"0x{p.WindowHandle.ToInt64():X}"] = $"클롣[{tag}]";
+                    }
+
+                    var routeJson = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        text = reactionText,
+                        user = rx.User,
+                        ts = rx.ItemTs,         // reacted message ts
+                        threadTs = rx.ItemTs,    // route as thread reply to the reacted message
+                        channel = rx.Channel,
+                        isReaction = true,
+                        reaction = rx.Reaction,
+                        eyeCwd = Environment.CurrentDirectory,
+                        botUsername = GetSendReplyUsername(),
+                        promptNames
+                    });
+
+                    var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
+                    File.WriteAllText(tmpFile, routeJson);
+                    var corePath = Environment.ProcessPath ?? "wkappbot";
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = corePath,
+                        Arguments = $"slack route --file \"{tmpFile}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                    };
+                    var proc = System.Diagnostics.Process.Start(psi);
+                    proc?.WaitForExit(60000);
+                    try { File.Delete(tmpFile); } catch { }
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[EYE] Reaction route error: {ex.Message}"); }
+            });
+        };
     }
 
     /// <summary>

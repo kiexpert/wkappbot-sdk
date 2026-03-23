@@ -88,7 +88,7 @@ internal partial class Program
             // Strategy 1: Find the tab via UIA (shows tab title = user knows which AI)
             try
             {
-                var pageTitle = await cdp.EvalAsync("document.title") ?? "";
+                var pageTitle = await cdp.GetTitleAsync() ?? "";
                 if (!string.IsNullOrEmpty(pageTitle))
                 {
                     using var automation = new UIA3Automation();

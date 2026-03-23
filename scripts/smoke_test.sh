@@ -234,8 +234,8 @@ if [ "$QUICK" -eq 0 ]; then
         # -- CDP commands --
         check_g "web tabs"            bash -c "\"$WKA\" web tabs 2>&1 | grep -qiE 'tab|url|http|about|smoke'"
         check_g "web screenshot"      bash -c "\"$WKA\" web screenshot 2>&1 | grep -qiE 'saved|Saved|captured|error'"
-        check_g "web eval smoke"      bash -c "\"$WKA\" web eval 'document.getElementById(\"smoke-marker\").dataset.smoke' 2>&1 | grep -qiE 'wkappbot-test-ok|eval|ok'"
-        check_g "web eval click"      bash -c "\"$WKA\" web eval 'window.smokeTestApi.clickBtn()' 2>&1 | grep -qiE '[0-9]|eval|ok'"
+        check_g "web read+evaljs smoke" bash -c "\"$WKA\" a11y read \"$CRM#$TEST_HINT\" --eval-js 'document.getElementById(\"smoke-marker\").dataset.smoke' 2>&1 | grep -qiE 'wkappbot-test-ok|eval|ok'"
+        check_g "web click+evaljs"     bash -c "\"$WKA\" a11y click \"$CRM#$TEST_HINT\" --eval-js 'window.smokeTestApi.clickBtn()' 2>&1 | grep -qiE '[0-9]|eval|ok|click'"
 
         # -- a11y on Chrome window (UIA) --
         check_g "a11y inspect chrome" bash -c "\"$WKA\" a11y inspect \"$CRM\" --nth 1 --depth 2 2>&1 | grep -qiE 'match|found|Chrome|window'"
@@ -243,9 +243,9 @@ if [ "$QUICK" -eq 0 ]; then
         check_g "a11y screenshot chr" bash -c "\"$WKA\" a11y screenshot \"$CRM_WIN\" 2>&1"
         check_g "a11y focus chrome"   bash -c "\"$WKA\" a11y focus \"$CRM\" --nth 1 2>&1 | grep -qiE 'focus|ok|error'"
 
-        # -- CDP via a11y eval with test page tab hint --
-        check_g "a11y eval counter"   bash -c "\"$WKA\" a11y eval \"$CRM#$TEST_HINT\" --text 'window.smokeTestApi.getCount()' 2>&1 | grep -qiE '[0-9]|eval|ok|error'"
-        check_g "a11y eval readyState" bash -c "\"$WKA\" a11y eval \"$CRM#$TEST_HINT\" --text 'document.readyState' 2>&1 | grep -qiE 'complete|interactive|eval|ok|error'"
+        # -- CDP via --eval-js with test page tab hint (replaces deprecated a11y eval) --
+        check_g "a11y read+evaljs counter"   bash -c "\"$WKA\" a11y read \"$CRM#$TEST_HINT\" --eval-js 'window.smokeTestApi.getCount()' 2>&1 | grep -qiE '[0-9]|eval|ok|error'"
+        check_g "a11y read+evaljs readyState" bash -c "\"$WKA\" a11y read \"$CRM#$TEST_HINT\" --eval-js 'document.readyState' 2>&1 | grep -qiE 'complete|interactive|eval|ok|error'"
 
         # -- CDP click button (CSS selector) --
         check_g "a11y click btn-click" bash -c "\"$WKA\" a11y click \"$CRM#button#btn-click\" 2>&1 | grep -qiE 'click|ok|error'"

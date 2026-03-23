@@ -45,6 +45,8 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     public int MessageCount => _messageCount;
     public int ReconnectCount => _reconnectCount;
     public DateTime LastConnectedUtc => _lastConnectedUtc;
+    /// <summary>Bot's own user ID (for filtering own reactions etc.).</summary>
+    public string? BotUserId => _botUserId;
 
     /// <summary>Fired when a message is posted in a subscribed channel.</summary>
     public event Action<SlackMessage>? OnMessage;
@@ -60,6 +62,9 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
 
     /// <summary>Fired when the bot's own message appears in a thread (for ack cleanup etc.).</summary>
     public event Action<SlackMessage>? OnSelfMessage;
+
+    /// <summary>Fired when a reaction (emoji) is added to a message.</summary>
+    public event Action<SlackReaction>? OnReaction;
 
     /// <summary>
     /// Connect to Slack via Socket Mode.
@@ -342,6 +347,32 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         var threadTs = eventNode["thread_ts"]?.GetValue<string>();
         var botId = eventNode["bot_id"]?.GetValue<string>();
 
+        // ── Reaction events: completely different JSON shape → handle early and return ──
+        // { "type": "reaction_added", "user": "U...", "reaction": "emoji", "item": { "type": "message", "channel": "C...", "ts": "..." } }
+        if (eventType is "reaction_added" or "reaction_removed")
+        {
+            var reaction = eventNode["reaction"]?.GetValue<string>();
+            var itemNode = eventNode["item"];
+            var itemChannel = itemNode?["channel"]?.GetValue<string>() ?? channel;
+            var itemTs = itemNode?["ts"]?.GetValue<string>();
+
+            Console.WriteLine($"[SLACK] {eventType}: :{reaction}: by {user} on {itemTs} in {itemChannel}");
+
+            if (!string.IsNullOrEmpty(reaction) && !string.IsNullOrEmpty(itemTs))
+            {
+                var rx = new SlackReaction
+                {
+                    Reaction = reaction,
+                    User = user ?? "",
+                    Channel = itemChannel ?? "",
+                    ItemTs = itemTs,
+                    EventType = eventType
+                };
+                _ = Task.Run(() => { try { OnReaction?.Invoke(rx); } catch (Exception ex) { Console.Error.WriteLine($"[SLACK] OnReaction error: {ex.Message}"); } });
+            }
+            return;
+        }
+
         // Bot's own messages → fire OnSelfMessage for ack cleanup, then skip normal processing
         if (user == _botUserId || (subtype == "bot_message" && botId != null))
         {
@@ -602,6 +633,21 @@ public record SlackMessage
     public string? BotId { get; init; }
     /// <summary>Bot username override (chat.postMessage username param). Used to identify which session posted.</summary>
     public string? Username { get; init; }
+}
+
+/// <summary>Slack reaction event (emoji added/removed on a message).</summary>
+public record SlackReaction
+{
+    /// <summary>Emoji name (without colons, e.g. "white_check_mark").</summary>
+    public string Reaction { get; init; } = "";
+    /// <summary>User who added the reaction.</summary>
+    public string User { get; init; } = "";
+    /// <summary>Channel where the reacted message lives.</summary>
+    public string Channel { get; init; } = "";
+    /// <summary>Timestamp of the message that was reacted to.</summary>
+    public string ItemTs { get; init; } = "";
+    /// <summary>Event type: "reaction_added" or "reaction_removed".</summary>
+    public string EventType { get; init; } = "";
 }
 
 /// <summary>Slack Block Kit interactive action (button click, etc.).</summary>

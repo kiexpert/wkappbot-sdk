@@ -88,7 +88,7 @@ internal partial class Program
             var cdp = ConnectCdp(port, withBar: false, navigateUrl: searchUrl);
             // Ensure we are on the search URL (in case ConnectCdp's EnsureCorrectWindowAsync
             // returned an existing tab that's not yet at searchUrl)
-            var curUrl = cdp.EvalAsync("location.href").GetAwaiter().GetResult() ?? "";
+            var curUrl = cdp.GetUrlAsync().GetAwaiter().GetResult() ?? "";
             if (!curUrl.StartsWith(searchUrl.Split('?')[0], StringComparison.OrdinalIgnoreCase))
                 cdp.NavigateAsync(searchUrl).GetAwaiter().GetResult();
 

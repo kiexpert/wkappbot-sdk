@@ -126,7 +126,7 @@ internal partial class Program
                 return false;
 
             // Focus editor
-            await cdp.EvalAsync($"document.querySelector('{editorSelector}')?.focus()");
+            await cdp.FocusAsync(editorSelector);
             await Task.Delay(200);
 
             // Ctrl+V via CDP

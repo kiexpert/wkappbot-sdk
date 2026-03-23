@@ -84,7 +84,7 @@ internal partial class Program
                 """);
             if (taResult == "OK") return true;
             Console.WriteLine($"[ASK] Textarea native setter result: {taResult}, trying Input.insertText...");
-            await cdp.EvalAsync($"document.querySelector(\"{selector}\")?.focus()");
+            await cdp.FocusAsync(selector);
             await Task.Delay(100);
             await cdp.SendAsync("Input.insertText", new JsonObject { ["text"] = text });
             await Task.Delay(200);
@@ -110,7 +110,7 @@ internal partial class Program
 
         // Fallback: CDP Input.insertText
         Console.WriteLine($"[ASK] ClipboardEvent paste result: {result}, trying Input.insertText...");
-        await cdp.EvalAsync($"document.querySelector(\"{selector}\")?.focus()");
+        await cdp.FocusAsync(selector);
         await Task.Delay(100);
         await cdp.SendAsync("Input.insertText", new JsonObject { ["text"] = text });
         await Task.Delay(200);
@@ -160,7 +160,7 @@ internal partial class Program
             {
                 // ── Phase 1: Navigate ──
                 PulseStep.Mark("phase1-navigate");
-                var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+                var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("claude.ai"))
                 {
@@ -274,15 +274,13 @@ internal partial class Program
                 // Capture existing streaming element count so Phase 5/6 only reacts to NEW elements.
                 // Bug: after persona injection, stale [data-is-streaming="false"] from "READY" response
                 // would immediately satisfy the DONE check, returning the persona response as the answer.
-                int preStreamingCount = int.Parse(await cdp.EvalAsync(
-                    "document.querySelectorAll('[data-is-streaming]').length") ?? "0");
+                int preStreamingCount = await cdp.QueryCountAsync("[data-is-streaming]");
                 // Fallback: also track assistant-message count (Claude.ai alternate DOM structure)
-                int preAssistantCount = int.Parse(await cdp.EvalAsync(
-                    "document.querySelectorAll('[data-testid=\"assistant-message\"]').length") ?? "0");
+                int preAssistantCount = await cdp.QueryCountAsync("[data-testid=\"assistant-message\"]");
                 var sendResult = "PENDING";
 
                 // Tier 1: CDP Enter key — queues safely, does NOT interrupt tool execution
-                await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.focus()");
+                await cdp.FocusAsync(editorSel);
                 await Task.Delay(100);
                 await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
                 {
@@ -300,9 +298,8 @@ internal partial class Program
                     sendResult = "CDP_ENTER";
                 else
                 {
-                    var remaining0 = await cdp.EvalAsync(
-                        $"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 99") ?? "99";
-                    if (remaining0 == "0") sendResult = "CDP_ENTER";
+                    var remaining0 = await cdp.GetTextLengthAsync(editorSel);
+                    if (remaining0 == 0) sendResult = "CDP_ENTER";
                 }
 
                 // Tier 2: JS click on send button (fallback — only when Enter had no effect)
@@ -330,9 +327,8 @@ internal partial class Program
                             sendResult = "JS_CLICK";
                         else
                         {
-                            var remaining = await cdp.EvalAsync(
-                                $"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 99") ?? "99";
-                            sendResult = remaining == "0" ? "JS_CLICK" : "CLICK_NOOP";
+                            var remaining = await cdp.GetTextLengthAsync(editorSel);
+                            sendResult = remaining == 0 ? "JS_CLICK" : "CLICK_NOOP";
                         }
                     }
                 }

@@ -79,7 +79,7 @@ internal partial class Program
             {
                 // ?�?� Phase 1: Navigate (iconified OK) ?�?�
                 PulseStep.Mark("phase1-navigate");
-                var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+                var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("chatgpt.com"))
                 {
@@ -371,13 +371,13 @@ internal partial class Program
         CdpClient cdp, string message, int timeoutSec, List<string>? attachFiles = null, bool returnAfterSend = false)
     {
         // ?�?� Phase 0: URL check + turn count (iconified OK) ?�?�
-        var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+        var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("chatgpt.com", StringComparison.OrdinalIgnoreCase))
         {
             Console.WriteLine($"[ASK:LOOP] GPT tab drifted to {currentUrl[..Math.Min(80, currentUrl.Length)]} ? navigating back to chatgpt.com");
             await cdp.NavigateAsync("https://chatgpt.com/");
             await Task.Delay(3000);
-            currentUrl = await cdp.EvalAsync("location.href") ?? "";
+            currentUrl = await cdp.GetUrlAsync() ?? "";
         }
         // prevTurns captured just before send (after lock) ? avoids lazy-DOM false positives
         int prevTurns = 0;
@@ -482,9 +482,8 @@ internal partial class Program
             }
             else
             {
-                var remaining = await cdp.EvalAsync(
-                    $"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 99") ?? "99";
-                sendResult = remaining == "0" ? "JS_CLICK" : "CLICK_NOOP";
+                var remaining = await cdp.GetTextLengthAsync(editorSel);
+                sendResult = remaining == 0 ? "JS_CLICK" : "CLICK_NOOP";
             }
         }
 
@@ -502,9 +501,8 @@ internal partial class Program
                     sendResult = "UIA_INVOKE";
                 else
                 {
-                    var remaining = await cdp.EvalAsync(
-                        $"document.querySelector('{editorSel}')?.textContent?.trim()?.length ?? 99") ?? "99";
-                    sendResult = remaining == "0" ? "UIA_INVOKE" : "UIA_NOOP";
+                    var remaining = await cdp.GetTextLengthAsync(editorSel);
+                    sendResult = remaining == 0 ? "UIA_INVOKE" : "UIA_NOOP";
                 }
             }
         }
@@ -512,7 +510,7 @@ internal partial class Program
         // Tier 3: CDP Enter key (needs visible viewport + editor focus)
         if (sendResult != "JS_CLICK" && sendResult != "UIA_INVOKE")
         {
-            await cdp.EvalAsync($"document.querySelector('{editorSel}')?.focus()");
+            await cdp.FocusAsync(editorSel);
             await Task.Delay(100);
             await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
             {
@@ -553,7 +551,7 @@ internal partial class Program
             await Task.Delay(1000);
 
             // URL change detection (new conversation resets turn count)
-            var newUrl = await cdp.EvalAsync("location.href") ?? "";
+            var newUrl = await cdp.GetUrlAsync() ?? "";
             if (newUrl != currentUrl && newUrl.Contains("/c/"))
             {
                 Console.WriteLine();
