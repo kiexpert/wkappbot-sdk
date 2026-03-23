@@ -252,6 +252,7 @@ internal partial class Program
                 catch { continue; }
 
                 bool headerPrinted = false;
+                int lastCtxEnd = -1; // for elision between context blocks
                 for (int i = 0; i < lines.Length && matchCount < maxResults; i++)
                 {
                     if (!regex.IsMatch(lines[i])) continue;
@@ -265,10 +266,17 @@ internal partial class Program
 
                     int ctxStart = Math.Max(0, i - context);
                     int ctxEnd   = Math.Min(lines.Length - 1, i + context);
+                    // Elision: show "   ..." between non-contiguous context blocks
+                    if (lastCtxEnd >= 0 && ctxStart > lastCtxEnd + 1)
+                        Console.WriteLine("   ...");
                     for (int ci = ctxStart; ci <= ctxEnd; ci++)
-                        Console.WriteLine($"{(ci == i ? ">" : " ")} {ci + 1,5}: {lines[ci]}");
-                    if (context > 0 && ctxEnd < lines.Length - 1)
-                        Console.WriteLine("--");
+                    {
+                        if (ci == i) // match line: arrow marker
+                            Console.WriteLine($"→ {ci + 1,5}│ {lines[ci]}");
+                        else         // context line
+                            Console.WriteLine($"  {ci + 1,5}│ {lines[ci]}");
+                    }
+                    lastCtxEnd = ctxEnd;
 
                     matchCount++;
                 }
