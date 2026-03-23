@@ -1107,20 +1107,37 @@ internal partial class Program
             var scoped = tree.ResolveScope(target, grap.Scopes);
             if (scoped == null)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found in UIA tree — trying OCR fallback...");
                 Console.ResetColor();
 
                 // Show available targets for debugging
-                Console.ForegroundColor = ConsoleColor.Yellow;
                 var candidates = tree.FindAllInScope(target, grap.Scopes[0]);
                 if (candidates.Count > 0)
                 {
-                    Console.WriteLine("[ADB] Similar matches:");
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("[ADB] Similar UIA matches:");
                     foreach (var c in candidates.Take(5))
                         Console.WriteLine($"  {c.SearchKey}");
+                    Console.ResetColor();
                 }
+
+                // ── OCR Fallback: screenshot → OCR → find text match → synthetic node ──
+                var ocrNode = TryOcrFallback(adb, serial, grap.Scopes[^1]);
+                if (ocrNode != null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"[ADB] OCR fallback hit: \"{ocrNode.DisplayName}\" at ({ocrNode.CenterX},{ocrNode.CenterY})");
+                    Console.ResetColor();
+                    return ocrNode;
+                }
+
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ADB] OCR fallback also failed for '{grap.ScopePath}'");
                 Console.ResetColor();
+
+                // Auto bug report
+                AutoBugReport($"ADB element not found: {grap.ScopePath} (UIA + OCR both failed)");
                 return null;
             }
             target = scoped;
@@ -1402,5 +1419,102 @@ internal partial class Program
         public string? WindowState => null;
         public IActionTarget? Parent => null;
         public IReadOnlyList<IActionTarget> Children => [];
+    }
+
+    // ── ADB OCR Fallback ──────────────────────────────────────────────────
+    /// <summary>
+    /// OCR fallback for ADB element not found: screenshot → Windows OCR → text match → synthetic node.
+    /// Returns an AndroidNode with approximate bounds, or null if text not found.
+    /// </summary>
+    static AndroidNode? TryOcrFallback(AdbClient adb, string serial, string searchText)
+    {
+        try
+        {
+            // 1. Capture screenshot via ADB
+            var tmpPng = Path.Combine(Path.GetTempPath(), $"adb_ocr_{DateTime.Now:HHmmss}.png");
+            adb.Shell($"screencap -p /sdcard/_wk_ocr.png", serial, timeoutMs: 5000);
+            adb.Run($"pull /sdcard/_wk_ocr.png \"{tmpPng}\"", serial, timeoutMs: 5000);
+            adb.Shell("rm /sdcard/_wk_ocr.png", serial);
+
+            if (!File.Exists(tmpPng) || new FileInfo(tmpPng).Length < 1000)
+                return null;
+
+            // 2. Run wkappbot OCR on the screenshot (reuses existing OcrCommand)
+            var ocrOutput = "";
+            try
+            {
+                var prevOut = Console.Out;
+                var capture = new StringWriter();
+                Console.SetOut(capture);
+                OcrCommand([tmpPng]);
+                Console.SetOut(prevOut);
+                ocrOutput = capture.ToString();
+            }
+            catch { }
+            try { File.Delete(tmpPng); } catch { }
+
+            if (string.IsNullOrWhiteSpace(ocrOutput))
+                return null;
+
+            // 3. Find text match in OCR output lines
+            var pattern = searchText.Replace("*", "").Trim();
+            var lines = ocrOutput.Split('\n');
+            foreach (var line in lines)
+            {
+                if (!line.Contains(pattern, StringComparison.OrdinalIgnoreCase)) continue;
+
+                // Try to extract bounds from OCR output: "text @X,Y WxH" or similar
+                // Fallback: use screen center if no bounds
+                // For now, search uiautomator dump for matching content-desc/text
+                var dumpResult = adb.Shell("uiautomator dump /dev/tty", serial, timeoutMs: 5000);
+                if (dumpResult.IsOk)
+                {
+                    var dump = dumpResult.StdOut;
+                    var patIdx = dump.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+                    if (patIdx >= 0)
+                    {
+                        // Find bounds near the match
+                        var boundsIdx = dump.IndexOf("bounds=\"[", patIdx);
+                        if (boundsIdx < 0) boundsIdx = dump.LastIndexOf("bounds=\"[", patIdx);
+                        if (boundsIdx >= 0)
+                        {
+                            var bStart = boundsIdx + "bounds=\"".Length;
+                            var bEnd = dump.IndexOf('"', bStart);
+                            if (bEnd > bStart)
+                            {
+                                var boundsStr = dump[bStart..bEnd]; // [x1,y1][x2,y2]
+                                var nums = System.Text.RegularExpressions.Regex.Matches(boundsStr, @"\d+");
+                                if (nums.Count >= 4)
+                                {
+                                    int x1 = int.Parse(nums[0].Value), y1 = int.Parse(nums[1].Value);
+                                    int x2 = int.Parse(nums[2].Value), y2 = int.Parse(nums[3].Value);
+                                    int cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+
+                                    Console.WriteLine($"[ADB-OCR] Found \"{pattern}\" at ({cx},{cy}) via OCR+dump hybrid");
+                                    return new AndroidNode
+                                    {
+                                        ClassName = "ocr-fallback", Text = pattern,
+                                        ContentDesc = $"[OCR] {pattern}", Package = "ocr",
+                                        BoundsLeft = x1, BoundsTop = y1, BoundsRight = x2, BoundsBottom = y2,
+                                        Clickable = true, Enabled = true,
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Console.WriteLine($"[ADB-OCR] OCR matched \"{pattern}\" but couldn't resolve bounds");
+                return null;
+            }
+
+            Console.WriteLine($"[ADB-OCR] Text \"{pattern}\" not found in OCR output");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ADB-OCR] Fallback error: {ex.Message}");
+            return null;
+        }
     }
 }
