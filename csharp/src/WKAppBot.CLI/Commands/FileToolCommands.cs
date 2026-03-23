@@ -1101,6 +1101,24 @@ Examples:
         int count = 0;
         string result;
 
+        // Helper: build "not found" error with encoding hint when Korean chars detected
+        string NotFoundError(string file)
+        {
+            var msg = $"[file edit] old_string not found in {file}";
+            bool hasKorean = oldStr.Any(c => c >= 0xAC00 && c <= 0xD7AF); // Hangul syllables
+            bool hasBadBytes = oldStr.Any(c => c == 0xFFFD || (c >= 0x80 && c < 0xA0)); // replacement char or high bytes
+            if (hasKorean || hasBadBytes)
+            {
+                msg += $"\n  ⚠ Encoding mismatch? File={enc.WebName}";
+                if (hasBadBytes)
+                    msg += ", old_string contains corrupted bytes (U+FFFD or high-byte)";
+                msg += "\n  💡 bash corrupts Korean CLI args — use --old-file instead:";
+                msg += "\n     echo '원본텍스트' > /tmp/old.txt && wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt <path>";
+                msg += "\n  💡 dry-run (search only): wkappbot file edit '같은텍스트' '같은텍스트' <path>";
+            }
+            return msg;
+        }
+
         if (useRegex)
         {
             Regex rx;
@@ -1118,13 +1136,13 @@ Examples:
             int pos = 0;
             while ((pos = text.IndexOf(oldStr, pos, StringComparison.Ordinal)) >= 0)
             { matchPositions.Add(pos); count++; pos += oldStr.Length; }
-            if (count == 0) return (false, null, $"[file edit] old_string not found in {Path.GetFileName(path)}");
+            if (count == 0) return (false, null, NotFoundError(Path.GetFileName(path)));
             result = text.Replace(oldStr, newStr, StringComparison.Ordinal);
         }
         else
         {
             int idx = text.IndexOf(oldStr, StringComparison.Ordinal);
-            if (idx < 0) return (false, null, $"[file edit] old_string not found in {Path.GetFileName(path)}");
+            if (idx < 0) return (false, null, NotFoundError(Path.GetFileName(path)));
             int second = text.IndexOf(oldStr, idx + oldStr.Length, StringComparison.Ordinal);
             if (second >= 0) return (false, null, $"[file edit] old_string matches multiple locations — use --replace-all or provide more context");
             matchPositions.Add(idx);
