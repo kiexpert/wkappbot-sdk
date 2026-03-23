@@ -325,6 +325,14 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         var eventNode = payload?["event"];
         if (eventNode == null) return;
 
+        // Debug: dump raw event JSON (first 500 chars)
+        try
+        {
+            var rawEvent = eventNode.ToJsonString();
+            Console.Error.WriteLine($"[SLACK-RAW] {rawEvent[..Math.Min(rawEvent.Length, 500)]}");
+        }
+        catch { }
+
         var eventType = eventNode["type"]?.GetValue<string>();
         var channel = eventNode["channel"]?.GetValue<string>();
         var user = eventNode["user"]?.GetValue<string>();
