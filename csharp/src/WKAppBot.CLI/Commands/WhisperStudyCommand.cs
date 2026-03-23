@@ -155,16 +155,20 @@ internal partial class Program
             var (success, response) = AskAiForStudy(batchFile, prompt, engine);
             if (!success || string.IsNullOrWhiteSpace(response))
             {
-                if (engine == "gemini")
+                Console.WriteLine($"[STUDY] {engine} failed — keeping batch file for retry.");
+                // Notify via Slack (no GPT fallback — Gemini-only policy)
+                try
                 {
-                    Console.WriteLine("[STUDY] Gemini failed — trying GPT fallback...");
-                    (success, response) = AskAiForStudy(batchFile, prompt, "gpt");
+                    var slackCfg = File.Exists(SlackConfigPath) ? JsonNode.Parse(File.ReadAllText(SlackConfigPath)) : null;
+                    var slackToken = slackCfg?["bot_token"]?.GetValue<string>();
+                    var slackCh = slackCfg?["channel"]?.GetValue<string>();
+                    if (!string.IsNullOrEmpty(slackToken) && !string.IsNullOrEmpty(slackCh))
+                        SlackSendViaApi(slackToken, slackCh,
+                            $":warning: Whisper study {engine} failed: {Path.GetFileName(batchFile)}",
+                            username: "앱봇위스퍼").GetAwaiter().GetResult();
                 }
-                if (!success || string.IsNullOrWhiteSpace(response))
-                {
-                    Console.WriteLine("[STUDY] AI query failed — keeping batch file for retry.");
-                    if (timeout == TimeSpan.Zero) break; else continue;
-                }
+                catch { }
+                if (timeout == TimeSpan.Zero) break; else continue;
             }
             Console.WriteLine($"[STUDY] Response: {response.Length} chars");
 
