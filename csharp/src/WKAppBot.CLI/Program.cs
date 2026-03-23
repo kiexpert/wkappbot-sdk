@@ -430,10 +430,24 @@ internal partial class Program
                 FocuslessWarningOverlay.Show(rootHwnd, $"UIA {action} 포커스 강탈 → 다음 실행 시 yield 팝업 자동 표시", null);
             };
 
-            // [CDP-FALLBACK] Auto-suggest when CDP caller has no fallback
+            // [CDP-FALLBACK] Auto-suggest when CDP caller has no fallback (separate process — zero memory)
             WKAppBot.WebBot.CdpClient.OnFallbackSuggest ??= (text) =>
             {
-                try { SuggestCommand(["[CDP-FALLBACK] " + text]); } catch { }
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        var exe = Environment.ProcessPath ?? "wkappbot";
+                        var psi = new System.Diagnostics.ProcessStartInfo(exe)
+                        {
+                            ArgumentList = { "suggest", "[CDP-FALLBACK] " + text },
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                        };
+                        System.Diagnostics.Process.Start(psi)?.WaitForExit(10_000);
+                    }
+                    catch { }
+                });
             };
 
             // Global option: disable zoom overlay — intentionally obnoxious name to discourage use
