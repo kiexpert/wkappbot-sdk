@@ -230,13 +230,12 @@ internal partial class Program
             else
             {
                 var sw = Stopwatch.StartNew();
-                using var discHelper = new ClaudePromptHelper();
-                allPrompts = discHelper.FindAllPrompts();
+                allPrompts = FindAllPromptsViaMcp();
                 sw.Stop();
                 _cachedAllPrompts = allPrompts;
-                _lastFindAllPromptsAt = DateTime.UtcNow; // cooldown starts after scan completes
+                _lastFindAllPromptsAt = DateTime.UtcNow;
                 if (sw.ElapsedMilliseconds > 50)
-                    Console.WriteLine($"[EYE] FindAllPrompts scan: {sw.ElapsedMilliseconds}ms ({allPrompts.Count} prompts)");
+                    Console.WriteLine($"[EYE] FindAllPrompts(MCP): {sw.ElapsedMilliseconds}ms ({allPrompts.Count} prompts)");
             }
             foreach (var p in allPrompts)
             {

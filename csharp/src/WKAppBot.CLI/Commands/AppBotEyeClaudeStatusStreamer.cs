@@ -123,7 +123,7 @@ internal partial class Program
         // Multiple VS Code windows share the same PID, so title-based CWD is the only reliable source.
         try
         {
-            var pi = ClaudePromptHelper.GetAllCachedPrompts().FirstOrDefault(p => p.WindowHandle == hwnd);
+            var pi = FindAllPromptsViaMcp().FirstOrDefault(p => p.WindowHandle == hwnd);
             if (pi?.HostType == "vscode-claudecode" && !string.IsNullOrEmpty(pi.WindowTitle))
             {
                 var titleCwd = ExtractCwdFromVsCodeTitle(pi.WindowTitle);
@@ -149,7 +149,7 @@ internal partial class Program
         // Fallback: short form of Claude Desktop window title
         try
         {
-            var pi = ClaudePromptHelper.GetAllCachedPrompts().FirstOrDefault(p => p.WindowHandle == hwnd);
+            var pi = FindAllPromptsViaMcp().FirstOrDefault(p => p.WindowHandle == hwnd);
             if (pi != null && !string.IsNullOrEmpty(pi.WindowTitle))
             {
                 var t = pi.WindowTitle.Replace("— Claude", "").Trim();
@@ -194,7 +194,7 @@ internal partial class Program
             claudeHwnd = FindClaudeDesktopWindow();
 
         // ── Collect all AI instances (Desktop + VS Code + Codex) from prompt cache ──
-        var allClaudePrompts = ClaudePromptHelper.GetAllCachedPrompts()
+        var allClaudePrompts = FindAllPromptsViaMcp()
             .Where(p => (p.HostType == "claude-desktop" || p.HostType == "vscode-claudecode" || p.HostType == "codex-desktop") && IsWindow(p.WindowHandle))
             .GroupBy(p => p.WindowHandle).Select(g => g.First()).ToList();
         var claudeInstances = allClaudePrompts.Select(p => p.WindowHandle).ToList();
@@ -239,23 +239,12 @@ internal partial class Program
                     Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 즉시 인수인계하세요!");
                     Console.ResetColor();
 
-                    // 프창에도 긴급 경고 전송
+                    // 프창에도 긴급 경고 전송 (MCP subprocess에서 실행)
                     try
                     {
-                        using var ctxHelper = new ClaudePromptHelper();
-                        var pi = ctxHelper.FindPromptForCwd(card.Cwd);
-                        if (pi != null)
-                        {
-                            ClaudePromptHelper.AllowFocusSteal = true;
-                            try
-                            {
-                                var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요!\n"
-                                    + "wkappbot newchat 실행 필요";
-                                ctxHelper.TypeAndSubmit(pi, urgentNudge);
-                                Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Urgent nudge sent to prompt");
-                            }
-                            finally { ClaudePromptHelper.AllowFocusSteal = false; }
-                        }
+                        var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요!\\nwkappbot newchat 실행 필요";
+                        EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, urgentNudge]);
+                        Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Urgent nudge sent via MCP");
                     }
                     catch { /* best-effort */ }
 
@@ -272,37 +261,18 @@ internal partial class Program
                     var handoff = BuildHandoffPrompt(jsonlPath, _cachedCards, sizeMB, ContextLimitMB);
                     try
                     {
-                        using var ctxHelper = new ClaudePromptHelper();
-                        var pi = ctxHelper.FindPromptForCwd(card.Cwd);
-                        if (pi != null)
-                        {
-                            ClaudePromptHelper.AllowFocusSteal = true;
-                            try
-                            {
-                                var nudge = $"⚠️ 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!\n"
-                                    + "준비되면 아래 명령을 실행:\n\n"
-                                    + $"wkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
-                                ctxHelper.TypeAndSubmit(pi, nudge);
-                                Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent");
-                                Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                    $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n클롣에게 인수인계 프롬프트를 전달했습니다.",
-                                    username: BuildSlackBotUsername(SlackClaudePrefix, cwdTag))).Wait(3000);
-                            }
-                            finally { ClaudePromptHelper.AllowFocusSteal = false; }
-                        }
-                        else
-                        {
-                            Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] No matching prompt — check Slack");
-                            Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                                $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\nClaude 창을 찾지 못해 인수인계 미전달! 직접 확인해주세요.",
-                                username: SlackBroadcastUsername)).Wait(3000);
-                        }
+                        var nudge = $"⚠️ 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!\\n준비되면 아래 명령을 실행:\\n\\nwkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
+                        EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, nudge]);
+                        Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent via MCP");
+                        Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
+                            $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n클롣에게 인수인계 프롬프트를 전달했습니다.",
+                            username: BuildSlackBotUsername(SlackClaudePrefix, cwdTag))).Wait(3000);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Handoff failed: {ex.Message}");
+                        Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Nudge delivery failed: {ex.Message}");
                         Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
-                            $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n인수인계 전달 오류: {ex.Message}",
+                            $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n인수인계 전달 실패! 직접 확인해주세요.",
                             username: SlackBroadcastUsername)).Wait(3000);
                     }
                 }
@@ -360,7 +330,7 @@ internal partial class Program
             Tuple<string, string>? claudeStatus = null;
             try
             {
-                claudeStatus = DetectClaudeDesktopStatus(hwnd);
+                claudeStatus = DetectClaudeDesktopStatusViaRoute(hwnd);
 
                 // VS Code / Codex: no turn-form in UIA → DetectClaudeDesktopStatus always null.
                 // Use JSONL card-based detection instead.
@@ -370,7 +340,7 @@ internal partial class Program
                     string? vsCwd = null;
                     if (hostType == "vscode-claudecode")
                     {
-                        var pi = ClaudePromptHelper.GetAllCachedPrompts().FirstOrDefault(p => p.WindowHandle == hwnd);
+                        var pi = FindAllPromptsViaMcp().FirstOrDefault(p => p.WindowHandle == hwnd);
                         if (pi != null) vsCwd = ExtractCwdFromVsCodeTitle(pi.WindowTitle);
                     }
                     if (string.IsNullOrEmpty(vsCwd))
@@ -640,7 +610,7 @@ internal partial class Program
                         {
                             try
                             {
-                                var plan = ExtractPlanContent(hwnd);
+                                var plan = ExtractPlanContentViaRoute(hwnd);
                                 if (plan != null)
                                 {
                                     var planContent = plan.Value.content;
@@ -974,7 +944,7 @@ internal partial class Program
                 {
                     await Task.Delay(8000); // let all instances load state
                     // Read active ts from window atom props (authoritative, even if _instanceStates not yet populated)
-                    var activeFromProps = ClaudePromptHelper.GetAllCachedPrompts()
+                    var activeFromProps = FindAllPromptsViaMcp()
                         .Select(p => GetWindowStringProp(p.WindowHandle, PropSlackTs))
                         .Where(t => t != null)
                         .ToHashSet()!;
@@ -1008,7 +978,7 @@ internal partial class Program
         if (_staleStatusTsOnStartup.Count == 0) return; // already swept by first-post mechanism
         var pending = _staleStatusTsOnStartup.ToList();
         _staleStatusTsOnStartup.Clear();
-        var activeFromProps = ClaudePromptHelper.GetAllCachedPrompts()
+        var activeFromProps = FindAllPromptsViaMcp()
             .Select(p => GetWindowStringProp(p.WindowHandle, PropSlackTs))
             .Where(t => t != null)
             .ToHashSet()!;
@@ -1113,35 +1083,31 @@ internal partial class Program
         Console.WriteLine($"[EYE] {label}Homework injection → {pending.Count} pending suggestions");
         Console.ResetColor();
 
-        // Deliver directly via TypeAndSubmit (no /clear, no policy) — window should be open since we just saw it idle.
+        // Deliver via MCP subprocess (prompt send with --when-idle) — keeps UIA out of Eye memory.
         // If window gone, TrySpawnAppbotVsCode will open VS Code and deliver after it's ready.
         try
         {
-            using var ph = new ClaudePromptHelper();
-            var pi = ph.FindPromptForCwd(state.FullCwd ?? state.CwdLabel);
-            if (pi != null)
+            var cwdFilter = state.FullCwd ?? state.CwdLabel;
+
+            // Set 1h cooldown now — persisted to disk
+            state.LastHomeworkAt = DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(cwdKey))
+                SaveHomeworkAt(cwdKey, state.LastHomeworkAt.Value);
+
+            // Route through MCP: prompt send finds window by name, respects idle check
+            var (output, exitCode) = EyeMcpClient.CallAsync(
+                ["prompt", "send", cwdFilter ?? "", prompt, "--when-idle", "30s", "--timeout", "2m"],
+                timeoutMs: 150_000).GetAwaiter().GetResult();
+
+            if (exitCode != 0)
             {
-                // Snapshot situation and decide delivery strategy
-                var ctx = PromptDeliveryContext.Snapshot(pi.WindowHandle, PromptAction.TypeAndSubmit);
-                Console.WriteLine($"[EYE] {label}Homework ctx: {ctx}");
-                if (ctx.Decide() == PromptDeliveryDecision.Skip)
-                {
-                    state.HomeworkNotified = false; // re-arm for next idle cycle
-                    Console.WriteLine($"[EYE] {label}Homework skipped — user active (idle={ctx.IdleSeconds:F0}s), will retry next idle");
-                    return;
-                }
-
-                // Set 1h cooldown now (delivery confirmed) — persisted to disk
-                state.LastHomeworkAt = DateTime.UtcNow;
-                if (!string.IsNullOrEmpty(cwdKey))
-                    SaveHomeworkAt(cwdKey, state.LastHomeworkAt.Value);
-
-                ph.TypeAndSubmit(pi, prompt, ctx);
+                Console.WriteLine($"[EYE] {label}Homework: MCP delivery failed (exit={exitCode}) — spawning VS Code");
+                state.HomeworkNotified = false; // re-arm
+                TrySpawnAppbotVsCode(prompt);
             }
             else
             {
-                Console.WriteLine($"[EYE] {label}Homework: window not found — spawning VS Code and queuing");
-                TrySpawnAppbotVsCode(prompt);
+                Console.WriteLine($"[EYE] {label}Homework delivered via MCP: {output.TrimEnd()}");
             }
         }
         catch (Exception ex)

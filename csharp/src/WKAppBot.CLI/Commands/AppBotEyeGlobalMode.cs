@@ -221,6 +221,11 @@ internal partial class Program
         EyeCmdPipeServer.StartServer();
         PulseStep.Mark("pipe-server");
 
+        // Start MCP worker subprocess — all a11y/UIA operations route through this process
+        // Eye stays lean (~80MB), UIA memory (~600MB) stays in the worker
+        EyeMcpClient.Start();
+        PulseStep.Mark("mcp-client");
+
         using var host = new AppBotEyeHost();
         host.Start(width, height, posX, posY, ownerHwnd: IntPtr.Zero);
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
@@ -1101,6 +1106,8 @@ internal partial class Program
                     }
                     Console.WriteLine($"[EYE:HOT-SWAP] New Eye responding ({hsw.Elapsed.TotalMilliseconds:F0}ms) — hiding old Eye window");
                     TryHideConsoleWindow(); // hide immediately so new Eye window is unobscured
+                    Console.WriteLine("[EYE:HOT-SWAP] Stopping MCP worker...");
+                    EyeMcpClient.Stop();
                     Console.WriteLine("[EYE:HOT-SWAP] Draining active pipe connections...");
                     EyeCmdPipeServer.StopAcceptingAndWaitForDrain();
                     Console.WriteLine("[EYE:HOT-SWAP] Pipe drain complete — old Eye exiting");

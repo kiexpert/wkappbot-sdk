@@ -59,9 +59,19 @@ internal partial class Program
     /// </summary>
     static bool McpLauncherMode = false;
 
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern bool FreeConsole();
+
     static int McpCommand(string[] args)
     {
         McpLauncherMode = args.Contains("--launcher");
+
+        // Detach from parent console when spawned by EyeMcpClient — prevents LPC deadlock
+        // in UIA calls (FindAllPrompts, DetectClaudeDesktopStatus) that csrss.exe mediates.
+        if (Environment.GetEnvironmentVariable("WKAPPBOT_MCP_DETACH") == "1")
+        {
+            try { FreeConsole(); } catch { }
+        }
 
         // Redirect Console.Out to stderr so stdout is pure JSON-RPC
         var jsonOut = Console.OpenStandardOutput();
@@ -550,6 +560,15 @@ internal partial class Program
     {
         var argv = GetArgvFromArgs(args);
         if (argv.Length == 0) return ("Error: argv is required and must not be empty", 1);
+
+        // Extract __cwd: prefix (passed by EyeCmdPipeServer for per-call CWD context)
+        while (argv.Length > 0 && argv[0].StartsWith("__cwd:", StringComparison.Ordinal))
+        {
+            EyeCmdPipeServer.CallerCwd.Value = argv[0].Substring("__cwd:".Length);
+            argv = argv[1..];
+        }
+        if (argv.Length == 0) return ("Error: argv empty after prefix strip", 1);
+
         var cmd = argv[0];
         var rest = argv[1..];
         // Fast in-proc path for known safe commands; external for everything else
@@ -562,6 +581,8 @@ internal partial class Program
             "windows" => RunCliCaptureWithCode("windows", rest, emitProgress),
             "ocr" => RunCliCaptureWithCode("ocr", rest, emitProgress),
             "prompt-probe" => RunCliCaptureWithCode("prompt-probe", rest, emitProgress),
+            "claude-detect" => RunCliCaptureWithCode("claude-detect", rest, emitProgress),
+            "find-prompts" => RunCliCaptureWithCode("find-prompts", rest, emitProgress),
             // All other commands: spawn external process (safest, no in-proc side-effects)
             _ => RunCliCaptureWithCodeExternal(cmd, rest, emitProgress)
         };
@@ -1015,6 +1036,8 @@ internal partial class Program
                 "web" => WebCommand(args),
                 "ocr" => OcrCommand(args),
                 "prompt-probe" => PromptProbeCommand(args),
+                "claude-detect" => ClaudeDetectCommand(args),
+                "find-prompts" => FindPromptsCommand(args),
                 _ => -1
             };
         }

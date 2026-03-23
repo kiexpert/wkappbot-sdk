@@ -80,49 +80,11 @@ internal partial class Program
 
         if (string.IsNullOrWhiteSpace(pendingMessage)) return;
 
-        // Background: poll until the prompt window is ready, then deliver the message
-        var msg = pendingMessage;
-        System.Threading.Tasks.Task.Run(() =>
-        {
-            const int maxWaitSec = 20;
-            const int pollMs = 1000;
-            ClaudePromptHelper.PromptInfo? target = null;
-
-            for (int i = 0; i < maxWaitSec; i++)
-            {
-                System.Threading.Thread.Sleep(pollMs);
-                try
-                {
-                    using var ph = new ClaudePromptHelper();
-                    var all = ph.FindAllPrompts();
-                    var cwdFolder = Path.GetFileName(Environment.CurrentDirectory);
-                    target = all.FirstOrDefault(p =>
-                        p.WindowTitle.Contains(cwdFolder, StringComparison.OrdinalIgnoreCase));
-                    if (target != null) break;
-                }
-                catch { }
-            }
-
-            if (target == null)
-            {
-                Console.WriteLine("[EYE][SLACK] VS Code 스폰 후 창 미발견 — 메시지 전달 포기");
-                return;
-            }
-
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[EYE][SLACK] VS Code 준비 완료 — 대기 메시지 전달: {msg[..Math.Min(60, msg.Length)]}...");
-            Console.ResetColor();
-            try
-            {
-                using var ph = new ClaudePromptHelper();
-                ClaudePromptHelper.AllowFocusSteal = true;
-                ph.TypeAndSubmit(target, msg);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[EYE][SLACK] 메시지 전달 실패: {ex.Message}");
-            }
-        });
+        // Route through MCP: prompt send handles finding the window + typing + submitting
+        // --after 5s gives VS Code time to start; --when-idle 3s auto-approves focus steal
+        var cwdFolder = Path.GetFileName(Environment.CurrentDirectory) ?? "";
+        Console.WriteLine($"[EYE][SLACK] VS Code 대기 메시지 MCP 전달 예약: {pendingMessage[..Math.Min(60, pendingMessage.Length)]}...");
+        EyeMcpClient.CallFireAndForget(["prompt", "send", cwdFolder, pendingMessage, "--after", "5s", "--timeout", "30s"]);
     }
 
     static List<ClaudePromptHelper.PromptInfo> ResolveWorkspaceScopedPrompts(ClaudePromptHelper promptHelper)
@@ -410,7 +372,7 @@ internal partial class Program
         var directHwnd = FindHwndBySlackStatusTs(threadTs);
         if (directHwnd != IntPtr.Zero)
         {
-            var directPrompt = ClaudePromptHelper.GetAllCachedPrompts()
+            var directPrompt = FindAllPromptsViaMcp()
                 .FirstOrDefault(p => p.WindowHandle == directHwnd);
             if (directPrompt != null)
             {
@@ -1005,9 +967,8 @@ internal partial class Program
             }
 
             // ── Normal @mention: broadcast to ALL prompts (멘션=폴더구분 없음) ──
-            ClaudePromptHelper.AllowFocusSteal = true; // fallback path용
-            var promptHelper = new ClaudePromptHelper();
-            var allMentionPrompts = promptHelper.FindAllPrompts();
+            // Route through MCP to avoid FlaUI loading in Eye
+            var allMentionPrompts = FindAllPromptsViaMcp(forceRefresh: true);
             if (allMentionPrompts.Count > 0)
             {
                 // Build thread context (starter + previous message) for Claude
@@ -1028,7 +989,12 @@ internal partial class Program
                     try
                     {
                         var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, replyThread)}";
-                        var ok = ProbeAndSubmit(promptHelper, pi, promptText, msg.Timestamp);
+                        // Route through MCP subprocess — ProbeAndSubmit uses UIA
+                        var hwndGrap = $"*hwnd={pi.WindowHandle.ToInt64():X}*";
+                        var (mcpOut, mcpCode) = EyeMcpClient.CallAsync(
+                            ["prompt", "send", hwndGrap, promptText, "--timeout", "30s"],
+                            timeoutMs: 45_000).GetAwaiter().GetResult();
+                        var ok = mcpCode == 0;
                         mentionResults.Add(new DeliveryResult(ExtractProjectName(pi), ok));
                         if (ok) mentionSent++;
                     }
@@ -1063,7 +1029,10 @@ internal partial class Program
                     }
                     var promptText = $"{cleanText}{threadContext}\n{SlackReplySuffix(msg.User, replyThread)}";
 
-                    if (promptHelper.TryNewChatInput(GetClaudeHwnd(), promptText))
+                    // Route new-chat through MCP
+                    var (ncOut, ncCode) = EyeMcpClient.CallAsync(
+                        ["newchat", promptText], timeoutMs: 15_000).GetAwaiter().GetResult();
+                    if (ncCode == 0)
                     {
                         Console.WriteLine("[EYE][SLACK] >> New-chat fallback SUCCESS!");
                         handledByMention.Add(msg.Timestamp);
@@ -1076,13 +1045,18 @@ internal partial class Program
                 try
                 {
                     // Comprehensive diagnosis
-                    var claudeStatus = GetClaudeHwnd() != IntPtr.Zero ? DetectClaudeDesktopStatus(GetClaudeHwnd()) : null;
+                    var claudeStatus = GetClaudeHwnd() != IntPtr.Zero ? DetectClaudeDesktopStatusViaRoute(GetClaudeHwnd()) : null;
                     var statusInfo = claudeStatus != null
                         ? $"AI status: {claudeStatus.Item2}"
                         : "AI status: unavailable";
 
                     string diagDetail;
-                    try { diagDetail = promptHelper.DiagnosePromptSearch(); }
+                    try
+                    {
+                        var (diagOut, diagCode) = EyeMcpClient.CallAsync(
+                            ["prompt-probe", "--all"], timeoutMs: 10_000).GetAwaiter().GetResult();
+                        diagDetail = diagCode == 0 ? diagOut : "(MCP 진단 실패)";
+                    }
                     catch (Exception dex) { diagDetail = $"(진단 실패: {dex.Message})"; }
 
                     Console.WriteLine(diagDetail);
@@ -1325,28 +1299,20 @@ internal partial class Program
                 ScheduleNotifySlack(slackBotToken, slackChannel,
                     $":rocket: 스케줄 실행 중: {item.Id} ({item.Type})");
 
-            // 3. Find Claude prompt and type
-            var promptHelper = new ClaudePromptHelper();
-            var promptInfo = ResolveWorkspaceScopedPrompt(promptHelper);
-            if (promptInfo == null)
-            {
-                // Retry once after 3 seconds (Claude may still be loading)
-                Thread.Sleep(3000);
-                promptInfo = ResolveWorkspaceScopedPrompt(promptHelper);
-            }
+            // 3. Route through MCP subprocess (avoid FlaUI loading in Eye)
+            var suffix = $"\\n\\n(자동 복구 — schedule {item.Id}, {item.Type})";
+            var cwdFolder = Path.GetFileName(Environment.CurrentDirectory) ?? "";
+            var (schedOut, schedCode) = EyeMcpClient.CallAsync(
+                ["prompt", "send", cwdFolder, promptText + suffix, "--timeout", "30s"],
+                timeoutMs: 60_000).GetAwaiter().GetResult();
 
-            if (promptInfo == null)
+            if (schedCode != 0)
             {
-                ScheduleManager.UpdateStatus(item.Id, "failed", "Claude prompt not found");
+                ScheduleManager.UpdateStatus(item.Id, "failed", "MCP prompt delivery failed");
                 ScheduleNotifySlack(slackBotToken, slackChannel,
-                    $":x: 스케줄 실패 ({item.Id}): Claude 프롬프트를 찾을 수 없습니다");
+                    $":x: 스케줄 실패 ({item.Id}): 프롬프트 전달 실패");
                 return;
             }
-
-            // 4. 위치확보 + Type and submit
-            ClaudePromptHelper.AllowFocusSteal = true; // schedule = auto request
-            var suffix = $"\n\n(자동 복구 — schedule {item.Id}, {item.Type})";
-            ProbeAndSubmit(promptHelper, promptInfo, promptText + suffix);
 
             // 5. Mark done + advance recurring
             ScheduleManager.UpdateStatus(item.Id, "done");

@@ -80,10 +80,8 @@ internal partial class Program
             Console.WriteLine($"[PROF:SLACK] ScreenReaderBroadcast={swStep.ElapsedMilliseconds}ms (enabled={WKAppBot.Win32.Native.ScreenReaderMode.IsEnabled})");
             Console.Out.Flush();
 
-            swStep.Restart();
-            using var helper = new ClaudePromptHelper();
+            // ClaudePromptHelper removed — all UIA goes through MCP subprocess
             swStep.Stop();
-            Console.WriteLine($"[PROF:SLACK] UIA3Automation_Init={swStep.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
             // ── Slack Step 6: Filter messages ──
@@ -125,7 +123,7 @@ internal partial class Program
                 Console.WriteLine("[EYE_TICK] slack=no_new_messages");
                 // Still check thread replies even if no new channel messages
                 swStep.Restart();
-                EyeTickCheckThreadReplies(messages, botToken, channel, botUserId, helper);
+                EyeTickCheckThreadReplies(messages, botToken, channel, botUserId);
                 swStep.Stop();
                 Console.WriteLine($"[PROF:SLACK] ThreadReplies={swStep.ElapsedMilliseconds}ms");
                 Console.Out.Flush();
@@ -138,7 +136,7 @@ internal partial class Program
 
             // ── Slack Step 7: FindPrompt (UIA tree walk) ──
             swStep.Restart();
-            var promptInfo = FindSlackPreferredPrompt(helper);
+            var promptInfo = FindSlackPreferredPromptViaMcp();
             swStep.Stop();
             Console.WriteLine($"[PROF:SLACK] FindPrompt={swStep.ElapsedMilliseconds}ms (found={promptInfo != null}, host={promptInfo?.HostType ?? "n/a"})");
             Console.Out.Flush();
@@ -161,7 +159,7 @@ internal partial class Program
                 var promptText = $"{contextPrefix}{cleanText}\n\n{SlackReplySuffix(user, msgTs)}";
 
                 swStep.Restart();
-                var fresh = FindSlackPreferredPrompt(helper);
+                var fresh = FindSlackPreferredPromptViaMcp();
                 swStep.Stop();
                 Console.WriteLine($"[PROF:SLACK] Re-FindPrompt={swStep.ElapsedMilliseconds}ms");
                 Console.Out.Flush();
@@ -175,7 +173,7 @@ internal partial class Program
                 Console.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → {fresh.HostType} prompt");
                 Console.Out.Flush();
                 swStep.Restart();
-                var ok = helper.TypeAndSubmit(fresh, promptText);
+                var ok = TypeAndSubmitViaMcp(fresh, promptText);
                 swStep.Stop();
                 Console.WriteLine($"[PROF:SLACK] TypeAndSubmit={swStep.ElapsedMilliseconds}ms (ok={ok})");
                 Console.Out.Flush();
@@ -217,7 +215,7 @@ internal partial class Program
 
             // ── Thread reply detection ──
             swStep.Restart();
-            EyeTickCheckThreadReplies(messages, botToken, channel, botUserId, helper);
+            EyeTickCheckThreadReplies(messages, botToken, channel, botUserId);
             swStep.Stop();
             Console.WriteLine($"[PROF:SLACK] ThreadReplies={swStep.ElapsedMilliseconds}ms");
             Console.WriteLine($"[PROF:SLACK] SlackTotal={swSlack.ElapsedMilliseconds}ms");
@@ -235,7 +233,7 @@ internal partial class Program
     /// Responds when: (1) parent is from bot (클롣) → any user reply, or (2) @mention in reply.
     /// </summary>
     static void EyeTickCheckThreadReplies(List<JsonNode> channelMessages,
-        string botToken, string channel, string? botUserId, ClaudePromptHelper helper)
+        string botToken, string channel, string? botUserId)
     {
         try
         {
@@ -331,7 +329,7 @@ internal partial class Program
 
                     var promptText = $"[쓰레드 시작] {cleanParent}\n\n{cleanReply}\n\n{SlackReplySuffix(rUser, threadTs, "thread reply")}";
 
-                    var fresh = FindSlackPreferredPrompt(helper);
+                    var fresh = FindSlackPreferredPromptViaMcp();
                     if (fresh == null)
                     {
                         Console.WriteLine("[EYE_TICK] WARNING: Lost prompt — stopping thread reply forward");
@@ -339,7 +337,7 @@ internal partial class Program
                     }
 
                     Console.WriteLine($"[EYE_TICK] [FORWARD] Thread @{rUser} → {fresh.HostType} prompt");
-                    var ok = helper.TypeAndSubmit(fresh, promptText);
+                    var ok = TypeAndSubmitViaMcp(fresh, promptText);
                     if (ok)
                     {
                         threadReplies++;
@@ -373,5 +371,26 @@ internal partial class Program
         {
             Console.WriteLine($"[EYE_TICK] thread check error: {ex.Message}");
         }
+    }
+
+    /// <summary>MCP-routed FindSlackPreferredPrompt — finds first available prompt via MCP.</summary>
+    static ClaudePromptHelper.PromptInfo? FindSlackPreferredPromptViaMcp()
+    {
+        var all = FindAllPromptsViaMcp();
+        return all.FirstOrDefault();
+    }
+
+    /// <summary>MCP-routed TypeAndSubmit — sends text to prompt via MCP subprocess.</summary>
+    static bool TypeAndSubmitViaMcp(ClaudePromptHelper.PromptInfo prompt, string text)
+    {
+        try
+        {
+            var hwndGrap = $"*hwnd={prompt.WindowHandle.ToInt64():X}*";
+            var (output, code) = EyeMcpClient.CallAsync(
+                ["prompt", "send", hwndGrap, text, "--timeout", "15s"],
+                timeoutMs: 20_000).GetAwaiter().GetResult();
+            return code == 0;
+        }
+        catch { return false; }
     }
 }

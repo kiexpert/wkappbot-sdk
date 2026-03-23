@@ -10,6 +10,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+// FlaUI using kept for DetectClaudeDesktopStatus/ExtractPlanContent — these methods run
+// in MCP subprocess only (via claude-detect command). Eye calls ViaRoute wrappers which go through MCP.
+// The FlaUI assembly loads lazily (only when these methods are JIT-compiled), which only happens in MCP subprocess.
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
@@ -223,7 +226,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Click the plan approval button via UIA Invoke pattern.
+    /// Click the plan approval button via MCP a11y invoke.
     /// Searches for a Button containing "계획 승인" in its Name.
     /// Returns true if button was found and invoked.
     /// </summary>
@@ -234,41 +237,15 @@ internal partial class Program
 
         try
         {
-            using var automation = new UIA3Automation();
-            var window = automation.FromHandle(claudeHwnd);
-            if (window == null) return false;
-
-            var cf = new ConditionFactory(new UIA3PropertyLibrary());
-
-            // Find all buttons and look for approval button
-            var buttons = window.FindAllDescendants(cf.ByControlType(ControlType.Button));
-            if (buttons == null) return false;
-
-            foreach (var btn in buttons)
+            var grap = $"*hwnd={claudeHwnd.ToInt64():X}*#*계획 승인*;*Approve*";
+            var (output, exitCode) = EyeMcpClient.CallAsync(["a11y", "invoke", grap]).GetAwaiter().GetResult();
+            if (exitCode == 0)
             {
-                try
-                {
-                    var name = btn.Name;
-                    if (string.IsNullOrEmpty(name)) continue;
-
-                    // Match "Claude의 계획 승인 및 코딩 시작" or similar patterns
-                    if (name.Contains("계획 승인", StringComparison.OrdinalIgnoreCase) ||
-                        name.Contains("Approve", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Click via UIA Invoke (focusless!)
-                        if (btn.Patterns.Invoke.IsSupported)
-                        {
-                            btn.Patterns.Invoke.Pattern.Invoke();
-                            Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine($"[EYE] Plan approved via UIA Invoke: \"{name}\"");
-                            Console.ResetColor();
-                            return true;
-                        }
-                    }
-                }
-                catch { continue; }
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"[EYE] Plan approved via MCP: {output.TrimEnd()}");
+                Console.ResetColor();
+                return true;
             }
-
             return false;
         }
         catch (Exception ex)
@@ -279,7 +256,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Type text into the plan feedback edit field and submit.
+    /// Type text into the plan feedback edit field and submit via MCP.
     /// Used when Slack user wants to modify the plan instead of approving.
     /// </summary>
     static bool TypePlanFeedback(IntPtr claudeHwnd, string feedback)
@@ -289,45 +266,23 @@ internal partial class Program
 
         try
         {
-            using var automation = new UIA3Automation();
-            var window = automation.FromHandle(claudeHwnd);
-            if (window == null) return false;
+            var hwndGrap = $"*hwnd={claudeHwnd.ToInt64():X}*";
 
-            var cf = new ConditionFactory(new UIA3PropertyLibrary());
+            // Set value on the edit field
+            var (output1, code1) = EyeMcpClient.CallAsync(
+                ["a11y", "set-value", $"{hwndGrap}#*대신 수행*", "--text", feedback]).GetAwaiter().GetResult();
+            if (code1 != 0) return false;
 
-            // Find the edit field: "Claude에게 대신 수행할 작업 알려주기"
-            var edits = window.FindAllDescendants(cf.ByControlType(ControlType.Edit));
-            if (edits == null) return false;
-
-            foreach (var edit in edits)
+            // Submit: click the submit button
+            var (output2, code2) = EyeMcpClient.CallAsync(
+                ["a11y", "invoke", $"{hwndGrap}#*피드백 제출*"]).GetAwaiter().GetResult();
+            if (code2 == 0)
             {
-                try
-                {
-                    var name = edit.Name;
-                    if (name != null && name.Contains("대신 수행할 작업", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Set value via UIA Value pattern
-                        if (edit.Patterns.Value.IsSupported)
-                        {
-                            edit.Patterns.Value.Pattern.SetValue(feedback);
-
-                            // Submit: find and click the submit button (피드백 제출)
-                            var submitBtn = window.FindFirstDescendant(
-                                cf.ByControlType(ControlType.Button).And(cf.ByName("피드백 제출")));
-                            if (submitBtn?.Patterns.Invoke.IsSupported == true)
-                            {
-                                submitBtn.Patterns.Invoke.Pattern.Invoke();
-                                Console.ForegroundColor = ConsoleColor.Green;
-                                Console.WriteLine($"[EYE] Plan feedback submitted: \"{feedback}\"");
-                                Console.ResetColor();
-                                return true;
-                            }
-                        }
-                    }
-                }
-                catch { continue; }
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"[EYE] Plan feedback submitted via MCP: \"{feedback}\"");
+                Console.ResetColor();
+                return true;
             }
-
             return false;
         }
         catch (Exception ex)
@@ -351,7 +306,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Click a permission button by matching button name via UIA.
+    /// Click a permission button by matching button name via MCP a11y invoke.
     /// Used when Slack user clicks a permission button (Allow/Deny/etc).
     /// Returns true if button was found and invoked.
     /// </summary>
@@ -362,37 +317,15 @@ internal partial class Program
 
         try
         {
-            using var automation = new UIA3Automation();
-            var window = automation.FromHandle(claudeHwnd);
-            if (window == null) return false;
-
-            var cf = new ConditionFactory(new UIA3PropertyLibrary());
-            var buttons = window.FindAllDescendants(cf.ByControlType(ControlType.Button));
-            if (buttons == null) return false;
-
-            foreach (var btn in buttons)
+            var grap = $"*hwnd={claudeHwnd.ToInt64():X}*#*{buttonText}*";
+            var (output, exitCode) = EyeMcpClient.CallAsync(["a11y", "invoke", grap]).GetAwaiter().GetResult();
+            if (exitCode == 0)
             {
-                try
-                {
-                    var name = btn.Name;
-                    if (string.IsNullOrEmpty(name)) continue;
-
-                    // Exact match on button text
-                    if (name.Equals(buttonText, StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (btn.Patterns.Invoke.IsSupported)
-                        {
-                            btn.Patterns.Invoke.Pattern.Invoke();
-                            Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine($"[EYE] Permission button clicked via UIA: \"{name}\"");
-                            Console.ResetColor();
-                            return true;
-                        }
-                    }
-                }
-                catch { continue; }
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"[EYE] Permission button clicked via MCP: \"{buttonText}\"");
+                Console.ResetColor();
+                return true;
             }
-
             return false;
         }
         catch (Exception ex)
@@ -403,7 +336,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Extract current permission button names from Claude Desktop.
+    /// Extract current permission button names from Claude Desktop via MCP a11y inspect.
     /// Returns list of button names for permission-related actions.
     /// </summary>
     static List<string> GetPermissionButtons(IntPtr claudeHwnd)
@@ -414,31 +347,32 @@ internal partial class Program
 
         try
         {
-            using var automation = new UIA3Automation();
-            var window = automation.FromHandle(claudeHwnd);
-            if (window == null) return result;
+            var grap = $"*hwnd={claudeHwnd.ToInt64():X}*";
+            var (output, exitCode) = EyeMcpClient.CallAsync(
+                ["a11y", "inspect", grap, "--depth", "10"], timeoutMs: 15_000).GetAwaiter().GetResult();
+            if (exitCode != 0 || string.IsNullOrWhiteSpace(output)) return result;
 
-            var cf = new ConditionFactory(new UIA3PropertyLibrary());
-            var buttons = window.FindAllDescendants(cf.ByControlType(ControlType.Button));
-            if (buttons == null) return result;
-
-            foreach (var btn in buttons)
+            // Parse inspect output for button names matching permission patterns
+            foreach (var line in output.Split('\n'))
             {
-                try
-                {
-                    var name = btn.Name;
-                    if (string.IsNullOrEmpty(name)) continue;
+                var trimmed = line.Trim();
+                if (!trimmed.Contains("[Button]", StringComparison.OrdinalIgnoreCase)) continue;
 
-                    if (name.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
-                        name.Contains("Deny", StringComparison.OrdinalIgnoreCase) ||
-                        name.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
-                        name.Contains("거부", StringComparison.OrdinalIgnoreCase) ||
-                        name.Contains("수락", StringComparison.OrdinalIgnoreCase))
-                    {
-                        result.Add(name);
-                    }
+                // Extract button name from UIA inspect output: [Button] "ButtonName"
+                var quoteStart = trimmed.IndexOf('"');
+                var quoteEnd = quoteStart >= 0 ? trimmed.IndexOf('"', quoteStart + 1) : -1;
+                if (quoteStart < 0 || quoteEnd < 0) continue;
+                var name = trimmed.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
+                if (string.IsNullOrEmpty(name)) continue;
+
+                if (name.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Deny", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("거부", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("수락", StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Add(name);
                 }
-                catch { continue; }
             }
         }
         catch { }
@@ -934,7 +868,7 @@ internal partial class Program
             if (renderW <= 0 || renderH <= 0) return false;
 
             // Use cached turn-form rect from ClaudePromptHelper (avoids re-scanning)
-            var cachedPrompt = ClaudePromptHelper.GetAllCachedPrompts()
+            var cachedPrompt = FindAllPromptsViaMcp()
                 .FirstOrDefault(p => p.WindowHandle == claudeHwnd);
             System.Drawing.RectangleF tfRect;
             if (cachedPrompt != null)
@@ -1021,5 +955,179 @@ internal partial class Program
             _consecutiveNoChange = 0;
             _cachedRenderHwnd = IntPtr.Zero;
         }
+    }
+
+    // ── claude-detect CLI command — runs status detection in MCP subprocess ──
+
+    /// <summary>
+    /// CLI entry: wkappbot claude-detect &lt;hwnd-hex&gt; [--plan]
+    /// Returns JSON: {"status":"executing","text":"실행 중"} or {"status":null}
+    /// With --plan: {"source":"file","content":"plan text..."} or {"source":null}
+    /// </summary>
+    static int ClaudeDetectCommand(string[] args)
+    {
+        if (args.Length == 0) { Console.WriteLine("{\"status\":null}"); return 0; }
+
+        var hwndStr = args[0].TrimStart('0', 'x').TrimStart('0', 'X');
+        if (!long.TryParse(hwndStr, System.Globalization.NumberStyles.HexNumber, null, out var hwndVal))
+        {
+            Console.WriteLine("{\"error\":\"invalid hwnd\"}");
+            return 1;
+        }
+        var hwnd = new IntPtr(hwndVal);
+
+        bool planMode = args.Contains("--plan");
+
+        if (planMode)
+        {
+            var plan = ExtractPlanContent(hwnd);
+            if (plan != null)
+                Console.WriteLine(JsonSerializer.Serialize(new { source = plan.Value.source, content = plan.Value.content }));
+            else
+                Console.WriteLine("{\"source\":null}");
+        }
+        else
+        {
+            var result = DetectClaudeDesktopStatus(hwnd);
+            if (result != null)
+                Console.WriteLine(JsonSerializer.Serialize(new { status = result.Item1, text = result.Item2 }));
+            else
+                Console.WriteLine("{\"status\":null}");
+        }
+        return 0;
+    }
+
+    // ── find-prompts CLI command — runs FindAllPrompts in MCP subprocess ──
+
+    /// <summary>
+    /// CLI entry: wkappbot find-prompts [--all]
+    /// Returns JSON array: [{"hwnd":"0x791B16","title":"...","host":"vscode-claudecode","pid":1234,"cwd":"..."}]
+    /// Uses static ClaudePromptHelper — cached UIA data persists across calls in MCP subprocess.
+    /// </summary>
+    private static ClaudePromptHelper? _mcpPromptHelper;
+    private static readonly object _mcpPromptHelperLock = new();
+
+    static int FindPromptsCommand(string[] args)
+    {
+        // Reuse static instance — UIA per-hwnd cache persists across MCP calls
+        lock (_mcpPromptHelperLock)
+        {
+            _mcpPromptHelper ??= new ClaudePromptHelper();
+        }
+        var all = _mcpPromptHelper.FindAllPrompts();
+        var result = all.Select(p => new
+        {
+            hwnd = $"0x{p.WindowHandle.ToInt64():X}",
+            title = p.WindowTitle,
+            host = p.HostType,
+            process = p.ProcessName,
+            rect = new { x = p.PromptRect.X, y = p.PromptRect.Y, w = p.PromptRect.Width, h = p.PromptRect.Height }
+        });
+        Console.WriteLine(JsonSerializer.Serialize(result));
+        return 0;
+    }
+
+    /// <summary>
+    /// MCP-routed FindAllPrompts: calls find-prompts via MCP subprocess.
+    /// Returns lightweight PromptInfo-compatible list without loading FlaUI in Eye.
+    /// Caches results for 2 seconds (Eye polling cycle).
+    /// </summary>
+    private static List<ClaudePromptHelper.PromptInfo>? _mcpPromptCache;
+    private static DateTime _mcpPromptCacheAt = DateTime.MinValue;
+
+    internal static List<ClaudePromptHelper.PromptInfo> FindAllPromptsViaMcp(bool forceRefresh = false)
+    {
+        // 2s cache to avoid MCP call on every tick
+        if (!forceRefresh && _mcpPromptCache != null && (DateTime.UtcNow - _mcpPromptCacheAt).TotalSeconds < 2)
+            return _mcpPromptCache;
+
+        if (!EyeMcpClient.IsRunning)
+            return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
+
+        try
+        {
+            var (output, code) = EyeMcpClient.CallAsync(["find-prompts"], timeoutMs: 10_000).GetAwaiter().GetResult();
+            if (code != 0 || string.IsNullOrWhiteSpace(output))
+                return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
+
+            var arr = JsonNode.Parse(output) as JsonArray;
+            if (arr == null)
+                return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
+
+            var result = new List<ClaudePromptHelper.PromptInfo>();
+            foreach (var item in arr)
+            {
+                if (item == null) continue;
+                var hwndStr = item["hwnd"]?.GetValue<string>() ?? "0";
+                var hwndVal = long.Parse(hwndStr.TrimStart('0', 'x').TrimStart('0', 'X'),
+                    System.Globalization.NumberStyles.HexNumber);
+                var title = item["title"]?.GetValue<string>() ?? "";
+                var host = item["host"]?.GetValue<string>() ?? "";
+                var pid = item["pid"]?.GetValue<int>() ?? 0;
+                var rx = item["rect"]?["x"]?.GetValue<int>() ?? 0;
+                var ry = item["rect"]?["y"]?.GetValue<int>() ?? 0;
+                var rw = item["rect"]?["w"]?.GetValue<int>() ?? 0;
+                var rh = item["rect"]?["h"]?.GetValue<int>() ?? 0;
+
+                result.Add(new ClaudePromptHelper.PromptInfo(
+                    new IntPtr(hwndVal), title, "", // ProcessName not needed for Eye routing
+                    new System.Drawing.Rectangle(rx, ry, rw, rh), host));
+            }
+
+            _mcpPromptCache = result;
+            _mcpPromptCacheAt = DateTime.UtcNow;
+            return result;
+        }
+        catch
+        {
+            return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
+        }
+    }
+
+    /// <summary>
+    /// MCP-routed wrapper: calls DetectClaudeDesktopStatus via MCP subprocess when in Eye.
+    /// Falls back to direct call when not in Eye (e.g., running in MCP subprocess itself).
+    /// </summary>
+    internal static Tuple<string, string>? DetectClaudeDesktopStatusViaRoute(IntPtr claudeHwnd)
+    {
+        if (!RunningInEye || !EyeMcpClient.IsRunning)
+            return DetectClaudeDesktopStatus(claudeHwnd);
+
+        try
+        {
+            var hwndHex = claudeHwnd.ToInt64().ToString("X");
+            var (output, code) = EyeMcpClient.CallAsync(["claude-detect", hwndHex], timeoutMs: 10_000).GetAwaiter().GetResult();
+            if (code != 0 || string.IsNullOrWhiteSpace(output)) return null;
+
+            var json = JsonNode.Parse(output);
+            var status = json?["status"]?.GetValue<string>();
+            if (status == null) return null;
+            var text = json?["text"]?.GetValue<string>() ?? "";
+            return Tuple.Create(status, text);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// MCP-routed wrapper: calls ExtractPlanContent via MCP subprocess when in Eye.
+    /// </summary>
+    internal static (string source, string content)? ExtractPlanContentViaRoute(IntPtr claudeHwnd)
+    {
+        if (!RunningInEye || !EyeMcpClient.IsRunning)
+            return ExtractPlanContent(claudeHwnd);
+
+        try
+        {
+            var hwndHex = claudeHwnd.ToInt64().ToString("X");
+            var (output, code) = EyeMcpClient.CallAsync(["claude-detect", hwndHex, "--plan"], timeoutMs: 10_000).GetAwaiter().GetResult();
+            if (code != 0 || string.IsNullOrWhiteSpace(output)) return null;
+
+            var json = JsonNode.Parse(output);
+            var source = json?["source"]?.GetValue<string>();
+            if (source == null) return null;
+            var content = json?["content"]?.GetValue<string>() ?? "";
+            return (source, content);
+        }
+        catch { return null; }
     }
 }

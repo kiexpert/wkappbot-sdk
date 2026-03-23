@@ -46,21 +46,43 @@ internal partial class Program
                     var cca = new WKAppBot.Vision.ConnectedComponentAnalyzer();
                     var regions = cca.Analyze(bmp);
 
-                    // Collect UIA leaves for fused matching
+                    // Collect UIA leaves for fused matching (via MCP to avoid loading UIA in Eye)
                     var uiaInfos = new List<WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo>();
                     try
                     {
-                        using var uia = new UiaLocator();
-                        var leaves = new List<(string text, int lx, int ly, int lw, int lh, int depth)>();
-                        var rootEl = uia.GetElementAndInfoAtPoint(x + w / 2, y + h / 2).element;
-                        if (rootEl?.Parent != null)
-                            UiaLocator.CollectTextLeaves(rootEl.Parent, leaves, 0, 8);
-                        foreach (var leaf in leaves)
-                            uiaInfos.Add(new WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo
+                        var hwndGrap = $"*hwnd={targetHwnd.ToInt64():X}*";
+                        var (inspOutput, inspCode) = EyeMcpClient.CallAsync(
+                            ["a11y", "inspect", hwndGrap, "--depth", "8"], timeoutMs: 10_000).GetAwaiter().GetResult();
+                        if (inspCode == 0 && !string.IsNullOrWhiteSpace(inspOutput))
+                        {
+                            // Parse inspect output for element bounds: [Type] "Name" (PxQ @X,Y)
+                            foreach (var line in inspOutput.Split('\n'))
                             {
-                                Name = leaf.text,
-                                Bounds = new System.Drawing.Rectangle(leaf.lx - x, leaf.ly - y, leaf.lw, leaf.lh)
-                            });
+                                var trimmed = line.Trim();
+                                if (string.IsNullOrEmpty(trimmed)) continue;
+                                // Extract name from quotes
+                                var q1 = trimmed.IndexOf('"');
+                                var q2 = q1 >= 0 ? trimmed.IndexOf('"', q1 + 1) : -1;
+                                if (q1 < 0 || q2 < 0) continue;
+                                var name = trimmed.Substring(q1 + 1, q2 - q1 - 1);
+                                if (string.IsNullOrEmpty(name)) continue;
+                                // Extract bounds from (@X,Y WxH) pattern
+                                var atIdx = trimmed.IndexOf('@', q2);
+                                if (atIdx < 0) continue;
+                                var boundsStr = trimmed.Substring(atIdx + 1).TrimEnd(')').Trim();
+                                var parts = boundsStr.Split(new[] { ',', ' ', 'x' }, StringSplitOptions.RemoveEmptyEntries);
+                                if (parts.Length >= 4 &&
+                                    int.TryParse(parts[0], out var bx) && int.TryParse(parts[1], out var by) &&
+                                    int.TryParse(parts[2], out var bw) && int.TryParse(parts[3], out var bh))
+                                {
+                                    uiaInfos.Add(new WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo
+                                    {
+                                        Name = name,
+                                        Bounds = new System.Drawing.Rectangle(bx - x, by - y, bw, bh)
+                                    });
+                                }
+                            }
+                        }
                     }
                     catch { }
 
