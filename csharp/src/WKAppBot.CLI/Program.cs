@@ -36,6 +36,7 @@ internal partial class Program
     /// <summary>True when stdout is redirected (pipe/file). Suppresses diagnostic output ([ACT], cmd echo)
     /// so downstream tools receive clean data only. Set early in Main, before TeeWriter.</summary>
     internal static bool IsPipeMode = false;
+    private static readonly HashSet<string> _autoBugDedup = new();
     /// <summary>When true, UIA write operations (TypeAndSubmit, Click, etc.) are blocked.
     /// Set via --read-only CLI flag. Callers can pass this when they need read-only UIA access.</summary>
     internal static bool ReadOnlyMode = false;
@@ -417,17 +418,54 @@ internal partial class Program
             var command = args[0].ToLowerInvariant();
             var restArgs = args.Skip(1).ToArray();
 
-            // [FL] Chrome focus theft → focusless warning overlay
+            // [BUG-AUTO] Auto bug report via separate process — captures callstack + context
+            void AutoBugReport(string context)
+            {
+                // Dedup: same context string → report once per session
+                if (!_autoBugDedup.Add(context)) return;
+
+                var stack = new System.Diagnostics.StackTrace(1, true);
+                var callerFrame = stack.GetFrame(0);
+                var callerInfo = $"{callerFrame?.GetMethod()?.DeclaringType?.Name}.{callerFrame?.GetMethod()?.Name}:{callerFrame?.GetFileLineNumber()}";
+
+                // Capture last log lines for context
+                var lastLog = _currentLogPath != null && File.Exists(_currentLogPath)
+                    ? string.Join("\n", File.ReadLines(_currentLogPath).TakeLast(5)) : "(no log)";
+
+                var bugText = $"[BUG-AUTO] {context}\ncaller: {callerInfo}\ncommand: {string.Join(" ", EyeCmdPipeServer.CallerArgs.Value ?? [])}\nlog tail:\n{lastLog}";
+                Console.Error.WriteLine($"[BUG-AUTO] {context} at {callerInfo}");
+
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        var exe = Environment.ProcessPath ?? "wkappbot";
+                        new System.Diagnostics.Process
+                        {
+                            StartInfo = new System.Diagnostics.ProcessStartInfo(exe)
+                            {
+                                ArgumentList = { "suggest", bugText },
+                                UseShellExecute = false, CreateNoWindow = true,
+                            }
+                        }.Start();
+                    }
+                    catch { }
+                });
+            }
+
+            // [FL] Chrome focus theft → focusless warning overlay + auto bug report
             WKAppBot.WebBot.ChromeLauncher.OnFocusTheft ??= (chromeHwnd, prevFgHwnd) =>
             {
                 FocuslessWarningOverlay.Show(chromeHwnd, "Chrome 복원 시 포커스 강탈 → 즉시 복구됨", "chrome");
+                AutoBugReport($"Chrome focus theft: chrome=0x{chromeHwnd:X} prevFg=0x{prevFgHwnd:X}");
             };
 
-            // [FOCUSSTEALER] UIA action stole focus → stamp prop + auto-record knowhow
+            // [FOCUSSTEALER] UIA action stole focus → stamp prop + auto-record knowhow + auto bug report
             ActionApi.OnFocusStealer ??= (rootHwnd, action) =>
             {
                 AppendFocusStealerKnowhow(rootHwnd, action);
                 FocuslessWarningOverlay.Show(rootHwnd, $"UIA {action} 포커스 강탈 → 다음 실행 시 yield 팝업 자동 표시", null);
+                AutoBugReport($"UIA focus steal: action={action} hwnd=0x{rootHwnd:X}");
             };
 
             // [CDP-FALLBACK] Auto-suggest when CDP caller has no fallback (separate process — zero memory)
