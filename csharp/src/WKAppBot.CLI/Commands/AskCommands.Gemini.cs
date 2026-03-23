@@ -693,8 +693,7 @@ internal partial class Program
                                 break;
                             }
                         }
-                        var curResponses = await cdp.EvalAsync(
-                            "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+                        var curResponses = (await cdp.GetResponseCountAsync()).ToString();
                         if (curResponses != preResponseCount)
                         {
                             sendResult = $"RESPONSE_IN_PROGRESS(attempt={sendAttempt})";
@@ -719,8 +718,7 @@ internal partial class Program
                     // Response started = message was sent, stop clicking (avoids hitting stop button)
                     if (sendAttempt > 0)
                     {
-                        var curResponses = await cdp.EvalAsync(
-                            "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+                        var curResponses = (await cdp.GetResponseCountAsync()).ToString();
                         if (curResponses != preResponseCount)
                         {
                             sendResult = $"RESPONSE_STARTED(attempt={sendAttempt})";
@@ -757,8 +755,7 @@ internal partial class Program
                                 return '0';
                             })()
                             """) ?? "0";
-                        var curResponses = await cdp.EvalAsync(
-                            "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+                        var curResponses = (await cdp.GetResponseCountAsync()).ToString();
                         if (stopVisibleNow == "1" || curResponses != preResponseCount)
                         {
                             sendResult = $"RESPONSE_STARTED(stop-visible attempt={sendAttempt + 1})";
