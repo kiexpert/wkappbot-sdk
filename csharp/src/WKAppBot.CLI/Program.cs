@@ -521,6 +521,7 @@ internal partial class Program
                 "file-read" => FileCommand(new[] { "read" }.Concat(restArgs).ToArray()),
                 "file-grep" => FileCommand(new[] { "grep" }.Concat(restArgs).ToArray()),
                 "file-glob" => FileCommand(new[] { "glob" }.Concat(restArgs).ToArray()),
+                "json-grep" => FileCommand(new[] { "json-grep" }.Concat(restArgs).ToArray()),
                 "mcp" => McpCommand(restArgs), // fallback (normally caught in Main early path)
                 // Web: use "web <subcommand>" or unified a11y for web views
                 // Automation
