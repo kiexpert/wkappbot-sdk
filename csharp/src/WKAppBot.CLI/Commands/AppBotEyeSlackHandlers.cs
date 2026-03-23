@@ -979,7 +979,9 @@ internal partial class Program
                 {
                     text = msg.Text, user = msg.User, ts = msg.Timestamp,
                     threadTs = msg.ThreadTs, channel = msg.Channel,
-                    isMention = true // signal to route: broadcast to all prompts
+                    isMention = true,
+                    eyeCwd = Environment.CurrentDirectory,
+                    botUsername = GetSendReplyUsername()
                 });
                 _ = Task.Run(() =>
                 {
@@ -1205,7 +1207,9 @@ internal partial class Program
             var routeJson = System.Text.Json.JsonSerializer.Serialize(new
             {
                 text = msg.Text, user = msg.User, ts = msg.Timestamp,
-                threadTs = msg.ThreadTs, channel = msg.Channel
+                threadTs = msg.ThreadTs, channel = msg.Channel,
+                eyeCwd = Environment.CurrentDirectory,
+                botUsername = GetSendReplyUsername()
             });
             // Separate process: UIA write ops (FindAllPrompts + TypeAndSubmit) run outside Eye
             _ = Task.Run(() =>

@@ -49,6 +49,17 @@ internal partial class Program
         var threadTs   = node["threadTs"]?.GetValue<string>();
         var channel    = node["channel"]?.GetValue<string>() ?? "";
         var retryCount = node["retryCount"]?.GetValue<int>() ?? 0;
+        var eyeCwd     = node["eyeCwd"]?.GetValue<string>();
+        var eyeBotName = node["botUsername"]?.GetValue<string>();
+
+        // Set Eye CWD/botUsername for routing functions (they read CallerCwd + BotUsername)
+        if (!string.IsNullOrEmpty(eyeCwd))
+        {
+            EyeCmdPipeServer.CallerCwd.Value = eyeCwd;
+            try { Environment.CurrentDirectory = eyeCwd; } catch { }
+        }
+        if (!string.IsNullOrEmpty(eyeBotName))
+            Console.WriteLine($"[ROUTE] Eye bot={eyeBotName} cwd={eyeCwd}");
 
         if (!File.Exists(SlackConfigPath)) { Console.WriteLine("[ROUTE] No Slack config — skip"); return 0; }
         var cfg = JsonNode.Parse(File.ReadAllText(SlackConfigPath));
@@ -96,7 +107,7 @@ internal partial class Program
 
         if (isTrackedThread && !string.IsNullOrEmpty(threadTs))
         {
-            targets = ResolveThreadScopedPrompts(promptHelper, botToken, channel, threadTs, BotUsername);
+            targets = ResolveThreadScopedPrompts(promptHelper, botToken, channel, threadTs, eyeBotName ?? BotUsername);
             if (targets.Count == 0)
             {
                 // Fallback 1: workspace-scoped prompt (CWD match)
