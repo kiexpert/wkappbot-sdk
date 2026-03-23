@@ -798,14 +798,7 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < Math.Max(20, timeoutSec))
         {
             await Task.Delay(2000);
-            var text = await cdp.EvalAsync(
-                "(() => {" +
-                "if (!document.body || !document.body.innerHTML || document.body.innerHTML.length < 100) return '\\x01BLANK';" +
-                "var r = document.querySelectorAll('model-response');" +
-                "if (r.length === 0) r = document.querySelectorAll('[role=\"article\"]');" +
-                $"if (r.length <= {baseCount}) return '';" +
-                "return (r[r.length-1].textContent || '').trim();" +
-                "})()") ?? "";
+            var text = await cdp.GetLastResponseTextAsync(baseCount, blankDetect: true) ?? "";
             if (text == "\x01BLANK")
             {
                 blankCount++;

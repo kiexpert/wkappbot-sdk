@@ -616,6 +616,22 @@ public sealed partial class CdpClient
             "return r.length>0?(r[r.length-1].textContent||'').trim():''})()");
     }
 
+    /// <summary>Get last response text with min-count guard + blank page detection.</summary>
+    /// <param name="minCount">Only return text if response count > minCount (skip old responses).</param>
+    /// <param name="blankDetect">If true, return "\x01BLANK" when page body is empty/broken.</param>
+    public async Task<string?> GetLastResponseTextAsync(int minCount, bool blankDetect = false)
+    {
+        var blankCheck = blankDetect
+            ? "if(!document.body||!document.body.innerHTML||document.body.innerHTML.length<100)return'\\x01BLANK';"
+            : "";
+        return await EvalAsync(
+            "(()=>{" + blankCheck +
+            "var r=document.querySelectorAll('model-response');" +
+            "if(!r.length)r=document.querySelectorAll('[role=\"article\"]');" +
+            $"if(r.length<={minCount})return '';" +
+            "return(r[r.length-1].textContent||'').trim()})()");
+    }
+
     /// <summary>Click an element via JS (no mouse events — works when iconified).</summary>
     public async Task JsClickAsync(string selector)
     {
