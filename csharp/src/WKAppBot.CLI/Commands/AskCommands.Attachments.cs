@@ -418,36 +418,7 @@ internal partial class Program
 
     static async Task<bool> CheckFileAttached(CdpClient cdp)
     {
-        var attached = await cdp.EvalAsync("""
-            (() => {
-                // Duplicate upload notice (Gemini): treat as logical success.
-                var bodyText = (document.body && (document.body.innerText || document.body.textContent) || '');
-                if (/이미\s*이\s*파일(을)?\s*업로드/.test(bodyText)) return 'DUPLICATE';
-                if (/already\s*uploaded/i.test(bodyText)) return 'DUPLICATE';
-
-                // ChatGPT indicators
-                if (document.querySelector('[data-testid="file-thumbnail"]')) return 'YES';
-                if (document.querySelector('[data-testid*="attachment"]')) return 'YES';
-                // Generic indicators (both ChatGPT and Gemini)
-                if (document.querySelector('[class*="attachment"]')) return 'YES';
-                if (document.querySelector('[class*="file-upload"]')) return 'YES';
-                if (document.querySelector('[class*="uploaded-file"]')) return 'YES';
-                if (document.querySelector('img[src*="blob:"]')) return 'YES';
-                // Gemini file chip / upload indicator
-                if (document.querySelector('[class*="file-chip"]')) return 'YES';
-                if (document.querySelector('[class*="upload-chip"]')) return 'YES';
-                if (document.querySelector('[class*="file-container"]')) return 'YES';
-                if (document.querySelector('[class*="upload-container"]')) return 'YES';
-                if (document.querySelector('[class*="inline-file"]')) return 'YES';
-                if (document.querySelector('[class*="file-preview"]')) return 'YES';
-                if (document.querySelector('uploader-thumbnail')) return 'YES';
-                if (document.querySelector('mat-chip')) return 'YES';
-                // Count file inputs with files set
-                var inputs = document.querySelectorAll('input[type="file"]');
-                for (var inp of inputs) { if (inp.files && inp.files.length > 0) return 'INPUT_HAS_FILES'; }
-                return 'NO';
-            })()
-            """) ?? "NO";
+        var attached = await cdp.CheckFileAttachedExtendedAsync();
         if (attached == "DUPLICATE")
         {
             Console.WriteLine("[ASK] Duplicate upload notice detected -> treating as attached");
