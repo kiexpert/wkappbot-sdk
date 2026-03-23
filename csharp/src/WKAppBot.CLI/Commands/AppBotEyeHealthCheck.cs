@@ -234,6 +234,10 @@ internal partial class Program
                 sw.Stop();
                 _cachedAllPrompts = allPrompts;
                 _lastFindAllPromptsAt = DateTime.UtcNow;
+                // Cache appbot master prompt (WKAppBot VS Code — always-on relay target)
+                CachedAppbotMasterPrompt = allPrompts.FirstOrDefault(p =>
+                    p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
+                    p.HostType is "vscode-claudecode");
                 if (sw.ElapsedMilliseconds > 50)
                     Console.WriteLine($"[EYE] FindAllPrompts(MCP): {sw.ElapsedMilliseconds}ms ({allPrompts.Count} prompts)");
             }
