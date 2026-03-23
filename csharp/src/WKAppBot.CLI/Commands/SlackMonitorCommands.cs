@@ -804,6 +804,24 @@ internal partial class Program
     /// Uses conversations.replies API to get the parent message and check for bot_id.
     /// Results are cached in ownMessageTimestamps to avoid repeated API calls.
     /// </summary>
+    /// <summary>Get the text of the thread starter message (for Eye-status thread detection).</summary>
+    static string? GetThreadStarterText(string botToken, string channel, string threadTs)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {botToken}");
+            var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=1&inclusive=true";
+            var resp = http.GetAsync(url).GetAwaiter().GetResult();
+            var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var json = JsonNode.Parse(body);
+            if (json?["ok"]?.GetValue<bool>() != true) return null;
+            var messages = json["messages"]?.AsArray();
+            return messages?.Count > 0 ? messages[0]?["text"]?.GetValue<string>() : null;
+        }
+        catch { return null; }
+    }
+
     static bool IsOwnThread(string botToken, string channel, string threadTs)
     {
         try
