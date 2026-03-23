@@ -103,6 +103,16 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
 - **--old-file/--new-file**: file edit 한국어 인수 파일 전달 (bash 인코딩 우회)
 - **file grep 출력**: edit 스타일 통일 (`→` 마커, `│` 구분, `...` elision)
 - **Slack Socket Mode ack**: envelope_id dedup + 2회 재시도 + 이벤트 핸들러 비동기 디스패치
+- **Slack message_changed unwrap**: URL unfurl 이벤트에서 inner message 추출
+- **Slack route subprocess**: Eye→서브프로세스 eyeCwd/botUsername/promptNames JSON 전달
+- **grap --json**: 구조적 JSON/JSONL 검색 (key+value regex AND 매칭)
+- **GetCommandLineA() encoding recovery**: bash 한국어 인수 깨짐 복구 (Launcher)
+- **AllocConsole BANNED**: 컴파일 에러 + 런타임 크래시 (콘솔 창 생성 금지)
+- **CDP fallback training**: 1-in-9 랜덤 실패 주입 + 자동 서제스트
+- **[BUG-AUTO]**: 포커스 탈취 감지 → callstack + 로그 자동 서제스트 (Eye pipe)
+- **ADB OCR fallback**: 요소 미발견 시 screenshot→OCR→dump 하이브리드
+- **ScreenSaver per-monitor**: 모니터별 독립 윈도우 + X-ray 토글
+- **Whisper 3-tier**: normal → fresh-session → new-tab 폴백 + Slack 알림
 
 ### Eye Live Analysis (v4.8)
 - **Mouse CCA Worker**: 1초마다 마우스 위치 → UIA 부모 → CCA 세그멘테이션 → Visual MD 변환 → Slack 쓰레드 갱신
