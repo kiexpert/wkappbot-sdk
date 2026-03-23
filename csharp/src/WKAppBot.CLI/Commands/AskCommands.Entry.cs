@@ -22,6 +22,10 @@ internal partial class Program
             return AskUsage();
 
         var ai = args[0].ToLowerInvariant();
+
+        // CDP reliability warning — remind callers to implement fallback
+        if (!_suppressSlackSession.Value)
+            Console.Error.WriteLine($"[ASK] ⚠ CDP-based AI query — may fail (tab stale, copyright, timeout). Implement fallback for production use.");
         string? modelHint = null;
         bool newTab = false;
         bool newSession = false;
