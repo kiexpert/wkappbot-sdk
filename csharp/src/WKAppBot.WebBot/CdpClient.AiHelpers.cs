@@ -57,40 +57,53 @@ public sealed partial class CdpClient
     // ══ Send Button ══
 
     /// <summary>
-    /// Click the send button for a specific AI provider.
-    /// Returns: "CLICKED", "DISABLED", "NOT_FOUND"
+    /// Send message via Enter key (modern AI chats use Enter=send, button=stop).
+    /// Focuses the editor first, then dispatches Enter key.
+    /// Returns: "SENT", "NO_EDITOR", "ERROR"
     /// </summary>
-    public async Task<string> ClickSendButtonAsync(string provider)
+    public async Task<string> SendPromptAsync(string editorSelector)
     {
-        var selectors = provider.ToLowerInvariant() switch
-        {
-            "claude" => """
-                'button[aria-label="Send Message"]',
-                'button[data-testid="chat-input-grid-area"] button[type="submit"]',
-                'button[data-testid="chat-input"] button[type="submit"]',
-                'button[aria-label*="Send"]'
-                """,
-            "gemini" => """
-                'button[aria-label="Send message"]',
-                'button[aria-label*="Send"]',
-                '.send-button',
-                'button.send-button'
-                """,
-            "gpt" or "chatgpt" => """
-                'button[data-testid="send-button"]',
-                'button[aria-label="Send prompt"]',
-                'button[aria-label*="Send"]',
-                'form button[type="submit"]:not([disabled])'
-                """,
-            _ => "'button[type=\"submit\"]','button[aria-label*=\"Send\"]'"
-        };
+        // Focus editor first
+        await FocusAsync(editorSelector);
+        await Task.Delay(50);
 
-        return await EvalAsync(
-            "(()=>{var sels=[" + selectors + "];" +
-            "for(var s of sels){var b=document.querySelector(s);" +
-            "if(b){if(b.disabled)return 'DISABLED';" +
-            "b.click();return 'CLICKED:'+s}}" +
-            "return 'NOT_FOUND'})()") ?? "NOT_FOUND";
+        // Enter key via CDP Input.dispatchKeyEvent
+        await SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+        {
+            ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
+            ["windowsVirtualKeyCode"] = 13
+        });
+        await SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+        {
+            ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
+            ["windowsVirtualKeyCode"] = 13
+        });
+        return "SENT";
+    }
+
+    /// <summary>
+    /// Click the stop/cancel button (visible during AI response generation).
+    /// ⚠ WARNING: In modern AI chats, the "send" button becomes "stop" during streaming!
+    /// Use SendPromptAsync() for sending, this for stopping.
+    /// </summary>
+    public async Task<string> ClickStopButtonAsync()
+    {
+        return await EvalAsync("""
+            (() => {
+                var sels = [
+                    'button[aria-label*="Stop"]', 'button[aria-label*="중지"]',
+                    'button[data-testid="stop-button"]',
+                    'button[aria-label="Cancel"]'
+                ];
+                var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
+                if (mat) { var b = mat.closest('button'); if (b) { b.click(); return 'STOPPED:mat-icon'; } }
+                for (var s of sels) {
+                    var b = document.querySelector(s);
+                    if (b && b.offsetParent !== null) { b.click(); return 'STOPPED:' + s; }
+                }
+                return 'NOT_FOUND';
+            })()
+            """) ?? "NOT_FOUND";
     }
 
     // ══ Streaming Detection ══
