@@ -85,11 +85,11 @@ internal partial class Program
 
         // Tier 2: Win32 clipboard + CDP Ctrl+V
         Console.WriteLine("[ASK] Synthetic paste failed, trying clipboard + Ctrl+V...");
+        System.Windows.Forms.IDataObject? clipBackup = null;
         try
         {
             // Set image to clipboard on STA thread (backup + restore)
             var clipboardSet = false;
-            System.Windows.Forms.IDataObject? clipBackup = null;
             var staThread = new Thread(() =>
             {
                 try
