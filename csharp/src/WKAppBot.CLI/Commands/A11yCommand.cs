@@ -368,7 +368,17 @@ internal partial class Program
 
         // ═══ Special: wait action (polls for window/element, early return) ═══
         if (action == "wait")
+        {
+            // Parse wait-specific options: --condition "text" --not
+            _waitCondition = null;
+            _waitNot = false;
+            for (int wi = 0; wi < args.Length; wi++)
+            {
+                if (args[wi] == "--condition" && wi + 1 < args.Length) _waitCondition = args[wi + 1];
+                if (args[wi] == "--not") _waitNot = true;
+            }
             return A11yWaitAction(grap, timeoutMs, intervalMs);
+        }
 
         // ═══ Special: kill (process kill by name/cmdline pattern, no window needed) ═══
         if (action == "kill")
@@ -2077,6 +2087,11 @@ internal partial class Program
 
     static int A11yWaitAction(string grap, int timeoutMs, int intervalMs)
     {
+        // Parse extra wait options from grap args context
+        // These are set by A11yCommand before calling: _waitCondition, _waitNot, _waitCdp
+        var condition = _waitCondition;
+        var waitNot = _waitNot;
+
         var (win32Segments, uiaPath) = GrapHelper.SplitGrap(grap);
         if (win32Segments.Length == 0)
             return Error("No window title in grap pattern");
@@ -2085,9 +2100,16 @@ internal partial class Program
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         bool needsUia = !string.IsNullOrEmpty(uiaPath);
-        Console.WriteLine($"[A11Y] wait — polling for \"{grap}\" (timeout={timeoutMs}ms, interval={intervalMs}ms)");
+        var modeStr = waitNot ? "disappear" : "appear";
+        var condStr = condition != null ? $", condition=\"{condition}\"" : "";
+        Console.WriteLine($"[A11Y] wait — polling for \"{grap}\" to {modeStr} (timeout={timeoutMs}ms, interval={intervalMs}ms{condStr})");
 
-        using var automation = needsUia ? new UIA3Automation() : null;
+        // CDP web wait: if grap contains CSS selector patterns
+        bool isCdpWait = grap.Contains("#") && firstSegPatterns.Any(p =>
+            p.Contains("*Chrome*", StringComparison.OrdinalIgnoreCase) ||
+            p.Contains("*Edge*", StringComparison.OrdinalIgnoreCase));
+
+        using var automation = needsUia && !isCdpWait ? new UIA3Automation() : null;
         if (automation != null)
         {
             automation.ConnectionTimeout = TimeSpan.FromSeconds(2);
@@ -2097,6 +2119,9 @@ internal partial class Program
         var sw = System.Diagnostics.Stopwatch.StartNew();
         while (sw.ElapsedMilliseconds < timeoutMs)
         {
+            bool found = false;
+            string foundInfo = "";
+
             foreach (var pat in firstSegPatterns)
             {
                 var wins = WindowFinder.FindByTitle(pat);
@@ -2114,11 +2139,12 @@ internal partial class Program
                 }
                 if (!childOk) continue;
 
-                // Window-only wait
+                // Window-only wait (no UIA scope)
                 if (!needsUia)
                 {
-                    Console.WriteLine($"[A11Y] wait — window found after {sw.ElapsedMilliseconds}ms: \"{wins[0].Title}\" (hwnd={hwnd:X8})");
-                    return 0;
+                    found = true;
+                    foundInfo = $"\"{wins[0].Title}\" (hwnd={hwnd:X8})";
+                    break;
                 }
 
                 // UIA scope wait
@@ -2131,19 +2157,52 @@ internal partial class Program
                         var name = scoped.Properties.Name.ValueOrDefault ?? "";
                         var type = "?";
                         try { type = scoped.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                        Console.WriteLine($"[A11Y] wait — element found after {sw.ElapsedMilliseconds}ms: [{type}] \"{name}\"");
-                        return 0;
+
+                        // Condition check: text/name must contain condition string
+                        if (condition != null)
+                        {
+                            var text = name;
+                            try { text = scoped.Patterns.Value.PatternOrDefault?.Value?.ToString() ?? name; } catch { }
+                            if (!text.Contains(condition, StringComparison.OrdinalIgnoreCase))
+                                continue; // condition not met, keep polling
+                        }
+
+                        found = true;
+                        foundInfo = $"[{type}] \"{name}\"";
+                        break;
                     }
                 }
                 catch { /* UIA timeout on stale elements, keep polling */ }
             }
 
+            // --not mode: wait until element DISAPPEARS
+            if (waitNot)
+            {
+                if (!found)
+                {
+                    Console.WriteLine($"[A11Y] wait --not — element gone after {sw.ElapsedMilliseconds}ms");
+                    return 0;
+                }
+            }
+            else
+            {
+                if (found)
+                {
+                    Console.WriteLine($"[A11Y] wait — found after {sw.ElapsedMilliseconds}ms: {foundInfo}");
+                    return 0;
+                }
+            }
+
             Thread.Sleep(intervalMs);
         }
 
-        Console.Error.WriteLine($"[A11Y] wait — timeout after {timeoutMs}ms: \"{grap}\"");
+        Console.Error.WriteLine($"[A11Y] wait — timeout after {timeoutMs}ms: \"{grap}\" ({modeStr})");
         return 1;
     }
+
+    // Wait options (set by A11yCommand before calling A11yWaitAction)
+    [ThreadStatic] static string? _waitCondition;
+    [ThreadStatic] static bool _waitNot;
 
     // ═══ Eval Action: execute JavaScript via CDP ═══
 

@@ -709,12 +709,18 @@ internal partial class Program
     {
         var timeoutMs = 10000;
         var intervalMs = 1000;
+        string? condition = null;
+        bool waitNot = false;
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--timeout" && i + 1 < args.Length)
                 int.TryParse(args[i + 1], out timeoutMs);
             if (args[i] == "--interval" && i + 1 < args.Length)
                 int.TryParse(args[i + 1], out intervalMs);
+            if (args[i] == "--condition" && i + 1 < args.Length)
+                condition = args[i + 1];
+            if (args[i] == "--not")
+                waitNot = true;
         }
 
         if (grap.Scopes.Length == 0 && grap.Package == null)
@@ -725,12 +731,17 @@ internal partial class Program
             return 1;
         }
 
-        Console.Write($"[ADB] Waiting for '{grap.ScopePath ?? grap.Package}' (timeout={timeoutMs}ms)... ");
+        var modeStr = waitNot ? "disappear" : "appear";
+        var condStr = condition != null ? $", condition=\"{condition}\"" : "";
+        Console.Write($"[ADB] Waiting for '{grap.ScopePath ?? grap.Package}' to {modeStr} (timeout={timeoutMs}ms{condStr})... ");
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var tree = new AndroidA11yTree(adb);
 
         while (sw.ElapsedMilliseconds < timeoutMs)
         {
+            bool found = false;
+            string foundInfo = "";
+
             var root = tree.GetRoot(serial, forceRefresh: true);
             if (root != null)
             {
@@ -746,26 +757,50 @@ internal partial class Program
                     var scoped = tree.ResolveScope(target, grap.Scopes);
                     if (scoped != null)
                     {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"FOUND ({sw.ElapsedMilliseconds}ms) {scoped.SearchKey}");
-                        Console.ResetColor();
-                        return 0;
+                        // Condition check: text/content-desc must contain condition string
+                        if (condition != null)
+                        {
+                            var text = !string.IsNullOrEmpty(scoped.Text) ? scoped.Text : scoped.ContentDesc;
+                            if (!text.Contains(condition, StringComparison.OrdinalIgnoreCase))
+                            { Thread.Sleep(intervalMs); continue; }
+                        }
+                        found = true;
+                        foundInfo = scoped.SearchKey;
                     }
                 }
                 else
                 {
-                    // Package-only wait — package found
+                    found = true;
+                    foundInfo = target.Package;
+                }
+            }
+
+            if (waitNot)
+            {
+                if (!found)
+                {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"FOUND ({sw.ElapsedMilliseconds}ms) {target.Package}");
+                    Console.WriteLine($"GONE ({sw.ElapsedMilliseconds}ms)");
                     Console.ResetColor();
                     return 0;
                 }
             }
+            else
+            {
+                if (found)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"FOUND ({sw.ElapsedMilliseconds}ms) {foundInfo}");
+                    Console.ResetColor();
+                    return 0;
+                }
+            }
+
             Thread.Sleep(intervalMs);
         }
 
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"TIMEOUT ({timeoutMs}ms)");
+        Console.WriteLine($"TIMEOUT ({timeoutMs}ms) ({modeStr})");
         Console.ResetColor();
         return 1;
     }
