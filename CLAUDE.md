@@ -189,6 +189,14 @@ wkappbot logcat [regex] [file1.log] [file2.log ...] [--hq] [--past Ns/Nm/Nh] [-f
   # no --past        → live only (real-time FSW)
   # --hq: include wkappbot.hq/logs (finished logs live here)
   # Ctrl+C / broken pipe / --timeout → clean exit
+  # --json: structural JSON matching (key+value regex)
+  #   grap '{"role":"user"}' *.jsonl --hq --past 1h --json
+  #   grap '{"role":"user","content":"screensaver"}' *.jsonl --json  (AND logic)
+  #   grap "keyword" *.jsonl --json  (simple keyword in JSON lines)
+wkappbot file edit <old> <new> <path>... [--replace-all] [--context N] [--tab-size N]
+  # --old-file/--new-file: read old/new from files (bash Korean encoding workaround)
+  # file-edit/file-read/file-grep/file-glob: hyphenated aliases supported
+  # wkedit.exe: busybox symlink → "file edit" auto-routing
 wkappbot mcp                                  # MCP stdio 서버 (도구 1개: wkappbot)
 wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령
   # Discovery: inspect, find, windows, screenshot, ocr

@@ -27,7 +27,7 @@ internal partial class Program
             "edit"                   => FileEditCommand(args[1..]),
             "undo"                   => FileUndoCommand(args[1..]),
             "grep"                   => FileGrepCommand(args[1..]),
-            "json-grep"              => FileJsonGrepCommand(args[1..]),
+            // json-grep removed — use "grap ... --json" instead (unified with logcat ecosystem)
             "glob"                   => FileGlobCommand(args[1..]),
             "--help" or "-h" or "help" => FileToolUsage(),
             _ => Error($"Unknown file subcommand: {args[0]}")
