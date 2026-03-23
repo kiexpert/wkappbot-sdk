@@ -1,4 +1,4 @@
-# WKAppBot v4.8.0 - Windows + Android App Automation Test Framework
+# WKAppBot v4.9.0 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -84,6 +84,18 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
 4. 픽셀해시 캐시 (`aid'hash=description.png`) + Experience DB 레이아웃해시별 저장
 5. CCA 파라미터 자동 튜닝 (Gemini 피드백 → EMA α감쇠, 프로세스/컨트롤/레이아웃별)
 6. 테이블 그리드 자동 감지 (Separator → 행/열 경계 → 셀별 OCR)
+
+### Eye MCP Architecture (v4.9)
+- **EyeMcpClient**: Eye→MCP 워커(Core) 파이프 연결, 모든 a11y/UIA를 MCP 서브프로세스로 라우팅
+  - `CreateProcessW` + `DETACHED_PROCESS` 플래그로 ConPTY LPC 교착 방지
+  - JSON-RPC 2.0 over stdin/stdout 파이프 (MCP 프로토콜 동일)
+  - 자동 재시작 (max 5/5min), 60s 기본 타임아웃
+  - static `ClaudePromptHelper` 캐시 — MCP 워커에서 UIA 데이터 유지
+- **Eye a11y 분리**: Eye 프로세스에 FlaUI/UIA 미로드 → 메모리 절감
+  - `ShouldRouteToMcp()`: a11y/inspect/windows/ask/prompt → MCP, slack/eye/schedule → in-process
+  - `a11y kill`은 MCP 제외 (자기 자신 kill 방지)
+- **내부 명령**: `find-prompts` (JSON 프롬프트 목록), `claude-detect <hwnd>` (상태 감지 JSON)
+- **ReadOnlyMode → --read-only CLI 인수**: Eye에서 제거, 필요 시 명시적 전달
 
 ### Eye Live Analysis (v4.8)
 - **Mouse CCA Worker**: 1초마다 마우스 위치 → UIA 부모 → CCA 세그멘테이션 → Visual MD 변환 → Slack 쓰레드 갱신

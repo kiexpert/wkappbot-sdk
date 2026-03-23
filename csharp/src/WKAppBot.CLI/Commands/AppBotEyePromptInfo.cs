@@ -8,7 +8,7 @@
 //   ExtractCwdFromVsCodeTitle() → "... - WKAppBot - Visual Studio Code" → W:\GitHub\WKAppBot
 //   GetContextInfoForCwdEx()    → JSONL size → context usage %
 
-using FlaUI.UIA3;
+// FlaUI removed from Eye — ExtractCwdFromCodexWindow routed through MCP
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
@@ -60,26 +60,26 @@ internal partial class Program
     {
         try
         {
-            using var automation = new UIA3Automation();
-            var root = automation.FromHandle(hwnd);
-            if (root == null) return null;
+            // Route through MCP to avoid FlaUI loading in Eye
+            var grap = $"*hwnd={hwnd.ToInt64():X}*#app-header-portal-main";
+            var (output, code) = EyeMcpClient.CallAsync(
+                ["a11y", "inspect", grap, "--depth", "3"], timeoutMs: 5_000).GetAwaiter().GetResult();
+            if (code != 0 || string.IsNullOrWhiteSpace(output)) return null;
 
-            // Fast path: FlaUI FindFirstDescendant with AutomationId condition
-            // app-header-portal-main contains [Text "thread-title"] [Button "ProjectName"] [Button ...]
-            var cf = automation.ConditionFactory;
-            var headerGroup = root.FindFirstDescendant(
-                cf.ByAutomationId("app-header-portal-main"));
-            if (headerGroup == null) return null;
-
-            // First Button child = project folder name (Text element before it is thread title)
-            var projectBtn = headerGroup.FindFirstDescendant(
-                cf.ByControlType(FlaUI.Core.Definitions.ControlType.Button));
-            if (projectBtn == null) return null;
-
-            var folderName = projectBtn.Properties.Name.ValueOrDefault ?? "";
-            if (string.IsNullOrWhiteSpace(folderName)) return null;
-
-            return ResolveProjectFolderToPath(folderName);
+            // Parse inspect output for Button name (project folder)
+            foreach (var line in output.Split('\n'))
+            {
+                if (!line.Contains("[Button]", StringComparison.OrdinalIgnoreCase)) continue;
+                var q1 = line.IndexOf('"');
+                var q2 = q1 >= 0 ? line.IndexOf('"', q1 + 1) : -1;
+                if (q1 >= 0 && q2 > q1)
+                {
+                    var folderName = line.Substring(q1 + 1, q2 - q1 - 1);
+                    if (!string.IsNullOrWhiteSpace(folderName))
+                        return ResolveProjectFolderToPath(folderName);
+                }
+            }
+            return null;
         }
         catch { return null; }
     }
@@ -269,7 +269,7 @@ internal partial class Program
     internal static (string displayName, string lastLine, string cwdLabel) GetPromptDisplayInfo(IntPtr hwnd)
     {
         // 1. PromptInfo from cache
-        var pi = ClaudePromptHelper.GetAllCachedPrompts()
+        var pi = FindAllPromptsViaMcp()
             .FirstOrDefault(p => p.WindowHandle == hwnd);
 
         // 2. CWD: 호스트 타입별 추출 우선순위

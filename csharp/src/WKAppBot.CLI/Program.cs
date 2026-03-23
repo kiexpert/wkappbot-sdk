@@ -37,7 +37,7 @@ internal partial class Program
     /// so downstream tools receive clean data only. Set early in Main, before TeeWriter.</summary>
     internal static bool IsPipeMode = false;
     /// <summary>When true, UIA write operations (TypeAndSubmit, Click, etc.) are blocked.
-    /// Set by Eye to enforce read-only mode. Write ops must run in separate process.</summary>
+    /// Set via --read-only CLI flag. Callers can pass this when they need read-only UIA access.</summary>
     internal static bool ReadOnlyMode = false;
     // Relay file path for grap/grep one-shot mode (WKAPPBOT_RELAY_FILE env var).
     // FastExit creates {relayFilePath}.done sentinel after closing the file.
@@ -313,6 +313,13 @@ internal partial class Program
         // Must be captured before TeeWriter replaces Console.Out.
         IsPipeMode = Console.IsOutputRedirected;
 
+        // --read-only: global flag for UIA read-only mode (strip from args before dispatch)
+        if (args.Contains("--read-only"))
+        {
+            ReadOnlyMode = true;
+            args = args.Where(a => a != "--read-only").ToArray();
+        }
+
         // Grep-mode: logcat family (logcat/grap/grep) with stdout redirected (no watch flags).
         // result=$(grap pattern *.txt) must work like grep: matches to stdout, diagnostics to stderr.
         // Detected here (before TeeWriter) so TeeWriter can echo to stderr instead of stdout.
@@ -560,6 +567,8 @@ internal partial class Program
                 "tree-select" => TreeSelectCommand(restArgs),
                 "prompt-test" => PromptTestCommand(restArgs),
                 "prompt-probe" => PromptProbeCommand(restArgs),
+                "claude-detect" => ClaudeDetectCommand(restArgs),
+                "find-prompts" => FindPromptsCommand(restArgs),
                 "msaa-probe" => MsaaProbeCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),
