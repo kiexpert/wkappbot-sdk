@@ -109,16 +109,9 @@ internal partial class Program
             })()
             """);
         await Task.Delay(1500);
-        var stillVisible = await cdp.EvalAsync("""
-            (() => {
-                if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="����"]')) return '1';
-                var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                if (mat) { var b=mat.closest('button'); if (b&&((b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('stop'))) return '1'; }
-                return '0';
-            })()
-            """) ?? "0";
-        Console.WriteLine($"[ASK] Gemini stop after click: {(stillVisible == "1" ? "still visible" : "cleared")}");
-        return stillVisible != "1";
+        var stillVisible = await cdp.IsStopButtonVisibleAsync();
+        Console.WriteLine($"[ASK] Gemini stop after click: {(stillVisible ? "still visible" : "cleared")}");
+        return !stillVisible;
     }
 
     /// <summary>
