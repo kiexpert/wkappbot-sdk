@@ -135,7 +135,10 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
 - **Eye Startup PulseStep**: 6 체크포인트 + 메모리 워터마크 (54→710MB 범인 추적)
 - **PIPE-MEM**: 파이프 명령별 메모리 델타 로깅 (±5MB 이상)
 - **Slack Heartbeat**: 1분마다 IsConnected 체크 → 끊기면 자동 재접속
-- **suggest resolve guard**: `--i-completed-the-code-and-built-successfully-and-deployed-and-tested-with-real-scenarios-and-confirmed-meaningful-results-and-have-evidence-and-willkim-allowed-this` 필수
+- **suggest resolve guard 6단계**: `--...-willkim-allowed-this-script <test.sh>` 필수
+  - 1) 플래그 필수 2) 증거 파일 필수 3) 파일명 `test-{cmd}-{subcmd}-*.sh` 규격
+  - 4) 스크립트 내 해당 명령 사용 검증 5) 스크립트 실행 PASS(exit=0) 6) Slack 업로드 + experience/tests/ 복사
+- **a11y wait --condition/--not**: 텍스트 조건 매칭 + 요소 사라짐 대기 (Windows UIA + ADB)
 - **claude-usage JSONL**: Session 라인에 JSONL 파일 크기 + context% 표시
 - **Eye ReadOnly Mode**: Eye 내 UIA 쓰기 금지 (ReadOnlyMode 전역 플래그)
 - **slack route 프로세스 분리**: route → 별도 프로세스 spawn (temp file JSON), Eye 메모리 0 증가
