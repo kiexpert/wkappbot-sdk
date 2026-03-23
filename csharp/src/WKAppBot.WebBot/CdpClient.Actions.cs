@@ -430,8 +430,8 @@ public sealed partial class CdpClient
             """);
     }
 
-    /// <summary>Default type — finds the most likely editor/input and types text.</summary>
-    public async Task<string?> DefaultTypeAsync(string text)
+    /// <summary>Default type — finds editor, types text, sends with Enter (full prompt flow).</summary>
+    public async Task<string?> DefaultTypeAsync(string text, bool autoSend = true)
     {
         var escaped = text.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n");
         var js = "(() => {" +
@@ -450,7 +450,25 @@ public sealed partial class CdpClient
             "return 'typed:' + s;" +
             "}}" +
             "return 'NOT_FOUND';})()";
-        return await EvalAsync(js);
+        var result = await EvalAsync(js);
+
+        // Auto-send with Enter key (AI chat flow: type → Enter → send)
+        if (autoSend && result != null && result.StartsWith("typed:"))
+        {
+            await Task.Delay(100);
+            await SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
+                ["windowsVirtualKeyCode"] = 13
+            });
+            await SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
+                ["windowsVirtualKeyCode"] = 13
+            });
+            result += "+sent";
+        }
+        return result;
     }
 
     /// <summary>Default focus — finds the most likely editor/input and focuses it.</summary>
