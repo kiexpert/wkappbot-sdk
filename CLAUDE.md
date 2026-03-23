@@ -108,6 +108,12 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
 - **Slack Heartbeat**: 1분마다 IsConnected 체크 → 끊기면 자동 재접속
 - **suggest resolve guard**: `--i-completed-the-code-and-built-successfully-and-deployed-and-tested-with-real-scenarios-and-confirmed-meaningful-results-and-have-evidence-and-willkim-allowed-this` 필수
 - **claude-usage JSONL**: Session 라인에 JSONL 파일 크기 + context% 표시
+- **Eye ReadOnly Mode**: Eye 내 UIA 쓰기 금지 (ReadOnlyMode 전역 플래그)
+- **slack route 프로세스 분리**: route → 별도 프로세스 spawn (temp file JSON), Eye 메모리 0 증가
+- **CWD git root 보정**: AbbreviateCwd가 .git/.svn/.wkappbot 마커까지 walk up
+- **좀비 프로세스 정리**: Eye shutdown 시 FocuslessWarning 등 WPF 윈도우 WM_CLOSE
+- **FindAllPrompts 2s 캐시**: 연속 호출 <1ms, 풀스캔은 캐시 미스 시에만
+- **Slack ack/event 디버그 로깅**: ACK 실패, self/bot skip, subtype skip 상세 로그
 
 ### Sunset Screensaver
 10초 idle → 해질녘 색상 전환 (7-stop gradient) → 별/달/토성/파도 애니메이션
