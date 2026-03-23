@@ -127,6 +127,8 @@ internal partial class Program
     // Per-hwnd cache in ClaudePromptHelper makes FindAllPrompts fast for known windows (no UIA rescan).
     // 1s cooldown avoids redundant EnumWindows calls in back-to-back ticks.
     static List<ClaudePromptHelper.PromptInfo>? _cachedAllPrompts;
+    /// <summary>Cached appbot master prompt — always-on relay target (WKAppBot VS Code).</summary>
+    internal static ClaudePromptHelper.PromptInfo? CachedAppbotMasterPrompt;
     static DateTime _lastFindAllPromptsAt = DateTime.MinValue;
 
     // ── Eye IPC cache: updated each tick so eye tick IPC queries get instant response ──
