@@ -96,6 +96,13 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
   - `a11y kill`은 MCP 제외 (자기 자신 kill 방지)
 - **내부 명령**: `find-prompts` (JSON 프롬프트 목록), `claude-detect <hwnd>` (상태 감지 JSON)
 - **ReadOnlyMode → --read-only CLI 인수**: Eye에서 제거, 필요 시 명시적 전달
+- **WKAPPBOT_CALLER_NAME env**: MCP 워커 프로세스 레벨 기본 대화명
+- **JSON-RPC _meta**: 호출별 `callerCwd`/`callerHwnd` 전달 (argv 오염 없음)
+- **file-edit/file-read/file-grep/file-glob**: 하이픈 별칭 지원
+- **wkedit.exe**: busybox symlink → `file edit` 자동 라우팅
+- **--old-file/--new-file**: file edit 한국어 인수 파일 전달 (bash 인코딩 우회)
+- **file grep 출력**: edit 스타일 통일 (`→` 마커, `│` 구분, `...` elision)
+- **Slack Socket Mode ack**: envelope_id dedup + 2회 재시도 + 이벤트 핸들러 비동기 디스패치
 
 ### Eye Live Analysis (v4.8)
 - **Mouse CCA Worker**: 1초마다 마우스 위치 → UIA 부모 → CCA 세그멘테이션 → Visual MD 변환 → Slack 쓰레드 갱신
