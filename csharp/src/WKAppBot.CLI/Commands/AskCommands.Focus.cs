@@ -277,16 +277,10 @@ internal partial class Program
 
             // Get element bounding rect in viewport coords
             // Task.Run avoids sync-over-async deadlock when caller is already on async context
-            var rectStr = Task.Run(() => cdp.EvalAsync($@"
-                (() => {{
-                    var el = document.querySelector('{cssSelector.Replace("'", "\\'")}');
-                    if (!el) return 'NO_EL';
-                    var r = el.getBoundingClientRect();
-                    return Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.width) + ',' + Math.round(r.height);
-                }})()
-            ")).WaitAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
+            var rectStr = Task.Run(() => cdp.GetElementRectAsync(cssSelector))
+                .WaitAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
 
-            if (string.IsNullOrEmpty(rectStr) || rectStr == "NO_EL") return null;
+            if (string.IsNullOrEmpty(rectStr)) return null;
 
             var parts = rectStr.Split(',');
             if (parts.Length != 4) return null;

@@ -2607,6 +2607,14 @@ internal partial class Program
                 continue;
             }
 
+            // ── null = streaming done signal: return previous result ──
+            if (result == null && lastResult != null)
+            {
+                Console.WriteLine($"[A11Y] read --eval-js: null signal → streaming done");
+                Console.WriteLine($"[A11Y] read --eval-js: {lastResult}");
+                return true;
+            }
+
             if (result == lastResult)
             {
                 stableCount++;

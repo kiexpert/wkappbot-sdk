@@ -37,9 +37,7 @@ internal partial class Program
         {
             foreach (var sel in ClaudeEditorSelectors)
             {
-                var found = await cdp.EvalAsync(
-                    $"document.querySelector(\"{sel}\") ? 'yes' : 'no'");
-                if (found == "yes") return sel;
+                if (await cdp.QueryExistsAsync(sel)) return sel;
             }
             await Task.Delay(500);
         }

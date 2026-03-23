@@ -497,6 +497,25 @@ public sealed partial class CdpClient
         );
     }
 
+    /// <summary>Get element bounding rect as "left,top,width,height" string. Returns null if not found.</summary>
+    public async Task<string?> GetElementRectAsync(string selector)
+    {
+        var escaped = selector.Replace("'", "\\'");
+        var result = await EvalAsync(
+            $"(()=>{{var el=document.querySelector('{escaped}');if(!el)return null;" +
+            "var r=el.getBoundingClientRect();" +
+            "return Math.round(r.left)+','+Math.round(r.top)+','+Math.round(r.width)+','+Math.round(r.height)}})()");
+        return result;
+    }
+
+    /// <summary>Check if a DOM element exists matching a CSS selector.</summary>
+    public async Task<bool> QueryExistsAsync(string selector)
+    {
+        var escaped = selector.Replace("'", "\\'");
+        var result = await EvalAsync($"document.querySelector('{escaped}') ? 'yes' : 'no'");
+        return result == "yes";
+    }
+
     /// <summary>Count DOM elements matching a CSS selector.</summary>
     public async Task<int> QueryCountAsync(string selector)
     {
@@ -511,6 +530,72 @@ public sealed partial class CdpClient
         var result = await EvalAsync(
             "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
         return int.TryParse(result, out var n) ? n : 0;
+    }
+
+    /// <summary>Check if a file attachment indicator is visible (ChatGPT/Gemini/Claude).</summary>
+    public async Task<string?> CheckAttachmentAsync()
+    {
+        return await EvalAsync("""
+            (() => {
+                var gpt = document.querySelector('[data-testid="file-thumbnail"]')
+                        || document.querySelector('[class*="attachment"]')
+                        || document.querySelector('[class*="file-upload"]')
+                        || document.querySelector('img[src*="blob:"]');
+                if (gpt) return 'GPT_ATTACHED';
+                var gem = document.querySelector('.input-area img')
+                        || document.querySelector('[class*="uploaded"]')
+                        || document.querySelector('img[src*="blob:"]');
+                if (gem) return 'GEM_ATTACHED';
+                return 'NONE';
+            })()
+            """) ?? "NONE";
+    }
+
+    /// <summary>Check if file is uploading (progress indicators visible).</summary>
+    public async Task<bool> IsUploadingAsync()
+    {
+        var result = await EvalAsync("""
+            (() => {
+                return document.querySelector('[class*="progress"]')
+                    || document.querySelector('[class*="uploading"]')
+                    || document.querySelector('[class*="loading"]')
+                    ? 'YES' : 'NO';
+            })()
+            """) ?? "NO";
+        return result == "YES";
+    }
+
+    /// <summary>Check if AI stop/cancel button is visible (generation in progress).</summary>
+    public async Task<bool> IsStopButtonVisibleAsync()
+    {
+        var result = await EvalAsync("""
+            (() => {
+                if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="중지"]')) return '1';
+                var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
+                if (mat) { var b=mat.closest('button'); if(b&&(b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('stop')) return '1'; }
+                return '0';
+            })()
+            """) ?? "0";
+        return result == "1";
+    }
+
+    /// <summary>Fake visibility events for hidden/iconified tabs (forces deferred rendering).</summary>
+    public async Task DispatchVisibilityAsync()
+    {
+        await EvalAsync(
+            "try{Object.defineProperty(document,'hidden',{get:()=>false,configurable:true});" +
+            "Object.defineProperty(document,'visibilityState',{get:()=>'visible',configurable:true});" +
+            "document.dispatchEvent(new Event('visibilitychange'));" +
+            "window.dispatchEvent(new Event('focus'));}catch(e){}");
+    }
+
+    /// <summary>Get the last AI response text (Gemini model-response / article role).</summary>
+    public async Task<string?> GetLastResponseTextAsync()
+    {
+        return await EvalAsync(
+            "(()=>{var r=document.querySelectorAll('model-response');" +
+            "if(!r.length)r=document.querySelectorAll('[role=\"article\"]');" +
+            "return r.length>0?(r[r.length-1].textContent||'').trim():''})()");
     }
 
     /// <summary>Click an element via JS (no mouse events — works when iconified).</summary>

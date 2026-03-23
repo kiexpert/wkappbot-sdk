@@ -70,23 +70,7 @@ internal partial class Program
             for (int i = 0; i < 10; i++)
             {
                 await Task.Delay(500);
-                var indicator = await cdp.EvalAsync("""
-                    (() => {
-                        // ChatGPT: file attachment area appears
-                        var gpt = document.querySelector('[data-testid="file-thumbnail"]')
-                                || document.querySelector('[class*="attachment"]')
-                                || document.querySelector('[class*="file-upload"]')
-                                || document.querySelector('img[src*="blob:"]');
-                        if (gpt) return 'GPT_ATTACHED';
-                        // Gemini: image preview in input area
-                        var gem = document.querySelector('.input-area img')
-                                || document.querySelector('[class*="uploaded"]')
-                                || document.querySelector('[class*="attachment"]')
-                                || document.querySelector('img[src*="blob:"]');
-                        if (gem) return 'GEM_ATTACHED';
-                        return 'NONE';
-                    })()
-                    """) ?? "NONE";
+                var indicator = await cdp.CheckAttachmentAsync();
 
                 if (indicator != "NONE")
                 {
@@ -103,12 +87,15 @@ internal partial class Program
         Console.WriteLine("[ASK] Synthetic paste failed, trying clipboard + Ctrl+V...");
         try
         {
-            // Set image to clipboard on STA thread
+            // Set image to clipboard on STA thread (backup + restore)
             var clipboardSet = false;
+            System.Windows.Forms.IDataObject? clipBackup = null;
             var staThread = new Thread(() =>
             {
                 try
                 {
+                    // Backup current clipboard contents
+                    try { clipBackup = System.Windows.Forms.Clipboard.GetDataObject(); } catch { }
                     using var img = System.Drawing.Image.FromFile(imagePath);
                     System.Windows.Forms.Clipboard.SetImage(img);
                     clipboardSet = true;
@@ -143,23 +130,46 @@ internal partial class Program
             await Task.Delay(1000);
 
             // Check for attachment
-            var attached = await cdp.EvalAsync("""
-                (() => {
-                    return document.querySelector('[data-testid="file-thumbnail"]')
-                        || document.querySelector('[class*="attachment"]')
-                        || document.querySelector('img[src*="blob:"]')
-                        ? 'YES' : 'NO';
-                })()
-                """) ?? "NO";
-
+            var attached = await cdp.CheckAttachmentAsync();
             Console.WriteLine($"[ASK] Clipboard paste: {attached}");
-            return attached == "YES";
+
+            // Restore original clipboard contents
+            RestoreClipboard(clipBackup);
+
+            return attached != "NONE";
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[ASK] Clipboard paste failed: {ex.Message}");
+            RestoreClipboard(clipBackup);
             return false;
         }
+    }
+
+    /// <summary>Restore clipboard contents from backup (best effort, STA thread).</summary>
+    static void RestoreClipboard(System.Windows.Forms.IDataObject? backup)
+    {
+        if (backup == null) return;
+        try
+        {
+            var t = new Thread(() =>
+            {
+                try
+                {
+                    if (backup.GetDataPresent(System.Windows.Forms.DataFormats.Text))
+                        System.Windows.Forms.Clipboard.SetText(
+                            backup.GetData(System.Windows.Forms.DataFormats.Text) as string ?? "");
+                    else if (backup.GetDataPresent(System.Windows.Forms.DataFormats.Bitmap))
+                        System.Windows.Forms.Clipboard.SetDataObject(backup, true);
+                    Console.WriteLine("[ASK] Clipboard restored");
+                }
+                catch { Console.WriteLine("[ASK] Clipboard restore failed (non-critical)"); }
+            });
+            t.SetApartmentState(ApartmentState.STA);
+            t.Start();
+            t.Join(2000);
+        }
+        catch { }
     }
 
     /// <summary>Wait for image upload to complete (progress indicator gone).</summary>

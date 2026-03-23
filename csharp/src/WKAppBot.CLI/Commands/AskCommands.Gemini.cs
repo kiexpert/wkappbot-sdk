@@ -51,15 +51,7 @@ internal partial class Program
         var sw = Stopwatch.StartNew();
         while (sw.ElapsedMilliseconds < maxWaitMs)
         {
-            var stopVisible = await cdp.EvalAsync("""
-                (() => {
-                    if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="����"]')) return '1';
-                    var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                    if (mat) { var b=mat.closest('button'); if(b&&(b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('stop')) return '1'; }
-                    return '0';
-                })()
-                """) ?? "0";
-            if (stopVisible == "0") return true;
+            if (!await cdp.IsStopButtonVisibleAsync()) return true;
             Console.WriteLine($"[ASK] Gemini generating... waiting ({sw.ElapsedMilliseconds}ms)");
             await Task.Delay(1000);
         }
@@ -69,13 +61,7 @@ internal partial class Program
 
     static async Task<string> GetGeminiLastResponseAsync(CdpClient cdp)
     {
-        return await cdp.EvalAsync("""
-            (() => {
-                var r = document.querySelectorAll('model-response');
-                if (r.length === 0) r = document.querySelectorAll('[role="article"]');
-                return r.length > 0 ? (r[r.length-1].textContent || '') : '';
-            })()
-            """) ?? "";
+        return await cdp.GetLastResponseTextAsync() ?? "";
     }
 
     static async Task<bool> WaitWhileGeminiStopVisibleAsync(CdpClient cdp, int maxWaitMs = 12000)
@@ -308,9 +294,7 @@ internal partial class Program
             while (sw.ElapsedMilliseconds < timeoutMs)
             {
                 await Task.Delay(500);
-                var text = await cdp.EvalAsync(
-                    "(()=>{var r=document.querySelectorAll('model-response');if(!r.length)r=document.querySelectorAll('[role=\"article\"]');return r.length>0?(r[r.length-1].textContent||''):'';})()"
-                ) ?? "";
+                var text = await cdp.GetLastResponseTextAsync() ?? "";
                 text = StripGeminiUiPrefix(text).Trim();
                 if (string.IsNullOrWhiteSpace(text)) continue;
 
@@ -428,11 +412,7 @@ internal partial class Program
                 if (tabState.hidden)
                 {
                     Console.WriteLine("[ASK] Tab hidden ??dispatching visibility events (focusless)...");
-                    await cdp.EvalAsync(
-                        "try{Object.defineProperty(document,'hidden',{get:()=>false,configurable:true});" +
-                        "Object.defineProperty(document,'visibilityState',{get:()=>'visible',configurable:true});" +
-                        "document.dispatchEvent(new Event('visibilitychange'));" +
-                        "window.dispatchEvent(new Event('focus'));}catch(e){}");
+                    await cdp.DispatchVisibilityAsync();
                     await Task.Delay(500);
                 }
 
