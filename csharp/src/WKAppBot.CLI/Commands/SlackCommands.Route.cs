@@ -69,33 +69,9 @@ internal partial class Program
         var textLower = text.ToLowerInvariant();
 
         // ── Determine delivery mode ──
-        // thread: if threadTs is in pending_acks (tracked) OR IsOwnThread (bot posted there)
-        // EXCLUDE: Eye-alive threads (":green_circle: Eye" / "Eye start" / "Eye alive") → prevents relay loop
-        bool isTrackedThread = false;
-        if (!string.IsNullOrEmpty(threadTs))
-        {
-            var pending = LoadPendingAcks();
-            isTrackedThread = pending.ContainsKey(threadTs) || IsOwnThread(botToken, channel, threadTs);
-
-            // Filter out Eye-alive/status threads — but ONLY for bot-to-bot relay (echo prevention).
-            // User replies in Eye-status threads should still be forwarded to Claude.
-            // The echo loop was: bot posts → Claude replies → bot re-routes → loop.
-            // Fix: if the CURRENT message is from a bot (not user), and thread is Eye-status → skip.
-            if (isTrackedThread && string.IsNullOrEmpty(user))
-            {
-                // Bot message in Eye-status thread → skip (prevents echo loop)
-                var starterText = GetThreadStarterText(botToken, channel, threadTs);
-                if (starterText != null && (
-                    starterText.Contains("Eye alive", StringComparison.OrdinalIgnoreCase) ||
-                    starterText.Contains("Eye start", StringComparison.OrdinalIgnoreCase) ||
-                    starterText.Contains(":green_circle:", StringComparison.OrdinalIgnoreCase) ||
-                    starterText.Contains(":large_green_circle:", StringComparison.OrdinalIgnoreCase)))
-                {
-                    Console.WriteLine($"[ROUTE] Skipping bot echo in Eye-status thread");
-                    isTrackedThread = false;
-                }
-            }
-        }
+        // ANY thread reply (threadTs != null) → thread-scoped routing (find owner Claude)
+        // Only non-threaded messages go to catch-all/keyword path
+        bool isTrackedThread = !string.IsNullOrEmpty(threadTs);
         bool isKeyword = !isTrackedThread &&
             SlackRouteKeywords.Any(kw => textLower.Contains(kw, StringComparison.OrdinalIgnoreCase));
 
