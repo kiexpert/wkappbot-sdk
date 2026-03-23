@@ -459,7 +459,97 @@ internal partial class Program
             Console.ResetColor();
             return 1;
         }
+
+        // Validate filename convention: test-{cmd}-{subcmd}-{desc}.{ext}
+        var evidenceName = Path.GetFileNameWithoutExtension(evidenceFile);
+        var evidenceParts = evidenceName.Split('-');
+        if (evidenceParts.Length < 3 || !evidenceParts[0].Equals("test", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  ❌ Evidence filename must follow: test-{{cmd}}-{{subcmd}}-{{description}}.sh");
+            Console.WriteLine($"     Got: {Path.GetFileName(evidenceFile)}");
+            Console.WriteLine($"     Example: test-a11y-wait-condition.sh, test-file-edit-korean.sh");
+            Console.ResetColor();
+            return 1;
+        }
+
         Console.WriteLine($"[RESOLVE] Evidence: {evidenceFile} ({new FileInfo(evidenceFile).Length} bytes)");
+
+        // Verify script content: must contain the command from filename (test-{cmd}-{subcmd}-*)
+        try
+        {
+            var cmd2 = evidenceParts.Length > 1 ? evidenceParts[1] : "";
+            var subcmd2 = evidenceParts.Length > 2 ? evidenceParts[2] : "";
+            var scriptContent = File.ReadAllText(evidenceFile);
+            var expectedCmd = $"{cmd2} {subcmd2}".Trim(); // e.g. "a11y wait", "file edit"
+            if (!string.IsNullOrEmpty(expectedCmd) && !scriptContent.Contains(expectedCmd, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  ❌ Script doesn't contain \"{expectedCmd}\" — filename says test-{cmd2}-{subcmd2} but command not used!");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+        catch { }
+
+        // Run evidence script — must pass (exit 0) to allow resolve
+        var ext = Path.GetExtension(evidenceFile).ToLowerInvariant();
+        var shell = ext switch
+        {
+            ".sh"  => "bash",
+            ".ps1" => "powershell -NoProfile -ExecutionPolicy Bypass -File",
+            ".bat" or ".cmd" => "cmd /c",
+            ".py"  => "python",
+            ".js"  => "node",
+            _ => null
+        };
+        if (shell != null)
+        {
+            Console.WriteLine($"[RESOLVE] Running evidence script ({ext} → {shell.Split(' ')[0]})...");
+            try
+            {
+                var shellParts = shell.Split(' ', 2);
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = shellParts[0],
+                    Arguments = (shellParts.Length > 1 ? shellParts[1] + " " : "") + $"\"{evidenceFile}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                };
+                var proc = System.Diagnostics.Process.Start(psi);
+                var stdout = proc?.StandardOutput.ReadToEnd() ?? "";
+                var stderr = proc?.StandardError.ReadToEnd() ?? "";
+                proc?.WaitForExit(120_000);
+                var exitCode = proc?.ExitCode ?? 1;
+
+                Console.WriteLine(stdout);
+                if (!string.IsNullOrWhiteSpace(stderr)) Console.Error.WriteLine(stderr);
+
+                if (exitCode != 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"  ❌ Evidence script FAILED (exit={exitCode}). Fix the test before resolving!");
+                    Console.ResetColor();
+                    return 1;
+                }
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"  ✅ Evidence script PASSED (exit=0)");
+                Console.ResetColor();
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  ❌ Evidence script execution error: {ex.Message}");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[RESOLVE] Non-executable evidence ({ext}) — skip execution, upload only");
+        }
 
         args = args.Where(a => a != ConfirmFlag && a != evidenceFile).ToArray();
 
@@ -529,6 +619,22 @@ internal partial class Program
         lines.RemoveAt(matchIdx);
         File.WriteAllLines(jsonlPath, lines);
         Console.WriteLine($"[RESOLVE] Moved to history: {note}");
+
+        // Copy evidence to experience DB: experience/tests/{cmd}/{subcmd}/{filename}
+        // Filename convention: test-{cmd}-{subcmd}-{desc}.sh → folder: tests/{cmd}/{subcmd}/
+        try
+        {
+            var parts = Path.GetFileNameWithoutExtension(evidenceFile).Split('-');
+            // parts[0]=test, parts[1]=cmd, parts[2]=subcmd, parts[3..]=desc
+            var cmd = parts.Length > 1 ? parts[1] : "misc";
+            var subcmd = parts.Length > 2 ? parts[2] : "general";
+            var testsDir = Path.Combine(hqDir, "experience", "tests", cmd, subcmd);
+            Directory.CreateDirectory(testsDir);
+            var destPath = Path.Combine(testsDir, Path.GetFileName(evidenceFile));
+            File.Copy(evidenceFile, destPath, overwrite: true);
+            Console.WriteLine($"[RESOLVE] Evidence → experience/tests/{cmd}/{subcmd}/{Path.GetFileName(evidenceFile)}");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[RESOLVE] Evidence copy failed: {ex.Message}"); }
 
         // Slack reply if slack_ts is available — uses shared SlackSendViaApi (same as 'slack reply')
         if (!string.IsNullOrEmpty(slackTs))
