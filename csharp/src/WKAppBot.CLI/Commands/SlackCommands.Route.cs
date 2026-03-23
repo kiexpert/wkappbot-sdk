@@ -111,8 +111,22 @@ internal partial class Program
         }
         else
         {
-            // keyword or catch-all → all prompts
-            targets = allPrompts;
+            // keyword or catch-all → workspace-scoped prompt first, then appbot CWD fallback
+            var scoped = ResolveWorkspaceScopedPrompts(promptHelper);
+            if (scoped.Count > 0)
+            {
+                targets = scoped;
+            }
+            else
+            {
+                // Fallback: find the appbot VS Code prompt (CWD = WKAppBot)
+                var appbotPrompt = allPrompts.FirstOrDefault(p =>
+                    p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
+                    p.HostType is "vscode-claudecode");
+                targets = appbotPrompt != null ? [appbotPrompt] : allPrompts;
+                if (appbotPrompt != null)
+                    Console.WriteLine($"[ROUTE] Fallback → appbot VS Code prompt: 0x{appbotPrompt.WindowHandle:X}");
+            }
             replyTs = threadTs ?? ts;
             if (isKeyword)
             {
