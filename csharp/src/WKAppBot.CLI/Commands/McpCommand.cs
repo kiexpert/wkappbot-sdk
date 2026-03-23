@@ -413,6 +413,14 @@ internal partial class Program
         var arguments = @params?["arguments"] as JsonObject ?? new JsonObject();
         var action = arguments["action"]?.GetValue<string>() ?? "";
 
+        // Extract per-call caller context from _meta (set by EyeMcpClient)
+        var meta = @params?["_meta"] as JsonObject;
+        var metaCwd = meta?["callerCwd"]?.GetValue<string>();
+        var metaHwnd = meta?["callerHwnd"]?.GetValue<string>();
+        if (metaCwd != null) EyeCmdPipeServer.CallerCwd.Value = metaCwd;
+        if (metaHwnd != null && long.TryParse(metaHwnd, System.Globalization.NumberStyles.HexNumber, null, out var hwndVal))
+            EyeCmdPipeServer.CallerHwnd.Value = new IntPtr(hwndVal);
+
         try
         {
             // All MCP calls route through unified "a11y" command
@@ -560,14 +568,7 @@ internal partial class Program
     {
         var argv = GetArgvFromArgs(args);
         if (argv.Length == 0) return ("Error: argv is required and must not be empty", 1);
-
-        // Extract __cwd: prefix (passed by EyeCmdPipeServer for per-call CWD context)
-        while (argv.Length > 0 && argv[0].StartsWith("__cwd:", StringComparison.Ordinal))
-        {
-            EyeCmdPipeServer.CallerCwd.Value = argv[0].Substring("__cwd:".Length);
-            argv = argv[1..];
-        }
-        if (argv.Length == 0) return ("Error: argv empty after prefix strip", 1);
+        // CallerCwd/CallerHwnd already set by RunToolCore from _meta
 
         var cmd = argv[0];
         var rest = argv[1..];
