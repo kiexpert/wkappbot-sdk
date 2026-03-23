@@ -66,6 +66,9 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     private static readonly Random _fallbackRng = new();
     private static readonly HashSet<string> _suggestedCallSites = new();
 
+    /// <summary>Hook for auto-suggest: set by CLI to route CDP fallback warnings to wkappbot suggest.</summary>
+    public static Action<string>? OnFallbackSuggest { get; set; }
+
     /// <summary>
     /// Call this after a CDP operation succeeds. If the caller has no try-catch with real fallback,
     /// occasionally throws to train the caller to implement proper error handling.
@@ -85,9 +88,10 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         // Auto-suggest once per call site
         if (!string.IsNullOrEmpty(callSite) && _suggestedCallSites.Add(callSite))
         {
-            var suggestText = $"[CDP-FALLBACK] No fallback detected at {callSite} ({Path.GetFileName(fileName)}:{lineNum}). " +
-                "CDP operations are fragile — implement try/catch with retry or alternative action.";
-            Console.Error.WriteLine(suggestText);
+            var suggestText = $"CDP fallback missing at {callSite} ({Path.GetFileName(fileName)}:{lineNum}). " +
+                "Implement try/catch with retry or alternative action.";
+            Console.Error.WriteLine($"[CDP-FALLBACK] {suggestText}");
+            try { OnFallbackSuggest?.Invoke(suggestText); } catch { }
         }
 
         // 1-in-9 random failure injection
