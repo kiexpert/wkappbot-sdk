@@ -30,6 +30,9 @@ internal partial class Program
             if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr" or "hack")
             {
                 var delegateArgs = args.Skip(1).ToArray();
+                // ADB check: if first delegate arg is adb:// → route to Android pipeline
+                if (delegateArgs.Length > 0 && Android.AdbGrapRouter.IsAdbGrap(delegateArgs[0]))
+                    return AdbA11yDispatch(args);
                 return maybeAction switch
                 {
                     "inspect"    => InspectCommand(delegateArgs),
