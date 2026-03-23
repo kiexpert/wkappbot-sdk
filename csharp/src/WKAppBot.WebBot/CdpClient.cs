@@ -56,6 +56,48 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     /// <summary>CDP reliability notice — printed once per process.</summary>
     private static int _cdpWarningShown;
 
+    /// <summary>
+    /// CDP fallback training: when a caller catches a CDP exception but has no real fallback
+    /// (empty catch / catch-and-rethrow / catch-and-return-null), inject random failures
+    /// 1-in-9 to force fallback implementation. Callers that DO implement fallback are unaffected.
+    /// Set to false to disable (e.g. in tests).
+    /// </summary>
+    public static bool FallbackTrainingEnabled { get; set; } = true;
+    private static readonly Random _fallbackRng = new();
+    private static readonly HashSet<string> _suggestedCallSites = new();
+
+    /// <summary>
+    /// Call this after a CDP operation succeeds. If the caller has no try-catch with real fallback,
+    /// occasionally throws to train the caller to implement proper error handling.
+    /// shouldProbe: set false if caller has known fallback (e.g. whisper 3-tier cascade).
+    /// </summary>
+    public static void ProbeFallbackReadiness(bool hasFallback = false)
+    {
+        if (!FallbackTrainingEnabled || hasFallback) return;
+
+        // Collect caller info
+        var stack = new System.Diagnostics.StackTrace(1, true);
+        var caller = stack.GetFrame(0);
+        var callSite = $"{caller?.GetMethod()?.DeclaringType?.Name}.{caller?.GetMethod()?.Name}";
+        var fileName = caller?.GetFileName();
+        var lineNum = caller?.GetFileLineNumber();
+
+        // Auto-suggest once per call site
+        if (!string.IsNullOrEmpty(callSite) && _suggestedCallSites.Add(callSite))
+        {
+            var suggestText = $"[CDP-FALLBACK] No fallback detected at {callSite} ({Path.GetFileName(fileName)}:{lineNum}). " +
+                "CDP operations are fragile — implement try/catch with retry or alternative action.";
+            Console.Error.WriteLine(suggestText);
+        }
+
+        // 1-in-9 random failure injection
+        if (_fallbackRng.Next(9) == 0)
+        {
+            Console.Error.WriteLine($"[CDP-TRAINING] Injected failure at {callSite} — implement fallback! (1-in-9 probe)");
+            throw new InvalidOperationException($"[CDP-TRAINING] Simulated CDP failure at {callSite}. Implement retry+fallback to handle real failures.");
+        }
+    }
+
     public async Task ConnectAsync(int port = 9222, int tabIndex = 0, int timeoutMs = 10_000, string? preferredTargetTag = null)
     {
         // One-time warning: CDP operations are inherently fragile
