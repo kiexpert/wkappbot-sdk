@@ -337,13 +337,7 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < 30)
         {
             await Task.Delay(1000);
-            var text = await cdp.EvalAsync(
-                "(() => {" +
-                "var r = document.querySelectorAll('model-response');" +
-                "if (r.length === 0) { var a = document.querySelectorAll('[role=\"article\"]'); r = a.length > 0 ? a : r; }" +
-                "if (r.length === 0) return '';" +
-                "return r[r.length-1].textContent || '';" +
-                "})()") ?? "";
+            var text = await cdp.GetLastResponseTextAsync() ?? "";
             if (string.IsNullOrWhiteSpace(text)) continue;
             if (text == retryText)
             {
@@ -1003,13 +997,7 @@ internal partial class Program
                 while (retrySw.Elapsed.TotalSeconds < 30)
                 {
                     await Task.Delay(1000);
-                    var text = await cdp.EvalAsync(
-                        "(() => {" +
-                        "var r = document.querySelectorAll('model-response');" +
-                        "if (r.length === 0) { var a = document.querySelectorAll('[role=\"article\"]'); r = a.length > 0 ? a : r; }" +
-                        "if (r.length === 0) return '';" +
-                        "return r[r.length-1].textContent || '';" +
-                        "})()") ?? "";
+                    var text = await cdp.GetLastResponseTextAsync() ?? "";
                     if (string.IsNullOrEmpty(text)) continue;
                     if (text == retryText)
                     {
