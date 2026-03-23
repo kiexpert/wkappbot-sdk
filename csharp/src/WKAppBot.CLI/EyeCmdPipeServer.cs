@@ -97,7 +97,7 @@ internal static class EyeCmdPipeServer
             "validate" => false,  // config validation
             "suggest" => false,   // Slack API + file I/O (no UIA)
             "file" => false,      // file read/edit/grep/glob (no UIA)
-            "json-grep" => false, // file json-grep alias (no UIA)
+            // json-grep removed — use "grap ... --json" instead
             "logcat" => false,    // log search (no UIA)
             "web" => false,       // CDP web operations (no UIA)
             "help" or "--help" or "-h" => false,
