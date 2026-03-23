@@ -124,6 +124,7 @@ internal static class EyeMcpClient
         }
         catch (OperationCanceledException)
         {
+            Console.Error.WriteLine($"[TIP] MCP timeout — command may have succeeded. Rerun or check target to confirm.");
             return ($"[EYE-MCP] Timeout after {timeoutMs}ms: {string.Join(" ", argv)}", 1);
         }
         catch (Exception ex)
