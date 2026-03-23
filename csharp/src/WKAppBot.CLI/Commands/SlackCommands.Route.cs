@@ -51,6 +51,8 @@ internal partial class Program
         var retryCount = node["retryCount"]?.GetValue<int>() ?? 0;
         var eyeCwd     = node["eyeCwd"]?.GetValue<string>();
         var eyeBotName = node["botUsername"]?.GetValue<string>();
+        var isReaction = node["isReaction"]?.GetValue<bool>() ?? false;
+        var reaction   = node["reaction"]?.GetValue<string>();
 
         // Set Eye CWD/botUsername for routing functions (they read CallerCwd + BotUsername)
         if (!string.IsNullOrEmpty(eyeCwd))
@@ -78,8 +80,8 @@ internal partial class Program
         var cleanText = Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
         if (string.IsNullOrEmpty(cleanText)) return 0;
 
-        // Noise filter
-        if (SlackRouteNoise.Any(n => cleanText.Equals(n, StringComparison.OrdinalIgnoreCase)))
+        // Noise filter (skip for reactions — they have no user text)
+        if (!isReaction && SlackRouteNoise.Any(n => cleanText.Equals(n, StringComparison.OrdinalIgnoreCase)))
         {
             Console.WriteLine($"[ROUTE] Noise filter — skip: {cleanText}");
             return 0;

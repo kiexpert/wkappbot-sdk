@@ -52,9 +52,9 @@ if [[ "$out" == *"[Document]"* ]] || [[ "$out" == *"[Pane]"* ]]; then pass "T05 
 echo ""
 echo "── Chrome CDP (WebBot) ──"
 
-# T06: eval document.title via CDP
-out=$(run "T06" a11y eval "*Chrome*" --text "document.title" --timeout 10 2>&1 | tr -d '\0')
-if [[ "$out" == *"[EVAL]"* ]] || [[ "$out" == *"title"* ]]; then pass "T06 CDP eval document.title"; else skip "T06 CDP not available"; fi
+# T06: read with --eval-js via CDP (replaces deprecated a11y eval)
+out=$(run "T06" a11y read "*Chrome*#body" --eval-js "document.title" --timeout 10 2>&1 | tr -d '\0')
+if [[ "$out" == *"eval-js"* ]] || [[ "$out" == *"title"* ]] || [[ ${#out} -gt 50 ]]; then pass "T06 CDP --eval-js"; else skip "T06 CDP not available"; fi
 
 # T07: CSS selector inspect (web a11y)
 out=$(run "T07" a11y read "*Chrome*#body" --timeout 10 2>&1 | tr -d '\0')

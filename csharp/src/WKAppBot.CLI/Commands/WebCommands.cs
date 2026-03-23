@@ -531,6 +531,12 @@ Options:
 
     static int WebEvalCommand(string[] args)
     {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Error.WriteLine("[DEPRECATED] 'web eval' will be removed — use a11y action with --eval-js instead.");
+        Console.Error.WriteLine("  a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"");
+        Console.Error.WriteLine("  CDP helpers: GetUrlAsync, GetTitleAsync, FocusAsync, JsClickAsync, QueryCountAsync");
+        Console.ResetColor();
+
         if (args.Length == 0)
             return Error("Usage: wkappbot web eval [tab-pattern] <expression> [--port N] [--tab <pattern>]");
 

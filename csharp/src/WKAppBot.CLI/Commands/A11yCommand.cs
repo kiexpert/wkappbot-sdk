@@ -189,9 +189,9 @@ internal partial class Program
             Console.WriteLine("  a11y click \"Chrome#button.submit\"       CSS → CDP auto-fallback!");
             Console.WriteLine("  a11y type  \"Chrome#input[name=q]\" \"hello\"  CDP type");
             Console.WriteLine("  a11y read  \"Claude#.editor\"             Electron + CDP read");
-            Console.WriteLine("  ⚠ eval: ALWAYS use #tab-hint — grap=\"*Chrome*\" alone hits active tab only!");
-            Console.WriteLine("  a11y eval \"Chrome#share/69ae513a\" \"document.body.innerText\"  URL substring");
-            Console.WriteLine("  a11y eval \"Chrome#chatgpt.com\"   \"document.title\"             domain hint");
+            Console.WriteLine("  --eval-js: run JS before any CDP action (pre-hook)");
+            Console.WriteLine("  a11y click \"Chrome#button[type=submit]\" --eval-js \"document.querySelector('button').disabled=false\"");
+            Console.WriteLine("  a11y read \"Chrome#chatgpt.com\" --eval-js \"document.title\"   JS + read combo");
             Console.WriteLine();
             Console.WriteLine("  grap = Win32#a11y — unified native + web path");
             Console.WriteLine("    Notepad                plain text = UIA Name match");
@@ -228,6 +228,7 @@ internal partial class Program
         string scrollDir = "down";
         string scrollAmount = "small";
         string? nthRaw = null;
+        string? evalJs = null;
         int findDepth = 3;
         int timeoutMs = 10000;
         int intervalMs = 500;
@@ -246,6 +247,7 @@ internal partial class Program
             else if (a == "--depth" && i + 1 < args.Length && int.TryParse(args[i + 1], out var dv)) { findDepth = dv; i++; }
             else if (a == "--timeout" && i + 1 < args.Length && int.TryParse(args[i + 1], out var tv)) { timeoutMs = tv; i++; }
             else if (a == "--interval" && i + 1 < args.Length && int.TryParse(args[i + 1], out var iv)) { intervalMs = iv; i++; }
+            else if (a == "--eval-js" && i + 1 < args.Length) { evalJs = args[++i]; }
         }
 
         // Parse encoding param (for file-read/file-write)
@@ -268,7 +270,7 @@ internal partial class Program
             // -- 옵션의 값으로 소비된 인수 인덱스 제외
             var valueOpts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 { "--text", "--nth", "--n", "--depth", "--timeout", "--interval",
-                  "--value", "--x", "--y", "--w", "--h", "--encoding", "--count" };
+                  "--value", "--x", "--y", "--w", "--h", "--encoding", "--count", "--eval-js" };
             var consumedIdx = new HashSet<int>();
             for (int i = 2; i < args.Length - 1; i++)
                 if (args[i].StartsWith("--") && valueOpts.Contains(args[i]))
@@ -689,13 +691,26 @@ internal partial class Program
 
             if (isElementAction)
             {
+                // ── CDP Tab List: browser target + no #scope + read/inspect → show tabs ──
+                if (string.IsNullOrEmpty(uiaPath) && action is "read" or "find" or "inspect")
+                {
+                    NativeMethods.GetWindowThreadProcessId(hwnd, out uint tabPid);
+                    var tabPort = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)tabPid);
+                    if (tabPort > 0)
+                    {
+                        success = CdpListTabs(tabPort, tag);
+                        if (success) ok++; else fail++;
+                        continue;
+                    }
+                }
+
                 // ── CDP Telepathy: if CSS pattern, try CDP first on ANY browser ──
                 bool isCssPattern = !string.IsNullOrEmpty(uiaPath) && GrapHelper.LooksLikeCssSelector(uiaPath);
 
                 if (isCssPattern)
                 {
                     // Telepathy: try CDP on any process that has a debugging port
-                    var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak, hotkey);
+                    var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak, hotkey, evalJs, timeoutMs, intervalMs);
                     if (cdpResult != null)
                     {
                         success = cdpResult.Value;
@@ -797,7 +812,7 @@ internal partial class Program
                         if (!isCssPattern && !string.IsNullOrEmpty(uiaPath))
                         {
                             Console.WriteLine($"[A11Y] UIA scope failed, trying CDP telepathy with \"{uiaPath}\"");
-                            var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak, hotkey);
+                            var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak, hotkey, evalJs, timeoutMs, intervalMs);
                             if (cdpResult != null)
                             {
                                 success = cdpResult.Value;
@@ -1240,7 +1255,7 @@ internal partial class Program
                     "move" => A11yMove(automation, hwnd, tag, mx!.Value, my!.Value),
                     "resize" => A11yResize(automation, hwnd, tag, mw!.Value, mh!.Value),
                     "focus" => A11yFocus(hwnd, tag),
-                    "eval" => A11yEvalJs(hwnd, tag, text!, uiaPath),
+                    "eval" => DeprecatedEval(hwnd, tag, text!, uiaPath),
                     _ => A11yNotYet(action)
                 };
 
@@ -2206,6 +2221,21 @@ internal partial class Program
 
     // ═══ Eval Action: execute JavaScript via CDP ═══
 
+    /// <summary>Deprecated wrapper — warns about eval removal, suggests --eval-js.</summary>
+    static bool DeprecatedEval(IntPtr hwnd, string tag, string jsExpression, string? tabHint)
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Error.WriteLine("[DEPRECATED] 'a11y eval' will be removed — target is ambiguous.");
+        Console.Error.WriteLine("  Use --eval-js with any a11y action:");
+        Console.Error.WriteLine("    a11y read  \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"");
+        Console.Error.WriteLine("    a11y click \"*Chrome*#gemini.google.com/button.send\" --eval-js \"el.disabled=false\"");
+        Console.Error.WriteLine("  Available CDP helpers (via CdpClient):");
+        Console.Error.WriteLine("    GetUrlAsync, GetTitleAsync, FocusAsync, GetTextLengthAsync,");
+        Console.Error.WriteLine("    IsHiddenAsync, GetTabStateAsync, QueryCountAsync, JsClickAsync");
+        Console.ResetColor();
+        return A11yEvalJs(hwnd, tag, jsExpression, tabHint);
+    }
+
     static bool A11yEvalJs(IntPtr hwnd, string tag, string jsExpression, string? tabHint)
     {
         try
@@ -2257,7 +2287,8 @@ internal partial class Program
     /// Returns true/false on success/failure, or null if CDP is unavailable.
     /// </summary>
     static bool? TryWebViewCdpAction(IntPtr hwnd, string action, string cssSelector,
-        string? text, double? rangeValue, string scrollDir, string scrollAmount, int findDepth, bool speak = false, bool hotkey = false)
+        string? text, double? rangeValue, string scrollDir, string scrollAmount, int findDepth, bool speak = false, bool hotkey = false, string? evalJs = null,
+        int timeoutMs = 10000, int intervalMs = 500)
     {
         try
         {
@@ -2292,6 +2323,28 @@ internal partial class Program
                 }
             }
 
+            // ── Inject shared JS helpers (defA11yRead, defA11yClick, etc.) ──
+            if (!string.IsNullOrEmpty(evalJs))
+                InjectA11yJsHelpers(cdp);
+
+            // ── Pre-action JS: --eval-js runs before AAR (can remove disabled, scroll, etc.) ──
+            // For read/find: --eval-js IS the action (CdpEvalAsRead), so skip pre-hook to avoid double execution
+            if (!string.IsNullOrEmpty(evalJs) && action is not ("read" or "find"))
+            {
+                try
+                {
+                    var jsResult = cdp.EvalAsync(evalJs).GetAwaiter().GetResult();
+                    Console.WriteLine($"[A11Y] --eval-js result: {jsResult}");
+                }
+                catch (Exception jsEx)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Error.WriteLine($"[A11Y] --eval-js FAILED: {jsEx.Message}");
+                    Console.Error.WriteLine($"[A11Y] → fallback: proceeding with '{action}' on \"{cssSelector}\" without pre-hook JS");
+                    Console.ResetColor();
+                }
+            }
+
             // ── AAR: Action-Aware Readiness for CDP ──
             if (action is not ("read" or "find" or "inspect" or "highlight" or "screenshot" or "ocr" or "eval"))
             {
@@ -2319,6 +2372,7 @@ internal partial class Program
                 "type" when hotkey  => CdpHotkey(cdp, text ?? ""),
                 "type" => CdpType(cdp, cssSelector, text ?? ""),
                 "set-value" => CdpSetValue(cdp, cssSelector, text ?? ""),
+                "read" or "find" when !string.IsNullOrEmpty(evalJs) => CdpEvalAsRead(cdp, evalJs, timeoutMs, intervalMs),
                 "read" or "find" => CdpReadElement(cdp, cssSelector),
                 "toggle" => CdpToggle(cdp, cssSelector),
                 "select" => CdpSelect(cdp, cssSelector, text ?? ""),
@@ -2468,6 +2522,135 @@ internal partial class Program
         return true;
     }
 
+    /// <summary>List all CDP tabs for a browser target (when no #scope specified).</summary>
+    static bool CdpListTabs(int port, string tag)
+    {
+        try
+        {
+            using var cdp = new WKAppBot.WebBot.CdpClient();
+            cdp.ConnectAsync(port).GetAwaiter().GetResult();
+            var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
+
+            Console.WriteLine($"[A11Y] {tag} — {tabs.Count} tab(s):");
+            for (int i = 0; i < tabs.Count; i++)
+            {
+                var t = tabs[i];
+                var active = t.Id == cdp.TargetId ? " ★" : "";
+                Console.WriteLine($"  [{i + 1}] {t.Title[..Math.Min(t.Title.Length, 60)]}{active}");
+                Console.WriteLine($"      {t.Url[..Math.Min(t.Url.Length, 80)]}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("[A11Y] Use #tab-hint to target a specific tab:");
+            Console.WriteLine($"  a11y read \"{tag}#chatgpt.com\" --eval-js \"document.title\"");
+            return tabs.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] CDP tab list error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>Inject shared a11y JS helpers into the page (idempotent).</summary>
+    static void InjectA11yJsHelpers(WKAppBot.WebBot.CdpClient cdp)
+    {
+        try
+        {
+            cdp.EvalAsync("""
+                if (!window.__a11y) {
+                    window.__a11y = {
+                        _editorSel: ['[contenteditable="true"]','textarea:not([readonly])','input[type="text"]:not([readonly])','[role="textbox"]','.ql-editor'],
+                        _btnSel: ['button[type="submit"]','button[aria-label*="Send"]','button[aria-label*="send"]','button[data-testid*="send"]','button.send-button','form button:last-of-type','button[aria-label*="확인"]']
+                    };
+                    window.defA11yRead = () => JSON.stringify({title:document.title,url:location.href,ready:document.readyState,hidden:document.hidden,text:(document.body?.innerText||'').substring(0,500)});
+                    window.defA11yClick = () => { for(const s of __a11y._btnSel){const e=document.querySelector(s);if(e&&!e.disabled&&e.offsetParent!==null){e.click();return 'clicked:'+s}} return 'NOT_FOUND' };
+                    window.defA11yFocus = () => { for(const s of __a11y._editorSel){const e=document.querySelector(s);if(e&&e.offsetParent!==null){e.focus();return 'focused:'+s}} return 'NOT_FOUND' };
+                    window.defA11yEditor = () => { for(const s of __a11y._editorSel){const e=document.querySelector(s);if(e&&e.offsetParent!==null)return e.textContent?.trim()||''} return '' };
+                    window.defA11yHidden = () => document.hidden;
+                    window.defA11yReady = () => document.readyState;
+                }
+                """).GetAwaiter().GetResult();
+        }
+        catch { /* best effort — helpers unavailable won't break eval-js */ }
+    }
+
+    /// <summary>
+    /// read + --eval-js: JS expression result becomes the read output.
+    /// Waits for readyState=complete, then polls until result stabilizes (streaming-safe).
+    /// </summary>
+    static bool CdpEvalAsRead(WKAppBot.WebBot.CdpClient cdp, string jsExpression, int timeoutMs = 10000, int intervalMs = 500)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // Phase 1: Wait for page ready (readyState = complete)
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            var state = cdp.EvalAsync("document.readyState").GetAwaiter().GetResult();
+            if (state is "complete" or "interactive") break;
+            Console.WriteLine($"[A11Y] read --eval-js: waiting for page load (readyState={state})...");
+            Thread.Sleep(Math.Min(intervalMs, 300));
+        }
+
+        // Phase 2: Eval + stabilize (detect streaming completion)
+        string? lastResult = null;
+        int stableCount = 0;
+        const int stableThreshold = 2; // N consecutive identical results = stable
+
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            string? result;
+            try { result = cdp.EvalAsync(jsExpression).GetAwaiter().GetResult(); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[A11Y] read --eval-js error: {ex.Message}");
+                Thread.Sleep(intervalMs);
+                continue;
+            }
+
+            if (result == lastResult)
+            {
+                stableCount++;
+                if (stableCount >= stableThreshold)
+                {
+                    // Result stabilized — done
+                    Console.WriteLine($"[A11Y] read --eval-js: {result}");
+                    return result != null;
+                }
+            }
+            else
+            {
+                // First eval or result changed (streaming in progress)
+                if (lastResult == null)
+                {
+                    // First eval — if not waiting for stability, return immediately
+                    // (when interval is default 500ms, just return first result for speed)
+                    if (intervalMs >= 500 && timeoutMs <= 10000)
+                    {
+                        Console.WriteLine($"[A11Y] read --eval-js: {result}");
+                        return result != null;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[A11Y] read --eval-js: streaming... ({result?.Length ?? 0} chars)");
+                }
+                lastResult = result;
+                stableCount = 1;
+            }
+            Thread.Sleep(intervalMs);
+        }
+
+        // Timeout — return last result
+        if (lastResult != null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine($"[A11Y] read --eval-js: timeout {timeoutMs}ms, returning last result");
+            Console.ResetColor();
+        }
+        Console.WriteLine($"[A11Y] read --eval-js: {lastResult}");
+        return lastResult != null;
+    }
+
     static bool CdpReadElement(WKAppBot.WebBot.CdpClient cdp, string selector)
     {
         var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
@@ -2479,7 +2662,14 @@ internal partial class Program
 
         if (result == "NOT_FOUND")
         {
-            Console.Error.WriteLine($"[A11Y] CDP element not found: {selector}");
+            // Fallback: selector is domain hint, not CSS — read page summary instead
+            Console.WriteLine($"[A11Y] CDP element not found: {selector} — falling back to page read");
+            var page = cdp.ReadPageAsync().GetAwaiter().GetResult();
+            if (!string.IsNullOrEmpty(page))
+            {
+                Console.WriteLine($"[A11Y] CDP page: {page}");
+                return true;
+            }
             return false;
         }
         Console.WriteLine($"[A11Y] CDP read: {result}");
@@ -2488,8 +2678,7 @@ internal partial class Program
 
     static bool CdpToggle(WKAppBot.WebBot.CdpClient cdp, string selector)
     {
-        var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
-        cdp.EvalAsync($"(() => {{ var el = document.querySelector('{escaped}'); if(!el) return; el.click(); }})()").GetAwaiter().GetResult();
+        cdp.JsClickAsync(selector).GetAwaiter().GetResult();
         return true;
     }
 
@@ -2502,8 +2691,7 @@ internal partial class Program
     static bool CdpEvalAction(WKAppBot.WebBot.CdpClient cdp, string selector, string action)
     {
         Console.Error.WriteLine($"[A11Y] CDP action '{action}' not directly supported, trying JS click");
-        var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
-        cdp.EvalAsync($"document.querySelector('{escaped}')?.click()").GetAwaiter().GetResult();
+        cdp.JsClickAsync(selector).GetAwaiter().GetResult();
         return true;
     }
 

@@ -304,6 +304,14 @@ public sealed partial class CdpClient
         return await EvalAsync(js);
     }
 
+    /// <summary>Get trimmed text length of an element (0 if not found).</summary>
+    public async Task<int> GetTextLengthAsync(string selector)
+    {
+        var escaped = selector.Replace("'", "\\'");
+        var result = await EvalAsync($"document.querySelector('{escaped}')?.textContent?.trim()?.length ?? 0") ?? "0";
+        return int.TryParse(result, out var len) ? len : 0;
+    }
+
     /// <summary>Get value of a form element by CSS selector.</summary>
     public async Task<string?> GetValueAsync(string selector)
     {
@@ -381,6 +389,135 @@ public sealed partial class CdpClient
     public async Task<string?> GetTitleAsync()
     {
         return await EvalAsync("document.title");
+    }
+
+    /// <summary>Default page read — returns structured page summary (title, url, readyState, text snippet).</summary>
+    public async Task<string?> ReadPageAsync()
+    {
+        return await EvalAsync("""
+            JSON.stringify({
+                title: document.title,
+                url: location.href,
+                readyState: document.readyState,
+                hidden: document.hidden,
+                text: (document.body?.innerText || '').substring(0, 500)
+            })
+            """);
+    }
+
+    /// <summary>Default click — finds the most likely interactive button (send/submit/confirm).</summary>
+    public async Task<string?> DefaultClickAsync()
+    {
+        return await EvalAsync("""
+            (() => {
+                const selectors = [
+                    'button[type="submit"]',
+                    'button[aria-label*="Send"]', 'button[aria-label*="send"]',
+                    'button[aria-label*="Submit"]', 'button[data-testid*="send"]',
+                    'button.send-button', 'button.submit',
+                    'form button:last-of-type',
+                    'button[aria-label*="확인"]', 'button[aria-label*="허용"]'
+                ];
+                for (const s of selectors) {
+                    const el = document.querySelector(s);
+                    if (el && !el.disabled && el.offsetParent !== null) {
+                        el.click();
+                        return 'clicked:' + s + '=' + (el.textContent||'').trim().substring(0,30);
+                    }
+                }
+                return 'NOT_FOUND';
+            })()
+            """);
+    }
+
+    /// <summary>Default type — finds the most likely editor/input and types text.</summary>
+    public async Task<string?> DefaultTypeAsync(string text)
+    {
+        var escaped = text.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n");
+        var js = "(() => {" +
+            "const selectors = ['[contenteditable=\"true\"]','textarea:not([readonly])'," +
+            "'input[type=\"text\"]:not([readonly])','input:not([type]):not([readonly])'," +
+            "'[role=\"textbox\"]','.editor','.ql-editor'];" +
+            "for (const s of selectors) {" +
+            "const el = document.querySelector(s);" +
+            "if (el && el.offsetParent !== null) {" +
+            "el.focus();" +
+            "if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {" +
+            $"el.value = '{escaped}'; el.dispatchEvent(new Event('input', {{bubbles:true}}));" +
+            "} else {" +
+            $"el.textContent = '{escaped}'; el.dispatchEvent(new Event('input', {{bubbles:true}}));" +
+            "}" +
+            "return 'typed:' + s;" +
+            "}}" +
+            "return 'NOT_FOUND';})()";
+        return await EvalAsync(js);
+    }
+
+    /// <summary>Default focus — finds the most likely editor/input and focuses it.</summary>
+    public async Task<string?> DefaultFocusAsync()
+    {
+        return await EvalAsync("""
+            (() => {
+                const selectors = [
+                    '[contenteditable="true"]', 'textarea:not([readonly])',
+                    'input[type="text"]:not([readonly])', '[role="textbox"]'
+                ];
+                for (const s of selectors) {
+                    const el = document.querySelector(s);
+                    if (el && el.offsetParent !== null) { el.focus(); return 'focused:' + s; }
+                }
+                return 'NOT_FOUND';
+            })()
+            """);
+    }
+
+    /// <summary>Focus a DOM element by CSS selector.</summary>
+    public async Task FocusAsync(string selector)
+    {
+        var escaped = selector.Replace("'", "\\'");
+        await EvalAsync($"document.querySelector('{escaped}')?.focus()");
+    }
+
+    /// <summary>Check if the tab is hidden (iconified/backgrounded).</summary>
+    public async Task<bool> IsHiddenAsync()
+    {
+        var result = await EvalAsync("document.hidden.toString()");
+        return result == "true";
+    }
+
+    /// <summary>Get tab state snapshot: hidden, title, DOM element count.</summary>
+    public async Task<(bool hidden, string title, int elementCount)> GetTabStateAsync()
+    {
+        var result = await EvalAsync("document.hidden + '|' + document.title + '|' + document.querySelectorAll('*').length") ?? "true||0";
+        var parts = result.Split('|', 3);
+        return (
+            parts[0] == "true",
+            parts.Length > 1 ? parts[1] : "",
+            parts.Length > 2 && int.TryParse(parts[2], out var c) ? c : 0
+        );
+    }
+
+    /// <summary>Count DOM elements matching a CSS selector.</summary>
+    public async Task<int> QueryCountAsync(string selector)
+    {
+        var escaped = selector.Replace("'", "\\'");
+        var result = await EvalAsync($"document.querySelectorAll('{escaped}').length.toString()") ?? "0";
+        return int.TryParse(result, out var n) ? n : 0;
+    }
+
+    /// <summary>Count AI response turns (Gemini model-response OR article role elements).</summary>
+    public async Task<int> GetResponseCountAsync()
+    {
+        var result = await EvalAsync(
+            "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+        return int.TryParse(result, out var n) ? n : 0;
+    }
+
+    /// <summary>Click an element via JS (no mouse events — works when iconified).</summary>
+    public async Task JsClickAsync(string selector)
+    {
+        var escaped = selector.Replace("'", "\\'");
+        await EvalAsync($"document.querySelector('{escaped}')?.click()");
     }
 
     /// <summary>

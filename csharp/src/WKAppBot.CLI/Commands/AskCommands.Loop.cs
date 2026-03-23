@@ -587,7 +587,7 @@ internal partial class Program
     static async Task<(bool ok, string? text)> ClaudeSendAndWaitAsync(CdpClient cdp, string message, int timeoutSec)
     {
         // Guard: verify tab is still on claude.ai (web search subprocess might have navigated away)
-        var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+        var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("claude.ai", StringComparison.OrdinalIgnoreCase))
         {
             Console.WriteLine($"[ASK:LOOP] Claude tab drifted to {currentUrl} — navigating back to claude.ai");
@@ -599,8 +599,7 @@ internal partial class Program
         if (editorSel == null)
             return (false, null);
 
-        var baseCountStr = await cdp.EvalAsync("document.querySelectorAll('[data-is-streaming]').length.toString()") ?? "0";
-        int baseCount = int.TryParse(baseCountStr, out var bc) ? bc : 0;
+        int baseCount = await cdp.QueryCountAsync("[data-is-streaming]");
 
         using var loopLock = ChromeTabLock.Acquire("Claude/loop");
         if (loopLock == null)
@@ -626,7 +625,7 @@ internal partial class Program
 
         if (clickResult != "CLICKED")
         {
-            await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.focus()");
+            await cdp.FocusAsync(editorSel);
             await Task.Delay(80);
             await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
             {
@@ -709,7 +708,7 @@ internal partial class Program
     static async Task<(bool ok, string? text)> GeminiSendAndWaitAsync(CdpClient cdp, string message, int timeoutSec)
     {
         // Guard: verify tab is still on gemini.google.com
-        var currentUrl = await cdp.EvalAsync("location.href") ?? "";
+        var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("gemini.google.com", StringComparison.OrdinalIgnoreCase))
         {
             Console.WriteLine($"[ASK:LOOP] Gemini tab drifted to {currentUrl} — navigating back");
@@ -731,8 +730,7 @@ internal partial class Program
         if (loopLock == null)
             return (false, null);
 
-        var baseCountStr = await cdp.EvalAsync(
-            "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+        var baseCountStr = (await cdp.GetResponseCountAsync()).ToString();
         int baseCount = int.TryParse(baseCountStr, out var b) ? b : 0;
 
         await ClearContentEditable(cdp, editorSel);
@@ -744,7 +742,7 @@ internal partial class Program
         var sendResult = "PENDING";
         for (int sendAttempt = 0; sendAttempt < 5; sendAttempt++)
         {
-            var remaining = await cdp.EvalAsync($"document.querySelector(\"{editorSel}\")?.textContent?.trim()?.length ?? 0") ?? "0";
+            var remaining = (await cdp.GetTextLengthAsync(editorSel)).ToString();
             if (remaining == "0" && sendAttempt > 0)
             {
                 sendResult = $"SENT(attempt={sendAttempt})";
@@ -753,8 +751,7 @@ internal partial class Program
 
             if (sendAttempt > 0)
             {
-                var curResponses = await cdp.EvalAsync(
-                    "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
+                var curResponses = (await cdp.GetResponseCountAsync()).ToString();
                 if (curResponses != baseCountStr)
                 {
                     sendResult = $"RESPONSE_STARTED(attempt={sendAttempt})";

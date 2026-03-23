@@ -219,9 +219,9 @@ wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령
   # type --hotkey: focusless label/menu dispatch (Experience DB → live scan → UIA AccessKey → CDP)
   #   메뉴경로: "파일/저장" (slash syntax), grap 패턴: "*저장*", 커버리지최고 자동선택
   #   실패 시 중단 (순수 타이핑 폴백 없음)
-  # Async (2): wait(--timeout --interval), eval(--text "js")
+  # Async (2): wait(--timeout --interval), eval(--text "js") [DEPRECATED → use --eval-js]
   # Utility (3): clipboard, clipboard-read, clipboard-write
-  # --all, --nth N, --depth N, --force, --force-close-ancestors, --timeout N, --speak
+  # --all, --nth N, --depth N, --force, --force-close-ancestors, --timeout N, --speak, --eval-js "js"
   # Web auto-fallback: Chrome/Electron → CSS selector 자동감지 → CDP 엔진
   # adb:// scheme: Android ADB USB 디바이스 제어 (30 actions)
 wkappbot a11y kill <pattern>[/<ancestor>] [--allow-ancestors]  # 프로세스 킬

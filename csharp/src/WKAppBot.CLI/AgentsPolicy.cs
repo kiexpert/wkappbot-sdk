@@ -126,13 +126,13 @@ DURATION FORMAT (--timeout, --for): 30=30s, 2m, 500ms, 1.1s, 2h
   wkappbot a11y inspect "*App*" --depth 5
   wkappbot a11y invoke "*App*#*OK*"
   wkappbot a11y type "*App*#*Input*" --text "hello"
-  wkappbot a11y eval "*Chrome*#chatgpt.com" --text "document.title"
+  wkappbot a11y read "*Chrome*#chatgpt.com" --eval-js "document.title"
   wkappbot a11y file-read "src/legacy.cpp" --encoding 949
   wkappbot file grep "class Foo" --path W:/GitHub/MyProject --type cs
   wkappbot web search "WKAppBot MCP setup"
   wkappbot ask gpt "Problem: button not found. Goal: click OK. Best approach?"
 
-⚠ eval ALWAYS needs #tab-hint — bare "*Chrome*" = active tab only
+⚠ --eval-js needs #tab-hint — bare "*Chrome*" = active tab only (eval is deprecated)
 ⚠ close "*Chrome*" without #hint → shows tab list (safety guard)
 ⚠ wkappbot_cli = MCP tool name only — not a CLI command
 """;
