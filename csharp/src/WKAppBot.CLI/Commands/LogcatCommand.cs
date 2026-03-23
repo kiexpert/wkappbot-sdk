@@ -35,6 +35,7 @@ internal partial class Program
         bool countOnly = false;    // -c: count per file
         int maxCount = int.MaxValue; // -m N: max matches per file
         bool showLineNums = false; // -n: prepend line numbers
+        bool jsonMode = false;    // --json: structural JSON key+value matching
         // Case: grap/grep default = case-sensitive (grep compat); logcat default = insensitive
         bool ignoreCase = !GrapMode;
 
@@ -66,6 +67,7 @@ internal partial class Program
             else if (a is "-i" or "--ignore-case")           { ignoreCase = true; }
             else if (a is "--case-sensitive" or "--no-ignore-case") { ignoreCase = false; }
             else if (a is "-n" or "--line-number")           { showLineNums = true; }
+            else if (a is "--json")                            { jsonMode = true; }
             else if (a == "--timeout" && i + 1 < args.Length) { timeoutSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--timeout=")) { timeoutSeconds = ParsePastDuration(a[10..]); }
             else { positional.Add(a); }
@@ -115,7 +117,44 @@ internal partial class Program
         if (contextLines > 0) { afterLines = contextLines; beforeLines = contextLines; }
 
         Regex? msgRegex = null;
-        if (!string.IsNullOrWhiteSpace(messageFilterArg) && messageFilterArg != "*")
+        Func<string, bool>? jsonMatchFn = null;
+
+        if (jsonMode && !string.IsNullOrWhiteSpace(messageFilterArg))
+        {
+            // --json: parse structural pattern or simple keyword
+            var rxOpts = ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None;
+            var pat = messageFilterArg.Trim();
+            if (pat.StartsWith("{") && pat.EndsWith("}"))
+            {
+                // Structural: { "key": "val" } → key+value regex AND matching
+                var kvPatterns = new List<(Regex keyRx, Regex valRx)>();
+                var inner = pat[1..^1].Trim();
+                foreach (var pair in SplitJsonPatternPairs(inner))
+                {
+                    var colonIdx = pair.IndexOf(':');
+                    if (colonIdx < 0) continue;
+                    var keyPart = pair[..colonIdx].Trim().Trim('"');
+                    var valPart = pair[(colonIdx + 1)..].Trim().Trim('"');
+                    kvPatterns.Add((new Regex(keyPart, rxOpts), new Regex(valPart, rxOpts)));
+                }
+                jsonMatchFn = line =>
+                {
+                    try
+                    {
+                        var node = System.Text.Json.Nodes.JsonNode.Parse(line);
+                        return node is System.Text.Json.Nodes.JsonObject obj && MatchJsonObject(obj, kvPatterns);
+                    }
+                    catch { return false; }
+                };
+            }
+            else
+            {
+                // Simple keyword in JSON values
+                var rx = new Regex(pat, rxOpts | RegexOptions.Compiled);
+                jsonMatchFn = line => rx.IsMatch(line);
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(messageFilterArg) && messageFilterArg != "*")
         {
             // ';' = grap-style OR separator → convert to regex '|'
             var rxPat = messageFilterArg.Contains(';')
@@ -124,6 +163,9 @@ internal partial class Program
             var rxOpts = RegexOptions.Compiled | (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None);
             msgRegex = new Regex(rxPat, rxOpts);
         }
+
+        // Set JSON match function for EmitDeltaLines (thread-static, safe for parallel)
+        _jsonMatchFn = jsonMatchFn;
 
         // Build watch directories: default = CWD (or --basedir)
         var baseDir = baseDirOverride ?? Environment.CurrentDirectory;
@@ -410,6 +452,9 @@ internal partial class Program
 
     const int MaxLineLengthForEmit = 32_768; // 32 KB — guard against binary files with no newlines
 
+    /// <summary>JSON match function — set by LogcatCommand when --json is active. Thread-static for safety.</summary>
+    [ThreadStatic] static Func<string, bool>? _jsonMatchFn;
+
     static void EmitDeltaLines(
         string path,
         Dictionary<string, long> offsets,
@@ -439,7 +484,7 @@ internal partial class Program
         long emitted = lineCounts.TryGetValue(path, out var lc) ? lc : 0;
 
         // No filter: tail-preview mode — path + last 7 non-empty lines
-        if (msgRegex == null && !invertMatch)
+        if (msgRegex == null && _jsonMatchFn == null && !invertMatch)
         {
             var tail = new Queue<string>(8);
             while (!sr.EndOfStream)
@@ -480,10 +525,13 @@ internal partial class Program
             if (!string.IsNullOrWhiteSpace(line)) { buf.Add(line); lineNums.Add(lineNum); }
         }
 
+        // Match helper: supports both regex and JSON mode
+        bool LineMatches(string l) => _jsonMatchFn != null ? _jsonMatchFn(l) : (msgRegex != null && msgRegex.IsMatch(l));
+
         // -l: filenames only
         if (filesOnly)
         {
-            bool any = buf.Any(l => msgRegex == null ? !invertMatch : msgRegex.IsMatch(l) != invertMatch);
+            bool any = buf.Any(l => msgRegex == null && _jsonMatchFn == null ? !invertMatch : LineMatches(l) != invertMatch);
             if (any) (grepOut ?? Console.Out).WriteLine(path);
             offsets[path] = fs.Length; lineCounts[path] = any ? emitted + 1 : emitted;
             return;
@@ -493,7 +541,7 @@ internal partial class Program
         int matchCount = 0;
         if (countOnly)
         {
-            matchCount = buf.Count(l => msgRegex == null ? !invertMatch : msgRegex.IsMatch(l) != invertMatch);
+            matchCount = buf.Count(l => msgRegex == null && _jsonMatchFn == null ? !invertMatch : LineMatches(l) != invertMatch);
             // Always output count (even 0) when showFilename; grep outputs "file:count"
             var countOut = grepOut ?? Console.Out;
             if (showFilename) countOut.WriteLine($"{path}:{matchCount}");
@@ -512,7 +560,7 @@ internal partial class Program
         int printUntil = -1;
         for (int i = 0; i < buf.Count && emitted < maxCount; i++)
         {
-            bool matched = msgRegex == null ? true : msgRegex.IsMatch(buf[i]);
+            bool matched = msgRegex == null && _jsonMatchFn == null ? true : LineMatches(buf[i]);
             if (matched == invertMatch) continue; // -v: flip
 
             emitted++;
