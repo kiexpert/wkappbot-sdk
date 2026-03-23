@@ -318,8 +318,8 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     /// <summary>Handle events_api envelope.</summary>
     private void HandleEventsApi(JsonNode envelope)
     {
-        // Must acknowledge within 3 seconds
-        AcknowledgeEnvelope(envelope);
+        // Must acknowledge within 3 seconds — returns false if duplicate
+        if (!AcknowledgeEnvelope(envelope)) return;
 
         var payload = envelope["payload"];
         var eventNode = payload?["event"];
@@ -376,16 +376,18 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             BotId = botId
         };
 
+        // Dispatch events in background — prevents blocking the receive loop
+        // (handlers can take 30s+ for route spawn/MCP calls; ACK must happen within 3s)
         switch (eventType)
         {
             case "app_mention":
                 Console.WriteLine($"[SLACK] @mention from {user} in {channel}: {text}");
-                OnMention?.Invoke(msg);
+                _ = Task.Run(() => { try { OnMention?.Invoke(msg); } catch (Exception ex) { Console.Error.WriteLine($"[SLACK] OnMention error: {ex.Message}"); } });
                 break;
 
             case "message":
                 Console.WriteLine($"[SLACK] Message from {user} in {channel}: {text}");
-                OnMessage?.Invoke(msg);
+                _ = Task.Run(() => { try { OnMessage?.Invoke(msg); } catch (Exception ex) { Console.Error.WriteLine($"[SLACK] OnMessage error: {ex.Message}"); } });
                 break;
         }
     }
@@ -393,8 +395,8 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     /// <summary>Handle interactive envelope (Block Kit button clicks, etc.).</summary>
     private void HandleInteractive(JsonNode envelope)
     {
-        // Must acknowledge within 3 seconds
-        AcknowledgeEnvelope(envelope);
+        // Must acknowledge within 3 seconds — returns false if duplicate
+        if (!AcknowledgeEnvelope(envelope)) return;
 
         var payload = envelope["payload"];
         if (payload == null) return;
@@ -432,11 +434,28 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         }
     }
 
-    /// <summary>Acknowledge an envelope (required within 3s).</summary>
-    private void AcknowledgeEnvelope(JsonNode envelope)
+    /// <summary>Envelope IDs already acked — prevents duplicate processing on Slack retransmit.</summary>
+    private readonly HashSet<string> _ackedEnvelopes = new();
+    private readonly object _ackLock = new();
+
+    /// <summary>Acknowledge an envelope (required within 3s). Returns false if already acked (duplicate).</summary>
+    private bool AcknowledgeEnvelope(JsonNode envelope)
     {
         var envelopeId = envelope["envelope_id"]?.GetValue<string>();
-        if (envelopeId == null) return;
+        if (envelopeId == null) return false;
+
+        // Dedup: skip if already acked (Slack retransmit)
+        lock (_ackLock)
+        {
+            if (!_ackedEnvelopes.Add(envelopeId))
+            {
+                Console.WriteLine($"[SLACK] ACK DEDUP — already acked envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
+                return false;
+            }
+            // Keep set bounded (max 500 entries)
+            if (_ackedEnvelopes.Count > 500)
+                _ackedEnvelopes.Clear();
+        }
 
         var ack = JsonSerializer.Serialize(new { envelope_id = envelopeId });
         var bytes = Encoding.UTF8.GetBytes(ack);
@@ -444,18 +463,24 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         if (_ws == null || _ws.State != WebSocketState.Open)
         {
             Console.Error.WriteLine($"[SLACK] ACK FAILED — ws={_ws?.State} envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
-            return;
+            return true; // still return true — event is new, just can't ack
         }
 
-        try
+        for (int retry = 0; retry < 2; retry++)
         {
-            _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None)
-                .GetAwaiter().GetResult();
+            try
+            {
+                _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None)
+                    .GetAwaiter().GetResult();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[SLACK] ACK ERROR (attempt {retry + 1}/2) — {ex.Message} envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
+                if (retry == 0) Thread.Sleep(100); // brief retry delay
+            }
         }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[SLACK] ACK ERROR — {ex.Message} envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
-        }
+        return true; // event is new even if ack failed
     }
 
     /// <summary>Reconnect by closing current WebSocket and opening a new one.
