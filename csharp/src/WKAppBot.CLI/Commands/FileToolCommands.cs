@@ -997,6 +997,7 @@ Examples:
         int? encoding = null;
         int context = 1; // extra lines beyond indent boundary (--context N)
         int tabSize = 4; // tab width for indent tracking (--tab-size N)
+        int indentContext = 7; // max lines per indent block direction (--indent-context N, default 7)
 
         string? oldFile = null, newFile = null;
 
@@ -1009,6 +1010,7 @@ Examples:
             if (args[i] == "--encoding" && i + 1 < args.Length) { encoding = int.Parse(args[++i]); continue; }
             if (args[i] == "--context"  && i + 1 < args.Length) { int.TryParse(args[++i], out context); continue; }
             if (args[i] == "--tab-size" && i + 1 < args.Length) { int.TryParse(args[++i], out tabSize); if (tabSize < 1) tabSize = 4; continue; }
+            if (args[i] == "--indent-context" && i + 1 < args.Length) { int.TryParse(args[++i], out indentContext); if (indentContext < 1) indentContext = 7; continue; }
             // --old-file/--new-file: read old/new strings from file (avoids bash Korean encoding issues)
             if (args[i] == "--old-file" && i + 1 < args.Length) { oldFile = args[++i]; continue; }
             if (args[i] == "--new-file" && i + 1 < args.Length) { newFile = args[++i]; continue; }
@@ -1073,7 +1075,7 @@ Examples:
         int totalEdited = 0;
         foreach (var plan in pending)
         {
-            if (FileEditWrite(plan, backup, context, multi, tabSize) == 0) totalEdited++;
+            if (FileEditWrite(plan, backup, context, multi, tabSize, indentContext) == 0) totalEdited++;
         }
 
         if (multi) Console.WriteLine($"[file edit] {totalEdited}/{paths.Count} file(s) edited");
@@ -1147,7 +1149,7 @@ Examples:
     }
 
     /// <summary>Write a validated plan to disk (backup + write + print context). Returns 0 on success.</summary>
-    static int FileEditWrite(FileEditPlan plan, bool backup, int context, bool multi, int tabSize = 4)
+    static int FileEditWrite(FileEditPlan plan, bool backup, int context, bool multi, int tabSize = 4, int indentContext = 7)
     {
         if (plan.HasUnmappable)
             ErrOut($"[file edit] WARNING(--i-really-want-lossy-encoding): character(s) replaced with '?' in {plan.Enc.WebName} — data loss accepted");
@@ -1217,24 +1219,28 @@ Examples:
                 // Find indent level of the match line
                 int matchIndent = GetLineIndent(resultLines, tabSize, start);
 
-                // Expand upward: while indent >= matchIndent
+                // Expand upward: while indent >= matchIndent (capped by --indent-context)
                 int top = start;
-                while (top > 0)
+                int upCount = 0;
+                while (top > 0 && upCount < indentContext)
                 {
                     var line = resultLines[top - 1];
                     if (line.Trim().Length > 0 && GetLineIndent(resultLines, tabSize, top - 1) < matchIndent)
                         break;
                     top--;
+                    if (line.Trim().Length > 0) upCount++;
                 }
 
-                // Expand downward: while indent >= matchIndent
+                // Expand downward: while indent >= matchIndent (capped by --indent-context)
                 int bot = end;
-                while (bot < resultLines.Length - 1)
+                int downCount = 0;
+                while (bot < resultLines.Length - 1 && downCount < indentContext)
                 {
                     var line = resultLines[bot + 1];
                     if (line.Trim().Length > 0 && GetLineIndent(resultLines, tabSize, bot + 1) < matchIndent)
                         break;
                     bot++;
+                    if (line.Trim().Length > 0) downCount++;
                 }
 
                 // Add N extra lines beyond indent boundary
@@ -1246,13 +1252,40 @@ Examples:
             }
 
             var changedSet = new HashSet<int>(changedRanges.SelectMany(r => Enumerable.Range(r.start, r.end - r.start + 1)));
+            // Build old lines for "before" display (← marker)
+            var origLines = plan.OrigText.ReplaceLineEndings("\n").Split('\n');
+            var oldLineRanges = new List<(int origStart, int origEnd)>();
+            {
+                var olc = plan.OldStr.Split('\n').Length - 1;
+                foreach (var mpos in plan.MatchPositions)
+                {
+                    int origLine = plan.OrigText[..mpos].Count(c => c == '\n');
+                    oldLineRanges.Add((origLine, origLine + olc));
+                }
+            }
+
             int? prev = null;
+            int rangeIdx = 0;
+            int lineShiftAccum = 0;
             foreach (var li in toShow)
             {
                 // Skip empty lines (waste of tokens, annoys AI agents)
                 if (resultLines[li].Trim().Length == 0) continue;
                 if (prev.HasValue && li > prev + 1) Console.WriteLine("   ...");
                 bool changed = changedSet.Contains(li);
+
+                // Show old lines (← marker) before the first changed line of each range
+                if (changed && rangeIdx < changedRanges.Count && li == changedRanges[rangeIdx].start)
+                {
+                    var (origStart, origEnd) = oldLineRanges[rangeIdx];
+                    for (int oi = origStart; oi <= origEnd && oi < origLines.Length; oi++)
+                    {
+                        if (origLines[oi].Trim().Length > 0)
+                            Console.WriteLine($"← {oi + 1,5}│ {origLines[oi]}");
+                    }
+                    rangeIdx++;
+                }
+
                 Console.WriteLine($"{(changed ? "→" : " ")} {li + 1,5}│ {resultLines[li]}");
                 prev = li;
             }
