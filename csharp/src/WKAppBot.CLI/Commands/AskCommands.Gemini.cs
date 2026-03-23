@@ -822,15 +822,9 @@ internal partial class Program
                     await Task.Delay(1000);
                     // A11y-first: model-response ??[role='article'] ??generic text
                     // Only read NEW responses (skip persona exchange)
-                    var text = await cdp.EvalAsync(
-                        "(() => {" +
-                        "if (!document.body || !document.body.innerHTML || document.body.innerHTML.length < 100) return '\\x01BLANK';" +
-                        "var responses = document.querySelectorAll('model-response');" +
-                        "if (responses.length === 0) { var articles = document.querySelectorAll('[role=\"article\"]'); responses = articles.length > 0 ? articles : responses; }" +
-                        (!responseAlreadyStarted ? $"if (responses.length <= {baseResponseCount}) return '';" : "") +
-                        "var last = responses[responses.length - 1];" +
-                        "return last.textContent || '';" +
-                        "})()");
+                    var text = responseAlreadyStarted
+                        ? await cdp.GetLastResponseTextAsync(0, blankDetect: true)
+                        : await cdp.GetLastResponseTextAsync(baseResponseCount, blankDetect: true);
 
                     // Blank/broken page detection
                     if (text == "\x01BLANK" || text == null)
