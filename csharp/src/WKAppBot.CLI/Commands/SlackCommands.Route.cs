@@ -87,16 +87,33 @@ internal partial class Program
 
         var textLower = text.ToLowerInvariant();
 
-        // ── Determine delivery mode ──
-        // ANY thread reply (threadTs != null) → thread-scoped routing (find owner Claude)
-        // Only non-threaded messages go to catch-all/keyword path
+        // ╔══════════════════════════════════════════════════════════════════════╗
+        // ║  ★ LEGACY ROUTING LOGIC — battle-tested. DO NOT MODIFY! ★         ║
+        // ║                                                                    ║
+        // ║  This routing logic survived dozens of production bug fixes.       ║
+        // ║  Any "simplification" or "improvement" WILL introduce bugs.        ║
+        // ║  If you need changes: only swap called functions (UIA→MCP etc).    ║
+        // ║  NEVER change the flow, branches, or conditions themselves.        ║
+        // ║                                                                    ║
+        // ║  v4.9 lessons learned:                                             ║
+        // ║  - "Simplify" OnMention → broadcast bug (all prompts got msg)      ║
+        // ║  - Change thread condition → wrong Claude got the message          ║
+        // ║  - Change catch-all to workspace-scoped → ping only reached 1/4   ║
+        // ╚══════════════════════════════════════════════════════════════════════╝
+
+        // ── Step 1: Determine delivery mode ──
+        // threadTs present → thread-scoped routing (find owner Claude)
+        // threadTs absent → keyword or full broadcast (ping etc)
+        // ⚠ Changing this condition breaks thread replies (broadcast or lost)
         bool isTrackedThread = !string.IsNullOrEmpty(threadTs);
+
+        // Keyword detection: channel messages only (not thread replies)
         bool isKeyword = !isTrackedThread &&
             SlackRouteKeywords.Any(kw => textLower.Contains(kw, StringComparison.OrdinalIgnoreCase));
 
         Console.WriteLine($"[ROUTE] from={user} thread={isTrackedThread} kw={isKeyword} text={cleanText[..Math.Min(cleanText.Length, 60)]}");
 
-        // ── Build thread context ──
+        // ── Step 2: Collect thread context (previous messages for Claude) ──
         string threadContext = "";
         if (!string.IsNullOrEmpty(threadTs))
         {
@@ -104,7 +121,10 @@ internal partial class Program
             if (!string.IsNullOrEmpty(ctx)) threadContext = $"\n{ctx}\n";
         }
 
-        // ── Find prompts ──
+        // ── Step 3: Discover all prompt windows ──
+        // AllowFocusSteal = true: user-initiated message delivery may take focus
+        // FindAllPrompts(): scans all open Claude/Codex prompt windows via UIA
+        // ⚠ Removing these lines → no prompts found → all messages lost
         ClaudePromptHelper.AllowFocusSteal = true;
         using var promptHelper = new ClaudePromptHelper();
         var allPrompts = promptHelper.FindAllPrompts();
@@ -113,12 +133,19 @@ internal partial class Program
         string replyTs;
         string? label;
 
+        // ── Step 4: Select target prompts (CRITICAL BRANCH) ──
         if (isTrackedThread && !string.IsNullOrEmpty(threadTs))
         {
+            // ★ Thread reply: find owning Claude via ResolveThreadScopedPrompts
+            // Matches bot username in thread → prompt CWD tag → exact 1 prompt
+            // eyeBotName: Eye's display name (subprocess doesn't know it, passed via JSON)
+            // ⚠ DO NOT replace this function. Internal matching is complex but correct.
             targets = ResolveThreadScopedPrompts(promptHelper, botToken, channel, threadTs, eyeBotName ?? BotUsername);
+
             if (targets.Count == 0)
             {
-                // Fallback 1: workspace-scoped prompt (CWD match)
+                // Fallback 1: workspace CWD match (Eye's working directory)
+                // Handles: Eye-alive thread replies, orphaned threads
                 var own = ResolveWorkspaceScopedPrompt(promptHelper);
                 if (own != null)
                 {
@@ -127,7 +154,9 @@ internal partial class Program
                 }
                 else
                 {
-                    // Fallback 2: appbot VS Code prompt (WKAppBot CWD — always-on relay target)
+                    // Fallback 2: appbot master (WKAppBot VS Code) — final receiver
+                    // Any unroutable message goes to appbot Claude (Slack master/root)
+                    // ⚠ Removing this fallback → orphaned messages silently lost
                     var appbot = allPrompts.FirstOrDefault(p =>
                         p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
                         p.HostType is "vscode-claudecode");
@@ -143,7 +172,9 @@ internal partial class Program
         }
         else
         {
-            // keyword or catch-all → ALL prompts (broadcast, original behavior)
+            // ★ Non-thread (channel message): broadcast to ALL prompts
+            // "ping" etc → every Claude gets it (original legacy behavior)
+            // ⚠ Changing to workspace-scoped → ping only reaches 1 of N (v4.9 lesson)
             targets = allPrompts;
             replyTs = threadTs ?? ts;
             if (isKeyword)
@@ -157,7 +188,8 @@ internal partial class Program
             }
         }
 
-        // ── No prompts found ──
+        // ── Step 5: 타겟 없음 → 재시도 큐 ──
+        // 프롬프트가 하나도 없는 경우 (Claude 아직 안 뜸 등) → 1분 후 재시도
         if (targets.Count == 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
