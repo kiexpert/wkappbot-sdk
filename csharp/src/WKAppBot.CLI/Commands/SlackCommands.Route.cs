@@ -70,11 +70,29 @@ internal partial class Program
 
         // ── Determine delivery mode ──
         // thread: if threadTs is in pending_acks (tracked) OR IsOwnThread (bot posted there)
+        // EXCLUDE: Eye-alive threads (":green_circle: Eye" / "Eye start" / "Eye alive") → prevents relay loop
         bool isTrackedThread = false;
         if (!string.IsNullOrEmpty(threadTs))
         {
             var pending = LoadPendingAcks();
             isTrackedThread = pending.ContainsKey(threadTs) || IsOwnThread(botToken, channel, threadTs);
+
+            // Filter out Eye-alive/status threads — bot-authored, not meant for Claude relay
+            if (isTrackedThread)
+            {
+                var starterText = GetThreadStarterText(botToken, channel, threadTs);
+                if (starterText != null && (
+                    starterText.Contains("Eye alive", StringComparison.OrdinalIgnoreCase) ||
+                    starterText.Contains("Eye start", StringComparison.OrdinalIgnoreCase) ||
+                    starterText.Contains(":green_circle:", StringComparison.OrdinalIgnoreCase) ||
+                    starterText.Contains(":large_green_circle:", StringComparison.OrdinalIgnoreCase) ||
+                    starterText.Contains("Idle after", StringComparison.OrdinalIgnoreCase) ||
+                    starterText.Contains(":zzz:", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Console.WriteLine($"[ROUTE] Skipping Eye-status thread (starter: {starterText[..Math.Min(starterText.Length, 40)]})");
+                    isTrackedThread = false;
+                }
+            }
         }
         bool isKeyword = !isTrackedThread &&
             SlackRouteKeywords.Any(kw => textLower.Contains(kw, StringComparison.OrdinalIgnoreCase));
