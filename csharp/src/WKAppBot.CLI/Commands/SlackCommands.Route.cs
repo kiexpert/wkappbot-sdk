@@ -99,8 +99,25 @@ internal partial class Program
             targets = ResolveThreadScopedPrompts(promptHelper, botToken, channel, threadTs, BotUsername);
             if (targets.Count == 0)
             {
+                // Fallback 1: workspace-scoped prompt (CWD match)
                 var own = ResolveWorkspaceScopedPrompt(promptHelper);
-                if (own != null) targets = [own];
+                if (own != null)
+                {
+                    targets = [own];
+                    Console.WriteLine($"[ROUTE] Thread fallback → workspace prompt: {ExtractProjectName(own)}");
+                }
+                else
+                {
+                    // Fallback 2: appbot VS Code prompt (WKAppBot CWD — always-on relay target)
+                    var appbot = allPrompts.FirstOrDefault(p =>
+                        p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
+                        p.HostType is "vscode-claudecode");
+                    if (appbot != null)
+                    {
+                        targets = [appbot];
+                        Console.WriteLine($"[ROUTE] Thread fallback → appbot VS Code: 0x{appbot.WindowHandle:X}");
+                    }
+                }
             }
             replyTs = threadTs;
             label = "thread reply";
