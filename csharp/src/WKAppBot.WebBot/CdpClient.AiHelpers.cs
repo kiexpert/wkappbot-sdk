@@ -159,6 +159,69 @@ public sealed partial class CdpClient
             """);
     }
 
+    // ══ Common Ask Flow ══
+
+    /// <summary>
+    /// Wait for AI response to complete (streaming done).
+    /// Polls until: stop button gone + response count increased + text stabilized.
+    /// Returns (success, responseText).
+    /// </summary>
+    public async Task<(bool ok, string text)> WaitForResponseAsync(
+        string provider, int baseResponseCount = 0, int timeoutSec = 30, int pollMs = 1000)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        string lastText = "";
+        int stableCount = 0;
+
+        while (sw.Elapsed.TotalSeconds < timeoutSec)
+        {
+            await Task.Delay(pollMs);
+
+            // Check response count increased
+            var count = await GetResponseCountAsync();
+            if (count <= baseResponseCount) continue;
+
+            // Read latest response
+            var text = await GetLastResponseTextAsync() ?? "";
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            // Check streaming done (stop button gone)
+            var streaming = await IsStreamingAsync(provider);
+            if (!streaming)
+            {
+                // Final read after streaming done
+                await Task.Delay(300);
+                text = await GetLastResponseTextAsync() ?? "";
+                return (true, text.Trim());
+            }
+
+            // Stability check (text unchanged for 2 polls = possibly done)
+            if (text == lastText) { stableCount++; if (stableCount >= 3) return (true, text.Trim()); }
+            else { lastText = text; stableCount = 0; }
+        }
+
+        // Timeout — return last result
+        if (!string.IsNullOrEmpty(lastText))
+            return (true, lastText.Trim());
+        return (false, "");
+    }
+
+    /// <summary>Wait for editor element to appear and become ready.</summary>
+    public async Task<string?> WaitForEditorAsync(string[] selectors, int timeoutSec = 15)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.Elapsed.TotalSeconds < timeoutSec)
+        {
+            foreach (var sel in selectors)
+            {
+                if (await QueryExistsAsync(sel))
+                    return sel;
+            }
+            await Task.Delay(500);
+        }
+        return null;
+    }
+
     /// <summary>Auto-dismiss modal dialogs (copyright, terms, warnings). Returns dismiss result.</summary>
     public async Task<string> DismissDialogAsync()
     {
