@@ -36,6 +36,7 @@ internal partial class Program
         int maxCount = int.MaxValue; // -m N: max matches per file
         bool showLineNums = false; // -n: prepend line numbers
         bool jsonMode = false;    // --json: structural JSON key+value matching
+        // (removed --max-context-lines — indent context limit is in file edit, not grap)
         // Case: grap/grep default = case-sensitive (grep compat); logcat default = insensitive
         bool ignoreCase = !GrapMode;
 
@@ -68,6 +69,7 @@ internal partial class Program
             else if (a is "--case-sensitive" or "--no-ignore-case") { ignoreCase = false; }
             else if (a is "-n" or "--line-number")           { showLineNums = true; }
             else if (a is "--json")                            { jsonMode = true; }
+            // --max-lines removed (was never wired up)
             else if (a == "--timeout" && i + 1 < args.Length) { timeoutSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--timeout=")) { timeoutSeconds = ParsePastDuration(a[10..]); }
             else { positional.Add(a); }
@@ -164,8 +166,10 @@ internal partial class Program
             msgRegex = new Regex(rxPat, rxOpts);
         }
 
-        // Set JSON match function for EmitDeltaLines (thread-static, safe for parallel)
+        // Set JSON match function + output line cap for EmitDeltaLines
         _jsonMatchFn = jsonMatchFn;
+        _maxOutputLines = 0;
+        _outputLineCount = 0;
 
         // Build watch directories: default = CWD (or --basedir)
         var baseDir = baseDirOverride ?? Environment.CurrentDirectory;
@@ -454,6 +458,9 @@ internal partial class Program
 
     /// <summary>JSON match function — set by LogcatCommand when --json is active. Thread-static for safety.</summary>
     [ThreadStatic] static Func<string, bool>? _jsonMatchFn;
+    /// <summary>Total output line cap — 0 = unlimited. Shared with EmitDeltaLines.</summary>
+    [ThreadStatic] static int _maxOutputLines;
+    [ThreadStatic] static int _outputLineCount;
 
     static void EmitDeltaLines(
         string path,
