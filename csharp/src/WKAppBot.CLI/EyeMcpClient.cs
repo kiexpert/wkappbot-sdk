@@ -73,6 +73,10 @@ internal static class EyeMcpClient
     /// Call a CLI command through MCP and wait for the result.
     /// argv: e.g. ["a11y","invoke","*Button*"] or ["prompt","send","name","text"]
     /// </summary>
+    /// <summary>Per-call caller context — set by EyeCmdPipeServer before CallAsync.</summary>
+    internal static string? CurrentCallerCwd;
+    internal static string? CurrentCallerHwnd;
+
     internal static async Task<(string output, int exitCode)> CallAsync(string[] argv, int timeoutMs = 60_000)
     {
         EnsureStarted();
@@ -85,6 +89,11 @@ internal static class EyeMcpClient
 
         try
         {
+            // Per-call caller context in _meta (CWD/HWND vary per call)
+            var meta = new JsonObject();
+            if (CurrentCallerCwd != null) meta["callerCwd"] = CurrentCallerCwd;
+            if (CurrentCallerHwnd != null) meta["callerHwnd"] = CurrentCallerHwnd;
+
             var request = new JsonObject
             {
                 ["jsonrpc"] = "2.0",
@@ -96,7 +105,8 @@ internal static class EyeMcpClient
                     ["arguments"] = new JsonObject
                     {
                         ["argv"] = new JsonArray(argv.Select(a => (JsonNode)JsonValue.Create(a)!).ToArray())
-                    }
+                    },
+                    ["_meta"] = meta
                 }
             };
 
@@ -386,6 +396,10 @@ internal static class EyeMcpClient
             if (removeVars.Contains(key)) continue;
             sb.Append(key).Append('=').Append(entry.Value?.ToString() ?? "").Append('\0');
         }
+        // Set default caller name for MCP worker (process-level, used as fallback)
+        var defaultName = Program.GetSendReplyUsername();
+        if (!string.IsNullOrEmpty(defaultName))
+            sb.Append("WKAPPBOT_CALLER_NAME=").Append(defaultName).Append('\0');
         sb.Append('\0'); // double-null terminator
 
         var bytes = Encoding.Unicode.GetBytes(sb.ToString());

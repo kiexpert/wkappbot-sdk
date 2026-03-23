@@ -257,11 +257,10 @@ internal static class EyeCmdPipeServer
             var cmdLine = string.Join(" ", args);
             pipeWriter.WriteLine($"[CMD-MCP] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"}");
 
-            // Prepend __cwd: to argv so MCP worker can set correct CWD for name resolution
-            var mcpArgs = callerCwd != null
-                ? new[] { $"__cwd:{callerCwd}" }.Concat(args).ToArray()
-                : args;
-            var (output, exitCode) = EyeMcpClient.CallAsync(mcpArgs).GetAwaiter().GetResult();
+            // Set per-call caller context (read by MCP worker via _meta in JSON-RPC)
+            EyeMcpClient.CurrentCallerCwd = callerCwd;
+            EyeMcpClient.CurrentCallerHwnd = callerHwnd?.ToInt64().ToString("X");
+            var (output, exitCode) = EyeMcpClient.CallAsync(args).GetAwaiter().GetResult();
             pipeWriter.Write(output);
             if (!output.EndsWith('\n')) pipeWriter.WriteLine();
             return exitCode;

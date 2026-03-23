@@ -250,6 +250,15 @@ internal partial class Program
     {
         string username;
 
+        // Priority 0: WKAPPBOT_CALLER_NAME env var (set by EyeMcpClient for MCP workers)
+        // Per-call CallerCwd overrides the process-level env var for CWD-specific naming
+        var envName = Environment.GetEnvironmentVariable("WKAPPBOT_CALLER_NAME");
+        if (!string.IsNullOrEmpty(envName) && EyeCmdPipeServer.CallerCwd.Value == null)
+        {
+            if (printDecision) Console.WriteLine($"[NAME] step=env → {envName}");
+            return envName;
+        }
+
         // Priority 1: prompt window cards (app type + CWD from actual Claude/Codex instances)
         var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
         // Prefer pipe-delivered hwnd (Launcher sends GetForegroundWindow) — faster than process-tree walk.
