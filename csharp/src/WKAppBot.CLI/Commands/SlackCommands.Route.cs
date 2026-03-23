@@ -193,13 +193,15 @@ internal partial class Program
                     : $"{cleanText}{threadContext}\n{SlackReplySuffix(user, replyTs, label)}";
 
                 var ok = ProbeAndSubmit(promptHelper, pi, promptText, ts);
-                results.Add(new DeliveryResult(ExtractProjectName(pi), ok));
+                var dispName = promptNameMap.TryGetValue($"0x{pi.WindowHandle.ToInt64():X}", out var n) ? n : ExtractProjectName(pi);
+                results.Add(new DeliveryResult(dispName, ok));
                 if (ok) sent++;
             }
             catch (Exception ex)
             {
-                results.Add(new DeliveryResult(ExtractProjectName(pi), false));
-                Console.WriteLine($"[ROUTE] Delivery error for {ExtractProjectName(pi)}: {ex.Message}");
+                var dispName = promptNameMap.TryGetValue($"0x{pi.WindowHandle.ToInt64():X}", out var n) ? n : ExtractProjectName(pi);
+                results.Add(new DeliveryResult(dispName, false));
+                Console.WriteLine($"[ROUTE] Delivery error for {dispName}: {ex.Message}");
             }
         }
 
