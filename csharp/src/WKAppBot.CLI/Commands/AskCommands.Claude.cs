@@ -61,8 +61,7 @@ internal partial class Program
         var escaped = text.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", "");
 
         // Detect element type first so we can choose the right injection strategy
-        var tagName = await cdp.EvalAsync(
-            $"document.querySelector(\"{selector}\")?.tagName?.toLowerCase() ?? 'unknown'") ?? "unknown";
+        var tagName = await cdp.GetTagNameAsync(selector);
 
         if (tagName == "textarea")
         {
@@ -86,9 +85,8 @@ internal partial class Program
             await Task.Delay(100);
             await cdp.SendAsync("Input.insertText", new JsonObject { ["text"] = text });
             await Task.Delay(200);
-            var taVerify = await cdp.EvalAsync(
-                $"(document.querySelector(\"{selector}\")?.value?.length ?? 0).toString()") ?? "0";
-            return taVerify != "0";
+            var taVal = await cdp.GetValueAsync(selector);
+            return !string.IsNullOrEmpty(taVal);
         }
 
         // ProseMirror / contenteditable: ClipboardEvent paste
@@ -112,9 +110,10 @@ internal partial class Program
         await Task.Delay(100);
         await cdp.SendAsync("Input.insertText", new JsonObject { ["text"] = text });
         await Task.Delay(200);
-        var verify = await cdp.EvalAsync(
-            $"(document.querySelector(\"{selector}\")?.value?.length ?? document.querySelector(\"{selector}\")?.textContent?.length ?? 0).toString()") ?? "0";
-        return verify != "0";
+        var val = await cdp.GetValueAsync(selector);
+        if (!string.IsNullOrEmpty(val)) return true;
+        var textLen = await cdp.GetTextLengthAsync(selector);
+        return textLen > 0;
     }
 
     /// <summary>Count Claude.ai assistant turns.</summary>
