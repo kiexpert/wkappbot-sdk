@@ -422,29 +422,46 @@ internal partial class Program
             return 0;
         }
 
-        // ── Resolve guard: require explicit confirmation flag ──
-        const string ConfirmFlag = "--i-completed-the-code-and-built-successfully-and-deployed-and-tested-with-real-scenarios-and-confirmed-meaningful-results-and-have-evidence-and-willkim-allowed-this";
-        // No short alias — force the long flag to make you think twice
-        bool hasConfirm = args.Any(a => a == ConfirmFlag);
-        if (!hasConfirm)
+        // ── Resolve guard: require confirmation flag + evidence script ──
+        // Flag format: --i-completed-...-and-willkim-allowed-this-script <file>
+        // The script/log/screenshot is REQUIRED — no evidence = no resolve.
+        // Uploaded to Slack thread as proof of testing.
+        const string ConfirmFlag = "--i-completed-the-code-and-built-successfully-and-deployed-and-tested-with-real-scenarios-and-confirmed-meaningful-results-and-have-evidence-and-willkim-allowed-this-script";
+        string? evidenceFile = null;
+        bool hasConfirm = false;
+        for (int ei = 0; ei < args.Length; ei++)
+        {
+            if (args[ei] == ConfirmFlag && ei + 1 < args.Length)
+            {
+                hasConfirm = true;
+                evidenceFile = args[ei + 1];
+                break;
+            }
+        }
+
+        if (!hasConfirm || evidenceFile == null)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("⚠️  RESOLVE GUARD — 졸속 완료 방지!");
+            Console.WriteLine("⚠️  RESOLVE GUARD — no resolve without test evidence!");
             Console.WriteLine();
-            Console.WriteLine("  resolve 전에 확인하세요:");
-            Console.WriteLine("  □ 코드 구현 완료?");
-            Console.WriteLine("  □ 빌드 성공 (0 에러)?");
-            Console.WriteLine("  □ 배포 (publish + hot-swap)?");
-            Console.WriteLine("  □ 실제 테스트 실행 + 결과 확인?");
-            Console.WriteLine("  □ 테스트 결과가 의미있는 수준? (matched=1/784 = 실패!)");
-            Console.WriteLine("  □ 스크린샷/로그 증거 있음?");
+            Console.WriteLine("  Required: confirmation flag + test script/log file");
+            Console.WriteLine("  The evidence file is uploaded to Slack as proof of testing.");
             Console.WriteLine();
-            Console.WriteLine("  모두 확인했으면 플래그 추가:");
-            Console.WriteLine($"  wkappbot suggest resolve <ts> \"note\" {ConfirmFlag}");
+            Console.WriteLine($"  wkappbot suggest resolve <ts> \"note\" {ConfirmFlag} test_result.sh");
             Console.ResetColor();
             return 1;
         }
-        args = args.Where(a => a != ConfirmFlag).ToArray();
+
+        if (!File.Exists(evidenceFile))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  ❌ Evidence file not found: {evidenceFile}");
+            Console.ResetColor();
+            return 1;
+        }
+        Console.WriteLine($"[RESOLVE] Evidence: {evidenceFile} ({new FileInfo(evidenceFile).Length} bytes)");
+
+        args = args.Where(a => a != ConfirmFlag && a != evidenceFile).ToArray();
 
         var tsPrefix = args[0];
         var note = args.Length >= 2 ? string.Join(" ", args[1..]) : "resolved";
@@ -519,13 +536,20 @@ internal partial class Program
             var botToken = LoadSlackBotToken();
             if (!string.IsNullOrEmpty(botToken))
             {
-                var replyText = $":white_check_mark: *RESOLVED* — {note}";
+                var replyText = $":white_check_mark: *RESOLVED* — {note}\n:page_facing_up: Evidence: `{Path.GetFileName(evidenceFile)}`";
                 var resolverName = GetSendReplyUsername();
                 var (ok, _) = SlackSendViaApi(botToken, SuggestChannel, replyText, threadTs: slackTs, username: resolverName).GetAwaiter().GetResult();
                 if (ok)
                     Console.WriteLine($"[RESOLVE] Slack reply sent to thread {slackTs}");
                 else
                     Console.Error.WriteLine($"[RESOLVE] Slack reply failed");
+                // Upload evidence file to Slack thread
+                try
+                {
+                    SlackCommand(["upload", evidenceFile, "--msg", slackTs]);
+                    Console.WriteLine($"[RESOLVE] Evidence uploaded to Slack thread");
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[RESOLVE] Evidence upload failed: {ex.Message}"); }
             }
             else
             {
