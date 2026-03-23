@@ -975,13 +975,23 @@ internal partial class Program
                 handledByMention.Add(msg.Timestamp); // dedup: OnMessage won't re-forward
 
                 Console.WriteLine($"[EYE][SLACK] @mention → spawn slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
+                var mentionPromptNames = new Dictionary<string, string>();
+                foreach (var p in allMentionPrompts)
+                {
+                    var cwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
+                    if (string.IsNullOrEmpty(cwd)) continue;
+                    var tag = AbbreviateCwd(cwd);
+                    if (!string.IsNullOrEmpty(tag))
+                        mentionPromptNames[$"0x{p.WindowHandle.ToInt64():X}"] = $"클롣[{tag}]";
+                }
                 var routeJson = System.Text.Json.JsonSerializer.Serialize(new
                 {
                     text = msg.Text, user = msg.User, ts = msg.Timestamp,
                     threadTs = msg.ThreadTs, channel = msg.Channel,
                     isMention = true,
                     eyeCwd = Environment.CurrentDirectory,
-                    botUsername = GetSendReplyUsername()
+                    botUsername = GetSendReplyUsername(),
+                    promptNames = mentionPromptNames
                 });
                 _ = Task.Run(() =>
                 {
@@ -1204,12 +1214,23 @@ internal partial class Program
 
             // ── Dispatch to route worker (separate process → memory isolation) ──
             Console.WriteLine($"[EYE][SLACK] → spawn slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
+            // Build per-prompt display name map for routing (hwnd → botUsername)
+            var promptNames = new Dictionary<string, string>();
+            foreach (var p in FindAllPromptsViaMcp())
+            {
+                var cwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
+                if (string.IsNullOrEmpty(cwd)) continue;
+                var tag = AbbreviateCwd(cwd);
+                if (!string.IsNullOrEmpty(tag))
+                    promptNames[$"0x{p.WindowHandle.ToInt64():X}"] = $"클롣[{tag}]";
+            }
             var routeJson = System.Text.Json.JsonSerializer.Serialize(new
             {
                 text = msg.Text, user = msg.User, ts = msg.Timestamp,
                 threadTs = msg.ThreadTs, channel = msg.Channel,
                 eyeCwd = Environment.CurrentDirectory,
-                botUsername = GetSendReplyUsername()
+                botUsername = GetSendReplyUsername(),
+                promptNames  // hwnd → display name map
             });
             // Separate process: UIA write ops (FindAllPrompts + TypeAndSubmit) run outside Eye
             _ = Task.Run(() =>

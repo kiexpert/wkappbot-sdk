@@ -58,8 +58,16 @@ internal partial class Program
             EyeCmdPipeServer.CallerCwd.Value = eyeCwd;
             try { Environment.CurrentDirectory = eyeCwd; } catch { }
         }
+        // Parse per-prompt display name map from Eye (hwnd → botUsername)
+        var promptNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (node["promptNames"] is JsonObject pn)
+        {
+            foreach (var kv in pn)
+                if (kv.Value != null) promptNameMap[kv.Key] = kv.Value.GetValue<string>();
+        }
+
         if (!string.IsNullOrEmpty(eyeBotName))
-            Console.WriteLine($"[ROUTE] Eye bot={eyeBotName} cwd={eyeCwd}");
+            Console.WriteLine($"[ROUTE] Eye bot={eyeBotName} cwd={eyeCwd} promptNames={promptNameMap.Count}");
 
         if (!File.Exists(SlackConfigPath)) { Console.WriteLine("[ROUTE] No Slack config — skip"); return 0; }
         var cfg = JsonNode.Parse(File.ReadAllText(SlackConfigPath));
