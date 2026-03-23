@@ -150,13 +150,56 @@ internal partial class Program
                 break; // dry-run always single-shot
             }
 
-            // ── AI query ──
-            Console.WriteLine($"[STUDY] Sending to {engine}...");
-            var (success, response) = AskAiForStudy(batchFile, prompt, engine);
+            // ── AI query — multi-tier fallback cascade ──
+            // Tier 1: normal ask → Tier 2: fresh session → Tier 3: copyright dismiss + retry
+            // → Tier 4: close tab + new tab → give up + Slack notify
+            bool success = false;
+            string? response = null;
+            string? failReason = null;
+
+            var tiers = new (string name, bool fresh, bool closeTab)[]
+            {
+                ("normal", false, false),
+                ("fresh-session", true, false),
+                ("new-tab", true, true),
+            };
+
+            foreach (var (tierName, fresh, closeTab) in tiers)
+            {
+                Console.WriteLine($"[STUDY] Tier [{tierName}] → {engine}...");
+
+                if (closeTab)
+                {
+                    // Close existing Gemini tab to force completely fresh state
+                    try
+                    {
+                        Console.WriteLine($"[STUDY] Closing existing {engine} tab...");
+                        A11yCommand(["close", $"*Chrome*#{engine}*", "--force"]);
+                        Thread.Sleep(2000);
+                    }
+                    catch { }
+                }
+
+                (success, response) = AskAiForStudy(batchFile, prompt, engine, freshSession: fresh);
+                if (success && !string.IsNullOrWhiteSpace(response))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"[STUDY] Tier [{tierName}] SUCCESS — {response.Length} chars");
+                    Console.ResetColor();
+                    break;
+                }
+
+                failReason = tierName;
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[STUDY] Tier [{tierName}] FAILED — trying next tier...");
+                Console.ResetColor();
+                Thread.Sleep(1000);
+            }
+
             if (!success || string.IsNullOrWhiteSpace(response))
             {
-                Console.WriteLine($"[STUDY] {engine} failed — keeping batch file for retry.");
-                // Notify via Slack with failure details (no GPT fallback — Gemini-only policy)
+                Console.WriteLine($"[STUDY] All tiers exhausted — keeping batch file for retry.");
+                // Notify via Slack with failure details
                 try
                 {
                     var slackCfg = File.Exists(SlackConfigPath) ? JsonNode.Parse(File.ReadAllText(SlackConfigPath)) : null;
@@ -164,14 +207,13 @@ internal partial class Program
                     var slackCh = slackCfg?["channel"]?.GetValue<string>();
                     if (!string.IsNullOrEmpty(slackToken) && !string.IsNullOrEmpty(slackCh))
                     {
-                        // Include debug file path if available
-                        var debugFile = Path.Combine(DataDir, "logs");
-                        var latestDebug = Directory.Exists(debugFile)
-                            ? Directory.GetFiles(debugFile, $"study_fail_{engine}_*.log")
+                        var debugDir = Path.Combine(DataDir, "logs");
+                        var latestDebug = Directory.Exists(debugDir)
+                            ? Directory.GetFiles(debugDir, $"study_fail_{engine}_*.log")
                                 .OrderByDescending(f => f).FirstOrDefault() : null;
-                        var detail = latestDebug != null ? $"\nDebug log: `{Path.GetFileName(latestDebug)}`" : "";
+                        var detail = latestDebug != null ? $"\nDebug: `{Path.GetFileName(latestDebug)}`" : "";
                         SlackSendViaApi(slackToken, slackCh,
-                            $":warning: Whisper study `{engine}` failed: `{Path.GetFileName(batchFile)}`{detail}\n클롣이 디버그 로그 확인 후 자동 수정 필요!",
+                            $":x: Whisper study `{engine}` ALL TIERS FAILED: `{Path.GetFileName(batchFile)}`\nTried: normal → fresh-session → new-tab{detail}",
                             username: "앱봇위스퍼").GetAwaiter().GetResult();
                     }
                 }
