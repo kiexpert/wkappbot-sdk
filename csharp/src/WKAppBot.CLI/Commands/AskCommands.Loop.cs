@@ -229,37 +229,10 @@ internal partial class Program
     }
 
     static async Task<bool> HasLoopPersonaStateAsync(CdpClient cdp, string provider)
-    {
-        var key = $"wkappbot.loop.persona.{provider}";
-        var script =
-            "(() => {" +
-            "try {" +
-            $"var k = '{key}';" +
-            $"if (sessionStorage.getItem(k) === '{LoopPersonaStateVersion}') return '1';" +
-            $"if (localStorage.getItem(k) === '{LoopPersonaStateVersion}') return '1';" +
-            $"if (window[k] === '{LoopPersonaStateVersion}') return '1';" +
-            "} catch (e) {}" +
-            "return '0';" +
-            "})()";
-        var result = await cdp.EvalAsync(script) ?? "0";
-        return result == "1";
-    }
+        => await cdp.HasSessionStateAsync($"wkappbot.loop.persona.{provider}", LoopPersonaStateVersion);
 
     static async Task SetLoopPersonaStateAsync(CdpClient cdp, string provider)
-    {
-        var key = $"wkappbot.loop.persona.{provider}";
-        var script =
-            "(() => {" +
-            "try {" +
-            $"var k = '{key}';" +
-            $"sessionStorage.setItem(k, '{LoopPersonaStateVersion}');" +
-            $"localStorage.setItem(k, '{LoopPersonaStateVersion}');" +
-            $"window[k] = '{LoopPersonaStateVersion}';" +
-            "} catch (e) {}" +
-            "return 'OK';" +
-            "})()";
-        await cdp.EvalAsync(script);
-    }
+        => await cdp.SetSessionStateAsync($"wkappbot.loop.persona.{provider}", LoopPersonaStateVersion);
 
     static string LoopProviderLabel(string provider) => provider switch
     {
