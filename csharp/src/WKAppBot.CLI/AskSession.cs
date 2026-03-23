@@ -17,10 +17,12 @@ internal record AiProvider(
     public static readonly AiProvider Gemini = new(
         Name: "gemini", Host: "gemini.google.com",
         EditorSelectors: [
-            "[contenteditable='true'].ql-editor",
+            ".ql-editor",
+            "[role='textbox'][contenteditable='true']",
             "div[contenteditable='true']",
-            "[role='textbox']",
-            "rich-textarea [contenteditable='true']"
+            "div.ql-editor",
+            "rich-textarea [contenteditable]",
+            ".input-area [contenteditable]"
         ],
         ResponseSelector: "model-response",
         StopSelectors: ["button[aria-label*='Stop']", "mat-icon[fonticon='stop_circle']"]
@@ -77,7 +79,7 @@ internal sealed class AskSession : IDisposable
 {
     public AiProvider Provider { get; }
     public CdpTabSession? Tab { get; private set; }
-    public CdpClient? Cdp => Tab?.Cdp;
+    public CdpClient? Cdp => _legacyCdp ?? Tab?.Cdp;
     public int Port { get; private set; } = 9222;
 
     public AskSession(AiProvider provider, int port = 9222)
@@ -85,6 +87,14 @@ internal sealed class AskSession : IDisposable
         Provider = provider;
         Port = port;
     }
+
+    /// <summary>Wrap an existing CdpClient (for gradual migration from legacy EnsureCdpConnection).</summary>
+    public AskSession(AiProvider provider, CdpClient existingCdp)
+    {
+        Provider = provider;
+        _legacyCdp = existingCdp;
+    }
+    private CdpClient? _legacyCdp;
 
     // ══ Step 1: Connect ══
 

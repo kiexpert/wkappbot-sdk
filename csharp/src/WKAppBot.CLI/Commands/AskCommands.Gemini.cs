@@ -358,6 +358,7 @@ internal partial class Program
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
         PulseStep.Mark("cdp-connected");
+        using var askSession = new AskSession(AiProvider.Gemini, cdp); // gradual migration wrapper
 
         // No tab activation ? CDP works on background tabs via targetId. Truly focusless.
         var prevFgGemini = NativeMethods.GetForegroundWindow();
