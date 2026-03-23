@@ -222,7 +222,13 @@ wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령
   # Async (2): wait(--timeout --interval), eval(--text "js") [DEPRECATED → use --eval-js]
   # Utility (3): clipboard, clipboard-read, clipboard-write
   # --all, --nth N, --depth N, --force, --force-close-ancestors, --timeout N, --speak, --eval-js "js"
+  # --eval-js: pre-hook (click/type) or primary output (read/find)
+  #   read: loading wait + streaming stabilization (null=done signal)
+  #   JS runtime injection: defA11yRead/Click/Focus/Editor/Hidden/Ready
+  #   Chrome without #scope → tab list display
   # Web auto-fallback: Chrome/Electron → CSS selector 자동감지 → CDP 엔진
+  # CdpClient.AiHelpers: InsertContentEditable, ClearEditor, SendPrompt, IsStreaming, ClickStop
+  # CdpTabManager: CreateScoped (hwnd-isolated) / CreateShared (pattern-match)
   # adb:// scheme: Android ADB USB 디바이스 제어 (30 actions)
 wkappbot a11y kill <pattern>[/<ancestor>] [--allow-ancestors]  # 프로세스 킬
 ```
