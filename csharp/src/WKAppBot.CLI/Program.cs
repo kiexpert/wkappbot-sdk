@@ -487,7 +487,7 @@ internal partial class Program
             var isEyeCommand = command == "eye"; // eye, eye tick, eye tick --timeout 등 전부 제외
             // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
             // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" || isEyeCommand || _fastExitAfterCommand;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
@@ -516,6 +516,11 @@ internal partial class Program
                 "slack" => SlackCommand(restArgs),
                 "web" => WebCommand(restArgs),
                 "file" => FileCommand(restArgs),
+                // file-* hyphenated aliases: "file-edit old new f.cs" → FileCommand(["edit","old","new","f.cs"])
+                "file-edit" => FileCommand(new[] { "edit" }.Concat(restArgs).ToArray()),
+                "file-read" => FileCommand(new[] { "read" }.Concat(restArgs).ToArray()),
+                "file-grep" => FileCommand(new[] { "grep" }.Concat(restArgs).ToArray()),
+                "file-glob" => FileCommand(new[] { "glob" }.Concat(restArgs).ToArray()),
                 "mcp" => McpCommand(restArgs), // fallback (normally caught in Main early path)
                 // Web: use "web <subcommand>" or unified a11y for web views
                 // Automation

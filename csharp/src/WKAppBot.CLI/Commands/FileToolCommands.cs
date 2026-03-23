@@ -787,6 +787,8 @@ internal partial class Program
         int context = 1; // extra lines beyond indent boundary (--context N)
         int tabSize = 4; // tab width for indent tracking (--tab-size N)
 
+        string? oldFile = null, newFile = null;
+
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--replace-all") { replaceAll = true; continue; }
@@ -796,18 +798,35 @@ internal partial class Program
             if (args[i] == "--encoding" && i + 1 < args.Length) { encoding = int.Parse(args[++i]); continue; }
             if (args[i] == "--context"  && i + 1 < args.Length) { int.TryParse(args[++i], out context); continue; }
             if (args[i] == "--tab-size" && i + 1 < args.Length) { int.TryParse(args[++i], out tabSize); if (tabSize < 1) tabSize = 4; continue; }
+            // --old-file/--new-file: read old/new strings from file (avoids bash Korean encoding issues)
+            if (args[i] == "--old-file" && i + 1 < args.Length) { oldFile = args[++i]; continue; }
+            if (args[i] == "--new-file" && i + 1 < args.Length) { newFile = args[++i]; continue; }
             positional.Add(args[i]);
+        }
+
+        // --old-file/--new-file mode: read strings from files, remaining positionals are target paths
+        if (oldFile != null || newFile != null)
+        {
+            if (oldFile == null || newFile == null)
+                return Error("[file edit] --old-file and --new-file must both be specified");
+            if (!File.Exists(oldFile)) return Error($"[file edit] --old-file not found: {oldFile}");
+            if (!File.Exists(newFile)) return Error($"[file edit] --new-file not found: {newFile}");
+            var oldContent = File.ReadAllText(oldFile);
+            var newContent = File.ReadAllText(newFile);
+            // Prepend to positional: old, new, then paths remain
+            positional.InsertRange(0, new[] { oldContent, newContent });
         }
 
         // sed/grep-style: first two positional args are old_string and new_string; rest are file paths/globs
         if (positional.Count < 3)
         {
-            Console.WriteLine("Usage: wkappbot file edit <old_string> <new_string> <path>... [--replace-all] [--regex] [--i-really-want-lossy-encoding] [--encoding N] [--context N]");
+            Console.WriteLine("Usage: wkappbot file edit <old_string> <new_string> <path>... [--replace-all] [--regex]");
+            Console.WriteLine("       wkappbot file edit --old-file old.txt --new-file new.txt <path>... [--replace-all]");
             return 1;
         }
 
-        string oldStr = UnescapeCString(positional[0]);
-        string newStr = UnescapeCString(positional[1]);
+        string oldStr = oldFile != null ? positional[0] : UnescapeCString(positional[0]);
+        string newStr = newFile != null ? positional[1] : UnescapeCString(positional[1]);
         var pathPatterns = positional[2..];
 
         // Expand globs for each path pattern

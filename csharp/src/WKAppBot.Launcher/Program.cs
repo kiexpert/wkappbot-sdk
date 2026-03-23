@@ -31,6 +31,7 @@ class Program
         ("grep",   "logcat"), // grep → logcat alias (busybox-style)
         ("grap",   "logcat"), // grap → logcat alias (GRab Accessible Pattern)
         ("scan",   "scan"),
+        ("wkedit", "file"),   // wkedit.exe → file edit (busybox-style)
     };
 
     // Aliases that bypass Launcher and point directly to Core (no relay needed)
@@ -65,8 +66,11 @@ class Program
         {
             // grap/grep: pass alias name to Core (not "logcat") — Core handles arg-order translation + help.
             // This allows Core's help fast path to show grap-specific help for "grap" with no args.
+            // wkedit: prepend "file" + "edit" (two args, not one)
             var prependCmd = (exeBase == "grap" || exeBase == "grep") ? exeBase : implicitCmd;
-            if (args.Length == 0 || args[0].ToLowerInvariant() != prependCmd)
+            if (exeBase == "wkedit")
+                args = new[] { "file", "edit" }.Concat(args).ToArray();
+            else if (args.Length == 0 || args[0].ToLowerInvariant() != prependCmd)
                 args = new[] { prependCmd }.Concat(args).ToArray();
             prof($"busybox-prepend={prependCmd}");
         }
