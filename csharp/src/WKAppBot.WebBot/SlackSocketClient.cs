@@ -355,7 +355,35 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             return;
         }
 
-        // Skip message subtypes (channel_join, etc.)
+        // Handle message_changed: extract inner message (Slack sends edits + URL unfurl this way)
+        if (subtype == "message_changed")
+        {
+            var innerMsg = eventNode["message"];
+            if (innerMsg != null)
+            {
+                user = innerMsg["user"]?.GetValue<string>() ?? user;
+                text = innerMsg["text"]?.GetValue<string>() ?? text;
+                ts = innerMsg["ts"]?.GetValue<string>() ?? ts;
+                threadTs = innerMsg["thread_ts"]?.GetValue<string>() ?? threadTs;
+                botId = innerMsg["bot_id"]?.GetValue<string>();
+                subtype = innerMsg["subtype"]?.GetValue<string>(); // may be null now → passes through
+
+                // Still a bot message after unwrap → skip
+                if (user == _botUserId || (!string.IsNullOrEmpty(botId)))
+                {
+                    Console.WriteLine($"[SLACK] Skip changed bot msg: user={user} botId={botId}");
+                    return;
+                }
+                Console.WriteLine($"[SLACK] Unwrapped message_changed: user={user} text={text?[..Math.Min(text?.Length ?? 0, 40)]}");
+            }
+            else
+            {
+                Console.WriteLine($"[SLACK] Skip message_changed (no inner message)");
+                return;
+            }
+        }
+
+        // Skip other message subtypes (channel_join, message_deleted, etc.)
         if (subtype != null)
         {
             Console.WriteLine($"[SLACK] Skip subtype={subtype} user={user} text={text?[..Math.Min(text?.Length ?? 0, 30)]}");
