@@ -53,8 +53,15 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     /// Connect to Chrome's DevTools WebSocket.
     /// Chrome must be running with --remote-debugging-port=PORT.
     /// </summary>
+    /// <summary>CDP reliability notice — printed once per process.</summary>
+    private static int _cdpWarningShown;
+
     public async Task ConnectAsync(int port = 9222, int tabIndex = 0, int timeoutMs = 10_000, string? preferredTargetTag = null)
     {
+        // One-time warning: CDP operations are inherently fragile
+        if (Interlocked.CompareExchange(ref _cdpWarningShown, 1, 0) == 0)
+            Console.Error.WriteLine("[CDP] CDP is fragile. Implement retry+fallback for production.");
+
         using var cts = new CancellationTokenSource(timeoutMs);
         var ct = cts.Token;
 
