@@ -526,6 +526,13 @@ public sealed partial class CdpClient
         return result;
     }
 
+    /// <summary>Get the tag name of a DOM element (lowercase, e.g. "div", "textarea").</summary>
+    public async Task<string> GetTagNameAsync(string selector)
+    {
+        var escaped = selector.Replace("'", "\\'");
+        return await EvalAsync($"document.querySelector('{escaped}')?.tagName?.toLowerCase() ?? 'unknown'") ?? "unknown";
+    }
+
     /// <summary>Check if a DOM element exists matching a CSS selector.</summary>
     public async Task<bool> QueryExistsAsync(string selector)
     {
