@@ -159,6 +159,31 @@ public sealed partial class CdpClient
             """);
     }
 
+    /// <summary>Auto-dismiss modal dialogs (copyright, terms, warnings). Returns dismiss result.</summary>
+    public async Task<string> DismissDialogAsync()
+    {
+        return await EvalAsync("""
+            (() => {
+                const dlg = document.querySelector('mat-dialog-container')
+                         || document.querySelector('[role="dialog"]')
+                         || document.querySelector('[role="alertdialog"]');
+                if (!dlg) return 'NONE';
+                const btns = dlg.querySelectorAll('button, [role="button"]');
+                for (const btn of btns) {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    if (txt.includes('ok') || txt.includes('got it') || txt.includes('i understand')
+                        || txt.includes('confirm') || txt.includes('agree') || txt.includes('continue')
+                        || txt.includes('확인') || txt.includes('동의') || txt.includes('계속')
+                        || btn.classList.contains('primary') || btn.classList.contains('mat-primary')) {
+                        btn.click(); return 'DISMISSED:' + txt;
+                    }
+                }
+                if (btns.length > 0) { btns[btns.length - 1].click(); return 'DISMISSED_LAST'; }
+                return 'NO_BUTTON';
+            })()
+            """) ?? "NONE";
+    }
+
     // ── Internal ──
     private static string Esc(string s) => s.Replace("\\", "\\\\").Replace("'", "\\'");
 }

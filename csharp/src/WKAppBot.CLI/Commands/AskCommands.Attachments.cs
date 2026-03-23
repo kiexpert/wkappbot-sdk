@@ -181,15 +181,7 @@ internal partial class Program
             await Task.Delay(500);
             // Auto-dismiss copyright/terms dialogs (Gemini image upload warning)
             await DismissDialogIfPresent(cdp);
-            var uploading = await cdp.EvalAsync("""
-                (() => {
-                    var progress = document.querySelector('[class*="uploading"]')
-                                || document.querySelector('[class*="progress"]')
-                                || document.querySelector('[role="progressbar"]');
-                    return progress ? 'UPLOADING' : 'DONE';
-                })()
-                """) ?? "DONE";
-            if (uploading == "DONE")
+            if (!await cdp.IsUploadingAsync())
             {
                 // Final check for delayed dialogs
                 await DismissDialogIfPresent(cdp);
@@ -209,35 +201,8 @@ internal partial class Program
     {
         try
         {
-            var dismissed = await cdp.EvalAsync("""
-                (() => {
-                    // Gemini mat-dialog (Material Design)
-                    const dlg = document.querySelector('mat-dialog-container')
-                             || document.querySelector('[role="dialog"]')
-                             || document.querySelector('[role="alertdialog"]');
-                    if (!dlg) return 'NONE';
-                    // Find confirm/OK/Got it/I understand button
-                    const btns = dlg.querySelectorAll('button, [role="button"]');
-                    for (const btn of btns) {
-                        const txt = (btn.textContent || '').trim().toLowerCase();
-                        if (txt.includes('ok') || txt.includes('got it') || txt.includes('i understand')
-                            || txt.includes('confirm') || txt.includes('agree') || txt.includes('continue')
-                            || txt.includes('확인') || txt.includes('동의') || txt.includes('계속')
-                            || btn.classList.contains('primary') || btn.classList.contains('mat-primary')
-                            || btn.getAttribute('data-test-id')?.includes('confirm')) {
-                            btn.click();
-                            return 'DISMISSED:' + txt;
-                        }
-                    }
-                    // Fallback: click last button (usually the confirm one)
-                    if (btns.length > 0) {
-                        btns[btns.length - 1].click();
-                        return 'DISMISSED_LAST';
-                    }
-                    return 'NO_BUTTON';
-                })()
-                """) ?? "NONE";
-            if (dismissed?.StartsWith("DISMISSED") == true)
+            var dismissed = await cdp.DismissDialogAsync();
+            if (dismissed.StartsWith("DISMISSED"))
                 Console.WriteLine($"[ASK] Auto-dismissed dialog: {dismissed}");
         }
         catch { /* best effort */ }
