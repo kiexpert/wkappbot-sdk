@@ -77,19 +77,21 @@ internal partial class Program
             var pending = LoadPendingAcks();
             isTrackedThread = pending.ContainsKey(threadTs) || IsOwnThread(botToken, channel, threadTs);
 
-            // Filter out Eye-alive/status threads — bot-authored, not meant for Claude relay
-            if (isTrackedThread)
+            // Filter out Eye-alive/status threads — but ONLY for bot-to-bot relay (echo prevention).
+            // User replies in Eye-status threads should still be forwarded to Claude.
+            // The echo loop was: bot posts → Claude replies → bot re-routes → loop.
+            // Fix: if the CURRENT message is from a bot (not user), and thread is Eye-status → skip.
+            if (isTrackedThread && string.IsNullOrEmpty(user))
             {
+                // Bot message in Eye-status thread → skip (prevents echo loop)
                 var starterText = GetThreadStarterText(botToken, channel, threadTs);
                 if (starterText != null && (
                     starterText.Contains("Eye alive", StringComparison.OrdinalIgnoreCase) ||
                     starterText.Contains("Eye start", StringComparison.OrdinalIgnoreCase) ||
                     starterText.Contains(":green_circle:", StringComparison.OrdinalIgnoreCase) ||
-                    starterText.Contains(":large_green_circle:", StringComparison.OrdinalIgnoreCase) ||
-                    starterText.Contains("Idle after", StringComparison.OrdinalIgnoreCase) ||
-                    starterText.Contains(":zzz:", StringComparison.OrdinalIgnoreCase)))
+                    starterText.Contains(":large_green_circle:", StringComparison.OrdinalIgnoreCase)))
                 {
-                    Console.WriteLine($"[ROUTE] Skipping Eye-status thread (starter: {starterText[..Math.Min(starterText.Length, 40)]})");
+                    Console.WriteLine($"[ROUTE] Skipping bot echo in Eye-status thread");
                     isTrackedThread = false;
                 }
             }
