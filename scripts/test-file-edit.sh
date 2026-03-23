@@ -238,6 +238,28 @@ out=$("$WK" file edit "beta" "beta" "$T22" 2>&1)
 check "search-only mode (no change)" "no change" "$out"
 check "search-only mode (match count)" "1 match" "$out"
 
+# ── Test 23: bash Korean arg → CP949 file (encoding recovery) ────────────
+T23="$TMP/korean_cp949.txt"
+powershell -NoProfile -Command "[System.IO.File]::WriteAllText('${T23//\//\\}', '// 테스트 code', [System.Text.Encoding]::GetEncoding(949))"
+out=$("$WK" file edit "테스트" "TEST_OK" "$T23" 2>&1)
+check "Korean arg → CP949 (replacement)" "1 replacement(s)" "$out"
+check "Korean arg → CP949 (← marker)" "테스트" "$out"
+check "Korean arg → CP949 (→ marker)" "TEST_OK" "$out"
+
+# ── Test 24: bash Korean arg → UTF-8 file ────────────────────────────────
+T24="$TMP/korean_utf8.txt"
+printf '// 한글테스트 utf8\n' > "$T24"
+out=$("$WK" file edit "한글테스트" "HANGUL_OK" "$T24" 2>&1)
+check "Korean arg → UTF-8 (replacement)" "1 replacement(s)" "$out"
+check "Korean arg → UTF-8 (content)" "HANGUL_OK" "$(cat "$T24")"
+
+# ── Test 25: write Korean back to CP949 ──────────────────────────────────
+T25="$TMP/korean_write_back.txt"
+powershell -NoProfile -Command "[System.IO.File]::WriteAllText('${T25//\//\\}', '// MARKER code', [System.Text.Encoding]::GetEncoding(949))"
+out=$("$WK" file edit "MARKER" "수정됨" "$T25" 2>&1)
+check "Write Korean to CP949 (replacement)" "1 replacement(s)" "$out"
+check "Write Korean to CP949 (→ marker)" "수정됨" "$out"
+
 # ── Summary ─────────────────────────────────────────────────────────────────
 echo ""
 echo "Results: $PASS passed, $FAIL failed (total $((PASS + FAIL)))"
