@@ -32,11 +32,47 @@ internal sealed class TriadSharedContext
     private readonly ConcurrentDictionary<string, string> _latestChunks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, int> _chunkVersions = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Update latest response chunk for an AI (called during streaming flush).</summary>
+    // Per-AI cross-prompt injection queue: chunks from peers waiting to be injected
+    private readonly ConcurrentDictionary<string, ConcurrentQueue<(string fromAi, string text)>> _crossPromptQueues =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    // Per-AI CdpClient reference for direct injection
+    private readonly ConcurrentDictionary<string, WKAppBot.WebBot.CdpClient> _cdpClients =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Register a CdpClient for an AI (needed for cross-prompt injection).</summary>
+    public void RegisterCdp(string ai, WKAppBot.WebBot.CdpClient cdp) => _cdpClients[ai] = cdp;
+
+    /// <summary>Update latest response chunk + broadcast to Slack + queue for other AIs.</summary>
     public void UpdateChunk(string ai, string chunk)
     {
+        var prev = _latestChunks.GetValueOrDefault(ai, "");
         _latestChunks[ai] = chunk;
         _chunkVersions.AddOrUpdate(ai, 1, (_, v) => v + 1);
+
+        // Only broadcast meaningful new content (delta > 100 chars)
+        var delta = chunk.Length - prev.Length;
+        if (delta < 100) return;
+
+        var newText = chunk[prev.Length..].Trim();
+        if (newText.Length < 50) return;
+
+        // Queue cross-prompt for other AIs
+        foreach (var kv in _cdpClients)
+        {
+            if (kv.Key.Equals(ai, StringComparison.OrdinalIgnoreCase)) continue;
+            var queue = _crossPromptQueues.GetOrAdd(kv.Key, _ => new ConcurrentQueue<(string, string)>());
+            queue.Enqueue((ai, newText.Length > 300 ? newText[..300] + "..." : newText));
+        }
+    }
+
+    /// <summary>Dequeue pending cross-prompts for an AI (call when AI is idle/between responses).</summary>
+    public List<(string fromAi, string text)> DequeueCrossPrompts(string ai)
+    {
+        var result = new List<(string, string)>();
+        if (_crossPromptQueues.TryGetValue(ai, out var queue))
+            while (queue.TryDequeue(out var item)) result.Add(item);
+        return result;
     }
 
     /// <summary>Get chunks from OTHER AIs (for cross-prompting). Returns only chunks newer than lastSeen versions.</summary>

@@ -316,9 +316,12 @@ internal partial class Program
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
         PulseStep.Mark("cdp-connected");
-        // Cross-prompt: stream chunks to shared context for other AIs to see
+        // Cross-prompt: stream chunks to shared context + register CDP for injection
         if (triadCtx != null)
+        {
+            triadCtx.RegisterCdp("gemini", cdp);
             cdp.OnStreamingChunk = chunk => triadCtx.UpdateChunk("gemini", chunk);
+        }
         using var askSession = new AskSession(AiProvider.Gemini, cdp); // gradual migration wrapper
 
         // No tab activation ? CDP works on background tabs via targetId. Truly focusless.
