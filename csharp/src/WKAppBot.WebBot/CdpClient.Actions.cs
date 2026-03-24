@@ -400,13 +400,33 @@ public sealed partial class CdpClient
     public async Task<string?> ReadPageAsync()
     {
         return await EvalAsync("""
-            JSON.stringify({
-                title: document.title,
-                url: location.href,
-                readyState: document.readyState,
-                hidden: document.hidden,
-                text: (document.body?.innerText || '').substring(0, 500)
-            })
+            (() => {
+                // Fallback selector chain for SPA content (Notion, etc.)
+                const selectors = [
+                    '.notion-page-content',       // Notion regular pages
+                    '[data-block-id]',             // Notion database views
+                    '.notion-body',                // Notion fallback
+                    'article', 'main', '[role="main"]',  // standard semantic
+                    '#__next', '#app', '#root',    // SPA root containers
+                    'document.body'                // final fallback
+                ];
+                let text = '';
+                for (const sel of selectors) {
+                    const el = sel === 'document.body' ? document.body : document.querySelector(sel);
+                    if (el && el.innerText && el.innerText.trim().length > 10) {
+                        text = el.innerText.substring(0, 500);
+                        break;
+                    }
+                }
+                if (!text) text = (document.body?.innerText || '').substring(0, 500);
+                return JSON.stringify({
+                    title: document.title,
+                    url: location.href,
+                    readyState: document.readyState,
+                    hidden: document.hidden,
+                    text: text
+                });
+            })()
             """);
     }
 

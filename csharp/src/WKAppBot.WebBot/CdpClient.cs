@@ -329,6 +329,20 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         // Small delay for page to settle
         await Task.Delay(500);
 
+        // SPA title stabilization: wait for document.title to change from default/stale
+        // (SPA sites like Notion update title async after navigation)
+        var initialTitle = await EvalAsync("document.title") ?? "";
+        if (string.IsNullOrEmpty(initialTitle) || initialTitle.Contains("WKWebBot"))
+        {
+            for (int i = 0; i < 10; i++) // up to 5s
+            {
+                await Task.Delay(500);
+                var curTitle = await EvalAsync("document.title") ?? "";
+                if (!string.IsNullOrEmpty(curTitle) && curTitle != initialTitle && !curTitle.Contains("WKWebBot"))
+                    break;
+            }
+        }
+
         // Inject WebBot bar and update title
         if (InjectWebBotBar)
             await InjectBarAsync();
