@@ -10,8 +10,12 @@ internal record AiProvider(
     string Name,                // "gemini", "claude", "gpt"
     string Host,                // "gemini.google.com"
     string[] EditorSelectors,   // contenteditable / textarea variants
-    string ResponseSelector,    // last-response element
-    string[] StopSelectors      // stop/cancel button variants
+    string ResponseSelector,    // last-response element (for :last-child text)
+    string[] StopSelectors,     // stop/cancel button variants
+    string[] SendSelectors,     // send/submit button variants (fallback after Enter)
+    string UserMessageSelector, // user turn counter selector
+    string StreamingIndicator,  // streaming-in-progress indicator (attr or element)
+    string? LimitSelector       // rate limit / quota banner (null = no detection)
 )
 {
     public static readonly AiProvider Gemini = new(
@@ -25,7 +29,11 @@ internal record AiProvider(
             ".input-area [contenteditable]"
         ],
         ResponseSelector: "model-response",
-        StopSelectors: ["button[aria-label*='Stop']", "mat-icon[fonticon='stop_circle']"]
+        StopSelectors: ["button[aria-label*='Stop']", "mat-icon[fonticon='stop_circle']"],
+        SendSelectors: ["button[aria-label*='Send']", "button.send-button"],
+        UserMessageSelector: ".query-content",
+        StreamingIndicator: "mat-icon[fonticon='stop_circle']",
+        LimitSelector: null
     );
 
     public static readonly AiProvider Claude = new(
@@ -36,7 +44,11 @@ internal record AiProvider(
             "div[contenteditable='plaintext-only']"
         ],
         ResponseSelector: "[data-is-streaming]",
-        StopSelectors: ["button[aria-label*='Stop']"]
+        StopSelectors: ["button[aria-label*='Stop']"],
+        SendSelectors: ["button[aria-label*='Send']", "button[type='submit']"],
+        UserMessageSelector: "[data-testid='user-message']",
+        StreamingIndicator: "[data-is-streaming='true']",
+        LimitSelector: ".limit-banner, [class*='quota'], [class*='limit']"
     );
 
     public static readonly AiProvider ChatGpt = new(
@@ -50,7 +62,11 @@ internal record AiProvider(
         StopSelectors: [
             "button[aria-label='Stop generating']",
             "button[data-testid='stop-button']"
-        ]
+        ],
+        SendSelectors: ["button[data-testid='send-button']", "button[aria-label*='Send']"],
+        UserMessageSelector: "[data-message-author-role='user']",
+        StreamingIndicator: "[data-testid='stop-button']",
+        LimitSelector: ".rate-limit-banner, [class*='rate-limit']"
     );
 
     public static AiProvider? FromName(string name) => name.ToLowerInvariant() switch
@@ -194,16 +210,50 @@ internal sealed class AskSession : IDisposable
     /// <summary>Called when streaming completes — e.g. response post-processing.</summary>
     public Func<AskSession, string, Task<string>>? OnResponseDone { get; set; }
 
-    // ══ Utilities ══
+    // ══ Provider-Aware Utilities ══
 
     public async Task<bool> IsStreamingAsync()
-        => Cdp != null && await Cdp.IsStreamingAsync(Provider.Name);
+        => Cdp != null && await Cdp.QueryExistsAsync(Provider.StreamingIndicator);
 
     public async Task<string?> GetLastResponseAsync()
-        => Cdp == null ? null : await Cdp.GetLastResponseTextAsync();
+        => Cdp == null ? null : await Cdp.EvalAsync(
+            $"document.querySelector('{Provider.ResponseSelector}:last-child')?.textContent?.trim() ?? ''");
 
     public async Task<int> GetResponseCountAsync()
-        => Cdp == null ? 0 : await Cdp.GetResponseCountAsync();
+        => Cdp == null ? 0 : await Cdp.QueryCountAsync(Provider.ResponseSelector);
+
+    public async Task<int> GetUserMessageCountAsync()
+        => Cdp == null ? 0 : await Cdp.QueryCountAsync(Provider.UserMessageSelector);
+
+    public async Task<bool> IsStopVisibleAsync()
+    {
+        if (Cdp == null) return false;
+        foreach (var sel in Provider.StopSelectors)
+            if (await Cdp.QueryExistsAsync(sel)) return true;
+        return false;
+    }
+
+    public async Task<bool> ClickStopAsync()
+    {
+        if (Cdp == null) return false;
+        foreach (var sel in Provider.StopSelectors)
+            if (await Cdp.QueryExistsAsync(sel)) { await Cdp.JsClickAsync(sel); return true; }
+        return false;
+    }
+
+    public async Task<bool> ClickSendAsync()
+    {
+        if (Cdp == null) return false;
+        foreach (var sel in Provider.SendSelectors)
+            if (await Cdp.QueryExistsAsync(sel)) { await Cdp.JsClickAsync(sel); return true; }
+        return false;
+    }
+
+    public async Task<bool> IsRateLimitedAsync()
+    {
+        if (Cdp == null || Provider.LimitSelector == null) return false;
+        return await Cdp.QueryExistsAsync(Provider.LimitSelector);
+    }
 
     public void Dispose() => Tab?.Dispose();
 }
