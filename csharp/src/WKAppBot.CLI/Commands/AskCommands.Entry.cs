@@ -256,6 +256,8 @@ Examples:
                 {
                     _slackSessionThreadTs.Value = ts;
                     Console.WriteLine($"[TRIAD] Unified Slack thread: {ts}");
+                    Console.WriteLine($"[TRIAD] Join: wkappbot slack reply \"your opinion\" --msg {ts}");
+                    Console.WriteLine($"[TRIAD:THREAD_TS] {ts}");
                 }
             }
         }
