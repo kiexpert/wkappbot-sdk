@@ -492,8 +492,26 @@ internal partial class Program
         try { fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete); }
         catch { return; } // locked or inaccessible — skip silently
         if (start > fs.Length) start = 0;
-        fs.Seek(start, SeekOrigin.Begin);
-        using var sr = new StreamReader(fs, Encoding.UTF8, true); // sr owns fs
+
+        // Auto-detect encoding: UTF-8/BOM/CP949 (EUC-KR) — essential for Korean HTS source files
+        Encoding fileEnc = Encoding.UTF8;
+        if (GrapMode && start == 0)
+        {
+            try
+            {
+                var sample = new byte[Math.Min(fs.Length, 8192)];
+                int read = fs.Read(sample, 0, sample.Length);
+                if (read > 0)
+                    fileEnc = DetectFileEncoding(sample[..read], null);
+                fs.Seek(0, SeekOrigin.Begin);
+            }
+            catch { fs.Seek(0, SeekOrigin.Begin); }
+        }
+        else
+        {
+            fs.Seek(start, SeekOrigin.Begin);
+        }
+        using var sr = new StreamReader(fs, fileEnc, detectEncodingFromByteOrderMarks: true); // sr owns fs
 
         long emitted = lineCounts.TryGetValue(path, out var lc) ? lc : 0;
 

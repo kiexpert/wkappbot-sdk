@@ -1047,8 +1047,10 @@ Examples:
             return 1;
         }
 
-        string oldStr = oldFile != null ? positional[0] : UnescapeCString(positional[0]);
-        string newStr = newFile != null ? positional[1] : UnescapeCString(positional[1]);
+        // No C-style escape processing — pass args as-is.
+        // Callers needing \n should use --old-file/--new-file instead.
+        string oldStr = positional[0];
+        string newStr = positional[1];
         bool fromFile = oldFile != null; // track for line-ending normalization in validate
         var pathPatterns = positional[2..];
 
