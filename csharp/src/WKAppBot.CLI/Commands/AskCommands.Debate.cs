@@ -124,6 +124,18 @@ internal sealed class TriadDebateLoop
         return sb.ToString();
     }
 
+    // ── DEBATE_JSON parsing ──
+
+    private static readonly Regex DebateJsonRegex = new(@"\[DEBATE_JSON\](.*?)\[/DEBATE_JSON\]", RegexOptions.Singleline);
+
+    public static JsonNode? ParseDebateJson(string text)
+    {
+        var m = DebateJsonRegex.Match(text);
+        if (!m.Success) return null;
+        try { return JsonNode.Parse(m.Groups[1].Value); }
+        catch { return null; }
+    }
+
     // ── Stance Points (N=Novelty R=Rigor C=Consensus E=Evidence D=Dissent, sum=9) ──
 
     public record Stance(int Novelty, int Rigor, int Consensus, int Evidence, int Dissent)
