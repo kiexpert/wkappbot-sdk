@@ -126,7 +126,7 @@ internal partial class Program
                     Console.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
 
                 var hasLoopPersonaState = await HasLoopPersonaStateAsync(cdp, "gpt");
-                var effectiveLoopPersona = loopMode || hasLoopPersonaState;
+                var effectiveLoopPersona = !_suppressLoopPersona.Value && (loopMode || hasLoopPersonaState);
                 Console.WriteLine($"[ASK] Loop persona state: {(hasLoopPersonaState ? "present" : "missing")}");
                 if (!loopMode && hasLoopPersonaState)
                     Console.WriteLine("[ASK] Loop marker found; MCP guidance will be included for fresh session persona.");
