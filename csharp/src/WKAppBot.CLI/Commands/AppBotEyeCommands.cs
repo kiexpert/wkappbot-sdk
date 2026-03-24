@@ -69,9 +69,9 @@ internal partial class Program
     private const string EyeWatchdogTaskName = "WKAppBot Eye Watchdog";
 
     /// <summary>
-    /// Schedule eye tick 5 minutes from now via schtasks.exe (no PowerShell = no focus steal).
-    /// Eye loop calls this every minute — keeps pushing 5 min forward while alive.
-    /// If Eye dies, last scheduled time fires 5 min later → tick checks + respawns Eye.
+    /// Schedule eye tick 2 minutes from now via schtasks.exe (no PowerShell = no focus steal).
+    /// Eye loop calls this every minute — keeps pushing 2 min forward while alive.
+    /// If Eye dies, last scheduled time fires 2 min later → tick checks + respawns Eye.
     /// </summary>
     internal static void EnsureEyeWatchdogTask()
     {
@@ -82,8 +82,16 @@ internal partial class Program
 
         var fireAt = DateTime.Now.AddMinutes(2).ToString("HH:mm");
         var fireDate = DateTime.Now.AddMinutes(2).ToString("yyyy/MM/dd");
-        // schtasks.exe: native, no console window with CreateNoWindow, no focus steal
-        var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"\\\"{launcherPath}\\\" eye tick --timeout 15\" /SC ONCE /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
+        // Use wscript.exe + VBS wrapper to suppress console window entirely.
+        // VBScript ws.Run "...", 0 = hidden window (more reliable than conhost --headless).
+        var vbsPath = Path.Combine(dir, "wkappbot-silent.vbs");
+        if (!File.Exists(vbsPath))
+        {
+            try { File.WriteAllText(vbsPath, $"Set ws = CreateObject(\"WScript.Shell\")\nws.Run \"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, False\n"); }
+            catch { }
+        }
+        var tr = File.Exists(vbsPath) ? $"wscript.exe \\\"{vbsPath}\\\"" : $"\\\"{launcherPath}\\\" eye tick --timeout 15";
+        var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"{tr}\" /SC ONCE /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
         try
         {
             var psi = new System.Diagnostics.ProcessStartInfo
