@@ -374,11 +374,11 @@ internal partial class Program
             try
             {
                 // ?�?�?Phase 1: Navigate (iconified OK ??CDP works without rendering) ?�?�?
-                // ── P1: Navigate via AskSession ──
+                // ── P1: Navigate ──
                 PulseStep.Mark("phase1-navigate");
-                await askSession.NavigateAsync(newSession);
-                var currentUrl = await cdp.GetUrlAsync() ?? ""; // kept for downstream logging
-                if (false) // legacy navigate — replaced by askSession.NavigateAsync
+                var currentUrl = await cdp.GetUrlAsync() ?? "";
+                Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
+                if (newSession || !currentUrl.Contains("gemini.google.com"))
                 {
                     Console.WriteLine(newSession ? "[ASK] New session ??navigating to fresh Gemini..." : "[ASK] Navigating to Gemini...");
                     await cdp.NavigateAsync("https://gemini.google.com/app");
@@ -392,8 +392,10 @@ internal partial class Program
                 // NOTE: BringToFront removed ??steals OS focus.
                 // CDP insertText/eval/setFileInputFiles all work on background tabs.
 
-                // Tab state + visibility dispatch handled by askSession.NavigateAsync above
-                if (false) // legacy — replaced by AskSession
+                // Diagnose tab state before editor search
+                var tabState = await cdp.GetTabStateAsync();
+                Console.WriteLine($"[ASK] Tab state: hidden={tabState.hidden} title={tabState.title} elements={tabState.elementCount}");
+                if (tabState.hidden)
                 {
                     Console.WriteLine("[ASK] Tab hidden ??dispatching visibility events (focusless)...");
                     await cdp.DispatchVisibilityAsync();
