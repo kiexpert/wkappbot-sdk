@@ -1026,6 +1026,11 @@ Examples:
             if (!File.Exists(newFile)) return Error($"[file edit] --new-file not found: {newFile}");
             var oldContent = File.ReadAllText(oldFile);
             var newContent = File.ReadAllText(newFile);
+            // Normalize line endings: bash heredoc/echo creates LF, but Windows source files use CRLF.
+            // Strip CR from old/new so matching works regardless of source line endings.
+            // Target file's original line endings are preserved in the output.
+            oldContent = oldContent.Replace("\r\n", "\n").Replace("\r", "");
+            newContent = newContent.Replace("\r\n", "\n").Replace("\r", "");
             // Prepend to positional: old, new, then paths remain
             positional.InsertRange(0, new[] { oldContent, newContent });
         }
@@ -1040,6 +1045,7 @@ Examples:
 
         string oldStr = oldFile != null ? positional[0] : UnescapeCString(positional[0]);
         string newStr = newFile != null ? positional[1] : UnescapeCString(positional[1]);
+        bool fromFile = oldFile != null; // track for line-ending normalization in validate
         var pathPatterns = positional[2..];
 
         // Expand globs for each path pattern
@@ -1066,7 +1072,20 @@ Examples:
         var pending = new List<FileEditPlan>();
         foreach (var path in paths)
         {
-            var (ok, plan, errMsg) = FileEditValidate(path, oldStr, newStr, replaceAll, useRegex, force, encoding);
+            // --old-file mode: adapt line endings to match target file
+            var effOld = oldStr;
+            var effNew = newStr;
+            if (fromFile)
+            {
+                var sample = File.Exists(path) ? File.ReadAllText(path) : "";
+                bool targetCrlf = sample.Contains("\r\n");
+                if (targetCrlf && !effOld.Contains("\r\n"))
+                {
+                    effOld = effOld.Replace("\n", "\r\n");
+                    effNew = effNew.Replace("\n", "\r\n");
+                }
+            }
+            var (ok, plan, errMsg) = FileEditValidate(path, effOld, effNew, replaceAll, useRegex, force, encoding);
             if (!ok) { ErrOut(errMsg); if (multi) return Error("[file edit] validation failed — no files written"); else return 1; }
             pending.Add(plan!);
         }
