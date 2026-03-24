@@ -65,7 +65,10 @@ internal partial class Program
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
         if (triadCtx != null)
+        {
+            triadCtx.RegisterCdp("gpt", cdp);
             cdp.OnStreamingChunk = chunk => triadCtx.UpdateChunk("gpt", chunk);
+        }
         using var askSession = new AskSession(AiProvider.ChatGpt, cdp); // gradual migration wrapper
         PulseStep.Mark("cdp-connected");
 
