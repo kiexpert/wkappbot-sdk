@@ -16,6 +16,9 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
+    // ── Focus theft stack capture (set by OnFocusTheft callback before LogError) ──
+    [ThreadStatic] static string? _lastFocusTheftStack;
+
     // ── Common error logging ──
     static void LogError(string tag, Exception ex)
     {
@@ -58,8 +61,10 @@ internal partial class Program
         {
             try
             {
-                var stack = ex.StackTrace ?? "(no stack)";
-                var bugText = $"[BUG-AUTO] [{tag}] {ex.GetType().Name}: {ex.Message}\nHotLine: {hotLine}\n{stack}";
+                var stack = _lastFocusTheftStack ?? ex.StackTrace ?? "(no stack)";
+                var callerCmd = string.Join(" ", EyeCmdPipeServer.CallerArgs.Value ?? []);
+                var logFile = _currentLogPath != null ? System.IO.Path.GetFileName(_currentLogPath) : "(no log)";
+                var bugText = $"[BUG-AUTO] [{tag}] {ex.GetType().Name}: {ex.Message}\nHotLine: {hotLine}\ncmd: {callerCmd}\nlog: {logFile}\n{stack}";
                 RunSuggestCommand(bugText);
             }
             catch { /* non-critical */ }
@@ -633,12 +638,34 @@ Examples:
                     }
                 }
 
+                cdp.ChromeWindowHandle = (nint)cdp.GetChromeWindowHandle();
                 cdp.EnableFocusTheftMonitoring = true;
+
+                // Magnifier: show on Chrome window for ALL CDP operations (non-foreground target)
+                cdp.OnZoomRequired = (hwnd) =>
+                {
+                    try
+                    {
+                        NativeMethods.GetWindowRect(hwnd, out var wr);
+                        if (wr.Width > 0 && wr.Height > 0)
+                            return ClickZoomHelper.BeginFromRect(
+                                new System.Drawing.Rectangle(wr.Left, wr.Top, wr.Width, wr.Height),
+                                hwnd, "cdp-session", cdp.OperationContext ?? "CDP");
+                    }
+                    catch { }
+                    return null;
+                };
+
                 cdp.OnFocusTheft = (method, prevFg, curFg) =>
                 {
+                    // Capture real call stack for diagnostics (not just "no stack")
+                    var stack = new System.Diagnostics.StackTrace(true).ToString();
                     var focusEx = new InvalidOperationException(
                         $"Focus stolen @ CDP:{method}: was={prevFg:X8} now={curFg:X8}");
+                    // Inject real stack via helper field
+                    _lastFocusTheftStack = stack;
                     LogError("BUG-AUTO", focusEx);
+                    _lastFocusTheftStack = null;
                 };
 
                 return (CdpClient?)cdp;

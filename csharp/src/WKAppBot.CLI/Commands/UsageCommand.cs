@@ -479,12 +479,28 @@ Data Directory:
         // No --past needed: autoOneShot scans all files directly without a time cutoff.
         // Only add --past if user explicitly requested it or wants follow mode (already in flags above).
 
+        // When --basedir already set and fileFilter has path separators, strip to filename only
+        // (logcat will search in basedir; keeping full path confuses the grep-style parser)
+        if (hasBasedir && !string.IsNullOrEmpty(fileFilter)
+            && (fileFilter.Contains('/') || fileFilter.Contains('\\')))
+        {
+            fileFilter = string.Join(";", fileFilter.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Select(p => (p.Contains('/') || p.Contains('\\'))
+                    ? System.IO.Path.GetFileName(p) : p));
+        }
+
         // Translate grep BRE special sequences to .NET regex equivalents
         // \| (BRE OR) → | ; \( \) (BRE groups) → ( )
         if (!string.IsNullOrEmpty(pattern))
             pattern = pattern.Replace("\\|", "|").Replace("\\(", "(").Replace("\\)", ")");
 
-        return new[] { fileFilter, pattern }.Concat(flags).ToArray();
+        // Return in grep-style order: [pattern, fileFilter, ...flags]
+        // logcat parser expects positional[0] = content regex, positional[1..] = file globs
+        var result = new List<string>();
+        if (!string.IsNullOrEmpty(pattern)) result.Add(pattern);
+        if (!string.IsNullOrEmpty(fileFilter)) result.Add(fileFilter);
+        result.AddRange(flags);
+        return result.ToArray();
     }
 
 

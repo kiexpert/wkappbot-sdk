@@ -12,6 +12,30 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
+    /// <summary>
+    /// Emoji prefixes used for Claude/Eye STATUS messages in Slack.
+    /// Only these are eligible for auto-cleanup on Eye restart.
+    /// NOTE: :memo: is NOT a status emoji — it's used by suggest (건의) messages.
+    /// </summary>
+    static readonly HashSet<string> StatusEmojis = new(StringComparer.Ordinal)
+    {
+        ":zzz:",        // idle
+        ":runner:",     // executing
+        ":gear:",       // executing (eye tick)
+        ":clipboard:",  // plan approval pending
+        ":warning:",    // rate limit / context alert
+        ":large_green_circle:", // Eye alive
+        ":red_circle:", // Eye stopped
+        ":robot_face:", // generic bot status
+    };
+
+    static bool IsStatusEmoji(string text)
+    {
+        foreach (var emoji in StatusEmojis)
+            if (text.StartsWith(emoji)) return true;
+        return false;
+    }
+
     // ── Per-instance state ──────────────────────────────────────────────────
 
     /// <summary>Per-Claude-Desktop-instance state: spinner detection + Slack status streaming.</summary>
@@ -918,11 +942,8 @@ internal partial class Program
                         var mUser = m?["username"]?.GetValue<string>();
                         var mText = m?["text"]?.GetValue<string>() ?? "";
                         if (mTs == null || mTs == ts || mUser != instanceUsername) continue;
-                        // Only delete status messages (emoji prefix), not user conversations
-                        bool isStatus = mText.StartsWith(":zzz:") || mText.StartsWith(":runner:")
-                            || mText.StartsWith(":gear:") || mText.StartsWith(":clipboard:")
-                            || mText.StartsWith(":memo:") || mText.StartsWith(":warning:");
-                        if (!isStatus) continue;
+                        // Only delete status messages (defined in StatusEmojis), not user conversations
+                        if (!IsStatusEmoji(mText)) continue;
                         var replyCount = m?["reply_count"]?.GetValue<int>() ?? 0;
                         if (replyCount > 0) continue; // protect threads
                         await SlackDeleteMessageAsync(slackBotToken, slackChannel, mTs);

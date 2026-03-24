@@ -81,57 +81,20 @@ internal partial class Program
                 return (false, prevFg, null);
             }
 
-            // Blocker/minimize already handled in EnsureCdpConnection.
-            // Here: zoom overlay ??show WHICH TAB is being targeted.
-            // Background tab = user can't see the editor, so zoom on the tab strip item.
-
-            // Strategy 1: Find the tab via UIA (shows tab title = user knows which AI)
-            try
-            {
-                var pageTitle = await cdp.GetTitleAsync() ?? "";
-                if (!string.IsNullOrEmpty(pageTitle))
-                {
-                    using var automation = new UIA3Automation();
-                    var chromeEl = automation.FromHandle(chromeHwnd);
-                    // Walk tab strip for matching title (substring match)
-                    var tabs = chromeEl.FindAllDescendants(cf =>
-                        cf.ByControlType(FlaUI.Core.Definitions.ControlType.TabItem));
-                    foreach (var tab in tabs)
-                    {
-                        var tabName = tab.Name ?? "";
-                        if (tabName.Contains(label ?? "", StringComparison.OrdinalIgnoreCase)
-                            || tabName.Contains(pageTitle[..Math.Min(20, pageTitle.Length)], StringComparison.OrdinalIgnoreCase))
-                        {
-                            var tabRect = tab.BoundingRectangle;
-                            if (tabRect.Width > 0 && tabRect.Height > 0)
-                            {
-                                var screenRect = new System.Drawing.Rectangle(
-                                    (int)tabRect.X, (int)tabRect.Y, (int)tabRect.Width, (int)tabRect.Height);
-                                Console.Write($"[ZOOM:TAB \"{tabName[..Math.Min(20, tabName.Length)]}\"] ");
-                                zoom = ClickZoomHelper.BeginFromRect(screenRect, chromeHwnd, $"cdp-{action}", label ?? action);
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-            catch (Exception tex)
-            {
-                Console.Write($"[ZOOM:TAB:ERR {tex.GetType().Name}] ");
-            }
-
-            // Fallback: zoom on Chrome window itself
+            // Magnifier on exact CSS element position (or Chrome window as fallback)
+            zoom = !string.IsNullOrEmpty(cssSelector)
+                ? BeginCdpZoom(cdp, cssSelector, action, label ?? action)
+                : null;
             if (zoom == null)
             {
+                // Fallback: zoom on Chrome window
                 try
                 {
                     NativeMethods.GetWindowRect(chromeHwnd, out var winRect);
                     if (winRect.Width > 0 && winRect.Height > 0)
-                    {
-                        var screenRect = new System.Drawing.Rectangle(
-                            winRect.Left, winRect.Top, winRect.Width, winRect.Height);
-                        zoom = ClickZoomHelper.BeginFromRect(screenRect, chromeHwnd, $"cdp-{action}", label ?? action);
-                    }
+                        zoom = ClickZoomHelper.BeginFromRect(
+                            new System.Drawing.Rectangle(winRect.Left, winRect.Top, winRect.Width, winRect.Height),
+                            chromeHwnd, $"cdp-{action}", label ?? action);
                 }
                 catch { }
             }

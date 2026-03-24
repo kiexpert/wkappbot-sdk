@@ -1000,6 +1000,7 @@ Examples:
         int indentContext = 7; // max lines per indent block direction (--indent-context N, default 7)
 
         string? oldFile = null, newFile = null;
+        string? undoTimestamp = null; // --undo <timestamp>: restore backup first, then edit
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -1014,6 +1015,8 @@ Examples:
             // --old-file/--new-file: read old/new strings from file (avoids bash Korean encoding issues)
             if (args[i] == "--old-file" && i + 1 < args.Length) { oldFile = args[++i]; continue; }
             if (args[i] == "--new-file" && i + 1 < args.Length) { newFile = args[++i]; continue; }
+            // --undo <timestamp>: restore file from .bak-{timestamp} backup before applying edit
+            if (args[i] == "--undo" && i + 1 < args.Length) { undoTimestamp = args[++i]; continue; }
             positional.Add(args[i]);
         }
 
@@ -1040,6 +1043,7 @@ Examples:
         {
             Console.WriteLine("Usage: wkappbot file edit <old_string> <new_string> <path>... [--replace-all] [--regex]");
             Console.WriteLine("       wkappbot file edit --old-file old.txt --new-file new.txt <path>... [--replace-all]");
+            Console.WriteLine("       wkappbot file edit --undo <timestamp> <old> <new> <path>  # restore backup, then edit");
             return 1;
         }
 
@@ -1066,6 +1070,45 @@ Examples:
         }
         if (paths.Count == 0) return Error("[file edit] no target files resolved");
         bool multi = paths.Count > 1;
+
+        // --undo: restore each file from its .bak-{timestamp} backup before editing
+        if (undoTimestamp != null)
+        {
+            var bakPattern = $".bak-{undoTimestamp}";
+            int restored = 0;
+            foreach (var path in paths)
+            {
+                // Search for backup: {path}.bak-{timestamp}*.txt
+                var dir = Path.GetDirectoryName(path) ?? ".";
+                var baseName = Path.GetFileName(path);
+                var bakFile = Directory.Exists(dir)
+                    ? Directory.EnumerateFiles(dir, $"{baseName}.bak-*", SearchOption.TopDirectoryOnly)
+                        .Where(f => Path.GetFileName(f).Contains(bakPattern))
+                        .OrderByDescending(f => f) // latest matching backup
+                        .FirstOrDefault()
+                    : null;
+
+                if (bakFile == null)
+                {
+                    Console.Error.WriteLine($"[file edit --undo] no backup matching {baseName}{bakPattern}* in {dir}");
+                    return 1;
+                }
+
+                // Safety: backup current file before undo (undo-of-undo)
+                if (File.Exists(path))
+                {
+                    var undoTs = DateTime.Now.ToString("yyyyMMdd-HHmmss.fff");
+                    var undoBak = $"{path}.undo-{undoTs}.txt";
+                    File.Copy(path, undoBak);
+                    Console.WriteLine($"[file edit --undo] safety backup → {Path.GetFileName(undoBak)}");
+                }
+
+                File.Copy(bakFile, path, overwrite: true);
+                Console.WriteLine($"[file edit --undo] restored {Path.GetFileName(path)} from {Path.GetFileName(bakFile)}");
+                restored++;
+            }
+            Console.WriteLine($"[file edit --undo] {restored} file(s) restored, now applying edit...");
+        }
 
         // All-or-nothing for multi-file edits: validate ALL files first, then write all.
         // Phase 1: validate (dry-run) — produces edited content for each file but does not write

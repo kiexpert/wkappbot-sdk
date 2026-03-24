@@ -653,11 +653,31 @@ public sealed partial class CdpClient
 
     /// <summary>
     /// Activate this tab in Chrome (bring to front).
-    /// Makes Chrome's window title bar show this tab's title.
-    /// WARNING: This steals focus! Only call when user explicitly wants to see the window.
+    /// Focusless-safe: ensures Chrome is iconic before Page.bringToFront so
+    /// tab activation happens internally without stealing OS focus.
     /// </summary>
     public async Task BringToFrontAsync()
     {
+        // Check if our target is already the active tab in Chrome (via CDP)
+        // If so, Page.bringToFront is a no-op — skip the minimize dance
+        bool alreadyActive = false;
+        try
+        {
+            var visible = await EvalAsync("document.visibilityState") ?? "";
+            alreadyActive = visible == "visible";
+        }
+        catch { }
+
+        if (!alreadyActive)
+        {
+            // Tab is not active → minimize Chrome before activation to prevent OS focus theft
+            var hwnd = GetChromeWindowHandle();
+            if (hwnd != IntPtr.Zero && !IsIconic(hwnd))
+            {
+                ShowWindowNative(hwnd, 6); // SW_MINIMIZE
+                await Task.Delay(50);
+            }
+        }
         await SendAsync("Page.bringToFront");
     }
 

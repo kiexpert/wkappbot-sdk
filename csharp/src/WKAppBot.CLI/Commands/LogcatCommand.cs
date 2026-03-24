@@ -220,7 +220,8 @@ internal partial class Program
         var depthLabel   = maxDepth == 0 ? "" : maxDepth == -1 ? " -r" : $" -r={maxDepth}";
         var pastLabel    = pastSeconds    > 0 ? $" --past {FormatDuration(pastSeconds)}" : "";
         var timeoutLabel = timeoutSeconds > 0 ? $" --timeout {FormatDuration(timeoutSeconds)}" : "";
-        var diagOut = autoOneShot ? Console.Error : Console.Out;
+        // GrapMode: diagnostics always to stderr (stdout = grep-compatible matches only)
+        var diagOut = (autoOneShot || GrapMode) ? Console.Error : Console.Out;
         if (!autoOneShot || !GrapMode)
             diagOut.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")}{pastLabel}{timeoutLabel}{(autoOneShot ? " (grep-mode)" : " (Ctrl+C to stop)")}");
 
@@ -301,8 +302,11 @@ internal partial class Program
             if (pastFiles.Count > 0)
             {
                 Console.Error.WriteLine($"[LOGCAT] --past: scanning {pastFiles.Count} file(s) from last {FormatDuration(pastSeconds)}");
+                // GrapMode: use grep-style output (FormatLine with arrows/line-nums) like autoOneShot
+                var pastGrepOut = GrapMode ? OriginalStdout : (TextWriter?)null;
+                bool pastShowFilename = pastFiles.Count != 1; // grep: suppress filename for single file
                 foreach (var f in pastFiles)
-                    EmitDeltaLines(f.FullName, pastOffsets, pastLineCounts, msgRegex, ref pastHeader, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount);
+                    EmitDeltaLines(f.FullName, pastOffsets, pastLineCounts, msgRegex, ref pastHeader, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount, pastGrepOut, pastShowFilename, showLineNums);
             }
             else
             {

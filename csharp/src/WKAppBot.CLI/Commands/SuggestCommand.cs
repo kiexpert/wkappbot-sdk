@@ -77,7 +77,7 @@ internal partial class Program
         var botToken = LoadSlackBotToken();
         if (!string.IsNullOrEmpty(botToken))
         {
-            var senderName = string.IsNullOrEmpty(cwdTag) ? "앱봇건의" : $"앱봇건의[{cwdTag}]";
+            var senderName = GetSendReplyUsername();
             var (ok, ts) = SlackSendViaApi(botToken, SuggestChannel, header, username: senderName).GetAwaiter().GetResult();
             if (ok)
             {
@@ -378,7 +378,7 @@ internal partial class Program
                 msgLines.Add(part);
             var slackMsg = string.Join("\n", msgLines);
             var (header, overflow) = SplitMessageForChannel(slackMsg);
-            var senderName = $"앱봇건의[{from}]";
+            var senderName = GetSendReplyUsername();
 
             var (ok, newTs) = SlackSendViaApi(botToken, SuggestChannel, header, username: senderName).GetAwaiter().GetResult();
             if (!ok || string.IsNullOrEmpty(newTs))
@@ -646,16 +646,21 @@ internal partial class Program
             {
                 var replyText = $":white_check_mark: *RESOLVED* — {note}\n:page_facing_up: Evidence: `{Path.GetFileName(evidenceFile)}`";
                 var resolverName = GetSendReplyUsername();
-                var (ok, _) = SlackSendViaApi(botToken, SuggestChannel, replyText, threadTs: slackTs, username: resolverName).GetAwaiter().GetResult();
-                if (ok)
-                    Console.WriteLine($"[RESOLVE] Slack reply sent to thread {slackTs}");
+
+                // 1. Text reply with reply_broadcast → visible in channel + thread
+                var (textOk, _) = SlackSendViaApi(botToken, SuggestChannel, replyText,
+                    threadTs: slackTs, username: resolverName, replyBroadcast: true).GetAwaiter().GetResult();
+                if (textOk)
+                    Console.WriteLine($"[RESOLVE] Slack reply sent to thread {slackTs} (+ channel broadcast)");
                 else
                     Console.Error.WriteLine($"[RESOLVE] Slack reply failed");
-                // Upload evidence file to Slack thread
+
+                // 2. Upload evidence file to thread (thread-only, no broadcast)
                 try
                 {
-                    SlackCommand(["upload", evidenceFile, "--msg", slackTs]);
-                    Console.WriteLine($"[RESOLVE] Evidence uploaded to Slack thread");
+                    SlackUploadFileAsync(botToken, SuggestChannel, evidenceFile,
+                        title: Path.GetFileName(evidenceFile), threadTs: slackTs).GetAwaiter().GetResult();
+                    Console.WriteLine($"[RESOLVE] Evidence uploaded to thread");
                 }
                 catch (Exception ex) { Console.Error.WriteLine($"[RESOLVE] Evidence upload failed: {ex.Message}"); }
             }

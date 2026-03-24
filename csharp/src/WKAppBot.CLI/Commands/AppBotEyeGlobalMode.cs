@@ -362,9 +362,7 @@ internal partial class Program
                                     var subtype = m?["subtype"]?.GetValue<string>();
                                     if (botId != null || subtype == "bot_message")
                                     {
-                                        var statusRx = System.Text.RegularExpressions.Regex.Match(text,
-                                            @"^(:zzz:|:runner:|:gear:|:clipboard:|:memo:|:warning:|:robot_face:)");
-                                        if (statusRx.Success)
+                                        if (IsStatusEmoji(text))
                                         {
                                             var ts = m?["ts"]?.GetValue<string>();
                                             var replyCount = m?["reply_count"]?.GetValue<int>() ?? 0;
