@@ -16,6 +16,45 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
+    // ── Common error logging ──
+    static void LogError(string tag, Exception ex)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"[{tag}] Error: {ex.Message}");
+        Console.ResetColor();
+        if (ex.StackTrace != null)
+        {
+            var firstFrame = ex.StackTrace.TrimStart();
+            if (firstFrame.Length > 300) firstFrame = firstFrame[..300] + "...";
+            Console.WriteLine($"[{tag}] at {firstFrame}");
+        }
+
+        // Auto bug report via suggest command (Slack + suggestions.jsonl handled by suggest)
+        Task.Run(() =>
+        {
+            try
+            {
+                var stack = ex.StackTrace ?? "(no stack)";
+                var bugText = $"[BUG-AUTO] [{tag}] {ex.GetType().Name}: {ex.Message}\n{stack}";
+                RunSuggestCommand(bugText);
+            }
+            catch { /* non-critical */ }
+        });
+    }
+
+    static void RunSuggestCommand(string text)
+    {
+        try { SuggestCommand(new[] { text }); }
+        catch { /* non-critical */ }
+    }
+
+    static void LogWarning(string tag, string context, Exception ex)
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[{tag}] {context}: {ex.Message}");
+        Console.ResetColor();
+    }
+
     static int AskCommand(string[] args)
     {
         if (args.Length < 2)
@@ -236,7 +275,7 @@ Examples:
             });
             Console.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) → {cwdTag}");
         }
-        catch (Exception ex) { Console.WriteLine($"[TRIAD] Reminder schedule error: {ex.Message}"); }
+        catch (Exception ex) { LogWarning("TRIAD", "Reminder schedule error", ex); }
         if (!string.IsNullOrEmpty(threadTs))
         {
             var body = $"🔔 *삼두 완료* — 종합의견 리마인더 예약됨 (5s)\n📌 `--msg {threadTs}`";
@@ -296,7 +335,7 @@ Examples:
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ASK] GrapHelper tab routing failed: {ex.Message}");
+            LogWarning("ASK", "GrapHelper tab routing failed", ex);
             return false;
         }
     }
@@ -449,7 +488,7 @@ Examples:
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[SANDBOX] Create failed after mismatch: {ex.Message}");
+                        LogWarning("SANDBOX", "Create failed after mismatch", ex);
                     }
                     return null;
                 }
@@ -485,7 +524,7 @@ Examples:
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SANDBOX] Create failed: {ex.Message}");
+            LogWarning("SANDBOX", "Create failed", ex);
         }
         return null;
     }
@@ -573,7 +612,7 @@ Examples:
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ASK] Failed to connect: {ex.Message}");
+                LogError("ASK", ex);
                 return (CdpClient?)null;
             }
         });

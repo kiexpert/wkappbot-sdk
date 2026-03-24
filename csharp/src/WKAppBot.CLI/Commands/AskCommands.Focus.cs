@@ -146,7 +146,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[AAR:CDP] Error: {ex.Message}");
+            LogWarning("AAR:CDP", "Focus rect error", ex);
             return (true, prevFg, zoom);
         }
     }

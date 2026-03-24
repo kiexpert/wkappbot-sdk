@@ -75,7 +75,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ASK] Tier2-DomFocus failed: {ex.Message}");
+            LogWarning("ASK", "Tier2-DomFocus failed", ex);
             return false;
         }
     }

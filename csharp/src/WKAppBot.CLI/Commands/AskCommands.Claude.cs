@@ -509,7 +509,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ASK] Error: {ex.Message}");
+                LogError("ASK", ex);
                 return (false, (string?)null);
             }
         });
@@ -722,7 +722,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ASK] Slack report failed: {ex.Message}");
+            LogWarning("ASK", "Slack report failed", ex);
         }
     }
 }
