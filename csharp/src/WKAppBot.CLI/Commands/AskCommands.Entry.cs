@@ -292,7 +292,19 @@ Examples:
         };
         Task.WaitAll(tasks);
         var results = tasks.Select(t => t.Result).ToArray();
-        Console.WriteLine($"[TRIAD] Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+        Console.WriteLine($"[TRIAD] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+
+        // ── 정반합 Debate Loop (R2 critique + R3 synthesis) ──
+        // Only run if at least 2 AIs responded successfully and not in no-wait mode
+        if (!noWait && results.Count(r => r == 0) >= 2)
+        {
+            try { RunDebateLoop(question, timeoutSec, ctx); }
+            catch (Exception ex) { Console.Error.WriteLine($"[DEBATE] Error: {ex.Message}"); }
+        }
+        else if (!noWait)
+        {
+            Console.WriteLine("[TRIAD] Skipping debate — need at least 2 successful AIs");
+        }
 
         // ── Schedule reminder into caller's Claude Code prompt via `wkappbot prompt send` ──
         // Uses the scheduler (independent process) so TeeTextWriter lifetime is irrelevant.
