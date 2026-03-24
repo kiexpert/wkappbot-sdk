@@ -84,8 +84,7 @@ internal partial class Program
 
         try
         {
-            // Suppress Slack noise for sub-calls
-            _suppressSlackSession.Value = true;
+            // Stream to Slack in real-time (don't suppress — user wants live updates)
 
             var askArgs = new List<string> { ai };
             foreach (var line in prompt.Split('\n'))
