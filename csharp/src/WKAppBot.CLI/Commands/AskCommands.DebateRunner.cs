@@ -161,7 +161,10 @@ internal partial class Program
             return;
         }
 
-        // Check early convergence (unlikely in R1 but possible for simple questions)
+        // ── Streaming cross-prompt: AIs react to each other in real-time ──
+        RunCrossPromptLoop(ais, Math.Min(timeoutSec, 90), ctx);
+
+        // Check convergence after cross-prompting
         var r1Convergence = TriadDebateLoop.CalculateConvergence(r1Results);
         Console.WriteLine($"[DEBATE:R1] Convergence: {r1Convergence:F2} (threshold: 0.60)");
         if (r1Convergence >= 0.6 && !TriadDebateLoop.HasContradictions(r1Results))
@@ -208,6 +211,91 @@ internal partial class Program
         PostDebateSummary(r3Results.Count > 0 ? r3Results : r2Results, 3);
 
         Console.WriteLine("[DEBATE] ═══ 정반합 토론 완료 ═══");
+    }
+
+    /// <summary>
+    /// Streaming cross-prompt loop: inject peer chunks into each AI after their R1 response.
+    /// Called from the main triad flow — runs concurrently with R1 polling.
+    /// Each AI that finishes early picks up peer chunks and auto-reacts.
+    /// Max 3 cross-prompt rounds per AI to prevent infinite loop.
+    /// </summary>
+    static void RunCrossPromptLoop(string[] ais, int timeoutSec, TriadSharedContext ctx)
+    {
+        const int maxCrossRounds = 3;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        Console.WriteLine("[CROSS] ═══ Real-time cross-prompting started ═══");
+        SlackPostToThread("🔄 *실시간 크로스 프롬프팅 시작* — AI끼리 실시간 토론!", "앱봇아이");
+
+        var crossTasks = ais.Select(ai => Task.Run(async () =>
+        {
+            var peerSeen = new ConcurrentDictionary<string, int>();
+
+            for (int round = 0; round < maxCrossRounds; round++)
+            {
+                if (sw.Elapsed.TotalSeconds > timeoutSec) break;
+
+                // Wait for peer chunks to accumulate
+                await Task.Delay(5000);
+
+                var peers = ctx.GetPeerChunks(ai, peerSeen);
+                if (peers.Count == 0) continue;
+
+                // Build cross-prompt message
+                var crossMsg = new StringBuilder();
+                crossMsg.AppendLine($"[CROSS-PROMPT round {round + 1}] Other AIs are arguing:");
+                foreach (var (fromAi, text) in peers)
+                    crossMsg.AppendLine($"  [{fromAi}]: {text}");
+                crossMsg.AppendLine("React briefly — agree, disagree, or refine. Use [CLAIM] format.");
+
+                Console.WriteLine($"[CROSS:{ai}] Round {round + 1}: {peers.Count} peer chunk(s) → injecting");
+                SlackPostToThread($"🔀 *[CROSS:{ai} R{round + 1}]* {peers.Count} peer chunk(s) injected", ai);
+
+                // Inject as follow-up ask (reuses existing session)
+                var response = AskAndCapture(ai, crossMsg.ToString(), Math.Min(timeoutSec, 60));
+                if (response != null)
+                {
+                    var claims = TriadDebateLoop.ParseClaims(response);
+                    ctx.LogStep(ai, $"[CROSS-R{round + 1}] {claims.Count} claims after peer review");
+
+                    // Share back via chunk update
+                    ctx.UpdateChunk(ai, response);
+
+                    SlackPostToThread(
+                        $"💬 *[{ai} CROSS-R{round + 1}]* {claims.Count} claims" +
+                        (claims.Count > 0 ? $": {claims[0].Text[..Math.Min(60, claims[0].Text.Length)]}..." : ""),
+                        ai);
+                }
+
+                // Check convergence after each cross-round
+                var allResults = ais.Select(a =>
+                {
+                    var chunks = ctx.GetPeerChunks("__none__", new ConcurrentDictionary<string, int>());
+                    // Build rough results from latest chunks
+                    var latestChunk = "";
+                    if (ctx.GetPeerChunks(a, new ConcurrentDictionary<string, int>()).Count > 0)
+                        latestChunk = ctx.GetPeerChunks(a, new ConcurrentDictionary<string, int>()).Last().chunk;
+                    return new TriadDebateLoop.RoundResult(a, latestChunk, TriadDebateLoop.ParseClaims(latestChunk));
+                }).Where(r => r.Claims.Count > 0).ToList();
+
+                if (allResults.Count >= 2)
+                {
+                    var conv = TriadDebateLoop.CalculateConvergence(allResults);
+                    Console.WriteLine($"[CROSS:{ai}] Convergence: {conv:F2}");
+                    if (conv >= 0.6 && !TriadDebateLoop.HasContradictions(allResults))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"[CROSS] Convergence reached! ({conv:F2})");
+                        Console.ResetColor();
+                        SlackPostToThread($"✅ *수렴 달성!* Jaccard={conv:F2} — 토론 종료", "앱봇아이");
+                        return;
+                    }
+                }
+            }
+        })).ToArray();
+
+        Task.WaitAll(crossTasks);
+        Console.WriteLine("[CROSS] ═══ Cross-prompting complete ═══");
     }
 
     /// <summary>Post debate summary to Slack thread.</summary>
