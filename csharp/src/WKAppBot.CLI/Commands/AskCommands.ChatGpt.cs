@@ -193,7 +193,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ASK] Error: {ex.Message}");
+                LogError("ASK", ex);
                 return (false, (string?)null);
             }
         });
@@ -962,7 +962,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ASK] UIA send failed: {ex.Message}");
+            LogWarning("ASK", "UIA send failed", ex);
         }
         return false;
     }

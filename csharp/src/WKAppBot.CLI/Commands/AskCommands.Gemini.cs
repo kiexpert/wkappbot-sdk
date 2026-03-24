@@ -301,7 +301,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[VISION-ASK] Gemini error: {ex.Message}");
+            LogError("VISION-ASK", ex);
             return null;
         }
         finally
@@ -784,7 +784,7 @@ internal partial class Program
                 var abPollTask = Task.Run(async () =>
                 {
                     try { return await cdp.PollStreamingResponseAsync("gemini", baseResponseCount, timeoutSec); }
-                    catch (Exception ex) { Console.Error.WriteLine($"[A/B] PollStreaming error: {ex.Message}"); return (false, ""); }
+                    catch (Exception ex) { LogWarning("A/B", "PollStreaming error", ex); return (false, ""); }
                 });
 
                 // Register for tab handoff + activate peer's tab (we'll poll with textContent)
@@ -1014,8 +1014,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ASK] Error: {ex.Message}");
-                Console.WriteLine($"[ASK] StackTrace: {ex.StackTrace}");
+                LogError("ASK", ex);
                 return (false, (string?)null);
             }
         });

@@ -269,7 +269,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[ASK] Image save failed: {ex.Message}");
+                    LogWarning("ASK", "Image save failed", ex);
                 }
             }
         }
@@ -277,7 +277,7 @@ internal partial class Program
         {
             // Non-fatal ??image detection is best-effort
             if (!ex.Message.Contains("JSON")) // suppress parse noise
-                Console.WriteLine($"[ASK] Image detect error: {ex.Message}");
+                LogWarning("ASK", "Image detect error", ex);
         }
         return saved;
     }

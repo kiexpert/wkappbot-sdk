@@ -102,7 +102,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[ASK] Clipboard.SetImage failed: {ex.Message}");
+                    LogWarning("ASK", "Clipboard.SetImage failed", ex);
                 }
             });
             staThread.SetApartmentState(ApartmentState.STA);
@@ -140,7 +140,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ASK] Clipboard paste failed: {ex.Message}");
+            LogWarning("ASK", "Clipboard paste failed", ex);
             RestoreClipboard(clipBackup);
             return false;
         }
@@ -354,7 +354,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ASK] File attach error: {ex.Message}");
+            LogWarning("ASK", "File attach error", ex);
             return false;
         }
     }
@@ -482,7 +482,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ASK] Duplicate notice dismiss failed: {ex.Message}");
+            LogWarning("ASK", "Duplicate notice dismiss failed", ex);
         }
     }
 
@@ -679,7 +679,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ASK] UIA dialog error: {ex.Message}");
+            LogWarning("ASK", "UIA dialog error", ex);
             return false;
         }
     }
