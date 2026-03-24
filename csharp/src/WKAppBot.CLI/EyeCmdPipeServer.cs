@@ -276,7 +276,28 @@ internal static class EyeCmdPipeServer
         {
             pipeWriter.WriteLine($"[CMD] {string.Join(" ", args)} → dispatched to background");
             pipeWriter.WriteLine($"Log: {logFile}");
-            DispatchBg(args, callerHwnd);
+            // Pass callerCwd so Slack bot-name and thread work correctly in background
+            var bgCwd = callerCwd;
+            var bgHwnd = callerHwnd;
+            var bgLogDir = Path.Combine(Program.DataDir, "logs");
+            Directory.CreateDirectory(bgLogDir);
+            var bgCmdTag = args.Length > 1 ? $"{args[0]}-{args[1]}" : (args.Length > 0 ? args[0] : "bg");
+            var bgLogFile = Path.Combine(bgLogDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{bgCmdTag}.pid={Environment.ProcessId}.log");
+            var bgTee = new TeeTextWriter(TextWriter.Null, bgLogFile);
+            _ = Task.Run(() =>
+            {
+                CallerCwd.Value = bgCwd;
+                CallerHwnd.Value = bgHwnd;
+                CallerArgs.Value = args;
+                CurrentCommandGlobal = args;
+                Program.RunningInEye = true;
+                using (ThreadRoutingWriter.Route(bgTee))
+                {
+                    try { Program.Main(args); }
+                    catch (Exception ex) { bgTee.WriteLine($"[BG] error: {ex.Message}"); }
+                }
+                bgTee.Dispose();
+            });
             return 0; // immediate return to launcher
         }
 
