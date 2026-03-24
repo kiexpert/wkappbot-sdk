@@ -64,6 +64,8 @@ internal partial class Program
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "gpt");
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+        if (triadCtx != null)
+            cdp.OnStreamingChunk = chunk => triadCtx.UpdateChunk("gpt", chunk);
         using var askSession = new AskSession(AiProvider.ChatGpt, cdp); // gradual migration wrapper
         PulseStep.Mark("cdp-connected");
 

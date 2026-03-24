@@ -137,6 +137,8 @@ internal partial class Program
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "claude");
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+        if (triadCtx != null)
+            cdp.OnStreamingChunk = chunk => triadCtx.UpdateChunk("claude", chunk);
         using var askSession = new AskSession(AiProvider.Claude, cdp); // gradual migration wrapper
         PulseStep.Mark("cdp-connected");
 
