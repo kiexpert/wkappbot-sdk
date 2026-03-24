@@ -69,25 +69,7 @@ internal partial class Program
         var sw = Stopwatch.StartNew();
         while (sw.ElapsedMilliseconds < maxWaitMs)
         {
-            var stopVisible = await cdp.EvalAsync("""
-                (() => {
-                    var s1 = document.querySelector('button[aria-label*="Stop"]');
-                    var s2 = document.querySelector('button[aria-label*="����"]');
-                    if (s1) return 'BTN:' + (s1.getAttribute('aria-label') || '?');
-                    if (s2) return 'BTN:' + (s2.getAttribute('aria-label') || '?');
-                    // mat-icon stop_circle: only count if parent button has stop-related aria-label
-                    var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                    if (mat) {
-                        var btn = mat.closest('button');
-                        if (btn) {
-                            var lbl = (btn.getAttribute('aria-label') || btn.title || '').toLowerCase();
-                            if (lbl.includes('stop') || lbl.includes('����') || lbl.includes('halt'))
-                                return 'MAT:' + lbl;
-                        }
-                    }
-                    return '0';
-                })()
-                """) ?? "0";
+            var stopVisible = await cdp.GetStopButtonDetailAsync() ?? "0";
             if (stopVisible == "0")
                 return true;
 
@@ -97,17 +79,7 @@ internal partial class Program
 
         // Timed out ? try clicking the stop button to cancel ongoing generation, then wait briefly
         Console.WriteLine("[ASK] Gemini stop still visible ? clicking stop to cancel generation...");
-        await cdp.EvalAsync("""
-            (() => {
-                var btn = document.querySelector('button[aria-label*="Stop"]')
-                       || document.querySelector('button[aria-label*="����"]');
-                if (!btn) {
-                    var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                    if (mat) btn = mat.closest('button');
-                }
-                if (btn) btn.click();
-            })()
-            """);
+        await cdp.ClickStopButtonAsync();
         await Task.Delay(1500);
         var stillVisible = await cdp.IsStopButtonVisibleAsync();
         Console.WriteLine($"[ASK] Gemini stop after click: {(stillVisible ? "still visible" : "cleared")}");
@@ -272,14 +244,7 @@ internal partial class Program
             await Task.Delay(200);
 
             // Send
-            await cdp.EvalAsync("""
-                (() => {
-                    var btn = document.querySelector('button[aria-label*="Send"]')
-                           || document.querySelector('button[aria-label="Send message"]')
-                           || document.querySelector('button.send-button');
-                    if (btn && !btn.disabled) btn.click();
-                })()
-                """);
+            await cdp.SendPromptAsync(editorSel);
 
             // Poll 500ms intervals until response stabilizes
             var sw = Stopwatch.StartNew();
@@ -316,14 +281,7 @@ internal partial class Program
         await cdp.ClearEditorAsync(editorSel);
         await cdp.InsertContentEditableAsync(editorSel, question);
         await Task.Delay(300);
-        await cdp.EvalAsync("""
-            (() => {
-                var btn = document.querySelector('button[aria-label="Send message"]')
-                       || document.querySelector('button[aria-label*="Send"]')
-                       || document.querySelector('button.send-button');
-                if (btn && !btn.disabled) btn.click();
-            })()
-            """);
+        await cdp.SendPromptAsync(editorSel);
 
         var sw = Stopwatch.StartNew();
         string? retryText = null;
@@ -477,26 +435,11 @@ internal partial class Program
                             while (pStabSw.Elapsed.TotalSeconds < 45)
                             {
                                 await Task.Delay(1500);
-                                var curText = await cdp.EvalAsync("""
-                                    (() => {
-                                        var r = document.querySelectorAll('model-response');
-                                        if (r.length === 0) r = document.querySelectorAll('[role="article"]');
-                                        if (r.length === 0) return '';
-                                        return (r[r.length-1].textContent || '').trim();
-                                    })()
-                                    """) ?? "";
+                                var curText = await cdp.GetLastResponseTextAsync() ?? "";
                                 if (curText.Length == 0) continue;
                                 // Also check stop button ? if still visible, Gemini is still generating (not truly stable)
-                                var stopNowPersona = await cdp.EvalAsync("""
-                                    (() => {
-                                        if (document.querySelector('button[aria-label*="Stop"]') ||
-                                            document.querySelector('button[aria-label*="����"]')) return '1';
-                                        var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                                        if (mat) { var b=mat.closest('button'); if(b&&(b.getAttribute('aria-label')||'').toLowerCase().includes('stop')) return '1'; }
-                                        return '0';
-                                    })()
-                                    """) ?? "0";
-                                if (stopNowPersona == "1") { pStabCount = 0; prevText = curText; continue; } // still generating
+                                var stopNowPersona = await cdp.GetStopButtonDetailAsync();
+                                if (stopNowPersona != "NONE") { pStabCount = 0; prevText = curText; continue; } // still generating
                                 if (curText == prevText)
                                 {
                                     pStabCount++;
@@ -612,29 +555,15 @@ internal partial class Program
                 // Pre-send: if stop visible (persona continuation), wait WITHOUT clicking stop.
                 // Clicking stop generates a stop-notice response that poisons subsequent reads.
                 {
-                    var preStopped = await cdp.IsStopButtonVisibleAsync() ? "1" : "0";
-                    /* replaced: EvalAsync stop check → IsStopButtonVisibleAsync */
-                    if (false) { var _x = await cdp.EvalAsync("""
-                        (() => {
-                            if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="����"]')) return '1';
-                            var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                            return (mat && mat.closest('button')) ? '1' : '0';
-                        })()
-                        """) ?? "0"; }
-                    if (preStopped == "1")
+                    var preStopped = await cdp.IsStopButtonVisibleAsync();
+                    if (preStopped)
                     {
                         Console.WriteLine("[ASK] Gemini still generating pre-send ? waiting without interrupt...");
                         await WaitWhileGeminiStopVisibleNoClickAsync(cdp, maxWaitMs: 30000);
                         // After Gemini finishes, check if it generated a tool call (loop mode)
                         if (effectiveLoopPersona && personaEarlyToolCall == null)
                         {
-                            var lateResp = await cdp.EvalAsync("""
-                                (() => {
-                                    var r = document.querySelectorAll('model-response');
-                                    if (r.length === 0) r = document.querySelectorAll('[role="article"]');
-                                    return r.length > 0 ? (r[r.length-1].textContent || '') : '';
-                                })()
-                                """) ?? "";
+                            var lateResp = await cdp.GetLastResponseTextAsync() ?? "";
                             Console.WriteLine($"[ASK] Post-wait resp ({lateResp.Length}): {lateResp.Substring(0, Math.Min(80, lateResp.Length)).Replace('\n', ' ')}");
                             if (lateResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                                 && ParseAllLoopToolCalls(lateResp).Count > 0)
@@ -655,16 +584,9 @@ internal partial class Program
 
                 for (int sendAttempt = 0; sendAttempt < 5; sendAttempt++)
                 {
-                    // Fast-fail if Gemini is still generating ? do NOT click stop (poisons response)
-                    var stopAtSend = await cdp.EvalAsync("""
-                        (() => {
-                            if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="����"]')) return '1';
-                            var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                            if (mat) { var b=mat.closest('button'); if(b) return '1'; }
-                            return '0';
-                        })()
-                        """) ?? "0";
-                    if (stopAtSend == "1")
+                    // Fast-fail if Gemini is still generating — do NOT click stop (poisons response)
+                    var stopAtSend = await cdp.GetStopButtonDetailAsync();
+                    if (stopAtSend != "NONE")
                     {
                         // If editor is already empty, message was sent ? Gemini is responding (stop = normal)
                         if (sendAttempt > 0)
@@ -716,30 +638,16 @@ internal partial class Program
                         await Task.Delay(200);
                     }
 
-                    // JS click() ??works even when Chrome is minimized (no viewport needed)
-                    var clickResult = await cdp.EvalAsync("""
-                        (() => {
-                            var btn = document.querySelector('button[aria-label="메시지 보내�?]')
-                                   || document.querySelector('button[aria-label="Send message"]')
-                                   || document.querySelector('button.send-button');
-                            if (!btn || btn.disabled) return 'NO_BUTTON';
-                            btn.click();
-                            return 'CLICKED';
-                        })()
-                        """) ?? "NO_BUTTON";
+                    // JS click() — works even when Chrome is minimized (no viewport needed)
+                    var sendBtnExists = await cdp.QueryExistsAsync("button[aria-label=\"Send message\"], button[aria-label*=\"Send\"], button.send-button");
+                    if (sendBtnExists)
+                        await cdp.JsClickAsync("button[aria-label=\"Send message\"], button[aria-label*=\"Send\"], button.send-button");
 
-                    if (clickResult != "CLICKED")
+                    if (!sendBtnExists)
                     {
-                        var stopVisibleNow = await cdp.EvalAsync("""
-                            (() => {
-                                if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="����"]')) return '1';
-                                var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                                if (mat) { var b=mat.closest('button'); if (b&&((b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('stop')||(b.getAttribute('aria-label')||b.title||'').toLowerCase().includes('����'))) return '1'; }
-                                return '0';
-                            })()
-                            """) ?? "0";
+                        var stopVisibleNow = await cdp.GetStopButtonDetailAsync();
                         var curResponses = (await cdp.GetResponseCountAsync()).ToString();
-                        if (stopVisibleNow == "1" || curResponses != preResponseCount)
+                        if (stopVisibleNow != "NONE" || curResponses != preResponseCount)
                         {
                             sendResult = $"RESPONSE_STARTED(stop-visible attempt={sendAttempt + 1})";
                             break;
@@ -830,9 +738,8 @@ internal partial class Program
                     if (string.IsNullOrEmpty(text))
                     {
                         // Diagnostic: log if response count changed but text is empty (baseline filter issue)
-                        var diagCount = await cdp.EvalAsync(
-                            "(document.querySelectorAll('model-response').length || document.querySelectorAll('[role=\"article\"]').length || 0).toString()") ?? "0";
-                        if (diagCount != preResponseCount && sw.Elapsed.TotalSeconds < 10)
+                        var diagCount = await cdp.GetResponseCountAsync();
+                        if (diagCount.ToString() != preResponseCount && sw.Elapsed.TotalSeconds < 10)
                             Console.WriteLine($"[ASK] Poll: respCount={diagCount} base={baseResponseCount} ? text empty (filter skipping? check baseline)");
                         continue;
                     }
@@ -969,14 +876,7 @@ internal partial class Program
                 await cdp.ClearEditorAsync(editorSel);
                 await cdp.InsertContentEditableAsync(editorSel, question);
                 await Task.Delay(300);
-                await cdp.EvalAsync("""
-                    (() => {
-                        var btn = document.querySelector('button[aria-label="메시지 보내�?]')
-                               || document.querySelector('button[aria-label="Send message"]')
-                               || document.querySelector('button.send-button');
-                        if (btn && !btn.disabled) btn.click();
-                    })()
-                    """);
+                await cdp.SendPromptAsync(editorSel);
                 Console.WriteLine("[ASK] Retry: sent question");
 
                 // Poll retry (shorter timeout)
