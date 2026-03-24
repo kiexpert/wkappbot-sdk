@@ -113,6 +113,11 @@ internal sealed class TriadDebateLoop
             3. Provide your FINAL claims with updated confidence:
             [CLAIM]{"claim":"...","confidence":0.95,"key_assumptions":["..."]}[/CLAIM]
 
+            IMPORTANT: Write your FINAL CONCLUSION in Korean (한국어).
+            Each AI should present their own position summary in Korean.
+            Format: [CONCLUSION_KR] 여기에 한국어로 최종 결론 작성 [/CONCLUSION_KR]
+            The rest of the synthesis should remain in English.
+
             Mark the synthesis complete with: [SYNTHESIS_COMPLETE]
             """);
 
