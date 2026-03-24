@@ -187,9 +187,9 @@ internal partial class Program
         sb.Append($"Max loop steps: {Math.Max(1, maxSteps)}. Per-step retry budget: {Math.Max(0, retry)}. ");
         if (triadMode)
         {
-            sb.Append("=== 정반합 DIALECTICAL DEBATE MODE === ");
+            sb.Append("=== DIALECTICAL DEBATE MODE === ");
             sb.Append("You are in a multi-AI debate. Other AIs will challenge your claims in real-time. ");
-            sb.Append("RULES: (1) Always respond in ENGLISH for token efficiency. ");
+            sb.Append("CRITICAL: (1) YOU MUST RESPOND IN ENGLISH ONLY. No Korean, no other languages. English saves 3x tokens. This is a hard requirement. ");
             sb.Append("(2) Structure every claim using this exact format: ");
             sb.Append("[CLAIM]{\"claim\":\"your specific claim\",\"confidence\":0.85,\"key_assumptions\":[\"assumption1\"]}[/CLAIM] ");
             sb.Append("(3) When you see '[AI-X says]: ...' — that is a LIVE message from another AI. React immediately: agree, disagree with evidence, or refine your position. ");

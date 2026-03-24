@@ -67,7 +67,7 @@ internal sealed class TriadSharedContext
             var queue = _crossPromptQueues.GetOrAdd(peerAi, _ => new ConcurrentQueue<(string, string)>());
             queue.Enqueue((ai, snippet));
 
-            // Pre-type into peer's editor (will be sent after their response finishes)
+            // Pre-type into peer's editor + post to Slack
             _ = Task.Run(async () =>
             {
                 try
@@ -81,9 +81,12 @@ internal sealed class TriadSharedContext
                     };
                     if (editorSel == null) return;
 
-                    var crossText = $"[{ai} says]: {snippet}\nYour brief reaction?";
+                    var crossText = $"[{ai} says]: {snippet}\nYour brief reaction? (ENGLISH ONLY)";
                     await peerCdp.InsertContentEditableAsync(editorSel, crossText);
                     Console.WriteLine($"[CROSS] {ai}→{peerAi}: pre-typed ({snippet.Length} chars)");
+
+                    // Post to Slack so user sees cross-prompt flow in real-time
+                    Program.SlackPostToThread($"🔀 *[{ai}→{peerAi}]*: {snippet[..Math.Min(200, snippet.Length)]}", ai);
                 }
                 catch { /* editor may not be ready — non-fatal */ }
             });
