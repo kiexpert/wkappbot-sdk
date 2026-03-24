@@ -161,12 +161,17 @@ internal partial class Program
             var results = tasks.Select(t => t.Result).ToArray();
             Console.WriteLine($"[AGENT] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
-            // ── 정반합 Debate Loop (R2 critique + R3 synthesis) ──
+            // ── 정반합: cross-prompt loop (R1 already done above, skip to cross-prompting) ──
             if (results.Count(r => r == 0) >= 2)
             {
                 var sessionDir = Path.Combine(DataDir, "triad", DateTime.UtcNow.ToString("yyyyMMdd_HHmmss"));
                 var ctx = new TriadSharedContext(question, sessionDir);
-                try { RunDebateLoop(question, timeoutSec, ctx); }
+                try
+                {
+                    // R1 already completed in parallel above — go straight to cross-prompting
+                    var ais = new[] { "gemini", "gpt", "claude" };
+                    RunCrossPromptLoop(ais, Math.Min(timeoutSec, 90), ctx);
+                }
                 catch (Exception ex) { Console.Error.WriteLine($"[DEBATE] Error: {ex.Message}"); }
             }
 
