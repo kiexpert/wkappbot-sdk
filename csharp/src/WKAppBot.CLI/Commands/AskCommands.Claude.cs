@@ -543,6 +543,11 @@ internal partial class Program
             Console.WriteLine(answer.Length > 2000 ? answer[..2000] + "\n... (truncated)" : answer);
             Console.WriteLine("[ASK_ANSWER_END]");
 
+            // Full answer marker (for programmatic capture by whisper study etc.)
+            Console.WriteLine("[ASK_FULL_ANSWER_BEGIN]");
+            Console.WriteLine(answer);
+            Console.WriteLine("[ASK_FULL_ANSWER_END]");
+
             // Slack already handled above (initial answer) + loop onStepReport
         }
 
