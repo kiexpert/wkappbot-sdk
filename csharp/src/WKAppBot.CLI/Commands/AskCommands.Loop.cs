@@ -189,15 +189,19 @@ internal partial class Program
         {
             sb.Append("=== DIALECTICAL DEBATE MODE === ");
             sb.Append("You are in a multi-AI debate. Other AIs will challenge your claims in real-time. ");
-            sb.Append("CRITICAL: (1) YOU MUST RESPOND IN ENGLISH ONLY. No Korean, no other languages. English saves 3x tokens. This is a hard requirement. ");
-            sb.Append("(2) Structure every claim using this exact format: ");
-            sb.Append("[CLAIM]{\"claim\":\"your specific claim\",\"confidence\":0.85,\"key_assumptions\":[\"assumption1\"]}[/CLAIM] ");
-            sb.Append("(3) When you see '[AI-X says]: ...' — that is a LIVE message from another AI. React immediately: agree, disagree with evidence, or refine your position. ");
-            sb.Append("(4) Be intellectually honest — update your confidence when convinced by peer arguments. ");
-            sb.Append("(5) Identify shared ground AND genuine disagreements. Don't compromise just for consensus. ");
-            sb.Append("(6) Keep responses concise (max 300 words). Focus on claims, not filler. ");
-            sb.Append("(7) If you strongly disagree, say WHY with specific reasoning (informed disagreement > silent conformity). ");
-            sb.Append("GOAL: converge on the strongest answer through rigorous debate, not averaging. ");
+            sb.Append("CRITICAL: (1) YOU MUST RESPOND IN ENGLISH ONLY. No Korean. Hard requirement. ");
+            sb.Append("(2) Structure every claim: [CLAIM]{\"claim\":\"...\",\"confidence\":0.85,\"prev_confidence\":null,\"key_assumptions\":[\"...\"],\"disputed_by\":[]}[/CLAIM] ");
+            sb.Append("When revising after critique, set prev_confidence to your old score. δconfidence = evidence of genuine persuasion. ");
+            sb.Append("(3) ROLE ASSIGNMENT: You are assigned a debate role. ");
+            sb.Append("  - EXPLORER: generate novel hypotheses, find unexpected angles. ");
+            sb.Append("  - SKEPTIC: attack assumptions, find weaknesses, stress-test claims. ");
+            sb.Append("  - AUDITOR: verify consistency, check evidence quality, ensure logical coherence. ");
+            sb.Append("(4) When you see '[AI-X says]: ...' — react from YOUR ROLE's perspective. ");
+            sb.Append("(5) DISPUTE STACK: to challenge a peer's assumption, explicitly state: [DISPUTE]{\"target_assumption\":\"...\",\"reason\":\"...\"}[/DISPUTE] ");
+            sb.Append("Convergence = all disputes resolved or withdrawn, not just word overlap. ");
+            sb.Append("(6) Keep responses concise (max 300 words). Claims > filler. ");
+            sb.Append("(7) Informed disagreement > silent conformity. Update confidence with reason. ");
+            sb.Append("GOAL: strongest answer through rigorous debate, not averaging. ");
         }
         sb.Append("APSP STREAMING PARALLEL: emit multiple MCP call envelopes back-to-back in one turn — server executes all simultaneously and streams results as they complete. ");
         sb.Append("Parallel example: ");

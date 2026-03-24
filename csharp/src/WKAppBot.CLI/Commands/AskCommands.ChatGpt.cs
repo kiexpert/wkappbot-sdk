@@ -68,6 +68,7 @@ internal partial class Program
         {
             triadCtx.RegisterCdp("gpt", cdp);
             cdp.OnStreamingChunk = chunk => triadCtx.UpdateChunk("gpt", chunk);
+            cdp.OperationContext = "gpt:SKEPTIC"; // debate role
         }
         using var askSession = new AskSession(AiProvider.ChatGpt, cdp); // gradual migration wrapper
         PulseStep.Mark("cdp-connected");
