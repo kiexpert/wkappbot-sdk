@@ -228,9 +228,14 @@ internal sealed class AskSession : IDisposable
     public async Task<bool> IsStopVisibleAsync()
     {
         if (Cdp == null) return false;
-        foreach (var sel in Provider.StopSelectors)
-            if (await Cdp.QueryExistsAsync(sel)) return true;
-        return false;
+        // Check visibility (not just DOM existence) — hidden/disabled buttons should not block
+        var js = string.Join(",", Provider.StopSelectors.Select(s => "'" + s.Replace("'", "\\'") + "'"));
+        var result = await Cdp.EvalAsync(
+            "(()=>{var sels=[" + js + "];" +
+            "for(var s of sels){var el=document.querySelector(s);" +
+            "if(el&&el.offsetParent!==null&&!el.disabled&&el.offsetWidth>0)return 'yes'}" +
+            "return 'no'})()");
+        return result == "yes";
     }
 
     public async Task<bool> ClickStopAsync()
