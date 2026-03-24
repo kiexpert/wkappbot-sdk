@@ -36,14 +36,17 @@ internal sealed class TriadDebateLoop
     public static string BuildR1Prompt(string question)
     {
         return $$"""
-            Answer the following question independently. Structure your response as:
+            You are participating in a 정반합 (dialectical) debate with other AIs.
+            Answer in ENGLISH. Be concise (max 300 words).
 
-            1. A concise summary (max 300 tokens)
-            2. Structured claims in this exact JSON format (one per line):
+            For each key point, use this exact format:
             [CLAIM]{"claim":"your specific claim","confidence":0.85,"key_assumptions":["assumption1","assumption2"]}[/CLAIM]
 
-            Provide 2-5 claims covering different aspects of your answer.
-            Be specific and honest about confidence levels (0.0-1.0).
+            Guidelines:
+            - Provide 2-5 claims covering different aspects
+            - Confidence: 0.0 (uncertain) to 1.0 (certain) — be honest
+            - List key assumptions that could be challenged
+            - Other AIs WILL see and critique your claims — be defensible
 
             Question: {{question}}
             """;

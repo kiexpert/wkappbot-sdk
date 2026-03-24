@@ -186,7 +186,19 @@ internal partial class Program
         sb.Append("LOOP MODE OVERRIDES base persona: be verbose and exploratory, not minimal. Explain your reasoning between steps. DO NOT add extra blank lines between paragraphs — keep formatting compact (one blank line max between sections). ");
         sb.Append($"Max loop steps: {Math.Max(1, maxSteps)}. Per-step retry budget: {Math.Max(0, retry)}. ");
         if (triadMode)
-            sb.Append("Use TRIAD planning: Observation -> Action -> Verification. ");
+        {
+            sb.Append("=== 정반합 DIALECTICAL DEBATE MODE === ");
+            sb.Append("You are in a multi-AI debate. Other AIs will challenge your claims in real-time. ");
+            sb.Append("RULES: (1) Always respond in ENGLISH for token efficiency. ");
+            sb.Append("(2) Structure every claim using this exact format: ");
+            sb.Append("[CLAIM]{\"claim\":\"your specific claim\",\"confidence\":0.85,\"key_assumptions\":[\"assumption1\"]}[/CLAIM] ");
+            sb.Append("(3) When you see '[AI-X says]: ...' — that is a LIVE message from another AI. React immediately: agree, disagree with evidence, or refine your position. ");
+            sb.Append("(4) Be intellectually honest — update your confidence when convinced by peer arguments. ");
+            sb.Append("(5) Identify shared ground AND genuine disagreements. Don't compromise just for consensus. ");
+            sb.Append("(6) Keep responses concise (max 300 words). Focus on claims, not filler. ");
+            sb.Append("(7) If you strongly disagree, say WHY with specific reasoning (informed disagreement > silent conformity). ");
+            sb.Append("GOAL: converge on the strongest answer through rigorous debate, not averaging. ");
+        }
         sb.Append("APSP STREAMING PARALLEL: emit multiple MCP call envelopes back-to-back in one turn — server executes all simultaneously and streams results as they complete. ");
         sb.Append("Parallel example: ");
         sb.Append(LoopCallBegin);
