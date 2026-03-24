@@ -199,8 +199,11 @@ internal partial class Program
             sb.Append("(4) When you see '[AI-X says]: ...' — react from YOUR ROLE's perspective. ");
             sb.Append("(5) DISPUTE STACK: to challenge a peer's assumption, explicitly state: [DISPUTE]{\"target_assumption\":\"...\",\"reason\":\"...\"}[/DISPUTE] ");
             sb.Append("Convergence = all disputes resolved or withdrawn, not just word overlap. ");
-            sb.Append("(6) Keep responses concise (max 300 words). Claims > filler. ");
-            sb.Append("(7) Informed disagreement > silent conformity. Update confidence with reason. ");
+            sb.Append("(6) STANCE POINTS: Start EVERY response with a point allocation (sum MUST = 9): ");
+            sb.Append("[STANCE N=? R=? C=? E=? D=?] where N=Novelty, R=Rigor, C=Consensus, E=Evidence, D=Dissent. ");
+            sb.Append("This reveals your priorities. High D = strong disagreement. High C = ready to converge. ");
+            sb.Append("(7) Keep responses concise (max 300 words). Claims > filler. ");
+            sb.Append("(8) Informed disagreement > silent conformity. Update confidence with reason. ");
             sb.Append("GOAL: strongest answer through rigorous debate, not averaging. ");
         }
         sb.Append("APSP STREAMING PARALLEL: emit multiple MCP call envelopes back-to-back in one turn — server executes all simultaneously and streams results as they complete. ");

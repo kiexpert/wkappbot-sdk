@@ -119,6 +119,33 @@ internal sealed class TriadDebateLoop
         return sb.ToString();
     }
 
+    // ── Stance Points (N=Novelty R=Rigor C=Consensus E=Evidence D=Dissent, sum=9) ──
+
+    public record Stance(int Novelty, int Rigor, int Consensus, int Evidence, int Dissent)
+    {
+        public int Sum => Novelty + Rigor + Consensus + Evidence + Dissent;
+        public override string ToString() => $"N={Novelty} R={Rigor} C={Consensus} E={Evidence} D={Dissent}";
+    }
+
+    private static readonly Regex StanceRegex = new(@"\[STANCE\s+N=(\d+)\s+R=(\d+)\s+C=(\d+)\s+E=(\d+)\s+D=(\d+)\]");
+
+    public static Stance? ParseStance(string text)
+    {
+        var m = StanceRegex.Match(text);
+        if (!m.Success) return null;
+        return new Stance(
+            int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value),
+            int.Parse(m.Groups[3].Value), int.Parse(m.Groups[4].Value),
+            int.Parse(m.Groups[5].Value));
+    }
+
+    /// <summary>Stance convergence: all AIs have C >= 3 (consensus priority) and D <= 1 (low dissent).</summary>
+    public static bool StancesConverged(List<(string ai, Stance stance)> stances)
+    {
+        if (stances.Count < 2) return false;
+        return stances.All(s => s.stance.Consensus >= 3 && s.stance.Dissent <= 1);
+    }
+
     // ── Dispute tracking ──
 
     public record Dispute(string TargetAssumption, string Reason);
