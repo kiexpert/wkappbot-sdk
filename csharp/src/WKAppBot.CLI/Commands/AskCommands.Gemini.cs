@@ -267,8 +267,8 @@ internal partial class Program
 
             // Attach screenshot + prompt
             await AttachFilesViaCdp(cdp, new List<string> { tmpPath }, editorSel);
-            await ClearContentEditable(cdp, editorSel);
-            await InsertTextContentEditable(cdp, editorSel, prompt);
+            await cdp.ClearEditorAsync(editorSel);
+            await cdp.InsertContentEditableAsync(editorSel, prompt);
             await Task.Delay(200);
 
             // Send
@@ -313,8 +313,8 @@ internal partial class Program
     static async Task<(bool ok, string? text)> RetryGeminiAfterStopAsync(CdpClient cdp, string editorSel, string question)
     {
         await WaitWhileGeminiStopVisibleAsync(cdp, 6000);
-        await ClearContentEditable(cdp, editorSel);
-        await InsertTextContentEditable(cdp, editorSel, question);
+        await cdp.ClearEditorAsync(editorSel);
+        await cdp.InsertContentEditableAsync(editorSel, question);
         await Task.Delay(300);
         await cdp.EvalAsync("""
             (() => {
@@ -374,10 +374,11 @@ internal partial class Program
             try
             {
                 // ?�?�?Phase 1: Navigate (iconified OK ??CDP works without rendering) ?�?�?
+                // ── P1: Navigate via AskSession ──
                 PulseStep.Mark("phase1-navigate");
-                var currentUrl = await cdp.GetUrlAsync() ?? "";
-                Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
-                if (newSession || !currentUrl.Contains("gemini.google.com"))
+                await askSession.NavigateAsync(newSession);
+                var currentUrl = await cdp.GetUrlAsync() ?? ""; // kept for downstream logging
+                if (false) // legacy navigate — replaced by askSession.NavigateAsync
                 {
                     Console.WriteLine(newSession ? "[ASK] New session ??navigating to fresh Gemini..." : "[ASK] Navigating to Gemini...");
                     await cdp.NavigateAsync("https://gemini.google.com/app");
@@ -391,29 +392,17 @@ internal partial class Program
                 // NOTE: BringToFront removed ??steals OS focus.
                 // CDP insertText/eval/setFileInputFiles all work on background tabs.
 
-                // Diagnose tab state before editor search
-                var tabState = await cdp.GetTabStateAsync();
-                Console.WriteLine($"[ASK] Tab state: hidden={tabState.hidden} title={tabState.title} elements={tabState.elementCount}");
-
-                // If tab is hidden (background), dispatch visibility events to trigger deferred rendering
-                // (Gemini lazily initializes editor on hidden tabs — fake visibility = focusless fix)
-                if (tabState.hidden)
+                // Tab state + visibility dispatch handled by askSession.NavigateAsync above
+                if (false) // legacy — replaced by AskSession
                 {
                     Console.WriteLine("[ASK] Tab hidden ??dispatching visibility events (focusless)...");
                     await cdp.DispatchVisibilityAsync();
                     await Task.Delay(500);
                 }
 
+                // ── P2: Find editor via AskSession (uses AiProvider.Gemini selectors) ──
                 PulseStep.Mark("find-editor");
-                // A11y-first: find editor via selector chain
-                var editorSel = await WaitForEditorA11y(cdp,
-                    ".ql-editor",                                   // Quill class
-                    "[role='textbox'][contenteditable='true']",      // ARIA role
-                    "div[contenteditable='true']",                   // Generic
-                    "div.ql-editor",                                 // Quill with tag
-                    "rich-textarea [contenteditable]",               // Gemini new UI
-                    ".input-area [contenteditable]"                  // Gemini alt
-                );
+                var editorSel = await askSession.FindEditorAsync(15);
                 if (editorSel == null)
                 {
                     // Last resort: dump available contenteditable elements
@@ -446,11 +435,11 @@ internal partial class Program
                     Console.WriteLine(geminiTurnCount == "0"
                         ? "[ASK] Fresh Gemini -- injecting persona..."
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
-                    await ClearContentEditable(cdp, editorSel);
+                    await cdp.ClearEditorAsync(editorSel);
                     var personaText = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
                         SlackPostToThread($"📋 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "..." : personaText)}\n```", "System");
-                    await InsertTextContentEditable(cdp, editorSel, personaText);
+                    await cdp.InsertContentEditableAsync(editorSel, personaText);
                     await Task.Delay(300);
 
                     // Send persona (button click ??Enter fallback)
@@ -600,8 +589,8 @@ internal partial class Program
                 }
 
                 // Tier 1: focusless insert (a11y-first)
-                await ClearContentEditable(cdp, editorSel);
-                var inserted = await InsertTextContentEditable(cdp, editorSel, question);
+                await cdp.ClearEditorAsync(editorSel);
+                var inserted = await cdp.InsertContentEditableAsync(editorSel, question);
                 if (!inserted)
                 {
                     // Tier 2: DOM.focus (Chrome-internal, no OS focus) + execCommand/DOM mutation
@@ -723,7 +712,7 @@ internal partial class Program
                     // Re-insert text if editor is empty (text didn't stick)
                     if (remaining == "0" && sendAttempt == 0)
                     {
-                        await InsertTextContentEditable(cdp, editorSel, question);
+                        await cdp.InsertContentEditableAsync(editorSel, question);
                         await Task.Delay(200);
                     }
 
@@ -963,8 +952,8 @@ internal partial class Program
 
                 // Retry: same page, re-insert and send (no reload, keeps session)
                 await Task.Delay(1000);
-                await ClearContentEditable(cdp, editorSel);
-                await InsertTextContentEditable(cdp, editorSel, question);
+                await cdp.ClearEditorAsync(editorSel);
+                await cdp.InsertContentEditableAsync(editorSel, question);
                 await Task.Delay(300);
                 await cdp.EvalAsync("""
                     (() => {
