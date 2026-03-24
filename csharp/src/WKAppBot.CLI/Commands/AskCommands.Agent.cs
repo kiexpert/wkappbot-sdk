@@ -158,8 +158,19 @@ internal partial class Program
                 Task.Run(() => AskClaude(question, true, timeoutSec, newTab: false, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"claude-agent-{tabSuffix}", linePrefix: "[claude] ")),
             };
             Task.WaitAll(tasks);
-            Console.WriteLine($"[AGENT] Triad done — gemini={tasks[0].Result} gpt={tasks[1].Result} claude={tasks[2].Result}");
-            return tasks.Select(t => t.Result).Any(r => r == 0) ? 0 : 1;
+            var results = tasks.Select(t => t.Result).ToArray();
+            Console.WriteLine($"[AGENT] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+
+            // ── 정반합 Debate Loop (R2 critique + R3 synthesis) ──
+            if (results.Count(r => r == 0) >= 2)
+            {
+                var sessionDir = Path.Combine(DataDir, "triad", DateTime.UtcNow.ToString("yyyyMMdd_HHmmss"));
+                var ctx = new TriadSharedContext(question, sessionDir);
+                try { RunDebateLoop(question, timeoutSec, ctx); }
+                catch (Exception ex) { Console.Error.WriteLine($"[DEBATE] Error: {ex.Message}"); }
+            }
+
+            return results.Any(r => r == 0) ? 0 : 1;
         }
 
         return ai switch
