@@ -39,8 +39,13 @@ internal partial class Program
     static string StripGeminiUiPrefix(string text)
     {
         if (!text.StartsWith("Gemini")) return text;
-        var eo = text.IndexOf('\uC751'); // ��
-        if (eo > 0 && eo < 15 && eo + 1 < text.Length && text[eo + 1] == '\uB2F5') // ��
+        // Strip Korean "Gemini의 응답" or English "Gemini's response"
+        foreach (var p in new[] { "Gemini\uC758 \uC751\uB2F5", "Gemini\uC758\uC751\uB2F5", "Gemini's response" })
+            if (text.StartsWith(p, StringComparison.OrdinalIgnoreCase))
+                return text[p.Length..].TrimStart();
+        // Fallback: find 응답 pattern within first 20 chars
+        var eo = text.IndexOf('\uC751');
+        if (eo > 0 && eo < 20 && eo + 1 < text.Length && text[eo + 1] == '\uB2F5')
             return text[(eo + 2)..].TrimStart();
         return text;
     }
