@@ -59,16 +59,33 @@ internal partial class Program
             return response;
         })).ToArray();
 
-        Task.WaitAll(r1Tasks);
-        var r1Results = r1Tasks.Select(t => t.Result).ToArray();
-        var r1Count = r1Results.Count(r => r != null);
-        Console.WriteLine($"[DEBATE:R1] Done: {r1Count}/3 responded");
-
-        if (r1Count < 2)
+        // Wait for at least 2 AIs (don't wait for all 3 — slow one can join later)
+        var r1Results = new string?[3];
+        var r1Sw = System.Diagnostics.Stopwatch.StartNew();
+        while (r1Sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 120))
         {
-            SlackPostToThread("❌ Debate aborted: less than 2 AIs responded.", "Moderator");
+            int done = 0;
+            for (int i = 0; i < r1Tasks.Length; i++)
+                if (r1Tasks[i].IsCompleted) { r1Results[i] = r1Tasks[i].Result; done++; }
+            if (done >= 2) break;
+            Thread.Sleep(2000);
+            // Nudge slow AIs via Slack
+            if (r1Sw.Elapsed.TotalSeconds > 30 && done < 2)
+                SlackPostToThread($"⏳ Waiting for responses... ({done}/3 so far)", "Moderator");
+        }
+        // Collect whatever we have
+        for (int i = 0; i < r1Tasks.Length; i++)
+            if (r1Tasks[i].IsCompleted) r1Results[i] = r1Tasks[i].Result;
+        var r1Count = r1Results.Count(r => r != null);
+        Console.WriteLine($"[DEBATE:R1] Proceeding with {r1Count}/3 responses");
+
+        if (r1Count < 1)
+        {
+            SlackPostToThread("❌ Debate aborted: no AIs responded.", "Moderator");
             return 1;
         }
+        if (r1Count < 2)
+            SlackPostToThread("⚠️ Only 1 AI responded — proceeding with limited debate.", "Moderator");
 
         // R2: Cross-critique — share R1 answers and ask for reactions
         Console.WriteLine("[DEBATE:R2] Cross-critique starting...");
@@ -103,8 +120,14 @@ internal partial class Program
             return response;
         })).ToArray();
 
-        Task.WaitAll(r2Tasks);
-        Console.WriteLine("[DEBATE:R2] Done");
+        // Wait for at least 2 (or timeout)
+        var r2Sw = System.Diagnostics.Stopwatch.StartNew();
+        while (r2Sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 90))
+        {
+            if (r2Tasks.Count(t => t.IsCompleted) >= 2) break;
+            Thread.Sleep(2000);
+        }
+        Console.WriteLine($"[DEBATE:R2] Done ({r2Tasks.Count(t => t.IsCompleted)}/3)");
 
         // R3: Synthesis — ask for final conclusion in Korean
         Console.WriteLine("[DEBATE:R3] Synthesis starting...");
