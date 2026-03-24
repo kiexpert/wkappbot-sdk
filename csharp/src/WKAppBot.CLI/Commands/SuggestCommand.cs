@@ -61,9 +61,9 @@ internal partial class Program
                         foreach (var subDir in Directory.GetDirectories(catDir).OrderBy(d => d))
                         {
                             var sub = Path.GetFileName(subDir);
-                            var files = Directory.GetFiles(subDir).Select(Path.GetFileName).ToArray();
-                            if (files.Length > 0)
-                                Console.WriteLine($"   {cat}/{sub}: {string.Join(", ", files)}");
+                            var subFiles = Directory.GetFiles(subDir).Select(Path.GetFileName).ToArray();
+                            if (subFiles.Length > 0)
+                                Console.WriteLine($"   {cat}/{sub}: {string.Join(", ", subFiles)}");
                         }
                     }
                     Console.WriteLine($"   Tip: reference these when writing your own resolve evidence!");
@@ -685,8 +685,8 @@ internal partial class Program
                 if (existingHash != newHash)
                 {
                     var ts = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-                    var ext = Path.GetExtension(destName);
-                    destName = $"{Path.GetFileNameWithoutExtension(destName)}-{ts}{ext}";
+                    var destExt = Path.GetExtension(destName);
+                    destName = $"{Path.GetFileNameWithoutExtension(destName)}-{ts}{destExt}";
                     destPath = Path.Combine(testsDir, destName);
                 }
                 // else: same content — overwrite is fine (idempotent)
