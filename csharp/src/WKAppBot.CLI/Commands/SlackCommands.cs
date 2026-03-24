@@ -407,12 +407,13 @@ internal partial class Program
         catch { return null; }
     }
 
-    static async Task<(bool ok, string? ts)> SlackSendViaApi(string botToken, string channel, string text, string? threadTs = null, string? username = null)
+    static async Task<(bool ok, string? ts)> SlackSendViaApi(string botToken, string channel, string text, string? threadTs = null, string? username = null, bool replyBroadcast = false)
     {
         using var http = new HttpClient();
         // Build payload with optional username override for multi-bot identification
         var dict = new Dictionary<string, object> { ["channel"] = channel, ["text"] = text };
         if (!string.IsNullOrEmpty(threadTs)) dict["thread_ts"] = threadTs;
+        if (replyBroadcast && !string.IsNullOrEmpty(threadTs)) dict["reply_broadcast"] = true;
         if (!string.IsNullOrEmpty(username))
         {
             dict["username"] = username;

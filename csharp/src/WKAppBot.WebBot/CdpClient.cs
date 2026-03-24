@@ -31,6 +31,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     private CancellationTokenSource? _receiveCts;
     private Task? _receiveTask;
     private TaskCompletionSource<JsonNode?>? _fileChooserTcs;
+    private IDisposable? _activeZoom; // auto-magnifier for non-foreground Chrome
     private readonly HttpClient _http = new();
 
     public bool IsConnected => _ws?.State == WebSocketState.Open;
@@ -44,10 +45,24 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     /// <summary>
     /// Focus theft monitoring for every CDP SendAsync call.
     /// When enabled, detects if Chrome steals OS foreground after each CDP command.
-    /// OnFocusTheft(method, prevFg, curFg) is called when focus stolen — caller can log/restore.
+    /// OnFocusTheft(method, prevFg, curFg) fires ONLY when Chrome itself stole focus
+    /// (not when the user naturally switches windows).
     /// </summary>
     public bool EnableFocusTheftMonitoring { get; set; }
     public Action<string, nint, nint>? OnFocusTheft { get; set; }
+
+    /// <summary>Chrome main window handle — set by caller for accurate focus theft detection.</summary>
+    public nint ChromeWindowHandle { get; set; }
+
+    /// <summary>Current high-level operation context (e.g. "ask-gemini:wait-response") for focus theft diagnostics.</summary>
+    public string? OperationContext { get; set; }
+
+    /// <summary>
+    /// Called once when CDP session starts active operations on a non-foreground Chrome window.
+    /// Caller should show magnifier on the target. Returns IDisposable to dismiss when done.
+    /// Signature: (chromeHwnd) → IDisposable? zoom
+    /// </summary>
+    public Func<IntPtr, IDisposable?>? OnZoomRequired { get; set; }
 
     /// <summary>
     /// Connect to Chrome's DevTools WebSocket.
@@ -229,6 +244,16 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         if (_ws == null || _ws.State != WebSocketState.Open)
             throw new InvalidOperationException("Not connected");
 
+        // Auto-magnifier: if Chrome is not foreground and no zoom is active, show one
+        if (OnZoomRequired != null && ChromeWindowHandle != 0 && _activeZoom == null)
+        {
+            var fg = GetForegroundWindow();
+            GetWindowThreadProcessId(fg, out int fgPid);
+            GetWindowThreadProcessId((IntPtr)ChromeWindowHandle, out int chPid);
+            if (fgPid != chPid)
+                _activeZoom = OnZoomRequired((IntPtr)ChromeWindowHandle);
+        }
+
         // Focus theft monitoring: capture prevFg just before send
         nint prevFg = 0;
         if (EnableFocusTheftMonitoring && OnFocusTheft != null)
@@ -263,14 +288,23 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
             throw new TimeoutException($"CDP command '{method}' timed out after {timeoutMs}ms");
         }
 
-        // Focus theft check after response received
+        // Focus theft check: only fire when CHROME stole focus (became foreground unexpectedly).
+        // User switching to other apps is normal behavior — never yank focus back.
         if (prevFg != 0 && OnFocusTheft != null)
         {
             var curFg = (nint)GetForegroundWindow();
-            if (curFg != prevFg)
+            if (curFg != prevFg && ChromeWindowHandle != 0)
             {
-                OnFocusTheft(method, prevFg, curFg);
-                SetForegroundWindow((IntPtr)prevFg);
+                // Get Chrome's process ID for comparison
+                GetWindowThreadProcessId((IntPtr)curFg, out int curPid);
+                GetWindowThreadProcessId((IntPtr)ChromeWindowHandle, out int chromePid);
+                if (curPid == chromePid)
+                {
+                    // Chrome process stole focus → report + restore user's window
+                    OnFocusTheft(method + (OperationContext != null ? $"[{OperationContext}]" : ""), prevFg, curFg);
+                    SetForegroundWindow((IntPtr)prevFg);
+                }
+                // else: user switched windows naturally → do nothing
             }
         }
 
@@ -569,6 +603,8 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
 
     public void Dispose()
     {
+        _activeZoom?.Dispose();
+        _activeZoom = null;
         DisconnectAsync().GetAwaiter().GetResult();
         _ws?.Dispose();
         _receiveCts?.Dispose();

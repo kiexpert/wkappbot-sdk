@@ -192,8 +192,8 @@ internal partial class Program
                     {
                         try
                         {
-                            // Bring tab to front for accurate screenshot (ignore errors)
-                            try { await cdp.SendAsync("Page.bringToFront"); } catch { }
+                            // Bring tab to front for accurate screenshot (focusless-safe: auto-minimizes if not foreground)
+                            try { await cdp.BringToFrontAsync(); } catch { }
 
                             // Scroll image into view, wait 2 frames for reflow, measure rect
                             var rectJson = await cdp.EvalAsync($$"""
