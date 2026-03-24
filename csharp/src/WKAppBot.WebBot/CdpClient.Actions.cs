@@ -33,7 +33,7 @@ public sealed partial class CdpClient
             result = await SendAsync("Runtime.evaluate", parameters);
         }
 
-        // Log JS exceptions to console (previously silent — returned null with no trace)
+        // Log JS exceptions — critical for debugging CDP automation bugs
         var exDetails = result?["exceptionDetails"];
         if (exDetails != null)
         {
@@ -41,7 +41,12 @@ public sealed partial class CdpClient
                    ?? exDetails["text"]?.GetValue<string>()
                    ?? "unknown JS error";
             var line = exDetails["lineNumber"]?.GetValue<int>() ?? -1;
+            var exprPreview = expression.Length > 120 ? expression[..120] + "..." : expression;
+            exprPreview = exprPreview.Replace('\n', ' ').Replace('\r', ' ');
+            Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"[CDP:JS-ERR] {msg}{(line >= 0 ? $" (line {line})" : "")}");
+            Console.WriteLine($"[CDP:JS-ERR] expr: {exprPreview}");
+            Console.ResetColor();
         }
 
         var valueNode = result?["result"]?["value"];
