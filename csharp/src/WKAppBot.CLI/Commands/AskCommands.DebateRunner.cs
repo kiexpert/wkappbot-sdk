@@ -276,13 +276,14 @@ internal partial class Program
                     if (ctx.GetPeerChunks(a, new ConcurrentDictionary<string, int>()).Count > 0)
                         latestChunk = ctx.GetPeerChunks(a, new ConcurrentDictionary<string, int>()).Last().chunk;
                     return new TriadDebateLoop.RoundResult(a, latestChunk, TriadDebateLoop.ParseClaims(latestChunk));
-                }).Where(r => r.Claims.Count > 0).ToList();
+                }).Where(r => r.Claims.Count >= 2).ToList(); // min 2 claims per AI
 
-                if (allResults.Count >= 2)
+                if (allResults.Count >= 2) // min 2 AIs with substantive claims
                 {
                     var conv = TriadDebateLoop.CalculateConvergence(allResults);
-                    Console.WriteLine($"[CROSS:{ai}] Convergence: {conv:F2}");
-                    if (conv >= 0.6 && !TriadDebateLoop.HasContradictions(allResults))
+                    Console.WriteLine($"[CROSS:{ai}] Convergence: {conv:F2} ({allResults.Count} AIs with 2+ claims)");
+                    SlackPostToThread($"📊 *[Convergence]* {conv:F2} ({allResults.Count} AIs)", "Moderator");
+                    if (conv >= 0.6 && conv < 1.0 && !TriadDebateLoop.HasContradictions(allResults)) // 1.0 = suspicious
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine($"[CROSS] Convergence reached! ({conv:F2})");

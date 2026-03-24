@@ -199,17 +199,17 @@ internal partial class Program
             sb.Append("(4) When you see '[AI-X says]: ...' — react from YOUR ROLE's perspective. ");
             sb.Append("(5) DISPUTE STACK: to challenge a peer's assumption, explicitly state: [DISPUTE]{\"target_assumption\":\"...\",\"reason\":\"...\"}[/DISPUTE] ");
             sb.Append("Convergence = all disputes resolved or withdrawn, not just word overlap. ");
-            sb.Append("(6) YOU MUST USE THIS EXACT RESPONSE FORMAT (fill in the blanks): ");
-            sb.Append("--- RESPONSE FORMAT START --- ");
-            sb.Append("[STANCE N=_ R=_ C=_ E=_ D=_] ");
-            sb.Append("[ROLE: EXPLORER|SKEPTIC|AUDITOR] ");
-            sb.Append("POSITION: (one sentence summary) ");
-            sb.Append("[CLAIM]{\"claim\":\"...\",\"confidence\":0.XX,\"prev_confidence\":null,\"key_assumptions\":[\"...\"]}[/CLAIM] ");
-            sb.Append("(repeat CLAIM for each point, 2-5 claims) ");
-            sb.Append("REBUTTAL: (if responding to [AI-X says]) ");
-            sb.Append("[DISPUTE]{\"target_assumption\":\"...\",\"reason\":\"...\"}[/DISPUTE] (if challenging a peer) ");
-            sb.Append("--- RESPONSE FORMAT END --- ");
-            sb.Append("RULES: STANCE sum MUST = 9. Max 300 words. English only. ");
+            sb.Append("(6) YOUR RESPONSE MUST BE VALID JSON wrapped in [DEBATE_JSON]...[/DEBATE_JSON] tags: ");
+            sb.Append("[DEBATE_JSON]{");
+            sb.Append("\"stance\":{\"N\":2,\"R\":3,\"C\":1,\"E\":2,\"D\":1},");
+            sb.Append("\"role\":\"EXPLORER\",");
+            sb.Append("\"position\":\"one sentence summary\",");
+            sb.Append("\"claims\":[{\"claim\":\"...\",\"confidence\":0.85,\"prev_confidence\":null,\"key_assumptions\":[\"...\"]}],");
+            sb.Append("\"rebuttals\":[\"response to peer argument\"],");
+            sb.Append("\"disputes\":[{\"target_assumption\":\"...\",\"reason\":\"...\"}]");
+            sb.Append("}[/DEBATE_JSON] ");
+            sb.Append("RULES: stance values sum MUST = 9. 2-5 claims. English only. ");
+            sb.Append("You may add free text AFTER the JSON block for elaboration. ");
             sb.Append("GOAL: strongest answer through rigorous debate, not averaging. ");
         }
         sb.Append("APSP STREAMING PARALLEL: emit multiple MCP call envelopes back-to-back in one turn — server executes all simultaneously and streams results as they complete. ");
