@@ -15,7 +15,7 @@ internal partial class Program
         Console.WriteLine("[DEBATE] Pure dialectical debate mode (no tool loop)");
 
         // Unified Slack thread
-        EnsureSlackThread("Debate", question);
+        EnsureSlackThread("정반합", question);
 
         var sessionDir = Path.Combine(DataDir, "triad", $"debate_{DateTime.UtcNow:yyyyMMdd_HHmmss}");
         var ctx = new TriadSharedContext(question, sessionDir);
