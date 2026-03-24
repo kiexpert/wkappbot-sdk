@@ -1994,6 +1994,22 @@ internal partial class Program
                     continue;
                 }
 
+                // Protect Eye child processes: WhisperRing, ScreenSaver, analyze-hack
+                // These are wkappbot-core.exe with specific args — check command line
+                try
+                {
+                    var cmdLine = NativeMethods.GetProcessCommandLine(p.Id);
+                    if (!string.IsNullOrEmpty(cmdLine) && (
+                        cmdLine.Contains("whisper-ring", StringComparison.OrdinalIgnoreCase) ||
+                        cmdLine.Contains("screensaver", StringComparison.OrdinalIgnoreCase) ||
+                        cmdLine.Contains("analyze-hack", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        skipped.Add($"{nodeKey} (eye-child: {cmdLine[..Math.Min(40, cmdLine.Length)]})");
+                        continue;
+                    }
+                }
+                catch { }
+
                 var mainHwnd = p.MainWindowHandle;
                 bool hasWindow = mainHwnd != IntPtr.Zero && NativeMethods.IsWindow(mainHwnd);
                 if (hasWindow)
