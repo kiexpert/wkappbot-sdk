@@ -23,7 +23,7 @@ internal partial class Program
         var results = new ConcurrentBag<TriadDebateLoop.RoundResult>();
 
         Console.WriteLine($"[DEBATE:{roundName}] Starting parallel round...");
-        SlackPostToThread($"🔄 *[{roundName}]* 라운드 시작", "앱봇아이");
+        SlackPostToThread($"🔄 *[{roundName}]* Round started", "Moderator");
 
         var tasks = prompts.Select(kv => Task.Run(() =>
         {
@@ -148,7 +148,7 @@ internal partial class Program
         var ais = new[] { "gemini", "gpt", "claude" };
 
         Console.WriteLine("\n[DEBATE] ═══ 정반합 토론 루프 시작 ═══");
-        SlackPostToThread("═══ *정반합 토론 시작* ═══\nR1(다양성) → R2(비판) → R3(합성)", "앱봇아이");
+        SlackPostToThread("═══ *Dialectical Debate Started* ═══\nR1(Diversity) → R2(Critique) → R3(Synthesis))", "Moderator");
 
         // ── R1: Diversity (independent answers with structured claims) ──
         var r1Prompts = ais.ToDictionary(ai => ai, _ => TriadDebateLoop.BuildR1Prompt(question));
@@ -157,7 +157,7 @@ internal partial class Program
         if (r1Results.Count < 2)
         {
             Console.Error.WriteLine("[DEBATE] R1: insufficient responses — need at least 2 AIs. Aborting.");
-            SlackPostToThread("❌ R1 실패: 응답 2개 미만. 토론 중단.", "앱봇아이");
+            SlackPostToThread("❌ R1 실패: Insufficient responses (<2). Debate aborted.", "Moderator");
             return;
         }
 
@@ -172,7 +172,7 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("[DEBATE] Early convergence in R1! Skipping R2/R3.");
             Console.ResetColor();
-            SlackPostToThread($"✅ *R1 조기수렴* (Jaccard={r1Convergence:F2}) — 토론 생략, 합의 완료", "앱봇아이");
+            SlackPostToThread($"✅ *R1 Early Convergence* (Jaccard={r1Convergence:F2}) — debate skipped, consensus reached", "Moderator");
             PostDebateSummary(r1Results, 1);
             return;
         }
@@ -196,7 +196,7 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("[DEBATE] Convergence in R2! Skipping R3.");
             Console.ResetColor();
-            SlackPostToThread($"✅ *R2 수렴* (Jaccard={r2Convergence:F2}) — R3 생략", "앱봇아이");
+            SlackPostToThread($"✅ *R2 Convergence* (Jaccard={r2Convergence:F2}) — R3 skipped", "Moderator");
             PostDebateSummary(r2Results, 2);
             return;
         }
@@ -210,7 +210,7 @@ internal partial class Program
         Console.WriteLine($"[DEBATE:R3] Final convergence: {r3Convergence:F2}");
         PostDebateSummary(r3Results.Count > 0 ? r3Results : r2Results, 3);
 
-        Console.WriteLine("[DEBATE] ═══ 정반합 토론 완료 ═══");
+        Console.WriteLine("[DEBATE] ═══ 정반합 토론 complete ═══");
     }
 
     /// <summary>
@@ -225,7 +225,7 @@ internal partial class Program
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         Console.WriteLine("[CROSS] ═══ Real-time cross-prompting started ═══");
-        SlackPostToThread("🔄 *실시간 크로스 프롬프팅 시작* — AI끼리 실시간 토론!", "앱봇아이");
+        SlackPostToThread("🔄 *Real-time cross-prompting started!", "Moderator");
 
         var crossTasks = ais.Select(ai => Task.Run(async () =>
         {
@@ -287,7 +287,7 @@ internal partial class Program
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine($"[CROSS] Convergence reached! ({conv:F2})");
                         Console.ResetColor();
-                        SlackPostToThread($"✅ *수렴 달성!* Jaccard={conv:F2} — 토론 종료", "앱봇아이");
+                        SlackPostToThread($"✅ *Convergence reached!* Jaccard={conv:F2} — debate complete", "Moderator");
                         return;
                     }
                 }
@@ -323,7 +323,7 @@ internal partial class Program
     static void PostDebateSummary(List<TriadDebateLoop.RoundResult> results, int roundsCompleted)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"═══ *정반합 결과* (R{roundsCompleted} 완료) ═══");
+        sb.AppendLine($"═══ *Debate Results* (R{roundsCompleted} complete) ═══");
 
         foreach (var r in results)
         {
@@ -336,6 +336,6 @@ internal partial class Program
         var hasContradictions = TriadDebateLoop.HasContradictions(results);
         sb.AppendLine($"\n📊 Convergence: {convergence:F2} | Contradictions: {(hasContradictions ? "⚠ YES" : "✅ No")}");
 
-        SlackPostToThread(sb.ToString(), "앱봇아이");
+        SlackPostToThread(sb.ToString(), "Moderator");
     }
 }

@@ -50,10 +50,15 @@ internal sealed class TriadSharedContext
         _latestChunks[ai] = chunk;
         _chunkVersions.AddOrUpdate(ai, 1, (_, v) => v + 1);
 
-        // First chunk: check for STANCE compliance
+        // First chunk: check for STANCE compliance + post to Slack
         if (prev.Length == 0 && chunk.Length > 50)
         {
             var stance = TriadDebateLoop.ParseStance(chunk);
+            if (stance != null)
+            {
+                // Post STANCE to Slack
+                Program.SlackPostToThread($"📊 *[{ai} STANCE]* {stance} (sum={stance.Sum})", ai);
+            }
             if (stance == null)
             {
                 // Moderator intervention: remind AI to include STANCE
@@ -76,8 +81,8 @@ internal sealed class TriadSharedContext
                                 await Task.Delay(3000);
                                 var reminder = $"SYSTEM RULE VIOLATION: You MUST start your response with [STANCE N=? R=? C=? E=? D=?] where sum=9. Example: [STANCE N=2 R=3 C=1 E=2 D=1]. This is mandatory. Respond now with your STANCE first, then your argument.";
                                 await selfCdp.InsertContentEditableAsync(editorSel, reminder);
-                                Console.WriteLine($"[MOD] {ai}: STANCE missing → reminder queued");
-                                Program.SlackPostToThread($"⚠️ *[사회자→{ai}]* STANCE 지표 누락! 다음 응답에 포함 요청", "사회자");
+                                Console.WriteLine($"[MOD] {ai}: STANCE missing → reminder sent");
+                                Program.SlackPostToThread($"⚠️ *[MOD→{ai}]* STANCE missing! Reminder injected.", "Moderator");
                             }
                         }
                     }
