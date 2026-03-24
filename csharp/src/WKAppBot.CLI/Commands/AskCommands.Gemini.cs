@@ -321,6 +321,7 @@ internal partial class Program
         {
             triadCtx.RegisterCdp("gemini", cdp);
             cdp.OnStreamingChunk = chunk => triadCtx.UpdateChunk("gemini", chunk);
+            cdp.OperationContext = "gemini:EXPLORER"; // debate role
         }
         using var askSession = new AskSession(AiProvider.Gemini, cdp); // gradual migration wrapper
 

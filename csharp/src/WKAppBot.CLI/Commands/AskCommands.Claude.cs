@@ -141,6 +141,7 @@ internal partial class Program
         {
             triadCtx.RegisterCdp("claude", cdp);
             cdp.OnStreamingChunk = chunk => triadCtx.UpdateChunk("claude", chunk);
+            cdp.OperationContext = "claude:AUDITOR"; // debate role
         }
         using var askSession = new AskSession(AiProvider.Claude, cdp); // gradual migration wrapper
         PulseStep.Mark("cdp-connected");

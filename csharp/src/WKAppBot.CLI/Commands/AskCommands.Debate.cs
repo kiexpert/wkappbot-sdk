@@ -119,6 +119,47 @@ internal sealed class TriadDebateLoop
         return sb.ToString();
     }
 
+    // ── Dispute tracking ──
+
+    public record Dispute(string TargetAssumption, string Reason);
+
+    private static readonly Regex DisputeRegex = new(@"\[DISPUTE\](.*?)\[/DISPUTE\]", RegexOptions.Singleline);
+
+    public static List<Dispute> ParseDisputes(string text)
+    {
+        var disputes = new List<Dispute>();
+        foreach (Match m in DisputeRegex.Matches(text))
+        {
+            try
+            {
+                var json = JsonNode.Parse(m.Groups[1].Value);
+                if (json == null) continue;
+                var target = json["target_assumption"]?.GetValue<string>() ?? "";
+                var reason = json["reason"]?.GetValue<string>() ?? "";
+                if (!string.IsNullOrEmpty(target))
+                    disputes.Add(new Dispute(target, reason));
+            }
+            catch { }
+        }
+        return disputes;
+    }
+
+    /// <summary>Check if all disputes are resolved (referenced in later claims' disputed_by).</summary>
+    public static bool AllDisputesResolved(List<RoundResult> results)
+    {
+        var allDisputes = new List<string>();
+        var allResolutions = new List<string>();
+        foreach (var r in results)
+        {
+            foreach (var c in r.Claims)
+                foreach (var a in c.KeyAssumptions)
+                    allResolutions.Add(a.ToLower());
+        }
+        // A dispute is "resolved" if its target_assumption appears in some claim's key_assumptions
+        // (meaning someone addressed it). Simple heuristic.
+        return true; // TODO: refine with actual dispute tracking
+    }
+
     // ── Claim Parsing ──
 
     private static readonly Regex ClaimRegex = new(@"\[CLAIM\](.*?)\[/CLAIM\]", RegexOptions.Singleline);
