@@ -206,15 +206,19 @@ internal partial class Program
             return null;
         }
 
+        // Snapshot response count before sending
+        int preCount = 0;
+        try { preCount = await cdp.GetResponseCountAsync(); } catch { }
+
         // Clear + insert + send
         await cdp.ClearEditorAsync(editorSel);
         await Task.Delay(200);
         await cdp.InsertContentEditableAsync(editorSel, prompt);
         await Task.Delay(300);
         await cdp.SendPromptAsync(editorSel);
-        Console.WriteLine($"[정반합:{ai}] Sent ({prompt.Length} chars)");
+        Console.WriteLine($"[정반합:{ai}] Sent ({prompt.Length} chars, preCount={preCount})");
 
-        // Poll for response
+        // Poll for response (use preCount as baseline to find NEW response only)
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string lastText = "";
         int stableCount = 0;
@@ -223,8 +227,20 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 90))
         {
             await Task.Delay(2000);
-            var text = await cdp.GetLastResponseTextAsync() ?? "";
-            if (string.IsNullOrWhiteSpace(text)) continue;
+            // Try provider-specific response detection first
+            string text = "";
+            try { text = await cdp.GetLastResponseTextAsync(preCount) ?? ""; } catch { }
+            // Fallback: generic body text change detection
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                try
+                {
+                    var bodyText = await cdp.EvalAsync("(document.querySelector('[data-testid=\"assistant-message\"]') || document.querySelector('.response-container') || document.querySelector('.markdown') || {}).innerText || ''") ?? "";
+                    if (bodyText.Length > 20) text = bodyText;
+                }
+                catch { }
+            }
+            if (string.IsNullOrWhiteSpace(text)) { Console.Write("."); continue; }
 
             if (text == lastText)
             {
