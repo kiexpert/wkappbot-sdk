@@ -572,7 +572,7 @@ internal partial class Program
                                 zoom?.ShowPass("tool call");
                                 zoom?.Dispose();
                                 questionLock.Release("late-toolcall");
-                                LogRestoreFocus(prevFg, "late-toolcall");
+                                LogRestoreFocus(prevFg, "late-toolcall", cdp);
                                 return (true, lateResp);
                             }
                         }
@@ -609,7 +609,7 @@ internal partial class Program
                         zoom?.ShowFail("still generating");
                         zoom?.Dispose();
                         questionLock.Release("fast-fail-gen");
-                        LogRestoreFocus(prevFg, "fast-fail-gen");
+                        LogRestoreFocus(prevFg, "fast-fail-gen", cdp);
                         return (false, null);
                     }
 
@@ -673,7 +673,7 @@ internal partial class Program
                 // Zoom feedback: sent successfully
                 zoom?.ShowPass($"sent ({sendResult})");
                 zoom?.Dispose();
-                LogRestoreFocus(prevFg, "after-send-Gemini");
+                LogRestoreFocus(prevFg, "after-send-Gemini", cdp);
 
                 Console.WriteLine($"[SEND-DONE] send={sendResult}");
                 questionLock.Release("sent");

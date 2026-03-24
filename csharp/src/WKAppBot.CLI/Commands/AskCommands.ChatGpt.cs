@@ -530,7 +530,7 @@ internal partial class Program
         zoom?.ShowPass($"sent ({sendResult})");
         zoom?.Dispose();
         GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
-        LogRestoreFocus(prevFg, "after-send-GPT");
+        LogRestoreFocus(prevFg, "after-send-GPT", cdp);
 
         // Check editor after send ??should be empty if sent successfully
         var afterSend = (await cdp.GetTextLengthAsync(editorSel)).ToString();

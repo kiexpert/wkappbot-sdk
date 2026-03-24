@@ -319,7 +319,7 @@ internal partial class Program
                 zoom?.ShowPass($"sent ({sendResult})");
                 zoom?.Dispose();
                 GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
-                LogRestoreFocus(prevFg, "after-send-Claude");
+                LogRestoreFocus(prevFg, "after-send-Claude", cdp);
 
                 var afterSend = (await cdp.GetTextLengthAsync(editorSel)).ToString();
                 Console.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={preSendTurns})");

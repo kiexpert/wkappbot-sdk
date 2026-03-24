@@ -525,7 +525,7 @@ internal partial class Program
                 await CdpTrustedClick(cdp, bx, by);
                 Console.WriteLine($"[ASK] UIA dialog: upload btn trusted click at ({bx},{by})");
                 await Task.Delay(1500); // give menu time to animate open
-                LogRestoreFocus(prevFg1, "trusted-click-upload-btn");
+                LogRestoreFocus(prevFg1, "trusted-click-upload-btn", cdp);
 
                 // Now find and click the "???뵬 ??낆쨮?? menu item with trusted gesture
                 var menuRect = await cdp.EvalAsync("""
@@ -566,7 +566,7 @@ internal partial class Program
                     await CdpTrustedClick(cdp, mx, my);
                     Console.WriteLine($"[ASK] UIA dialog: menu item trusted click at ({mx},{my})");
                     await Task.Delay(200);
-                    LogRestoreFocus(prevFg2, "trusted-click-menu-item");
+                    LogRestoreFocus(prevFg2, "trusted-click-menu-item", cdp);
                 }
             }
             else
@@ -593,7 +593,7 @@ internal partial class Program
                 return false;
             }
             Console.WriteLine($"[ASK] UIA dialog: found hwnd={dialogHwnd:X}");
-            LogRestoreFocus(prevFg3, "file-dialog-appeared");
+            LogRestoreFocus(prevFg3, "file-dialog-appeared", cdp);
 
             // Step 4: Find the filename edit via Win32 (ComboBoxEx32 ??ComboBox ??Edit chain)
             // Standard Windows file dialog structure: Dialog ??ComboBoxEx32(cid=1148) ??ComboBox ??Edit
@@ -654,7 +654,7 @@ internal partial class Program
                 Console.WriteLine("[ASK] UIA dialog: Open button not found, posting Enter");
                 NativeMethods.PostMessageW(dialogHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x0D, IntPtr.Zero);
             }
-            LogRestoreFocus(prevFg4, "open-btn-click");
+            LogRestoreFocus(prevFg4, "open-btn-click", cdp);
 
             // Step 6: Wait for dialog to close and file to appear in Gemini
             for (int i = 0; i < 15; i++)
