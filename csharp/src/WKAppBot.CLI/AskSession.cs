@@ -160,13 +160,39 @@ internal sealed class AskSession : IDisposable
 
     public async Task<(bool ok, string text)> AskAsync(string editorSelector, string question, int timeoutSec = 30)
     {
+        // Pre-type hook (persona injection etc.)
+        if (OnBeforeType != null)
+            try { await OnBeforeType(this, editorSelector); } catch (Exception ex) { Console.WriteLine($"[ASK] OnBeforeType hook error: {ex.Message}"); }
+
         if (!await TypeAsync(editorSelector, question)) return (false, "TYPE_FAILED");
         var verify = await Cdp!.GetEditorContentAsync(editorSelector);
         Console.WriteLine($"[ASK] Editor: [{verify[..Math.Min(verify.Length, 60)]}]");
 
         await SendAsync(editorSelector);
-        return await WaitForResponseAsync(timeoutSec);
+
+        // Post-send hook
+        if (OnAfterSend != null)
+            try { await OnAfterSend(this); } catch (Exception ex) { Console.WriteLine($"[ASK] OnAfterSend hook error: {ex.Message}"); }
+
+        var (ok, text) = await WaitForResponseAsync(timeoutSec);
+
+        // Response done hook (post-processing)
+        if (ok && OnResponseDone != null)
+            try { text = await OnResponseDone(this, text); } catch (Exception ex) { Console.WriteLine($"[ASK] OnResponseDone hook error: {ex.Message}"); }
+
+        return (ok, text);
     }
+
+    // ══ Provider Hooks (set by caller for provider-specific behavior) ══
+
+    /// <summary>Called before typing question — e.g. persona injection.</summary>
+    public Func<AskSession, string, Task>? OnBeforeType { get; set; }
+
+    /// <summary>Called after send — e.g. send verification.</summary>
+    public Func<AskSession, Task>? OnAfterSend { get; set; }
+
+    /// <summary>Called when streaming completes — e.g. response post-processing.</summary>
+    public Func<AskSession, string, Task<string>>? OnResponseDone { get; set; }
 
     // ══ Utilities ══
 

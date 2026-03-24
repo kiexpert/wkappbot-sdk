@@ -222,6 +222,22 @@ public sealed partial class CdpClient
         return null;
     }
 
+    /// <summary>Get detailed stop button info (for diagnostic logging). Returns "BTN:label", "MAT:label", or "NONE".</summary>
+    public async Task<string> GetStopButtonDetailAsync()
+    {
+        return await EvalAsync("""
+            (() => {
+                var s1 = document.querySelector('button[aria-label*="Stop"]');
+                var s2 = document.querySelector('button[aria-label*="중지"]');
+                if (s1) return 'BTN:' + (s1.getAttribute('aria-label') || '?');
+                if (s2) return 'BTN:' + (s2.getAttribute('aria-label') || '?');
+                var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
+                if (mat) { var b = mat.closest('button'); if (b) { var l = (b.getAttribute('aria-label')||b.title||'').toLowerCase(); if (l.includes('stop')||l.includes('중지')) return 'MAT:'+l; } }
+                return 'NONE';
+            })()
+            """) ?? "NONE";
+    }
+
     /// <summary>Auto-dismiss modal dialogs (copyright, terms, warnings). Returns dismiss result.</summary>
     public async Task<string> DismissDialogAsync()
     {
