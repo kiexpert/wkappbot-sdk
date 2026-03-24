@@ -64,6 +64,7 @@ internal partial class Program
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "gpt");
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+        using var askSession = new AskSession(AiProvider.ChatGpt, cdp); // gradual migration wrapper
         PulseStep.Mark("cdp-connected");
 
         // No tab activation ? CDP works on background tabs via targetId. Truly focusless.
@@ -97,7 +98,8 @@ internal partial class Program
                 PulseStep.Mark("editor-found");
                 Console.WriteLine($"[ASK] Editor found: {editorSel}");
 
-                // Check if this is a fresh conversation ??try multiple selectors
+                // Check if this is a fresh conversation — try multiple selectors
+                // TODO: migrate to askSession.GetUserMessageCountAsync() when multi-selector counting is unified
                 var turnCountStr = await cdp.EvalAsync("""
                     (() => {
                         var c = document.querySelectorAll('[data-message-author-role="assistant"]').length;
@@ -302,7 +304,8 @@ internal partial class Program
         catch { }
     }
 
-    /// <summary>Count assistant turns ??multi-selector for ChatGPT DOM changes.</summary>
+    /// <summary>Count assistant turns — multi-selector for ChatGPT DOM changes.
+    /// TODO: migrate to askSession.GetResponseCountAsync() when multi-selector fallback counting is unified</summary>
     static async Task<int> CountChatGptTurns(CdpClient cdp)
     {
         var result = await cdp.EvalAsync("""
@@ -392,6 +395,7 @@ internal partial class Program
         // Capture stable baseline AFTER lock ? DOM fully settled, no stale prior-session answer.
         // Fixes: WKAppBot reading an old unread GPT reply as the new response (off-by-1 DOM timing).
         prevTurns = await CountChatGptTurns(cdp);
+        // TODO: migrate to AskSession when provider-specific fingerprinting is unified
         prevLastFingerprint = await cdp.EvalAsync(
             "(() => { var els = document.querySelectorAll('[data-message-author-role=\"assistant\"]');" +
             " return els.length > 0 ? (els[els.length-1].textContent?.substring(0,80) ?? '') : ''; })()") ?? string.Empty;
@@ -425,6 +429,7 @@ internal partial class Program
         }
         // ?�?� Send: JS click ??verify ??CDP Enter fallback ?�?�
         // With file attachments, wait for send button to become enabled
+        // TODO: migrate to AskSession when provider-specific send button state polling is unified
         if (attachFiles?.Count > 0)
         {
             for (int bw = 0; bw < 10; bw++)
@@ -455,6 +460,7 @@ internal partial class Program
         int preSendTurns = await CountChatGptTurns(cdp);
 
         // Tier 1: JS click (works minimized, but React may ignore .click())
+        // TODO: migrate to AskSession.ClickSendAsync() when turn-count verification flow is unified
         var jsClick = await cdp.EvalAsync("""
             (() => {
                 var btn = document.querySelector('button[data-testid="send-button"]')
@@ -555,6 +561,7 @@ internal partial class Program
             }
 
             // Multi-signal detection: turn count OR stop button OR thinking marker
+            // TODO: migrate to AskSession when provider-specific response detection is unified
             var detectResult = await cdp.EvalAsync(
                 "(() => {" +
                 "var turns = document.querySelectorAll('[data-message-author-role=\"assistant\"]').length;" +
@@ -611,6 +618,7 @@ internal partial class Program
             await Task.Delay(1500);
 
             // Combined check: state + streaming text length + delta text for live flush
+            // TODO: migrate to AskSession when provider-specific polling is unified
             var stateJson = await cdp.EvalAsync($$"""
                 (() => {
                     if (!document.body || !document.body.innerHTML || document.body.innerHTML.length < 100)
@@ -783,6 +791,7 @@ internal partial class Program
         await Task.Delay(300);
 
         // Scroll into view + hydrate + extract
+        // TODO: migrate to AskSession when provider-specific text extraction is unified
         string? finalText = null;
         for (int extractAttempt = 0; extractAttempt < 3; extractAttempt++)
         {
@@ -886,19 +895,19 @@ internal partial class Program
 
     static async Task<bool> WaitWhileStopButtonVisible(CdpClient cdp, int maxWaitMs = 12000)
     {
+        // Legacy overload — wrap in a generic AskSession for provider-aware stop detection.
+        // Uses ChatGpt provider as default since this was originally GPT-only.
+        using var session = new AskSession(AiProvider.ChatGpt, cdp);
+        return await WaitWhileStopButtonVisible(session, maxWaitMs);
+    }
+
+    static async Task<bool> WaitWhileStopButtonVisible(AskSession session, int maxWaitMs = 12000)
+    {
         var sw = Stopwatch.StartNew();
         bool headerPrinted = false;
         while (sw.ElapsedMilliseconds < maxWaitMs)
         {
-            var stopVisible = await cdp.EvalAsync("""
-                (() => {
-                    var stop = document.querySelector('button[data-testid="stop-button"]')
-                            || document.querySelector('button[aria-label*="Stop"]')
-                            || document.querySelector('button[aria-label*="����"]');
-                    return stop ? '1' : '0';
-                })()
-                """) ?? "0";
-            if (stopVisible != "1")
+            if (!await session.IsStopVisibleAsync())
             {
                 if (headerPrinted) Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
                 return true;
@@ -910,16 +919,9 @@ internal partial class Program
         }
 
         Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
-        // Timed out ? click stop to cancel ongoing generation, then wait briefly and proceed
-        Console.WriteLine("[ASK] GPT stop still visible ? clicking stop to cancel generation...");
-        await cdp.EvalAsync("""
-            (() => {
-                var btn = document.querySelector('button[data-testid="stop-button"]')
-                       || document.querySelector('button[aria-label*="Stop"]')
-                       || document.querySelector('button[aria-label*="����"]');
-                if (btn) btn.click();
-            })()
-            """);
+        // Timed out — click stop to cancel ongoing generation, then wait briefly and proceed
+        Console.WriteLine($"[ASK] {session.Provider.Name} stop still visible — clicking stop to cancel generation...");
+        await session.ClickStopAsync();
         await Task.Delay(1500);
         return true;
     }
