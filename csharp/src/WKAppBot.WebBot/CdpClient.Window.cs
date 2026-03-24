@@ -96,12 +96,10 @@ public sealed partial class CdpClient
             var style = GetWindowLong(hwnd, -16); // GWL_STYLE
             if ((style & 0x00C00000) == 0) return true; // WS_CAPTION required
 
-            // Match by PID if known
-            if (targetPid > 0)
-            {
-                GetWindowThreadProcessId(hwnd, out var pid);
-                if (pid != targetPid) return true; // wrong Chrome instance
-            }
+            // Match by PID — REQUIRED to avoid hitting VS Code or other Electron apps
+            GetWindowThreadProcessId(hwnd, out var pid);
+            if (targetPid > 0 && pid != targetPid) return true; // wrong Chrome instance
+            if (targetPid == 0) return true; // PID unknown → refuse to guess (could be VS Code)
 
             found = hwnd;
             return false; // stop
