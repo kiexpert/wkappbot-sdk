@@ -19,22 +19,24 @@ public sealed partial class CdpClient
     {
         var jsStr = JsonSerializer.Serialize(text);
 
+        var esc = Esc(selector);
+
         // Tier 1: Focusless innerHTML/textContent
         var result = await EvalAsync(
-            $"(()=>{{var el=document.querySelector('{Esc(selector)}');if(!el)return 'NOT_FOUND';" +
-            $"var t={jsStr};var p=el.querySelector('p');" +
+            "(()=>{var el=document.querySelector('" + esc + "');if(!el)return 'NOT_FOUND';" +
+            "var t=" + jsStr + ";var p=el.querySelector('p');" +
             "if(p)p.textContent=t;else el.innerHTML='<p>'+t.replace(/</g,'&lt;')+'</p>';" +
             "el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:t}));" +
-            "return el.textContent.length>0?'OK':'EMPTY'}})()");
+            "return el.textContent.length>0?'OK':'EMPTY'})()");
         if (result == "OK") return true;
 
         // Tier 2: execCommand (respects selection model)
         result = await EvalAsync(
-            $"(()=>{{var el=document.querySelector('{Esc(selector)}');if(!el)return 'NOT_FOUND';" +
+            "(()=>{var el=document.querySelector('" + esc + "');if(!el)return 'NOT_FOUND';" +
             "el.focus();var sel=window.getSelection();var r=document.createRange();" +
             "r.selectNodeContents(el);r.collapse(false);sel.removeAllRanges();sel.addRange(r);" +
-            $"document.execCommand('insertText',false,{jsStr});" +
-            "return el.textContent.length>0?'OK':'EMPTY'}})()");
+            "document.execCommand('insertText',false," + jsStr + ");" +
+            "return el.textContent.length>0?'OK':'EMPTY'})()");
         if (result == "OK") return true;
 
         // Tier 3: Input.insertText (CDP protocol level)
@@ -48,10 +50,11 @@ public sealed partial class CdpClient
     /// <summary>Clear a contenteditable editor (selectAll + delete).</summary>
     public async Task ClearEditorAsync(string selector)
     {
+        var esc = Esc(selector);
         await EvalAsync(
-            $"(()=>{{var el=document.querySelector('{Esc(selector)}');" +
+            "(()=>{var el=document.querySelector('" + esc + "');" +
             "if(!el)return;el.focus();" +
-            "document.execCommand('selectAll');document.execCommand('delete')}})()");
+            "document.execCommand('selectAll');document.execCommand('delete')})()");
     }
 
     // ══ Send Button ══
