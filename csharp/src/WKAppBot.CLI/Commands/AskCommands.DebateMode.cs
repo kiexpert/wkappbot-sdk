@@ -10,6 +10,9 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal partial class Program
 {
+    /// <summary>When true, skip loop/APSP persona injection (debate mode = pure one-shot).</summary>
+    internal static readonly System.Threading.AsyncLocal<bool> _suppressLoopPersona = new();
+
     static int AskTriadDebate(string question, int timeoutSec, string? modelHint)
     {
         Console.WriteLine("[DEBATE] Pure dialectical debate mode (no tool loop)");
@@ -22,6 +25,12 @@ internal partial class Program
 
         // Pure debate persona — NO tool/APSP instructions
         var debatePersona = BuildDebateOnlyPersona();
+
+        // Suppress loop persona: debate mode = pure one-shot, no APSP/tool persona
+        _suppressLoopPersona.Value = true;
+
+        // Post debate persona to Slack for transparency
+        SlackPostToThread($"📋 *[Debate Persona]*\n```\n{debatePersona[..Math.Min(500, debatePersona.Length)]}\n```", "Moderator");
 
         var ais = new[] { "gemini", "gpt", "claude" };
         var roles = new Dictionary<string, string>
