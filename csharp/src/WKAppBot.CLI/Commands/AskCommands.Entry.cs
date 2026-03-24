@@ -103,6 +103,7 @@ internal partial class Program
         bool newSession = false;
         bool noWait = false;
         bool loopMode = false;
+        bool debateMode = false;
         bool triadMode = false;
         int loopMaxSteps = 7;
         int loopRetry = 1;
@@ -118,6 +119,8 @@ internal partial class Program
                 newSession = true;
             else if (args[i] == "--no-wait")
                 noWait = true;
+            else if (args[i] == "--debate")
+                debateMode = true;
             else if (args[i] == "--loop")
             {
                 loopMode = true;
@@ -182,7 +185,9 @@ internal partial class Program
             "gemini" => AskGemini(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
             "gpt" or "chatgpt" => AskChatGpt(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
             "claude" => AskClaude(question, true, timeoutSec, newTab, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
-            "triad" or "all" => AskTriadParallel(question, timeoutSec, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait),
+            "triad" or "all" => debateMode
+                ? AskTriadDebate(question, timeoutSec, modelHint)
+                : AskTriadParallel(question, timeoutSec, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait),
             _ => Error($"Unknown AI: {ai} (use gemini, gpt, claude, or triad)")
         };
     }
