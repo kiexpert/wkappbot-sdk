@@ -377,5 +377,5 @@ public sealed partial class CdpClient
     }
 
     // ── Internal ──
-    private static string Esc(string s) => s.Replace("\\", "\\\\").Replace("'", "\\'");
+    public static string Esc(string s) => s.Replace("\\", "\\\\").Replace("'", "\\'");
 }

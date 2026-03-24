@@ -1,203 +1,288 @@
 using System.Collections.Concurrent;
 using System.Text;
+using WKAppBot.WebBot;
 
 namespace WKAppBot.CLI;
 
 /// <summary>
 /// Pure debate mode: ask triad --debate "question"
-/// No tool loop, no APSP persona — just dialectical debate.
-/// Short persona = less AI confusion, faster responses.
+/// COMPLETELY SEPARATE from tool loop — uses CDP directly.
+/// No AskCommand, no AskGemini, no loop persona, no APSP.
 /// </summary>
 internal partial class Program
 {
-    /// <summary>When true, skip loop/APSP persona injection (debate mode = pure one-shot).</summary>
+    /// <summary>When true, skip loop/APSP persona injection (debate mode).</summary>
     internal static readonly System.Threading.AsyncLocal<bool> _suppressLoopPersona = new();
 
     static int AskTriadDebate(string question, int timeoutSec, string? modelHint)
     {
-        Console.WriteLine("[DEBATE] Pure dialectical debate mode (no tool loop)");
+        Console.WriteLine("[정반합] Pure debate mode (no tool loop, CDP direct)");
 
-        // Unified Slack thread
         EnsureSlackThread("정반합", question);
 
-        var sessionDir = Path.Combine(DataDir, "triad", $"debate_{DateTime.UtcNow:yyyyMMdd_HHmmss}");
-        var ctx = new TriadSharedContext(question, sessionDir);
-
-        // Pure debate persona — NO tool/APSP instructions
         var debatePersona = BuildDebateOnlyPersona();
-
-        // Suppress loop persona: debate mode = pure one-shot, no APSP/tool persona
-        _suppressLoopPersona.Value = true;
-
-        // Post debate persona to Slack for transparency
         SlackPostToThread($"📋 *[Debate Persona]*\n```\n{debatePersona[..Math.Min(500, debatePersona.Length)]}\n```", "Moderator");
 
         var ais = new[] { "gemini", "gpt", "claude" };
         var roles = new Dictionary<string, string>
         {
-            ["gemini"] = "EXPLORER",
-            ["gpt"] = "SKEPTIC",
-            ["claude"] = "AUDITOR"
+            ["gemini"] = "EXPLORER", ["gpt"] = "SKEPTIC", ["claude"] = "AUDITOR"
+        };
+        var hosts = new Dictionary<string, string>
+        {
+            ["gemini"] = "gemini.google.com", ["gpt"] = "chatgpt.com", ["claude"] = "claude.ai"
+        };
+        var editorSels = new Dictionary<string, string[]>
+        {
+            ["gemini"] = new[] { ".ql-editor", "[role='textbox'][contenteditable='true']", "div[contenteditable='true']" },
+            ["gpt"] = new[] { "#prompt-textarea", "[contenteditable='true']" },
+            ["claude"] = new[] { "div.tiptap.ProseMirror", "[contenteditable='true']" }
         };
 
-        // R1: Independent answers with debate persona
-        Console.WriteLine("[DEBATE:R1] Independent answers starting...");
-        SlackPostToThread("═══ *Debate R1: Independent Positions* ═══", "Moderator");
+        // ═══ R1: Independent positions (CDP direct) ═══
+        Console.WriteLine("[정반합:R1] Independent positions...");
+        SlackPostToThread("═══ *R1: Independent Positions* ═══", "Moderator");
 
-        var r1Tasks = ais.Select(ai => Task.Run(() =>
+        var r1Results = new ConcurrentDictionary<string, string>();
+        var r1Tasks = ais.Select(ai => Task.Run(async () =>
         {
-            var prompt = $"{debatePersona}\n\nYour role: {roles[ai]}\n\nQuestion: {question}";
-            var response = AskAndCapture(ai, prompt, Math.Min(timeoutSec, 90));
-            if (response != null)
+            try
             {
-                ctx.UpdateChunk(ai, response);
-                ctx.LogStep(ai, $"[R1] {response[..Math.Min(200, response.Length)]}");
+                var cdp = EnsureCdpConnection(preferredHost: hosts[ai], newTab: false,
+                    targetTag: $"debate-{ai}-{DateTime.UtcNow:HHmmss}");
+                if (cdp == null) { Console.WriteLine($"[정반합:{ai}] CDP connection failed"); return; }
 
-                // Parse and report
-                var debateJson = TriadDebateLoop.ParseDebateJson(response);
-                var stance = TriadDebateLoop.ParseStance(response);
-                var claims = TriadDebateLoop.ParseClaims(response);
+                var prompt = $"{debatePersona}\n\nYour role: {roles[ai]}\n\nQuestion: {question}";
+                var response = await DebateSendAndPoll(cdp, ai, prompt, editorSels[ai], timeoutSec);
 
-                if (stance != null)
-                    SlackPostToThread($"📊 *[{ai} {roles[ai]}]* STANCE: {stance}", ai);
-                if (claims.Count > 0)
-                    SlackPostToThread($"💬 *[{ai}]* {claims.Count} claims: {claims[0].Text[..Math.Min(80, claims[0].Text.Length)]}...", ai);
+                if (response != null)
+                {
+                    r1Results[ai] = response;
+                    var snippet = response.Length > 200 ? response[..200] + "..." : response;
+                    SlackPostToThread($"💬 *[{ai} {roles[ai]}]*:\n{snippet}", ai);
+
+                    var stance = TriadDebateLoop.ParseStance(response);
+                    if (stance != null)
+                        SlackPostToThread($"📊 *[{ai}]* STANCE: {stance} (sum={stance.Sum})", ai);
+                }
                 else
-                    SlackPostToThread($"💬 *[{ai}]* {response[..Math.Min(200, response.Length)]}...", ai);
+                {
+                    SlackPostToThread($"❌ *{ai}* R1 응답 실패", ai);
+                }
+                cdp.Dispose();
             }
-            return response;
+            catch (Exception ex) { Console.Error.WriteLine($"[정반합:{ai}] R1 error: {ex.Message}"); }
         })).ToArray();
 
-        // Wait for at least 2 AIs (don't wait for all 3 — slow one can join later)
-        var r1Results = new string?[3];
-        var r1Sw = System.Diagnostics.Stopwatch.StartNew();
-        while (r1Sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 120))
-        {
-            int done = 0;
-            for (int i = 0; i < r1Tasks.Length; i++)
-                if (r1Tasks[i].IsCompleted) { r1Results[i] = r1Tasks[i].Result; done++; }
-            if (done >= 2) break;
-            Thread.Sleep(2000);
-            // Nudge slow AIs via Slack
-            if (r1Sw.Elapsed.TotalSeconds > 30 && done < 2)
-                SlackPostToThread($"⏳ Waiting for responses... ({done}/3 so far)", "Moderator");
-        }
-        // Collect whatever we have
-        for (int i = 0; i < r1Tasks.Length; i++)
-            if (r1Tasks[i].IsCompleted) r1Results[i] = r1Tasks[i].Result;
-        var r1Count = r1Results.Count(r => r != null);
-        Console.WriteLine($"[DEBATE:R1] Proceeding with {r1Count}/3 responses");
+        // Wait for 2+ responses
+        WaitForNTasks(r1Tasks, 2, timeoutSec, "R1");
 
-        if (r1Count < 1)
+        if (r1Results.Count < 1)
         {
             SlackPostToThread("❌ Debate aborted: no AIs responded.", "Moderator");
             return 1;
         }
-        if (r1Count < 2)
-            SlackPostToThread("⚠️ Only 1 AI responded — proceeding with limited debate.", "Moderator");
 
-        // R2: Cross-critique — share R1 answers and ask for reactions
-        Console.WriteLine("[DEBATE:R2] Cross-critique starting...");
-        SlackPostToThread("═══ *Debate R2: Cross-Critique* ═══", "Moderator");
+        // ═══ R2: Cross-critique ═══
+        Console.WriteLine("[정반합:R2] Cross-critique...");
+        SlackPostToThread("═══ *R2: Cross-Critique* ═══", "Moderator");
 
-        var r2Tasks = ais.Select(ai => Task.Run(() =>
+        var r2Results = new ConcurrentDictionary<string, string>();
+        var r2Tasks = ais.Where(ai => r1Results.ContainsKey(ai)).Select(ai => Task.Run(async () =>
         {
-            var otherResponses = new StringBuilder();
-            for (int i = 0; i < ais.Length; i++)
+            try
             {
-                if (ais[i] == ai || r1Results[i] == null) continue;
-                var snippet = r1Results[i]!.Length > 500 ? r1Results[i]![..500] + "..." : r1Results[i]!;
-                otherResponses.AppendLine($"[{ais[i]} says]: {snippet}");
-            }
+                var peers = new StringBuilder();
+                foreach (var kv in r1Results)
+                {
+                    if (kv.Key == ai) continue;
+                    var s = kv.Value.Length > 400 ? kv.Value[..400] + "..." : kv.Value;
+                    peers.AppendLine($"[{kv.Key} says]: {s}");
+                }
 
-            var prompt = $"{debatePersona}\n\nYour role: {roles[ai]}\n\n" +
-                $"You answered: {(r1Results[Array.IndexOf(ais, ai)] ?? "(no response)")[..Math.Min(200, (r1Results[Array.IndexOf(ais, ai)] ?? "").Length)]}\n\n" +
-                $"Other AIs responded:\n{otherResponses}\n\n" +
-                "React from your role's perspective. Update your STANCE and claims. Use [DISPUTE] if you challenge an assumption.";
+                var myR1 = r1Results.GetValueOrDefault(ai, "(no response)");
+                var mySnippet = myR1.Length > 200 ? myR1[..200] + "..." : myR1;
 
-            var response = AskAndCapture(ai, prompt, Math.Min(timeoutSec, 90));
-            if (response != null)
-            {
-                ctx.UpdateChunk(ai, response);
-                var stance = TriadDebateLoop.ParseStance(response);
-                var claims = TriadDebateLoop.ParseClaims(response);
-                if (stance != null)
-                    SlackPostToThread($"📊 *[{ai} R2]* STANCE: {stance}", ai);
-                if (claims.Count > 0)
-                    SlackPostToThread($"🔀 *[{ai} R2]* {claims.Count} claims (revised)", ai);
+                var prompt = $"{debatePersona}\n\nYour role: {roles[ai]}\n\n" +
+                    $"Your R1 position: {mySnippet}\n\nPeer responses:\n{peers}\n\n" +
+                    "React from your role. Update STANCE and claims. Use disputes[] to challenge peers.";
+
+                var cdp = EnsureCdpConnection(preferredHost: hosts[ai], newTab: false,
+                    targetTag: $"debate-{ai}-{DateTime.UtcNow:HHmmss}");
+                if (cdp == null) return;
+
+                var response = await DebateSendAndPoll(cdp, ai, prompt, editorSels[ai], timeoutSec);
+                if (response != null)
+                {
+                    r2Results[ai] = response;
+                    var snippet = response.Length > 200 ? response[..200] + "..." : response;
+                    SlackPostToThread($"🔀 *[{ai} R2]*:\n{snippet}", ai);
+                }
+                cdp.Dispose();
             }
-            return response;
+            catch (Exception ex) { Console.Error.WriteLine($"[정반합:{ai}] R2 error: {ex.Message}"); }
         })).ToArray();
 
-        // Wait for at least 2 (or timeout)
-        var r2Sw = System.Diagnostics.Stopwatch.StartNew();
-        while (r2Sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 90))
-        {
-            if (r2Tasks.Count(t => t.IsCompleted) >= 2) break;
-            Thread.Sleep(2000);
-        }
-        Console.WriteLine($"[DEBATE:R2] Done ({r2Tasks.Count(t => t.IsCompleted)}/3)");
+        WaitForNTasks(r2Tasks, Math.Min(r1Results.Count, 2), timeoutSec, "R2");
 
-        // R3: Synthesis — ask for final conclusion in Korean
-        Console.WriteLine("[DEBATE:R3] Synthesis starting...");
-        SlackPostToThread("═══ *Debate R3: Final Synthesis* ═══", "Moderator");
+        // ═══ R3: Synthesis + Korean conclusion ═══
+        Console.WriteLine("[정반합:R3] Synthesis...");
+        SlackPostToThread("═══ *R3: Final Synthesis* ═══", "Moderator");
 
-        var allAnswers = new StringBuilder();
-        for (int i = 0; i < ais.Length; i++)
+        var allPositions = new StringBuilder();
+        foreach (var ai in ais)
         {
-            var r2 = r2Tasks[i].Result ?? r1Results[i] ?? "(no response)";
-            allAnswers.AppendLine($"[{ais[i]} final position]: {r2[..Math.Min(300, r2.Length)]}");
+            var best = r2Results.GetValueOrDefault(ai, r1Results.GetValueOrDefault(ai, ""));
+            if (best.Length > 0)
+            {
+                var s = best.Length > 300 ? best[..300] + "..." : best;
+                allPositions.AppendLine($"[{ai} final]: {s}");
+            }
         }
 
-        var synthPrompt = $"{debatePersona}\n\nAll positions after critique:\n{allAnswers}\n\n" +
-            "Produce a FINAL SYNTHESIS:\n" +
-            "1. Points of agreement across all AIs\n" +
-            "2. Remaining disagreements with reasoning\n" +
-            "3. Your final [DEBATE_JSON] with updated confidence\n" +
-            "4. Write [CONCLUSION_KR] with your conclusion in Korean 한국어 [/CONCLUSION_KR]\n\n" +
-            "[SYNTHESIS_COMPLETE] when done.";
+        var synthAi = r1Results.ContainsKey("gemini") ? "gemini" : r1Results.Keys.First();
+        var synthPrompt = $"{debatePersona}\n\nAll positions:\n{allPositions}\n\n" +
+            "FINAL SYNTHESIS: (1) Consensus points (2) Remaining disagreements (3) Updated [DEBATE_JSON]\n" +
+            "(4) Write your conclusion in Korean: [CONCLUSION_KR] 한국어 결론 [/CONCLUSION_KR]\n[SYNTHESIS_COMPLETE]";
 
-        // Use first successful AI for synthesis
-        var synthAi = r1Count >= 3 ? "gemini" : (r1Results[0] != null ? "gemini" : "gpt");
-        var synthesis = AskAndCapture(synthAi, synthPrompt, Math.Min(timeoutSec, 90));
+        var synthTask = Task.Run(async () =>
+        {
+            try
+            {
+                var cdp = EnsureCdpConnection(preferredHost: hosts[synthAi], newTab: false,
+                    targetTag: $"debate-{synthAi}-synth");
+                if (cdp == null) return (string?)null;
+                var result = await DebateSendAndPoll(cdp, synthAi, synthPrompt, editorSels[synthAi], timeoutSec);
+                cdp.Dispose();
+                return result;
+            }
+            catch { return (string?)null; }
+        });
+
+        synthTask.Wait(TimeSpan.FromSeconds(timeoutSec));
+        var synthesis = synthTask.IsCompleted ? synthTask.Result : null;
+
         if (synthesis != null)
         {
-            SlackPostToThread($"📋 *[Final Synthesis by {synthAi}]*\n{synthesis[..Math.Min(500, synthesis.Length)]}", "Moderator");
+            SlackPostToThread($"📋 *[Synthesis by {synthAi}]*\n{synthesis[..Math.Min(500, synthesis.Length)]}", "Moderator");
 
-            // Extract Korean conclusion
             var krStart = synthesis.IndexOf("[CONCLUSION_KR]");
             var krEnd = synthesis.IndexOf("[/CONCLUSION_KR]");
             if (krStart >= 0 && krEnd > krStart)
             {
-                var krConclusion = synthesis[(krStart + "[CONCLUSION_KR]".Length)..krEnd].Trim();
-                SlackPostToThread($"🇰🇷 *한국어 결론*\n{krConclusion}", "Moderator");
+                var kr = synthesis[(krStart + "[CONCLUSION_KR]".Length)..krEnd].Trim();
+                SlackPostToThread($"🇰🇷 *한국어 결론*\n{kr}", "Moderator");
             }
         }
 
-        Console.WriteLine("[DEBATE] ═══ Debate complete ═══");
-        SlackPostToThread("═══ *Debate Complete* ═══", "Moderator");
+        Console.WriteLine("[정반합] ═══ Complete ═══");
+        SlackPostToThread("═══ *정반합 토론 완료* ═══", "Moderator");
         return 0;
     }
 
-    /// <summary>Pure debate persona — no tool/APSP instructions.</summary>
+    /// <summary>CDP direct: insert text + send + poll response. No AskCommand involvement.</summary>
+    static async Task<string?> DebateSendAndPoll(CdpClient cdp, string ai, string prompt, string[] editorSels, int timeoutSec)
+    {
+        // Find editor
+        string? editorSel = null;
+        foreach (var sel in editorSels)
+        {
+            var len = await cdp.GetTextLengthAsync(sel);
+            if (len >= 0) { editorSel = sel; break; }
+        }
+        if (editorSel == null)
+        {
+            // Wait and retry
+            await Task.Delay(3000);
+            foreach (var sel in editorSels)
+            {
+                try { var r = await cdp.EvalAsync($"document.querySelector('{CdpClient.Esc(sel)}') ? 'OK' : 'NO'");
+                    if (r == "OK") { editorSel = sel; break; } } catch { }
+            }
+        }
+        if (editorSel == null)
+        {
+            Console.Error.WriteLine($"[정반합:{ai}] Editor not found");
+            return null;
+        }
+
+        // Clear + insert + send
+        await cdp.ClearEditorAsync(editorSel);
+        await Task.Delay(200);
+        await cdp.InsertContentEditableAsync(editorSel, prompt);
+        await Task.Delay(300);
+        await cdp.SendPromptAsync(editorSel);
+        Console.WriteLine($"[정반합:{ai}] Sent ({prompt.Length} chars)");
+
+        // Poll for response
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        string lastText = "";
+        int stableCount = 0;
+        var provider = ai == "gpt" ? "chatgpt" : ai;
+
+        while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 90))
+        {
+            await Task.Delay(2000);
+            var text = await cdp.GetLastResponseTextAsync() ?? "";
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            if (text == lastText)
+            {
+                stableCount++;
+                if (stableCount >= 3)
+                {
+                    Console.WriteLine($"[정반합:{ai}] Response stable ({text.Length} chars)");
+                    return text;
+                }
+            }
+            else
+            {
+                stableCount = 0;
+                lastText = text;
+                Console.Write($"[정반합:{ai} {sw.Elapsed.TotalSeconds:F0}s {text.Length}ch] ");
+            }
+
+            // Check if done streaming
+            try
+            {
+                if (!await cdp.IsStreamingAsync(provider))
+                {
+                    await Task.Delay(1000);
+                    var final = await cdp.GetLastResponseTextAsync() ?? text;
+                    Console.WriteLine($"[정반합:{ai}] Done ({final.Length} chars)");
+                    return final;
+                }
+            }
+            catch { }
+        }
+
+        return string.IsNullOrEmpty(lastText) ? null : lastText;
+    }
+
+    /// <summary>Wait until N tasks complete or timeout.</summary>
+    static void WaitForNTasks(Task[] tasks, int minDone, int timeoutSec, string label)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 120))
+        {
+            var done = tasks.Count(t => t.IsCompleted);
+            if (done >= minDone) break;
+            Thread.Sleep(2000);
+            if (sw.Elapsed.TotalSeconds > 30 && done < minDone)
+                SlackPostToThread($"⏳ [{label}] Waiting... ({done}/{tasks.Length})", "Moderator");
+        }
+    }
+
+    /// <summary>Pure debate persona — no tool/APSP/loop instructions.</summary>
     static string BuildDebateOnlyPersona()
     {
         return """
-            You are participating in a structured dialectical debate with other AIs.
+You are in a structured dialectical debate. Respond with [DEBATE_JSON]...[/DEBATE_JSON]:
 
-            RESPONSE FORMAT: Your response MUST contain [DEBATE_JSON]...[/DEBATE_JSON]:
-            [DEBATE_JSON]{"stance":{"N":2,"R":3,"C":1,"E":2,"D":1},"role":"YOUR_ROLE","position":"one sentence","claims":[{"claim":"...","confidence":0.85,"key_assumptions":["..."]}],"rebuttals":["..."],"disputes":[{"target_assumption":"...","reason":"..."}]}[/DEBATE_JSON]
+[DEBATE_JSON]{"stance":{"N":2,"R":3,"C":1,"E":2,"D":1},"role":"YOUR_ROLE","position":"one sentence","claims":[{"claim":"...","confidence":0.85,"key_assumptions":["..."]}],"rebuttals":["..."],"disputes":[{"target_assumption":"...","reason":"..."}]}[/DEBATE_JSON]
 
-            RULES:
-            - stance values N+R+C+E+D MUST sum to 9
-            - N=Novelty R=Rigor C=Consensus E=Evidence D=Dissent
-            - 2-5 claims per response, with honest confidence scores
-            - ENGLISH ONLY for the debate (Korean only in [CONCLUSION_KR] tags)
-            - Max 300 words. Claims over filler.
-            - When critiquing peers, use disputes[] with specific target_assumption
-            - Update confidence with prev_confidence when revising after critique
-
-            You may add free text AFTER the JSON block for elaboration.
-            """;
+RULES: stance N+R+C+E+D must sum to 9. 2-5 claims. ENGLISH ONLY. Max 300 words.
+Free text allowed AFTER the JSON block.
+""";
     }
 }
