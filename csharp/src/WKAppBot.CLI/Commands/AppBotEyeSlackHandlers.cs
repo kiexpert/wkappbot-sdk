@@ -1267,6 +1267,66 @@ internal partial class Program
 
             Console.WriteLine($"[EYE][SLACK] Reaction :{rx.Reaction}: by {rx.User} on {rx.ItemTs}");
 
+            // ✅ reaction on suggest message → auto-resolve (willkim approval = no test guard needed)
+            if (rx.Reaction == "white_check_mark" && rx.Channel == SuggestChannel)
+            {
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        // Find suggestion by slack_ts
+                        var jsonlPath = Path.Combine(DataDir, "suggestions.jsonl");
+                        if (!File.Exists(jsonlPath)) return;
+                        var lines = File.ReadAllLines(jsonlPath);
+                        foreach (var line in lines)
+                        {
+                            if (string.IsNullOrWhiteSpace(line)) continue;
+                            try
+                            {
+                                var node = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(line);
+                                var slackTs = node?["slack_ts"]?.GetValue<string>();
+                                if (slackTs == rx.ItemTs)
+                                {
+                                    var ts = node?["ts"]?.GetValue<string>() ?? "";
+                                    var text = node?["text"]?.GetValue<string>() ?? "";
+                                    var preview = text.Length > 60 ? text[..60] + "..." : text;
+                                    Console.WriteLine($"[EYE] ✅ reaction → auto-resolve: {preview}");
+
+                                    // Post resolve reply to Slack (no test guard — willkim approved via reaction)
+                                    var botToken = LoadSlackBotToken();
+                                    if (!string.IsNullOrEmpty(botToken))
+                                    {
+                                        var resolverName = GetSendReplyUsername();
+                                        SlackSendViaApi(botToken, SuggestChannel,
+                                            $":white_check_mark: *RESOLVED* (✅ approved by willkim)",
+                                            threadTs: rx.ItemTs, username: resolverName, replyBroadcast: true)
+                                            .GetAwaiter().GetResult();
+                                    }
+
+                                    // Move to history
+                                    var obj = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(line)!;
+                                    obj["review_status"] = "done";
+                                    obj["review_note"] = "Approved by willkim via ✅ reaction";
+                                    obj["review_ts"] = DateTime.UtcNow.ToString("o");
+                                    var historyPath = Path.Combine(DataDir, "suggestions_history.jsonl");
+                                    File.AppendAllText(historyPath, System.Text.Json.JsonSerializer.Serialize(obj) + Environment.NewLine);
+
+                                    // Remove from active
+                                    var remaining = lines.Where(l => l != line).ToArray();
+                                    File.WriteAllLines(jsonlPath, remaining);
+
+                                    Console.WriteLine($"[EYE] ✅ resolve done: {ts}");
+                                    break;
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                    catch (Exception ex) { Console.Error.WriteLine($"[EYE] ✅ auto-resolve error: {ex.Message}"); }
+                });
+                return; // handled — don't forward to Claude
+            }
+
             _ = Task.Run(() =>
             {
                 try
