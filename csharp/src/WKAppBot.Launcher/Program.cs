@@ -617,12 +617,12 @@ class Program
                     return (int)exitCode; // unreachable
                 }
 
-                // Timeout check
+                // Timeout check: Launcher exits, Core continues running (DETACHED_PROCESS)
                 if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
                 {
-                    Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s exceeded");
-                    TerminateProcess(hProc, 1);
+                    Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s — Launcher exiting, Core continues in background");
                     try { _stdout.Flush(); } catch { }
+                    // Do NOT kill Core — it's detached and may still be working (e.g. agent triad)
                     CloseHandle(hOut); CloseHandle(hErr); CloseHandle(hProc);
                     TerminateSelf((uint)timeoutExit);
                     return timeoutExit; // unreachable
