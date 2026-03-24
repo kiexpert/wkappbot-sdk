@@ -79,9 +79,12 @@ internal partial class Program
         static bool LooksLikePath(string s) =>
             (s.Length >= 2 && s[1] == ':') || s.StartsWith('/') || s.StartsWith('\\')
             || s.Contains('/') || s.Contains('\\');
-        if (positional.Count > 0 && !LooksLikePath(positional[0]))
+        // "*.cs", "*.log", "foo.txt" etc. = file glob, not content regex
+        static bool LooksLikeFileGlob(string s) =>
+            s.Contains('.') && (s.Contains('*') || s.Contains('?'));
+        if (positional.Count > 0 && !LooksLikePath(positional[0]) && !LooksLikeFileGlob(positional[0]))
             messageFilterArg = positional[0];
-        else if (positional.Count > 0 && LooksLikePath(positional[0]))
+        else if (positional.Count > 0 && (LooksLikePath(positional[0]) || LooksLikeFileGlob(positional[0])))
             positional.Insert(0, "*"); // shift: treat original [0] as file arg, pattern = match-all
         // Each positional[1..] is a file glob; ';' within a segment = OR at that path level
         // e.g. "logs/가;나;다/*.txt" → ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
