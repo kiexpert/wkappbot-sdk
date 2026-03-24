@@ -27,6 +27,39 @@ internal sealed class TriadSharedContext
     private readonly ConcurrentDictionary<string, object> _fileLocks =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // ── Real-time cross-prompting: streaming chunks shared between AIs ──
+    // When AI-A produces a chunk, other AIs get it as context.
+    private readonly ConcurrentDictionary<string, string> _latestChunks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, int> _chunkVersions = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Update latest response chunk for an AI (called during streaming flush).</summary>
+    public void UpdateChunk(string ai, string chunk)
+    {
+        _latestChunks[ai] = chunk;
+        _chunkVersions.AddOrUpdate(ai, 1, (_, v) => v + 1);
+    }
+
+    /// <summary>Get chunks from OTHER AIs (for cross-prompting). Returns only chunks newer than lastSeen versions.</summary>
+    public List<(string ai, string chunk)> GetPeerChunks(string selfAi, ConcurrentDictionary<string, int> lastSeen)
+    {
+        var result = new List<(string ai, string chunk)>();
+        foreach (var kv in _latestChunks)
+        {
+            if (kv.Key.Equals(selfAi, StringComparison.OrdinalIgnoreCase)) continue;
+            var ver = _chunkVersions.GetValueOrDefault(kv.Key, 0);
+            var seen = lastSeen.GetValueOrDefault(kv.Key, 0);
+            if (ver > seen && kv.Value.Length > 50) // only meaningful chunks
+            {
+                result.Add((kv.Key, kv.Value));
+                lastSeen[kv.Key] = ver;
+            }
+        }
+        return result;
+    }
+
+    /// <summary>Check if an AI has finished its response (chunk stops updating).</summary>
+    public bool IsAiDone(string ai) => _stepLogs.TryGetValue(ai, out var steps) && steps.Count > 0;
+
     public string? SessionDir => _sessionDir;
 
     public TriadSharedContext(string question, string? sessionDir = null)

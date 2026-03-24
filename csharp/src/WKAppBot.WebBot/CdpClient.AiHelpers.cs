@@ -331,6 +331,9 @@ public sealed partial class CdpClient
     /// Poll streaming response with comprehensive checks.
     /// Returns (success, finalText) — integrates response count, stop button, stability, rate limit.
     /// </summary>
+    /// <summary>Called during streaming with latest response text. For cross-prompting.</summary>
+    public Action<string>? OnStreamingChunk { get; set; }
+
     public async Task<(bool ok, string text)> PollStreamingResponseAsync(
         string provider, int baseResponseCount, int timeoutSec = 30, bool detectBlank = true)
     {
@@ -352,6 +355,10 @@ public sealed partial class CdpClient
 
             // Auto-dismiss dialogs (Gemini copyright warning etc.)
             await DismissDialogAsync();
+
+            // Notify chunk callback (cross-prompting)
+            if (text.Length > lastText.Length)
+                OnStreamingChunk?.Invoke(text);
 
             // Check streaming done
             if (!await IsStreamingAsync(provider) && !await IsStopButtonVisibleAsync())
