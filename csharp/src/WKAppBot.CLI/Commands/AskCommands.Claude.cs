@@ -557,6 +557,8 @@ internal partial class Program
         }
 
         PulseStep.Done();
+        if (triadCtx != null && ok)
+            SendPendingCrossPromptAsync(cdp, "claude", "div.tiptap.ProseMirror").GetAwaiter().GetResult();
         cdp.Dispose();
         return ok ? 0 : 1;
     }
