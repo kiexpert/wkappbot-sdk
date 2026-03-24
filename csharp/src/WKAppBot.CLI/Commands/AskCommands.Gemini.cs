@@ -977,6 +977,9 @@ internal partial class Program
         }
 
         UnregisterWaitingTab("gemini");
+        // Cross-prompt: send pending peer text if pre-typed in editor
+        if (triadCtx != null && ok)
+            SendPendingCrossPromptAsync(cdp, "gemini", ".ql-editor").GetAwaiter().GetResult();
         // Preserve Chrome's original state ??don't force minimize
         cdp.Dispose();
         return ok ? 0 : 1;

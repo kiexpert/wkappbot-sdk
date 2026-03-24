@@ -224,7 +224,8 @@ internal partial class Program
         }
 
         UnregisterWaitingTab("chatgpt");
-        // Preserve Chrome's original state ??don't force minimize
+        if (triadCtx != null && ok)
+            SendPendingCrossPromptAsync(cdp, "gpt", "#prompt-textarea").GetAwaiter().GetResult();
         cdp.Dispose();
         return ok ? 0 : 1;
     }
