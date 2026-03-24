@@ -603,9 +603,9 @@ Examples:
                 cdp.EnableFocusTheftMonitoring = true;
                 cdp.OnFocusTheft = (method, prevFg, curFg) =>
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[ASK:FOCUS] ??STOLEN @ CDP:{method}: was={prevFg:X8} now={curFg:X8} ??restoring");
-                    Console.ResetColor();
+                    var focusEx = new InvalidOperationException(
+                        $"Focus stolen @ CDP:{method}: was={prevFg:X8} now={curFg:X8}");
+                    LogError("BUG-AUTO", focusEx);
                 };
 
                 return (CdpClient?)cdp;
