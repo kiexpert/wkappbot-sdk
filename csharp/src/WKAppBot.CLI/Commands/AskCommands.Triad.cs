@@ -61,7 +61,7 @@ internal sealed class TriadSharedContext
             }
             if (stance == null)
             {
-                // Moderator intervention: remind AI to include STANCE
+                // Moderator: queue STANCE demand — will be sent AFTER response completes
                 _ = Task.Run(async () =>
                 {
                     try
@@ -77,16 +77,29 @@ internal sealed class TriadSharedContext
                             };
                             if (editorSel != null)
                             {
-                                // Wait for response to finish, then remind
-                                await Task.Delay(3000);
-                                var reminder = $"SYSTEM RULE VIOLATION: You MUST start your response with [STANCE N=? R=? C=? E=? D=?] where sum=9. Example: [STANCE N=2 R=3 C=1 E=2 D=1]. This is mandatory. Respond now with your STANCE first, then your argument.";
-                                await selfCdp.InsertContentEditableAsync(editorSel, reminder);
-                                Console.WriteLine($"[MOD] {ai}: STANCE missing → reminder sent");
-                                Program.SlackPostToThread($"⚠️ *[MOD→{ai}]* STANCE missing! Reminder injected.", "Moderator");
+                                // Wait for response to finish (streaming ends)
+                                for (int w = 0; w < 30; w++)
+                                {
+                                    await Task.Delay(2000);
+                                    try
+                                    {
+                                        var streaming = await selfCdp.IsStreamingAsync(ai == "gpt" ? "chatgpt" : ai);
+                                        if (!streaming) break;
+                                    }
+                                    catch { break; }
+                                }
+                                await Task.Delay(1000); // settle
+
+                                var demand = "[MODERATOR DM] Your response was REJECTED — missing mandatory [STANCE]. Reply with ONLY this format:\n[STANCE N=? R=? C=? E=? D=?] (sum must equal 9)\nExample: [STANCE N=2 R=3 C=1 E=2 D=1]\nThen restate your key claim in one sentence.";
+                                await selfCdp.InsertContentEditableAsync(editorSel, demand);
+                                await Task.Delay(500);
+                                await selfCdp.SendPromptAsync(editorSel); // auto-send!
+                                Console.WriteLine($"[MOD] {ai}: STANCE missing → reject + re-request SENT");
+                                Program.SlackPostToThread($"⚠️ *[MOD→{ai}]* STANCE missing! Response rejected, re-requested.", "Moderator");
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { Console.Error.WriteLine($"[MOD] {ai}: error: {ex.Message}"); }
                 });
             }
         }
