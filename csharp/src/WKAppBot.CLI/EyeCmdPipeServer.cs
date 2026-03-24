@@ -269,6 +269,17 @@ internal static class EyeCmdPipeServer
             return exitCode;
         }
 
+        // ── Long-running commands (ask/agent): dispatch as background task ──
+        // Launcher gets immediate response; Core continues working with Slack streaming.
+        var cmd0 = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+        if (cmd0 is "ask" or "agent")
+        {
+            pipeWriter.WriteLine($"[CMD] {string.Join(" ", args)} → dispatched to background");
+            pipeWriter.WriteLine($"Log: {logFile}");
+            DispatchBg(args, callerHwnd);
+            return 0; // immediate return to launcher
+        }
+
         // ── In-process path for Eye-internal commands ──
         // TeeTextWriter wraps pipeWriter: output goes to pipe (real-time) AND log file.
         // AsyncLocal routing isolates this command's output from concurrent commands.
