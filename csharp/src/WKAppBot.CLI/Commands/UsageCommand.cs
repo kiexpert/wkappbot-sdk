@@ -337,7 +337,7 @@ Data Directory:
     }
 
     // Busybox aliases to auto-create as symlinks next to wkappbot.exe
-    static readonly string[] BusyboxAliases = { "a11y", "wka11y", "grep", "grap" };
+    static readonly string[] BusyboxAliases = { "a11y", "wka11y", "grep", "grap", "wkedit" };
 
     static void PrintGrapHelp(string alias)
     {
@@ -546,8 +546,17 @@ Data Directory:
                 // Check for stale hardlink: no symlink target + size mismatch → delete and recreate
                 if (File.Exists(linkPath))
                 {
-                    bool isSymlink = File.ResolveLinkTarget(linkPath, returnFinalTarget: false) != null;
-                    if (!isSymlink)
+                    var linkTarget = File.ResolveLinkTarget(linkPath, returnFinalTarget: false)?.ToString();
+                    if (linkTarget != null)
+                    {
+                        // Symlink exists — verify it points to the correct target
+                        var linkTargetName = Path.GetFileName(linkTarget);
+                        if (string.Equals(linkTargetName, targetName, StringComparison.OrdinalIgnoreCase))
+                            continue; // correct symlink, keep it
+                        // Wrong target (e.g. wkappbot-core.exe instead of wkappbot.exe) — recreate
+                        try { File.Delete(linkPath); } catch { continue; }
+                    }
+                    else
                     {
                         // It's a hardlink (or copy). Check if stale after hot-swap.
                         long linkSize = new FileInfo(linkPath).Length;
@@ -558,7 +567,6 @@ Data Directory:
                         }
                         else continue; // hardlink still matches, keep it
                     }
-                    else continue; // symlink exists, good
                 }
                 // Also skip dangling symlinks (File.Exists=false but path exists)
                 else
