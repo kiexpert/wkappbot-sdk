@@ -448,13 +448,9 @@ internal partial class Program
                     {
                         var rem = (await cdp.GetTextLengthAsync(editorSel)).ToString();
                         if (rem == "0" && ps > 0) { personaSent = true; break; }
-                        await cdp.JsClickAsync("button[aria-label=\"Send message\"], button[aria-label*=\"Send\"], .send-button, button.send-button");
+                        // Send: Enter key (modern AI: Enter=send, button=stop)
+                        await askSession.SendAsync(editorSel);
                         await Task.Delay(500);
-                        await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
-                        {
-                            ["type"] = "keyDown", ["key"] = "Enter", ["code"] = "Enter",
-                            ["windowsVirtualKeyCode"] = 13, ["nativeVirtualKeyCode"] = 13
-                        });
                         await cdp.SendAsync("Input.dispatchKeyEvent", new System.Text.Json.Nodes.JsonObject
                         {
                             ["type"] = "keyUp", ["key"] = "Enter", ["code"] = "Enter",
