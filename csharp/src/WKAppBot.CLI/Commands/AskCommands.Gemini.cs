@@ -610,13 +610,15 @@ internal partial class Program
                 // Pre-send: if stop visible (persona continuation), wait WITHOUT clicking stop.
                 // Clicking stop generates a stop-notice response that poisons subsequent reads.
                 {
-                    var preStopped = await cdp.EvalAsync("""
+                    var preStopped = await cdp.IsStopButtonVisibleAsync() ? "1" : "0";
+                    /* replaced: EvalAsync stop check → IsStopButtonVisibleAsync */
+                    if (false) { var _x = await cdp.EvalAsync("""
                         (() => {
                             if (document.querySelector('button[aria-label*="Stop"]') || document.querySelector('button[aria-label*="����"]')) return '1';
                             var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
                             return (mat && mat.closest('button')) ? '1' : '0';
                         })()
-                        """) ?? "0";
+                        """) ?? "0"; }
                     if (preStopped == "1")
                     {
                         Console.WriteLine("[ASK] Gemini still generating pre-send ? waiting without interrupt...");
