@@ -98,6 +98,10 @@ internal sealed class TriadSharedContext
         var newText = chunk[prev.Length..].Trim();
         if (newText.Length < 50) return;
 
+        // Post chunk to Slack immediately
+        var slackSnippet = newText.Length > 200 ? newText[..200] + "..." : newText;
+        Program.SlackPostToThread($"💬 *[{ai}]*: {slackSnippet}", ai);
+
         // Inject cross-prompt into other AIs' editors immediately (editor is free during streaming)
         var snippet = newText.Length > 300 ? newText[..300] + "..." : newText;
         foreach (var kv in _cdpClients)
@@ -126,8 +130,8 @@ internal sealed class TriadSharedContext
                     await peerCdp.InsertContentEditableAsync(editorSel, crossText);
                     Console.WriteLine($"[CROSS] {ai}→{peerAi}: pre-typed ({snippet.Length} chars)");
 
-                    // Post to Slack so user sees cross-prompt flow in real-time
-                    Program.SlackPostToThread($"🔀 *[{ai}→{peerAi}]*: {snippet[..Math.Min(200, snippet.Length)]}", ai);
+                    // Post delivery result to Slack
+                    Program.SlackPostToThread($"🔀 *[{ai}→{peerAi} ✅]*", ai);
                 }
                 catch { /* editor may not be ready — non-fatal */ }
             });
