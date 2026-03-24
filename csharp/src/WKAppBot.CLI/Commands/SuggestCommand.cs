@@ -44,6 +44,32 @@ internal partial class Program
             Console.WriteLine("  wkappbot suggest \"Need UIA support for MDI child windows\" screenshot.png");
             Console.WriteLine("  wkappbot suggest list");
             Console.WriteLine("  wkappbot suggest resolve 2026-03-17T05:00:00 \"Fixed in v4.4.5\"");
+            Console.WriteLine();
+            // Show experience DB test scripts summary
+            var testsRoot = Path.Combine(DataDir, "experience", "tests");
+            if (Directory.Exists(testsRoot))
+            {
+                var allTests = Directory.GetFiles(testsRoot, "*", SearchOption.AllDirectories);
+                if (allTests.Length > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.WriteLine($"📚 Experience DB: {allTests.Length} test script(s) from previous resolves");
+                    Console.WriteLine($"   Path: {testsRoot}");
+                    foreach (var catDir in Directory.GetDirectories(testsRoot).OrderBy(d => d))
+                    {
+                        var cat = Path.GetFileName(catDir);
+                        foreach (var subDir in Directory.GetDirectories(catDir).OrderBy(d => d))
+                        {
+                            var sub = Path.GetFileName(subDir);
+                            var files = Directory.GetFiles(subDir).Select(Path.GetFileName).ToArray();
+                            if (files.Length > 0)
+                                Console.WriteLine($"   {cat}/{sub}: {string.Join(", ", files)}");
+                        }
+                    }
+                    Console.WriteLine($"   Tip: reference these when writing your own resolve evidence!");
+                    Console.ResetColor();
+                }
+            }
             return 0;
         }
 
@@ -475,6 +501,23 @@ internal partial class Program
 
         Console.WriteLine($"[RESOLVE] Evidence: {evidenceFile} ({new FileInfo(evidenceFile).Length} bytes)");
 
+        // Show existing test scripts for this cmd/subcmd (help newcomer Claudes learn from predecessors)
+        {
+            var cmd1 = evidenceParts.Length > 1 ? evidenceParts[1] : "";
+            var sub1 = evidenceParts.Length > 2 ? evidenceParts[2] : "";
+            var existingDir = Path.Combine(DataDir, "experience", "tests", cmd1, sub1);
+            if (Directory.Exists(existingDir))
+            {
+                var existing = Directory.GetFiles(existingDir).Select(Path.GetFileName).ToArray();
+                if (existing.Length > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.WriteLine($"  📚 Existing tests for {cmd1}/{sub1}: {string.Join(", ", existing)}");
+                    Console.ResetColor();
+                }
+            }
+        }
+
         // Verify script content: must contain the command from filename (test-{cmd}-{subcmd}-*)
         try
         {
@@ -632,7 +675,22 @@ internal partial class Program
             var subcmd = parts.Length > 2 ? parts[2] : "general";
             var testsDir = Path.Combine(hqDir, "experience", "tests", cmd, subcmd);
             Directory.CreateDirectory(testsDir);
-            var destPath = Path.Combine(testsDir, Path.GetFileName(evidenceFile));
+            var destName = Path.GetFileName(evidenceFile);
+            var destPath = Path.Combine(testsDir, destName);
+            // Avoid overwriting: if file exists with different content, add timestamp suffix
+            if (File.Exists(destPath))
+            {
+                var existingHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(destPath)))[..8];
+                var newHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(evidenceFile)))[..8];
+                if (existingHash != newHash)
+                {
+                    var ts = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                    var ext = Path.GetExtension(destName);
+                    destName = $"{Path.GetFileNameWithoutExtension(destName)}-{ts}{ext}";
+                    destPath = Path.Combine(testsDir, destName);
+                }
+                // else: same content — overwrite is fine (idempotent)
+            }
             File.Copy(evidenceFile, destPath, overwrite: true);
             Console.WriteLine($"[RESOLVE] Evidence → experience/tests/{cmd}/{subcmd}/{Path.GetFileName(evidenceFile)}");
         }
