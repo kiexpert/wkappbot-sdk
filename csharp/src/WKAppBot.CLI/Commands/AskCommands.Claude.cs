@@ -119,16 +119,10 @@ internal partial class Program
     /// <summary>Count Claude.ai assistant turns.</summary>
     static async Task<int> CountClaudeTurns(CdpClient cdp)
     {
-        var result = await cdp.EvalAsync("""
-            (() => {
-                var c = document.querySelectorAll('[data-testid="user-message"]').length;
-                if (c > 0) return '' + c;
-                c = document.querySelectorAll('[data-is-streaming]').length;
-                if (c > 0) return '1';
-                return '0';
-            })()
-            """) ?? "0";
-        return int.TryParse(result, out var v) ? v : 0;
+        var c = await cdp.QueryCountAsync("[data-testid=\"user-message\"]");
+        if (c > 0) return c;
+        c = await cdp.QueryCountAsync("[data-is-streaming]");
+        return c > 0 ? 1 : 0;
     }
 
     static int AskClaude(string question, bool slackReport = true, int timeoutSec = 30, bool newTab = false, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
