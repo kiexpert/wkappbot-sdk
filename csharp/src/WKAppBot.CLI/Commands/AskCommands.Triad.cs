@@ -50,6 +50,42 @@ internal sealed class TriadSharedContext
         _latestChunks[ai] = chunk;
         _chunkVersions.AddOrUpdate(ai, 1, (_, v) => v + 1);
 
+        // First chunk: check for STANCE compliance
+        if (prev.Length == 0 && chunk.Length > 50)
+        {
+            var stance = TriadDebateLoop.ParseStance(chunk);
+            if (stance == null)
+            {
+                // Moderator intervention: remind AI to include STANCE
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        if (_cdpClients.TryGetValue(ai, out var selfCdp))
+                        {
+                            var editorSel = ai.ToLowerInvariant() switch
+                            {
+                                "gemini" => ".ql-editor",
+                                "gpt" or "chatgpt" => "#prompt-textarea",
+                                "claude" => "div.tiptap.ProseMirror",
+                                _ => null
+                            };
+                            if (editorSel != null)
+                            {
+                                // Wait for response to finish, then remind
+                                await Task.Delay(3000);
+                                var reminder = $"[MODERATOR]: {ai}, you forgot [STANCE N=? R=? C=? E=? D=?] (sum=9). Please include it in your next response.";
+                                await selfCdp.InsertContentEditableAsync(editorSel, reminder);
+                                Console.WriteLine($"[MOD] {ai}: STANCE missing → reminder queued");
+                                Program.SlackPostToThread($"⚠️ *[사회자→{ai}]* STANCE 지표 누락! 다음 응답에 포함 요청", "사회자");
+                            }
+                        }
+                    }
+                    catch { }
+                });
+            }
+        }
+
         // Only broadcast meaningful new content (delta > 100 chars)
         var delta = chunk.Length - prev.Length;
         if (delta < 100) return;
