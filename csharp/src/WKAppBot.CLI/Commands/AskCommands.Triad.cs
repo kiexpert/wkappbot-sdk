@@ -74,7 +74,7 @@ internal sealed class TriadSharedContext
                             {
                                 // Wait for response to finish, then remind
                                 await Task.Delay(3000);
-                                var reminder = $"[MODERATOR]: {ai}, you forgot [STANCE N=? R=? C=? E=? D=?] (sum=9). Please include it in your next response.";
+                                var reminder = $"SYSTEM RULE VIOLATION: You MUST start your response with [STANCE N=? R=? C=? E=? D=?] where sum=9. Example: [STANCE N=2 R=3 C=1 E=2 D=1]. This is mandatory. Respond now with your STANCE first, then your argument.";
                                 await selfCdp.InsertContentEditableAsync(editorSel, reminder);
                                 Console.WriteLine($"[MOD] {ai}: STANCE missing → reminder queued");
                                 Program.SlackPostToThread($"⚠️ *[사회자→{ai}]* STANCE 지표 누락! 다음 응답에 포함 요청", "사회자");
