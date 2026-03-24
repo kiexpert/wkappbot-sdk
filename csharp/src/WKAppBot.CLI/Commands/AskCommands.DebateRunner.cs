@@ -298,6 +298,27 @@ internal partial class Program
         Console.WriteLine("[CROSS] ═══ Cross-prompting complete ═══");
     }
 
+    /// <summary>
+    /// After AI response completes, check if cross-prompt text was pre-typed in editor.
+    /// If so, send it immediately (Enter key). Returns true if cross-prompt was sent.
+    /// </summary>
+    internal static async Task<bool> SendPendingCrossPromptAsync(WKAppBot.WebBot.CdpClient cdp, string ai, string editorSel)
+    {
+        try
+        {
+            var editorLen = await cdp.GetTextLengthAsync(editorSel);
+            if (editorLen > 10) // cross-prompt text was pre-typed
+            {
+                Console.WriteLine($"[CROSS:{ai}] Found pre-typed cross-prompt ({editorLen} chars) → sending");
+                await cdp.SendPromptAsync(editorSel);
+                SlackPostToThread($"🔀 *[{ai}]* Cross-prompt sent ({editorLen} chars)", ai);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
     /// <summary>Post debate summary to Slack thread.</summary>
     static void PostDebateSummary(List<TriadDebateLoop.RoundResult> results, int roundsCompleted)
     {

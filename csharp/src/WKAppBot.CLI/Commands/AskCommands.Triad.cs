@@ -57,12 +57,36 @@ internal sealed class TriadSharedContext
         var newText = chunk[prev.Length..].Trim();
         if (newText.Length < 50) return;
 
-        // Queue cross-prompt for other AIs
+        // Inject cross-prompt into other AIs' editors immediately (editor is free during streaming)
+        var snippet = newText.Length > 300 ? newText[..300] + "..." : newText;
         foreach (var kv in _cdpClients)
         {
             if (kv.Key.Equals(ai, StringComparison.OrdinalIgnoreCase)) continue;
-            var queue = _crossPromptQueues.GetOrAdd(kv.Key, _ => new ConcurrentQueue<(string, string)>());
-            queue.Enqueue((ai, newText.Length > 300 ? newText[..300] + "..." : newText));
+            var peerCdp = kv.Value;
+            var peerAi = kv.Key;
+            var queue = _crossPromptQueues.GetOrAdd(peerAi, _ => new ConcurrentQueue<(string, string)>());
+            queue.Enqueue((ai, snippet));
+
+            // Pre-type into peer's editor (will be sent after their response finishes)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var editorSel = peerAi.ToLowerInvariant() switch
+                    {
+                        "gemini" => ".ql-editor",
+                        "gpt" or "chatgpt" => "#prompt-textarea",
+                        "claude" => "div.tiptap.ProseMirror",
+                        _ => null
+                    };
+                    if (editorSel == null) return;
+
+                    var crossText = $"[{ai} says]: {snippet}\nYour brief reaction?";
+                    await peerCdp.InsertContentEditableAsync(editorSel, crossText);
+                    Console.WriteLine($"[CROSS] {ai}→{peerAi}: pre-typed ({snippet.Length} chars)");
+                }
+                catch { /* editor may not be ready — non-fatal */ }
+            });
         }
     }
 
