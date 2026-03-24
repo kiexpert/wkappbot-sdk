@@ -38,6 +38,7 @@ internal partial class Program
                 ? "model-response:last-of-type img, [role='article']:last-of-type img"
                 : "[data-message-author-role='assistant']:last-of-type img, article:last-of-type img");
 
+            // TODO: consider cdp.QueryImageElementsAsync() helper if image extraction pattern recurs
             var imgJson = await cdp.EvalAsync($$"""
                 (() => {
                     var imgs = document.querySelectorAll("{{selectorBase}}");
@@ -93,6 +94,7 @@ internal partial class Program
                         findImgJs = $"Array.from(document.querySelectorAll('img')).find(i => i.src.includes('{srcSnippet}'))";
                     }
 
+                    // TODO: consider cdp.CaptureImageBase64Async(selector) helper if canvas extraction recurs
                     // ???? Tier 1: Canvas rendering ??reload with crossOrigin to avoid taint ????
                     var canvasB64 = await cdp.EvalAsync($$"""
                         (async () => {
@@ -157,6 +159,7 @@ internal partial class Program
                             bytes = Convert.FromBase64String(src.Substring(commaIdx + 1));
                     }
 
+                    // TODO: consider cdp.FetchImageBase64Async(url) helper if fetch-image pattern recurs
                     // ???? Tier 3: fetch with credentials (https: URLs) ????
                     if (bytes == null && src.StartsWith("http"))
                     {
