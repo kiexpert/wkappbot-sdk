@@ -384,7 +384,10 @@ internal partial class Program
 
         // ═══ Special: kill (process kill by name/cmdline pattern, no window needed) ═══
         if (action == "kill")
-            return A11yKillByPattern(grap, allowAncestors);
+        {
+            bool dryRun = args.Any(a => a == "--dry-run");
+            return A11yKillByPattern(grap, allowAncestors, dryRun);
+        }
 
         var elementActions = new HashSet<string> {
             "invoke", "click", "toggle", "expand", "collapse", "select",
@@ -1931,7 +1934,7 @@ internal partial class Program
     //   "**/wkappbot-core"         → wkappbot-core with any ancestor (any depth)
     //   "wkappbot-core#regex:lucy" → '#' splits name#exePathFilter
     // If process has a window → WM_CLOSE first then Kill; else → Kill directly.
-    static int A11yKillByPattern(string grap, bool allowAncestors)
+    static int A11yKillByPattern(string grap, bool allowAncestors, bool dryRun = false)
     {
         // Split '#' for optional exe-path sub-filter
         string namePattern = grap;
@@ -1994,44 +1997,51 @@ internal partial class Program
                     continue;
                 }
 
+                // Get command line for display + protection
+                string cmdLine = "";
+                try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
+                var cmdBrief = cmdLine.Length > 80 ? cmdLine[..80] + "..." : cmdLine;
+
                 // Protect Eye child processes: WhisperRing, ScreenSaver, analyze-hack
-                // These are wkappbot-core.exe with specific args — check command line
-                try
+                if (!string.IsNullOrEmpty(cmdLine) && (
+                    cmdLine.Contains("whisper-ring", StringComparison.OrdinalIgnoreCase) ||
+                    cmdLine.Contains("screensaver", StringComparison.OrdinalIgnoreCase) ||
+                    cmdLine.Contains("analyze-hack", StringComparison.OrdinalIgnoreCase)))
                 {
-                    var cmdLine = NativeMethods.GetProcessCommandLine(p.Id);
-                    if (!string.IsNullOrEmpty(cmdLine) && (
-                        cmdLine.Contains("whisper-ring", StringComparison.OrdinalIgnoreCase) ||
-                        cmdLine.Contains("screensaver", StringComparison.OrdinalIgnoreCase) ||
-                        cmdLine.Contains("analyze-hack", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        skipped.Add($"{nodeKey} (eye-child: {cmdLine[..Math.Min(40, cmdLine.Length)]})");
-                        continue;
-                    }
+                    skipped.Add($"[{p.Id}]{procName} (eye-child)");
+                    Console.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (eye-child: {cmdBrief})");
+                    continue;
                 }
-                catch { }
+
+                if (dryRun)
+                {
+                    Console.WriteLine($"[KILL:DRY] [{p.Id}]{procName} — {cmdBrief}");
+                    killed.Add($"[{p.Id}]{procName}");
+                    continue;
+                }
 
                 var mainHwnd = p.MainWindowHandle;
                 bool hasWindow = mainHwnd != IntPtr.Zero && NativeMethods.IsWindow(mainHwnd);
                 if (hasWindow)
                 {
-                    Console.WriteLine($"[KILL] {nodeKey} — window found, sending WM_CLOSE");
+                    Console.WriteLine($"[KILL] [{p.Id}]{procName} — window found, sending WM_CLOSE\n       cmd: {cmdBrief}");
                     NativeMethods.SendMessageTimeoutW(mainHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 2000, out _);
                     Thread.Sleep(800);
                     try { p.Refresh(); } catch { }
                     if (p.HasExited)
                     {
-                        Console.WriteLine($"[KILL] {nodeKey} — exited gracefully");
-                        killed.Add(nodeKey);
+                        Console.WriteLine($"[KILL] [{p.Id}]{procName} — exited gracefully");
+                        killed.Add($"[{p.Id}]{procName}");
                         continue;
                     }
-                    Console.WriteLine($"[KILL] {nodeKey} — still alive, force kill");
+                    Console.WriteLine($"[KILL] [{p.Id}]{procName} — still alive, force kill");
                 }
                 else
                 {
-                    Console.WriteLine($"[KILL] {nodeKey} — no window, force kill");
+                    Console.WriteLine($"[KILL] [{p.Id}]{procName} — no window, force kill\n       cmd: {cmdBrief}");
                 }
                 p.Kill(entireProcessTree: false);
-                killed.Add(nodeKey);
+                killed.Add($"[{p.Id}]{procName}");
             }
             catch (Exception ex)
             {
