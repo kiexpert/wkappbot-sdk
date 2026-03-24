@@ -562,6 +562,12 @@ internal partial class Program
         }
 
         string FormatLine(int j, bool isMatch) {
+            if (GrapMode && !Console.IsOutputRedirected)
+            {
+                // wkedit-style: → arrow marker + padded line number + │ separator
+                var arrow = isMatch ? "→" : " ";
+                return $"{arrow} {lineNums[j],5}│ {buf[j]}";
+            }
             var prefix = showFilename ? $"{path}:" : "";
             var numPfx = showLineNums ? $"{lineNums[j]}:" : "";
             return $"{prefix}{numPfx}{buf[j]}";
@@ -593,7 +599,7 @@ internal partial class Program
                 // Interactive mode: file header + marker + timestamp
                 if (!string.Equals(lastHeaderPath, path, StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine($"풀경로: {path}");
+                    Console.WriteLine(GrapMode ? $"\n[FILE] {path}" : $"풀경로: {path}");
                     lastHeaderPath = path;
                 }
 
@@ -603,7 +609,7 @@ internal partial class Program
                 int to   = Math.Min(buf.Count - 1, i + aft);
 
                 if ((bef > 0 || aft > 0) && from > printUntil + 1)
-                    Console.WriteLine("--");
+                    Console.WriteLine(GrapMode ? "   ..." : "--");
 
                 for (int j = from; j <= to; j++)
                 {
