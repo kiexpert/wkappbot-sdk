@@ -559,6 +559,7 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> ClaudeSendAndWaitAsync(CdpClient cdp, string message, int timeoutSec)
     {
+        using var askSession = new AskSession(AiProvider.Claude, cdp); // provider-aware utilities
         // Guard: verify tab is still on claude.ai (web search subprocess might have navigated away)
         var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("claude.ai", StringComparison.OrdinalIgnoreCase))
@@ -584,19 +585,9 @@ internal partial class Program
             return (false, null);
 
         await Task.Delay(350);
-        var clickResult = await cdp.EvalAsync("""
-            (() => {
-                var btn = document.querySelector('[data-testid="chat-input-grid-area"] button[type="submit"]')
-                       || document.querySelector('[data-testid="chat-input"] button[type="submit"]')
-                       || document.querySelector('button[aria-label="Send Message"]')
-                       || document.querySelector('button[aria-label*="Send"]');
-                if (!btn || btn.disabled) return 'NO_BTN';
-                btn.click();
-                return 'CLICKED';
-            })()
-            """) ?? "NO_BTN";
+        var sendClicked = await askSession.ClickSendAsync();
 
-        if (clickResult != "CLICKED")
+        if (!sendClicked)
         {
             await cdp.FocusAsync(editorSel);
             await Task.Delay(80);
@@ -620,6 +611,7 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < Math.Max(20, timeoutSec))
         {
             await Task.Delay(1500);
+            // TODO: migrate to AskSession when provider-specific limit detection is unified
             var limitText = await cdp.EvalAsync("""
                 (() => {
                     // Only check last AI message to avoid false positives from prior conversation history
@@ -640,6 +632,7 @@ internal partial class Program
             if (!string.IsNullOrWhiteSpace(limitText))
                 return (true, FormatClaudeLimitResponse(limitText));
 
+            // TODO: migrate to AskSession when provider-specific polling is unified
             var poll = await cdp.EvalAsync(
                 "(() => {" +
                 "var msgs = document.querySelectorAll('[data-is-streaming]');" +
@@ -680,6 +673,7 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> GeminiSendAndWaitAsync(CdpClient cdp, string message, int timeoutSec)
     {
+        using var askSession = new AskSession(AiProvider.Gemini, cdp); // provider-aware utilities
         // Guard: verify tab is still on gemini.google.com
         var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("gemini.google.com", StringComparison.OrdinalIgnoreCase))
@@ -732,18 +726,9 @@ internal partial class Program
                 }
             }
 
-            var clickResult = await cdp.EvalAsync("""
-                (() => {
-                    var btn = document.querySelector('button[aria-label*="Send"]')
-                           || document.querySelector('button[aria-label="Send message"]')
-                           || document.querySelector('button.send-button');
-                    if (!btn || btn.disabled) return 'NO_BUTTON';
-                    btn.click();
-                    return 'CLICKED';
-                })()
-                """) ?? "NO_BUTTON";
+            var sendClicked = await askSession.ClickSendAsync();
 
-            if (clickResult != "CLICKED")
+            if (!sendClicked)
             {
                 await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
                 {
@@ -783,19 +768,12 @@ internal partial class Program
             if (string.IsNullOrWhiteSpace(text))
                 continue;
 
-            var streaming = await cdp.EvalAsync("""
-                (() => {
-                    var stop = document.querySelector('button[aria-label="Stop response"], button[aria-label="Stop"]');
-                    if (stop) return '1';
-                    var mat = document.querySelector('mat-icon[fonticon="stop_circle"]');
-                    return mat ? '1' : '0';
-                })()
-                """) ?? "0";
+            var isStreaming = await askSession.IsStopVisibleAsync();
 
             if (text == last)
             {
                 stable++;
-                if (stable >= 1 && streaming != "1")
+                if (stable >= 1 && !isStreaming)
                     return (true, text);
             }
             else

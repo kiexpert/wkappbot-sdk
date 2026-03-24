@@ -42,6 +42,7 @@ internal partial class Program
             await Task.Delay(500);
         }
         // Diagnostic: log what input-like elements exist on the page
+        // TODO: migrate to AskSession when provider-specific editor diagnostics are unified
         var diag = await cdp.EvalAsync("""
             (() => {
                 var ce = document.querySelectorAll('[contenteditable]').length;
@@ -136,6 +137,7 @@ internal partial class Program
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "claude");
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+        using var askSession = new AskSession(AiProvider.Claude, cdp); // gradual migration wrapper
         PulseStep.Mark("cdp-connected");
 
         // No tab activation — CDP works on background tabs via targetId. Truly focusless.
@@ -257,7 +259,7 @@ internal partial class Program
                 // Wait for any active response to finish (stop button = Claude is generating/tool-running).
                 // Clicking the send button during tool execution would interrupt it — Enter key is safer
                 // because Claude queues it in the editor without firing until generation completes.
-                if (!await WaitWhileStopButtonVisible(cdp, maxWaitMs: 60000))
+                if (!await WaitWhileStopButtonVisible(askSession, maxWaitMs: 60000))
                     return (false, (string?)null);
 
                 await Task.Delay(500);
@@ -297,20 +299,9 @@ internal partial class Program
                 if (sendResult == "PENDING")
                 {
                     Console.WriteLine("[ASK] Enter key didn't send, trying JS button click...");
-                    var jsClick = await cdp.EvalAsync("""
-                        (() => {
-                            var btn = document.querySelector('[data-testid="chat-input-grid-area"] button[type="submit"]')
-                                   || document.querySelector('[data-testid="chat-input"] button[type="submit"]')
-                                   || document.querySelector('button[aria-label="메시지 보내기"]')
-                                   || document.querySelector('button[aria-label="Send Message"]')
-                                   || document.querySelector('button[aria-label*="Send"]');
-                            if (!btn || btn.disabled) return 'NO_BTN';
-                            btn.click();
-                            return 'CLICKED';
-                        })()
-                        """) ?? "NO_BTN";
+                    var sendClicked = await askSession.ClickSendAsync();
 
-                    if (jsClick == "CLICKED")
+                    if (sendClicked)
                     {
                         await Task.Delay(1000);
                         var postTurns = await CountClaudeTurns(cdp);
@@ -345,6 +336,7 @@ internal partial class Program
                 {
                     await Task.Delay(1000);
 
+                    // TODO: migrate to AskSession when provider-specific limit detection is unified
                     var limitText = await cdp.EvalAsync("""
                         (() => {
                             // Only check the LAST AI message to avoid false positives from prior conversation
@@ -371,6 +363,7 @@ internal partial class Program
                         return (false, FormatClaudeLimitResponse(limitText));
                     }
 
+                    // TODO: migrate to AskSession when provider-specific response detection is unified
                     var detectResult = await cdp.EvalAsync($$"""
                         (() => {
                             var msgs = document.querySelectorAll('[data-is-streaming]');
@@ -416,6 +409,7 @@ internal partial class Program
                     await Task.Delay(1500);
 
                     // Get streaming state + latest response text
+                    // TODO: migrate to AskSession when provider-specific polling is unified
                     var pollResult = await cdp.EvalAsync($$"""
                         (() => {
                             var msgs = document.querySelectorAll('[data-is-streaming]');
@@ -490,6 +484,7 @@ internal partial class Program
                 }
 
                 // Timeout — return what we have
+                // TODO: migrate to AskSession when provider-specific polling is unified
                 var finalText = await cdp.EvalAsync($$"""
                     (() => {
                         var msgs = document.querySelectorAll('[data-is-streaming]');
