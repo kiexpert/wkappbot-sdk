@@ -778,6 +778,13 @@ internal partial class Program
                 int baseResponseCount = int.TryParse(preResponseCount, out var brc) ? brc : 0;
                 Console.WriteLine($"[POLL-WAIT] start (base={baseResponseCount}, timeout={timeoutSec}s)...");
 
+                // ── P5 A/B: run new PollStreamingResponseAsync alongside legacy poll ──
+                var abPollTask = Task.Run(async () =>
+                {
+                    try { return await cdp.PollStreamingResponseAsync("gemini", baseResponseCount, timeoutSec); }
+                    catch (Exception ex) { Console.Error.WriteLine($"[A/B] PollStreaming error: {ex.Message}"); return (false, ""); }
+                });
+
                 // Register for tab handoff + activate peer's tab (we'll poll with textContent)
                 RegisterWaitingTab("gemini", cdp);
                 await HandoffTabToPeer("gemini");
@@ -932,8 +939,15 @@ internal partial class Program
                     }
                 }
 
-                // Done ??hand off tab to peer if still waiting
+                // Done — hand off tab to peer if still waiting
                 await HandoffTabToPeer("gemini");
+
+                // ── P5 A/B comparison: log difference between legacy and new poll ──
+                if (abPollTask.IsCompleted)
+                {
+                    var (abOk, abText) = await abPollTask;
+                    Console.WriteLine($"[A/B] New poll: ok={abOk} len={abText.Length}");
+                }
 
                 // Timeout ??return whatever we have
                 if (!string.IsNullOrEmpty(lastText))
