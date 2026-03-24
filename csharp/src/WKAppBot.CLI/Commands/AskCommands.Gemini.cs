@@ -1015,6 +1015,7 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.WriteLine($"[ASK] Error: {ex.Message}");
+                Console.WriteLine($"[ASK] StackTrace: {ex.StackTrace}");
                 return (false, (string?)null);
             }
         });
