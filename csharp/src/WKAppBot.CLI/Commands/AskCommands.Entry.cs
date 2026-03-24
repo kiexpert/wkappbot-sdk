@@ -29,13 +29,37 @@ internal partial class Program
             Console.WriteLine($"[{tag}] at {firstFrame}");
         }
 
+        // Capture a11y hot focus chain (non-blocking, best-effort)
+        string hotLine = "";
+        try
+        {
+            var snap = WKAppBot.Win32.Input.KeyboardInput.FocusSnapshot.Capture();
+            if (!snap.IsEmpty)
+            {
+                var fgTitle = NativeMethods.GetWindowTextW(snap.Foreground);
+                var fgClass = GetClassNameHelper(snap.Foreground);
+                NativeMethods.GetWindowThreadProcessId(snap.Foreground, out uint pid);
+                var procName = "?";
+                try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+                hotLine = $"fg=0x{snap.Foreground:X} \"{fgTitle}\" ({fgClass}) pid={pid} [{procName}]";
+                if (snap.FocusedCtl != IntPtr.Zero && snap.FocusedCtl != snap.Foreground)
+                {
+                    var ctlTitle = NativeMethods.GetWindowTextW(snap.FocusedCtl);
+                    var ctlClass = GetClassNameHelper(snap.FocusedCtl);
+                    hotLine += $"\n  focus=0x{snap.FocusedCtl:X} \"{ctlTitle}\" ({ctlClass})";
+                }
+                Console.WriteLine($"[{tag}] HotLine: {hotLine}");
+            }
+        }
+        catch { /* UIA/Win32 may fail — non-critical */ }
+
         // Auto bug report via suggest command (Slack + suggestions.jsonl handled by suggest)
         Task.Run(() =>
         {
             try
             {
                 var stack = ex.StackTrace ?? "(no stack)";
-                var bugText = $"[BUG-AUTO] [{tag}] {ex.GetType().Name}: {ex.Message}\n{stack}";
+                var bugText = $"[BUG-AUTO] [{tag}] {ex.GetType().Name}: {ex.Message}\nHotLine: {hotLine}\n{stack}";
                 RunSuggestCommand(bugText);
             }
             catch { /* non-critical */ }
@@ -46,6 +70,13 @@ internal partial class Program
     {
         try { SuggestCommand(new[] { text }); }
         catch { /* non-critical */ }
+    }
+
+    static string GetClassNameHelper(IntPtr hwnd)
+    {
+        var sb = new System.Text.StringBuilder(256);
+        NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
+        return sb.ToString();
     }
 
     static void LogWarning(string tag, string context, Exception ex)
