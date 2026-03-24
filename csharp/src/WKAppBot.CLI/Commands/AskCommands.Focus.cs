@@ -152,7 +152,7 @@ internal partial class Program
     /// Fires ActionApi.OnFocusStealer callback ??knowhow recording + overlay.
     /// Returns true if focus was stolen (and restored).
     /// </summary>
-    static bool LogRestoreFocus(IntPtr prevFg, string step)
+    static bool LogRestoreFocus(IntPtr prevFg, string step, CdpClient? cdp = null)
     {
         if (prevFg == IntPtr.Zero) return false;
         var cur = NativeMethods.GetForegroundWindow();
@@ -160,6 +160,23 @@ internal partial class Program
         {
             Console.WriteLine($"[ASK:FOCUS] ok @ {step} fg={cur:X8}");
             return false;
+        }
+
+        // Only treat as focus theft if Chrome process stole focus (not user switching naturally)
+        if (cdp != null)
+        {
+            var chromeHwnd = cdp.GetChromeWindowHandle();
+            if (chromeHwnd != IntPtr.Zero)
+            {
+                NativeMethods.GetWindowThreadProcessId(cur, out uint curPid);
+                NativeMethods.GetWindowThreadProcessId(chromeHwnd, out uint chromePid);
+                if (curPid != chromePid)
+                {
+                    // User switched to a non-Chrome window — not a bug
+                    Console.WriteLine($"[ASK:FOCUS] user-switch @ {step}: was={prevFg:X8} now={cur:X8} (not Chrome)");
+                    return false;
+                }
+            }
         }
 
         // ?? Snapshot IME state of prevFg (per-window context, readable even when not foreground)
