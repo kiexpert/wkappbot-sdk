@@ -151,11 +151,15 @@ internal partial class Program
             // Pre-open a shared Slack thread so all 3 AI answers land in one thread
             EnsureSlackThread("Triad", question);
 
+            // Shared context for cross-prompting + debate
+            var sessionDir = Path.Combine(DataDir, "triad", DateTime.UtcNow.ToString("yyyyMMdd_HHmmss"));
+            var triadCtx = new TriadSharedContext(question, sessionDir);
+
             var tasks = new[]
             {
-                Task.Run(() => AskGemini(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gemini-agent-{tabSuffix}", linePrefix: "[gemini] ")),
-                Task.Run(() => AskChatGpt(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gpt-agent-{tabSuffix}",    linePrefix: "[gpt] ")),
-                Task.Run(() => AskClaude(question, true, timeoutSec, newTab: false, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"claude-agent-{tabSuffix}", linePrefix: "[claude] ")),
+                Task.Run(() => AskGemini(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gemini-agent-{tabSuffix}", linePrefix: "[gemini] ", triadCtx: triadCtx)),
+                Task.Run(() => AskChatGpt(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gpt-agent-{tabSuffix}",    linePrefix: "[gpt] ", triadCtx: triadCtx)),
+                Task.Run(() => AskClaude(question, true, timeoutSec, newTab: false, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"claude-agent-{tabSuffix}", linePrefix: "[claude] ", triadCtx: triadCtx)),
             };
             Task.WaitAll(tasks);
             var results = tasks.Select(t => t.Result).ToArray();
@@ -164,13 +168,10 @@ internal partial class Program
             // ── 정반합: cross-prompt loop (R1 already done above, skip to cross-prompting) ──
             if (results.Count(r => r == 0) >= 2)
             {
-                var sessionDir = Path.Combine(DataDir, "triad", DateTime.UtcNow.ToString("yyyyMMdd_HHmmss"));
-                var ctx = new TriadSharedContext(question, sessionDir);
                 try
                 {
-                    // R1 already completed in parallel above — go straight to cross-prompting
                     var ais = new[] { "gemini", "gpt", "claude" };
-                    RunCrossPromptLoop(ais, Math.Min(timeoutSec, 90), ctx);
+                    RunCrossPromptLoop(ais, Math.Min(timeoutSec, 90), triadCtx);
                 }
                 catch (Exception ex) { Console.Error.WriteLine($"[DEBATE] Error: {ex.Message}"); }
             }
