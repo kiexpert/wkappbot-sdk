@@ -222,6 +222,7 @@ internal partial class Program
 
         var roundResults = results.ToList();
         Console.WriteLine($"[DEBATE:{roundName}] Complete: {roundResults.Count}/{prompts.Count} AIs responded");
+        Console.Out.Flush();
         return roundResults;
     }
 

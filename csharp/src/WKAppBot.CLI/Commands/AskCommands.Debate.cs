@@ -138,8 +138,13 @@ internal sealed class TriadDebateLoop
             [Gemini/EXPLORER의 판단]: (이 AI의 핵심 주장 2-3줄 + 근거)
             [GPT/SKEPTIC의 판단]: (이 AI의 핵심 주장 2-3줄 + 근거)
             [Claude/AUDITOR의 판단]: (이 AI의 핵심 주장 2-3줄 + 근거)
-            [합의]: (공통 결론 — 한국어 100단어 이상! 구체적으로! "다들 동의했다"는 안 됩니다)
-            [미합의]: (남은 이견. ⚠️ 다른 AI가 [합의]에 넣었지만 당신이 동의하지 않는 항목이 있으면 반드시 여기에 기입! 정말 없으면 "없음"으로 표기)
+            [합의]: Each item must be ATOMIC (one clear proposition per line) with your agreement score (0-9).
+            Score 7+ = genuine agreement. Below 7 = move to [미합의].
+            Format: "1. 구체적 합의 내용 (8)" — 한국어, 항목당 한 문장, 총 100단어 이상!
+            Example:
+              1. Jaccard 키워드 겹침을 NLI 의미론적 함의로 대체한다 (9)
+              2. 원자적 명제 분해가 의미 분석보다 선행한다 (6) ← 7미만이면 [미합의]로!
+            [미합의]: (남은 이견 + 점수 7 미만 항목. ⚠️ 다른 AI가 [합의]에 넣었지만 동의 안 하면 반드시 여기에! 없으면 "없음")
             [개인의견]: (당신의 솔직한 본심 — 합의와 다를 수 있음, 20단어 이상)
             [/CONCLUSION_KR]
 
@@ -259,6 +264,7 @@ internal sealed class TriadDebateLoop
     public static List<Claim> ParseClaims(string text)
     {
         var claims = new List<Claim>();
+        // Tier 1: [CLAIM]...[/CLAIM] inline tags
         foreach (Match m in ClaimRegex.Matches(text))
         {
             try
@@ -273,6 +279,28 @@ internal sealed class TriadDebateLoop
                     claims.Add(new Claim(claim, Math.Clamp(conf, 0, 1), assumptions));
             }
             catch { }
+        }
+        // Tier 2: DEBATE_JSON → "claims" array (Gemini often puts claims inside DEBATE_JSON)
+        if (claims.Count == 0)
+        {
+            var debateJson = ParseDebateJson(text);
+            var claimsArr = debateJson?["claims"]?.AsArray();
+            if (claimsArr != null)
+            {
+                foreach (var node in claimsArr)
+                {
+                    try
+                    {
+                        var claim = node?["claim"]?.GetValue<string>() ?? "";
+                        var conf = node?["confidence"]?.GetValue<double>() ?? 0.5;
+                        var assumptions = node?["key_assumptions"]?.AsArray()
+                            ?.Select(a => a?.GetValue<string>() ?? "").ToArray() ?? [];
+                        if (!string.IsNullOrEmpty(claim))
+                            claims.Add(new Claim(claim, Math.Clamp(conf, 0, 1), assumptions));
+                    }
+                    catch { }
+                }
+            }
         }
         return claims;
     }
