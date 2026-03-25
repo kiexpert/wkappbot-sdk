@@ -298,7 +298,6 @@ Examples:
         var aiNames = new[] { "gemini", "gpt", "claude" };
         var pending = tasks.ToList();
         var results = new int[3];
-        bool nudged = false;
         while (pending.Count > 0)
         {
             var done = Task.WhenAny(pending).GetAwaiter().GetResult();
@@ -306,10 +305,9 @@ Examples:
             results[idx] = done.Result;
             pending.Remove(done);
 
-            // First AI done + others still working → moderator nudge
-            if (!nudged && pending.Count > 0 && done.Result == 0)
+            // AI done + others still working → moderator nudge every time
+            if (pending.Count > 0 && done.Result == 0)
             {
-                nudged = true;
                 var doneAi = aiNames[idx];
                 var nudge = $"[MODERATOR]: {doneAi} has finished. Please wrap up your answer promptly.";
                 foreach (var p in pending)
