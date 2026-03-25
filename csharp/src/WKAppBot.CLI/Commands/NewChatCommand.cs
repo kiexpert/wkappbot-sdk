@@ -160,6 +160,44 @@ Then immediately:
 
                 Console.WriteLine($"[NEWCHAT] Input field value: \"{existing.Replace("\n","\\n")}\" ({existing.Length} chars){(isPlaceholder ? " [placeholder]" : "")}");
 
+                // Focusless placeholder probe: type 'a' via WM_CHAR, check if existing text disappears
+                // If it does → was placeholder (not real user input). Then clear 'a'.
+                if (!isPlaceholder && existing.Length > 0)
+                {
+                    try
+                    {
+                        // Find Chromium renderer child for WM_CHAR
+                        // Get window handle from UIA element → find Chromium renderer child
+                        var editHwnd = editEl.Properties.NativeWindowHandle.ValueOrDefault;
+                        var parentHwnd = editHwnd != IntPtr.Zero ? editHwnd : root.Properties.NativeWindowHandle.ValueOrDefault;
+                        var renderer = NativeMethods.FindWindowExW(parentHwnd, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
+                        if (renderer != IntPtr.Zero)
+                        {
+                            // Focusless type space
+                            NativeMethods.PostMessageW(renderer, 0x0102 /*WM_CHAR*/, (IntPtr)' ', IntPtr.Zero);
+                            Thread.Sleep(150);
+                            // Re-read
+                            var after = editEl.Patterns.Value.IsSupported
+                                ? editEl.Patterns.Value.Pattern.Value.Value ?? "" : "";
+                            if (!after.Contains(existing[..Math.Min(10, existing.Length)]))
+                            {
+                                // Existing text gone → was placeholder!
+                                isPlaceholder = true;
+                                Console.WriteLine($"[NEWCHAT] Focusless probe: '{existing[..Math.Min(20, existing.Length)]}' disappeared after typing → placeholder ✓");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"[NEWCHAT] Focusless probe: text persisted → real user input");
+                            }
+                            // Clean up: select all + delete (regardless)
+                            // Cleanup: backspace to remove the probe space
+                            NativeMethods.PostMessageW(renderer, 0x0102 /*WM_CHAR*/, (IntPtr)'\b', IntPtr.Zero);
+                            // Just clear via Ctrl+A,Delete later in the normal flow
+                        }
+                    }
+                    catch (Exception ex) { Console.WriteLine($"[NEWCHAT] Probe error: {ex.Message}"); }
+                }
+
                 if (!isPlaceholder && (existing.Length > 30 || existing.Contains('\n')))
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
