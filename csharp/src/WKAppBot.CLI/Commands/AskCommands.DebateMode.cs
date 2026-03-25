@@ -210,6 +210,10 @@ internal partial class Program
         int preCount = 0;
         try { preCount = await cdp.GetResponseCountAsync(); } catch { }
 
+        // Restore Chrome (no focus steal) — ProseMirror needs rendering for text insertion
+        cdp.RestoreChromeNoActivate();
+        await Task.Delay(200);
+
         // Clear + insert + send
         await cdp.ClearEditorAsync(editorSel);
         await Task.Delay(200);
