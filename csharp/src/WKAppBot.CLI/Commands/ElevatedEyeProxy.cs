@@ -322,9 +322,9 @@ static class ElevationHelper
         if (Program.IsMcpMode || Program.RunningInEye)
         {
             NativeMethods.GetWindowThreadProcessId(targetHwnd, out uint mcpPid);
-            var targetElev = NativeMethods.IsProcessElevated(mcpPid);
-            Console.Error.WriteLine($"[ELEVATION] MCP/Eye mode: target pid={mcpPid} elevated={targetElev} IsMcp={Program.IsMcpMode} InEye={Program.RunningInEye}");
-            if (targetElev == true)
+            var mcpTargetElev = NativeMethods.IsProcessElevated(mcpPid);
+            Console.Error.WriteLine($"[ELEVATION] MCP/Eye mode: target pid={mcpPid} elevated={mcpTargetElev} IsMcp={Program.IsMcpMode} InEye={Program.RunningInEye}");
+            if (mcpTargetElev == true)
             {
                 if (ElevatedEyeClient.IsAvailable())
                 {
@@ -394,6 +394,35 @@ static class ElevationHelper
         Console.WriteLine("[ELEVATION] Proxy unavailable — continuing with limited access");
         Console.ResetColor();
         return (false, 0);
+    }
+
+    /// <summary>
+    /// Unified entry: wait for admin server availability.
+    /// MCP mode: signal Launcher via McpElevationRequired, return false (Launcher handles).
+    /// Eye mode: try existing proxy pipe, return availability.
+    /// Normal mode: try proxy, then LaunchElevatedEye.
+    /// </summary>
+    public static bool WaitForAdminServer()
+    {
+        // Already available?
+        if (ElevatedEyeClient.IsAvailable()) return true;
+
+        if (Program.IsMcpMode)
+        {
+            // Signal Launcher to spawn admin Core
+            Console.Error.WriteLine("[ELEVATION] WaitForAdminServer: MCP mode — signaling Launcher");
+            Program.McpElevationRequired = true;
+            return false; // Launcher will re-route
+        }
+
+        if (Program.RunningInEye)
+        {
+            Console.Error.WriteLine("[ELEVATION] WaitForAdminServer: Eye mode — proxy unavailable");
+            return false;
+        }
+
+        // Normal mode: launch elevated Eye
+        return LaunchElevatedEye();
     }
 
     /// <summary>

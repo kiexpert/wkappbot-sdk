@@ -173,6 +173,16 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
 {
     public bool RequestElevation(string targetProcessName, uint targetPid)
     {
+        // MCP mode: never launch processes — proxy only, or signal Launcher
+        if (Program.IsMcpMode || Program.RunningInEye)
+        {
+            Console.Error.WriteLine($"[ELEVATION] MCP/Eye mode: cannot launch admin process for {targetProcessName} (pid={targetPid})");
+            if (ElevatedEyeClient.IsAvailable())
+                return DelegateViaProxy();
+            if (Program.IsMcpMode) Program.McpElevationRequired = true;
+            return false;
+        }
+
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"  [ELEVATION] {targetProcessName} (PID {targetPid}) is elevated — requesting admin rights...");
         Console.ResetColor();

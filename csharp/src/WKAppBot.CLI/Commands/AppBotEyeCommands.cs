@@ -181,6 +181,7 @@ internal partial class Program
     {
         // ── Step 1: Guard checks ──
         if (RunningInEye) return;
+        if (IsMcpMode) return; // MCP server must NEVER spawn Eye/console windows
         // Loop subprocess mode: Eye inherits stdout pipe handle → blocks parent's ReadToEndAsync.
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WKAPPBOT_LOOP_CALLER"))) return;
 
