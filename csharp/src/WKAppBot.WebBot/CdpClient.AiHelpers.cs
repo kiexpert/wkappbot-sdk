@@ -21,7 +21,7 @@ public sealed partial class CdpClient
 
         var esc = Esc(selector);
 
-        // Tier 1: Focusless innerHTML/textContent
+        // Tier 1: Focusless innerHTML/textContent (works even when iconic)
         var result = await EvalAsync(
             "(()=>{var el=document.querySelector('" + esc + "');if(!el)return 'NOT_FOUND';" +
             "var t=" + jsStr + ";var p=el.querySelector('p');" +
@@ -29,6 +29,15 @@ public sealed partial class CdpClient
             "el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:t}));" +
             "return el.textContent.length>0?'OK':'EMPTY'})()");
         if (result == "OK") return true;
+
+        // Tier 1 failed → restore Chrome if iconic (Claude ProseMirror needs rendering)
+        var chromeHwnd = GetChromeWindowHandle();
+        if (chromeHwnd != IntPtr.Zero && IsIconic(chromeHwnd))
+        {
+            ShowWindowNative(chromeHwnd, 4); // SW_SHOWNOACTIVATE
+            Thread.Sleep(100);
+            try { await EmulateActiveTabAsync(); } catch { }
+        }
 
         // Tier 2: execCommand (respects selection model)
         result = await EvalAsync(
@@ -377,5 +386,23 @@ public sealed partial class CdpClient
     }
 
     // ── Internal ──
+    /// <summary>
+    /// Ensure Chrome window is not minimized before DOM-dependent operations.
+    /// ProseMirror, contenteditable, and some React components need rendering.
+    /// Uses SW_SHOWNOACTIVATE (4) — no focus steal.
+    /// Also emulates active tab via CDP for background tab rendering.
+    /// </summary>
+    private void EnsureChromeNotIconic()
+    {
+        var hwnd = GetChromeWindowHandle();
+        if (hwnd != IntPtr.Zero && IsIconic(hwnd))
+        {
+            ShowWindowNative(hwnd, 4); // SW_SHOWNOACTIVATE — visible, no focus steal
+            Thread.Sleep(100);
+        }
+        // CDP: emulate active tab (triggers rendering even for background tabs)
+        try { EmulateActiveTabAsync().GetAwaiter().GetResult(); } catch { }
+    }
+
     public static string Esc(string s) => s.Replace("\\", "\\\\").Replace("'", "\\'");
 }
