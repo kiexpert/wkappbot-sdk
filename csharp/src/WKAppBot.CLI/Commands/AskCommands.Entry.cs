@@ -294,9 +294,36 @@ Examples:
                 return RunTriadAiWithRecovery("claude", question, timeoutSec, attachFiles,
                 freshSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, ctx, "[claude] "); }),
         };
-        Task.WaitAll(tasks);
-        var results = tasks.Select(t => t.Result).ToArray();
-        Console.WriteLine($"[TRIAD] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+        // Wait with nudging: first-done AI's answer streams to peers, then moderator nudges
+        var aiNames = new[] { "gemini", "gpt", "claude" };
+        var pending = tasks.ToList();
+        var results = new int[3];
+        bool nudged = false;
+        while (pending.Count > 0)
+        {
+            var done = Task.WhenAny(pending).GetAwaiter().GetResult();
+            var idx = Array.IndexOf(tasks, done);
+            results[idx] = done.Result;
+            pending.Remove(done);
+
+            // First AI done + others still working → moderator nudge
+            if (!nudged && pending.Count > 0 && done.Result == 0)
+            {
+                nudged = true;
+                var doneAi = aiNames[idx];
+                var nudge = $"[MODERATOR]: {doneAi} has finished. Please wrap up your answer promptly.";
+                foreach (var p in pending)
+                {
+                    var pIdx = Array.IndexOf(tasks, p);
+                    var peerAi = aiNames[pIdx];
+                    // Inject nudge via cross-prompt infrastructure
+                    ctx.UpdateChunk(doneAi, nudge);
+                }
+                Console.WriteLine($"[{modeLabel}] {doneAi} done → moderator nudging {pending.Count} remaining");
+                SlackPostToThread($"⏰ *{doneAi}* finished! Moderator: please wrap up, remaining {pending.Count} AI(s).", "Moderator");
+            }
+        }
+        Console.WriteLine($"[{modeLabel}] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
         // ── 정반합 사회자 루프 (--debate 플래그 시에만) ──
         if (debateMode && !noWait && results.Count(r => r == 0) >= 2)
