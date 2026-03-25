@@ -100,13 +100,28 @@ internal sealed class TriadDebateLoop
     }
 
     /// <summary>R3: Synthesis — propose unified answer.</summary>
-    public static string BuildR3Prompt(string question, List<RoundResult> r2Results)
+    public static string BuildR3Prompt(string question, List<RoundResult> r2Results,
+        List<string>? priorConsensusItems = null, string? currentAi = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine("[MODERATOR — Round 3: Final Synthesis]");
         sb.AppendLine();
         sb.AppendLine("All AIs have critiqued each other. Now it's time to find common ground.");
         sb.AppendLine($"\nOriginal question: {question}");
+
+        // Cascading: show prior AIs' consensus items
+        if (priorConsensusItems?.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("═══ PRIOR AIs' CONSENSUS ITEMS (you MUST address each one!) ═══");
+            sb.AppendLine("For each item below: INCLUDE it in your [합의] if you agree, or move it to [미합의] with your reason.");
+            sb.AppendLine("You may also ADD new items not listed here.");
+            sb.AppendLine();
+            for (int i = 0; i < priorConsensusItems.Count; i++)
+                sb.AppendLine($"  {i + 1}. {priorConsensusItems[i]}");
+            sb.AppendLine();
+        }
+
         sb.AppendLine();
         sb.AppendLine("Here's where each AI stands after the critique round:");
 

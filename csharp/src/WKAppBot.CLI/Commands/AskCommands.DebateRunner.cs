@@ -396,8 +396,34 @@ internal partial class Program
             Console.WriteLine($"[DEBATE:R3-{r3i + 1}] Consensus attempt {r3i + 1}/{maxR3Loops}");
             SlackPostToThread($"🔄 *R3-{r3i + 1}* Consensus attempt", "Moderator");
 
-            var r3Prompts = ais.ToDictionary(ai => ai, _ => TriadDebateLoop.BuildR3Prompt(question, currentResults));
-            r3Results = RunDebateRound($"R3-{r3i + 1}", r3Prompts, timeoutSec, ctx);
+            // Cascading consensus: AI-A first → AI-B sees A's items → AI-C sees A+B
+            var priorConsensusItems = new List<string>(); // accumulates [합의] from earlier AIs
+            r3Results = new();
+            for (int aiIdx = 0; aiIdx < ais.Length; aiIdx++)
+            {
+                var ai = ais[aiIdx];
+                var prompt = TriadDebateLoop.BuildR3Prompt(question, currentResults, priorConsensusItems, ai);
+                Console.WriteLine($"[DEBATE:R3-{r3i + 1}:{ai}] Cascading — {priorConsensusItems.Count} prior items");
+                SlackPostToThread($"🔗 *{ai}* — 이전 {priorConsensusItems.Count}개 합의 항목 포함하여 작성 중...", ai);
+                var singlePrompt = new Dictionary<string, string> { [ai] = prompt };
+                var singleResult = RunDebateRound($"R3-{r3i + 1}", singlePrompt, timeoutSec, ctx);
+                r3Results.AddRange(singleResult);
+                // Extract [합의] items from this AI's response for next AI
+                foreach (var r in singleResult)
+                {
+                    var haStart = r.Summary.IndexOf("[합의]");
+                    if (haStart < 0) continue;
+                    var haEnd = r.Summary.IndexOf("[미합의]", haStart);
+                    if (haEnd < 0) haEnd = r.Summary.IndexOf("[개인의견]", haStart);
+                    if (haEnd < 0) haEnd = r.Summary.Length;
+                    var haSection = r.Summary[(haStart + "[합의]".Length)..haEnd].Trim();
+                    foreach (var line in haSection.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        var trimmed = line.Trim().TrimStart("0123456789.•-  ".ToCharArray());
+                        if (trimmed.Length > 5) priorConsensusItems.Add($"{ai}: {trimmed}");
+                    }
+                }
+            }
             if (r3Results.Count == 0) break;
 
             // Parse [합의] and [미합의] from all responses
