@@ -176,6 +176,7 @@ internal partial class Program
                 if (!isEye) continue;
                 try
                 {
+                    Console.Error.WriteLine($"[EYE:WARN] ⚠ KILL: Killing duplicate Eye PID={proc.Id} (I am PID={Environment.ProcessId})");
                     proc.Kill();
                     proc.WaitForExit(3000);
                     EyeColor(ConsoleColor.Yellow);
@@ -198,6 +199,7 @@ internal partial class Program
                     using var old = Process.GetProcessById(replacePid);
                     if (!old.HasExited)
                     {
+                        Console.Error.WriteLine($"[EYE:WARN] ⚠ KILL: Force-killing zombie old Eye PID={replacePid} after 1min grace (I am PID={Environment.ProcessId})");
                         old.Kill();
                         EyeColor(ConsoleColor.Yellow);
                         Console.WriteLine($"[EYE:HOT-SWAP] Force-killed zombie old Eye (PID={replacePid}) after 1min grace");
