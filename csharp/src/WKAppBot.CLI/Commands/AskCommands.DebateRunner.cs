@@ -222,10 +222,24 @@ internal partial class Program
             r3Results = RunDebateRound($"R3-{r3i + 1}", r3Prompts, timeoutSec, ctx);
             if (r3Results.Count == 0) break;
 
-            // Parse [미합의] from all responses
+            // Parse [합의] and [미합의] from all responses
             var unresolved = new List<string>();
+            bool hasConsensus = false;
             foreach (var r in r3Results)
             {
+                // Check [합의] exists and non-empty
+                var haStart = r.Summary.IndexOf("[합의]");
+                if (haStart >= 0)
+                {
+                    var haEnd = r.Summary.IndexOf("[미합의]", haStart);
+                    if (haEnd < 0) haEnd = r.Summary.Length;
+                    var haSection = r.Summary[(haStart + "[합의]".Length)..haEnd].Trim();
+                    if (haSection.Length > 500) hasConsensus = true; // ~100 words minimum
+                    else if (haSection.Length > 0)
+                        SlackPostToThread($"⚠️ *[Moderator→{r.Ai}]* Consensus too brief ({haSection.Length} chars, need 500+). Write at least 100 words!", "Moderator");
+                }
+
+                // Check [미합의]
                 var miStart = r.Summary.IndexOf("[미합의]");
                 var miEnd = r.Summary.IndexOf("[개인의견]");
                 if (miEnd < 0) miEnd = r.Summary.IndexOf("[MY_OPINION");
@@ -236,6 +250,14 @@ internal partial class Program
                     if (!string.IsNullOrEmpty(section) && section != "없음" && section != "None" && section.Length > 5)
                         unresolved.Add($"[{r.Ai}] {section[..Math.Min(100, section.Length)]}");
                 }
+            }
+
+            // Warn if no consensus content
+            if (!hasConsensus && r3Results.Count > 0)
+            {
+                SlackPostToThread("⚠️ *[Moderator]* No [합의] content found! AIs must state consensus.", "Moderator");
+                // Treat as unresolved
+                if (unresolved.Count == 0) unresolved.Add("No consensus stated");
             }
 
             if (unresolved.Count == 0)
