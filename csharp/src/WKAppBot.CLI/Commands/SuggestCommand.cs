@@ -539,7 +539,7 @@ internal partial class Program
         var ext = Path.GetExtension(evidenceFile).ToLowerInvariant();
         var shell = ext switch
         {
-            ".sh"  => "bash",
+            ".sh"  => "bash", // resolved below with full path
             ".ps1" => "powershell -NoProfile -ExecutionPolicy Bypass -File",
             ".bat" or ".cmd" => "cmd /c",
             ".py"  => "python",
@@ -551,7 +551,13 @@ internal partial class Program
             Console.WriteLine($"[RESOLVE] Running evidence script ({ext} → {shell.Split(' ')[0]})...");
             try
             {
-                var shellParts = shell.Split(' ', 2);
+                // Resolve bash to absolute path (Git Bash) to avoid PATH issues in Eye environment
+                var resolvedShell = shell;
+                if (resolvedShell == "bash" && File.Exists(@"C:\Program Files\Git\usr\bin\bash.exe"))
+                    resolvedShell = @"C:\Program Files\Git\usr\bin\bash.exe";
+                var shellParts = resolvedShell.Contains(' ') && !resolvedShell.Contains('"')
+                    ? new[] { resolvedShell } // full path with spaces — don't split
+                    : resolvedShell.Split(' ', 2);
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = shellParts[0],
