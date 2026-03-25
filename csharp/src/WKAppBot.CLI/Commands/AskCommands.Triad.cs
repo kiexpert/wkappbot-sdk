@@ -46,6 +46,9 @@ internal sealed class TriadSharedContext
     /// <summary>When true, moderator intervenes (STANCE check, format enforcement). Off during R0.</summary>
     public bool ModeratorEnabled { get; set; } = false;
 
+    /// <summary>Get the latest chunk for an AI (direct access, not peer-filtered).</summary>
+    public string? GetLatestChunk(string ai) => _latestChunks.GetValueOrDefault(ai);
+
     /// <summary>Update latest response chunk + broadcast to Slack + queue for other AIs.</summary>
     public void UpdateChunk(string ai, string chunk)
     {
