@@ -428,6 +428,11 @@ internal partial class Program
         bool elevated = args.Any(a => a == "--elevated") || ElevationHelper.IsElevated();
         if (elevated)
         {
+            // Hide console window — attach to parent's console if exists, otherwise no window
+            var hConsole = GetConsoleWindow();
+            if (hConsole != IntPtr.Zero)
+                ShowWindow(hConsole, 0); // SW_HIDE
+
             EyeColor(ConsoleColor.Yellow);
             Console.WriteLine("[EYE] Running as ADMIN — elevated proxy pipe will be available");
             EyeResetColor();

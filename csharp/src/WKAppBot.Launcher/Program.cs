@@ -753,6 +753,7 @@ class Program
         var _outLock = new object();
         string? _initializeLine = null; // cached for admin Core synthetic init
         IntPtr _activeStdinWrite = hCoreStdinWrite; // current target for new requests
+        System.IO.TextWriter? _activeStdinWriter = null; // current line writer after admin handoff
         IntPtr _adminStdinWrite = IntPtr.Zero;
         IntPtr _adminStdoutRead = IntPtr.Zero;
         IntPtr _adminProc = IntPtr.Zero;
@@ -792,12 +793,20 @@ class Program
                             _inflight[id] = line;
 
                         // Route to active Core
-                        var target = _activeStdinWrite;
-                        if (target != IntPtr.Zero)
+                        if (_activeStdinWriter != null)
                         {
-                            var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
-                            WriteFile(target, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
-                            FlushFileBuffers(target);
+                            _activeStdinWriter.WriteLine(line);
+                            _activeStdinWriter.Flush();
+                        }
+                        else
+                        {
+                            var target = _activeStdinWrite;
+                            if (target != IntPtr.Zero)
+                            {
+                                var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
+                                WriteFile(target, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
+                                FlushFileBuffers(target);
+                            }
                         }
                     }
                 }
@@ -809,6 +818,7 @@ class Program
             lock (_gate)
             {
                 if (_activeStdinWrite != IntPtr.Zero) { CloseHandle(_activeStdinWrite); _activeStdinWrite = IntPtr.Zero; }
+                if (_activeStdinWriter is IDisposable d) { try { d.Dispose(); } catch { } _activeStdinWriter = null; }
                 if (_adminStdinWrite != IntPtr.Zero) { CloseHandle(_adminStdinWrite); _adminStdinWrite = IntPtr.Zero; }
             }
         }) { IsBackground = true, Name = "mcp-stdin-router" };
@@ -850,7 +860,7 @@ class Program
                         // Spawn admin Core on background thread (runas blocks on UAC)
                         new Thread(() => SpawnAdminCore(core, args, _initializeLine, _elevationRequestLine,
                             ref _adminStdinWrite, ref _adminStdoutRead, ref _adminProc, ref _activeStdinWrite,
-                            ref _adminMode, hCoreStdinWrite, hOut, _gate, _outLock, _inflight))
+                            ref _activeStdinWriter, ref _adminMode, hCoreStdinWrite, hOut, _gate, _outLock, _inflight))
                         { IsBackground = true, Name = "mcp-admin-spawn" }.Start();
 
                         continue; // suppress elevation error from reaching client
@@ -955,10 +965,12 @@ class Program
     static void SpawnAdminCore(string corePath, string[] mcpArgs,
         string? initLine, string? elevationRequestLine,
         ref IntPtr adminStdinWrite, ref IntPtr adminStdoutRead, ref IntPtr adminProc,
-        ref IntPtr activeStdinWrite, ref bool adminMode,
+        ref IntPtr activeStdinWrite, ref System.IO.TextWriter? activeStdinWriter, ref bool adminMode,
         IntPtr oldCoreStdinWrite, IntPtr hOut, object gate, object outLock,
         Dictionary<string, string> inflight)
     {
+        System.IO.StreamWriter? stdinWriter = null;
+        System.IO.StreamReader? stdoutReader = null;
         var pipeName = $"wkappbot-mcp-admin-{Environment.ProcessId}";
         var stdinPipeName = $"{pipeName}-stdin";
         var stdoutPipeName = $"{pipeName}-stdout";
@@ -1019,14 +1031,22 @@ class Program
             {
                 CloseHandle(oldCoreStdinWrite); // EOF to old Core → drain remaining work
                 activeStdinWrite = IntPtr.Zero; // temporarily null until we set up admin pipe handle
-                adminMode = true;
             }
 
             // Send initialize + elevation request to admin Core
-            var stdinWriter = new System.IO.StreamWriter(pipeStdinServer, new System.Text.UTF8Encoding(false)) { AutoFlush = true };
-            if (initLine != null) stdinWriter.WriteLine(initLine);
+            // NOTE: NOT using 'using' — lifetime managed by finally block below.
+            // 'using' would dispose at method exit while _activeStdinWriter still references it (race).
+            stdinWriter = new System.IO.StreamWriter(pipeStdinServer, new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+            if (initLine != null)
+            {
+                lock (gate)
+                {
+                    stdinWriter.WriteLine(initLine);
+                    stdinWriter.Flush();
+                }
+            }
             // Wait briefly for initialize response (read and forward)
-            var stdoutReader = new System.IO.StreamReader(pipeStdoutServer, System.Text.Encoding.UTF8);
+            stdoutReader = new System.IO.StreamReader(pipeStdoutServer, System.Text.Encoding.UTF8);
             var initResp = stdoutReader.ReadLine(); // initialize response
             if (initResp != null)
             {
@@ -1034,10 +1054,20 @@ class Program
                 Console.Error.WriteLine($"[LAUNCHER:MCP] Admin init OK: {initResp[..Math.Min(80, initResp.Length)]}...");
             }
 
+            lock (gate)
+            {
+                activeStdinWriter = stdinWriter;
+                adminMode = true;
+            }
+
             // Re-send the elevation-failed request
             if (elevationRequestLine != null)
             {
-                stdinWriter.WriteLine(elevationRequestLine);
+                lock (gate)
+                {
+                    stdinWriter.WriteLine(elevationRequestLine);
+                    stdinWriter.Flush();
+                }
                 Console.Error.WriteLine($"[LAUNCHER:MCP] Re-sent elevation request to admin Core");
             }
 
@@ -1066,6 +1096,16 @@ class Program
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[LAUNCHER:MCP] Admin Core error: {ex.Message}");
+        }
+        finally
+        {
+            lock (gate)
+            {
+                activeStdinWriter = null; // prevent other threads from writing
+            }
+            // Dispose after nulling reference — no race
+            try { stdinWriter?.Dispose(); } catch { }
+            try { stdoutReader?.Dispose(); } catch { }
         }
     }
 

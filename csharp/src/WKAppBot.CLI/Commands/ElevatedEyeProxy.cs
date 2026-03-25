@@ -231,7 +231,7 @@ static class ElevatedEyeClient
             // File.Exists on named pipe is unreliable — try actual connection
             using var pipe = new NamedPipeClientStream(
                 ".", ElevatedEyeServer.PipeName, PipeDirection.InOut, PipeOptions.None);
-            pipe.Connect(500); // 500ms timeout
+            pipe.Connect(100); // 100ms — if proxy is alive, pipe connects instantly
             return true;
         }
         catch { return false; }
@@ -239,7 +239,7 @@ static class ElevatedEyeClient
 
     /// <summary>Send a command to elevated Eye and get the result.</summary>
     public static async Task<EyeProxyResponse?> SendCommandAsync(
-        string command, string[] args, int timeoutMs = 30000)
+        string command, string[] args, int timeoutMs = 5000)
     {
         try
         {
@@ -429,6 +429,28 @@ static class ElevationHelper
     /// Launch Eye as admin with --elevated flag.
     /// Returns true if UAC was approved and Eye started.
     /// </summary>
+    /// <summary>Alert user before elevation request — wkappbot speak (fire-and-forget).</summary>
+    static void PlayElevationMelody()
+    {
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? "", "wkappbot.exe"),
+                    Arguments = "speak 관리자 권한이 필요합니다",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                };
+                Process.Start(psi);
+            }
+            catch { }
+        });
+    }
+
     public static bool LaunchElevatedEye()
     {
         try
@@ -440,8 +462,10 @@ static class ElevationHelper
                 Arguments = "eye --elevated",
                 UseShellExecute = true,
                 Verb = "runas",
+                WindowStyle = ProcessWindowStyle.Hidden,
             };
 
+            PlayElevationMelody(); // 🎵 before UAC
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("[ELEVATION] Requesting admin rights for Eye proxy...");
             Console.ResetColor();
