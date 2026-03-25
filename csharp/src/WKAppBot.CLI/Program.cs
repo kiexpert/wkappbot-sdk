@@ -499,10 +499,10 @@ internal partial class Program
             // Global Eye tick (for eye --global multi-parent monitor)
             // Skip for grap/grep alias — EmitEyeTick calls FindLogicalHost which may leave pending
             // I/O (UIA/WMI) that prevents TerminateProcess from completing for ~28s.
-            if (!_fastExitAfterCommand && command != "mcp")
+            if (!_fastExitAfterCommand)
             {
                 try { EmitEyeTick(command, cmdTag, "start"); } catch { }
-                if (!GrepModeActive && !IsPipeMode && command != "mcp") Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
+                if (!GrepModeActive && !IsPipeMode) Console.Error.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
                 try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
                 try
                 {
@@ -528,8 +528,8 @@ internal partial class Program
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
             }
 
-            if (!_fastExitAfterCommand && command != "mcp") try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
-            if (!GrepModeActive && !GrapMode && !IsPipeMode && command != "mcp") try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
+            if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
+            if (!GrepModeActive && !GrapMode && !IsPipeMode) try { Console.Error.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
             prof("dispatch");
 
             exitCode = command switch
@@ -621,8 +621,8 @@ internal partial class Program
             {
                 if (!GrapMode && !IsPipeMode)
                 {
-                    if (exitCode == 0) Console.WriteLine($"[ACT] result=ok cmd={command}");
-                    else Console.WriteLine($"[FALLBACK] result=fail code={exitCode} cmd={command}");
+                    if (exitCode == 0) Console.Error.WriteLine($"[ACT] result=ok cmd={command}");
+                    else Console.Error.WriteLine($"[FALLBACK] result=fail code={exitCode} cmd={command}");
                 }
             }
             catch { }
@@ -641,7 +641,7 @@ internal partial class Program
                         var winTitle = restArgs[0];
                         if (!string.IsNullOrWhiteSpace(winTitle))
                         {
-                            Console.WriteLine($"[FALLBACK] auto snapshot+experience trigger (cmd={command})");
+                            Console.Error.WriteLine($"[FALLBACK] auto snapshot+experience trigger (cmd={command})");
                             Console.WriteLine($"[A11Y] unavailable (cmd={command}, reason=action-failed, text=(none), role=(none), action=(none))");
                             var cidArg = "";
                             for (int i = 0; i < restArgs.Length - 1; i++)
@@ -697,7 +697,7 @@ internal partial class Program
             catch { }
             if (tee != null) Console.SetOut(tee.OriginalConsole);
             tee?.Dispose(); // normal-exit atexit-style move to logs/old
-            if (tee != null) Console.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
+            if (tee != null) Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
             timeoutTimer?.Dispose();
             // grap/grep alias → FastExit to bypass EnsureBusyboxAliases DLL-detach deadlock (26s hang)
             if (_fastExitAfterCommand)
