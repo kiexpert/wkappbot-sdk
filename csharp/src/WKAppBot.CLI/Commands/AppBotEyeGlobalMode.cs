@@ -186,7 +186,7 @@ internal partial class Program
             // 부모가 자연 은퇴하면 OK. 좀비(10초 이상 안 죽음)면 패륜 — 자식이 부모만 kill.
             _ = Task.Run(async () =>
             {
-                await Task.Delay(30_000); // 30s grace — window freed instantly, allow pipe drain to complete
+                await Task.Delay(600_000); // 10min grace — triad debate may be running through Eye's pipe
                 try
                 {
                     using var parent = Process.GetProcessById(replacePid);
