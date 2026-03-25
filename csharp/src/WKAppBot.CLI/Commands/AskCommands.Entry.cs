@@ -273,7 +273,7 @@ Examples:
             {
                 // Use SlackSendWithThread: auto-splits long messages (header → channel, overflow → thread)
                 var (ok, ts) = PostWithOverflow(botToken, channel,
-                    debateMode ? $"*[정반합]* {question}" : $"*[🔱 TRIAD]* {question}", username: GetSendReplyUsername());
+                    debateMode ? $"🎙️⚔️ *[정반합]* {question}" : $"*[🔱 TRIAD]* {question}", username: GetSendReplyUsername());
                 if (ok && ts != null)
                 {
                     _slackSessionThreadTs.Value = ts;
@@ -327,8 +327,8 @@ Examples:
                 {
                     var pIdx = Array.IndexOf(tasks, p);
                     var peerAi = aiNames[pIdx];
-                    // Inject nudge via cross-prompt infrastructure
-                    ctx.UpdateChunk(doneAi, nudge);
+                    // DM nudge directly — NOT UpdateChunk (pollutes peer chunk stream with moderator messages)
+                    ctx.InjectToSingle(peerAi, nudge);
                 }
                 Console.WriteLine($"[{modeLabel}] {doneAi} done → moderator nudging {pending.Count} remaining");
                 SlackPostToThread($"⏰ *{doneAi}* finished! Moderator: please wrap up, remaining {pending.Count} AI(s).", "Moderator");
@@ -338,7 +338,9 @@ Examples:
                 {
                     await Task.Delay(1000);
                     var followUp = $"[MODERATOR]: Once all answers are in, we begin Round 1 of 정반합 debate. Prepare your [DEBATE_JSON] with STANCE points.";
-                    ctx.UpdateChunk("moderator", followUp);
+                    // Broadcast to all AIs via DM — NOT UpdateChunk (keeps chunk stream clean for peer content only)
+                    foreach (var broadcastAi in aiNames)
+                        ctx.InjectToSingle(broadcastAi, followUp);
                     SlackPostToThread("📢 All answers in → 정반합 Round 1 starts! Prepare STANCE + DEBATE_JSON.", "Moderator");
                 });
             }
