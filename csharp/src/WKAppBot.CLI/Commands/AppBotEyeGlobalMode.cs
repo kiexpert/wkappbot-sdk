@@ -186,13 +186,23 @@ internal partial class Program
             // 부모가 자연 은퇴하면 OK. 좀비(10초 이상 안 죽음)면 패륜 — 자식이 부모만 kill.
             _ = Task.Run(async () =>
             {
-                await Task.Delay(600_000); // 10min grace — triad debate may be running through Eye's pipe
+                // 30s warning → 10min final grace (triad debate may be running through Eye's pipe)
+                await Task.Delay(30_000);
+                try
+                {
+                    using var check = Process.GetProcessById(replacePid);
+                    if (!check.HasExited)
+                        Console.Error.WriteLine($"[EYE:WARN] ⏰ Parent Eye PID={replacePid} still alive after 30s — will force-kill in 10min if zombie");
+                }
+                catch { /* already gone */ }
+
+                await Task.Delay(570_000); // remaining 9.5min
                 try
                 {
                     using var parent = Process.GetProcessById(replacePid);
                     if (!parent.HasExited)
                     {
-                        Console.Error.WriteLine($"[EYE:WARN] ⚠ PATRICIDE: Parent Eye PID={replacePid} didn't retire in 10s — child PID={Environment.ProcessId} force-killing parent");
+                        Console.Error.WriteLine($"[EYE:WARN] ⚠ PATRICIDE: Parent Eye PID={replacePid} didn't retire in 10min — child PID={Environment.ProcessId} force-killing parent");
                         parent.Kill();
                         EyeColor(ConsoleColor.Yellow);
                         Console.WriteLine($"[EYE:HOT-SWAP] Parent Eye (PID={replacePid}) force-retired by child");
