@@ -257,6 +257,7 @@ Examples:
         // Triad always starts fresh per-AI — prevents stale session cross-contamination.
         var freshSession = newSession; // --new-session only when explicitly requested
         Interlocked.Exchange(ref _slackPersonaPostedFlag, 0); // reset: only first AI posts persona
+        if (debateMode) _suppressLoopPersona.Value = true; // debate: game rules replace persona
         var modeLabel = debateMode ? "정반합" : "TRIAD";
         Console.WriteLine($"[{modeLabel}] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
 

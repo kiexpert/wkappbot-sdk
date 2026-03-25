@@ -270,9 +270,10 @@ internal partial class Program
             if (beginIdx >= 0 && endIdx > beginIdx)
                 return output[(beginIdx + "[ASK_FULL_ANSWER_BEGIN]".Length)..endIdx].Trim();
 
-            // Fallback: return last substantial block
-            var lines = output.Split('\n').Where(l => l.Length > 20 && !l.StartsWith("[")).ToArray();
-            return lines.Length > 0 ? string.Join("\n", lines.TakeLast(20)) : null;
+            // Fallback: return last substantial block (keep debate format lines like [CLAIM], [CONCLUSION_KR])
+            var skipPrefixes = new[] { "[ASK]", "[ASK_", "[CDP", "[SANDBOX", "[ZOOM", "[AAR", "[POLL", "[SEND", "[SERVER", "[EDITOR", "[PERSONA", "[FLUSH", "[RUNNING", "[NAME]", "[CMD]", "[SLACK]", "[LOG]" };
+            var lines = output.Split('\n').Where(l => l.Length > 20 && !skipPrefixes.Any(p => l.StartsWith(p))).ToArray();
+            return lines.Length > 0 ? string.Join("\n", lines.TakeLast(50)) : null;
         }
         catch (Exception ex)
         {
@@ -804,10 +805,19 @@ internal partial class Program
                 return AskAndCapture(ai, prompt, timeoutSec);
             }
 
-            // Capture baseline BEFORE injection (to distinguish new response from old)
+            // Capture baseline response count + text BEFORE injection
+            int baselineCount = 0;
             var baseline = "";
-            try { baseline = await cdp.GetLastResponseTextAsync() ?? ""; } catch { }
-            Console.WriteLine($"[DEBATE:INJECT] {ai}: baseline={baseline.Length} chars, connected={cdp.IsConnected}");
+            try
+            {
+                // Count existing response blocks (model-response / [role="article"])
+                var countStr = await cdp.EvalAsync(
+                    "(()=>{var r=document.querySelectorAll('model-response');if(!r.length)r=document.querySelectorAll('[role=\"article\"]');return r.length})()");
+                int.TryParse(countStr, out baselineCount);
+                baseline = await cdp.GetLastResponseTextAsync() ?? "";
+            }
+            catch { }
+            Console.WriteLine($"[DEBATE:INJECT] {ai}: baseline={baseline.Length} chars, turns={baselineCount}, connected={cdp.IsConnected}");
 
             // Inject prompt text
             try
@@ -842,21 +852,18 @@ internal partial class Program
             {
                 await Task.Delay(2000);
                 string text;
-                try { text = await cdp.GetLastResponseTextAsync() ?? ""; }
+                try { text = await cdp.GetLastResponseTextAsync(baselineCount) ?? ""; }
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"[DEBATE:INJECT] {ai}: poll error: {ex.Message}");
                     continue;
                 }
 
-                // Skip if still showing baseline (old response, not new)
-                if (text.Length > 0 && text == baseline) continue;
-
                 // 9s since last new chunk → nudge (max 2 times)
                 if (lastChunkTime.Elapsed.TotalSeconds >= 9 && nudgeCount < 2)
                 {
                     nudgeCount++;
-                    var stallMsg = text.Length < 20 || text == baseline
+                    var stallMsg = text.Length < 20
                         ? "You haven't started responding. Please begin your answer now."
                         : "Your response appears stalled. Please continue or wrap up.";
                     Console.WriteLine($"[DEBATE:INJECT] {ai}: stall detected ({lastChunkTime.Elapsed.TotalSeconds:F0}s) → nudge #{nudgeCount}");
