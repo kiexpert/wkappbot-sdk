@@ -488,6 +488,9 @@ internal partial class Program
                                         var idx = state.LastSlackStatusText.IndexOf("Claude: ", StringComparison.Ordinal);
                                         if (idx >= 0) idleHint = state.LastSlackStatusText[(idx + 8)..];
                                     }
+                                    // Strip rate_limit artifacts from idle hint
+                                    if (idleHint != null && (idleHint.Contains("한도") || idleHint.Contains("rate") || idleHint.Contains("리셋") || idleHint.Contains("Rate")))
+                                        idleHint = null;
                                     var idleSuffix = !string.IsNullOrEmpty(idleHint) ? $" after: {idleHint}" : "";
                                     var idleMsg = $":zzz: {slackLabel}Idle{idleSuffix}";
                                     var instUser2 = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
@@ -586,6 +589,9 @@ internal partial class Program
                                         var cidx = state.LastSlackStatusText.IndexOf("Claude: ", StringComparison.Ordinal);
                                         if (cidx >= 0) state.IdleAfterText = state.LastSlackStatusText[(cidx + 8)..];
                                     }
+                                    // Strip rate_limit artifacts
+                                    if (state.IdleAfterText != null && (state.IdleAfterText.Contains("한도") || state.IdleAfterText.Contains("rate") || state.IdleAfterText.Contains("리셋") || state.IdleAfterText.Contains("Rate")))
+                                        state.IdleAfterText = null;
                                     var idleSuffix = !string.IsNullOrEmpty(state.IdleAfterText) ? $" after: {state.IdleAfterText}" : "";
                                     var idleMsg = $":zzz: {slackLabel}Idle{idleSuffix}";
 
