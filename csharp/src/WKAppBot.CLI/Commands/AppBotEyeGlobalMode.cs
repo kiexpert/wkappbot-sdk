@@ -145,9 +145,10 @@ internal partial class Program
             posY = y;
         }
 
-        // ── Kill duplicate Eye processes ──
-        // Sweep all wkappbot/wkappbot-core processes that have an Eye window or hold the Eye mutex.
-        // This ensures only one Eye runs at a time regardless of how many were spawned.
+        // ── Duplicate Eye guard (no kill — mutex-based yielding) ──
+        // If another Eye with a window already exists and we're NOT a hot-swap replacement,
+        // log a warning and let the mutex guard in AppBotEyeCommand handle it.
+        // The alive-mutex 5s wait ensures exactly one Eye survives without killing.
         if (replacePid == 0)
         {
             int myPid = Environment.ProcessId;
@@ -155,11 +156,10 @@ internal partial class Program
             foreach (var name in names)
             foreach (var proc in Process.GetProcessesByName(name))
             {
-                if (proc.Id == myPid) continue;
+                if (proc.Id == myPid) { proc.Dispose(); continue; }
                 bool isEye = false;
                 try
                 {
-                    // Detect Eye: has "WK AppBot Eye" window owned by this PID
                     var sb2 = new System.Text.StringBuilder(256);
                     NativeMethods.EnumWindows((hwnd, _) =>
                     {
@@ -173,18 +173,11 @@ internal partial class Program
                     }, IntPtr.Zero);
                 }
                 catch { }
-                if (!isEye) continue;
-                try
+                proc.Dispose();
+                if (isEye)
                 {
-                    Console.Error.WriteLine($"[EYE:WARN] ⚠ KILL: Killing duplicate Eye PID={proc.Id} (I am PID={Environment.ProcessId})");
-                    proc.Kill();
-                    proc.WaitForExit(3000);
-                    EyeColor(ConsoleColor.Yellow);
-                    Console.WriteLine($"[EYE] Killed duplicate Eye (PID={proc.Id})");
-                    EyeResetColor();
+                    Console.Error.WriteLine($"[EYE:WARN] ⚠ Existing Eye detected (PID={proc.Id}) — yielding via mutex (no kill)");
                 }
-                catch { /* already exited or access denied */ }
-                finally { proc.Dispose(); }
             }
         }
         else
