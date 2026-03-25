@@ -600,7 +600,19 @@ Examples:
                 }
 
                 var cdp = new CdpClient();
-                await cdp.ConnectAsync(port, timeoutMs: 5000);
+                try
+                {
+                    await cdp.ConnectAsync(port, timeoutMs: 5000);
+                }
+                catch
+                {
+                    // Connection failed — Chrome may not be running. Force launch and retry.
+                    Console.WriteLine("[ASK] CDP connect failed — launching Chrome...");
+                    var launchUrl2 = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
+                    await ChromeLauncher.LaunchAsync(port: port, url: launchUrl2);
+                    await Task.Delay(3000);
+                    await cdp.ConnectAsync(port, timeoutMs: 10000);
+                }
 
                 // ── Pre-minimize Chrome BEFORE any tab action (prevent focus steal) ──
                 var preMinHwnd = cdp.GetChromeWindowHandle();
