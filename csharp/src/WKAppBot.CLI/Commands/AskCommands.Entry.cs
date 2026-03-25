@@ -321,6 +321,15 @@ Examples:
                 }
                 Console.WriteLine($"[{modeLabel}] {doneAi} done → moderator nudging {pending.Count} remaining");
                 SlackPostToThread($"⏰ *{doneAi}* finished! Moderator: please wrap up, remaining {pending.Count} AI(s).", "Moderator");
+
+                // Follow-up after 1 second
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(1000);
+                    var followUp = $"[MODERATOR]: Once all answers are in, we begin Round 1 of 정반합 debate. Prepare your [DEBATE_JSON] with STANCE points.";
+                    ctx.UpdateChunk("moderator", followUp);
+                    SlackPostToThread("📢 All answers in → 정반합 Round 1 starts! Prepare STANCE + DEBATE_JSON.", "Moderator");
+                });
             }
         }
         Console.WriteLine($"[{modeLabel}] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
