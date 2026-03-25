@@ -154,14 +154,10 @@ internal partial class Program
         // Build R1 results from shared context (chunks collected during R1 streaming)
         var r1Results = ais.Select(ai =>
         {
-            var chunks = ctx.GetPeerChunks(ai, new System.Collections.Concurrent.ConcurrentDictionary<string, int>());
-            // Use latest chunk as R1 response
-            var latestChunk = "";
-            foreach (var kv in ctx.GetPeerChunks("__dummy__", new System.Collections.Concurrent.ConcurrentDictionary<string, int>()))
-                if (kv.ai == ai) latestChunk = kv.chunk;
+            var latestChunk = ctx.GetLatestChunk(ai) ?? "";
             var claims = TriadDebateLoop.ParseClaims(latestChunk);
             return new TriadDebateLoop.RoundResult(ai, latestChunk, claims);
-        }).Where(r => r.Claims.Count > 0 || r.Summary.Length > 50).ToList();
+        }).Where(r => r.Summary.Length > 50).ToList();
 
         Console.WriteLine($"[DEBATE] R1 results from context: {r1Results.Count} AIs with content");
 
