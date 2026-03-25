@@ -259,6 +259,7 @@ Examples:
         Interlocked.Exchange(ref _slackPersonaPostedFlag, 0); // reset: only first AI posts persona
         if (debateMode) _suppressLoopPersona.Value = true; // debate: game rules replace persona
         var modeLabel = debateMode ? "정반합" : "TRIAD";
+        ResetEmojis(); // 🦊🐬🐙 fresh race!
         Console.WriteLine($"[{modeLabel}] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
 
         // ── Unified Slack thread ──────────────────────────────────────────────────────────
@@ -330,8 +331,9 @@ Examples:
                     // DM nudge directly — NOT UpdateChunk (pollutes peer chunk stream with moderator messages)
                     ctx.InjectToSingle(peerAi, nudge);
                 }
+                AssignEmojiOnFinish(doneAi); // 🦊🐬🐙 speed-based emoji!
                 Console.WriteLine($"[{modeLabel}] {doneAi} done → moderator nudging {pending.Count} remaining");
-                SlackPostToThread($"⏰ *{doneAi}* finished! Moderator: please wrap up, remaining {pending.Count} AI(s).", "Moderator");
+                SlackPostToThread($"⏰ *{AiDisplayName(doneAi)}* finished! Moderator: wrap up, {pending.Count} AI(s) remaining.", "🦉 Moderator");
 
                 // Follow-up after 1 second
                 _ = Task.Run(async () =>
