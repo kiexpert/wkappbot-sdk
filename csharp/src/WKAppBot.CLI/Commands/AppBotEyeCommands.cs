@@ -401,23 +401,29 @@ internal partial class Program
         }
 
         // Acquire Eye-alive mutex for this process's lifetime — signals to callers that Eye is running.
-        // Single-instance guard: if another Eye holds it, exit — UNLESS process is < 5 min old.
-        // Young processes never self-terminate (prevents hot-swap mutex race: old Eye holds mutex
-        // while new Eye starts → new Eye dies → old Eye exits → both dead).
-        _eyeAliveMutex = new System.Threading.Mutex(true, EyeAliveMutexName, out bool createdNew);
-        if (!createdNew)
+        // Elevated Eye skips mutex — runs alongside normal Eye (admin proxy only, not full Eye).
+        bool isElevatedArg = args.Any(a => a == "--elevated");
+        if (!isElevatedArg)
         {
-            // Another Eye holds the mutex — wait briefly (hot-swap handoff window)
-            EyeLog("[EYE] Another Eye detected — waiting 5s for handoff...");
-            bool acquired = _eyeAliveMutex.WaitOne(5000);
-            if (!acquired)
+            _eyeAliveMutex = new System.Threading.Mutex(true, EyeAliveMutexName, out bool createdNew);
+            if (!createdNew)
             {
-                Console.Error.WriteLine($"[EYE:WARN] ⚠ SELF-EXIT: Another Eye holds mutex after 5s — PID={Environment.ProcessId} exiting as duplicate");
-                _eyeAliveMutex.Dispose();
-                _eyeAliveMutex = null;
-                return 0;
+                // Another Eye holds the mutex — wait briefly (hot-swap handoff window)
+                EyeLog("[EYE] Another Eye detected — waiting 5s for handoff...");
+                bool acquired = _eyeAliveMutex.WaitOne(5000);
+                if (!acquired)
+                {
+                    Console.Error.WriteLine($"[EYE:WARN] ⚠ SELF-EXIT: Another Eye holds mutex after 5s — PID={Environment.ProcessId} exiting as duplicate");
+                    _eyeAliveMutex.Dispose();
+                    _eyeAliveMutex = null;
+                    return 0;
+                }
+                EyeLog("[EYE] Previous Eye released mutex — taking over");
             }
-            EyeLog("[EYE] Previous Eye released mutex — taking over");
+        }
+        else
+        {
+            EyeLog("[EYE] Elevated mode — skipping mutex (coexists with normal Eye)");
         }
         // _eyeAliveMutex is static — held for process lifetime, GC will never collect it
 
