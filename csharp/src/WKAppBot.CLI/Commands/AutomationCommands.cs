@@ -63,6 +63,15 @@ Examples:
 
         if ((targetElevated == true || targetElevated == null) && !weAreElevated)
         {
+            // MCP/Eye mode: no process launch, signal only
+            if (Program.IsMcpMode || Program.RunningInEye)
+            {
+                Console.Error.WriteLine($"[ELEVATION] Click: target pid={targetPid} elevated, MCP/Eye mode — using WaitForAdminServer");
+                if (ElevationHelper.WaitForAdminServer())
+                    return ElevatedEyeClient.ExecuteViaProxy("click", args) == 0 ? 0 : 1;
+                return 1; // elevation unavailable
+            }
+
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"  ⚠ Target process (pid={targetPid}) is elevated (admin).");
             Console.WriteLine($"  ⚠ This process is NOT elevated → SendInput/SetCursorPos will be blocked by UIPI.");
