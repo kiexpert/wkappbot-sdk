@@ -1139,6 +1139,17 @@ internal partial class Program
                     if (action is "click" or "invoke")
                         _autoHealTiers = new List<string>();
 
+                    // ── Dry-run gate: block write actions, allow read/discovery ──
+                    if (_dryRunMode.Value && action is not ("highlight" or "find" or "read" or "wait" or "eval" or "clipboard-read"))
+                    {
+                        var targetDesc = root?.Name ?? grap ?? "?";
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.WriteLine($"[DRY-RUN] Would execute: a11y {action} {targetDesc}");
+                        Console.ResetColor();
+                        success = true; // report success without side effects
+                        break;
+                    }
+
                     var swIter = System.Diagnostics.Stopwatch.StartNew();
                     success = action switch
                     {
@@ -1249,6 +1260,15 @@ internal partial class Program
                 ClickZoomHelper? zoom = null;
                 zoom = ClickZoomHelper.Begin(hwnd, hwnd, $"a11y-{action}", $"\"{title}\"");
 
+                // Dry-run gate for window actions (focus and eval are read-safe)
+                if (_dryRunMode.Value && action is not ("focus" or "eval"))
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.WriteLine($"[DRY-RUN] Would execute: a11y {action} \"{title}\"");
+                    Console.ResetColor();
+                    success = true;
+                }
+                else
                 success = action switch
                 {
                     "close" => A11yClose(automation, hwnd, tag, force, readiness),
@@ -1936,6 +1956,8 @@ internal partial class Program
     // If process has a window → WM_CLOSE first then Kill; else → Kill directly.
     static int A11yKillByPattern(string grap, bool allowAncestors, bool dryRun = false)
     {
+        // Global dry-run mode overrides local flag
+        if (_dryRunMode.Value) dryRun = true;
         // Split '#' for optional exe-path sub-filter
         string namePattern = grap;
         string? exeFilter = null;
@@ -2068,6 +2090,10 @@ internal partial class Program
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"[KILL] killed {killed.Count}: {string.Join(", ", killed)}");
         Console.ResetColor();
+
+        // X-ray cleanup: recover any windows left transparent by killed processes
+        try { XRayHelper.RestoreAll(); } catch { }
+
         return 0;
     }
 

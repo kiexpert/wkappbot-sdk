@@ -1266,6 +1266,27 @@ Examples:
 
         if (!noChange)
         {
+            // Dry-run gate: save proposed edit as backup instead of writing
+            if (_dryRunMode.Value)
+            {
+                var aiName = Environment.GetEnvironmentVariable("WKAPPBOT_LOOP_CALLER") ?? "ai";
+                var ts = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                var backupPath = $"{plan.Path}.{aiName}-{ts}.txt";
+                try
+                {
+                    File.WriteAllBytes(backupPath, plan.OutBytes);
+                    Console.Error.WriteLine("[DRY-RUN] ⚠ Your edit has been PROPOSED. The original file was NOT modified.");
+                    Console.WriteLine($"[file edit] backup → {backupPath}");
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.WriteLine($"[DRY-RUN] file edit: {plan.Count} replacement(s) — backup failed ({ex.Message})");
+                    Console.ResetColor();
+                }
+                return 0;
+            }
+
             // Sanity check: re-detect encoding of output bytes to catch accidental encoding change
             var verifyEnc = DetectFileEncoding(plan.OutBytes, null);
             if (verifyEnc.CodePage != plan.Enc.CodePage)

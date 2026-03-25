@@ -56,34 +56,44 @@ internal sealed class TriadDebateLoop
     public static string BuildR2Prompt(string question, List<RoundResult> r1Results, string selfAi)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("You previously answered this question. Now review anonymized peer responses.");
-        sb.AppendLine($"Question: {question}");
+        sb.AppendLine("[MODERATOR — Round 2: Cross-Critique]");
+        sb.AppendLine();
+        sb.AppendLine("You answered this question in Round 1. Now it's time to critique your peers.");
+        sb.AppendLine("Below are anonymized peer responses. Read them carefully, then respond.");
+        sb.AppendLine($"\nOriginal question: {question}");
         sb.AppendLine();
 
         char label = 'A';
         foreach (var r in r1Results)
         {
             if (r.Ai.Equals(selfAi, StringComparison.OrdinalIgnoreCase)) continue;
-            sb.AppendLine($"=== AI-{label} Response ===");
+            sb.AppendLine($"═══ Peer AI-{label} ═══");
             sb.AppendLine(r.Summary);
-            foreach (var c in r.Claims)
-                sb.AppendLine($"  Claim (confidence={c.Confidence:F2}): {c.Text}");
+            if (r.Claims.Count > 0)
+            {
+                sb.AppendLine($"  Their claims ({r.Claims.Count}):");
+                foreach (var c in r.Claims)
+                    sb.AppendLine($"    • [{c.Confidence:F2}] {c.Text}");
+            }
             sb.AppendLine();
             label++;
         }
 
         sb.AppendLine("""
-            Tasks:
-            1. Identify points of AGREEMENT with peers (strengthen shared claims)
-            2. Identify points of DISAGREEMENT (explain why, with evidence)
-            3. Flag any assumptions you think are WRONG in peer responses
-            4. Revise your own claims if convinced by peer arguments
+            ━━ What you must do ━━
+            1. AGREE: Which peer claims do you support? Strengthen them with your reasoning.
+            2. DISAGREE: Which claims are wrong or weak? Explain WHY with evidence.
+               Use: [DISPUTE]{"target_assumption":"what you challenge","reason":"why it's wrong"}[/DISPUTE]
+            3. REVISE: Update your own claims based on what you learned from peers.
+               If a peer convinced you, raise your confidence. If not, explain why.
 
-            Output your revised claims in the same format:
-            [CLAIM]{"claim":"...","confidence":0.9,"key_assumptions":["..."]}[/CLAIM]
+            ━━ Required output format ━━
+            • For each of your points (2-5 total):
+              [CLAIM]{"claim":"your position","confidence":0.85,"key_assumptions":["assumption1"]}[/CLAIM]
+            • At least ONE [DISPUTE] tag (this is a critique round — you MUST challenge something)
+            • End with: [STANCE N=? R=? C=? E=? D=?] (sum must equal 9, D must be >= 1)
 
-            Be intellectually honest — update confidence based on peer evidence.
-            If you disagree, explain WHY with specific reasoning (informed disagreement).
+            Be direct. Be honest. Don't just agree to be nice — real disagreement makes better answers.
             """);
 
         return sb.ToString();
@@ -93,39 +103,50 @@ internal sealed class TriadDebateLoop
     public static string BuildR3Prompt(string question, List<RoundResult> r2Results)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Final synthesis round. All AIs have now critiqued each other's positions.");
-        sb.AppendLine($"Original question: {question}");
+        sb.AppendLine("[MODERATOR — Round 3: Final Synthesis]");
         sb.AppendLine();
-        sb.AppendLine("Peer positions after critique:");
+        sb.AppendLine("All AIs have critiqued each other. Now it's time to find common ground.");
+        sb.AppendLine($"\nOriginal question: {question}");
+        sb.AppendLine();
+        sb.AppendLine("Here's where each AI stands after the critique round:");
 
         foreach (var r in r2Results)
         {
-            sb.AppendLine($"=== {r.Ai} (revised) ===");
-            foreach (var c in r.Claims)
-                sb.AppendLine($"  [{c.Confidence:F2}] {c.Text}");
+            sb.AppendLine($"\n═══ {r.Ai} (revised position) ═══");
+            if (r.Claims.Count > 0)
+                foreach (var c in r.Claims)
+                    sb.AppendLine($"  • [{c.Confidence:F2}] {c.Text}");
+            else
+                sb.AppendLine($"  (no structured claims extracted)");
         }
 
         sb.AppendLine();
         sb.AppendLine("""
-            Produce a UNIFIED SYNTHESIS:
-            1. State the consensus answer (points all AIs agree on)
-            2. State remaining disagreements (if any) with each position's reasoning
-            3. Provide your FINAL claims with updated confidence:
-            [CLAIM]{"claim":"...","confidence":0.95,"key_assumptions":["..."]}[/CLAIM]
+            ━━ What you must do ━━
+            This is the FINAL round. Produce a unified synthesis that captures the best of all positions.
 
-            IMPORTANT: Write your FINAL CONCLUSION in Korean (한국어).
-            Include each AI's position with their reasoning:
+            Step 1: English synthesis (brief)
+            • What do all AIs agree on? (consensus)
+            • What remains disputed? (with each side's reasoning)
+            • Your final claims (2-4):
+              [CLAIM]{"claim":"...","confidence":0.95,"key_assumptions":["..."]}[/CLAIM]
+
+            Step 2: Korean conclusion (REQUIRED — this is the main output!)
+            Write a thorough conclusion IN KOREAN using this exact format:
+
             [CONCLUSION_KR]
-            [Gemini/EXPLORER의 판단]: (이 AI의 핵심 주장과 근거)
-            [GPT/SKEPTIC의 판단]: (이 AI의 핵심 주장과 근거)
-            [Claude/AUDITOR의 판단]: (이 AI의 핵심 주장과 근거)
-            [합의]: (공통 결론)
-            [미합의]: (남은 이견. 없으면 반드시 "없음"으로 표기)
-            [개인의견]: (합의와 별개로 당신의 솔직한 본심)
+            [Gemini/EXPLORER의 판단]: (이 AI의 핵심 주장 2-3줄 + 근거)
+            [GPT/SKEPTIC의 판단]: (이 AI의 핵심 주장 2-3줄 + 근거)
+            [Claude/AUDITOR의 판단]: (이 AI의 핵심 주장 2-3줄 + 근거)
+            [합의]: (공통 결론 — 한국어 100단어 이상! 구체적으로! "다들 동의했다"는 안 됩니다)
+            [미합의]: (남은 이견. ⚠️ 다른 AI가 [합의]에 넣었지만 당신이 동의하지 않는 항목이 있으면 반드시 여기에 기입! 정말 없으면 "없음"으로 표기)
+            [개인의견]: (당신의 솔직한 본심 — 합의와 다를 수 있음, 20단어 이상)
             [/CONCLUSION_KR]
-            The rest of the synthesis should remain in English.
 
-            Mark the synthesis complete with: [SYNTHESIS_COMPLETE]
+            Step 3: End with [STANCE N=? R=? C=? E=? D=?] (sum=9)
+
+            ⚠ The Korean conclusion IS the deliverable. Don't skip it or make it brief.
+            Mark complete with: [SYNTHESIS_COMPLETE]
             """);
 
         return sb.ToString();
@@ -155,12 +176,32 @@ internal sealed class TriadDebateLoop
 
     public static Stance? ParseStance(string text)
     {
+        // Tier 1: [STANCE N=X R=X C=X E=X D=X] inline tag
         var m = StanceRegex.Match(text);
-        if (!m.Success) return null;
-        return new Stance(
-            int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value),
-            int.Parse(m.Groups[3].Value), int.Parse(m.Groups[4].Value),
-            int.Parse(m.Groups[5].Value));
+        if (m.Success)
+            return new Stance(
+                int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value),
+                int.Parse(m.Groups[3].Value), int.Parse(m.Groups[4].Value),
+                int.Parse(m.Groups[5].Value));
+
+        // Tier 2: DEBATE_JSON → "stance":{"N":2,"R":3,"C":1,"E":2,"D":1}
+        var json = ParseDebateJson(text);
+        var stanceNode = json?["stance"];
+        if (stanceNode != null)
+        {
+            try
+            {
+                return new Stance(
+                    stanceNode["N"]?.GetValue<int>() ?? 0,
+                    stanceNode["R"]?.GetValue<int>() ?? 0,
+                    stanceNode["C"]?.GetValue<int>() ?? 0,
+                    stanceNode["E"]?.GetValue<int>() ?? 0,
+                    stanceNode["D"]?.GetValue<int>() ?? 0);
+            }
+            catch { }
+        }
+
+        return null;
     }
 
     /// <summary>Stance convergence: all AIs have C >= 3 (consensus priority) and D <= 1 (low dissent).</summary>

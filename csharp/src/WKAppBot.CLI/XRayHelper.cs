@@ -130,4 +130,32 @@ internal sealed class XRayHelper : IDisposable
         if (_affected.Count > 0)
             Console.Write($"[XRAY] {_affected.Count} window(s) restored ");
     }
+
+    /// <summary>
+    /// Global cleanup: scan ALL visible top-level windows for MagicAlpha=13 and restore them.
+    /// Call on process exit / Eye shutdown to recover from leaked X-ray (Dispose not called).
+    /// Safe to call multiple times — only affects windows with the exact magic alpha value.
+    /// </summary>
+    public static int RestoreAll()
+    {
+        int restored = 0;
+        NativeMethods.EnumWindows((hwnd, _) =>
+        {
+            if (!IsWindowVisible(hwnd)) return true;
+            int exStyle = NativeMethods.GetWindowLongW(hwnd, NativeMethods.GWL_EXSTYLE);
+            if ((exStyle & NativeMethods.WS_EX_LAYERED) == 0) return true;
+
+            if (GetLayeredWindowAttributes(hwnd, IntPtr.Zero, out byte alpha, IntPtr.Zero) && alpha == MagicAlpha)
+            {
+                // Restore to fully opaque — safest option since we don't know original state
+                NativeMethods.SetLayeredWindowAttributes(hwnd, 0, 255, NativeMethods.LWA_ALPHA);
+                restored++;
+            }
+            return true;
+        }, IntPtr.Zero);
+
+        if (restored > 0)
+            Console.WriteLine($"[XRAY] RestoreAll: {restored} leaked window(s) recovered");
+        return restored;
+    }
 }
