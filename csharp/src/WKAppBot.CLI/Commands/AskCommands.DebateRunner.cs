@@ -10,6 +10,13 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal partial class Program
 {
+    static string AiDisplayName(string ai) => ai switch
+    {
+        "gpt" => "GPT(SKEPTIC)",
+        "gemini" => "Gemini(EXPLORER)",
+        "claude" => "Claude(AUDITOR)",
+        _ => ai,
+    };
     /// <summary>
     /// Execute a 정반합 debate round: send prompt to all AIs in parallel, collect structured responses.
     /// Each AI gets a prompt via `ask {ai} "prompt"` and the response is parsed for [CLAIM] markers.
@@ -137,7 +144,7 @@ internal partial class Program
                     results.Add(result);
 
                     Console.WriteLine($"[DEBATE:{roundName}:{ai}] {claims.Count} claims extracted{(needsRetry ? " (after retry)" : "")}");
-                    SlackPostToThread($"📋 *[{roundName}:{ai}]* {claims.Count} claims{(needsRetry ? " 🔄(revised)" : "")}", ai);
+                    SlackPostToThread($"📋 *[{roundName}:{AiDisplayName(ai)}]* {claims.Count} claims{(needsRetry ? " 🔄(revised)" : "")}", AiDisplayName(ai));
 
                     // D=0 warning: critique round requires dissent — warn if AI didn't challenge anything
                     if (roundName.StartsWith("R2", StringComparison.OrdinalIgnoreCase))
