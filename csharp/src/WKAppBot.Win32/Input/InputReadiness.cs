@@ -389,8 +389,28 @@ public sealed class InputReadiness
 
     // ── Probe: 전수조사 ──────────────────────────────────────────
 
+    /// <summary>Global dry-run flag (AsyncLocal, set by CLI ask/agent entry points).</summary>
+    public static readonly System.Threading.AsyncLocal<bool> DryRunMode = new();
+
     public InputReadinessReport Probe(InputReadinessRequest req)
     {
+        // Dry-run gate: block all input actions at the native readiness level.
+        // This is the final safety net — even if higher-level gates are accidentally bypassed,
+        // no write/input action can proceed without Probe() approval.
+        if (DryRunMode.Value)
+        {
+            ReadinessCalled = true;
+            var action = req.IntendedAction ?? "unknown";
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"[DRY-RUN] InputReadiness.Probe() blocked: {action} on hwnd=0x{req.TargetHwnd:X}");
+            Console.ResetColor();
+            return new InputReadinessReport
+            {
+                TargetHwnd = req.TargetHwnd,
+                Methods = new List<InputMethod>() // empty = no available methods = action cannot proceed
+            };
+        }
+
         ReadinessCalled = true;
         var swProbe = Stopwatch.StartNew();
         long msInit = 0, msElevation = 0, msZoom = 0, msUia = 0, msWin32 = 0, msSendInput = 0;

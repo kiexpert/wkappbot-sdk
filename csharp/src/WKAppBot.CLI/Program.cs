@@ -110,6 +110,7 @@ internal partial class Program
         int _exitCode = 1;
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
+            try { XRayHelper.RestoreAll(); } catch { }
             try { Console.Out.Flush(); } catch { }
             // Signal Launcher to TerminateSelf immediately — don't wait for Core's ~30s OS cleanup.
             // Launcher stdout relay detects "\0UIT" sentinel → TerminateSelf → bash gets control back.

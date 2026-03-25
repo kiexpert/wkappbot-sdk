@@ -799,6 +799,16 @@ internal partial class Program
 
                     if (File.Exists(newExePath))
                     {
+                        // Skip if .new.exe is identical to running exe (same mtime + size = no actual rebuild)
+                        var newInfo = new FileInfo(newExePath);
+                        var curInfo = new FileInfo(exePath);
+                        if (newInfo.LastWriteTimeUtc == curInfo.LastWriteTimeUtc && newInfo.Length == curInfo.Length)
+                        {
+                            Console.WriteLine($"[EYE:HOT-SWAP] .new.exe identical (mtime={newInfo.LastWriteTimeUtc:HH:mm:ss}, size={newInfo.Length}) — skipping");
+                            try { File.Delete(newExePath); } catch { }
+                            continue;
+                        }
+
                         // .new.exe staged — rename-swap (running exe CAN be renamed on Windows!)
                         EyeColor(ConsoleColor.Magenta);
                         Console.WriteLine("[EYE:HOT-SWAP] .new.exe detected — rename-swap");

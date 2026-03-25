@@ -94,6 +94,8 @@ internal partial class Program
                 triadMode = true;
             else if (args[i] == "--debate")
                 debateMode = true;
+            else if (args[i] == "--dry-run")
+                _dryRunMode.Value = true;
             else if (args[i] == "--agent-id" && i + 1 < args.Length)
                 agentId = args[++i];
             else if (args[i] == "--timeout" && i + 1 < args.Length)
@@ -117,6 +119,9 @@ internal partial class Program
             else
                 remaining.Add(args[i]);
         }
+
+        // Agent mode: _dryRunMode already set by --dry-run flag above (default false).
+        // Agent calls AskGemini/AskChatGpt/AskClaude directly → bypasses AskCommand's dry-run gate.
 
         var (questionParts, attachFiles) = ParseTextAndFilesWithMarkers(remaining.ToArray());
         var question = InlineTextFiles(questionParts, attachFiles);
