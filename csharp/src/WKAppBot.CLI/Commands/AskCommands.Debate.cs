@@ -120,7 +120,8 @@ internal sealed class TriadDebateLoop
             [GPT/SKEPTIC의 판단]: (이 AI의 핵심 주장과 근거)
             [Claude/AUDITOR의 판단]: (이 AI의 핵심 주장과 근거)
             [합의]: (공통 결론)
-            [미합의]: (남은 이견과 각자의 이유)
+            [미합의]: (남은 이견. 없으면 반드시 "없음"으로 표기)
+            [개인의견]: (합의와 별개로 당신의 솔직한 본심)
             [/CONCLUSION_KR]
             The rest of the synthesis should remain in English.
 
