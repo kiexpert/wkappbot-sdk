@@ -501,9 +501,27 @@ internal partial class Program
         catch { /* best effort */ }
 
         // ═══ STEP 4.9: Elevation auto-detect → Elevated Eye Proxy delegation ═══
+        // Pre-check: if target is elevated AND we have #scope, delegate BEFORE UIA traversal
+        // (UIPI blocks UIA access to admin windows → 60s timeout without this check)
+        NativeMethods.GetWindowThreadProcessId(targets[0].Handle, out uint _targetPid);
+        var _targetElevated = NativeMethods.IsProcessElevated(_targetPid);
+        if (_targetElevated == true && !NativeMethods.IsCurrentProcessElevated())
+        {
+            Console.Error.WriteLine($"[A11Y] Target (pid={_targetPid}) is elevated — delegating full command before UIA traversal");
+        }
         var (delegated, delegateExit) = ElevationHelper.TryDelegateIfElevated(
             targets[0].Handle, "a11y", args);
         if (delegated) return delegateExit;
+        // If elevation was needed but delegation failed (MCP/Eye mode), and we have UIA scope,
+        // skip UIA traversal entirely (would hang 60s on UIPI block)
+        if (_targetElevated == true && !NativeMethods.IsCurrentProcessElevated() && !string.IsNullOrEmpty(uiaPath))
+        {
+            Console.Error.WriteLine($"[A11Y] UIPI block: cannot traverse UIA on elevated target without admin rights");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[A11Y] Target is admin (pid={_targetPid}) — elevation required for #scope access");
+            Console.ResetColor();
+            return 1;
+        }
 
         // ═══ STEP 4.95: close on browser window ═══
         // Rule: browser windows (CDP port detected) REQUIRE a #tabHint to close a tab.
