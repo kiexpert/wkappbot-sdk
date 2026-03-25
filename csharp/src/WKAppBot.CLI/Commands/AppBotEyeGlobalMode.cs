@@ -182,24 +182,28 @@ internal partial class Program
         }
         else
         {
-            // Hot-swap start: old Eye should self-exit (cts.Cancel), but if it goes zombie,
-            // force-kill after 1 minute. Fire-and-forget — does not block startup.
+            // Hot-swap 세대교체: 자식(나)이 부모(replacePid)를 인수인계 받는다.
+            // 부모가 자연 은퇴하면 OK. 좀비(10초 이상 안 죽음)면 패륜 — 자식이 부모만 kill.
             _ = Task.Run(async () =>
             {
-                await Task.Delay(60_000);
+                await Task.Delay(10_000); // 10s grace for parent to retire
                 try
                 {
-                    using var old = Process.GetProcessById(replacePid);
-                    if (!old.HasExited)
+                    using var parent = Process.GetProcessById(replacePid);
+                    if (!parent.HasExited)
                     {
-                        Console.Error.WriteLine($"[EYE:WARN] ⚠ KILL: Force-killing zombie old Eye PID={replacePid} after 1min grace (I am PID={Environment.ProcessId})");
-                        old.Kill();
+                        Console.Error.WriteLine($"[EYE:WARN] ⚠ PATRICIDE: Parent Eye PID={replacePid} didn't retire in 10s — child PID={Environment.ProcessId} force-killing parent");
+                        parent.Kill();
                         EyeColor(ConsoleColor.Yellow);
-                        Console.WriteLine($"[EYE:HOT-SWAP] Force-killed zombie old Eye (PID={replacePid}) after 1min grace");
+                        Console.WriteLine($"[EYE:HOT-SWAP] Parent Eye (PID={replacePid}) force-retired by child");
                         EyeResetColor();
                     }
+                    else
+                    {
+                        Console.WriteLine($"[EYE:HOT-SWAP] Parent Eye (PID={replacePid}) retired gracefully — good succession");
+                    }
                 }
-                catch { /* already exited — happy path */ }
+                catch { /* already exited — happy path, 효도 성공 */ }
             });
         }
 
