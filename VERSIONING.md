@@ -34,4 +34,4 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`4.7` — bumped at 2026-03-20 (Eye launch bug fixes, PulseStep profiler)
+`5.1` — bumped at 2026-03-25 (debate hardening, dry-run, moderator quality gates, Eye memory fix)
