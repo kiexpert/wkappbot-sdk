@@ -86,6 +86,7 @@ internal partial class Program
         // Tool invocations will use ThreadRoutingWriter.Route() for per-tab output
         Console.SetOut(new ThreadRoutingWriter(Console.Error));
 
+        IsMcpMode = true; // global flag: no console windows, no Eye spawn, no elevation launch
         Console.Error.WriteLine($"[MCP] Server starting... (launcher={McpLauncherMode})");
 
         var writer = new StreamWriter(jsonOut, new UTF8Encoding(false)) { AutoFlush = true };

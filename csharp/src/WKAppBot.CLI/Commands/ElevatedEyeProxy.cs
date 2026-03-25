@@ -317,6 +317,21 @@ static class ElevationHelper
         if (NativeMethods.IsCurrentProcessElevated())
             return (false, 0); // we're already admin
 
+        // MCP mode: never launch new processes (no console window, no Eye spawn)
+        // Only try existing elevated Eye proxy, never LaunchElevatedEye()
+        if (Program.IsMcpMode)
+        {
+            NativeMethods.GetWindowThreadProcessId(targetHwnd, out uint mcpPid);
+            if (NativeMethods.IsProcessElevated(mcpPid) == true && ElevatedEyeClient.IsAvailable())
+            {
+                Console.Error.WriteLine("[ELEVATION:MCP] Delegating via existing elevated Eye proxy");
+                var exit = ElevatedEyeClient.ExecuteViaProxy(command, args);
+                if (exit != -1) return (true, exit);
+            }
+            Console.Error.WriteLine("[ELEVATION:MCP] Skipping elevation — no console/Eye spawn in MCP mode");
+            return (false, 0);
+        }
+
         NativeMethods.GetWindowThreadProcessId(targetHwnd, out uint pid);
         var targetElev = NativeMethods.IsProcessElevated(pid);
         if (targetElev != true)
