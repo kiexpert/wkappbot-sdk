@@ -644,6 +644,7 @@ public sealed partial class CdpClient
     {
         return await EvalAsync(
             "(()=>{var r=document.querySelectorAll('model-response');" +
+            "if(!r.length)r=document.querySelectorAll('[data-message-author-role=\"assistant\"]');" +
             "if(!r.length)r=document.querySelectorAll('[role=\"article\"]');" +
             "return r.length>0?(r[r.length-1].textContent||'').trim():''})()");
     }
@@ -659,6 +660,7 @@ public sealed partial class CdpClient
         return await EvalAsync(
             "(()=>{" + blankCheck +
             "var r=document.querySelectorAll('model-response');" +
+            "if(!r.length)r=document.querySelectorAll('[data-message-author-role=\"assistant\"]');" +
             "if(!r.length)r=document.querySelectorAll('[role=\"article\"]');" +
             $"if(r.length<={minCount})return '';" +
             "return(r[r.length-1].textContent||'').trim()})()");
