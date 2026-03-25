@@ -81,6 +81,7 @@ internal partial class Program
         int verifyDelayMs = 400;
         bool newSession   = false;    // --fresh
         bool triadMode    = false;
+        bool debateMode   = false;    // --debate: 사회자 루프 관리
         string? modelHint = null;
         string? agentId   = null;     // --agent-id <name>
 
@@ -91,6 +92,8 @@ internal partial class Program
                 newSession = true;
             else if (args[i] == "--triad")
                 triadMode = true;
+            else if (args[i] == "--debate")
+                debateMode = true;
             else if (args[i] == "--agent-id" && i + 1 < args.Length)
                 agentId = args[++i];
             else if (args[i] == "--timeout" && i + 1 < args.Length)
@@ -165,14 +168,11 @@ internal partial class Program
             var results = tasks.Select(t => t.Result).ToArray();
             Console.WriteLine($"[AGENT] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
-            // ── 정반합: cross-prompt loop (R1 already done above, skip to cross-prompting) ──
-            if (results.Count(r => r == 0) >= 2)
+            // ── 정반합 사회자 (--debate 시에만) ──
+            if (debateMode && results.Count(r => r == 0) >= 2)
             {
-                try
-                {
-                    var ais = new[] { "gemini", "gpt", "claude" };
-                    RunCrossPromptLoop(ais, Math.Min(timeoutSec, 90), triadCtx);
-                }
+                Console.WriteLine("[정반합] Agent debate: moderator loop with write tools...");
+                try { RunDebateLoop(question, timeoutSec, triadCtx); }
                 catch (Exception ex) { Console.Error.WriteLine($"[DEBATE] Error: {ex.Message}"); }
             }
 

@@ -185,9 +185,7 @@ internal partial class Program
             "gemini" => AskGemini(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
             "gpt" or "chatgpt" => AskChatGpt(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
             "claude" => AskClaude(question, true, timeoutSec, newTab, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
-            "triad" or "all" => debateMode
-                ? AskTriadDebate(question, timeoutSec, modelHint)
-                : AskTriadParallel(question, timeoutSec, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait),
+            "triad" or "all" => AskTriadParallel(question, timeoutSec, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, debateMode),
             _ => Error($"Unknown AI: {ai} (use gemini, gpt, claude, or triad)")
         };
     }
@@ -242,12 +240,13 @@ Examples:
     /// </summary>
     static int AskTriadParallel(string question, int timeoutSec, List<string>? attachFiles,
         bool newSession, bool loopMode, int loopMaxSteps, int loopRetry, int loopMaxParallel,
-        string? modelHint, bool noWait)
+        string? modelHint, bool noWait, bool debateMode = false)
     {
         // Triad always starts fresh per-AI — prevents stale session cross-contamination.
         var freshSession = true;
         Interlocked.Exchange(ref _slackPersonaPostedFlag, 0); // reset: only first AI posts persona
-        Console.WriteLine("[TRIAD] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
+        var modeLabel = debateMode ? "정반합" : "TRIAD";
+        Console.WriteLine($"[{modeLabel}] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
 
         // ── Unified Slack thread ──────────────────────────────────────────────────────────
         // Set _slackSessionThreadTs.Value BEFORE spawning Task.Run children.
@@ -261,7 +260,7 @@ Examples:
             {
                 // Use SlackSendWithThread: auto-splits long messages (header → channel, overflow → thread)
                 var (ok, ts) = PostWithOverflow(botToken, channel,
-                    $"*[🔱 TRIAD]* {question}", username: BotUsername);
+                    debateMode ? $"*[정반합]* {question}" : $"*[🔱 TRIAD]* {question}", username: BotUsername);
                 if (ok && ts != null)
                 {
                     _slackSessionThreadTs.Value = ts;
@@ -299,16 +298,17 @@ Examples:
         var results = tasks.Select(t => t.Result).ToArray();
         Console.WriteLine($"[TRIAD] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
-        // ── 정반합 Debate Loop (R2 critique + R3 synthesis) ──
-        // Only run if at least 2 AIs responded successfully and not in no-wait mode
-        if (!noWait && results.Count(r => r == 0) >= 2)
+        // ── 정반합 사회자 루프 (--debate 플래그 시에만) ──
+        if (debateMode && !noWait && results.Count(r => r == 0) >= 2)
         {
+            Console.WriteLine($"[정반합] Moderator loop starting (R2 critique + R3 synthesis)...");
+            SlackPostToThread("📋 *Debate persona:*\n```\n" + BuildDebateOnlyPersona()[..Math.Min(300, BuildDebateOnlyPersona().Length)] + "\n```", "Moderator");
             try { RunDebateLoop(question, timeoutSec, ctx); }
             catch (Exception ex) { Console.Error.WriteLine($"[DEBATE] Error: {ex.Message}"); }
         }
-        else if (!noWait)
+        else if (debateMode && !noWait)
         {
-            Console.WriteLine("[TRIAD] Skipping debate — need at least 2 successful AIs");
+            Console.WriteLine("[정반합] Skipping moderator — need at least 2 successful AIs");
         }
 
         // ── Schedule reminder into caller's Claude Code prompt via `wkappbot prompt send` ──
