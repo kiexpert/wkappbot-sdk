@@ -37,6 +37,28 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     public bool IsConnected => _ws?.State == WebSocketState.Open;
     public string? WebSocketUrl { get; private set; }
     public string? TargetId { get; private set; }
+
+    /// <summary>Reconnect to the same tab using saved WebSocketUrl (tab still open, WS dropped).</summary>
+    public async Task ReconnectAsync(int timeoutMs = 5000)
+    {
+        if (string.IsNullOrEmpty(WebSocketUrl))
+            throw new InvalidOperationException("No WebSocketUrl saved — cannot reconnect");
+
+        // Dispose old WebSocket
+        try { _receiveCts?.Cancel(); } catch { }
+        try { _ws?.Dispose(); } catch { }
+
+        using var cts = new CancellationTokenSource(timeoutMs);
+        _ws = new ClientWebSocket();
+        await _ws.ConnectAsync(new Uri(WebSocketUrl), cts.Token);
+
+        _receiveCts = new CancellationTokenSource();
+        _receiveTask = ReceiveLoopAsync(_receiveCts.Token);
+
+        await SendAsync("Runtime.enable");
+        await SendAsync("Page.enable");
+        Console.WriteLine($"[CDP] Reconnected to {TargetId}");
+    }
     private int? _currentContextId;
 
     /// <summary>Chrome browser process ID (resolved from CDP port).</summary>
