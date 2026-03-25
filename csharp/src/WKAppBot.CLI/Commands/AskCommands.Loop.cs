@@ -266,7 +266,7 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> RunChatGptLoopAsync(
         CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7,
-        Action<string, string?>? onReport = null)
+        Action<string, string?>? onReport = null, TriadSharedContext? triadCtx = null)
     {
         var answer = initialAnswer;
         var steps = Math.Max(1, maxSteps);
@@ -318,7 +318,7 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> RunGeminiLoopAsync(
         CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7,
-        Action<string, string?>? onReport = null)
+        Action<string, string?>? onReport = null, TriadSharedContext? triadCtx = null)
     {
         var answer = initialAnswer;
         var steps = Math.Max(1, maxSteps);
@@ -370,7 +370,7 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> RunClaudeLoopAsync(
         CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7,
-        Action<string, string?>? onReport = null)
+        Action<string, string?>? onReport = null, TriadSharedContext? triadCtx = null)
     {
         var answer = initialAnswer;
         var steps = Math.Max(1, maxSteps);
@@ -431,7 +431,8 @@ internal partial class Program
         IReadOnlyDictionary<string, string>? idToCmd = null,
         Action<string, string?>? onReport = null,
         int step = 0,
-        IReadOnlyDictionary<string, string>? idToStartTs = null)
+        IReadOnlyDictionary<string, string>? idToStartTs = null,
+        TriadSharedContext? triadCtx = null)
     {
         var pending = execTasks.ToList();
         // Map task → id so we can show status=running for incomplete tasks
@@ -447,6 +448,16 @@ internal partial class Program
             var r = completed.GetAwaiter().GetResult();
             taskIds[completed] = r.id; // update id now that it's resolved
             collected.Add(r);
+
+            // Cross-share tool call + result with other triad AIs
+            if (triadCtx != null)
+            {
+                var cmdStr = idToCmd?.GetValueOrDefault(r.id, r.id) ?? r.id;
+                var outputSnippet = r.result.Output.Length > 300 ? r.result.Output[..300] + "..." : r.result.Output;
+                var toolMsg = $"[{provider} tool] {cmdStr} → exit={r.result.ExitCode}\n{outputSnippet}";
+                triadCtx.UpdateChunk(provider, toolMsg);
+                Console.WriteLine($"[CROSS:TOOL] {provider} → peers: {cmdStr} (exit={r.result.ExitCode}, {r.result.Output.Length}ch)");
+            }
 
             // Echo tool output to console with "{id}> " prefix + metrics
             {

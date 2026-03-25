@@ -196,7 +196,7 @@ internal partial class Program
                     triadCtx?.LogStep("ChatGPT", msg);
                 };
                 if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-                    (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport);
+                    (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport, triadCtx);
                 return (ok, answer);
             }
             catch (Exception ex)

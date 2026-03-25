@@ -528,7 +528,7 @@ internal partial class Program
             triadCtx?.LogStep("Claude", msg);
         };
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-            (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport)).GetAwaiter().GetResult();
+            (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport, triadCtx)).GetAwaiter().GetResult();
         bool isLimit = IsClaudeLimitResponse(answer);
         if (isLimit) ok = false;
 

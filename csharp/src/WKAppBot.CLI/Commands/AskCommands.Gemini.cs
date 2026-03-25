@@ -962,7 +962,7 @@ internal partial class Program
             triadCtx?.LogStep("Gemini", msg);
         };
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-            (ok, answer) = Task.Run(() => RunGeminiLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport)).GetAwaiter().GetResult();
+            (ok, answer) = Task.Run(() => RunGeminiLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport, triadCtx)).GetAwaiter().GetResult();
 
         if (ok && answer != null)
         {
