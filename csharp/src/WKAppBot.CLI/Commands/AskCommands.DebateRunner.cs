@@ -825,11 +825,27 @@ internal partial class Program
                 return null;
             }
 
-            // Verify CDP is still connected
+            // Verify CDP is still connected — try reconnect before fallback
             if (!cdp.IsConnected)
             {
-                Console.Error.WriteLine($"[DEBATE:INJECT] {ai}: CDP disconnected — falling back to AskAndCapture");
-                return AskAndCapture(ai, prompt, timeoutSec);
+                Console.Error.WriteLine($"[DEBATE:INJECT] {ai}: CDP disconnected — attempting reconnect...");
+                try
+                {
+                    // Reconnect using same tab ID (the tab is still open, just WebSocket dropped)
+                    await cdp.ReconnectAsync();
+                    if (cdp.IsConnected)
+                        Console.WriteLine($"[DEBATE:INJECT] {ai}: CDP reconnected!");
+                    else
+                    {
+                        Console.Error.WriteLine($"[DEBATE:INJECT] {ai}: reconnect failed — falling back to AskAndCapture");
+                        return AskAndCapture(ai, prompt, timeoutSec);
+                    }
+                }
+                catch (Exception rex)
+                {
+                    Console.Error.WriteLine($"[DEBATE:INJECT] {ai}: reconnect error: {rex.Message} — falling back");
+                    return AskAndCapture(ai, prompt, timeoutSec);
+                }
             }
 
             // Capture baseline response count + text BEFORE injection
