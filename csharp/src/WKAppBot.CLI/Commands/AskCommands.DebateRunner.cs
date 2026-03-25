@@ -204,10 +204,52 @@ internal partial class Program
             return;
         }
 
-        // ── R3: All 3 AIs write consensus + personal opinion ──
-        SlackPostToThread("═══ *R3: Consensus + Personal Opinion* ═══", "Moderator");
-        var r3Prompts = ais.ToDictionary(ai => ai, _ => TriadDebateLoop.BuildR3Prompt(question, bestResults));
-        var r3Results = RunDebateRound("R3", r3Prompts, timeoutSec, ctx);
+        // ── R3: Consensus loop — repeat until [미합의] is empty ──
+        SlackPostToThread("═══ *R3: Consensus Loop* ═══", "Moderator");
+        var currentResults = bestResults;
+        List<TriadDebateLoop.RoundResult> r3Results = new();
+        const int maxR3Loops = 3;
+
+        for (int r3i = 0; r3i < maxR3Loops; r3i++)
+        {
+            Console.WriteLine($"[DEBATE:R3-{r3i + 1}] Consensus attempt {r3i + 1}/{maxR3Loops}");
+            SlackPostToThread($"🔄 *R3-{r3i + 1}* Consensus attempt", "Moderator");
+
+            var r3Prompts = ais.ToDictionary(ai => ai, _ => TriadDebateLoop.BuildR3Prompt(question, currentResults));
+            r3Results = RunDebateRound($"R3-{r3i + 1}", r3Prompts, timeoutSec, ctx);
+            if (r3Results.Count == 0) break;
+
+            // Parse [미합의] from all responses
+            var unresolved = new List<string>();
+            foreach (var r in r3Results)
+            {
+                var miStart = r.Summary.IndexOf("[미합의]");
+                var miEnd = r.Summary.IndexOf("[개인의견]");
+                if (miEnd < 0) miEnd = r.Summary.IndexOf("[MY_OPINION");
+                if (miEnd < 0) miEnd = r.Summary.Length;
+                if (miStart >= 0)
+                {
+                    var section = r.Summary[(miStart + "[미합의]".Length)..Math.Min(miEnd, r.Summary.Length)].Trim();
+                    if (!string.IsNullOrEmpty(section) && section != "없음" && section != "None" && section.Length > 5)
+                        unresolved.Add($"[{r.Ai}] {section[..Math.Min(100, section.Length)]}");
+                }
+            }
+
+            if (unresolved.Count == 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"[DEBATE:R3] Full consensus reached! (attempt {r3i + 1})");
+                Console.ResetColor();
+                SlackPostToThread($"✅ *Full consensus!* (R3-{r3i + 1})", "Moderator");
+                break;
+            }
+
+            Console.WriteLine($"[DEBATE:R3] {unresolved.Count} unresolved items");
+            SlackPostToThread($"⚠️ *{unresolved.Count} 미합의 남음* → 다음 라운드", "Moderator");
+
+            // Inject unresolved items back for next round
+            currentResults = r3Results;
+        }
 
         var finalResults = r3Results.Count > 0 ? r3Results : bestResults;
         var r3Convergence = TriadDebateLoop.CalculateConvergence(finalResults);
