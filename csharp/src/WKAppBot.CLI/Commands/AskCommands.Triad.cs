@@ -49,6 +49,29 @@ internal sealed class TriadSharedContext
     /// <summary>Get the latest chunk for an AI (direct access, not peer-filtered).</summary>
     public string? GetLatestChunk(string ai) => _latestChunks.GetValueOrDefault(ai);
 
+    /// <summary>DM: inject message to ONE AI only (no broadcast to peers). For warnings/corrections.</summary>
+    public void InjectToSingle(string targetAi, string message)
+    {
+        if (!_cdpClients.TryGetValue(targetAi, out var cdp)) return;
+        var editorSel = targetAi.ToLowerInvariant() switch
+        {
+            "gemini" => ".ql-editor",
+            "gpt" or "chatgpt" => "#prompt-textarea",
+            "claude" => "div.tiptap.ProseMirror",
+            _ => null
+        };
+        if (editorSel == null) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await cdp.InsertContentEditableAsync(editorSel, message);
+                Console.WriteLine($"[MOD:DM] → {targetAi}: {message[..Math.Min(60, message.Length)]}");
+            }
+            catch { }
+        });
+    }
+
     /// <summary>Update latest response chunk + broadcast to Slack + queue for other AIs.</summary>
     public void UpdateChunk(string ai, string chunk)
     {
