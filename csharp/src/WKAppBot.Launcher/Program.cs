@@ -704,19 +704,24 @@ class Program
 
         // stdin broadcaster — single reader, routes bytes to whichever Core is current
         Process? _current = null;
+        var coreReady = new ManualResetEventSlim(false);
         var stdinThread = new Thread(() =>
         {
             var stdin = Console.OpenStandardInput();
             var buf   = new byte[4096];
+            Console.Error.WriteLine("[LAUNCHER:MCP] stdin relay thread started");
             while (true)
             {
                 int n;
                 try   { n = stdin.Read(buf, 0, buf.Length); }
-                catch { break; }
-                if (n == 0) break; // EOF from Claude Code → done
+                catch (Exception ex) { Console.Error.WriteLine($"[LAUNCHER:MCP] stdin read error: {ex.Message}"); break; }
+                if (n == 0) { Console.Error.WriteLine("[LAUNCHER:MCP] stdin EOF"); break; }
 
+                Console.Error.WriteLine($"[LAUNCHER:MCP] stdin read {n} bytes, waiting for core...");
+                // Wait for Core to be ready (prevents dropping first JSON-RPC message)
+                coreReady.Wait();
                 var p = Volatile.Read(ref _current);
-                if (p == null) continue;
+                if (p == null) { Console.Error.WriteLine("[LAUNCHER:MCP] stdin: core is null, dropping"); continue; }
                 try
                 {
                     p.StandardInput.BaseStream.Write(buf, 0, n);
@@ -735,8 +740,8 @@ class Program
                 {
                     FileName        = core,
                     UseShellExecute = false,
-                    RedirectStandardInput  = true,    // fed by stdin broadcaster
-                    RedirectStandardOutput = false,    // inherited → flows to Claude Code
+                    RedirectStandardInput  = true,     // relay: Launcher reads caller stdin → writes to Core
+                    RedirectStandardOutput = true,     // relay: Launcher reads Core stdout → writes to caller
                     RedirectStandardError  = wtLogFile != null, // --wt: tee to log; else inherited
                     CreateNoWindow  = false,
                 }
@@ -759,7 +764,27 @@ class Program
             proc.Start();
             if (wtLogFile != null) proc.BeginErrorReadLine();
             Volatile.Write(ref _current, proc);
+            coreReady.Set(); // unblock stdin relay
             Console.Error.WriteLine($"[LAUNCHER:MCP] core started (pid={proc.Id})");
+
+            // Relay Core stdout → our stdout (JSON-RPC passthrough)
+            var stdoutRelay = new Thread(() =>
+            {
+                try
+                {
+                    var src = proc.StandardOutput.BaseStream;
+                    var dst = Console.OpenStandardOutput();
+                    var buf = new byte[4096];
+                    int n;
+                    while ((n = src.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        dst.Write(buf, 0, n);
+                        dst.Flush();
+                    }
+                }
+                catch { }
+            }) { IsBackground = true, Name = "mcp-stdout-relay" };
+            stdoutRelay.Start();
 
             if (timeoutSec > 0)
             {
