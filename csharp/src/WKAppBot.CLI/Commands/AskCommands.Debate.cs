@@ -327,7 +327,7 @@ internal sealed class TriadDebateLoop
         "should", "would", "could", "these", "than", "into", "some", "when", "there"
     };
 
-    static HashSet<string> Tokenize(string text)
+    public static HashSet<string> Tokenize(string text)
     {
         var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (Match m in WordRegex.Matches(text))

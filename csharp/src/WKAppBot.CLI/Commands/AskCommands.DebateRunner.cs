@@ -189,12 +189,8 @@ internal partial class Program
             .ToDictionary(ai => ai, ai => TriadDebateLoop.BuildR2Prompt(question, r1Results, ai));
         var r2Results = RunDebateRound("R2", r2Prompts, timeoutSec, ctx);
 
-        if (r2Results.Count < 2)
-        {
-            Console.Error.WriteLine("[DEBATE] R2: insufficient responses. Using R1 results.");
-            PostDebateSummary(r1Results, 2);
-            return;
-        }
+        // Proceed with whatever we have (even 1 response)
+        var bestResults = r2Results.Count > 0 ? r2Results : r1Results;
 
         var r2Convergence = TriadDebateLoop.CalculateConvergence(r2Results);
         Console.WriteLine($"[DEBATE:R2] Convergence: {r2Convergence:F2}");
@@ -208,16 +204,71 @@ internal partial class Program
             return;
         }
 
-        // ── R3: Synthesis (unified answer) ──
-        var r3Prompts = ais.Where(ai => r2Results.Any(r => r.Ai.Equals(ai, StringComparison.OrdinalIgnoreCase)))
-            .ToDictionary(ai => ai, _ => TriadDebateLoop.BuildR3Prompt(question, r2Results));
+        // ── R3: All 3 AIs write consensus + personal opinion ──
+        SlackPostToThread("═══ *R3: Consensus + Personal Opinion* ═══", "Moderator");
+        var r3Prompts = ais.ToDictionary(ai => ai, _ => TriadDebateLoop.BuildR3Prompt(question, bestResults));
         var r3Results = RunDebateRound("R3", r3Prompts, timeoutSec, ctx);
 
-        var r3Convergence = TriadDebateLoop.CalculateConvergence(r3Results.Count > 0 ? r3Results : r2Results);
+        var finalResults = r3Results.Count > 0 ? r3Results : bestResults;
+        var r3Convergence = TriadDebateLoop.CalculateConvergence(finalResults);
         Console.WriteLine($"[DEBATE:R3] Final convergence: {r3Convergence:F2}");
-        PostDebateSummary(r3Results.Count > 0 ? r3Results : r2Results, 3);
 
-        Console.WriteLine("[DEBATE] ═══ 정반합 토론 complete ═══");
+        // ── Cross-verify: extract consensus from intersection of all AI claims ──
+        var allClaims = finalResults.SelectMany(r => r.Claims.Select(c => (r.Ai, c))).ToList();
+        var consensusClaims = new List<string>();
+        var dissentClaims = new List<(string ai, string claim)>();
+
+        foreach (var (ai, claim) in allClaims)
+        {
+            // Check if similar claim exists in other AIs (simple keyword overlap)
+            bool shared = allClaims.Any(other =>
+                other.Ai != ai &&
+                TriadDebateLoop.Tokenize(claim.Text).Intersect(TriadDebateLoop.Tokenize(other.c.Text)).Count() >= 3);
+            if (shared)
+                consensusClaims.Add(claim.Text);
+            else
+                dissentClaims.Add((ai, claim.Text));
+        }
+
+        // Post final consensus to Slack
+        var sb = new StringBuilder();
+        sb.AppendLine("═══ *정반합 최종 결과* ═══\n");
+        sb.AppendLine($"📊 Convergence: {r3Convergence:F2}\n");
+
+        if (consensusClaims.Count > 0)
+        {
+            sb.AppendLine("*[합의]*");
+            foreach (var c in consensusClaims.Distinct().Take(5))
+                sb.AppendLine($"  • {c[..Math.Min(100, c.Length)]}");
+        }
+        if (dissentClaims.Count > 0)
+        {
+            sb.AppendLine("\n*[미합의]*");
+            foreach (var (ai, c) in dissentClaims.Take(5))
+                sb.AppendLine($"  • [{ai}] {c[..Math.Min(100, c.Length)]}");
+        }
+
+        // Extract personal opinions [MY_OPINION_KR] or [CONCLUSION_KR]
+        sb.AppendLine("\n*[개인의견]*");
+        foreach (var r in finalResults)
+        {
+            var krStart = r.Summary.IndexOf("[CONCLUSION_KR]");
+            var krEnd = r.Summary.IndexOf("[/CONCLUSION_KR]");
+            if (krStart >= 0 && krEnd > krStart)
+            {
+                var kr = r.Summary[(krStart + "[CONCLUSION_KR]".Length)..krEnd].Trim();
+                sb.AppendLine($"  🗣️ *{r.Ai}*: {kr[..Math.Min(200, kr.Length)]}");
+            }
+            else
+            {
+                // Fallback: first 100 chars of summary
+                sb.AppendLine($"  🗣️ *{r.Ai}*: {r.Summary[..Math.Min(100, r.Summary.Length)]}...");
+            }
+        }
+
+        SlackPostToThread(sb.ToString(), "Moderator");
+        Console.WriteLine("[DEBATE] ═══ 정반합 토론 완료 ═══");
+        SlackPostToThread("═══ *정반합 토론 완료* ═══", "Moderator");
     }
 
     /// <summary>
