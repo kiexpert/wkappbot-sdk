@@ -132,7 +132,8 @@ internal sealed class TriadDebateLoop
               [CLAIM]{"claim":"...","confidence":0.95,"key_assumptions":["..."]}[/CLAIM]
 
             Step 2: Korean conclusion (REQUIRED — this is the main output!)
-            Write a thorough conclusion IN KOREAN using this exact format:
+            Write a thorough conclusion IN KOREAN (max 2000 chars total — fits one Slack message).
+            Use this exact format:
 
             [CONCLUSION_KR]
             [Gemini/EXPLORER의 판단]: (이 AI의 핵심 주장 2-3줄 + 근거)
