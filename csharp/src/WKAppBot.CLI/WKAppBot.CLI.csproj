@@ -47,6 +47,7 @@
 
   <!-- Post-publish: deploy wkappbot-core.exe (Eye hot-swap via .new.exe if locked) -->
   <Target Name="DeployToSdkBin" AfterTargets="Publish" Condition="'$(SkipDeployCore)' != 'true'">
+    <Message Importance="high" Text="[BUILD] WKAppBot v$(Version)" />
     <!-- Step 1: Copy handlers -->
     <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
     <!-- Step 2: Try direct copy first. If locked (Eye running), stage as .new.exe for hot-swap -->
