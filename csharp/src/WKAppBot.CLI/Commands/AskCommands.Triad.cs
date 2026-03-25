@@ -37,7 +37,7 @@ internal sealed class TriadSharedContext
         new(StringComparer.OrdinalIgnoreCase);
 
     // Per-AI CdpClient reference for direct injection
-    private readonly ConcurrentDictionary<string, WKAppBot.WebBot.CdpClient> _cdpClients =
+    internal readonly ConcurrentDictionary<string, WKAppBot.WebBot.CdpClient> _cdpClients =
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Register a CdpClient for an AI (needed for cross-prompt injection).</summary>

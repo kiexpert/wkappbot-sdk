@@ -28,7 +28,7 @@ internal partial class Program
         var promptPreview = samplePrompt.Length > 200 ? samplePrompt[..200] + "..." : samplePrompt;
         SlackPostToThread($"🎙️ *[Moderator → {roundName}]*: {promptPreview}", "Moderator");
 
-        var tasks = prompts.Select(kv => Task.Run(() =>
+        var tasks = prompts.Select(kv => Task.Run(async () =>
         {
             var ai = kv.Key;
             var prompt = kv.Value;
@@ -38,8 +38,10 @@ internal partial class Program
             {
                 using var pfx = ApplyOutputPrefix(linePrefix);
 
-                // Reuse existing ask infrastructure — one-shot ask (no loop mode)
-                var response = AskAndCapture(ai, prompt, timeoutSec);
+                // Direct editor injection — no persona re-injection, moderator's words only
+                var response = ctx._cdpClients.ContainsKey(ai)
+                    ? await InjectAndPollAsync(ctx, ai, prompt, timeoutSec)
+                    : AskAndCapture(ai, prompt, timeoutSec); // fallback if no CDP registered
 
                 if (response != null)
                 {
@@ -461,6 +463,41 @@ internal partial class Program
         }
         catch { }
         return false;
+    }
+
+    /// <summary>Inject moderator prompt directly into AI editor + poll response. No persona re-injection.</summary>
+    static async Task<string?> InjectAndPollAsync(TriadSharedContext ctx, string ai, string prompt, int timeoutSec)
+    {
+        try
+        {
+            ctx.InjectToSingle(ai, prompt);
+            await Task.Delay(500);
+            // Send (Enter) — InjectToSingle types but doesn't send
+            var editorSel = ai.ToLowerInvariant() switch { "gemini" => ".ql-editor", "gpt" => "#prompt-textarea", "claude" => "div.tiptap.ProseMirror", _ => null };
+            if (editorSel != null && ctx._cdpClients.TryGetValue(ai, out var cdp))
+            {
+                await cdp.SendPromptAsync(editorSel);
+                Console.WriteLine($"[DEBATE:INJECT] {ai}: sent moderator prompt ({prompt.Length} chars)");
+
+                // Poll response
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                string lastText = "";
+                int stable = 0;
+                while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 90))
+                {
+                    await Task.Delay(2000);
+                    var text = await cdp.GetLastResponseTextAsync() ?? "";
+                    if (text.Length < 20) continue;
+                    if (text == lastText) { stable++; if (stable >= 3) return text; }
+                    else { stable = 0; lastText = text; }
+                    try { var provider = ai == "gpt" ? "chatgpt" : ai;
+                        if (!await cdp.IsStreamingAsync(provider)) { await Task.Delay(1000); return lastText; } } catch { }
+                }
+                return string.IsNullOrEmpty(lastText) ? null : lastText;
+            }
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[DEBATE:INJECT] {ai} error: {ex.Message}"); }
+        return null;
     }
 
     /// <summary>Post debate summary to Slack thread.</summary>
