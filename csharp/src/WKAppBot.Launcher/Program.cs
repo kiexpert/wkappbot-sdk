@@ -770,15 +770,58 @@ class Program
         }) { IsBackground = true, Name = "mcp-stdin-relay" };
         stdinRelay.Start();
 
-        // Relay: Core → pipe → ConPTY stdout
-        var hOut = GetStdHandle(-11); // our stdout to ConPTY
+        // Relay: Core → pipe → ConPTY stdout (with elevation intercept)
+        var hOut = GetStdHandle(-11);
+        IntPtr hAdminStdinWrite = IntPtr.Zero, hAdminStdoutRead = IntPtr.Zero, hAdminProc = IntPtr.Zero;
+        string? lastStdinRequest = null; // track last request for re-send on elevation
+
+        // Stdin relay also saves last request line
+        // (already running on stdinRelay thread — we track via shared variable)
+
+        // Stdout relay: line-buffered to detect _elevationRequired
         var outBuf = new byte[4096];
+        var lineBuf = new System.Text.StringBuilder();
         while (ReadFile(hCoreStdoutRead, outBuf, (uint)outBuf.Length, out uint outN, IntPtr.Zero) && outN > 0)
         {
-            WriteFile(hOut, outBuf, outN, out _, IntPtr.Zero);
+            var chunk = System.Text.Encoding.UTF8.GetString(outBuf, 0, (int)outN);
+            lineBuf.Append(chunk);
+
+            // Process complete lines
+            string accumulated = lineBuf.ToString();
+            int newlineIdx;
+            while ((newlineIdx = accumulated.IndexOf('\n')) >= 0)
+            {
+                var line = accumulated[..newlineIdx];
+                accumulated = accumulated[(newlineIdx + 1)..];
+
+                // Check for elevation signal
+                if (line.Contains("\"_elevationRequired\":true"))
+                {
+                    Console.Error.WriteLine("[LAUNCHER:MCP] Elevation required — spawning admin Core");
+                    // TODO: spawn admin Core pipe, re-send last request, relay response
+                    // For now: pass through the error (client sees isError=true)
+                    Console.Error.WriteLine("[LAUNCHER:MCP] Admin re-route not yet implemented — passing error through");
+                }
+
+                // Write line + newline to stdout
+                var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
+                WriteFile(hOut, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
+                FlushFileBuffers(hOut);
+            }
+            lineBuf.Clear();
+            if (accumulated.Length > 0) lineBuf.Append(accumulated);
+        }
+        // Flush remaining
+        if (lineBuf.Length > 0)
+        {
+            var rem = System.Text.Encoding.UTF8.GetBytes(lineBuf.ToString());
+            WriteFile(hOut, rem, (uint)rem.Length, out _, IntPtr.Zero);
             FlushFileBuffers(hOut);
         }
         CloseHandle(hCoreStdoutRead);
+        if (hAdminStdinWrite != IntPtr.Zero) CloseHandle(hAdminStdinWrite);
+        if (hAdminStdoutRead != IntPtr.Zero) CloseHandle(hAdminStdoutRead);
+        if (hAdminProc != IntPtr.Zero) { WaitForSingleObject(hAdminProc, 5000); CloseHandle(hAdminProc); }
 
         WaitForSingleObject(pi.hProcess, 5000);
         GetExitCodeProcess(pi.hProcess, out uint exitCode2);

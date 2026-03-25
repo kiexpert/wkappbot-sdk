@@ -318,17 +318,22 @@ static class ElevationHelper
             return (false, 0); // we're already admin
 
         // MCP mode: never launch new processes (no console window, no Eye spawn)
-        // Only try existing elevated Eye proxy, never LaunchElevatedEye()
+        // Try existing elevated Eye proxy. If unavailable, signal Launcher to re-route via admin Core.
         if (Program.IsMcpMode)
         {
             NativeMethods.GetWindowThreadProcessId(targetHwnd, out uint mcpPid);
-            if (NativeMethods.IsProcessElevated(mcpPid) == true && ElevatedEyeClient.IsAvailable())
+            if (NativeMethods.IsProcessElevated(mcpPid) == true)
             {
-                Console.Error.WriteLine("[ELEVATION:MCP] Delegating via existing elevated Eye proxy");
-                var exit = ElevatedEyeClient.ExecuteViaProxy(command, args);
-                if (exit != -1) return (true, exit);
+                if (ElevatedEyeClient.IsAvailable())
+                {
+                    Console.Error.WriteLine("[ELEVATION:MCP] Delegating via existing elevated Eye proxy");
+                    var exit = ElevatedEyeClient.ExecuteViaProxy(command, args);
+                    if (exit != -1) return (true, exit);
+                }
+                // Signal: elevation needed but can't do it here — Launcher will re-route
+                Console.Error.WriteLine("[ELEVATION:MCP] Elevation required — signaling Launcher");
+                Program.McpElevationRequired = true;
             }
-            Console.Error.WriteLine("[ELEVATION:MCP] Skipping elevation — no console/Eye spawn in MCP mode");
             return (false, 0);
         }
 

@@ -450,6 +450,21 @@ internal partial class Program
                     _ => ($"Unknown tool: {toolName}", 1)
                 };
 
+            // Check if elevation was needed — signal Launcher via special error code
+            if (McpElevationRequired)
+            {
+                McpElevationRequired = false;
+                return new JsonObject
+                {
+                    ["content"] = new JsonArray
+                    {
+                        new JsonObject { ["type"] = "text", ["text"] = output }
+                    },
+                    ["isError"] = true,
+                    ["_elevationRequired"] = true // Launcher intercepts this
+                };
+            }
+
             var result = new JsonObject
             {
                 ["content"] = new JsonArray

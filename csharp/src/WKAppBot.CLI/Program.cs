@@ -30,6 +30,7 @@ internal partial class Program
     /// <summary>Set by EyeCmdPipeServer before calling Main() — skips TeeWriter, crash handler, LaunchEye.</summary>
     internal static volatile bool RunningInEye = false;
     internal static volatile bool IsMcpMode = false;
+    [ThreadStatic] internal static bool McpElevationRequired;
 
     /// <summary>True when logcat runs in piped stdout (grep-mode): matches → OriginalStdout, diagnostics → stderr.</summary>
     internal static bool GrepModeActive = false;
