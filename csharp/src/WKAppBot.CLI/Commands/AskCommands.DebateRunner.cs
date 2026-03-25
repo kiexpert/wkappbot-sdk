@@ -10,13 +10,31 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal partial class Program
 {
-    static string AiDisplayName(string ai) => ai switch
+    // 🦉 Moderator assigns animal emoji by R0 finish order (dictator style!)
+    static readonly string[] _speedEmojis = ["🦊", "🐬", "🐙"]; // 1st, 2nd, 3rd
+    static readonly ConcurrentDictionary<string, string> _aiEmoji = new();
+    static int _emojiIndex;
+
+    static void AssignEmojiOnFinish(string ai)
     {
-        "gpt" => "GPT(SKEPTIC)",
-        "gemini" => "Gemini(EXPLORER)",
-        "claude" => "Claude(AUDITOR)",
-        _ => ai,
-    };
+        var idx = Interlocked.Increment(ref _emojiIndex) - 1;
+        if (idx < _speedEmojis.Length)
+            _aiEmoji[ai] = _speedEmojis[idx];
+    }
+
+    static void ResetEmojis() { _aiEmoji.Clear(); Interlocked.Exchange(ref _emojiIndex, 0); }
+
+    static string AiDisplayName(string ai)
+    {
+        var emoji = _aiEmoji.GetValueOrDefault(ai, "🤖");
+        return ai switch
+        {
+            "gpt" => $"{emoji} GPT(SKEPTIC)",
+            "gemini" => $"{emoji} Gemini(EXPLORER)",
+            "claude" => $"{emoji} Claude(AUDITOR)",
+            _ => $"{emoji} {ai}",
+        };
+    }
     /// <summary>
     /// Execute a 정반합 debate round: send prompt to all AIs in parallel, collect structured responses.
     /// Each AI gets a prompt via `ask {ai} "prompt"` and the response is parsed for [CLAIM] markers.
@@ -33,7 +51,7 @@ internal partial class Program
         // Post moderator's instruction to Slack (first prompt's first 200 chars)
         var samplePrompt = prompts.Values.FirstOrDefault() ?? "";
         var promptPreview = samplePrompt.Length > 200 ? samplePrompt[..200] + "..." : samplePrompt;
-        SlackPostToThread($"🎙️ *[Moderator → {roundName}]*: {promptPreview}", "Moderator");
+        SlackPostToThread($"🎙️ *[Moderator → {roundName}]*: {promptPreview}", "🦉 Moderator");
 
         var tasks = prompts.Select(kv => Task.Run(async () =>
         {
@@ -123,7 +141,7 @@ internal partial class Program
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine($"[DEBATE:{roundName}:{ai}] Format violation: {retryReason} → requesting revision");
                         Console.ResetColor();
-                        SlackPostToThread($"🔄 *[Moderator→{ai}]* Format violation: {retryReason}. Requesting revision.", "Moderator");
+                        SlackPostToThread($"🔄 *[Moderator→{ai}]* Format violation: {retryReason}. Requesting revision.", "🦉 Moderator");
 
                         var retryPrompt = $"[MODERATOR] ⚠️ Your response is missing required format: {retryReason}.\n" +
                             (roundName.StartsWith("R2")
@@ -170,7 +188,7 @@ internal partial class Program
                                 Console.ForegroundColor = ConsoleColor.Yellow;
                                 Console.WriteLine($"[DEBATE:{roundName}:{ai}] WARNING: D=0 with no disputes — critique round requires dissent!");
                                 Console.ResetColor();
-                                SlackPostToThread($"⚠️ *[Moderator→{ai}]* D=0 + no [DISPUTE] in critique round! You MUST challenge at least one peer assumption. Revise your STANCE.", "Moderator");
+                                SlackPostToThread($"⚠️ *[Moderator→{ai}]* D=0 + no [DISPUTE] in critique round! You MUST challenge at least one peer assumption. Revise your STANCE.", "🦉 Moderator");
                                 // DM the AI to fix their response
                                 if (ctx._cdpClients.ContainsKey(ai))
                                 {
@@ -208,7 +226,7 @@ internal partial class Program
             {
                 var doneAi = aiKeys[idx];
                 Console.WriteLine($"[DEBATE:{roundName}] {doneAi} done → nudging {pending.Count} remaining");
-                SlackPostToThread($"⏰ *{doneAi}* finished {roundName}! Moderator: wrap up, {pending.Count} AI(s) remaining.", "Moderator");
+                SlackPostToThread($"⏰ *{doneAi}* finished {roundName}! Moderator: wrap up, {pending.Count} AI(s) remaining.", "🦉 Moderator");
 
                 // Inject nudge directly into still-running AIs' editors
                 foreach (var p in pending)
@@ -318,7 +336,7 @@ internal partial class Program
         var ais = new[] { "gemini", "gpt", "claude" };
 
         Console.WriteLine("\n[DEBATE] ═══ 사회자: R2/R3 시작 (R1 이미 완료) ═══");
-        SlackPostToThread("═══ *Moderator: R2(Critique) → R3(Synthesis)* ═══\nR1 already completed. Proceeding to cross-critique.", "Moderator");
+        SlackPostToThread("═══ *Moderator: R2(Critique) → R3(Synthesis)* ═══\nR1 already completed. Proceeding to cross-critique.", "🦉 Moderator");
 
         // Inject debate rules to all AIs (game announcement, not persona)
         var rules = "[MODERATOR] 🎮 정반합 게임 시작!\n" +
@@ -336,7 +354,7 @@ internal partial class Program
             if (ctx._cdpClients.ContainsKey(ai))
                 ctx.InjectToSingle(ai, rules);
         }
-        SlackPostToThread($"📋 *Debate Rules injected to all AIs*", "Moderator");
+        SlackPostToThread($"📋 *Debate Rules injected to all AIs*", "🦉 Moderator");
 
         // ── R1 SKIP: already completed by AskTriadParallel/AgentCommand ──
         // Build R1 results from shared context (chunks collected during R1 streaming)
@@ -352,7 +370,7 @@ internal partial class Program
         if (r1Results.Count < 1)
         {
             Console.Error.WriteLine("[DEBATE] No R1 context found — cannot proceed.");
-            SlackPostToThread("❌ No R1 context available for R2/R3.", "Moderator");
+            SlackPostToThread("❌ No R1 context available for R2/R3.", "🦉 Moderator");
             return;
         }
 
@@ -367,7 +385,7 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("[DEBATE] Early convergence in R1! Skipping R2/R3.");
             Console.ResetColor();
-            SlackPostToThread($"✅ *R1 Early Convergence* (Jaccard={r1Convergence:F2}) — debate skipped, consensus reached", "Moderator");
+            SlackPostToThread($"✅ *R1 Early Convergence* (Jaccard={r1Convergence:F2}) — debate skipped, consensus reached", "🦉 Moderator");
             PostDebateSummary(r1Results, 1);
             return;
         }
@@ -387,13 +405,13 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("[DEBATE] Convergence in R2! Skipping R3.");
             Console.ResetColor();
-            SlackPostToThread($"✅ *R2 Convergence* (Jaccard={r2Convergence:F2}) — R3 skipped", "Moderator");
+            SlackPostToThread($"✅ *R2 Convergence* (Jaccard={r2Convergence:F2}) — R3 skipped", "🦉 Moderator");
             PostDebateSummary(r2Results, 2);
             return;
         }
 
         // ── R3: Consensus loop — repeat until [미합의] is empty ──
-        SlackPostToThread("═══ *R3: Consensus Loop* ═══", "Moderator");
+        SlackPostToThread("═══ *R3: Consensus Loop* ═══", "🦉 Moderator");
         var currentResults = bestResults;
         List<TriadDebateLoop.RoundResult> r3Results = new();
         const int maxR3Loops = 3;
@@ -401,7 +419,7 @@ internal partial class Program
         for (int r3i = 0; r3i < maxR3Loops; r3i++)
         {
             Console.WriteLine($"[DEBATE:R3-{r3i + 1}] Consensus attempt {r3i + 1}/{maxR3Loops}");
-            SlackPostToThread($"🔄 *R3-{r3i + 1}* Consensus attempt", "Moderator");
+            SlackPostToThread($"🔄 *R3-{r3i + 1}* Consensus attempt", "🦉 Moderator");
 
             // Cascading consensus: AI-A first → AI-B sees A's items → AI-C sees A+B
             var priorConsensusItems = new List<string>(); // accumulates [합의] from earlier AIs
@@ -448,7 +466,7 @@ internal partial class Program
                     var haWords = haSection.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
                     if (haWords >= 100) hasConsensus = true;
                     else if (haWords > 0)
-                        SlackPostToThread($"⚠️ *[Moderator→{r.Ai}]* [합의] too brief ({haWords} words, need ≥100). 한국어 100단어 이상으로 다시!", "Moderator");
+                        SlackPostToThread($"⚠️ *[Moderator→{r.Ai}]* [합의] too brief ({haWords} words, need ≥100). 한국어 100단어 이상으로 다시!", "🦉 Moderator");
                 }
 
                 // Check [미합의]
@@ -472,7 +490,7 @@ internal partial class Program
             // Warn if no consensus content
             if (!hasConsensus && r3Results.Count > 0)
             {
-                SlackPostToThread("⚠️ *[Moderator]* No [합의] content found! AIs must state consensus.", "Moderator");
+                SlackPostToThread("⚠️ *[Moderator]* No [합의] content found! AIs must state consensus.", "🦉 Moderator");
                 // Treat as unresolved
                 if (unresolved.Count == 0) unresolved.Add("No consensus stated");
             }
@@ -559,7 +577,7 @@ internal partial class Program
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine($"[DEBATE:R3] {unverified.Count} unverified consensus items");
                         Console.ResetColor();
-                        SlackPostToThread(reportSb.ToString(), "Moderator");
+                        SlackPostToThread(reportSb.ToString(), "🦉 Moderator");
 
                         // ── Step 1: Broadcast full report to ALL AIs (공개 양식) ──
                         var broadcastSb = new StringBuilder();
@@ -609,7 +627,7 @@ internal partial class Program
                                 ctx.InjectToSingle(targetAi, dmSb.ToString());
 
                             // Slack에도 DM 내용 공개 (유저 모니터링용)
-                            SlackPostToThread($"📩 *[DM→{targetAi}]* {missingItems.Count}건 이의제기:\n{string.Join("\n", missingItems.Take(3).Select(m => $"  {m}"))}", "Moderator");
+                            SlackPostToThread($"📩 *[DM→{targetAi}]* {missingItems.Count}건 이의제기:\n{string.Join("\n", missingItems.Take(3).Select(m => $"  {m}"))}", "🦉 Moderator");
                         }
 
                         unresolved.Add($"Cross-check: {unverified.Count} unverified consensus items");
@@ -622,12 +640,12 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine($"[DEBATE:R3] Full consensus reached! (attempt {r3i + 1})");
                 Console.ResetColor();
-                SlackPostToThread($"✅ *Full consensus!* (R3-{r3i + 1})", "Moderator");
+                SlackPostToThread($"✅ *Full consensus!* (R3-{r3i + 1})", "🦉 Moderator");
                 break;
             }
 
             Console.WriteLine($"[DEBATE:R3] {unresolved.Count} unresolved items");
-            SlackPostToThread($"⚠️ *{unresolved.Count} 미합의 남음* → 다음 라운드", "Moderator");
+            SlackPostToThread($"⚠️ *{unresolved.Count} 미합의 남음* → 다음 라운드", "🦉 Moderator");
 
             // Inject unresolved items back for next round
             currentResults = r3Results;
@@ -699,7 +717,7 @@ internal partial class Program
             else if (!string.IsNullOrEmpty(opinion))
             {
                 sb.AppendLine($"  🗣️ *{r.Ai}*: {opinion} ⚠️(too brief)");
-                SlackPostToThread($"⚠️ *[Moderator→{r.Ai}]* Personal opinion too brief ({opinion.Length} chars). Express yourself fully!", "Moderator");
+                SlackPostToThread($"⚠️ *[Moderator→{r.Ai}]* Personal opinion too brief ({opinion.Length} chars). Express yourself fully!", "🦉 Moderator");
             }
             else
             {
@@ -708,9 +726,9 @@ internal partial class Program
             }
         }
 
-        SlackPostToThread(sb.ToString(), "Moderator");
+        SlackPostToThread(sb.ToString(), "🦉 Moderator");
         Console.WriteLine("[DEBATE] ═══ 정반합 토론 완료 ═══");
-        SlackPostToThread("═══ *정반합 토론 완료* ═══", "Moderator");
+        SlackPostToThread("═══ *정반합 토론 완료* ═══", "🦉 Moderator");
     }
 
     /// <summary>
@@ -725,7 +743,7 @@ internal partial class Program
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         Console.WriteLine("[CROSS] ═══ Real-time cross-prompting started ═══");
-        SlackPostToThread("🔄 *Real-time cross-prompting started!", "Moderator");
+        SlackPostToThread("🔄 *Real-time cross-prompting started!", "🦉 Moderator");
 
         var crossTasks = ais.Select(ai => Task.Run(async () =>
         {
@@ -782,13 +800,13 @@ internal partial class Program
                 {
                     var conv = TriadDebateLoop.CalculateConvergence(allResults);
                     Console.WriteLine($"[CROSS:{ai}] Convergence: {conv:F2} ({allResults.Count} AIs with 2+ claims)");
-                    SlackPostToThread($"📊 *[Convergence]* {conv:F2} ({allResults.Count} AIs)", "Moderator");
+                    SlackPostToThread($"📊 *[Convergence]* {conv:F2} ({allResults.Count} AIs)", "🦉 Moderator");
                     if (conv >= 0.6 && conv < 1.0 && !TriadDebateLoop.HasContradictions(allResults)) // 1.0 = suspicious
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine($"[CROSS] Convergence reached! ({conv:F2})");
                         Console.ResetColor();
-                        SlackPostToThread($"✅ *Convergence reached!* Jaccard={conv:F2} — debate complete", "Moderator");
+                        SlackPostToThread($"✅ *Convergence reached!* Jaccard={conv:F2} — debate complete", "🦉 Moderator");
                         return;
                     }
                 }
@@ -917,7 +935,7 @@ internal partial class Program
                         ? "You haven't started responding. Please begin your answer now."
                         : "Your response appears stalled. Please continue or wrap up.";
                     Console.WriteLine($"[DEBATE:INJECT] {ai}: stall detected ({lastChunkTime.Elapsed.TotalSeconds:F0}s) → nudge #{nudgeCount}");
-                    SlackPostToThread($"⏰ *[Moderator→{ai}]* {lastChunkTime.Elapsed.TotalSeconds:F0}초 무응답 — 재촉 #{nudgeCount}", "Moderator");
+                    SlackPostToThread($"⏰ *[Moderator→{ai}]* {lastChunkTime.Elapsed.TotalSeconds:F0}초 무응답 — 재촉 #{nudgeCount}", "🦉 Moderator");
                     await cdp.InsertContentEditableAsync(editorSel, $"[MODERATOR] ⏰ {stallMsg}");
                     await cdp.SendPromptAsync(editorSel);
                     lastChunkTime.Restart();
@@ -952,6 +970,6 @@ internal partial class Program
         var hasContradictions = TriadDebateLoop.HasContradictions(results);
         sb.AppendLine($"\n📊 Convergence: {convergence:F2} | Contradictions: {(hasContradictions ? "⚠ YES" : "✅ No")}");
 
-        SlackPostToThread(sb.ToString(), "Moderator");
+        SlackPostToThread(sb.ToString(), "🦉 Moderator");
     }
 }
