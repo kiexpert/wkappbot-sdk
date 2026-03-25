@@ -499,10 +499,10 @@ internal partial class Program
             // Global Eye tick (for eye --global multi-parent monitor)
             // Skip for grap/grep alias — EmitEyeTick calls FindLogicalHost which may leave pending
             // I/O (UIA/WMI) that prevents TerminateProcess from completing for ~28s.
-            if (!_fastExitAfterCommand)
+            if (!_fastExitAfterCommand && command != "mcp")
             {
                 try { EmitEyeTick(command, cmdTag, "start"); } catch { }
-                if (!GrepModeActive && !IsPipeMode) Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
+                if (!GrepModeActive && !IsPipeMode && command != "mcp") Console.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
                 try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
                 try
                 {
@@ -521,14 +521,15 @@ internal partial class Program
             var isEyeCommand = command == "eye"; // eye, eye tick, eye tick --timeout 등 전부 제외
             // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
             // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || _fastExitAfterCommand;
+            var isMcpCommand = command == "mcp";
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || isMcpCommand || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
             }
 
-            if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
-            if (!GrepModeActive && !GrapMode && !IsPipeMode) try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
+            if (!_fastExitAfterCommand && command != "mcp") try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
+            if (!GrepModeActive && !GrapMode && !IsPipeMode && command != "mcp") try { Console.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
             prof("dispatch");
 
             exitCode = command switch
