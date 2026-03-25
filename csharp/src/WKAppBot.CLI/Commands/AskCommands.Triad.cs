@@ -43,8 +43,8 @@ internal sealed class TriadSharedContext
     /// <summary>Register a CdpClient for an AI (needed for cross-prompt injection).</summary>
     public void RegisterCdp(string ai, WKAppBot.WebBot.CdpClient cdp) => _cdpClients[ai] = cdp;
 
-    /// <summary>When true, cross-prompting is active (R1+). During R0 (free answer), this is false.</summary>
-    public bool CrossPromptEnabled { get; set; } = false;
+    /// <summary>When true, moderator intervenes (STANCE check, format enforcement). Off during R0.</summary>
+    public bool ModeratorEnabled { get; set; } = false;
 
     /// <summary>Update latest response chunk + broadcast to Slack + queue for other AIs.</summary>
     public void UpdateChunk(string ai, string chunk)
@@ -53,8 +53,8 @@ internal sealed class TriadSharedContext
         _latestChunks[ai] = chunk;
         _chunkVersions.AddOrUpdate(ai, 1, (_, v) => v + 1);
 
-        // First chunk: check for STANCE compliance (only during debate rounds, not R0)
-        if (CrossPromptEnabled && prev.Length == 0 && chunk.Length > 50)
+        // First chunk: check for STANCE compliance (only when moderator active, not R0)
+        if (ModeratorEnabled && prev.Length == 0 && chunk.Length > 50)
         {
             var stance = TriadDebateLoop.ParseStance(chunk);
             if (stance != null)
@@ -128,9 +128,7 @@ internal sealed class TriadSharedContext
             var queue = _crossPromptQueues.GetOrAdd(peerAi, _ => new ConcurrentQueue<(string, string)>());
             queue.Enqueue((ai, snippet));
 
-            // Skip cross-prompt injection during R0 (free answer phase)
-            if (!CrossPromptEnabled) continue;
-
+            // Cross-prompt always ON (streaming peer answers = natural nudge)
             // Pre-type into peer's editor + post to Slack
             _ = Task.Run(async () =>
             {
