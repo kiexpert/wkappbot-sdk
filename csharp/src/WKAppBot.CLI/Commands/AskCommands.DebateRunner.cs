@@ -315,16 +315,34 @@ internal partial class Program
                 sb.AppendLine($"  • [{ai}] {c[..Math.Min(100, c.Length)]}");
         }
 
-        // Extract personal opinions [MY_OPINION_KR] or [CONCLUSION_KR]
+        // Extract personal opinions [개인의견] or [CONCLUSION_KR]
         sb.AppendLine("\n*[개인의견]*");
         foreach (var r in finalResults)
         {
-            var krStart = r.Summary.IndexOf("[CONCLUSION_KR]");
-            var krEnd = r.Summary.IndexOf("[/CONCLUSION_KR]");
-            if (krStart >= 0 && krEnd > krStart)
+            string? opinion = null;
+            // Try [개인의견] first
+            var opStart = r.Summary.IndexOf("[개인의견]");
+            var opEnd = r.Summary.IndexOf("[/CONCLUSION_KR]");
+            if (opEnd < 0) opEnd = r.Summary.Length;
+            if (opStart >= 0)
+                opinion = r.Summary[(opStart + "[개인의견]".Length)..Math.Min(opEnd, r.Summary.Length)].Trim();
+            // Fallback: [CONCLUSION_KR]
+            if (string.IsNullOrEmpty(opinion))
             {
-                var kr = r.Summary[(krStart + "[CONCLUSION_KR]".Length)..krEnd].Trim();
-                sb.AppendLine($"  🗣️ *{r.Ai}*: {kr[..Math.Min(200, kr.Length)]}");
+                var krStart = r.Summary.IndexOf("[CONCLUSION_KR]");
+                var krEnd = r.Summary.IndexOf("[/CONCLUSION_KR]");
+                if (krStart >= 0 && krEnd > krStart)
+                    opinion = r.Summary[(krStart + "[CONCLUSION_KR]".Length)..krEnd].Trim();
+            }
+
+            if (!string.IsNullOrEmpty(opinion) && opinion.Length >= 100)
+            {
+                sb.AppendLine($"  🗣️ *{r.Ai}*: {opinion[..Math.Min(300, opinion.Length)]}");
+            }
+            else if (!string.IsNullOrEmpty(opinion))
+            {
+                sb.AppendLine($"  🗣️ *{r.Ai}*: {opinion} ⚠️(too brief)");
+                SlackPostToThread($"⚠️ *[Moderator→{r.Ai}]* Personal opinion too brief ({opinion.Length} chars). Express yourself fully!", "Moderator");
             }
             else
             {
