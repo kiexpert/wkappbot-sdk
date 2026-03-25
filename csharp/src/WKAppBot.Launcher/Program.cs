@@ -746,88 +746,327 @@ class Program
         CloseHandle(pi.hThread);
         Console.Error.WriteLine($"[LAUNCHER:MCP] core started via pipe (pid={pi.dwProcessId})");
 
-        // Relay: ConPTY stdin → pipe → Core
+        // ── State machine for MCP relay ──
+        // Tracks JSON-RPC requests by id for routing during elevation handoff
+        var _inflight = new Dictionary<string, string>(); // id → raw request line
+        var _gate = new object();
+        var _outLock = new object();
+        string? _initializeLine = null; // cached for admin Core synthetic init
+        IntPtr _activeStdinWrite = hCoreStdinWrite; // current target for new requests
+        IntPtr _adminStdinWrite = IntPtr.Zero;
+        IntPtr _adminStdoutRead = IntPtr.Zero;
+        IntPtr _adminProc = IntPtr.Zero;
+        string? _elevationRequestLine = null; // saved for re-send to admin Core
+        bool _adminMode = false;
+
+        // Stdin router: line-buffered, tracks JSON-RPC id, routes to active Core
         var stdinRelay = new Thread(() =>
         {
-            var hIn = GetStdHandle(-10); // our stdin from ConPTY
-            Console.Error.WriteLine($"[LAUNCHER:MCP] stdin relay: hIn=0x{hIn:X}, valid={hIn != IntPtr.Zero && hIn != INVALID_HANDLE}");
-            Console.Error.Flush();
+            var hIn = GetStdHandle(-10);
             var buf = new byte[4096];
-            bool ok = ReadFile(hIn, buf, (uint)buf.Length, out uint n, IntPtr.Zero);
-            Console.Error.WriteLine($"[LAUNCHER:MCP] stdin first ReadFile: ok={ok} n={n} err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
-            Console.Error.Flush();
-            if (ok && n > 0)
+            var lineBuf = new System.Text.StringBuilder();
+
+            while (ReadFile(hIn, buf, (uint)buf.Length, out uint n, IntPtr.Zero) && n > 0)
             {
-                WriteFile(hCoreStdinWrite, buf, n, out _, IntPtr.Zero);
-                FlushFileBuffers(hCoreStdinWrite);
-                while (ReadFile(hIn, buf, (uint)buf.Length, out n, IntPtr.Zero) && n > 0)
+                lineBuf.Append(System.Text.Encoding.UTF8.GetString(buf, 0, (int)n));
+                var acc = lineBuf.ToString();
+                int nlIdx;
+                while ((nlIdx = acc.IndexOf('\n')) >= 0)
                 {
-                    WriteFile(hCoreStdinWrite, buf, n, out _, IntPtr.Zero);
-                    FlushFileBuffers(hCoreStdinWrite);
+                    var line = acc[..nlIdx].TrimEnd('\r');
+                    acc = acc[(nlIdx + 1)..];
+
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    // Extract JSON-RPC id
+                    var id = ExtractJsonRpcId(line);
+
+                    lock (_gate)
+                    {
+                        // Cache initialize for admin Core replay
+                        if (line.Contains("\"method\":\"initialize\""))
+                            _initializeLine = line;
+
+                        // Track in-flight requests
+                        if (id != null)
+                            _inflight[id] = line;
+
+                        // Route to active Core
+                        var target = _activeStdinWrite;
+                        if (target != IntPtr.Zero)
+                        {
+                            var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
+                            WriteFile(target, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
+                            FlushFileBuffers(target);
+                        }
+                    }
                 }
+                lineBuf.Clear();
+                if (acc.Length > 0) lineBuf.Append(acc);
             }
-            CloseHandle(hCoreStdinWrite); // EOF to Core
-        }) { IsBackground = true, Name = "mcp-stdin-relay" };
+
+            // ConPTY stdin EOF → close all Core stdins
+            lock (_gate)
+            {
+                if (_activeStdinWrite != IntPtr.Zero) { CloseHandle(_activeStdinWrite); _activeStdinWrite = IntPtr.Zero; }
+                if (_adminStdinWrite != IntPtr.Zero) { CloseHandle(_adminStdinWrite); _adminStdinWrite = IntPtr.Zero; }
+            }
+        }) { IsBackground = true, Name = "mcp-stdin-router" };
         stdinRelay.Start();
 
-        // Relay: Core → pipe → ConPTY stdout (with elevation intercept)
+        // ── Normal Core stdout relay (main thread) ──
         var hOut = GetStdHandle(-11);
-        IntPtr hAdminStdinWrite = IntPtr.Zero, hAdminStdoutRead = IntPtr.Zero, hAdminProc = IntPtr.Zero;
-        string? lastStdinRequest = null; // track last request for re-send on elevation
 
-        // Stdin relay also saves last request line
-        // (already running on stdinRelay thread — we track via shared variable)
-
-        // Stdout relay: line-buffered to detect _elevationRequired
-        var outBuf = new byte[4096];
-        var lineBuf = new System.Text.StringBuilder();
-        while (ReadFile(hCoreStdoutRead, outBuf, (uint)outBuf.Length, out uint outN, IntPtr.Zero) && outN > 0)
+        // Shared helper: relay one Core's stdout to hOut, with elevation detection
+        void RelayStdout(IntPtr hRead, string label, bool detectElevation)
         {
-            var chunk = System.Text.Encoding.UTF8.GetString(outBuf, 0, (int)outN);
-            lineBuf.Append(chunk);
-
-            // Process complete lines
-            string accumulated = lineBuf.ToString();
-            int newlineIdx;
-            while ((newlineIdx = accumulated.IndexOf('\n')) >= 0)
+            var outBuf = new byte[4096];
+            var outLineBuf = new System.Text.StringBuilder();
+            while (ReadFile(hRead, outBuf, (uint)outBuf.Length, out uint outN, IntPtr.Zero) && outN > 0)
             {
-                var line = accumulated[..newlineIdx];
-                accumulated = accumulated[(newlineIdx + 1)..];
-
-                // Check for elevation signal
-                if (line.Contains("\"_elevationRequired\":true"))
+                outLineBuf.Append(System.Text.Encoding.UTF8.GetString(outBuf, 0, (int)outN));
+                var acc = outLineBuf.ToString();
+                int nlIdx;
+                while ((nlIdx = acc.IndexOf('\n')) >= 0)
                 {
-                    Console.Error.WriteLine("[LAUNCHER:MCP] Elevation required — spawning admin Core");
-                    // TODO: spawn admin Core pipe, re-send last request, relay response
-                    // For now: pass through the error (client sees isError=true)
-                    Console.Error.WriteLine("[LAUNCHER:MCP] Admin re-route not yet implemented — passing error through");
-                }
+                    var line = acc[..nlIdx].TrimEnd('\r');
+                    acc = acc[(nlIdx + 1)..];
 
-                // Write line + newline to stdout
-                var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
-                WriteFile(hOut, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
-                FlushFileBuffers(hOut);
+                    // Elevation intercept
+                    if (detectElevation && line.Contains("\"_elevationRequired\":true"))
+                    {
+                        var failedId = ExtractJsonRpcId(line);
+                        Console.Error.WriteLine($"[LAUNCHER:MCP] Elevation required (id={failedId}) — spawning admin Core");
+
+                        // Save the original request for re-send
+                        string? savedRequest = null;
+                        lock (_gate)
+                        {
+                            if (failedId != null && _inflight.TryGetValue(failedId, out var req))
+                                savedRequest = req;
+                        }
+                        _elevationRequestLine = savedRequest;
+
+                        // Spawn admin Core on background thread (runas blocks on UAC)
+                        new Thread(() => SpawnAdminCore(core, args, _initializeLine, _elevationRequestLine,
+                            ref _adminStdinWrite, ref _adminStdoutRead, ref _adminProc, ref _activeStdinWrite,
+                            ref _adminMode, hCoreStdinWrite, hOut, _gate, _outLock, _inflight))
+                        { IsBackground = true, Name = "mcp-admin-spawn" }.Start();
+
+                        continue; // suppress elevation error from reaching client
+                    }
+
+                    // Remove from inflight
+                    var id = ExtractJsonRpcId(line);
+                    if (id != null)
+                        lock (_gate) { _inflight.Remove(id); }
+
+                    // Forward to client
+                    lock (_outLock)
+                    {
+                        var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
+                        WriteFile(hOut, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
+                        FlushFileBuffers(hOut);
+                    }
+                }
+                outLineBuf.Clear();
+                if (acc.Length > 0) outLineBuf.Append(acc);
             }
-            lineBuf.Clear();
-            if (accumulated.Length > 0) lineBuf.Append(accumulated);
+            // Flush remaining
+            if (outLineBuf.Length > 0)
+            {
+                lock (_outLock)
+                {
+                    var rem = System.Text.Encoding.UTF8.GetBytes(outLineBuf.ToString());
+                    WriteFile(hOut, rem, (uint)rem.Length, out _, IntPtr.Zero);
+                    FlushFileBuffers(hOut);
+                }
+            }
+            CloseHandle(hRead);
+            Console.Error.WriteLine($"[LAUNCHER:MCP] {label} stdout EOF");
         }
-        // Flush remaining
-        if (lineBuf.Length > 0)
+
+        // Run normal Core relay on main thread
+        RelayStdout(hCoreStdoutRead, "normal-core", detectElevation: true);
+
+        // If admin Core was spawned, wait for it too
+        if (_adminProc != IntPtr.Zero)
         {
-            var rem = System.Text.Encoding.UTF8.GetBytes(lineBuf.ToString());
-            WriteFile(hOut, rem, (uint)rem.Length, out _, IntPtr.Zero);
-            FlushFileBuffers(hOut);
+            WaitForSingleObject(_adminProc, 0xFFFFFFFF);
+            GetExitCodeProcess(_adminProc, out uint adminExit);
+            CloseHandle(_adminProc);
+            Console.Error.WriteLine($"[LAUNCHER:MCP] admin core exited (code={adminExit})");
         }
-        CloseHandle(hCoreStdoutRead);
-        if (hAdminStdinWrite != IntPtr.Zero) CloseHandle(hAdminStdinWrite);
-        if (hAdminStdoutRead != IntPtr.Zero) CloseHandle(hAdminStdoutRead);
-        if (hAdminProc != IntPtr.Zero) { WaitForSingleObject(hAdminProc, 5000); CloseHandle(hAdminProc); }
 
         WaitForSingleObject(pi.hProcess, 5000);
         GetExitCodeProcess(pi.hProcess, out uint exitCode2);
         CloseHandle(pi.hProcess);
         Console.Error.WriteLine($"[LAUNCHER:MCP] core exited (code={exitCode2})");
         return (int)exitCode2;
+    }
+
+    /// <summary>Extract JSON-RPC "id" from a JSON line (naive string search, sufficient for MCP).</summary>
+    static string? ExtractJsonRpcId(string line)
+    {
+        // Find "id": followed by value (number or string)
+        var idx = line.IndexOf("\"id\"", StringComparison.Ordinal);
+        if (idx < 0) return null;
+        var colonIdx = line.IndexOf(':', idx + 4);
+        if (colonIdx < 0) return null;
+        var rest = line[(colonIdx + 1)..].TrimStart();
+        if (rest.Length == 0) return null;
+        if (rest[0] == '"')
+        {
+            var endQuote = rest.IndexOf('"', 1);
+            return endQuote > 0 ? rest[1..endQuote] : null;
+        }
+        // Numeric id
+        int end = 0;
+        while (end < rest.Length && (char.IsDigit(rest[end]) || rest[end] == '-')) end++;
+        return end > 0 ? rest[..end] : null;
+    }
+
+    [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern bool ShellExecuteExW(ref SHELLEXECUTEINFOW lpExecInfo);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    struct SHELLEXECUTEINFOW
+    {
+        public uint cbSize;
+        public uint fMask;
+        public IntPtr hwnd;
+        public string lpVerb;
+        public string lpFile;
+        public string lpParameters;
+        public string? lpDirectory;
+        public int nShow;
+        public IntPtr hInstApp;
+        public IntPtr lpIDList;
+        public string? lpClass;
+        public IntPtr hkeyClass;
+        public uint dwHotKey;
+        public IntPtr hIcon; // union with hMonitor
+        public IntPtr hProcess;
+    }
+
+    const uint SEE_MASK_NOCLOSEPROCESS = 0x00000040;
+
+    /// <summary>Spawn elevated admin Core with named pipes for MCP relay.</summary>
+    static void SpawnAdminCore(string corePath, string[] mcpArgs,
+        string? initLine, string? elevationRequestLine,
+        ref IntPtr adminStdinWrite, ref IntPtr adminStdoutRead, ref IntPtr adminProc,
+        ref IntPtr activeStdinWrite, ref bool adminMode,
+        IntPtr oldCoreStdinWrite, IntPtr hOut, object gate, object outLock,
+        Dictionary<string, string> inflight)
+    {
+        var pipeName = $"wkappbot-mcp-admin-{Environment.ProcessId}";
+        var stdinPipeName = $"{pipeName}-stdin";
+        var stdoutPipeName = $"{pipeName}-stdout";
+
+        // Launch admin Core via ShellExecuteExW runas
+        var paramStr = $"mcp --admin-pipes {stdinPipeName} {stdoutPipeName}";
+        var sei = new SHELLEXECUTEINFOW
+        {
+            cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<SHELLEXECUTEINFOW>(),
+            fMask = SEE_MASK_NOCLOSEPROCESS,
+            lpVerb = "runas",
+            lpFile = corePath,
+            lpParameters = paramStr,
+            nShow = 0, // SW_HIDE
+        };
+
+        Console.Error.WriteLine($"[LAUNCHER:MCP] Requesting admin elevation (runas)...");
+        if (!ShellExecuteExW(ref sei))
+        {
+            var err = System.Runtime.InteropServices.Marshal.GetLastWin32Error();
+            Console.Error.WriteLine($"[LAUNCHER:MCP] UAC denied or failed (err={err})");
+            // Send error for the elevation-failed request
+            if (elevationRequestLine != null)
+            {
+                var failId = ExtractJsonRpcId(elevationRequestLine);
+                var errJson = $"{{\"jsonrpc\":\"2.0\",\"id\":{failId},\"error\":{{\"code\":-32001,\"message\":\"Elevation denied by user\"}}}}\n";
+                lock (outLock)
+                {
+                    var errBytes = System.Text.Encoding.UTF8.GetBytes(errJson);
+                    WriteFile(hOut, errBytes, (uint)errBytes.Length, out _, IntPtr.Zero);
+                    FlushFileBuffers(hOut);
+                }
+                lock (gate) { if (failId != null) inflight.Remove(failId); }
+            }
+            return;
+        }
+
+        Console.Error.WriteLine($"[LAUNCHER:MCP] Admin Core launched (pid=?) — waiting for pipe connection (60s)...");
+        adminProc = sei.hProcess;
+
+        // Wait for admin Core to connect to named pipes (it uses NamedPipeClientStream)
+        // We create server-side named pipes that admin Core connects to
+        try
+        {
+            using var pipeStdinServer = new System.IO.Pipes.NamedPipeServerStream(stdinPipeName,
+                System.IO.Pipes.PipeDirection.Out, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.None);
+            using var pipeStdoutServer = new System.IO.Pipes.NamedPipeServerStream(stdoutPipeName,
+                System.IO.Pipes.PipeDirection.In, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.None);
+
+            // Wait for connections (60s timeout for UAC)
+            var cts = new System.Threading.CancellationTokenSource(60_000);
+            pipeStdinServer.WaitForConnectionAsync(cts.Token).GetAwaiter().GetResult();
+            pipeStdoutServer.WaitForConnectionAsync(cts.Token).GetAwaiter().GetResult();
+            Console.Error.WriteLine("[LAUNCHER:MCP] Admin Core connected to pipes!");
+
+            // Transition: close old Core stdin (drain), switch to admin
+            lock (gate)
+            {
+                CloseHandle(oldCoreStdinWrite); // EOF to old Core → drain remaining work
+                activeStdinWrite = IntPtr.Zero; // temporarily null until we set up admin pipe handle
+                adminMode = true;
+            }
+
+            // Send initialize + elevation request to admin Core
+            var stdinWriter = new System.IO.StreamWriter(pipeStdinServer, new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+            if (initLine != null) stdinWriter.WriteLine(initLine);
+            // Wait briefly for initialize response (read and forward)
+            var stdoutReader = new System.IO.StreamReader(pipeStdoutServer, System.Text.Encoding.UTF8);
+            var initResp = stdoutReader.ReadLine(); // initialize response
+            if (initResp != null)
+            {
+                // Don't forward init response (client already initialized)
+                Console.Error.WriteLine($"[LAUNCHER:MCP] Admin init OK: {initResp[..Math.Min(80, initResp.Length)]}...");
+            }
+
+            // Re-send the elevation-failed request
+            if (elevationRequestLine != null)
+            {
+                stdinWriter.WriteLine(elevationRequestLine);
+                Console.Error.WriteLine($"[LAUNCHER:MCP] Re-sent elevation request to admin Core");
+            }
+
+            // Relay admin Core stdout on this thread
+            string? adminLine;
+            while ((adminLine = stdoutReader.ReadLine()) != null)
+            {
+                var id = ExtractJsonRpcId(adminLine);
+                if (id != null)
+                    lock (gate) { inflight.Remove(id); }
+
+                lock (outLock)
+                {
+                    var lineBytes = System.Text.Encoding.UTF8.GetBytes(adminLine + "\n");
+                    WriteFile(hOut, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
+                    FlushFileBuffers(hOut);
+                }
+            }
+            Console.Error.WriteLine("[LAUNCHER:MCP] Admin Core stdout EOF");
+        }
+        catch (OperationCanceledException)
+        {
+            Console.Error.WriteLine("[LAUNCHER:MCP] Admin Core connection timeout (60s) — elevation failed");
+            try { TerminateProcess(adminProc, 1); } catch { }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[LAUNCHER:MCP] Admin Core error: {ex.Message}");
+        }
     }
 
     /// <param name="fastExitTimeoutMs">If >0, kills Core if it doesn't exit within this time (ms) and returns exit 0.
