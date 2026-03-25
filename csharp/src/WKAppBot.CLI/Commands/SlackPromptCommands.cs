@@ -133,13 +133,36 @@ internal partial class Program
 
         var senderName = GetSendReplyUsername(printDecision: true);
 
+        // Detect completion/report messages by Claude's report format patterns
+        static bool IsCompletionMessage(string text)
+        {
+            // Check marks (emoji or Slack shortcode)
+            if (text.Contains("✅") || text.Contains(":white_check_mark:")) return true;
+            // Bullet list + completion keyword (typical report format)
+            bool hasBullets = text.Contains("• ") || text.Contains("- ") || text.Contains("✅");
+            bool hasCompletion = text.Contains("완료") || text.Contains("수정") || text.Contains("성공")
+                || text.Contains("리졸브") || text.Contains("커밋") || text.Contains("fixed")
+                || text.Contains("Done") || text.Contains("Complete");
+            if (hasBullets && hasCompletion) return true;
+            // Debate/test results
+            if (text.Contains("═══") && text.Contains("완료")) return true;
+            if (text.Contains("PASS") && text.Contains("FAIL")) return true;
+            return false;
+        }
+
         // Thread reply: send as-is (no splitting — already in thread context).
         // Channel post (no threadTs): use PostWithOverflow — first paragraph + overflow as thread.
         bool hasTargetThread = !string.IsNullOrEmpty(threadTs);
         bool ok;
         string? postedTs = null;
+
+        // Auto-broadcast: completion/report messages also appear in channel
+        bool autoBroadcast = hasTargetThread && IsCompletionMessage(replyText);
+        if (autoBroadcast)
+            Console.WriteLine("[SLACK] Auto-broadcast: completion message detected");
+
         if (hasTargetThread)
-            (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName).GetAwaiter().GetResult();
+            (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName, replyBroadcast: autoBroadcast).GetAwaiter().GetResult();
         else
             (ok, postedTs) = PostWithOverflow(botToken, channel, replyText, username: senderName);
 
