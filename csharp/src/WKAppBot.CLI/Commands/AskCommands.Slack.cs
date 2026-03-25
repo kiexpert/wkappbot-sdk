@@ -110,14 +110,62 @@ internal partial class Program
             for (int pos = 0; pos < msg.Length; pos += chunkSize)
             {
                 var chunk = msg[pos..Math.Min(pos + chunkSize, msg.Length)];
-                var (ok, ts) = SlackSendViaApi(botToken, channel, chunk,
-                    threadTs: sessionTs, username: uname).GetAwaiter().GetResult();
+                // Extract emoji from username for icon_emoji (e.g. "🦊 GPT(SKEPTIC)" → ":fox:")
+                var iconEmoji = ExtractDebateIconEmoji(uname);
+                var (ok, ts) = SlackSendViaApiWithIcon(botToken, channel, chunk,
+                    threadTs: sessionTs, username: uname, iconEmoji: iconEmoji).GetAwaiter().GetResult();
                 if (ok && ts != null && pos == 0) newMsgTs = ts;
             }
             if (newMsgTs != null)
                 _slackThreadLastPost[sessionTs] = (newMsgTs, uname, msg.Length > SlackMaxAppendLength ? msg[..SlackMaxAppendLength] : msg);
         }
         catch { }
+    }
+
+    /// <summary>Map Unicode emoji in username to Slack :shortcode: for icon_emoji.</summary>
+    static string? ExtractDebateIconEmoji(string? username) => username switch
+    {
+        _ when username?.Contains("🦉") == true => ":owl:",
+        _ when username?.Contains("🦊") == true => ":fox_face:",
+        _ when username?.Contains("🐬") == true => ":dolphin:",
+        _ when username?.Contains("🐙") == true => ":octopus:",
+        _ => null,
+    };
+
+    /// <summary>SlackSendViaApi wrapper that injects icon_emoji for debate posts.</summary>
+    static async Task<(bool ok, string? ts)> SlackSendViaApiWithIcon(
+        string botToken, string channel, string text,
+        string? threadTs = null, string? username = null, string? iconEmoji = null)
+    {
+        using var http = new HttpClient();
+        var dict = new Dictionary<string, object> { ["channel"] = channel, ["text"] = text };
+        if (!string.IsNullOrEmpty(threadTs)) dict["thread_ts"] = threadTs;
+        if (!string.IsNullOrEmpty(username)) dict["username"] = username;
+        if (!string.IsNullOrEmpty(iconEmoji)) dict["icon_emoji"] = iconEmoji;
+        else
+        {
+            // Fall back to workspace custom icon
+            var callerCwd = EyeCmdPipeServer.CallerCwd.Value;
+            var icon = GetCustomSlackIcon(callerCwd);
+            if (icon != null)
+            {
+                if (icon.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                    dict["icon_url"] = icon;
+                else
+                    dict["icon_emoji"] = icon;
+            }
+        }
+        var payload = System.Text.Json.JsonSerializer.Serialize(dict);
+        var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+        using var req = new HttpRequestMessage(HttpMethod.Post, "https://slack.com/api/chat.postMessage");
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+        req.Content = content;
+        var resp = await http.SendAsync(req);
+        var body = await resp.Content.ReadAsStringAsync();
+        var json = System.Text.Json.JsonDocument.Parse(body);
+        var ok = json.RootElement.GetProperty("ok").GetBoolean();
+        var ts = json.RootElement.TryGetProperty("ts", out var tsProp) ? tsProp.GetString() : null;
+        return (ok, ts);
     }
 
     /// <summary>
