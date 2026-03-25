@@ -365,6 +365,10 @@ class Program
     static extern bool SetHandleInformation(IntPtr h, uint mask, uint flags);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
     static extern bool ReadFile(IntPtr h, byte[] buf, uint toRead, out uint read, IntPtr ov);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool WriteFile(IntPtr h, byte[] buf, uint toWrite, out uint written, IntPtr ov);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern bool FlushFileBuffers(IntPtr h);
     const uint HANDLE_FLAG_INHERIT = 0x1;
     const uint STARTF_USESTDHANDLES = 0x100;
     static readonly IntPtr INVALID_HANDLE = new IntPtr(-1);
@@ -702,20 +706,20 @@ class Program
 
         var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
 
-        // MCP mode: Launcher cannot reliably relay stdin/stdout due to ConPTY/NativeAOT
-        // handle inheritance issues. Instead, exec Core directly — Launcher replaces itself.
-        // Hot-swap: MCP client reconnects on disconnect (standard MCP behavior).
-        Console.Error.WriteLine($"[LAUNCHER:MCP] exec → {core} (direct stdio)");
-        Console.Error.Flush();
+        // MCP mode: pipe-based relay (same pattern as Eye↔Core).
+        // ConPTY doesn't pass stdin to grandchild, so we pipe explicitly:
+        //   Claude Code → ConPTY → Launcher (ReadFile stdin → WriteFile pipe) → Core
+        //   Core → pipe → Launcher (ReadFile pipe → WriteFile stdout) → ConPTY → Claude Code
 
-        // Replace Launcher process with Core (Windows doesn't have exec(), so we use
-        // CreateProcess with our own std handles and TerminateProcess self after).
-        var hStdin  = GetStdHandle(-10);
-        var hStdout = GetStdHandle(-11);
-        var hStderr = GetStdHandle(-12);
-        SetHandleInformation(hStdin,  HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-        SetHandleInformation(hStdout, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-        SetHandleInformation(hStderr, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+        // Create stdin pipe: Launcher writes → Core reads
+        if (!CreatePipe(out var hCoreStdinRead, out var hCoreStdinWrite, IntPtr.Zero, 0))
+        { Console.Error.WriteLine("[LAUNCHER:MCP] CreatePipe(stdin) failed"); return 1; }
+        SetHandleInformation(hCoreStdinRead, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+
+        // Create stdout pipe: Core writes → Launcher reads
+        if (!CreatePipe(out var hCoreStdoutRead, out var hCoreStdoutWrite, IntPtr.Zero, 0))
+        { CloseHandle(hCoreStdinRead); CloseHandle(hCoreStdinWrite); Console.Error.WriteLine("[LAUNCHER:MCP] CreatePipe(stdout) failed"); return 1; }
+        SetHandleInformation(hCoreStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
 
         var cmdSb = new StringBuilder($"\"{core.Replace("\"", "\\\"")}\"");
         foreach (var a in args) cmdSb.Append(" \"").Append(a.Replace("\"", "\\\"")).Append('"');
@@ -724,21 +728,62 @@ class Program
         {
             cb = System.Runtime.InteropServices.Marshal.SizeOf<STARTUPINFOW>(),
             dwFlags = STARTF_USESTDHANDLES,
-            hStdInput  = hStdin,
-            hStdOutput = hStdout,
-            hStdError  = hStderr,
+            hStdInput  = hCoreStdinRead,   // Core reads from this pipe
+            hStdOutput = hCoreStdoutWrite,  // Core writes to this pipe
+            hStdError  = GetStdHandle(-12), // stderr inherited directly
         };
         if (!CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, true,
             CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, null, ref si, out var pi))
         {
             Console.Error.WriteLine($"[LAUNCHER:MCP] CreateProcess failed (err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()})");
+            CloseHandle(hCoreStdinRead); CloseHandle(hCoreStdinWrite);
+            CloseHandle(hCoreStdoutRead); CloseHandle(hCoreStdoutWrite);
             return 1;
         }
-        Console.Error.WriteLine($"[LAUNCHER:MCP] core pid={pi.dwProcessId} — Launcher waiting");
+        // Close child-side handles in parent
+        CloseHandle(hCoreStdinRead);
+        CloseHandle(hCoreStdoutWrite);
         CloseHandle(pi.hThread);
-        WaitForSingleObject(pi.hProcess, 0xFFFFFFFF);
+        Console.Error.WriteLine($"[LAUNCHER:MCP] core started via pipe (pid={pi.dwProcessId})");
+
+        // Relay: ConPTY stdin → pipe → Core
+        var stdinRelay = new Thread(() =>
+        {
+            var hIn = GetStdHandle(-10); // our stdin from ConPTY
+            Console.Error.WriteLine($"[LAUNCHER:MCP] stdin relay: hIn=0x{hIn:X}, valid={hIn != IntPtr.Zero && hIn != INVALID_HANDLE}");
+            Console.Error.Flush();
+            var buf = new byte[4096];
+            bool ok = ReadFile(hIn, buf, (uint)buf.Length, out uint n, IntPtr.Zero);
+            Console.Error.WriteLine($"[LAUNCHER:MCP] stdin first ReadFile: ok={ok} n={n} err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
+            Console.Error.Flush();
+            if (ok && n > 0)
+            {
+                WriteFile(hCoreStdinWrite, buf, n, out _, IntPtr.Zero);
+                FlushFileBuffers(hCoreStdinWrite);
+                while (ReadFile(hIn, buf, (uint)buf.Length, out n, IntPtr.Zero) && n > 0)
+                {
+                    WriteFile(hCoreStdinWrite, buf, n, out _, IntPtr.Zero);
+                    FlushFileBuffers(hCoreStdinWrite);
+                }
+            }
+            CloseHandle(hCoreStdinWrite); // EOF to Core
+        }) { IsBackground = true, Name = "mcp-stdin-relay" };
+        stdinRelay.Start();
+
+        // Relay: Core → pipe → ConPTY stdout
+        var hOut = GetStdHandle(-11); // our stdout to ConPTY
+        var outBuf = new byte[4096];
+        while (ReadFile(hCoreStdoutRead, outBuf, (uint)outBuf.Length, out uint outN, IntPtr.Zero) && outN > 0)
+        {
+            WriteFile(hOut, outBuf, outN, out _, IntPtr.Zero);
+            FlushFileBuffers(hOut);
+        }
+        CloseHandle(hCoreStdoutRead);
+
+        WaitForSingleObject(pi.hProcess, 5000);
         GetExitCodeProcess(pi.hProcess, out uint exitCode2);
         CloseHandle(pi.hProcess);
+        Console.Error.WriteLine($"[LAUNCHER:MCP] core exited (code={exitCode2})");
         return (int)exitCode2;
     }
 
