@@ -687,7 +687,7 @@ internal partial class Program
             if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return null;
 
             var qTrunc = question.Length > 200 ? question[..200] + "..." : question;
-            var (ok, ts) = SlackSendViaApi(botToken, channel, $"*[{label}]* {qTrunc}", username: BotUsername)
+            var (ok, ts) = SlackSendViaApi(botToken, channel, $"*[{label}]* {qTrunc}", username: GetSendReplyUsername())
                                .GetAwaiter().GetResult();
             if (ok) _slackSessionThreadTs.Value = ts;
             return ok ? ts : null;
@@ -716,7 +716,7 @@ internal partial class Program
             while (pos < answer.Length)
             {
                 var chunk = answer[pos..Math.Min(pos + chunkSize, answer.Length)];
-                SlackSendViaApi(botToken, channel, chunk, threadTs: ts, username: BotUsername).GetAwaiter().GetResult();
+                SlackSendViaApi(botToken, channel, chunk, threadTs: ts, username: GetSendReplyUsername()).GetAwaiter().GetResult();
                 pos += chunkSize;
                 part++;
             }

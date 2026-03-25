@@ -260,7 +260,7 @@ Examples:
             {
                 // Use SlackSendWithThread: auto-splits long messages (header → channel, overflow → thread)
                 var (ok, ts) = PostWithOverflow(botToken, channel,
-                    debateMode ? $"*[정반합]* {question}" : $"*[🔱 TRIAD]* {question}", username: BotUsername);
+                    debateMode ? $"*[정반합]* {question}" : $"*[🔱 TRIAD]* {question}", username: GetSendReplyUsername());
                 if (ok && ts != null)
                 {
                     _slackSessionThreadTs.Value = ts;
