@@ -397,10 +397,21 @@ internal partial class Program
 
                 if (claudeStatus != null)
                 {
-                    if (claudeStatus.Item1 == "executing")
-                        state.LastExecutingText = claudeStatus.Item2;
+                    var statusText = claudeStatus.Item2;
 
-                    combinedStatusText = $"{label}Claude: {claudeStatus.Item2}";
+                    // Skip prompt edit node placeholder: pure ASCII short text from the input field
+                    // (e.g. "ctrl esc to focus or unfocus Claude", "Type a message")
+                    // Real AI output always contains non-ASCII chars or is longer than placeholder
+                    bool isEditPlaceholder = statusText != null
+                        && claudeStatus.Item1 == "prompt_ready" // only from prompt edit node
+                        && statusText.Length < 80
+                        && statusText.Length > 0
+                        && !statusText.Any(c => c > 0x7F); // pure ASCII = placeholder
+
+                    if (claudeStatus.Item1 == "executing" && statusText != null)
+                        state.LastExecutingText = statusText;
+
+                    combinedStatusText = isEditPlaceholder ? null : $"{label}Claude: {statusText}";
 
                     // ── Rate limit detection ──
                     bool justHitRateLimit = false;
