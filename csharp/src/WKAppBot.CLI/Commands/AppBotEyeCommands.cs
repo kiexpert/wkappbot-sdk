@@ -411,7 +411,7 @@ internal partial class Program
             bool acquired = _eyeAliveMutex.WaitOne(5000);
             if (!acquired)
             {
-                EyeLog("[EYE] Another Eye is still alive after 5s — exiting duplicate");
+                Console.Error.WriteLine($"[EYE:WARN] ⚠ SELF-EXIT: Another Eye holds mutex after 5s — PID={Environment.ProcessId} exiting as duplicate");
                 _eyeAliveMutex.Dispose();
                 _eyeAliveMutex = null;
                 return 0;
