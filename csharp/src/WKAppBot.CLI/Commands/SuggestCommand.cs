@@ -535,6 +535,34 @@ internal partial class Program
         }
         catch { }
 
+        // Duplicate guard: reject if same filename in experience DB has >50% line overlap
+        try
+        {
+            var cmd3 = evidenceParts.Length > 1 ? evidenceParts[1] : "misc";
+            var sub3 = evidenceParts.Length > 2 ? evidenceParts[2] : "general";
+            var existDir = Path.Combine(DataDir, "experience", "tests", cmd3, sub3);
+            if (Directory.Exists(existDir))
+            {
+                var newLines = File.ReadAllLines(evidenceFile).Where(l => l.Trim().Length > 0).ToArray();
+                foreach (var existing in Directory.GetFiles(existDir))
+                {
+                    var oldLines = File.ReadAllLines(existing).Where(l => l.Trim().Length > 0).ToArray();
+                    if (oldLines.Length == 0 || newLines.Length == 0) continue;
+                    int overlap = newLines.Count(nl => oldLines.Any(ol => ol.Trim() == nl.Trim()));
+                    double ratio = (double)overlap / Math.Max(newLines.Length, oldLines.Length);
+                    if (ratio > 0.5)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"  ❌ Evidence too similar to existing {Path.GetFileName(existing)} ({ratio:P0} overlap)");
+                        Console.WriteLine($"     Write a NEW test specific to this fix, don't reuse old scripts!");
+                        Console.ResetColor();
+                        return 1;
+                    }
+                }
+            }
+        }
+        catch { }
+
         // Run evidence script — must pass (exit 0) to allow resolve
         var ext = Path.GetExtension(evidenceFile).ToLowerInvariant();
         var shell = ext switch
