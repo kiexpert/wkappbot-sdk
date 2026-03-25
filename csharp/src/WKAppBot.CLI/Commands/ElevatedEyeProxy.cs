@@ -319,20 +319,34 @@ static class ElevationHelper
 
         // MCP mode: never launch new processes (no console window, no Eye spawn)
         // Try existing elevated Eye proxy. If unavailable, signal Launcher to re-route via admin Core.
-        if (Program.IsMcpMode)
+        if (Program.IsMcpMode || Program.RunningInEye)
         {
             NativeMethods.GetWindowThreadProcessId(targetHwnd, out uint mcpPid);
-            if (NativeMethods.IsProcessElevated(mcpPid) == true)
+            var targetElev = NativeMethods.IsProcessElevated(mcpPid);
+            Console.Error.WriteLine($"[ELEVATION] MCP/Eye mode: target pid={mcpPid} elevated={targetElev} IsMcp={Program.IsMcpMode} InEye={Program.RunningInEye}");
+            if (targetElev == true)
             {
                 if (ElevatedEyeClient.IsAvailable())
                 {
-                    Console.Error.WriteLine("[ELEVATION:MCP] Delegating via existing elevated Eye proxy");
+                    Console.Error.WriteLine("[ELEVATION] Delegating via existing elevated Eye proxy pipe");
                     var exit = ElevatedEyeClient.ExecuteViaProxy(command, args);
+                    Console.Error.WriteLine($"[ELEVATION] Proxy result: exit={exit}");
                     if (exit != -1) return (true, exit);
+                    Console.Error.WriteLine("[ELEVATION] Proxy failed — falling through");
                 }
-                // Signal: elevation needed but can't do it here — Launcher will re-route
-                Console.Error.WriteLine("[ELEVATION:MCP] Elevation required — signaling Launcher");
-                Program.McpElevationRequired = true;
+                else
+                {
+                    Console.Error.WriteLine("[ELEVATION] No elevated Eye proxy available");
+                }
+                if (Program.IsMcpMode)
+                {
+                    Console.Error.WriteLine("[ELEVATION:MCP] Signaling Launcher for admin Core re-route");
+                    Program.McpElevationRequired = true;
+                }
+                else
+                {
+                    Console.Error.WriteLine("[ELEVATION:EYE] Cannot elevate in Eye worker — limited access");
+                }
             }
             return (false, 0);
         }
