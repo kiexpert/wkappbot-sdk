@@ -23,7 +23,10 @@ internal partial class Program
         var results = new ConcurrentBag<TriadDebateLoop.RoundResult>();
 
         Console.WriteLine($"[DEBATE:{roundName}] Starting parallel round...");
-        SlackPostToThread($"🔄 *[{roundName}]* Round started", "Moderator");
+        // Post moderator's instruction to Slack (first prompt's first 200 chars)
+        var samplePrompt = prompts.Values.FirstOrDefault() ?? "";
+        var promptPreview = samplePrompt.Length > 200 ? samplePrompt[..200] + "..." : samplePrompt;
+        SlackPostToThread($"🎙️ *[Moderator → {roundName}]*: {promptPreview}", "Moderator");
 
         var tasks = prompts.Select(kv => Task.Run(() =>
         {
