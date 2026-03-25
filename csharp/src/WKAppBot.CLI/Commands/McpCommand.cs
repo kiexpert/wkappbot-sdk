@@ -210,17 +210,11 @@ internal partial class Program
             ["capabilities"] = new JsonObject
             {
                 ["tools"] = new JsonObject { },
-                // APSP v1: streaming progress via notifications/progress
-                ["experimental"] = new JsonObject
-                {
-                    ["apsp"] = "v1"  // AppBot Parallel Streaming Protocol
-                }
             },
             ["serverInfo"] = new JsonObject
             {
                 ["name"] = "wkappbot",
-                ["version"] = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "4.1",
-                ["protocol"] = "MCP+APSP-v1"
+                ["version"] = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "5.1",
             }
         };
     }
