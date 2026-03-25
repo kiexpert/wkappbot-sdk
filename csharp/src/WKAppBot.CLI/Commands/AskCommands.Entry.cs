@@ -335,8 +335,11 @@ Examples:
         // ── 정반합 사회자 루프 (--debate 플래그 시에만) ──
         if (debateMode && !noWait && results.Count(r => r == 0) >= 2)
         {
-            Console.WriteLine($"[정반합] Moderator loop starting (R2 critique + R3 synthesis)...");
-            SlackPostToThread("📋 *Debate persona:*\n```\n" + BuildDebateOnlyPersona()[..Math.Min(300, BuildDebateOnlyPersona().Length)] + "\n```", "Moderator");
+            // R0 done → enable cross-prompting for debate rounds
+            ctx.CrossPromptEnabled = true;
+            Console.WriteLine($"[정반합] R0 complete. Cross-prompting ON. Moderator starting R1...");
+            SlackPostToThread("═══ *R0 자유 답변 완료! 정반합 게임 시작!* ═══\n📋 DEBATE_JSON + STANCE 포맷으로 응답해주세요.", "Moderator");
+            SlackPostToThread($"📋 *Debate Rules:*\n```\n{BuildDebateOnlyPersona()[..Math.Min(400, BuildDebateOnlyPersona().Length)]}\n```", "Moderator");
             try { RunDebateLoop(question, timeoutSec, ctx); }
             catch (Exception ex) { Console.Error.WriteLine($"[DEBATE] Error: {ex.Message}"); }
         }
