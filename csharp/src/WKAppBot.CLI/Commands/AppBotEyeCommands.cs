@@ -406,19 +406,17 @@ internal partial class Program
         _eyeAliveMutex = new System.Threading.Mutex(true, EyeAliveMutexName, out bool createdNew);
         if (!createdNew)
         {
-            var processAge = DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
-            if (processAge.TotalMinutes < 5)
+            // Another Eye holds the mutex — wait briefly (hot-swap handoff window)
+            EyeLog("[EYE] Another Eye detected — waiting 5s for handoff...");
+            bool acquired = _eyeAliveMutex.WaitOne(5000);
+            if (!acquired)
             {
-                EyeLog($"[EYE] Another Eye detected but process is young ({processAge.TotalSeconds:F0}s) — staying alive");
-                // Don't dispose mutex — will retry acquiring when other Eye exits
-            }
-            else
-            {
-                EyeLog("[EYE] Another Eye instance is already running — exiting duplicate");
+                EyeLog("[EYE] Another Eye is still alive after 5s — exiting duplicate");
                 _eyeAliveMutex.Dispose();
                 _eyeAliveMutex = null;
                 return 0;
             }
+            EyeLog("[EYE] Previous Eye released mutex — taking over");
         }
         // _eyeAliveMutex is static — held for process lifetime, GC will never collect it
 
