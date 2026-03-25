@@ -73,8 +73,47 @@ internal partial class Program
             try { FreeConsole(); } catch { }
         }
 
-        // Redirect Console.Out to stderr so stdout is pure JSON-RPC
-        var jsonOut = Console.OpenStandardOutput();
+        // Admin pipe mode: use named pipes instead of stdin/stdout
+        // Launched by Launcher via ShellExecuteExW runas with --admin-pipes <stdin> <stdout>
+        string? adminStdinPipe = null, adminStdoutPipe = null;
+        for (int ai = 0; ai < args.Length - 2; ai++)
+        {
+            if (args[ai] == "--admin-pipes")
+            {
+                adminStdinPipe = args[ai + 1];
+                adminStdoutPipe = args[ai + 2];
+                break;
+            }
+        }
+
+        Stream jsonOut;
+        Stream jsonIn;
+        if (adminStdinPipe != null && adminStdoutPipe != null)
+        {
+            // Connect to Launcher's named pipes
+            Console.Error.WriteLine($"[MCP:ADMIN] Connecting to pipes: in={adminStdinPipe} out={adminStdoutPipe}");
+            try
+            {
+                var pipeIn = new System.IO.Pipes.NamedPipeClientStream(".", adminStdinPipe, System.IO.Pipes.PipeDirection.In);
+                pipeIn.Connect(10_000); // 10s timeout
+                var pipeOut = new System.IO.Pipes.NamedPipeClientStream(".", adminStdoutPipe, System.IO.Pipes.PipeDirection.Out);
+                pipeOut.Connect(10_000);
+                jsonIn = pipeIn;
+                jsonOut = pipeOut;
+                Console.Error.WriteLine("[MCP:ADMIN] Named pipes connected — admin MCP ready");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[MCP:ADMIN] Pipe connection failed: {ex.Message}");
+                return 1;
+            }
+        }
+        else
+        {
+            // Normal mode: stdin/stdout
+            jsonOut = Console.OpenStandardOutput();
+            jsonIn = Console.OpenStandardInput();
+        }
 
         // ── 앱봇관리 콘솔 호스트 설정 ──
         // stderr → TeeTextWriter(stderr, mainLogFile) → WT 탭 (no-focus)
@@ -86,14 +125,14 @@ internal partial class Program
         // Tool invocations will use ThreadRoutingWriter.Route() for per-tab output
         Console.SetOut(new ThreadRoutingWriter(Console.Error));
 
-        IsMcpMode = true; // global flag: no console windows, no Eye spawn, no elevation launch
+        IsMcpMode = true; // global flag: no console windows, no Eye spawn, no elevation launch, no AllocConsole
         Console.Error.WriteLine($"[MCP] Server starting... (launcher={McpLauncherMode})");
 
         var writer = new StreamWriter(jsonOut, new UTF8Encoding(false)) { AutoFlush = true };
 
         try
         {
-            using var reader = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8);
+            using var reader = new StreamReader(jsonIn, Encoding.UTF8);
             string? line;
             while ((line = reader.ReadLine()) != null)
             {
