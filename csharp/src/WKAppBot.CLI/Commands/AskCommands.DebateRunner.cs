@@ -147,17 +147,28 @@ internal partial class Program
     {
         var ais = new[] { "gemini", "gpt", "claude" };
 
-        Console.WriteLine("\n[DEBATE] ═══ 정반합 토론 루프 시작 ═══");
-        SlackPostToThread("═══ *Dialectical Debate Started* ═══\nR1(Diversity) → R2(Critique) → R3(Synthesis))", "Moderator");
+        Console.WriteLine("\n[DEBATE] ═══ 사회자: R2/R3 시작 (R1 이미 완료) ═══");
+        SlackPostToThread("═══ *Moderator: R2(Critique) → R3(Synthesis)* ═══\nR1 already completed. Proceeding to cross-critique.", "Moderator");
 
-        // ── R1: Diversity (independent answers with structured claims) ──
-        var r1Prompts = ais.ToDictionary(ai => ai, _ => TriadDebateLoop.BuildR1Prompt(question));
-        var r1Results = RunDebateRound("R1", r1Prompts, timeoutSec, ctx);
-
-        if (r1Results.Count < 2)
+        // ── R1 SKIP: already completed by AskTriadParallel/AgentCommand ──
+        // Build R1 results from shared context (chunks collected during R1 streaming)
+        var r1Results = ais.Select(ai =>
         {
-            Console.Error.WriteLine("[DEBATE] R1: insufficient responses — need at least 2 AIs. Aborting.");
-            SlackPostToThread("❌ R1 실패: Insufficient responses (<2). Debate aborted.", "Moderator");
+            var chunks = ctx.GetPeerChunks(ai, new System.Collections.Concurrent.ConcurrentDictionary<string, int>());
+            // Use latest chunk as R1 response
+            var latestChunk = "";
+            foreach (var kv in ctx.GetPeerChunks("__dummy__", new System.Collections.Concurrent.ConcurrentDictionary<string, int>()))
+                if (kv.ai == ai) latestChunk = kv.chunk;
+            var claims = TriadDebateLoop.ParseClaims(latestChunk);
+            return new TriadDebateLoop.RoundResult(ai, latestChunk, claims);
+        }).Where(r => r.Claims.Count > 0 || r.Summary.Length > 50).ToList();
+
+        Console.WriteLine($"[DEBATE] R1 results from context: {r1Results.Count} AIs with content");
+
+        if (r1Results.Count < 1)
+        {
+            Console.Error.WriteLine("[DEBATE] No R1 context found — cannot proceed.");
+            SlackPostToThread("❌ No R1 context available for R2/R3.", "Moderator");
             return;
         }
 
