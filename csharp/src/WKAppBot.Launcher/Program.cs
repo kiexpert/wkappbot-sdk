@@ -702,109 +702,44 @@ class Program
 
         var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
 
-        // stdin broadcaster — single reader, routes bytes to whichever Core is current
-        Process? _current = null;
-        var coreReady = new ManualResetEventSlim(false);
-        var stdinThread = new Thread(() =>
+        // MCP mode: Launcher cannot reliably relay stdin/stdout due to ConPTY/NativeAOT
+        // handle inheritance issues. Instead, exec Core directly — Launcher replaces itself.
+        // Hot-swap: MCP client reconnects on disconnect (standard MCP behavior).
+        Console.Error.WriteLine($"[LAUNCHER:MCP] exec → {core} (direct stdio)");
+        Console.Error.Flush();
+
+        // Replace Launcher process with Core (Windows doesn't have exec(), so we use
+        // CreateProcess with our own std handles and TerminateProcess self after).
+        var hStdin  = GetStdHandle(-10);
+        var hStdout = GetStdHandle(-11);
+        var hStderr = GetStdHandle(-12);
+        SetHandleInformation(hStdin,  HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+        SetHandleInformation(hStdout, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+        SetHandleInformation(hStderr, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+
+        var cmdSb = new StringBuilder($"\"{core.Replace("\"", "\\\"")}\"");
+        foreach (var a in args) cmdSb.Append(" \"").Append(a.Replace("\"", "\\\"")).Append('"');
+        var cmdArr = (cmdSb.ToString() + "\0").ToCharArray();
+        var si = new STARTUPINFOW
         {
-            var stdin = Console.OpenStandardInput();
-            var buf   = new byte[4096];
-            Console.Error.WriteLine("[LAUNCHER:MCP] stdin relay thread started");
-            while (true)
-            {
-                int n;
-                try   { n = stdin.Read(buf, 0, buf.Length); }
-                catch (Exception ex) { Console.Error.WriteLine($"[LAUNCHER:MCP] stdin read error: {ex.Message}"); break; }
-                if (n == 0) { Console.Error.WriteLine("[LAUNCHER:MCP] stdin EOF"); break; }
-
-                Console.Error.WriteLine($"[LAUNCHER:MCP] stdin read {n} bytes, waiting for core...");
-                // Wait for Core to be ready (prevents dropping first JSON-RPC message)
-                coreReady.Wait();
-                var p = Volatile.Read(ref _current);
-                if (p == null) { Console.Error.WriteLine("[LAUNCHER:MCP] stdin: core is null, dropping"); continue; }
-                try
-                {
-                    p.StandardInput.BaseStream.Write(buf, 0, n);
-                    p.StandardInput.BaseStream.Flush();
-                }
-                catch { } // Core died mid-write — next iteration gets new Core
-            }
-        }) { IsBackground = true, Name = "mcp-stdin" };
-        stdinThread.Start();
-
-        while (true)
+            cb = System.Runtime.InteropServices.Marshal.SizeOf<STARTUPINFOW>(),
+            dwFlags = STARTF_USESTDHANDLES,
+            hStdInput  = hStdin,
+            hStdOutput = hStdout,
+            hStdError  = hStderr,
+        };
+        if (!CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, true,
+            CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, null, ref si, out var pi))
         {
-            using var proc = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName        = core,
-                    UseShellExecute = false,
-                    RedirectStandardInput  = true,     // relay: Launcher reads caller stdin → writes to Core
-                    RedirectStandardOutput = true,     // relay: Launcher reads Core stdout → writes to caller
-                    RedirectStandardError  = wtLogFile != null, // --wt: tee to log; else inherited
-                    CreateNoWindow  = false,
-                }
-            };
-            foreach (var a in args) proc.StartInfo.ArgumentList.Add(a);
-            if (!string.IsNullOrEmpty(dotnetRoot))
-                proc.StartInfo.EnvironmentVariables["DOTNET_ROOT"] = dotnetRoot;
-
-            // --wt: tee stderr to log file so WT tab can tail it
-            if (wtLogFile != null)
-            {
-                proc.ErrorDataReceived += (_, e) =>
-                {
-                    if (e.Data == null) return;
-                    Console.Error.WriteLine(e.Data);           // still flows to MCP caller
-                    try { File.AppendAllText(wtLogFile, e.Data + "\n"); } catch { }
-                };
-            }
-
-            proc.Start();
-            if (wtLogFile != null) proc.BeginErrorReadLine();
-            Volatile.Write(ref _current, proc);
-            coreReady.Set(); // unblock stdin relay
-            Console.Error.WriteLine($"[LAUNCHER:MCP] core started (pid={proc.Id})");
-
-            // Relay Core stdout → our stdout (JSON-RPC passthrough)
-            var stdoutRelay = new Thread(() =>
-            {
-                try
-                {
-                    var src = proc.StandardOutput.BaseStream;
-                    var dst = Console.OpenStandardOutput();
-                    var buf = new byte[4096];
-                    int n;
-                    while ((n = src.Read(buf, 0, buf.Length)) > 0)
-                    {
-                        dst.Write(buf, 0, n);
-                        dst.Flush();
-                    }
-                }
-                catch { }
-            }) { IsBackground = true, Name = "mcp-stdout-relay" };
-            stdoutRelay.Start();
-
-            if (timeoutSec > 0)
-            {
-                if (!proc.WaitForExit(timeoutSec * 1000))
-                {
-                    Console.Error.WriteLine($"[LAUNCHER:MCP] timeout {timeoutSec}s exceeded — killing core (pid={proc.Id})");
-                    try { proc.Kill(entireProcessTree: true); } catch { }
-                    return timeoutExit;
-                }
-            }
-            else
-            {
-                proc.WaitForExit();
-            }
-
-            var exit = proc.ExitCode;
-            Console.Error.WriteLine($"[LAUNCHER:MCP] core exited (code={exit})");
-            if (exit == 42) { Thread.Sleep(50); continue; } // Core self-requested reload
-            return exit;
+            Console.Error.WriteLine($"[LAUNCHER:MCP] CreateProcess failed (err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()})");
+            return 1;
         }
+        Console.Error.WriteLine($"[LAUNCHER:MCP] core pid={pi.dwProcessId} — Launcher waiting");
+        CloseHandle(pi.hThread);
+        WaitForSingleObject(pi.hProcess, 0xFFFFFFFF);
+        GetExitCodeProcess(pi.hProcess, out uint exitCode2);
+        CloseHandle(pi.hProcess);
+        return (int)exitCode2;
     }
 
     /// <param name="fastExitTimeoutMs">If >0, kills Core if it doesn't exit within this time (ms) and returns exit 0.
