@@ -227,15 +227,47 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 90))
         {
             await Task.Delay(2000);
-            // Try provider-specific response detection first
+            // Provider-specific response detection (selectors from triad AI consultation)
             string text = "";
             try { text = await cdp.GetLastResponseTextAsync(preCount) ?? ""; } catch { }
-            // Fallback: generic body text change detection
+
+            // Fallback: AI-specific selectors (2026 DOM structures)
             if (string.IsNullOrWhiteSpace(text))
             {
+                var responseJs = ai switch
+                {
+                    "gpt" => """
+                        (() => {
+                            var turns = document.querySelectorAll('[data-testid^="conversation-turn-"]');
+                            if (!turns.length) return '';
+                            var last = turns[turns.length - 1];
+                            var prose = last.querySelector('.prose,.markdown');
+                            return prose ? prose.innerText : last.innerText || '';
+                        })()
+                        """,
+                    "claude" => """
+                        (() => {
+                            var msgs = document.querySelectorAll('[data-testid="assistant-message"],.font-claude-message');
+                            if (!msgs.length) {
+                                var log = document.querySelector('[role="log"]');
+                                if (log) { var divs = log.querySelectorAll('div'); msgs = divs; }
+                            }
+                            if (!msgs.length) return '';
+                            return msgs[msgs.length - 1].innerText || '';
+                        })()
+                        """,
+                    "gemini" => """
+                        (() => {
+                            var resp = document.querySelectorAll('.model-response-text,.response-content');
+                            if (!resp.length) return '';
+                            return resp[resp.length - 1].innerText || '';
+                        })()
+                        """,
+                    _ => "''"
+                };
                 try
                 {
-                    var bodyText = await cdp.EvalAsync("(document.querySelector('[data-testid=\"assistant-message\"]') || document.querySelector('.response-container') || document.querySelector('.markdown') || {}).innerText || ''") ?? "";
+                    var bodyText = await cdp.EvalAsync(responseJs) ?? "";
                     if (bodyText.Length > 20) text = bodyText;
                 }
                 catch { }
@@ -258,15 +290,22 @@ internal partial class Program
                 Console.Write($"[정반합:{ai} {sw.Elapsed.TotalSeconds:F0}s {text.Length}ch] ");
             }
 
-            // Check if done streaming
+            // Check if done streaming (AI-specific stop button detection)
             try
             {
-                if (!await cdp.IsStreamingAsync(provider))
+                var doneJs = ai switch
+                {
+                    "gpt" => "!document.querySelector('[data-testid=\"stop-button\"],button[aria-label=\"Stop generating\"]')",
+                    "claude" => "!document.querySelector('.is-streaming,.claude-streaming-indicator,[data-is-streaming=\"true\"]')",
+                    "gemini" => "!document.querySelector('mat-icon[fonticon=\"stop_circle\"],button[aria-label*=\"Stop\"]')",
+                    _ => "true"
+                };
+                var isDone = await cdp.EvalAsync($"({doneJs}) ? '1' : '0'");
+                if (isDone == "1")
                 {
                     await Task.Delay(1000);
-                    var final = await cdp.GetLastResponseTextAsync() ?? text;
-                    Console.WriteLine($"[정반합:{ai}] Done ({final.Length} chars)");
-                    return final;
+                    Console.WriteLine($"[정반합:{ai}] Done ({text.Length} chars)");
+                    return text; // use already-captured text (not re-fetch that might fail)
                 }
             }
             catch { }
