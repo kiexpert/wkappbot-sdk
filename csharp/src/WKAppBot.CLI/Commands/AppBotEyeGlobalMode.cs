@@ -1113,8 +1113,9 @@ internal partial class Program
                         }
                         Thread.Sleep(200);
                     }
-                    Console.WriteLine($"[EYE:HOT-SWAP] New Eye responding ({hsw.Elapsed.TotalMilliseconds:F0}ms) — hiding old Eye window");
-                    TryHideConsoleWindow(); // hide immediately so new Eye window is unobscured
+                    Console.WriteLine($"[EYE:HOT-SWAP] New Eye responding ({hsw.Elapsed.TotalMilliseconds:F0}ms) — freeing old Eye windows");
+                    try { host.Dispose(); } catch { } // free WPF "WK AppBot Eye" window first (prevents duplicate detection)
+                    TryHideConsoleWindow(); // hide console too
                     Console.WriteLine("[EYE:HOT-SWAP] Stopping MCP worker...");
                     EyeMcpClient.Stop();
                     Console.WriteLine("[EYE:HOT-SWAP] Draining active pipe connections...");
