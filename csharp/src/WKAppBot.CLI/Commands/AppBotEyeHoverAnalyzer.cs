@@ -5,7 +5,6 @@
 using System.Text;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Input;
-using WKAppBot.Win32.Accessibility;
 
 namespace WKAppBot.CLI;
 
@@ -29,78 +28,42 @@ internal partial class Program
             {
                 try
                 {
-                    Console.WriteLine($"[AUTO-HACK] Probe success → analyzing {processName}/{className} (0x{targetHwnd:X8})");
+                    Console.WriteLine($"[AUTO-HACK] Probe success → routing to analyze-hack server ({processName}/{className} 0x{targetHwnd:X8})");
 
-                    // Capture target parent region
-                    NativeMethods.GetWindowRect(targetHwnd, out var wr);
-                    int x = wr.Left, y = wr.Top, w = wr.Right - wr.Left, h = wr.Bottom - wr.Top;
-                    if (w < 10 || h < 10) return;
-                    if (w > 1200) w = 1200;
-                    if (h > 800) h = 800;
-
-                    using var bmp = new System.Drawing.Bitmap(w, h);
-                    using (var g = System.Drawing.Graphics.FromImage(bmp))
-                        g.CopyFromScreen(x, y, 0, 0, new System.Drawing.Size(w, h));
-
-                    // CCA analysis
-                    var cca = new WKAppBot.Vision.ConnectedComponentAnalyzer();
-                    var regions = cca.Analyze(bmp);
-
-                    // Collect UIA leaves for fused matching (via MCP to avoid loading UIA in Eye)
-                    var uiaInfos = new List<WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo>();
-                    try
+                    // Route CCA+UIA analysis to analyze-hack server process (avoids loading Vision assembly in Eye)
+                    EnsureHackServer();
+                    if (_hackServerProcess is not { HasExited: false } || _hackServerStdin == null)
                     {
-                        var hwndGrap = $"*hwnd={targetHwnd.ToInt64():X}*";
-                        var (inspOutput, inspCode) = EyeMcpClient.CallAsync(
-                            ["a11y", "inspect", hwndGrap, "--depth", "8"], timeoutMs: 10_000).GetAwaiter().GetResult();
-                        if (inspCode == 0 && !string.IsNullOrWhiteSpace(inspOutput))
-                        {
-                            // Parse inspect output for element bounds: [Type] "Name" (PxQ @X,Y)
-                            foreach (var line in inspOutput.Split('\n'))
-                            {
-                                var trimmed = line.Trim();
-                                if (string.IsNullOrEmpty(trimmed)) continue;
-                                // Extract name from quotes
-                                var q1 = trimmed.IndexOf('"');
-                                var q2 = q1 >= 0 ? trimmed.IndexOf('"', q1 + 1) : -1;
-                                if (q1 < 0 || q2 < 0) continue;
-                                var name = trimmed.Substring(q1 + 1, q2 - q1 - 1);
-                                if (string.IsNullOrEmpty(name)) continue;
-                                // Extract bounds from (@X,Y WxH) pattern
-                                var atIdx = trimmed.IndexOf('@', q2);
-                                if (atIdx < 0) continue;
-                                var boundsStr = trimmed.Substring(atIdx + 1).TrimEnd(')').Trim();
-                                var parts = boundsStr.Split(new[] { ',', ' ', 'x' }, StringSplitOptions.RemoveEmptyEntries);
-                                if (parts.Length >= 4 &&
-                                    int.TryParse(parts[0], out var bx) && int.TryParse(parts[1], out var by) &&
-                                    int.TryParse(parts[2], out var bw) && int.TryParse(parts[3], out var bh))
-                                {
-                                    uiaInfos.Add(new WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo
-                                    {
-                                        Name = name,
-                                        Bounds = new System.Drawing.Rectangle(bx - x, by - y, bw, bh)
-                                    });
-                                }
-                            }
-                        }
+                        Console.Error.WriteLine("[AUTO-HACK] analyze-hack server not available");
+                        return;
                     }
-                    catch { }
 
-                    // Fused match + save
-                    if (uiaInfos.Count > 0 || regions.Count > 0)
+                    var request = System.Text.Json.JsonSerializer.Serialize(new
                     {
-                        var matchResults = WKAppBot.Vision.CcaUiaFusedMatcher.Match(regions, uiaInfos);
-                        var summary = WKAppBot.Vision.CcaUiaFusedMatcher.Summarize(matchResults);
-                        WKAppBot.Vision.CcaUiaFusedMatcher.SaveToExperienceDb(
-                            Path.Combine(DataDir, "experience"), processName, className, matchResults);
-                        Console.WriteLine($"[AUTO-HACK] Done: {summary}");
+                        type = "auto-hack",
+                        hwnd = targetHwnd.ToInt64(),
+                        process = processName,
+                        className = className
+                    });
+
+                    string? response;
+                    lock (_hackServerStdin)
+                    {
+                        _hackServerStdin.WriteLine(request);
+                        _hackServerStdin.Flush();
+                        response = _hackServerProcess!.StandardOutput.ReadLine();
                     }
+
+                    if (!string.IsNullOrEmpty(response))
+                        Console.WriteLine($"[AUTO-HACK] Done: {response}");
+                    else
+                        Console.WriteLine($"[AUTO-HACK] No response from server");
                 }
                 catch (Exception ex) { Console.Error.WriteLine($"[AUTO-HACK] Error: {ex.Message}"); }
                 finally { _autoHackSemaphore.Release(); }
             });
         };
-        Console.WriteLine("[AUTO-HACK] Subscribed to InputReadiness.OnProbeSuccess");
+        Console.WriteLine("[AUTO-HACK] Subscribed to InputReadiness.OnProbeSuccess (via analyze-hack server)");
     }
 
     // ── Analyze-hack server process ──
