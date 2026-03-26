@@ -284,8 +284,8 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         if (EnableFocusTheftMonitoring && OnFocusTheft != null)
             prevFg = (nint)GetForegroundWindow();
 
-        // Minimize Chrome before Input.* commands to prevent focus theft
-        // CDP protocol works on minimized windows — renderer processes messages without activation
+        // Minimize Chrome before Input.* to prevent focus theft (focusless CDP operation)
+        // Zoom zombies: handled by zoom cleanup timer (60s) + target IsIconic check
         if (method.StartsWith("Input.", StringComparison.Ordinal) && ChromeWindowHandle != 0)
         {
             if (!IsIconic((IntPtr)ChromeWindowHandle))
