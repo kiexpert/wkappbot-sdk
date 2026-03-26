@@ -136,7 +136,7 @@ internal partial class Program
         _ when username?.Contains("🦊") == true => ":fox_face:",
         _ when username?.Contains("🐬") == true => ":dolphin:",
         _ when username?.Contains("🐙") == true => ":octopus:",
-        _ when username?.Contains("🤖") == true => ":robot_face:",
+        _ when username?.Contains("🚧") == true => ":construction:",
         _ => null,
     };
 
