@@ -702,7 +702,19 @@ public sealed partial class ClaudePromptHelper
 
             var txtPat = inputGroup2.Patterns.Text;
             if (txtPat.IsSupported)
-                return txtPat.Pattern.DocumentRange.GetText(-1);
+            {
+                var text = txtPat.Pattern.DocumentRange.GetText(-1);
+                // Filter out placeholder text (empty input returns placeholder like "Type your message...")
+                if (!string.IsNullOrEmpty(text))
+                {
+                    var lower = text.ToLowerInvariant();
+                    if (lower.Contains("type your message") || lower.Contains("입력하세요")
+                        || lower.Contains("message claude") || lower.Contains("ask anything")
+                        || lower.Contains("reply to") || lower.Contains("what can i"))
+                        return null; // placeholder → treat as empty
+                }
+                return text;
+            }
 
             return null;
         }
