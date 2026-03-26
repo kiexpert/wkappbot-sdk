@@ -1337,7 +1337,10 @@ public sealed partial class UiaLocator : IDisposable
         }
         catch { }
 
-        sb.AppendLine($"{indent}[{ctStr}] \"{name}\" aid=\"{aid}\" {rectStr}{patternStr}");
+        var rectParsed2 = new System.Drawing.Rectangle();
+        try { var r = element.BoundingRectangle; rectParsed2 = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
+        var tag = GrapHelper.FormatNodeLabel(ctStr, aid, name == "(null)" || name == "(err)" ? "" : name, rect: rectParsed2);
+        sb.AppendLine($"{indent}{tag}{patternStr}");
 
         if (depth < maxDepth)
         {
