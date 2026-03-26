@@ -60,17 +60,18 @@ public static class GrapHelper
     /// Format a11y node label: "ControlType(AutomationId)" or "ControlType("Name")".
     /// Used everywhere a11y nodes are displayed: windows, inspect, find, read, etc.
     /// </summary>
-    public static string FormatNodeLabel(AutomationElement el)
+    public static string FormatNodeLabel(AutomationElement el, int siblingIndex = 0)
     {
         var ct = el.Properties.ControlType.ValueOrDefault;
         var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
         var name = el.Properties.Name.ValueOrDefault ?? "";
-        var label = ct.ToString();
+        // Format: Type{N}{id|name} — e.g. Button2btnOK, Edit1, Pane3chatContainer
+        var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
         if (aid.Length > 0)
-            return $"{label}({aid})";
+            return $"{ct}{idx}{aid}";
         if (name.Length > 0)
-            return $"{label}(\"{(name.Length > 25 ? name[..22] + "..." : name)}\")";
-        return label;
+            return $"{ct}{idx}{(name.Length > 20 ? name[..17] + "..." : name)}";
+        return $"{ct}{idx}";
     }
 
     /// <summary>
@@ -83,7 +84,34 @@ public static class GrapHelper
         var el = leaf;
         while (el != null)
         {
-            parts.Add(FormatNodeLabel(el));
+            // Count sibling index (same ControlType under same parent)
+            int sibIdx = 1;
+            try
+            {
+                var parent = el.Parent;
+                if (parent != null)
+                {
+                    var ct = el.Properties.ControlType.ValueOrDefault;
+                    var siblings = parent.FindAllChildren();
+                    int sameTypeCount = 0;
+                    foreach (var sib in siblings)
+                    {
+                        if (sib.Properties.ControlType.ValueOrDefault == ct)
+                        {
+                            sameTypeCount++;
+                            if (sib.Equals(el)) { sibIdx = sameTypeCount; break; }
+                        }
+                    }
+                    // Only number if >1 same type siblings
+                    if (sameTypeCount <= 1 && siblings.Length > 0)
+                    {
+                        int total = siblings.Count(s => s.Properties.ControlType.ValueOrDefault == ct);
+                        if (total <= 1) sibIdx = 0; // unique → no number
+                    }
+                }
+            }
+            catch { sibIdx = 0; }
+            parts.Add(FormatNodeLabel(el, sibIdx));
             try { el = el.Parent; } catch { break; }
         }
         parts.Reverse();
