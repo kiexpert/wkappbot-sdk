@@ -195,9 +195,9 @@ public static class WindowFinder
         string procName, int w, int h, FocusSnapshot? focus = null)
     {
         var flags = focus?.GetFlags(hWnd) ?? "";
-        // WKWebBot tag: if window has SetPropW("WKWebBot") → include in search key
-        var webbot = NativeMethods.GetPropW(hWnd, "WKWebBot") != IntPtr.Zero ? " [WKWebBot]" : "";
-        return $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h}{flags}{webbot})";
+        // wkwebbot prop: enriches search key — grap "*wkwebbot*" matches webbot only
+        var wkwebbot = NativeMethods.GetPropW(hWnd, "wkwebbot") != IntPtr.Zero ? " wkwebbot" : "";
+        return $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h}{flags}{wkwebbot})";
     }
 
     /// <summary>Check if childHwnd is a descendant of a top-level parentHwnd.</summary>
