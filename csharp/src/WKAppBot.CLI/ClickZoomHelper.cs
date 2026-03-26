@@ -35,6 +35,8 @@ internal sealed class ClickZoomHelper : IDisposable
     private const int FixedCapW = 100; // fixed capture area
     private const int FixedCapH = 60;
 
+    private System.Threading.Timer? _zombieTimer;
+
     private ClickZoomHelper(InputZoomHost host, IntPtr formHandle, IntPtr controlHandle,
         Rectangle? captureRect = null, XRayHelper? xray = null)
     {
@@ -43,6 +45,23 @@ internal sealed class ClickZoomHelper : IDisposable
         _formHandle = formHandle;
         _controlHandle = controlHandle;
         _captureRect = captureRect;
+
+        // Zombie prevention: check target every 2s, auto-dispose if gone/iconified
+        _zombieTimer = new System.Threading.Timer(_ =>
+        {
+            try
+            {
+                bool targetGone = _formHandle != IntPtr.Zero && !NativeMethods.IsWindow(_formHandle);
+                bool targetIconic = _formHandle != IntPtr.Zero && NativeMethods.IsIconic(_formHandle);
+                bool controlGone = _controlHandle != IntPtr.Zero && !NativeMethods.IsWindow(_controlHandle);
+                if (targetGone || targetIconic || controlGone)
+                {
+                    Console.WriteLine($"[ZOOM] Auto-dispose: target {(targetGone ? "gone" : targetIconic ? "iconic" : "control gone")}");
+                    Dispose();
+                }
+            }
+            catch { Dispose(); }
+        }, null, 2000, 2000);
     }
 
     /// <summary>
@@ -448,6 +467,8 @@ internal sealed class ClickZoomHelper : IDisposable
 
     public void Dispose()
     {
+        _zombieTimer?.Dispose();
+        _zombieTimer = null;
         _xray?.Dispose();
         _xray = null;
         _host?.Dispose();
