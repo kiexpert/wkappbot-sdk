@@ -54,6 +54,81 @@ namespace WKAppBot.Win32.Accessibility;
 /// </summary>
 public static class GrapHelper
 {
+    // ── 공용 a11y 노드 포맷터 ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Format a11y node label: "ControlType(AutomationId)" or "ControlType("Name")".
+    /// Used everywhere a11y nodes are displayed: windows, inspect, find, read, etc.
+    /// </summary>
+    public static string FormatNodeLabel(AutomationElement el)
+    {
+        var ct = el.Properties.ControlType.ValueOrDefault;
+        var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
+        var name = el.Properties.Name.ValueOrDefault ?? "";
+        var label = ct.ToString();
+        if (aid.Length > 0)
+            return $"{label}({aid})";
+        if (name.Length > 0)
+            return $"{label}(\"{(name.Length > 25 ? name[..22] + "..." : name)}\")";
+        return label;
+    }
+
+    /// <summary>
+    /// Build full a11y path from leaf to root: "Window/Group/Edit(inputId)".
+    /// Walk up parent chain. Returns grap-ready path (/ separated).
+    /// </summary>
+    public static string BuildA11yPath(AutomationElement leaf)
+    {
+        var parts = new List<string>();
+        var el = leaf;
+        while (el != null)
+        {
+            parts.Add(FormatNodeLabel(el));
+            try { el = el.Parent; } catch { break; }
+        }
+        parts.Reverse();
+        return string.Join("/", parts);
+    }
+
+    /// <summary>
+    /// Build full grap expression: "windowTitle#a11yPath".
+    /// Ready to use as wkappbot a11y target.
+    /// </summary>
+    public static string BuildGrapExpression(IntPtr hwnd, AutomationElement leaf)
+    {
+        var title = WKAppBot.Win32.Native.NativeMethods.GetWindowTextW(hwnd);
+        if (title.Length > 30) title = title[..27] + "*";
+        return $"\"{title}\"#{BuildA11yPath(leaf)}";
+    }
+
+    /// <summary>
+    /// Find the keyboard-focused LEAF element under a root (works for background windows).
+    /// Uses TreeWalker + HasKeyboardFocus instead of FocusedElement (foreground-only).
+    /// </summary>
+    public static AutomationElement? FindFocusedLeaf(FlaUI.UIA3.UIA3Automation uia, AutomationElement root)
+    {
+        if (root.Properties.HasKeyboardFocus.ValueOrDefault) return root;
+        try
+        {
+            var walker = uia.TreeWalkerFactory.GetControlViewWalker();
+            return WalkForFocus(walker, root);
+        }
+        catch { return null; }
+    }
+
+    private static AutomationElement? WalkForFocus(dynamic walker, AutomationElement el)
+    {
+        var child = walker.GetFirstChild(el);
+        while (child != null)
+        {
+            if (child.Properties.HasKeyboardFocus.ValueOrDefault) return child;
+            var found = WalkForFocus(walker, child);
+            if (found != null) return found;
+            child = walker.GetNextSibling(child);
+        }
+        return null;
+    }
+
     // Container types: these are preferred when searching for scope roots
     private static readonly HashSet<ControlType> ContainerTypes = new()
     {

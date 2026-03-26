@@ -194,14 +194,18 @@ internal partial class Program
             taskIds[completed] = r.id; // update id now that it's resolved
             collected.Add(r);
 
-            // Cross-share tool call + result with other triad AIs
+            // Cross-share tool call + result via discovery queue (경합 방지)
             if (triadCtx != null)
             {
                 var cmdStr = idToCmd?.GetValueOrDefault(r.id, r.id) ?? r.id;
-                var outputSnippet = r.result.Output.Length > 300 ? r.result.Output[..300] + "..." : r.result.Output;
-                var toolMsg = $"[{provider} tool] {cmdStr} → exit={r.result.ExitCode}\n{outputSnippet}";
-                triadCtx.UpdateChunk(provider, toolMsg);
-                Console.WriteLine($"[CROSS:TOOL] {provider} → peers: {cmdStr} (exit={r.result.ExitCode}, {r.result.Output.Length}ch)");
+                var outputSnippet = r.result.Output.Length > 500 ? r.result.Output[..500] + "..." : r.result.Output;
+                var toolMsg = $"{cmdStr} → exit={r.result.ExitCode}\n{outputSnippet}";
+                // Queue for idle-time injection to peers (no race condition)
+                triadCtx.PushDiscovery(provider, toolMsg);
+                // Also log to chunk stream (for context recovery)
+                triadCtx.UpdateChunk(provider, $"[TOOL] {toolMsg}");
+                Console.WriteLine($"[CROSS:TOOL] {provider} → queued for peers: {cmdStr} (exit={r.result.ExitCode}, {r.result.Output.Length}ch)");
+                SlackPostToThread($"🔧 *[{provider} tool→peers]* `{cmdStr}` exit={r.result.ExitCode}, {r.result.Output.Length}ch", "🦉 Moderator");
             }
 
             // Echo tool output to console with "{id}> " prefix + metrics

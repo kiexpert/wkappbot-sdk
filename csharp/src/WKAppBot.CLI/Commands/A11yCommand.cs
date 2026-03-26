@@ -2376,19 +2376,44 @@ internal partial class Program
             using var cdp = new WKAppBot.WebBot.CdpClient();
             cdp.ConnectAsync(port).GetAwaiter().GetResult();
 
-            // Find the right tab — match by window title
-            var windowTitle = WKAppBot.Win32.Window.WindowFinder.GetWindowText(hwnd);
-            if (!string.IsNullOrEmpty(windowTitle))
+            // Find the right tab — match by URL hint first (scope), then window title
+            var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
+            bool tabFound = false;
+
+            // Priority 1: if scope looks like URL (contains localhost, http, .com, :port) → match by URL
+            bool scopeIsUrl = cssSelector.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+                || cssSelector.Contains("http", StringComparison.OrdinalIgnoreCase)
+                || cssSelector.Contains(":", StringComparison.Ordinal) && char.IsDigit(cssSelector[^1]);
+            if (scopeIsUrl)
             {
-                var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
                 foreach (var tab in tabs)
                 {
-                    if (tab.Title.Contains(windowTitle, StringComparison.OrdinalIgnoreCase) ||
-                        windowTitle.Contains(tab.Title, StringComparison.OrdinalIgnoreCase))
+                    if (tab.Url.Contains(cssSelector, StringComparison.OrdinalIgnoreCase))
                     {
+                        Console.WriteLine($"[A11Y] Tab matched by URL hint: \"{cssSelector}\" → {tab.Url[..Math.Min(60, tab.Url.Length)]}");
                         if (tab.Id != cdp.TargetId)
                             cdp.SwitchToTargetAsync(tab.Id, port).GetAwaiter().GetResult();
+                        tabFound = true;
                         break;
+                    }
+                }
+            }
+
+            // Priority 2: fallback to window title match
+            if (!tabFound)
+            {
+                var windowTitle = WKAppBot.Win32.Window.WindowFinder.GetWindowText(hwnd);
+                if (!string.IsNullOrEmpty(windowTitle))
+                {
+                    foreach (var tab in tabs)
+                    {
+                        if (tab.Title.Contains(windowTitle, StringComparison.OrdinalIgnoreCase) ||
+                            windowTitle.Contains(tab.Title, StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (tab.Id != cdp.TargetId)
+                                cdp.SwitchToTargetAsync(tab.Id, port).GetAwaiter().GetResult();
+                            break;
+                        }
                     }
                 }
             }

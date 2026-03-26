@@ -10,31 +10,8 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal partial class Program
 {
-    // 🦉 Moderator assigns animal emoji by R0 finish order (dictator style!)
-    static readonly string[] _speedEmojis = ["🦊", "🐬", "🐙"]; // 1st, 2nd, 3rd
-    static readonly ConcurrentDictionary<string, string> _aiEmoji = new();
-    static int _emojiIndex;
+    // Emoji + Messages: see DebateRunner.Emoji.cs and DebateRunner.Messages.cs
 
-    static void AssignEmojiOnFinish(string ai)
-    {
-        var idx = Interlocked.Increment(ref _emojiIndex) - 1;
-        if (idx < _speedEmojis.Length)
-            _aiEmoji[ai] = _speedEmojis[idx];
-    }
-
-    static void ResetEmojis() { _aiEmoji.Clear(); Interlocked.Exchange(ref _emojiIndex, 0); }
-
-    static string AiDisplayName(string ai)
-    {
-        var emoji = _aiEmoji.GetValueOrDefault(ai, "🤖");
-        return ai switch
-        {
-            "gpt" => $"{emoji} GPT(SKEPTIC)",
-            "gemini" => $"{emoji} Gemini(EXPLORER)",
-            "claude" => $"{emoji} Claude(AUDITOR)",
-            _ => $"{emoji} {ai}",
-        };
-    }
     /// <summary>
     /// Execute a 정반합 debate round: send prompt to all AIs in parallel, collect structured responses.
     /// Each AI gets a prompt via `ask {ai} "prompt"` and the response is parsed for [CLAIM] markers.
@@ -48,10 +25,10 @@ internal partial class Program
         var results = new ConcurrentBag<TriadDebateLoop.RoundResult>();
 
         Console.WriteLine($"[DEBATE:{roundName}] Starting parallel round...");
-        // Post moderator's instruction to Slack (first prompt's first 200 chars)
+
+        // Post moderator's full instruction to Slack (no truncation)
         var samplePrompt = prompts.Values.FirstOrDefault() ?? "";
-        var promptPreview = samplePrompt.Length > 200 ? samplePrompt[..200] + "..." : samplePrompt;
-        SlackPostToThread($"🎙️ *[Moderator → {roundName}]*: {promptPreview}", "🦉 Moderator");
+        SlackPostToThread($"🎙️ *[Moderator → {roundName}]*: {samplePrompt}", "🦉 Moderator");
 
         var tasks = prompts.Select(kv => Task.Run(async () =>
         {
@@ -78,8 +55,20 @@ internal partial class Program
                     bool needsRetry = false;
                     string? retryReason = null;
 
-                    if (claims.Count == 0)
+                    // Word limit: R2 = total ≤99 words, R3 = [합의]+[미합의] items only (삼두 합의: Option B)
+                    if (roundName.StartsWith("R2"))
                     {
+                        var totalWords = response.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+                        if (totalWords > 99)
+                        {
+                            SlackPostToThread($"⚠️ *[Moderator→{ai}]* R2 답변 {totalWords}단어 — 99단어 초과!", "🦉 Moderator");
+                            needsRetry = true;
+                            retryReason = $"R2 too verbose ({totalWords} words, max 99).";
+                        }
+                    }
+                    else if (claims.Count == 0 && !roundName.StartsWith("R3"))
+                    {
+                        // [CLAIM] required for R2, optional for R3 (R3 main output is [CONCLUSION_KR])
                         needsRetry = true;
                         retryReason = "no [CLAIM] blocks found";
                     }
@@ -87,6 +76,17 @@ internal partial class Program
                     {
                         needsRetry = true;
                         retryReason = "no [DISPUTE] in critique round";
+                    }
+                    else if (roundName.StartsWith("R2") && (response.Contains("[합의]") || response.Contains("[CONCLUSION_KR]")))
+                    {
+                        // R2 round scope violation: using R3 format prematurely
+                        var warnMsg = "[MODERATOR DM] ⚠️ ROUND SCOPE VIOLATION: You used R3 format ([합의]/[CONCLUSION_KR]) in R2. " +
+                            "R2 is CRITIQUE ONLY. Use [DISPUTE] + [CLAIM] + [STANCE]. Remove [합의]/[CONCLUSION_KR] and focus on critiquing peers.";
+                        if (ctx._cdpClients.ContainsKey(ai))
+                            ctx.InjectToSingle(ai, warnMsg);
+                        SlackPostToThread($"⚠️ *[Moderator→{ai}]* 라운드 범위 위반! R2에서 R3 포맷([합의]/[CONCLUSION_KR]) 사용 → DM 경고 발송", "🦉 Moderator");
+                        needsRetry = true;
+                        retryReason = "R2 round scope violation — used R3 format ([합의]/[CONCLUSION_KR]). R2 = critique only!";
                     }
                     else if (roundName.StartsWith("R3"))
                     {
@@ -97,7 +97,7 @@ internal partial class Program
                         }
                         else
                         {
-                            // Check [합의] content quality: must be substantial (≥100 Korean chars)
+                            // Check [합의] content quality
                             var krStart = response.IndexOf("[CONCLUSION_KR]");
                             var krEnd = response.IndexOf("[/CONCLUSION_KR]");
                             if (krStart >= 0 && krEnd > krStart)
@@ -107,13 +107,12 @@ internal partial class Program
                                 var miIdx = krBlock.IndexOf("[미합의]");
                                 if (haIdx >= 0 && miIdx > haIdx)
                                 {
-                                    var consensus = krBlock[(haIdx + "[합의]".Length)..miIdx].Trim();
-                                    // Count words (whitespace split, filter empties)
-                                    var wordCount = consensus.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
-                                    if (wordCount < 100)
+                                    // Verbosity guard: CONCLUSION_KR should be concise (≤2000 chars)
+                                    if (krBlock.Length > 2000)
                                     {
-                                        needsRetry = true;
-                                        retryReason = $"[합의] too brief ({wordCount} words, need ≥100). Explain WHAT was agreed and WHY, not just '동의했습니다'";
+                                        SlackPostToThread($"⚠️ *[Moderator→{ai}]* [CONCLUSION_KR] 너무 장황! ({krBlock.Length}자, 2000자 이하로 줄이세요)", "🦉 Moderator");
+                                        if (ctx._cdpClients.ContainsKey(ai))
+                                            ctx.InjectToSingle(ai, $"[MODERATOR DM] ⚠️ Your [CONCLUSION_KR] is too verbose ({krBlock.Length} chars). Keep it under 2000 chars. Be concise — atomic items, not essays.");
                                     }
 
                                     // Check [개인의견] quality: ≥20 words
@@ -131,6 +130,12 @@ internal partial class Program
                                             }
                                         }
                                     }
+                                    // Check [셀프힐링] presence (R3 required)
+                                    if (!needsRetry && !krBlock.Contains("[셀프힐링]"))
+                                    {
+                                        needsRetry = true;
+                                        retryReason = "missing [셀프힐링] section — you MUST admit what you revised or got wrong from prior rounds";
+                                    }
                                 }
                             }
                         }
@@ -147,6 +152,7 @@ internal partial class Program
                             (roundName.StartsWith("R2")
                                 ? "You MUST include:\n• At least 2 [CLAIM] blocks\n• At least 1 [DISPUTE] block\n• [STANCE N=? R=? C=? E=? D=?] with D >= 1\nPlease revise your answer now."
                                 : "You MUST include:\n• At least 2 [CLAIM] blocks\n• [CONCLUSION_KR] with [합의]/[미합의]/[개인의견]\n• [합의] must be at least 100 words IN KOREAN (한국어 100단어 이상!)\n• [STANCE N=? R=? C=? E=? D=?]\n한국어로 충분히 상세하게 다시 응답해주세요.");
+                        SlackPostToThread($"📩 *[DM→{ai}]* {retryPrompt}", "🦉 Moderator");
                         var retry = await InjectAndPollAsync(ctx, ai, retryPrompt, Math.Min(timeoutSec, 60));
                         if (retry != null)
                         {
@@ -155,14 +161,38 @@ internal partial class Program
                         }
                     }
 
+                    // ── EEP: Evidence Escalation Protocol — detect restatements ──
+                    int restatements = 0;
+                    foreach (var c in claims)
+                    {
+                        if (ctx.IsRestatement(ai, c.Text))
+                        {
+                            restatements++;
+                            var count = ctx.IncrementRestatement(ai);
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine($"[EEP:{ai}] RESTATEMENT #{count}: {c.Text[..Math.Min(60, c.Text.Length)]}");
+                            Console.ResetColor();
+                            if (count >= 2)
+                            {
+                                SlackPostToThread($"⚠️ *[EEP→{AiDisplayName(ai)}]* RESTATEMENT #{count} — 새 근거 없이 반복! 해당 항목 자동 양보 처리", "🦉 Moderator");
+                                if (ctx._cdpClients.ContainsKey(ai))
+                                    ctx.InjectToSingle(ai, $"[MODERATOR] ⚠️ EEP: You restated the same claim {count} times without new evidence. This item is auto-conceded. STANCE -1.");
+                            }
+                            else
+                                SlackPostToThread($"🔁 *[EEP:{AiDisplayName(ai)}]* 반복 감지 — 새 근거 제시 필요!", "🦉 Moderator");
+                        }
+                    }
+                    // Store claims for next round comparison
+                    ctx.StoreClaims(ai, claims);
+
                     var summary = TriadDebateLoop.CompressSummary(response);
                     var result = new TriadDebateLoop.RoundResult(ai, summary, claims);
 
-                    ctx.LogStep(ai, $"[{roundName}] {claims.Count} claims: {string.Join("; ", claims.Select(c => $"{c.Text[..Math.Min(50, c.Text.Length)]}({c.Confidence:F1})"))}");
+                    ctx.LogStep(ai, $"[{roundName}] {claims.Count} claims ({restatements} restated): {string.Join("; ", claims.Select(c => $"{c.Text[..Math.Min(50, c.Text.Length)]}({c.Confidence:F1})"))}");
                     results.Add(result);
 
-                    Console.WriteLine($"[DEBATE:{roundName}:{ai}] {claims.Count} claims extracted{(needsRetry ? " (after retry)" : "")}");
-                    SlackPostToThread($"📋 *[{roundName}:{AiDisplayName(ai)}]* {claims.Count} claims{(needsRetry ? " 🔄(revised)" : "")}", AiDisplayName(ai));
+                    Console.WriteLine($"[DEBATE:{roundName}:{ai}] {claims.Count} claims ({restatements} restated){(needsRetry ? " (after retry)" : "")}");
+                    SlackPostToThread($"📋 *[{roundName}:{AiDisplayName(ai)}]* {claims.Count} claims{(restatements > 0 ? $" 🔁{restatements} restated" : "")}{(needsRetry ? " 🔄(revised)" : "")}", AiDisplayName(ai));
 
                     // D=0 warning: critique round requires dissent — warn if AI didn't challenge anything
                     if (roundName.StartsWith("R2", StringComparison.OrdinalIgnoreCase))
@@ -197,6 +227,7 @@ internal partial class Program
                                         "Please add at least one [DISPUTE]{\"target_assumption\":\"...\",\"reason\":\"...\"}[/DISPUTE] " +
                                         "and set D >= 1 in your STANCE. Revise now.";
                                     ctx.InjectToSingle(ai, dmPrompt);
+                                    SlackPostToThread($"📩 *[DM→{ai}]* {dmPrompt}", "🦉 Moderator");
                                 }
                             }
                         }
@@ -222,25 +253,39 @@ internal partial class Program
             var idx = Array.IndexOf(tasks, done);
             pending.Remove(done);
 
-            if (pending.Count > 0 && idx >= 0 && idx < aiKeys.Length)
+            if (idx >= 0 && idx < aiKeys.Length)
             {
                 var doneAi = aiKeys[idx];
-                Console.WriteLine($"[DEBATE:{roundName}] {doneAi} done → nudging {pending.Count} remaining");
-                SlackPostToThread($"⏰ *{doneAi}* finished {roundName}! Moderator: wrap up, {pending.Count} AI(s) remaining.", "🦉 Moderator");
+                var hasResponse = results.Any(r => r.Ai.Equals(doneAi, StringComparison.OrdinalIgnoreCase));
 
-                // Inject nudge directly into still-running AIs' editors
-                foreach (var p in pending)
+                if (pending.Count > 0 && hasResponse)
                 {
-                    var pIdx = Array.IndexOf(tasks, p);
-                    if (pIdx >= 0 && pIdx < aiKeys.Length)
+                    Console.WriteLine($"[DEBATE:{roundName}] {AiDisplayName(doneAi)} done → nudging {pending.Count} remaining");
+                    SlackPostToThread($"⏰ *{AiDisplayName(doneAi)}* finished {roundName}! Moderator: wrap up, {pending.Count} AI(s) remaining.", "🦉 Moderator");
+
+                    // Inject nudge directly into still-running AIs' editors
+                    foreach (var p in pending)
                     {
-                        var peerAi = aiKeys[pIdx];
-                        var nudge = $"[MODERATOR]: ⏰ {doneAi} has finished {roundName}. You're still writing — please wrap up promptly. Other participants are waiting.";
-                        if (ctx._cdpClients.ContainsKey(peerAi))
-                            ctx.InjectToSingle(peerAi, nudge);
-                        else
-                            ctx.UpdateChunk("moderator", nudge); // fallback: broadcast
+                        var pIdx = Array.IndexOf(tasks, p);
+                        if (pIdx >= 0 && pIdx < aiKeys.Length)
+                        {
+                            var peerAi = aiKeys[pIdx];
+                            var nudge = $"[MODERATOR]: ⏰ {AiDisplayName(doneAi)} has finished {roundName}. You're still writing — please wrap up promptly. Other participants are waiting.";
+                            if (ctx._cdpClients.ContainsKey(peerAi))
+                                ctx.InjectToSingle(peerAi, nudge);
+                            else
+                                ctx.UpdateChunk("moderator", nudge); // fallback: broadcast
+                            SlackPostToThread($"📩 *[DM→{peerAi}]* {nudge}", "🦉 Moderator");
+                        }
                     }
+                }
+                else if (!hasResponse)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[DEBATE:{roundName}] {AiDisplayName(doneAi)} returned NULL — no response");
+                    Console.ResetColor();
+                    if (pending.Count > 0)
+                        SlackPostToThread($"⚠️ *{AiDisplayName(doneAi)}* returned no response for {roundName}. {pending.Count} AI(s) remaining.", "🦉 Moderator");
                 }
             }
         }
@@ -336,25 +381,16 @@ internal partial class Program
         var ais = new[] { "gemini", "gpt", "claude" };
 
         Console.WriteLine("\n[DEBATE] ═══ 사회자: R2/R3 시작 (R1 이미 완료) ═══");
-        SlackPostToThread("═══ *Moderator: R2(Critique) → R3(Synthesis)* ═══\nR1 already completed. Proceeding to cross-critique.", "🦉 Moderator");
+        SlackPostToThread(DebateMsg.R2R3Start, "🦉 Moderator");
 
         // Inject debate rules to all AIs (game announcement, not persona)
-        var rules = "[MODERATOR] 🎮 정반합 게임 시작!\n" +
-            "RULES:\n" +
-            "1. Use [CLAIM]{\"claim\":\"...\",\"confidence\":0.9,\"key_assumptions\":[\"...\"]}[/CLAIM] for each point\n" +
-            "2. Use [DISPUTE]{\"target_assumption\":\"...\",\"reason\":\"...\"}[/DISPUTE] to challenge peers\n" +
-            "3. Include [STANCE N=? R=? C=? E=? D=?] (sum=9) to show your position\n" +
-            "4. Korean conclusion: [CONCLUSION_KR] with [합의]/[미합의]/[개인의견]\n" +
-            "5. [합의] must be ≥100 words in Korean. [개인의견] must be ≥20 words.\n" +
-            "6. ⚠️ CRITICAL: If another AI puts something in [합의] that you disagree with, you MUST list it in YOUR [미합의]. Do NOT silently accept.\n" +
-            "7. Read-only tools available (file read, grep, web search). No writes.\n" +
-            "Respond to the moderator's prompts. Be intellectually honest.";
+        var rules = DebateMsg.GameRules;
         foreach (var ai in ais)
         {
             if (ctx._cdpClients.ContainsKey(ai))
                 ctx.InjectToSingle(ai, rules);
         }
-        SlackPostToThread($"📋 *Debate Rules injected to all AIs*", "🦉 Moderator");
+        SlackPostToThread(DebateMsg.SlackRulesInjected(rules), "🦉 Moderator");
 
         // ── R1 SKIP: already completed by AskTriadParallel/AgentCommand ──
         // Build R1 results from shared context (chunks collected during R1 streaming)
@@ -390,9 +426,22 @@ internal partial class Program
             return;
         }
 
-        // ── R2: Critique (adversarial, anonymous labels) ──
-        var r2Prompts = ais.Where(ai => r1Results.Any(r => r.Ai.Equals(ai, StringComparison.OrdinalIgnoreCase)))
-            .ToDictionary(ai => ai, ai => TriadDebateLoop.BuildR2Prompt(question, r1Results, ai));
+        // ── Devil's Advocate: random dissenter assignment ──
+        var activeAis = ais.Where(ai => ctx._cdpClients.ContainsKey(ai)).ToList();
+        var dissenter = activeAis[Random.Shared.Next(activeAis.Count)];
+        Console.WriteLine($"[DEBATE] ⚔️ DISSENTER assigned: {AiDisplayName(dissenter)}");
+        SlackPostToThread($"⚔️ *[DISSENTER]* {AiDisplayName(dissenter)} — 3개 이상 P-항목 도전 필수! 첫 동의 = STANCE -2점", "🦉 Moderator");
+
+        // ── R2: Critique — ALL AIs participate ──
+        var r2Prompts = activeAis
+            .ToDictionary(ai => ai, ai =>
+            {
+                var basePrompt = TriadDebateLoop.BuildR2Prompt(question, r1Results, ai);
+                if (ai.Equals(dissenter, StringComparison.OrdinalIgnoreCase))
+                    return basePrompt + "\n\n⚔️ YOU ARE [DISSENTER]: You MUST challenge ≥3 P-items before accepting ANY. First agreement costs 2 STANCE points. Be adversarial!";
+                else
+                    return basePrompt + $"\n\n⚠️ {AiDisplayName(dissenter)} is [DISSENTER] this round. Expect strong pushback from them.";
+            });
         var r2Results = RunDebateRound("R2", r2Prompts, timeoutSec, ctx);
 
         // Proceed with whatever we have (even 1 response)
@@ -428,24 +477,29 @@ internal partial class Program
             {
                 var ai = ais[aiIdx];
                 var prompt = TriadDebateLoop.BuildR3Prompt(question, currentResults, priorConsensusItems, ai);
-                Console.WriteLine($"[DEBATE:R3-{r3i + 1}:{ai}] Cascading — {priorConsensusItems.Count} prior items");
-                SlackPostToThread($"🔗 *{ai}* — 이전 {priorConsensusItems.Count}개 합의 항목 포함하여 작성 중...", ai);
+                Console.WriteLine($"[DEBATE:R3-{r3i + 1}:{ai}] Cascading — {priorConsensusItems.Count} atomic items");
+                var cascadePreview = priorConsensusItems.Count > 0
+                    ? $"\n{string.Join("\n", priorConsensusItems.Select((p, i) => $"  P{i + 1}. {p}"))}"
+                    : " (첫 번째 AI — 선행 항목 없음)";
+                SlackPostToThread($"🔗 *{AiDisplayName(ai)}* — {priorConsensusItems.Count}개 원자적 합의 항목 수용/거부 판정 중...{cascadePreview}", AiDisplayName(ai));
                 var singlePrompt = new Dictionary<string, string> { [ai] = prompt };
                 var singleResult = RunDebateRound($"R3-{r3i + 1}", singlePrompt, timeoutSec, ctx);
                 r3Results.AddRange(singleResult);
-                // Extract [합의] items from this AI's response for next AI
+                // Extract [합의] items as atomic propositions for next AI (with score if present)
                 foreach (var r in singleResult)
                 {
                     var haStart = r.Summary.IndexOf("[합의]");
                     if (haStart < 0) continue;
                     var haEnd = r.Summary.IndexOf("[미합의]", haStart);
+                    if (haEnd < 0) haEnd = r.Summary.IndexOf("[셀프힐링]", haStart);
                     if (haEnd < 0) haEnd = r.Summary.IndexOf("[개인의견]", haStart);
                     if (haEnd < 0) haEnd = r.Summary.Length;
                     var haSection = r.Summary[(haStart + "[합의]".Length)..haEnd].Trim();
                     foreach (var line in haSection.Split('\n', StringSplitOptions.RemoveEmptyEntries))
                     {
-                        var trimmed = line.Trim().TrimStart("0123456789.•-  ".ToCharArray());
-                        if (trimmed.Length > 5) priorConsensusItems.Add($"{ai}: {trimmed}");
+                        // Strip leading numbering: "1.", "P1.", "•", "-"
+                        var trimmed = line.Trim().TrimStart("0123456789.•-P ".ToCharArray());
+                        if (trimmed.Length > 5) priorConsensusItems.Add($"[{AiDisplayName(ai)}] {trimmed}");
                     }
                 }
             }
@@ -463,10 +517,10 @@ internal partial class Program
                     var haEnd = r.Summary.IndexOf("[미합의]", haStart);
                     if (haEnd < 0) haEnd = r.Summary.Length;
                     var haSection = r.Summary[(haStart + "[합의]".Length)..haEnd].Trim();
-                    var haWords = haSection.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
-                    if (haWords >= 100) hasConsensus = true;
-                    else if (haWords > 0)
-                        SlackPostToThread($"⚠️ *[Moderator→{r.Ai}]* [합의] too brief ({haWords} words, need ≥100). 한국어 100단어 이상으로 다시!", "🦉 Moderator");
+                    // Check item count (not word count) — at least 1 meaningful line
+                    var haLines = haSection.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                        .Where(l => l.Trim().Length > 5).ToList();
+                    if (haLines.Count > 0) hasConsensus = true;
                 }
 
                 // Check [미합의]
@@ -564,15 +618,12 @@ internal partial class Program
                         if (confirmed.Count > 0)
                         {
                             reportSb.AppendLine("\n*✅ 확인된 합의:*");
-                            foreach (var c in confirmed.Take(10))
-                                reportSb.AppendLine($"  • {c[..Math.Min(80, c.Length)]}");
+                            foreach (var c in confirmed)
+                                reportSb.AppendLine($"  • {c}");
                         }
                         reportSb.AppendLine("\n*❓ 미확인 항목 (일부 AI만 언급):*");
-                        foreach (var (ai, item, missing) in unverified.Take(10))
-                        {
-                            var snippet = item.Length > 60 ? item[..60] + "…" : item;
-                            reportSb.AppendLine($"  • [{ai}] \"{snippet}\" — missing from: {string.Join(", ", missing)}");
-                        }
+                        foreach (var (ai, item, missing) in unverified)
+                            reportSb.AppendLine($"  • [{ai}] \"{item}\" — missing from: {string.Join(", ", missing)}");
 
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine($"[DEBATE:R3] {unverified.Count} unverified consensus items");
@@ -585,24 +636,26 @@ internal partial class Program
                         if (confirmed.Count > 0)
                         {
                             broadcastSb.AppendLine($"\n[확인된 합의] ({confirmed.Count}건):");
-                            for (int ci = 0; ci < Math.Min(confirmed.Count, 10); ci++)
-                                broadcastSb.AppendLine($"  {ci + 1}. {confirmed[ci][..Math.Min(80, confirmed[ci].Length)]}");
+                            for (int ci = 0; ci < confirmed.Count; ci++)
+                                broadcastSb.AppendLine($"  {ci + 1}. {confirmed[ci]}");
                         }
                         broadcastSb.AppendLine($"\n[미확인 항목] ({unverified.Count}건 — 일부 AI만 언급):");
-                        for (int ui = 0; ui < Math.Min(unverified.Count, 10); ui++)
+                        for (int ui = 0; ui < unverified.Count; ui++)
                         {
                             var (srcAi2, item2, missing2) = unverified[ui];
-                            broadcastSb.AppendLine($"  {ui + 1}. [{srcAi2}] \"{item2[..Math.Min(60, item2.Length)]}\" — missing from: {string.Join(", ", missing2)}");
+                            broadcastSb.AppendLine($"  {ui + 1}. [{srcAi2}] \"{item2}\" — missing from: {string.Join(", ", missing2)}");
                         }
                         broadcastSb.AppendLine("\n각 AI는 미확인 항목에 대해 동의/거부를 밝혀주세요.");
                         broadcastSb.AppendLine("전체 [합의]/[미합의]/[개인의견] 양식을 다시 출력해주세요.");
 
-                        // Broadcast to all AIs
+                        // Broadcast to all AIs + Slack
+                        var broadcastText = broadcastSb.ToString();
                         foreach (var ai in ais)
                         {
                             if (ctx._cdpClients.ContainsKey(ai))
-                                ctx.InjectToSingle(ai, broadcastSb.ToString());
+                                ctx.InjectToSingle(ai, broadcastText);
                         }
+                        SlackPostToThread($"📢 *[Moderator→ALL]* Cross-check 방송:\n{broadcastText}", "🦉 Moderator");
 
                         // ── Step 2: DM objection prompts to specific AIs (이의제기 타겟) ──
                         var perAiMissing = new Dictionary<string, List<string>>();
@@ -619,15 +672,15 @@ internal partial class Program
                         {
                             var dmSb = new StringBuilder();
                             dmSb.AppendLine($"[MODERATOR DM → {targetAi} only] 아래 항목들이 당신의 [합의]에 빠져있습니다:");
-                            foreach (var mi in missingItems.Take(5))
+                            foreach (var mi in missingItems) // no truncation
                                 dmSb.AppendLine($"  ⚡ {mi}");
                             dmSb.AppendLine("각 항목에 대해: 동의하면 [합의]에 추가, 반대하면 [미합의]에 이유와 함께 넣어주세요.");
 
                             if (ctx._cdpClients.ContainsKey(targetAi))
                                 ctx.InjectToSingle(targetAi, dmSb.ToString());
 
-                            // Slack에도 DM 내용 공개 (유저 모니터링용)
-                            SlackPostToThread($"📩 *[DM→{targetAi}]* {missingItems.Count}건 이의제기:\n{string.Join("\n", missingItems.Take(3).Select(m => $"  {m}"))}", "🦉 Moderator");
+                            // Slack에도 DM 전체 내용 공개 (no truncation)
+                            SlackPostToThread($"📩 *[DM→{targetAi}]* {dmSb}", "🦉 Moderator");
                         }
 
                         unresolved.Add($"Cross-check: {unverified.Count} unverified consensus items");
@@ -644,10 +697,65 @@ internal partial class Program
                 break;
             }
 
-            Console.WriteLine($"[DEBATE:R3] {unresolved.Count} unresolved items");
-            SlackPostToThread($"⚠️ *{unresolved.Count} 미합의 남음* → 다음 라운드", "🦉 Moderator");
+            Console.WriteLine($"[DEBATE:R3] {unresolved.Count} unresolved items → tiered persuasion");
 
-            // Inject unresolved items back for next round
+            // ── Tiered Disagreement Classification ──
+            // T1(표현): 2/3 agree → rewrite to unify
+            // T2(판단): 1/3 agree → demand evidence
+            // T3(근본): 0/3 agree → [합의불가] graceful exit
+            var t1Items = new List<string>(); // expression difference
+            var t2Items = new List<string>(); // judgment difference
+            var t3Items = new List<string>(); // fundamental gap
+            foreach (var item in unresolved)
+            {
+                // Count how many AIs have this item in [합의] (rough keyword match)
+                var itemKey = TriadDebateLoop.Tokenize(item);
+                int agreeCount = r3Results.Count(r =>
+                {
+                    var ha = r.Summary.IndexOf("[합의]");
+                    if (ha < 0) return false;
+                    var haEnd = r.Summary.IndexOf("[미합의]", ha);
+                    if (haEnd < 0) haEnd = r.Summary.Length;
+                    var haSection = r.Summary[ha..haEnd];
+                    return itemKey.Any(k => haSection.Contains(k, StringComparison.OrdinalIgnoreCase));
+                });
+                if (agreeCount >= 2) t1Items.Add(item);
+                else if (agreeCount == 1) t2Items.Add(item);
+                else t3Items.Add(item);
+            }
+
+            SlackPostToThread($"📊 *미합의 분류:* T1(표현)={t1Items.Count} T2(판단)={t2Items.Count} T3(근본)={t3Items.Count}", "🦉 Moderator");
+
+            var persuasionSb = new StringBuilder();
+            persuasionSb.AppendLine("[MODERATOR] 🎯 미합의 항목 — 등급별 처리:");
+            if (t1Items.Count > 0)
+            {
+                persuasionSb.AppendLine("\n📝 *T1(표현 차이)* — 사회자가 통합 표현 제안:");
+                foreach (var item in t1Items)
+                    persuasionSb.AppendLine($"  → {item}");
+            }
+            if (t2Items.Count > 0)
+            {
+                persuasionSb.AppendLine("\n🔍 *T2(판단 차이)* — 새 근거/데이터 제시 필수:");
+                foreach (var item in t2Items)
+                    persuasionSb.AppendLine($"  🔴 {item}");
+            }
+            if (t3Items.Count > 0)
+            {
+                persuasionSb.AppendLine("\n🚫 *T3(근본 차이)* — [합의불가] 선언, 양측 입장 보존:");
+                foreach (var item in t3Items)
+                    persuasionSb.AppendLine($"  ⛔ {item}");
+            }
+            persuasionSb.AppendLine("\nT1: 사회자 표현 수용/수정. T2: 새 근거 제시 OR 수용. T3: 합의불가 인정.");
+
+            var persuasionText = persuasionSb.ToString();
+            foreach (var ai in ais)
+            {
+                if (ctx._cdpClients.ContainsKey(ai))
+                    ctx.InjectToSingle(ai, persuasionText);
+            }
+            SlackPostToThread($"🎯 *[Moderator→ALL] 미합의 설득 유도:*\n{persuasionText}", "🦉 Moderator");
+
             currentResults = r3Results;
         }
 
@@ -680,14 +788,14 @@ internal partial class Program
         if (consensusClaims.Count > 0)
         {
             sb.AppendLine("*[합의]*");
-            foreach (var c in consensusClaims.Distinct().Take(5))
-                sb.AppendLine($"  • {c[..Math.Min(100, c.Length)]}");
+            foreach (var c in consensusClaims.Distinct())
+                sb.AppendLine($"  • {c}");
         }
         if (dissentClaims.Count > 0)
         {
             sb.AppendLine("\n*[미합의]*");
-            foreach (var (ai, c) in dissentClaims.Take(5))
-                sb.AppendLine($"  • [{ai}] {c[..Math.Min(100, c.Length)]}");
+            foreach (var (ai, c) in dissentClaims)
+                sb.AppendLine($"  • [{ai}] {c}");
         }
 
         // Extract personal opinions [개인의견] or [CONCLUSION_KR]
@@ -712,7 +820,7 @@ internal partial class Program
 
             if (!string.IsNullOrEmpty(opinion) && opinion.Length >= 100)
             {
-                sb.AppendLine($"  🗣️ *{r.Ai}*: {opinion[..Math.Min(300, opinion.Length)]}");
+                sb.AppendLine($"  🗣️ *{r.Ai}*: {opinion}");
             }
             else if (!string.IsNullOrEmpty(opinion))
             {
@@ -721,8 +829,7 @@ internal partial class Program
             }
             else
             {
-                // Fallback: first 100 chars of summary
-                sb.AppendLine($"  🗣️ *{r.Ai}*: {r.Summary[..Math.Min(100, r.Summary.Length)]}...");
+                sb.AppendLine($"  🗣️ *{r.Ai}*: {r.Summary}");
             }
         }
 
@@ -821,8 +928,28 @@ internal partial class Program
     /// After AI response completes, check if cross-prompt text was pre-typed in editor.
     /// If so, send it immediately (Enter key). Returns true if cross-prompt was sent.
     /// </summary>
-    internal static async Task<bool> SendPendingCrossPromptAsync(WKAppBot.WebBot.CdpClient cdp, string ai, string editorSel)
+    internal static async Task<bool> SendPendingCrossPromptAsync(WKAppBot.WebBot.CdpClient cdp, string ai, string editorSel,
+        TriadSharedContext? ctx = null)
     {
+        // Drain tool discoveries first (큐 기반 — idle 시점에만 주입)
+        if (ctx != null)
+        {
+            var discoveries = ctx.DrainDiscoveries(ai);
+            if (discoveries.Count > 0)
+            {
+                var combined = string.Join("\n", discoveries);
+                try
+                {
+                    await cdp.InsertContentEditableAsync(editorSel, combined);
+                    await cdp.SendPromptAsync(editorSel);
+                    Console.WriteLine($"[CROSS:{ai}] Injected {discoveries.Count} tool discoveries ({combined.Length} chars)");
+                    SlackPostToThread($"🔧 *[→{ai}]* {discoveries.Count}개 도구 발견 주입", "🦉 Moderator");
+                    return true;
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[CROSS:{ai}] Discovery inject failed: {ex.Message}"); }
+            }
+        }
+
         try
         {
             var editorLen = await cdp.GetTextLengthAsync(editorSel);
@@ -873,19 +1000,78 @@ internal partial class Program
                 }
             }
 
-            // Capture baseline response count + text BEFORE injection
+            // Capture baseline: full page text length (DOM-agnostic snapshot)
+            // Claude triad fix: don't rely on turn-count selectors — they break across AI sites
             int baselineCount = 0;
+            int baselinePageLen = 0;
             var baseline = "";
             try
             {
-                // Count existing response blocks (model-response / [role="article"])
                 var countStr = await cdp.EvalAsync(
                     "(()=>{var r=document.querySelectorAll('model-response');if(!r.length)r=document.querySelectorAll('[role=\"article\"]');return r.length})()");
                 int.TryParse(countStr, out baselineCount);
                 baseline = await cdp.GetLastResponseTextAsync() ?? "";
+                // DOM-agnostic: snapshot full page text length
+                var pageLenStr = await cdp.EvalAsync("document.body?.innerText?.length??0") ?? "0";
+                int.TryParse(pageLenStr, out baselinePageLen);
             }
             catch { }
-            Console.WriteLine($"[DEBATE:INJECT] {ai}: baseline={baseline.Length} chars, turns={baselineCount}, connected={cdp.IsConnected}");
+            Console.WriteLine($"[DEBATE:INJECT] {ai}: baseline={baseline.Length}chars, pageLen={baselinePageLen}, turns={baselineCount}, connected={cdp.IsConnected}");
+
+            // Verify target page URL matches expected AI site
+            try
+            {
+                var pageUrl = await cdp.EvalAsync("location.href") ?? "(unknown)";
+                var expectedHost = ai switch { "gemini" => "gemini.google", "gpt" => "chatgpt.com", "claude" => "claude.ai", _ => "" };
+                if (!string.IsNullOrEmpty(expectedHost) && !pageUrl.Contains(expectedHost, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[DEBATE:INJECT] {ai}: ❌ WRONG TARGET! Expected {expectedHost}, got {pageUrl}");
+                    Console.ResetColor();
+                    SlackPostToThread($"❌ *[{ai}] Wrong target!* Expected {expectedHost}, got: {pageUrl}", "🦉 Moderator");
+                    return AskAndCapture(ai, prompt, timeoutSec);
+                }
+                Console.WriteLine($"[DEBATE:INJECT] {ai}: target verified → {pageUrl[..Math.Min(60, pageUrl.Length)]}");
+            }
+            catch (Exception urlEx) { Console.WriteLine($"[DEBATE:INJECT] {ai}: URL check failed: {urlEx.Message}"); }
+
+            // Wait for previous response to finish streaming before injecting new prompt
+            try
+            {
+                var provider = ai == "gpt" ? "chatgpt" : ai;
+                for (int waitGen = 0; waitGen < 15; waitGen++) // max 30s
+                {
+                    if (!await cdp.IsStreamingAsync(provider)) break;
+                    Console.WriteLine($"[DEBATE:INJECT] {ai}: waiting for previous response to finish ({waitGen * 2}s)...");
+                    await Task.Delay(2000);
+                }
+            }
+            catch { }
+
+            // Dump editor + response node paths BEFORE inject
+            try
+            {
+                var editorPath = await cdp.EvalAsync($@"(()=>{{
+                    var el=document.querySelector('{editorSel}');
+                    if(!el) return '(editor not found: {editorSel})';
+                    var path=[];
+                    while(el){{path.unshift(el.tagName+(el.id?'#'+el.id:'')+(el.className?' .'+el.className.split(' ').slice(0,2).join('.'):'')); el=el.parentElement;}}
+                    return path.join(' > ');
+                }})()") ?? "(eval fail)";
+                // Use CSS selectors without quotes conflict — backtick template in JS
+                var respSel = ai switch { "gemini" => "model-response", "gpt" => "[data-message-author-role=assistant]", "claude" => "[role=article]", _ => "model-response" };
+                var respPath = await cdp.EvalAsync($@"(()=>{{
+                    var els=document.querySelectorAll('{respSel}');
+                    if(!els.length) return '(no response nodes: {respSel})';
+                    var last=els[els.length-1];
+                    var path=[];
+                    while(last){{path.unshift(last.tagName+(last.id?'#'+last.id:'')+(last.className?' .'+last.className.split(' ').slice(0,2).join('.'):'')); last=last.parentElement;}}
+                    return els.length+'nodes, last='+path.join(' > ');
+                }})()") ?? "(eval fail)";
+                Console.WriteLine($"[DEBATE:INJECT] {ai}: editor-path: {editorPath}");
+                Console.WriteLine($"[DEBATE:INJECT] {ai}: response-path: {respPath}");
+            }
+            catch (Exception pathEx) { Console.WriteLine($"[DEBATE:INJECT] {ai}: path dump failed: {pathEx.Message}"); }
 
             // Inject prompt text
             try
@@ -895,6 +1081,14 @@ internal partial class Program
                 // Send (Enter)
                 await cdp.SendPromptAsync(editorSel);
                 Console.WriteLine($"[DEBATE:INJECT] {ai}: sent moderator prompt ({prompt.Length} chars)");
+                // Post-inject verification: editor content + send button state
+                try
+                {
+                    var editorContent = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.innerText?.substring(0,100)??'(empty)'") ?? "(null)";
+                    var editorLen = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.innerText?.length??0") ?? "0";
+                    Console.WriteLine($"[DEBATE:INJECT] {ai}: post-inject editor={editorLen}chars [{editorContent}]");
+                }
+                catch { }
             }
             catch (Exception insertEx)
             {
@@ -910,47 +1104,227 @@ internal partial class Program
                 catch (Exception fb) { Console.Error.WriteLine($"[DEBATE:INJECT] {ai}: fallback also failed: {fb.Message}"); return null; }
             }
 
-            // Poll response with baseline comparison + 9s stall detection
+            // Poll response: DOM-agnostic page text length comparison (삼두 합의 방식)
+            // Initial wait 5s (AI needs time to start responding after Enter)
+            await Task.Delay(5000);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             string lastText = "";
             int stable = 0;
             var lastChunkTime = System.Diagnostics.Stopwatch.StartNew();
-            int nudgeCount = 0;
             while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 90))
             {
                 await Task.Delay(2000);
-                string text;
-                try { text = await cdp.GetLastResponseTextAsync(baselineCount) ?? ""; }
+
+                // Primary: page text length growth detection (DOM-agnostic)
+                int curPageLen = 0;
+                string text = "";
+                try
+                {
+                    var pageLenStr = await cdp.EvalAsync("document.body?.innerText?.length??0") ?? "0";
+                    int.TryParse(pageLenStr, out curPageLen);
+                    // Also try selector-based (best-effort)
+                    text = await cdp.GetLastResponseTextAsync(baselineCount) ?? "";
+                    // If selector failed but page grew → extract last chunk
+                    if (text.Length < 20 && curPageLen > baselinePageLen + 50)
+                    {
+                        text = await cdp.EvalAsync(
+                            $"document.body?.innerText?.substring({baselinePageLen})?.trim()?.substring(0,3000)??''") ?? "";
+                        if (text.Length > 20 && stable == 0) // log only once (first detection)
+                            Console.WriteLine($"[DEBATE:INJECT] {ai}: selector miss → pageLen fallback +{curPageLen - baselinePageLen}chars, extracted {text.Length}chars");
+                    }
+                }
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"[DEBATE:INJECT] {ai}: poll error: {ex.Message}");
                     continue;
                 }
 
-                // 9s since last new chunk → nudge (max 2 times)
-                if (lastChunkTime.Elapsed.TotalSeconds >= 9 && nudgeCount < 2)
+                // Stall detection: 15s with no growth → log (no nudge — nudge poisons context)
+                if (lastChunkTime.Elapsed.TotalSeconds >= 15 && text.Length < 20)
                 {
-                    nudgeCount++;
-                    var stallMsg = text.Length < 20
-                        ? "You haven't started responding. Please begin your answer now."
-                        : "Your response appears stalled. Please continue or wrap up.";
-                    Console.WriteLine($"[DEBATE:INJECT] {ai}: stall detected ({lastChunkTime.Elapsed.TotalSeconds:F0}s) → nudge #{nudgeCount}");
-                    SlackPostToThread($"⏰ *[Moderator→{ai}]* {lastChunkTime.Elapsed.TotalSeconds:F0}초 무응답 — 재촉 #{nudgeCount}", "🦉 Moderator");
-                    await cdp.InsertContentEditableAsync(editorSel, $"[MODERATOR] ⏰ {stallMsg}");
-                    await cdp.SendPromptAsync(editorSel);
+                    Console.WriteLine($"[DEBATE:INJECT] {ai}: stall {lastChunkTime.Elapsed.TotalSeconds:F0}s, pageLen={curPageLen}(was {baselinePageLen}), text={text.Length}chars");
+                    SlackPostToThread($"⏰ *[{ai}]* {lastChunkTime.Elapsed.TotalSeconds:F0}초 무응답 — pageLen={curPageLen}(was {baselinePageLen})", "🦉 Moderator");
                     lastChunkTime.Restart();
                 }
 
                 if (text.Length < 20) continue;
+
+                // TOOL_CALL detection: if AI emitted [APPBOT_TOOL_CALL_BEGIN]...[END], execute and inject result
+                if (text.Contains("[APPBOT_TOOL_CALL_BEGIN]") && text.Contains("[APPBOT_TOOL_CALL_END]"))
+                {
+                    var tcStart = text.IndexOf("[APPBOT_TOOL_CALL_BEGIN]") + "[APPBOT_TOOL_CALL_BEGIN]".Length;
+                    var tcEnd = text.IndexOf("[APPBOT_TOOL_CALL_END]", tcStart);
+                    if (tcEnd > tcStart)
+                    {
+                        var toolCmd = text[tcStart..tcEnd].Trim();
+                        Console.WriteLine($"[DEBATE:TOOL] {ai}: detected TOOL_CALL: {toolCmd[..Math.Min(100, toolCmd.Length)]}");
+                        SlackPostToThread($"🔧 *[{AiDisplayName(ai)} TOOL_CALL]* `{toolCmd[..Math.Min(80, toolCmd.Length)]}`", AiDisplayName(ai));
+                        // Parse: CLI string "wkappbot cmd args" OR JSON {"argv":["cmd","args"]}
+                        string[] cmdParts;
+                        if (toolCmd.TrimStart().StartsWith("{"))
+                        {
+                            try
+                            {
+                                var json = System.Text.Json.JsonDocument.Parse(toolCmd);
+                                var argv = json.RootElement.GetProperty("argv");
+                                cmdParts = new string[argv.GetArrayLength()];
+                                for (int ci = 0; ci < cmdParts.Length; ci++)
+                                    cmdParts[ci] = argv[ci].GetString() ?? "";
+                            }
+                            catch { cmdParts = toolCmd.Split(' ', StringSplitOptions.RemoveEmptyEntries); }
+                        }
+                        else
+                            cmdParts = toolCmd.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        // Strip leading "wkappbot" if present
+                        if (cmdParts.Length >= 1 && cmdParts[0].Equals("wkappbot", StringComparison.OrdinalIgnoreCase))
+                            cmdParts = cmdParts[1..];
+                        if (cmdParts.Length >= 1)
+                        {
+                            var (output, exitCode) = RunCliCaptureWithCode(cmdParts[0], cmdParts.Length > 1 ? cmdParts[1..] : Array.Empty<string>(), null);
+                            var resultSnippet = output.Length > 500 ? output[..500] + "..." : output;
+                            var toolResult = $"TOOL_RESULT [exit={exitCode}]\n{resultSnippet}";
+                            Console.WriteLine($"[DEBATE:TOOL] {ai}: result={output.Length}chars exit={exitCode}");
+                            SlackPostToThread($"🔧 *[{ai} TOOL_RESULT]* exit={exitCode}, {output.Length}chars", "🦉 Moderator");
+                            // Inject result back to AI
+                            try { await cdp.InsertContentEditableAsync(editorSel, toolResult); await cdp.SendPromptAsync(editorSel); }
+                            catch { }
+                            // Share with peers
+                            ctx.PushDiscovery(ai, $"{toolCmd} → {resultSnippet}");
+                            baselinePageLen = curPageLen + toolResult.Length; // reset baseline
+                            lastChunkTime.Restart();
+                            continue; // poll for AI's next response after tool result
+                        }
+                    }
+                }
+
                 if (text != lastText) { stable = 0; lastText = text; lastChunkTime.Restart(); }
                 else { stable++; if (stable >= 3) return text; }
                 try { var provider = ai == "gpt" ? "chatgpt" : ai;
                     if (!await cdp.IsStreamingAsync(provider)) { await Task.Delay(1000); return lastText; } } catch { }
             }
-            return string.IsNullOrEmpty(lastText) ? null : lastText;
+            // Poll timeout — dump debug info for diagnosis
+            if (string.IsNullOrEmpty(lastText))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[DEBATE:INJECT] {ai}: ❌ POLL TIMEOUT — no response detected after {sw.Elapsed.TotalSeconds:F0}s");
+                Console.ResetColor();
+
+                // Debug dump: DOM state + editor state + screenshot
+                var dumpSb = new StringBuilder();
+                dumpSb.AppendLine($"baseline: {baseline.Length}chars, turns={baselineCount}");
+                try
+                {
+                    var curCount = await cdp.EvalAsync(
+                        "(()=>{var r=document.querySelectorAll('model-response');if(!r.length)r=document.querySelectorAll('[role=\"article\"]');return r.length})()");
+                    var curText = await cdp.GetLastResponseTextAsync() ?? "(null)";
+                    var editorText = await cdp.EvalAsync($"document.querySelector('{editorSel}')?.innerText?.substring(0,200)??'(no editor)'") ?? "(eval fail)";
+                    var pageTitle = await cdp.EvalAsync("document.title") ?? "(no title)";
+                    var isStreaming = false;
+                    try { isStreaming = await cdp.IsStreamingAsync(ai == "gpt" ? "chatgpt" : ai); } catch { }
+                    dumpSb.AppendLine($"current: turns={curCount}(was {baselineCount}), streaming={isStreaming}");
+                    dumpSb.AppendLine($"lastResponse: {curText.Length}chars [{curText[..Math.Min(120, curText.Length)]}]");
+                    dumpSb.AppendLine($"editor: [{editorText}]");
+                    dumpSb.AppendLine($"title: {pageTitle}");
+                    dumpSb.AppendLine($"connected={cdp.IsConnected}, wsUrl={cdp.WebSocketUrl?[..Math.Min(60, cdp.WebSocketUrl?.Length ?? 0)]}");
+                    // Full a11y node path: Chrome hwnd + tab info
+                    var chromeHwnd = cdp.GetChromeWindowHandle();
+                    dumpSb.AppendLine($"chromeHwnd=0x{chromeHwnd:X}, ChromeWindowHandle=0x{cdp.ChromeWindowHandle:X}");
+                    var tabUrl = await cdp.EvalAsync("location.href") ?? "(unknown)";
+                    var tabTitle = await cdp.EvalAsync("document.title") ?? "(unknown)";
+                    dumpSb.AppendLine($"tab: {tabTitle}");
+                    dumpSb.AppendLine($"url: {tabUrl}");
+                    // Response selectors check
+                    var modelResp = await cdp.EvalAsync("document.querySelectorAll('model-response').length") ?? "0";
+                    var roleArticle = await cdp.EvalAsync("document.querySelectorAll('[role=\"article\"]').length") ?? "0";
+                    var turnGroups = await cdp.EvalAsync("document.querySelectorAll('[data-testid*=\"turn\"]').length") ?? "0";
+                    dumpSb.AppendLine($"DOM: model-response={modelResp}, [role=article]={roleArticle}, turn-groups={turnGroups}");
+                }
+                catch (Exception dex) { dumpSb.AppendLine($"dump error: {dex.Message}"); }
+
+                // Screenshot
+                string? screenshotPath = null;
+                try
+                {
+                    var ssDir = Path.Combine(Path.GetTempPath(), "wkappbot_debate_debug");
+                    Directory.CreateDirectory(ssDir);
+                    screenshotPath = Path.Combine(ssDir, $"{ai}_{DateTime.Now:HHmmss}_poll_fail.png");
+                    var ssData = await cdp.EvalAsync("(async()=>{var r=await new Promise(ok=>chrome.debugger?ok('n/a'):ok('n/a'));return r})()");
+                    // CDP screenshot
+                    var ssResult = await cdp.SendAsync("Page.captureScreenshot", new System.Text.Json.Nodes.JsonObject { ["format"] = "png" });
+                    var b64 = ssResult?["data"]?.GetValue<string>();
+                    if (b64 != null) File.WriteAllBytes(screenshotPath, Convert.FromBase64String(b64));
+                    dumpSb.AppendLine($"screenshot: {screenshotPath}");
+                }
+                catch (Exception ssEx) { dumpSb.AppendLine($"screenshot failed: {ssEx.Message}"); screenshotPath = null; }
+
+                var dumpText = dumpSb.ToString();
+                Console.WriteLine($"[DEBATE:INJECT] {ai}: DEBUG DUMP:\n{dumpText}");
+                // Upload dump as text file attachment (avoids msg_too_long)
+                SlackPostToThread($"❌ *[{ai}] Poll Timeout* — 디버그 덤프 첨부 ↓", "🦉 Moderator");
+                try
+                {
+                    var dumpDir = Path.Combine(Path.GetTempPath(), "wkappbot_debate_debug");
+                    Directory.CreateDirectory(dumpDir);
+                    var dumpFile = Path.Combine(dumpDir, $"{ai}_{DateTime.Now:HHmmss}_poll_dump.txt");
+                    File.WriteAllText(dumpFile, dumpText);
+                    var threadTs = _slackSessionThreadTs.Value;
+                    if (threadTs != null)
+                    {
+                        var config = LoadSlackConfig();
+                        var botToken = config?["bot_token"]?.GetValue<string>();
+                        var channel = config?["channel"]?.GetValue<string>();
+                        if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
+                            SlackUploadFileAsync(botToken, channel, dumpFile, $"{ai} poll timeout dump", threadTs).GetAwaiter().GetResult();
+                    }
+                }
+                catch { }
+                // Upload screenshot to Slack if available
+                if (screenshotPath != null && File.Exists(screenshotPath))
+                {
+                    try
+                    {
+                        var threadTs = _slackSessionThreadTs.Value;
+                        if (threadTs != null)
+                        {
+                            var config = LoadSlackConfig();
+                            var botToken = config?["bot_token"]?.GetValue<string>();
+                            var channel = config?["channel"]?.GetValue<string>();
+                            if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
+                                SlackUploadFileAsync(botToken, channel, screenshotPath, $"{ai} poll timeout", threadTs).GetAwaiter().GetResult();
+                        }
+                    }
+                    catch { }
+                }
+
+                // RETRY: fall back to AskAndCapture (new tab approach)
+                Console.WriteLine($"[DEBATE:INJECT] {ai}: retrying via AskAndCapture fallback...");
+                SlackPostToThread($"🔄 *[Moderator→{ai}]* CDP poll 실패 → AskAndCapture 폴백 재시도", "🦉 Moderator");
+                return AskAndCapture(ai, prompt, timeoutSec);
+            }
+            return lastText;
         }
         catch (Exception ex) { Console.Error.WriteLine($"[DEBATE:INJECT] {ai} error: {ex.Message}"); }
         return null;
+    }
+
+    // ── NLI: AI-as-judge semantic comparison ──
+    enum NliResult { Entail, Neutral, Contradict }
+
+    static async Task<NliResult> SemanticCompareAsync(TriadSharedContext ctx, string claim1, string claim2)
+    {
+        // Pick fastest available AI (prefer gemini for speed)
+        var ai = ctx._cdpClients.ContainsKey("gemini") ? "gemini"
+               : ctx._cdpClients.Keys.FirstOrDefault() ?? "gemini";
+        var prompt = $"Are these two claims semantically equivalent?\nP1: {claim1}\nP2: {claim2}\nReply ONLY: ENTAIL / NEUTRAL / CONTRADICT";
+        try
+        {
+            var resp = await InjectAndPollAsync(ctx, ai, prompt, 15);
+            var r = resp?.Trim().ToUpper();
+            if (r?.Contains("ENTAIL") == true) return NliResult.Entail;
+            if (r?.Contains("CONTRADICT") == true) return NliResult.Contradict;
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[NLI] SemanticCompare error: {ex.Message}"); }
+        return NliResult.Neutral;
     }
 
     /// <summary>Post debate summary to Slack thread.</summary>

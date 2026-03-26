@@ -180,10 +180,10 @@ internal partial class Program
                     if (ok && !string.IsNullOrWhiteSpace(answer))
                     {
                         var gptSlack = NormalizeBlankLines(answer);
-                        SlackPostToThread(gptSlack.Length > 2000 ? gptSlack[..2000] + "..." : gptSlack, "ChatGPT");
+                        SlackPostToThread(gptSlack.Length > 2000 ? gptSlack[..2000] + "..." : gptSlack, SlackAiName("gpt", "ChatGPT"));
                     }
                     else
-                         SlackPostToThread("[timeout or image failed]", "ChatGPT");
+                         SlackPostToThread("[timeout or image failed]", SlackAiName("gpt", "ChatGPT"));
                 }
 
                 // Log initial answer to shared triad context (for recovery by other AIs if needed)
@@ -192,7 +192,7 @@ internal partial class Program
 
                 Action<string, string?> onStepReport = (msg, uname) =>
                 {
-                    SlackPostToThread(msg, uname ?? "ChatGPT");
+                    SlackPostToThread(msg, uname ?? SlackAiName("gpt", "ChatGPT"));
                     triadCtx?.LogStep("ChatGPT", msg);
                 };
                 if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))

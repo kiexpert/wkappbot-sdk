@@ -117,9 +117,10 @@ internal partial class Program
             // Signal Launcher to TerminateSelf immediately — don't wait for Core's ~30s OS cleanup.
             // Launcher stdout relay detects "\0UIT" sentinel → TerminateSelf → bash gets control back.
             // Core's SMB console handle cleanup (~30s) continues in background after Launcher exits.
+            // Sentinel via stderr (not stdout) — keeps stdout clean for pipes, MCP JSON-RPC, etc.
             try
             {
-                var raw = Console.OpenStandardOutput();
+                var raw = Console.OpenStandardError();
                 raw.Write(new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' });
                 raw.Flush();
             }

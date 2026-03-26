@@ -1987,8 +1987,8 @@ internal partial class Program
                 Console.ResetColor();
             }
 
-            // Show focus child + owned popup (foreground or filtered matches)
-            if (!isChild && (isForeground || hasFilter))
+            // Show focus child + owned popup (all matched windows, not just foreground)
+            if (!isChild)
                 PrintFocusAndPopup(hWnd);
         }
 
@@ -2001,8 +2001,14 @@ internal partial class Program
                 var gti = new NativeMethods.GUITHREADINFO
                     { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
                 bool gtiOk = NativeMethods.GetGUIThreadInfo(threadId, ref gti);
-                // Show focus child (skip if focus == self — no extra info)
-                if (gtiOk && gti.hwndFocus != IntPtr.Zero && gti.hwndFocus != hWnd)
+                if (gtiOk && gti.hwndFocus == IntPtr.Zero)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine("    ⌨ focus: (none — no stored keyboard focus for this thread)");
+                    Console.ResetColor();
+                }
+                // Show focus child (including focus == self for a11y path)
+                if (gtiOk && gti.hwndFocus != IntPtr.Zero)
                 {
                     var focusBuf = new StringBuilder(256);
                     NativeMethods.GetWindowTextW(gti.hwndFocus, focusBuf, focusBuf.Capacity);
@@ -2014,7 +2020,68 @@ internal partial class Program
                     var focusTitle = focusBuf.ToString();
                     Console.WriteLine($"[{gti.hwndFocus:X8}] \"{(focusTitle.Length > 40 ? focusTitle[..37] + "..." : focusTitle)}\" ({focusClassBuf})");
                     Console.ResetColor();
+
+                    // UIA focused LEAF element — TreeWalker + HasKeyboardFocus (works for background windows)
+                    try
+                    {
+                        using var uia = new FlaUI.UIA3.UIA3Automation();
+                        FlaUI.Core.AutomationElements.AutomationElement? focusEl = null;
+                        // Get UIA root from hwndFocus, then walk to leaf with HasKeyboardFocus
+                        try
+                        {
+                            var hwndRoot = uia.FromHandle(gti.hwndFocus);
+                            focusEl = GrapHelper.FindFocusedLeaf(uia, hwndRoot) ?? hwndRoot;
+                        }
+                        catch { }
+                        if (focusEl == null) try { focusEl = uia.FocusedElement(); } catch { } // global fallback
+                        if (focusEl == null)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine($"    ⚠ a11y focus: unavailable (hwndFocus=0x{gti.hwndFocus:X}, thread={threadId})");
+                            Console.ResetColor();
+                        }
+                        else
+                        {
+                            // Full grap expression: "windowTitle#a11y/full/path"
+                            var grapExpr = WKAppBot.Win32.Accessibility.GrapHelper.BuildGrapExpression(hWnd, focusEl);
+                            var leafRect = focusEl.Properties.BoundingRectangle.ValueOrDefault;
+                            var vp = focusEl.Patterns.Value.PatternOrDefault;
+                            var editable = vp != null && !vp.IsReadOnly.ValueOrDefault;
+
+                            Console.ForegroundColor = ConsoleColor.DarkCyan;
+                            Console.Write("    ↳ ");
+                            Console.ForegroundColor = ConsoleColor.Cyan;
+                            Console.Write(grapExpr);
+                            Console.ForegroundColor = ConsoleColor.DarkGray;
+                            Console.Write($" ({leafRect.X},{leafRect.Y} {leafRect.Width}x{leafRect.Height})");
+                            if (editable) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" [editable]"); }
+                            Console.ResetColor();
+                            Console.WriteLine();
+                        }
+                    }
+                    catch { }
                 }
+
+                // CDP active tab URL (best-effort)
+                try
+                {
+                    NativeMethods.GetWindowThreadProcessId(hWnd, out uint cdpPid);
+                    var cdpPort = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)cdpPid);
+                    if (cdpPort > 0)
+                    {
+                        using var cdpProbe = new WKAppBot.WebBot.CdpClient();
+                        cdpProbe.ConnectAsync(cdpPort).GetAwaiter().GetResult();
+                        var tabUrl = cdpProbe.EvalAsync("location.href").GetAwaiter().GetResult() ?? "";
+                        if (tabUrl.Length > 0 && tabUrl != "about:blank")
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkCyan;
+                            Console.Write("    ↳ url: ");
+                            Console.ResetColor();
+                            Console.WriteLine(tabUrl.Length > 80 ? tabUrl[..77] + "..." : tabUrl);
+                        }
+                    }
+                }
+                catch { }
             }
 
             // 2. Owned popup/dialog windows (other top-levels whose owner = hWnd)

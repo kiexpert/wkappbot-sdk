@@ -318,6 +318,9 @@ internal partial class Program
                     _lastFocusTheftStack = null;
                 };
 
+                // JS errors → Slack thread (빠른 버그 추적)
+                cdp.OnJsError = (dump) => SlackPostToThread($"🔴 {dump}", "🦉 Moderator");
+
                 return (CdpClient?)cdp;
             }
             catch (Exception ex)

@@ -79,6 +79,9 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     /// <summary>Current high-level operation context (e.g. "ask-gemini:wait-response") for focus theft diagnostics.</summary>
     public string? OperationContext { get; set; }
 
+    /// <summary>Callback for JS errors — caller can route to Slack. Args: (errorMsg, expression, pageUrl, contextDump).</summary>
+    public Action<string>? OnJsError { get; set; }
+
     /// <summary>
     /// Called once when CDP session starts active operations on a non-foreground Chrome window.
     /// Caller should show magnifier on the target. Returns IDisposable to dismiss when done.
@@ -280,6 +283,14 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         nint prevFg = 0;
         if (EnableFocusTheftMonitoring && OnFocusTheft != null)
             prevFg = (nint)GetForegroundWindow();
+
+        // Minimize Chrome before Input.* commands to prevent focus theft
+        // CDP protocol works on minimized windows — renderer processes messages without activation
+        if (method.StartsWith("Input.", StringComparison.Ordinal) && ChromeWindowHandle != 0)
+        {
+            if (!IsIconic((IntPtr)ChromeWindowHandle))
+                ShowWindowNative((IntPtr)ChromeWindowHandle, 6); // SW_MINIMIZE
+        }
 
         var id = Interlocked.Increment(ref _messageId);
         var tcs = new TaskCompletionSource<JsonNode?>();
