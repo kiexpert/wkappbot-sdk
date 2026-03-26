@@ -58,6 +58,7 @@ internal partial class Program
         public DateTime? RateLimitDetectedAt;
         public DateTime? RateLimitResetTime;
         public DateTime? LastRateLimitAlertTime;
+        public string? RateLimitAlertMsgTs; // Slack ts for deletion on clear
 
         // ── Plan/permission approval ──
         public bool PlanApprovalSentToSlack;
@@ -435,6 +436,13 @@ internal partial class Program
                         state.WasRateLimited = false;
                         state.RateLimitDetectedAt = null;
                         state.RateLimitResetTime = null;
+                        // Delete rate limit alert from Slack
+                        if (state.RateLimitAlertMsgTs != null && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                        {
+                            try { Task.Run(async () => await SlackDeleteMessageAsync(slackBotToken!, slackChannel!, state.RateLimitAlertMsgTs!, guardThreadStarter: true)).Wait(3000); }
+                            catch { }
+                            state.RateLimitAlertMsgTs = null;
+                        }
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine($"[EYE] {label}Rate limit cleared (newState={claudeStatus.Item1}, cooldown={cooldownPassed}, resetTime={resetTimePassed})");
                         Console.ResetColor();
@@ -469,9 +477,10 @@ internal partial class Program
                         {
                             var alertMsg = $":rotating_light: *{label}Rate Limit!* {claudeStatus.Item2}";
                             var rateLimitUsername = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
-                            Task.Run(async () =>
+                            var (ok, ts) = Task.Run(async () =>
                                 await SlackSendViaApi(slackBotToken!, slackChannel!, alertMsg, username: rateLimitUsername))
-                                .Wait(5000);
+                                .GetAwaiter().GetResult();
+                            if (ok && ts != null) state.RateLimitAlertMsgTs = ts;
                         }
                         catch { }
                     }
