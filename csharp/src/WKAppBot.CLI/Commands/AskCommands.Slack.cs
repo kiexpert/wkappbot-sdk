@@ -132,7 +132,7 @@ internal partial class Program
     /// <summary>Map Unicode emoji in username to Slack :shortcode: for icon_emoji.</summary>
     static string? ExtractDebateIconEmoji(string? username) => username switch
     {
-        _ when username?.Contains("🦉") == true => ":owl:",
+        _ when username?.Contains("⚖️") == true => ":scales:",
         _ when username?.Contains("🦊") == true => ":fox_face:",
         _ when username?.Contains("🐬") == true => ":dolphin:",
         _ when username?.Contains("🐙") == true => ":octopus:",
