@@ -54,6 +54,24 @@ internal partial class Program
             try { subDirs = Directory.GetDirectories(root); }
             catch { continue; }
 
+            // Pre-scan: show per-folder summary (file count + total size)
+            if (subDirs.Length > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.WriteLine($"[GC] Scanning {Path.GetFileName(root)}/ ({subDirs.Length} folders):");
+                Console.ResetColor();
+                foreach (var d in subDirs)
+                {
+                    try
+                    {
+                        var files = Directory.GetFiles(d, "*", System.IO.SearchOption.AllDirectories);
+                        var size = files.Sum(f => { try { return new FileInfo(f).Length; } catch { return 0L; } });
+                        Console.WriteLine($"  {Path.GetFileName(d)}/: {files.Length} files, {size / 1024.0:F0}KB");
+                    }
+                    catch { }
+                }
+            }
+
             foreach (var dir in subDirs)
             {
                 var folderName = Path.GetFileName(dir);
