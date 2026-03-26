@@ -413,7 +413,14 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
                     Console.WriteLine($"[SLACK] Skip changed bot msg: user={user} botId={botId}");
                     return;
                 }
-                Console.WriteLine($"[SLACK] Unwrapped message_changed: user={user} text={text?[..Math.Min(text?.Length ?? 0, 40)]}");
+                var isEdited = innerMsg["edited"] != null;
+                if (!isEdited)
+                {
+                    // URL unfurl (not user edit) → skip to avoid double-routing
+                    Console.WriteLine($"[SLACK] Skip message_changed (unfurl, not edit): user={user}");
+                    return;
+                }
+                Console.WriteLine($"[SLACK] User edit detected → re-routing as new message: user={user} text={text?[..Math.Min(text?.Length ?? 0, 40)]}");
             }
             else
             {
