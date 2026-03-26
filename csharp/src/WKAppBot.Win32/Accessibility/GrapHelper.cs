@@ -102,29 +102,65 @@ public static class GrapHelper
     }
 
     /// <summary>
-    /// Find the keyboard-focused LEAF element under a root (works for background windows).
-    /// Uses TreeWalker + HasKeyboardFocus instead of FocusedElement (foreground-only).
+    /// Find the keyboard-focused LEAF element under a root.
+    /// Strategy: (1) Foreground → FocusedElement (accurate). (2) Background → TreeWalker HasKeyboardFocus.
     /// </summary>
-    public static AutomationElement? FindFocusedLeaf(FlaUI.UIA3.UIA3Automation uia, AutomationElement root)
+    public static AutomationElement? FindFocusedLeaf(FlaUI.UIA3.UIA3Automation uia, AutomationElement root, IntPtr hwnd = default)
     {
-        if (root.Properties.HasKeyboardFocus.ValueOrDefault) return root;
+        // Strategy 1: If this is the foreground window, FocusedElement is accurate
         try
         {
-            var walker = uia.TreeWalkerFactory.GetControlViewWalker();
-            return WalkForFocus(walker, root);
+            var fg = WKAppBot.Win32.Native.NativeMethods.GetForegroundWindow();
+            if (hwnd != default && hwnd == fg)
+            {
+                var focused = uia.FocusedElement();
+                if (focused != null) return focused;
+            }
         }
-        catch { return null; }
+        catch { }
+
+        // Strategy 2: TreeWalker — walk children for HasKeyboardFocus
+        try
+        {
+            if (root.Properties.HasKeyboardFocus.ValueOrDefault) return root;
+            var walker = uia.TreeWalkerFactory.GetControlViewWalker();
+            var found = WalkForFocusIterative(walker, root);
+            if (found != null) return found;
+        }
+        catch { }
+
+        // Strategy 3: FindAll descendants with HasKeyboardFocus (broader, slower)
+        try
+        {
+            var cond = new FlaUI.Core.Conditions.PropertyCondition(
+                uia.PropertyLibrary.Element.HasKeyboardFocus, true);
+            var results = root.FindAll(FlaUI.Core.Definitions.TreeScope.Descendants, cond);
+            if (results.Length > 0) return results[0];
+        }
+        catch { }
+
+        return root; // fallback: return root itself
     }
 
-    private static AutomationElement? WalkForFocus(dynamic walker, AutomationElement el)
+    private static AutomationElement? WalkForFocusIterative(dynamic walker, AutomationElement root)
     {
-        var child = walker.GetFirstChild(el);
-        while (child != null)
+        var stack = new Stack<AutomationElement>();
+        stack.Push(root);
+        int safety = 200;
+        while (stack.Count > 0 && safety-- > 0)
         {
-            if (child.Properties.HasKeyboardFocus.ValueOrDefault) return child;
-            var found = WalkForFocus(walker, child);
-            if (found != null) return found;
-            child = walker.GetNextSibling(child);
+            var el = stack.Pop();
+            try { if (el.Properties.HasKeyboardFocus.ValueOrDefault) return el; } catch { continue; }
+            try
+            {
+                var child = walker.GetFirstChild(el);
+                while (child != null)
+                {
+                    stack.Push(child);
+                    child = walker.GetNextSibling(child);
+                }
+            }
+            catch { }
         }
         return null;
     }
