@@ -161,6 +161,8 @@ public static class ChromeLauncher
                             ShowWindow(mainHwnd, 4);
                             // SWP_NOACTIVATE(0x10)|SWP_NOZORDER(0x4)|SWP_NOOWNERZORDER(0x200)
                             SetWindowPos(mainHwnd, IntPtr.Zero, bounds.X, bounds.Y, bounds.W, bounds.H, 0x0214);
+                            // Tag window as WKWebBot — SetPropW survives title changes from tab switches
+                            SetPropW(mainHwnd, "WKWebBot", new IntPtr(1));
                         }
                     }
                     catch { }
@@ -250,6 +252,9 @@ public static class ChromeLauncher
     }
 
     // P/Invoke
+    [DllImport("user32.dll")]
+    private static extern bool SetPropW(IntPtr hWnd, [MarshalAs(UnmanagedType.LPWStr)] string lpString, IntPtr hData);
+
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
