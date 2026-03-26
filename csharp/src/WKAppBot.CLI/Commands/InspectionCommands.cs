@@ -1982,9 +1982,8 @@ internal partial class Program
                     Console.WriteLine(focusPath);
                 }
             }
-            // Full UIA focus path (expensive) — foreground + filtered only
-            if (!isChild && (isForeground || hasFilter))
-                PrintFocusAndPopup(hWnd);
+            // Full UIA focus path — DISABLED for speed. Use GetFocusPath (Win32) above.
+            // To re-enable: if (!isChild && (isForeground || hasFilter)) PrintFocusAndPopup(hWnd);
         }
 
         void PrintFocusAndPopup(IntPtr hWnd)
