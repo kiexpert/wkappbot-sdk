@@ -60,18 +60,41 @@ public static class GrapHelper
     /// Format a11y node label: "ControlType(AutomationId)" or "ControlType("Name")".
     /// Used everywhere a11y nodes are displayed: windows, inspect, find, read, etc.
     /// </summary>
-    public static string FormatNodeLabel(AutomationElement el, int siblingIndex = 0)
+    /// <summary>String-based overload for pre-extracted info (ElementAtPointInfo etc.)</summary>
+    public static string FormatNodeLabel(string controlType, string? automationId, string? name,
+        int siblingIndex = 0, System.Drawing.Rectangle? rect = null)
+    {
+        var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
+        var id = !string.IsNullOrEmpty(automationId) ? automationId
+               : !string.IsNullOrEmpty(name) ? (name.Length > 20 ? name[..17] + "..." : name)
+               : "";
+        var r = rect.HasValue ? $"ltwh={rect.Value.X},{rect.Value.Y},{rect.Value.Width},{rect.Value.Height}" : "";
+        return r.Length > 0 ? $"{controlType}{idx}{id}({r})" : $"{controlType}{idx}{id}";
+    }
+
+    public static string FormatNodeLabel(AutomationElement el, int siblingIndex = 0, bool includeRect = false, bool includeText = false)
     {
         var ct = el.Properties.ControlType.ValueOrDefault;
         var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
         var name = el.Properties.Name.ValueOrDefault ?? "";
-        // Format: Type{N}{id|name} — e.g. Button2btnOK, Edit1, Pane3chatContainer
-        var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
-        if (aid.Length > 0)
-            return $"{ct}{idx}{aid}";
-        if (name.Length > 0)
-            return $"{ct}{idx}{(name.Length > 20 ? name[..17] + "..." : name)}";
-        return $"{ct}{idx}";
+        System.Drawing.Rectangle? rect = null;
+        if (includeRect)
+            try { var r = el.Properties.BoundingRectangle.ValueOrDefault; rect = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
+        var label = FormatNodeLabel(ct.ToString(), aid, name, siblingIndex, rect);
+        // text= node's own text (Value pattern or Name, JS-string encoded)
+        if (includeText)
+        {
+            var text = "";
+            try { text = el.Patterns.Value.PatternOrDefault?.Value.ValueOrDefault ?? ""; } catch { }
+            if (string.IsNullOrEmpty(text)) text = name;
+            if (text.Length > 0)
+            {
+                var escaped = text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
+                if (escaped.Length > 50) escaped = escaped[..47] + "...";
+                label += $" text=\"{escaped}\"";
+            }
+        }
+        return label;
     }
 
     /// <summary>
