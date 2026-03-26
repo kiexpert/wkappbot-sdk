@@ -195,8 +195,13 @@ public static class WindowFinder
         string procName, int w, int h, FocusSnapshot? focus = null)
     {
         var flags = focus?.GetFlags(hWnd) ?? "";
-        // wkwebbot prop: enriches search key — grap "*wkwebbot*" matches webbot only
-        var wkwebbot = NativeMethods.GetPropW(hWnd, "wkwebbot") != IntPtr.Zero ? " wkwebbot" : "";
+        // wkwebbot + cdp prop: enriches search key for Chrome automation
+        var wkwebbot = "";
+        var cdpProp = NativeMethods.GetPropW(hWnd, "cdp");
+        if (NativeMethods.GetPropW(hWnd, "wkwebbot") != IntPtr.Zero)
+            wkwebbot = cdpProp != IntPtr.Zero ? $" wkwebbot cdp={cdpProp.ToInt32()}" : " wkwebbot";
+        else if (cdpProp != IntPtr.Zero)
+            wkwebbot = $" cdp={cdpProp.ToInt32()}";
         return $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h}{flags}{wkwebbot})";
     }
 
