@@ -1970,8 +1970,8 @@ internal partial class Program
                 Console.ResetColor();
             }
 
-            // Show focus child + owned popup (all matched windows, not just foreground)
-            if (!isChild)
+            // Show focus child + owned popup (foreground + filtered only — UIA is slow per window)
+            if (!isChild && (isForeground || hasFilter))
                 PrintFocusAndPopup(hWnd);
         }
 
