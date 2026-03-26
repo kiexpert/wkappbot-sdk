@@ -1970,7 +1970,24 @@ internal partial class Program
                 Console.ResetColor();
             }
 
-            // Show focus child + owned popup (foreground + filtered only — UIA is slow per window)
+            // Lightweight focus hint for ALL windows (Win32 only, <1ms per window)
+            if (!isChild)
+            {
+                var tid = NativeMethods.GetWindowThreadProcessId(hWnd, out _);
+                var gtiQuick = new NativeMethods.GUITHREADINFO
+                    { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+                if (NativeMethods.GetGUIThreadInfo(tid, ref gtiQuick) && gtiQuick.hwndFocus != IntPtr.Zero && gtiQuick.hwndFocus != hWnd)
+                {
+                    var fTitle = NativeMethods.GetWindowTextW(gtiQuick.hwndFocus);
+                    var fClass = new StringBuilder(128);
+                    NativeMethods.GetClassNameW(gtiQuick.hwndFocus, fClass, 128);
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write("    ⌨ ");
+                    Console.ResetColor();
+                    Console.WriteLine($"0x{gtiQuick.hwndFocus:X}({fClass}){(fTitle.Length > 0 ? $" \"{(fTitle.Length > 35 ? fTitle[..32] + "..." : fTitle)}\"" : "")}");
+                }
+            }
+            // Full UIA focus path (expensive) — foreground + filtered only
             if (!isChild && (isForeground || hasFilter))
                 PrintFocusAndPopup(hWnd);
         }
