@@ -161,8 +161,9 @@ public static class ChromeLauncher
                             ShowWindow(mainHwnd, 4);
                             // SWP_NOACTIVATE(0x10)|SWP_NOZORDER(0x4)|SWP_NOOWNERZORDER(0x200)
                             SetWindowPos(mainHwnd, IntPtr.Zero, bounds.X, bounds.Y, bounds.W, bounds.H, 0x0214);
-                            // Tag window as WKWebBot — SetPropW survives title changes from tab switches
+                            // Tag window as WKWebBot + CDP port — survives title changes
                             SetPropW(mainHwnd, "wkwebbot", new IntPtr(1));
+                            SetPropW(mainHwnd, "cdp", new IntPtr(port));
                         }
                     }
                     catch { }
