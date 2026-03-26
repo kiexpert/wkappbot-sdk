@@ -278,9 +278,7 @@ Examples:
         if (debateMode && !loopMode) _suppressLoopPersona.Value = true; // debate: game rules replace persona (unless --use-tools enables loopMode)
         var modeLabel = debateMode ? "정반합" : "TRIAD";
         ResetEmojis(); // 🦊🐬🐙 fresh race!
-        var qNum = Interlocked.Increment(ref _triadQuestionCount);
-        question = $"[Q{qNum}] {question}"; // sequential numbering for context linking
-        Console.WriteLine($"[{modeLabel}] Q{qNum}: Launching Gemini + GPT + Claude in parallel...");
+        // Game ID will be set after thread creation (uses thread ts)
 
         // ── Unified Slack thread ──────────────────────────────────────────────────────────
         // Set _slackSessionThreadTs.Value BEFORE spawning Task.Run children.
@@ -304,6 +302,11 @@ Examples:
                 }
             }
         }
+
+        // Game ID = thread ts (unique per debate, linkable)
+        var gameId = _slackSessionThreadTs.Value ?? DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        question = $"[G:{gameId}] {question}";
+        Console.WriteLine($"[{modeLabel}] Game {gameId}: Launching Gemini + GPT + Claude in parallel...");
 
         // ── Shared context for recovery (in-memory + JSONL files) ────────────────────────
         // Session folder: {DataDir}/triad/{yyyyMMdd_HHmmss} — one folder per triad run.

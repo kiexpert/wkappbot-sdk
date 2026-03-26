@@ -29,8 +29,8 @@ internal partial class Program
                wkappbot file grep 'keyword' --path W:/GitHub/WKAppBot --type cs
                [APPBOT_TOOL_CALL_END]
                사회자가 실행 후 결과를 알려드립니다. 다른 도구가 궁금하면 물어보세요!
-            11. 🔢 GAME NUMBER: This game is [Q{N}]. Start your responses with [A{N}].
-               게임번호 불일치 시 사회자가 경고합니다 (참여 확인용).
+            11. 🔢 GAME ID: This game is [G:{threadTs}]. Include game ID in responses.
+               게임ID 불일치 시 사회자가 경고합니다 (참여 확인용).
             12. ⚠️ ROUND SCOPE: Follow ONLY the current round's rules. 다른 라운드 룰 사용시 답변 인정 안함! (REJECTED + forced retry)
                R2 = critique only ([DISPUTE]+[CLAIM]+[STANCE]). [합의]/[CONCLUSION_KR] 사용 금지!
                R3 = synthesis only ([CONCLUSION_KR]+[합의]/[미합의]/[셀프힐링]/[개인의견]). [DISPUTE] 필수 아님.
