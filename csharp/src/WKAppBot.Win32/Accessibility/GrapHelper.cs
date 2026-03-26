@@ -68,8 +68,11 @@ public static class GrapHelper
         var id = !string.IsNullOrEmpty(automationId) ? automationId
                : !string.IsNullOrEmpty(name) ? (name.Length > 20 ? name[..17] + "..." : name)
                : "";
-        // XML tag format: <Type{N}id attrs>
-        var tag = $"{controlType}{idx}{id}";
+        // XML tag: <Type{N}id attrs> — skip N if id is present (id is already unique)
+        var numPart = (!string.IsNullOrEmpty(automationId) || !string.IsNullOrEmpty(id)) ? "" : idx;
+        if (string.IsNullOrEmpty(id)) numPart = idx; // no id → always show number
+        else numPart = ""; // has id → skip number
+        var tag = $"{controlType}{numPart}{id}";
         var attrs = new List<string>(3);
         if (rect.HasValue) attrs.Add($"ltwh={rect.Value.X},{rect.Value.Y},{rect.Value.Width},{rect.Value.Height}");
         return attrs.Count > 0 ? $"<{tag} {string.Join(" ", attrs)}>" : $"<{tag}>";

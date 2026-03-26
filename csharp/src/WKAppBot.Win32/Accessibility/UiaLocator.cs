@@ -1226,20 +1226,8 @@ public sealed partial class UiaLocator : IDisposable
             try { elemName = elem.Name ?? ""; } catch { elemName = ""; }
             try { elemAid = elem.AutomationId ?? ""; } catch { elemAid = ""; }
             try { elemCt = elem.ControlType.ToString(); } catch { elemCt = "?"; }
-            var pathParts = ancestors.Select(a =>
-            {
-                var typeStart = a.IndexOf('[');
-                var typeEnd = a.IndexOf(']', typeStart + 1);
-                var nameStart = a.IndexOf('"', typeEnd) + 1;
-                var nameEnd = a.IndexOf('"', nameStart);
-                var type = typeStart >= 0 && typeEnd > typeStart ? a[(typeStart + 1)..typeEnd] : "?";
-                var name = nameStart > 0 && nameEnd > nameStart ? a[nameStart..nameEnd] : "";
-                return string.IsNullOrEmpty(name) || name == "(null)" ? type : $"{type}:{name}";
-            }).ToList();
-            // Element itself: include aid if available
-            string elemPart = string.IsNullOrEmpty(elemName) ? elemCt : $"{elemCt}:{elemName}";
-            if (!string.IsNullOrEmpty(elemAid)) elemPart += $"(aid={elemAid})";
-            pathParts.Add(elemPart);
+            var pathParts = ancestors.ToList(); // already formatted as tags
+            pathParts.Add(GrapHelper.FormatNodeLabel(elemCt, elemAid, elemName));
 
             // Path line with index — A11Y: prefix to distinguish from Win32 tree paths
             sb.AppendLine($"[{i + 1}] A11Y:/{string.Join("/", pathParts)}");
@@ -1296,7 +1284,9 @@ public sealed partial class UiaLocator : IDisposable
                 || ctStr.Contains(filterText, StringComparison.OrdinalIgnoreCase);
         }
 
-        string lineForAncestry = $"[{ctStr}] \"{(name.Length > 40 ? name[..40] + "..." : name)}\" aid=\"{aid}\" {rectStr}";
+        var rectParsed = new System.Drawing.Rectangle();
+        try { var r = element.BoundingRectangle; rectParsed = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
+        string lineForAncestry = GrapHelper.FormatNodeLabel(ctStr, aid, name, rect: rectParsed);
 
         if (isMatch)
         {
