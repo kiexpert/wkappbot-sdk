@@ -953,6 +953,34 @@ public static partial class NativeMethods
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Get window text with timeout protection. Uses SendMessageTimeoutW + SMTO_ABORTIFHUNG
+    /// to avoid blocking on hung windows. Returns "" if timeout or hung.
+    /// </summary>
+    public static string GetWindowTextSafe(IntPtr hWnd, uint timeoutMs = 50)
+    {
+        // Step 1: Get text length (with timeout)
+        var ok = SendMessageTimeoutW(hWnd, WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero,
+            SMTO_ABORTIFHUNG, timeoutMs, out var lenResult);
+        if (ok == IntPtr.Zero) return ""; // hung or timeout
+        int len = lenResult.ToInt32();
+        if (len <= 0) return "";
+
+        // Step 2: Get text (with timeout)
+        var buf = System.Runtime.InteropServices.Marshal.AllocHGlobal((len + 1) * 2);
+        try
+        {
+            ok = SendMessageTimeoutW(hWnd, WM_GETTEXT, (IntPtr)(len + 1), buf,
+                SMTO_ABORTIFHUNG, timeoutMs, out _);
+            if (ok == IntPtr.Zero) return ""; // hung or timeout
+            return System.Runtime.InteropServices.Marshal.PtrToStringUni(buf) ?? "";
+        }
+        finally
+        {
+            System.Runtime.InteropServices.Marshal.FreeHGlobal(buf);
+        }
+    }
+
     // ── Process CWD reading via NtQueryInformationProcess → PEB ──────
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,

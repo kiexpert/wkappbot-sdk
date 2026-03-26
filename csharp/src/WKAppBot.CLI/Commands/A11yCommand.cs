@@ -363,8 +363,9 @@ internal partial class Program
             if (files.Count > 0)
                 return ClipboardWriteFiles(files.ToArray());
 
-            // Text only → CF_UNICODETEXT
-            return ClipboardWrite(string.Join(Environment.NewLine, textParts));
+            // Text only → CF_UNICODETEXT (+ CF_HTML if --html)
+            bool asHtml = args.Contains("--html");
+            return ClipboardWrite(string.Join(Environment.NewLine, textParts), asHtml);
         }
 
         // ═══ Special: file-read / file-write (encoding-aware, no window needed) ═══

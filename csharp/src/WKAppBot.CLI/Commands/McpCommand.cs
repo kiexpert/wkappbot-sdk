@@ -128,6 +128,25 @@ internal partial class Program
         IsMcpMode = true; // global flag: no console windows, no Eye spawn, no elevation launch, no AllocConsole
         Console.Error.WriteLine($"[MCP] Server starting... (launcher={McpLauncherMode})");
 
+        // ── FlaUI/UIA preload: background fire-and-forget ──
+        // Cold-start FlaUI assembly loading takes ~30s. Preload while waiting for first command.
+        // By the time first a11y request arrives, assemblies are already in memory.
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                // Touch FlaUI types to trigger assembly loading
+                _ = typeof(FlaUI.UIA3.UIA3Automation).Assembly;
+                _ = typeof(FlaUI.Core.AutomationElements.AutomationElement).Assembly;
+                Console.Error.WriteLine($"[MCP] FlaUI preloaded in {sw.ElapsedMilliseconds}ms");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[MCP] FlaUI preload failed (non-fatal): {ex.Message}");
+            }
+        });
+
         var writer = new StreamWriter(jsonOut, new UTF8Encoding(false)) { AutoFlush = true };
 
         try
