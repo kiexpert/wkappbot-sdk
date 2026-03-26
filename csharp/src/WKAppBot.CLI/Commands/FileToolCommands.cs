@@ -204,7 +204,11 @@ internal partial class Program
             else if ((args[i] is "-C" or "--context") && i + 1 < args.Length) int.TryParse(args[++i], out context);
             else if (args[i] == "--max"   && i + 1 < args.Length) int.TryParse(args[++i], out maxResults);
             else if (args[i] == "--encoding" && i + 1 < args.Length) { if (int.TryParse(args[++i], out int cp)) encoding = cp; }
-            else if (!args[i].StartsWith("-"))                     pattern = args[i];
+            else if (!args[i].StartsWith("-"))
+            {
+                if (pattern == null) pattern = args[i];           // 1st positional = pattern
+                else if (Directory.Exists(args[i]) || File.Exists(args[i])) searchRoot = args[i]; // 2nd positional = folder/file
+            }
         }
 
         if (string.IsNullOrEmpty(pattern))
@@ -504,7 +508,11 @@ Examples:
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--path" && i + 1 < args.Length) root = args[++i];
-            else if (!args[i].StartsWith("--")) pattern = args[i];
+            else if (!args[i].StartsWith("--"))
+            {
+                if (pattern == null) pattern = args[i];
+                else if (Directory.Exists(args[i])) root = args[i]; // 2nd positional = folder
+            }
         }
 
         if (string.IsNullOrEmpty(pattern))
