@@ -155,15 +155,9 @@ internal partial class Program
         Console.WriteLine($"── {mode} under #{scopeName} ({matches.Count} results) ──");
         foreach (var m in matches)
         {
+            var tag = GrapHelper.FormatNodeLabel(m.ControlType, m.AutomationId, m.Name);
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"  [{m.ControlType}] ");
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.Write($"\"{m.Name}\"");
-            if (!string.IsNullOrEmpty(m.AutomationId))
-            {
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($" aid=\"{m.AutomationId}\"");
-            }
+            Console.Write($"  {tag}");
             if (!string.IsNullOrEmpty(m.NamePath))
             {
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
@@ -1454,18 +1448,10 @@ internal partial class Program
 
         if (elemInfo != null)
         {
-            WriteControlType(elemInfo.ControlType);
-
-            if (!string.IsNullOrEmpty(elemInfo.Name))
-            {
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write($" \"{Truncate(elemInfo.Name, 30)}\"");
-            }
-            if (!string.IsNullOrEmpty(elemInfo.AutomationId))
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write($" aid=\"{elemInfo.AutomationId}\"");
-            }
+            var rect = new System.Drawing.Rectangle(elemInfo.BoundsX, elemInfo.BoundsY, elemInfo.BoundsW, elemInfo.BoundsH);
+            var tag = GrapHelper.FormatNodeLabel(elemInfo.ControlType, elemInfo.AutomationId, elemInfo.Name, rect: rect);
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write(tag);
             if (!string.IsNullOrEmpty(elemInfo.Value))
             {
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
@@ -1480,7 +1466,7 @@ internal partial class Program
         else
         {
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.Write("[?]");
+            Console.Write("<Unknown>");
         }
 
         if (showWin32)
@@ -1506,11 +1492,8 @@ internal partial class Program
 
         if (elemInfo != null)
         {
-            sb.Append($"[{elemInfo.ControlType}]");
-            if (!string.IsNullOrEmpty(elemInfo.Name))
-                sb.Append($" \"{elemInfo.Name}\"");
-            if (!string.IsNullOrEmpty(elemInfo.AutomationId))
-                sb.Append($" aid=\"{elemInfo.AutomationId}\"");
+            sb.Append(GrapHelper.FormatNodeLabel(elemInfo.ControlType, elemInfo.AutomationId, elemInfo.Name,
+                rect: new System.Drawing.Rectangle(elemInfo.BoundsX, elemInfo.BoundsY, elemInfo.BoundsW, elemInfo.BoundsH)));
             if (!string.IsNullOrEmpty(elemInfo.Value))
                 sb.Append($" val=\"{elemInfo.Value}\"");
             if (elemInfo.Patterns.Count > 0)
@@ -1518,7 +1501,7 @@ internal partial class Program
         }
         else
         {
-            sb.Append("[?]");
+            sb.Append("<Unknown>");
         }
 
         if (showWin32)
@@ -2276,15 +2259,9 @@ internal partial class Program
         {
             foreach (var m in matches)
             {
+                var tag = GrapHelper.FormatNodeLabel(m.ControlType, m.AutomationId, m.Name);
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write($"    → [{m.ControlType}] ");
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write($"\"{m.Name}\"");
-                if (!string.IsNullOrEmpty(m.AutomationId))
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write($" aid=\"{m.AutomationId}\"");
-                }
+                Console.Write($"    → {tag}");
                 if (!string.IsNullOrEmpty(m.NamePath))
                 {
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
