@@ -1970,35 +1970,16 @@ internal partial class Program
                 Console.ResetColor();
             }
 
-            // Lightweight focus path for ALL windows (Win32 only, <1ms)
+            // Lightweight focus path for ALL windows (Win32 only, <1ms, generalized)
             if (!isChild)
             {
-                var tid = NativeMethods.GetWindowThreadProcessId(hWnd, out _);
-                var gtiQuick = new NativeMethods.GUITHREADINFO
-                    { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
-                if (NativeMethods.GetGUIThreadInfo(tid, ref gtiQuick) && gtiQuick.hwndFocus != IntPtr.Zero)
+                var focusPath = GrapHelper.GetFocusPath(hWnd);
+                if (focusPath != null)
                 {
-                    // Build absolute Win32 path: top-level/child/.../focusLeaf
-                    var pathParts = new List<string>();
-                    var cur = gtiQuick.hwndFocus;
-                    int safety = 20;
-                    while (cur != IntPtr.Zero && safety-- > 0)
-                    {
-                        var cls = new StringBuilder(128);
-                        NativeMethods.GetClassNameW(cur, cls, 128);
-                        var fTitle = NativeMethods.GetWindowTextW(cur);
-                        var label = cls.ToString();
-                        if (fTitle.Length > 0) label += $"(\"{(fTitle.Length > 20 ? fTitle[..17] + "..." : fTitle)}\")";
-                        pathParts.Add(label);
-                        if (cur == hWnd) break; // reached top-level
-                        cur = NativeMethods.GetParent(cur);
-                        if (cur == IntPtr.Zero) break;
-                    }
-                    pathParts.Reverse();
                     Console.ForegroundColor = ConsoleColor.Magenta;
                     Console.Write("    ⌨ ");
                     Console.ResetColor();
-                    Console.WriteLine(string.Join("/", pathParts));
+                    Console.WriteLine(focusPath);
                 }
             }
             // Full UIA focus path (expensive) — foreground + filtered only

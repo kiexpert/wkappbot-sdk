@@ -107,6 +107,38 @@ public static class GrapHelper
         return attrs.Count > 0 ? $"<{tag} {string.Join(" ", attrs)}>" : $"<{tag}>";
     }
 
+    /// <summary>
+    /// Get Win32 focus leaf absolute path for any window (fast, no UIA, &lt;1ms).
+    /// Returns: "TopLevel(title)/Child(class)/FocusLeaf(class)" or null if no focus.
+    /// </summary>
+    public static string? GetFocusPath(IntPtr hwnd)
+    {
+        var tid = Native.NativeMethods.GetWindowThreadProcessId(hwnd, out _);
+        if (tid == 0) return null;
+        var gti = new Native.NativeMethods.GUITHREADINFO
+            { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<Native.NativeMethods.GUITHREADINFO>() };
+        if (!Native.NativeMethods.GetGUIThreadInfo(tid, ref gti) || gti.hwndFocus == IntPtr.Zero)
+            return null;
+
+        var parts = new List<string>();
+        var cur = gti.hwndFocus;
+        int safety = 20;
+        while (cur != IntPtr.Zero && safety-- > 0)
+        {
+            var cls = new System.Text.StringBuilder(128);
+            Native.NativeMethods.GetClassNameW(cur, cls, 128);
+            var title = Native.NativeMethods.GetWindowTextW(cur);
+            var label = cls.ToString();
+            if (title.Length > 0) label += $"(\"{(title.Length > 20 ? title[..17] + "..." : title)}\")";
+            parts.Add(label);
+            if (cur == hwnd) break;
+            cur = Native.NativeMethods.GetParent(cur);
+            if (cur == IntPtr.Zero) break;
+        }
+        parts.Reverse();
+        return parts.Count > 0 ? string.Join("/", parts) : null;
+    }
+
     /// <summary>Close tag: &lt;/Type{N}id&gt;</summary>
     public static string FormatCloseTag(AutomationElement el, int siblingIndex = 0)
     {
