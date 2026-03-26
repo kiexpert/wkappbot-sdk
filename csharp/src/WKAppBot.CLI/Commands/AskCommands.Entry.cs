@@ -106,6 +106,7 @@ internal partial class Program
         bool debateMode = false;
         bool triadMode = false;
         bool noDryRun = false;
+        bool useTools = false;
         int loopMaxSteps = 7;
         int loopRetry = 1;
         int loopMaxParallel = 7;
@@ -154,6 +155,11 @@ internal partial class Program
                 modelHint = args[++i];
             else if (args[i] == "--triad")
                 triadMode = true;
+            else if (args[i] == "--use-tools")
+            {
+                useTools = true;
+                loopMode = true; // tools require loop mode for TOOL_CALL parsing
+            }
             else if (args[i] == "--target-tag" && i + 1 < args.Length)
                 targetTagOverride = args[++i];
             else if (args[i] == "--timeout" && i + 1 < args.Length)
@@ -168,6 +174,15 @@ internal partial class Program
         var question = InlineTextFiles(questionParts, attachFiles);
         if (string.IsNullOrWhiteSpace(question))
             return AskUsage();
+
+        // --use-tools: prepend tool instructions to question (bypasses persona turn-count check)
+        if (useTools)
+        {
+            question = "[SYSTEM] You have tools. To use them, emit:\n" +
+                "[APPBOT_TOOL_CALL_BEGIN]\nwkappbot <command> <args>\n[APPBOT_TOOL_CALL_END]\n" +
+                "Available: file read/grep/glob, web search/fetch, inspect, windows.\n" +
+                "Wait for TOOL_RESULT before continuing.\n\n" + question;
+        }
 
         foreach (var f in attachFiles)
         {
@@ -244,6 +259,9 @@ Examples:
         return 1;
     }
 
+    // Sequential question counter for triad sessions (helps AIs reference prior questions)
+    static int _triadQuestionCount;
+
     /// <summary>
     /// Run Gemini, GPT, Claude in parallel with per-AI output prefixes ([gemini], [gpt], [claude]).
     /// Pre-creates a single unified Slack thread before spawning tasks — all three AIs post replies
@@ -257,10 +275,12 @@ Examples:
         // Triad always starts fresh per-AI — prevents stale session cross-contamination.
         var freshSession = newSession; // --new-session only when explicitly requested
         Interlocked.Exchange(ref _slackPersonaPostedFlag, 0); // reset: only first AI posts persona
-        if (debateMode) _suppressLoopPersona.Value = true; // debate: game rules replace persona
+        if (debateMode && !loopMode) _suppressLoopPersona.Value = true; // debate: game rules replace persona (unless --use-tools enables loopMode)
         var modeLabel = debateMode ? "정반합" : "TRIAD";
         ResetEmojis(); // 🦊🐬🐙 fresh race!
-        Console.WriteLine($"[{modeLabel}] Launching Gemini + GPT + Claude in parallel (fresh sessions)...");
+        var qNum = Interlocked.Increment(ref _triadQuestionCount);
+        question = $"[Q{qNum}] {question}"; // sequential numbering for context linking
+        Console.WriteLine($"[{modeLabel}] Q{qNum}: Launching Gemini + GPT + Claude in parallel...");
 
         // ── Unified Slack thread ──────────────────────────────────────────────────────────
         // Set _slackSessionThreadTs.Value BEFORE spawning Task.Run children.
@@ -319,32 +339,37 @@ Examples:
             results[idx] = done.Result;
             pending.Remove(done);
 
-            // AI done + others still working → moderator nudge every time
-            if (pending.Count > 0 && done.Result == 0)
+            // Emoji already assigned on first chunk arrival (UpdateChunk) — handle nudging only
+            if (done.Result == 0)
             {
                 var doneAi = aiNames[idx];
-                var nudge = $"[MODERATOR]: {doneAi} has finished. Please wrap up your answer promptly.";
-                foreach (var p in pending)
-                {
-                    var pIdx = Array.IndexOf(tasks, p);
-                    var peerAi = aiNames[pIdx];
-                    // DM nudge directly — NOT UpdateChunk (pollutes peer chunk stream with moderator messages)
-                    ctx.InjectToSingle(peerAi, nudge);
-                }
-                AssignEmojiOnFinish(doneAi); // 🦊🐬🐙 speed-based emoji!
-                Console.WriteLine($"[{modeLabel}] {doneAi} done → moderator nudging {pending.Count} remaining");
-                SlackPostToThread($"⏰ *{AiDisplayName(doneAi)}* finished! Moderator: wrap up, {pending.Count} AI(s) remaining.", "🦉 Moderator");
 
-                // Follow-up after 1 second
-                _ = Task.Run(async () =>
+                // AI done + others still working → moderator nudge
+                if (pending.Count > 0)
                 {
-                    await Task.Delay(1000);
-                    var followUp = $"[MODERATOR]: Once all answers are in, we begin Round 1 of 정반합 debate. Prepare your [DEBATE_JSON] with STANCE points.";
-                    // Broadcast to all AIs via DM — NOT UpdateChunk (keeps chunk stream clean for peer content only)
-                    foreach (var broadcastAi in aiNames)
-                        ctx.InjectToSingle(broadcastAi, followUp);
-                    SlackPostToThread("📢 All answers in → 정반합 Round 1 starts! Prepare STANCE + DEBATE_JSON.", "Moderator");
-                });
+                    var nudge = $"[MODERATOR]: {AiDisplayName(doneAi)} has finished. Please wrap up your answer promptly.";
+                    foreach (var p in pending)
+                    {
+                        var pIdx = Array.IndexOf(tasks, p);
+                        var peerAi = aiNames[pIdx];
+                        // DM nudge directly — NOT UpdateChunk (pollutes peer chunk stream with moderator messages)
+                        ctx.InjectToSingle(peerAi, nudge);
+                        SlackPostToThread($"📩 *[DM→{peerAi}]* {nudge}", "🦉 Moderator");
+                    }
+                    Console.WriteLine($"[{modeLabel}] {AiDisplayName(doneAi)} done → moderator nudging {pending.Count} remaining");
+                    SlackPostToThread($"⏰ *{AiDisplayName(doneAi)}* finished! Moderator: wrap up, {pending.Count} AI(s) remaining.", "🦉 Moderator");
+
+                    // Follow-up after 1 second
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(1000);
+                        var followUp = $"[MODERATOR]: Once all answers are in, we begin Round 1 of 정반합 debate. Prepare your [DEBATE_JSON] with STANCE points.";
+                        // Broadcast to all AIs via DM — NOT UpdateChunk (keeps chunk stream clean for peer content only)
+                        foreach (var broadcastAi in aiNames)
+                            ctx.InjectToSingle(broadcastAi, followUp);
+                        SlackPostToThread($"📢 *[Moderator→ALL]* {followUp}", "🦉 Moderator");
+                    });
+                }
             }
         }
         Console.WriteLine($"[{modeLabel}] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
@@ -355,8 +380,8 @@ Examples:
             // R0 done → enable moderator for debate rounds
             ctx.ModeratorEnabled = true;
             Console.WriteLine($"[정반합] R0 complete. Cross-prompting ON. Moderator starting R1...");
-            SlackPostToThread("═══ *R0 자유 답변 완료! 정반합 게임 시작!* ═══\n📋 DEBATE_JSON + STANCE 포맷으로 응답해주세요.", "Moderator");
-            SlackPostToThread($"📋 *Debate Rules:*\n```\n{BuildDebateOnlyPersona()[..Math.Min(400, BuildDebateOnlyPersona().Length)]}\n```", "Moderator");
+            SlackPostToThread("═══ *R0 자유 답변 완료! 정반합 게임 시작!* ═══\n📋 DEBATE_JSON + STANCE 포맷으로 응답해주세요.", "🦉 Moderator");
+            SlackPostToThread($"📋 *Debate Rules:*\n```\n{BuildDebateOnlyPersona()}\n```", "🦉 Moderator");
             try { RunDebateLoop(question, timeoutSec, ctx); }
             catch (Exception ex) { Console.Error.WriteLine($"[DEBATE] Error: {ex.Message}"); }
         }
@@ -375,13 +400,19 @@ Examples:
         try
         {
             var cwdTag = AbbreviateCwd(callerCwd);
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName,
-                Arguments = $"prompt send \"{cwdTag}\" \"{promptMsg.Replace("\"", "\\\"")}\" --after 5s",
                 UseShellExecute = false,
                 CreateNoWindow = true,
-            });
+            };
+            psi.ArgumentList.Add("prompt");
+            psi.ArgumentList.Add("send");
+            psi.ArgumentList.Add(cwdTag);
+            psi.ArgumentList.Add(promptMsg);
+            psi.ArgumentList.Add("--after");
+            psi.ArgumentList.Add("5s");
+            System.Diagnostics.Process.Start(psi);
             Console.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) → {cwdTag}");
         }
         catch (Exception ex) { LogWarning("TRIAD", "Reminder schedule error", ex); }

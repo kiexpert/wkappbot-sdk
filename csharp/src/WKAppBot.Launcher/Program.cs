@@ -590,36 +590,39 @@ class Program
             }
             Prof($"detached-normal spawned, relaying stdout");
 
-            // Relay stderr in background
+            // Relay stderr in background — with sentinel detection (\0UIT on stderr since v5.1.31)
             var _stderr = Console.OpenStandardError();
+            var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
+            var _hOut = hOut; var _hErr = hErr; var _hProc = hProc; // capture for lambda
             _ = System.Threading.Tasks.Task.Run(() =>
             {
                 var b = new byte[4096];
-                while (ReadFile(hErr, b, (uint)b.Length, out uint n, IntPtr.Zero) && n > 0)
-                    { _stderr.Write(b, 0, (int)n); _stderr.Flush(); }
+                while (ReadFile(_hErr, b, (uint)b.Length, out uint n, IntPtr.Zero) && n > 0)
+                {
+                    // Exact 4-byte sentinel on stderr → TerminateSelf immediately
+                    if (n == 4 && b[0] == sentinel[0] && b[1] == sentinel[1]
+                               && b[2] == sentinel[2] && b[3] == sentinel[3])
+                    {
+                        Prof("detached-normal: \\0UIT sentinel (stderr) → TerminateSelf");
+                        try { Console.Out.Flush(); CloseHandle(GetStdHandle(-11)); } catch { }
+                        WaitForSingleObject(_hProc, 500);
+                        GetExitCodeProcess(_hProc, out uint ec);
+                        CloseHandle(_hOut); CloseHandle(_hErr); CloseHandle(_hProc);
+                        TerminateSelf(ec);
+                        return;
+                    }
+                    _stderr.Write(b, 0, (int)n); _stderr.Flush();
+                }
             });
 
-            // Relay stdout in real-time with sentinel detection
+            // Relay stdout in real-time (no sentinel here — sentinel moved to stderr)
             var _stdout = Console.OpenStandardOutput();
             int effectiveTimeoutMs = timeoutSec > 0 ? timeoutSec * 1000 : 0;
-            var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
             var relayBuf = new byte[65536];
             uint exitCode = 0;
 
             while (ReadFile(hOut, relayBuf, (uint)relayBuf.Length, out uint n, IntPtr.Zero) && n > 0)
             {
-                // Exact 4-byte sentinel → TerminateSelf immediately
-                if (n == 4 && relayBuf[0] == sentinel[0] && relayBuf[1] == sentinel[1]
-                           && relayBuf[2] == sentinel[2] && relayBuf[3] == sentinel[3])
-                {
-                    Prof("detached-normal: \\0UIT sentinel → TerminateSelf");
-                    try { _stdout.Flush(); CloseHandle(GetStdHandle(-11)); } catch { }
-                    WaitForSingleObject(hProc, 500);
-                    GetExitCodeProcess(hProc, out exitCode);
-                    CloseHandle(hOut); CloseHandle(hErr); CloseHandle(hProc);
-                    TerminateSelf(exitCode);
-                    return (int)exitCode; // unreachable
-                }
 
                 // Timeout check: Launcher exits, Core continues running (DETACHED_PROCESS)
                 if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
@@ -764,6 +767,7 @@ class Program
         var stdinRelay = new Thread(() =>
         {
             var hIn = GetStdHandle(-10);
+            Console.Error.WriteLine($"[LAUNCHER:MCP] stdin relay started (hIn=0x{hIn:X})");
             var buf = new byte[4096];
             var lineBuf = new System.Text.StringBuilder();
 
@@ -806,7 +810,10 @@ class Program
                                 var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
                                 WriteFile(target, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
                                 FlushFileBuffers(target);
+                                Console.Error.WriteLine($"[LAUNCHER:MCP] stdin→core: {line[..System.Math.Min(60, line.Length)]}");
                             }
+                            else
+                                Console.Error.WriteLine("[LAUNCHER:MCP] stdin relay: target handle is ZERO!");
                         }
                     }
                 }
@@ -814,6 +821,7 @@ class Program
                 if (acc.Length > 0) lineBuf.Append(acc);
             }
 
+            Console.Error.WriteLine($"[LAUNCHER:MCP] stdin relay: ReadFile loop ended (EOF or error)");
             // ConPTY stdin EOF → close all Core stdins
             lock (_gate)
             {
@@ -1391,11 +1399,11 @@ class Program
                 }
             }
 
-            // Normal path: relay Core's stdout to Launcher's stdout in real-time.
-            // Detect "\0UIT" sentinel (exactly 4 bytes, Core-flushed) → TerminateSelf immediately.
+            // Normal path: relay Core's stdout/stderr to Launcher's stdout/stderr in real-time.
+            // Sentinel \0UIT on stderr (control signal) → TerminateSelf immediately.
             // Core's ~30s SMB console cleanup runs in background; bash gets control back right away.
-            // Relay stderr in background — stderr is now always redirected (avoids ConPTY inheritance).
             var _stderr = Console.OpenStandardError();
+            var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
             _ = System.Threading.Tasks.Task.Run(() =>
             {
                 try
@@ -1403,14 +1411,25 @@ class Program
                     var buf = new byte[4096];
                     int n;
                     while ((n = proc.StandardError.BaseStream.Read(buf, 0, buf.Length)) > 0)
-                    { _stderr.Write(buf, 0, n); _stderr.Flush(); }
+                    {
+                        // Exact 4-byte sentinel on stderr → TerminateSelf
+                        if (n == 4 && buf[0] == sentinel[0] && buf[1] == sentinel[1]
+                                   && buf[2] == sentinel[2] && buf[3] == sentinel[3])
+                        {
+                            Prof($"relay: \\0UIT sentinel (stderr) → TerminateSelf");
+                            try { Console.Out.Flush(); CloseHandle(GetStdHandle(-11)); } catch { }
+                            var ec = proc.WaitForExit(500) ? proc.ExitCode : 0;
+                            TerminateSelf((uint)ec);
+                            return;
+                        }
+                        _stderr.Write(buf, 0, n); _stderr.Flush();
+                    }
                 }
                 catch { }
             });
             var _stdout = Console.OpenStandardOutput();
             int effectiveTimeoutMs = timeoutSec > 0 ? timeoutSec * 1000 : 0;
             var relayBuf = new byte[65536];
-            var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
             int coreExitFromRelay = -1;
             while (true)
             {
@@ -1418,21 +1437,6 @@ class Program
                 try { n = proc.StandardOutput.BaseStream.Read(relayBuf, 0, relayBuf.Length); }
                 catch { break; }
                 if (n == 0) break; // EOF — Core exited normally
-
-                // Exact 4-byte sentinel check (Core flushes exactly these 4 bytes as a signal)
-                if (n == 4 && relayBuf[0] == sentinel[0] && relayBuf[1] == sentinel[1]
-                           && relayBuf[2] == sentinel[2] && relayBuf[3] == sentinel[3])
-                {
-                    Prof($"relay: \\0UIT sentinel received — TerminateSelf immediately (Core cleanup in bg)");
-                    try { _stdout.Flush(); } catch { }
-                    // Close stdout handle → pipe gets EOF immediately so bash pipeline completes right away.
-                    // Core's 30s SMB cleanup continues in background; bash doesn't need to wait.
-                    try { CloseHandle(GetStdHandle(-11)); } catch { }
-                    // Try to get Core's exit code (Core calls TerminateProcess right after sentinel)
-                    coreExitFromRelay = proc.WaitForExit(500) ? proc.ExitCode : 0;
-                    TerminateSelf((uint)coreExitFromRelay);
-                    return coreExitFromRelay; // unreachable
-                }
 
                 // Timeout check (--timeout N flag)
                 if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)

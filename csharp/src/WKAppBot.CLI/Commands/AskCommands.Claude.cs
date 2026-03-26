@@ -515,7 +515,7 @@ internal partial class Program
         if (ok && !string.IsNullOrWhiteSpace(answer))
         {
             EnsureSlackThread("Claude", question);
-            SlackPostToThread(answer.Length > 2000 ? answer[..2000] + "…" : answer, "Claude");
+            SlackPostToThread(answer.Length > 2000 ? answer[..2000] + "…" : answer, SlackAiName("claude", "Claude"));
         }
 
         // Log initial answer to shared triad context (for recovery by other AIs if needed)
@@ -524,7 +524,7 @@ internal partial class Program
 
         Action<string, string?> onStepReport = (msg, uname) =>
         {
-            SlackPostToThread(msg, uname ?? "Claude");
+            SlackPostToThread(msg, uname ?? SlackAiName("claude", "Claude"));
             triadCtx?.LogStep("Claude", msg);
         };
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
@@ -535,12 +535,12 @@ internal partial class Program
         if (isLimit)
         {
             EnsureSlackThread("Claude", question);
-            SlackPostToThread("❌ _Claude 메시지 한도 초과_ — claude.ai 사용량 확인 필요", "Claude");
+            SlackPostToThread("❌ _Claude 메시지 한도 초과_ — claude.ai 사용량 확인 필요", SlackAiName("claude", "Claude"));
         }
         else if (!ok)
         {
             EnsureSlackThread("Claude", question);
-            SlackPostToThread("❌ _Claude 응답 실패_", "Claude");
+            SlackPostToThread("❌ _Claude 응답 실패_", SlackAiName("claude", "Claude"));
         }
 
         if (answer != null)

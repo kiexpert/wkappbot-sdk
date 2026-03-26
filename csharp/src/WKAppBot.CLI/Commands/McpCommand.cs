@@ -1085,6 +1085,7 @@ internal partial class Program
                 "windows" => WindowsCommand(args),
                 "web" => WebCommand(args),
                 "ocr" => OcrCommand(args),
+                "logcat" => LogcatCommand(args),
                 "prompt-probe" => PromptProbeCommand(args),
                 "claude-detect" => ClaudeDetectCommand(args),
                 "find-prompts" => FindPromptsCommand(args),

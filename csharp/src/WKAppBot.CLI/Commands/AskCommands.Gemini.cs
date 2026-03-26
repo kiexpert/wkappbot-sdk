@@ -654,7 +654,7 @@ internal partial class Program
             {
                 var suffix = ok ? "" : "\n[send failed]";
                 var post = forSlack.Length > 2000 ? forSlack[..2000] + "..." : forSlack;
-                SlackPostToThread(post + suffix, "Gemini");
+                SlackPostToThread(post + suffix, SlackAiName("gemini", "Gemini"));
             }
         }
 
@@ -664,7 +664,7 @@ internal partial class Program
 
         Action<string, string?> onStepReport = (msg, uname) =>
         {
-            SlackPostToThread(msg, uname ?? "Gemini");
+            SlackPostToThread(msg, uname ?? SlackAiName("gemini", "Gemini"));
             triadCtx?.LogStep("Gemini", msg);
         };
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))

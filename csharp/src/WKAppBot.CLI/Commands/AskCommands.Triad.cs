@@ -46,6 +46,57 @@ internal sealed class TriadSharedContext
     /// <summary>When true, moderator intervenes (STANCE check, format enforcement). Off during R0.</summary>
     public bool ModeratorEnabled { get; set; } = false;
 
+    // ── EEP: Evidence Escalation Protocol — track claims per AI per round ──
+    internal readonly ConcurrentDictionary<string, List<string>> _priorClaims = new(StringComparer.OrdinalIgnoreCase);
+    internal readonly ConcurrentDictionary<string, int> _restatementCount = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Store claims for restatement detection in next round.</summary>
+    public void StoreClaims(string ai, List<TriadDebateLoop.Claim> claims)
+        => _priorClaims[ai] = claims.Select(c => c.Text).ToList();
+
+    /// <summary>Check if a claim is a restatement (>70% keyword overlap with prior).</summary>
+    public bool IsRestatement(string ai, string claimText)
+    {
+        if (!_priorClaims.TryGetValue(ai, out var prior)) return false;
+        var curTokens = TriadDebateLoop.Tokenize(claimText);
+        return prior.Any(p =>
+        {
+            var prevTokens = TriadDebateLoop.Tokenize(p);
+            if (prevTokens.Count == 0) return false;
+            var overlap = curTokens.Intersect(prevTokens).Count();
+            return (double)overlap / prevTokens.Count >= 0.7;
+        });
+    }
+
+    /// <summary>Increment restatement counter. Returns new count.</summary>
+    public int IncrementRestatement(string ai)
+        => _restatementCount.AddOrUpdate(ai, 1, (_, v) => v + 1);
+
+    // ── Tool Discovery Sharing (큐 기반 — 경합 방지) ──
+    private readonly ConcurrentDictionary<string, ConcurrentQueue<string>> _toolDiscoveryQueues =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Push a tool discovery to all peer AIs' queues (not to source AI).</summary>
+    public void PushDiscovery(string sourceAi, string summary)
+    {
+        foreach (var ai in _cdpClients.Keys)
+        {
+            if (ai.Equals(sourceAi, StringComparison.OrdinalIgnoreCase)) continue;
+            var queue = _toolDiscoveryQueues.GetOrAdd(ai, _ => new ConcurrentQueue<string>());
+            queue.Enqueue($"[TOOL from {sourceAi}] {summary}");
+        }
+    }
+
+    /// <summary>Drain pending tool discoveries for a target AI. Call when AI is idle (between responses).</summary>
+    public List<string> DrainDiscoveries(string targetAi)
+    {
+        var result = new List<string>();
+        if (_toolDiscoveryQueues.TryGetValue(targetAi, out var queue))
+            while (queue.TryDequeue(out var item))
+                result.Add(item);
+        return result;
+    }
+
     /// <summary>Get the latest chunk for an AI (direct access, not peer-filtered).</summary>
     public string? GetLatestChunk(string ai) => _latestChunks.GetValueOrDefault(ai);
 
@@ -79,6 +130,10 @@ internal sealed class TriadSharedContext
         _latestChunks[ai] = chunk;
         _chunkVersions.AddOrUpdate(ai, 1, (_, v) => v + 1);
 
+        // First meaningful chunk → assign emoji (speed-based: first responder = 🦊)
+        if (prev.Length == 0 && chunk.Length > 20)
+            Program.AssignEmojiOnFinish(ai);
+
         // First chunk: check for STANCE compliance (only when moderator active, not R0)
         if (ModeratorEnabled && prev.Length == 0 && chunk.Length > 50)
         {
@@ -86,7 +141,7 @@ internal sealed class TriadSharedContext
             if (stance != null)
             {
                 // Post STANCE to Slack
-                Program.SlackPostToThread($"📊 *[{ai} STANCE]* {stance} (sum={stance.Sum})", ai);
+                Program.SlackPostToThread($"📊 *[{Program.AiDisplayName(ai)} STANCE]* {stance} (sum={stance.Sum})", Program.AiDisplayName(ai));
             }
             if (stance == null)
             {
@@ -124,7 +179,7 @@ internal sealed class TriadSharedContext
                                 await Task.Delay(500);
                                 await selfCdp.SendPromptAsync(editorSel); // auto-send!
                                 Console.WriteLine($"[MOD] {ai}: STANCE missing → reject + re-request SENT");
-                                Program.SlackPostToThread($"⚠️ *[MOD→{ai}]* STANCE missing! Response rejected, re-requested.", "Moderator");
+                                Program.SlackPostToThread($"⚠️ *[MOD→{ai}]* STANCE missing! Response rejected, re-requested.", "🦉 Moderator");
                             }
                         }
                     }
@@ -142,7 +197,7 @@ internal sealed class TriadSharedContext
 
         // Post chunk to Slack immediately
         var slackSnippet = newText.Length > 200 ? newText[..200] + "..." : newText;
-        Program.SlackPostToThread($"💬 *[{ai}]*: {slackSnippet}", ai);
+        Program.SlackPostToThread($"💬 *[{Program.AiDisplayName(ai)}]*: {slackSnippet}", Program.AiDisplayName(ai));
 
         // Inject cross-prompt into other AIs' editors immediately (editor is free during streaming)
         var snippet = newText.Length > 300 ? newText[..300] + "..." : newText;
@@ -174,7 +229,7 @@ internal sealed class TriadSharedContext
                     Console.WriteLine($"[CROSS] {ai}→{peerAi}: pre-typed ({snippet.Length} chars)");
 
                     // Post delivery result to Slack
-                    Program.SlackPostToThread($"🔀 *[{ai}→{peerAi} ✅]*", ai);
+                    Program.SlackPostToThread($"🔀 *[{Program.AiDisplayName(ai)}→{peerAi} ✅]*", Program.AiDisplayName(ai));
                 }
                 catch { /* editor may not be ready — non-fatal */ }
             });
@@ -375,7 +430,7 @@ internal partial class Program
             Console.WriteLine($"[TRIAD:{ai}] ⚠ Failed — attempting recovery with shared context");
             Console.ResetColor();
 
-            SlackPostToThread($"🔄 *[복구]* `{ai}` 실패 감지 — 컨텍스트 재주입 후 재시작 중...", ai);
+            SlackPostToThread($"🔄 *[복구]* `{AiDisplayName(ai)}` 실패 감지 — 컨텍스트 재주입 후 재시작 중...", AiDisplayName(ai));
 
             var recoveryCtx = ctx.BuildRecoveryContext(ai);
             var recoveryQuestion = recoveryCtx + "\n\nResume task:\n" + question;
@@ -402,9 +457,9 @@ internal partial class Program
 
             {
                 var status = result == 0
-                    ? $"✅ *[복구 성공]* `{ai}` 응답 완료"
-                    : $"❌ *[복구 실패]* `{ai}` — 두 번째 시도도 실패";
-                SlackPostToThread(status, ai);
+                    ? $"✅ *[복구 성공]* `{AiDisplayName(ai)}` 응답 완료"
+                    : $"❌ *[복구 실패]* `{AiDisplayName(ai)}` — 두 번째 시도도 실패";
+                SlackPostToThread(status, AiDisplayName(ai));
             }
         }
 

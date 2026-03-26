@@ -1161,6 +1161,19 @@ Examples:
         var enc   = DetectFileEncoding(bytes, encoding);
         var text  = enc.GetString(bytes);
 
+        // Adapt old/new line endings to match file's style (fixes LF-only file + CRLF old_string mismatch)
+        bool fileCrlf = text.Contains("\r\n");
+        if (!fileCrlf && oldStr.Contains("\r\n"))
+        {
+            oldStr = oldStr.Replace("\r\n", "\n");
+            newStr = newStr.Replace("\r\n", "\n");
+        }
+        else if (fileCrlf && !oldStr.Contains("\r\n") && oldStr.Contains("\n"))
+        {
+            oldStr = oldStr.Replace("\n", "\r\n");
+            newStr = newStr.Replace("\n", "\r\n");
+        }
+
         var matchPositions = new List<int>();
         int count = 0;
         string result;
@@ -1402,8 +1415,10 @@ Examples:
         var line = lines[idx];
         int leadEnd = line.Length - line.TrimStart().Length;
         var leading = line[..leadEnd];
+        // Normalize: convert N-space groups and space+tab combos to tabs, then count all tabs
         var pattern = $@"( {{{tabSize},{tabSize}}}| +\t)";
         while (leading != (leading = System.Text.RegularExpressions.Regex.Replace(leading, pattern, "\t"))) ;
+        // Count tabs (including pre-existing tabs in tab-indented files)
         return leading.Count(c => c == '\t');
     }
 

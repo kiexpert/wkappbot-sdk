@@ -94,16 +94,26 @@ public static class WindowFinder
             // ★ Standard search key with focus flags
             var searchKey = BuildSearchKey(hWnd, cls, title, procName, w, h, focus);
 
-            // Substring match: try title first, then full searchKey
+            // Substring match: try title first, then full searchKey — track coverage
             if (matcher.IsMatch(title) || matcher.IsMatch(searchKey))
-                results.Add(WindowInfo.FromHwnd(hWnd));
+            {
+                var info = WindowInfo.FromHwnd(hWnd);
+                // Coverage = pattern literal length / matched text length (higher = more specific match)
+                var patLen = titlePattern.Replace("*", "").Replace("?", "").Length;
+                info.Coverage = patLen > 0 && title.Length > 0 ? (double)patLen / title.Length : 0;
+                results.Add(info);
+            }
 
             return true;
         }, IntPtr.Zero);
 
-        // Sort by focus priority: ★keyboard > ★mouse > ★foreground > Z-order
+        // Sort by coverage descending (most specific match first), then focus priority
         if (results.Count > 1)
-            results.Sort((a, b) => focus.GetPriority(b.Handle).CompareTo(focus.GetPriority(a.Handle)));
+            results.Sort((a, b) =>
+            {
+                var covCmp = b.Coverage.CompareTo(a.Coverage);
+                return covCmp != 0 ? covCmp : focus.GetPriority(b.Handle).CompareTo(focus.GetPriority(a.Handle));
+            });
 
         // ── Cache results for repeat searches ──
         _grapCache[titlePattern] = (results.Select(r => r.Handle).ToList(), DateTime.UtcNow);
@@ -677,6 +687,8 @@ public sealed class WindowInfo
     public int Style { get; init; }
     /// <summary>WS_EX_* extended style bits from GetWindowLongW(GWL_EXSTYLE)</summary>
     public int ExStyle { get; init; }
+    /// <summary>Grap pattern coverage score (0-1). Higher = more specific match.</summary>
+    public double Coverage { get; set; }
 
     public static WindowInfo FromHwnd(IntPtr hWnd)
     {

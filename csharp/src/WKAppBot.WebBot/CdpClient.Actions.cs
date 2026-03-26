@@ -11,8 +11,21 @@ namespace WKAppBot.WebBot;
 
 public sealed partial class CdpClient
 {
-    /// <summary>Evaluate JavaScript and return the result as string.</summary>
+    /// <summary>Evaluate JavaScript and return the result as string. Retries once on timeout.</summary>
     public async Task<string?> EvalAsync(string expression, bool awaitPromise = false)
+    {
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            try { return await EvalAsyncCore(expression, awaitPromise); }
+            catch (TimeoutException) when (attempt == 0)
+            {
+                Console.Error.WriteLine($"[CDP:EVAL] Timeout on attempt 0 — retrying once ({expression[..Math.Min(60, expression.Length)]})");
+            }
+        }
+        return await EvalAsyncCore(expression, awaitPromise); // final attempt, let exception propagate
+    }
+
+    private async Task<string?> EvalAsyncCore(string expression, bool awaitPromise)
     {
         var parameters = new JsonObject
         {
@@ -46,6 +59,17 @@ public sealed partial class CdpClient
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"[CDP:JS-ERR] {msg}{(line >= 0 ? $" (line {line})" : "")}");
             Console.WriteLine($"[CDP:JS-ERR] expr: {exprPreview}");
+            // Debug context dump on every JS error
+            try
+            {
+                Console.WriteLine($"[CDP:JS-ERR] context: wsUrl={WebSocketUrl?[..Math.Min(60, WebSocketUrl?.Length ?? 0)]}, connected={IsConnected}, chromeHwnd=0x{ChromeWindowHandle:X}");
+                var urlResult = await SendAsync("Runtime.evaluate", new JsonObject { ["expression"] = "location.href", ["returnByValue"] = true });
+                var pageUrl = urlResult?["result"]?["value"]?.GetValue<string>() ?? "(unknown)";
+                Console.WriteLine($"[CDP:JS-ERR] page: {pageUrl}");
+                // Notify caller (Slack routing etc.)
+                OnJsError?.Invoke($"[CDP:JS-ERR] {msg}\nexpr: {exprPreview}\npage: {pageUrl}\nconnected={IsConnected} hwnd=0x{ChromeWindowHandle:X}");
+            }
+            catch { }
             Console.ResetColor();
         }
 

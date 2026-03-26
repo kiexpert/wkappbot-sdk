@@ -141,7 +141,6 @@ internal partial class Program
             Console.WriteLine($"[AAR:CDP:FOCUS] Chrome stole focus during {action}! Restoring...");
             Console.ResetColor();
             NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg
-            // FocusStealer prop NOT stamped — SW_SHOWNOACTIVATE prevents repeat steals
             ActionApi.OnFocusStealer?.Invoke(chromeHwnd, $"ask-{action}");
         }
     }

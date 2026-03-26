@@ -21,7 +21,7 @@ internal partial class Program
         EnsureSlackThread("정반합", question);
 
         var debatePersona = BuildDebateOnlyPersona();
-        SlackPostToThread($"📋 *[Debate Persona]*\n```\n{debatePersona[..Math.Min(500, debatePersona.Length)]}\n```", "Moderator");
+        SlackPostToThread($"📋 *[Debate Persona]*\n```\n{debatePersona[..Math.Min(500, debatePersona.Length)]}\n```", "🦉 Moderator");
 
         var ais = new[] { "gemini", "gpt", "claude" };
         var roles = new Dictionary<string, string>
@@ -41,7 +41,7 @@ internal partial class Program
 
         // ═══ R1: Independent positions (CDP direct) ═══
         Console.WriteLine("[정반합:R1] Independent positions...");
-        SlackPostToThread("═══ *R1: Independent Positions* ═══", "Moderator");
+        SlackPostToThread("═══ *R1: Independent Positions* ═══", "🦉 Moderator");
 
         var r1Results = new ConcurrentDictionary<string, string>();
         var r1Tasks = ais.Select(ai => Task.Run(async () =>
@@ -79,13 +79,13 @@ internal partial class Program
 
         if (r1Results.Count < 1)
         {
-            SlackPostToThread("❌ Debate aborted: no AIs responded.", "Moderator");
+            SlackPostToThread("❌ Debate aborted: no AIs responded.", "🦉 Moderator");
             return 1;
         }
 
         // ═══ R2: Cross-critique ═══
         Console.WriteLine("[정반합:R2] Cross-critique...");
-        SlackPostToThread("═══ *R2: Cross-Critique* ═══", "Moderator");
+        SlackPostToThread("═══ *R2: Cross-Critique* ═══", "🦉 Moderator");
 
         var r2Results = new ConcurrentDictionary<string, string>();
         var r2Tasks = ais.Where(ai => r1Results.ContainsKey(ai)).Select(ai => Task.Run(async () =>
@@ -127,7 +127,7 @@ internal partial class Program
 
         // ═══ R3: Synthesis + Korean conclusion ═══
         Console.WriteLine("[정반합:R3] Synthesis...");
-        SlackPostToThread("═══ *R3: Final Synthesis* ═══", "Moderator");
+        SlackPostToThread("═══ *R3: Final Synthesis* ═══", "🦉 Moderator");
 
         var allPositions = new StringBuilder();
         foreach (var ai in ais)
@@ -164,19 +164,19 @@ internal partial class Program
 
         if (synthesis != null)
         {
-            SlackPostToThread($"📋 *[Synthesis by {synthAi}]*\n{synthesis[..Math.Min(500, synthesis.Length)]}", "Moderator");
+            SlackPostToThread($"📋 *[Synthesis by {synthAi}]*\n{synthesis[..Math.Min(500, synthesis.Length)]}", "🦉 Moderator");
 
             var krStart = synthesis.IndexOf("[CONCLUSION_KR]");
             var krEnd = synthesis.IndexOf("[/CONCLUSION_KR]");
             if (krStart >= 0 && krEnd > krStart)
             {
                 var kr = synthesis[(krStart + "[CONCLUSION_KR]".Length)..krEnd].Trim();
-                SlackPostToThread($"🇰🇷 *한국어 결론*\n{kr}", "Moderator");
+                SlackPostToThread($"🇰🇷 *한국어 결론*\n{kr}", "🦉 Moderator");
             }
         }
 
         Console.WriteLine("[정반합] ═══ Complete ═══");
-        SlackPostToThread("═══ *정반합 토론 완료* ═══", "Moderator");
+        SlackPostToThread("═══ *정반합 토론 완료* ═══", "🦉 Moderator");
         return 0;
     }
 
@@ -324,7 +324,7 @@ internal partial class Program
             if (done >= minDone) break;
             Thread.Sleep(2000);
             if (sw.Elapsed.TotalSeconds > 30 && done < minDone)
-                SlackPostToThread($"⏳ [{label}] Waiting... ({done}/{tasks.Length})", "Moderator");
+                SlackPostToThread($"⏳ [{label}] Waiting... ({done}/{tasks.Length})", "🦉 Moderator");
         }
     }
 

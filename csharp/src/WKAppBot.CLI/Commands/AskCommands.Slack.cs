@@ -75,10 +75,17 @@ internal partial class Program
     /// Post text to the current session's Slack thread. Noop if no active thread.
     /// If the latest thread message was posted by the same username, appends via chat.update
     /// instead of creating a new message (per user request: "최신 댓글이 자기꺼인 경우만 편집").
+    // Ratelimit guard: min 800ms between Slack posts (prevents Slack API 429)
+    static long _lastSlackPostTicks;
+
     internal static void SlackPostToThread(string msg, string? username = null)
     {
         var sessionTs = _slackSessionThreadTs.Value;
         if (sessionTs == null) return;
+        // Debounce: wait if last post was <800ms ago
+        var elapsed = (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastSlackPostTicks)) / TimeSpan.TicksPerMillisecond;
+        if (elapsed < 800) System.Threading.Thread.Sleep(Math.Max(0, (int)(800 - elapsed)));
+        Interlocked.Exchange(ref _lastSlackPostTicks, DateTime.UtcNow.Ticks);
         try
         {
             var config = LoadSlackConfig();
