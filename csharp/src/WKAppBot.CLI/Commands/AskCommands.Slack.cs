@@ -80,6 +80,9 @@ internal partial class Program
 
     internal static void SlackPostToThread(string msg, string? username = null)
     {
+        // Dual sink: always broadcast to local dashboard (even if Slack fails)
+        DashboardBroadcaster.Emit("slack", msg, username ?? BotUsername, _slackSessionThreadTs.Value);
+
         var sessionTs = _slackSessionThreadTs.Value;
         if (sessionTs == null) return;
         // Debounce: wait if last post was <800ms ago

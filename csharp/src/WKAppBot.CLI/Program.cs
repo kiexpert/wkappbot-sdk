@@ -525,7 +525,7 @@ internal partial class Program
             // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
             // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
             var isMcpCommand = command == "mcp";
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || isMcpCommand || _fastExitAfterCommand;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" or "dashboard" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || isMcpCommand || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
@@ -594,6 +594,7 @@ internal partial class Program
                 "whisper-ring" => WhisperRingStandaloneCommand(restArgs),
                 "prompt"  => PromptCommand(restArgs),
                 "schedule" => ScheduleCommand(restArgs),
+                "dashboard" => DashboardCommand(restArgs),
                 "knowhow" => KnowhowCommand(restArgs),
                 "win-move" => WindowMoveCommand(restArgs),
                 "screen" => ScreenCommand(restArgs),
