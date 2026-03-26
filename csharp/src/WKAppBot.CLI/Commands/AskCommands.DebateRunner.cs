@@ -688,12 +688,35 @@ internal partial class Program
                 }
             }
 
-            if (unresolved.Count == 0)
+            // Count total consensus items across all AIs
+            int totalConsensusItems = 0;
+            foreach (var r in r3Results)
+            {
+                var ha = r.Summary.IndexOf("[합의]");
+                var haEnd = r.Summary.IndexOf("[미합의]", Math.Max(0, ha));
+                if (haEnd < 0) haEnd = r.Summary.IndexOf("[셀프힐링]", Math.Max(0, ha));
+                if (haEnd < 0) haEnd = r.Summary.Length;
+                if (ha >= 0)
+                    totalConsensusItems += r.Summary[ha..haEnd].Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                        .Count(l => l.Trim().Length > 5);
+            }
+
+            // Target consensus check (--debate N)
+            var target = _debateTargetConsensus;
+            if (target > 0 && totalConsensusItems < target)
+            {
+                SlackPostToThread($"🎯 *합의 {totalConsensusItems}/{target}개* — 목표 미달! 더 합의하세요!", "🦉 Moderator");
+                foreach (var ai in ais)
+                    if (ctx._cdpClients.ContainsKey(ai))
+                        ctx.InjectToSingle(ai, $"[MODERATOR] 🎯 합의 목표 {target}개 중 {totalConsensusItems}개 달성. {target - totalConsensusItems}개 더 필요! 미합의 항목을 설득하거나 새 합의를 추가하세요.");
+                // Don't break — continue R3 loop
+            }
+            else if (unresolved.Count == 0)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[DEBATE:R3] Full consensus reached! (attempt {r3i + 1})");
+                Console.WriteLine($"[DEBATE:R3] Full consensus reached! ({totalConsensusItems} items, attempt {r3i + 1})");
                 Console.ResetColor();
-                SlackPostToThread($"✅ *Full consensus!* (R3-{r3i + 1})", "🦉 Moderator");
+                SlackPostToThread($"✅ *Full consensus!* ({totalConsensusItems}개, R3-{r3i + 1})", "🦉 Moderator");
                 break;
             }
 
