@@ -1055,10 +1055,9 @@ Examples:
             return 1;
         }
 
-        // No C-style escape processing — pass args as-is.
-        // Callers needing \n should use --old-file/--new-file instead.
-        string oldStr = positional[0];
-        string newStr = positional[1];
+        // C-style escape: \n \t \r \\ → actual characters (unless --old-file mode)
+        string oldStr = UnescapeCString(positional[0]);
+        string newStr = UnescapeCString(positional[1]);
         bool fromFile = oldFile != null; // track for line-ending normalization in validate
         var pathPatterns = positional[2..];
 
