@@ -122,7 +122,12 @@ internal partial class Program
             else if (args[i] == "--no-wait")
                 noWait = true;
             else if (args[i] == "--debate")
+            {
                 debateMode = true;
+                // --debate N = target consensus count (e.g. --debate 5 = need 5 합의 items)
+                if (i + 1 < args.Length && int.TryParse(args[i + 1], out var dc) && dc > 0)
+                { _debateTargetConsensus = dc; i++; }
+            }
             else if (args[i] == "--dry-run")
                 _dryRunMode.Value = true;
             else if (args[i] == "--no-dry-run")
@@ -261,6 +266,8 @@ Examples:
 
     // Sequential question counter for triad sessions (helps AIs reference prior questions)
     static int _triadQuestionCount;
+    // Target consensus count for debate (--debate N): 0 = no target (loop until maxR3Loops)
+    internal static int _debateTargetConsensus;
 
     /// <summary>
     /// Run Gemini, GPT, Claude in parallel with per-AI output prefixes ([gemini], [gpt], [claude]).
