@@ -68,8 +68,11 @@ public static class GrapHelper
         var id = !string.IsNullOrEmpty(automationId) ? automationId
                : !string.IsNullOrEmpty(name) ? (name.Length > 20 ? name[..17] + "..." : name)
                : "";
-        var r = rect.HasValue ? $"ltwh={rect.Value.X},{rect.Value.Y},{rect.Value.Width},{rect.Value.Height}" : "";
-        return r.Length > 0 ? $"{controlType}{idx}{id}({r})" : $"{controlType}{idx}{id}";
+        // XML tag format: <Type{N}id attrs>
+        var tag = $"{controlType}{idx}{id}";
+        var attrs = new List<string>(3);
+        if (rect.HasValue) attrs.Add($"ltwh={rect.Value.X},{rect.Value.Y},{rect.Value.Width},{rect.Value.Height}");
+        return attrs.Count > 0 ? $"<{tag} {string.Join(" ", attrs)}>" : $"<{tag}>";
     }
 
     public static string FormatNodeLabel(AutomationElement el, int siblingIndex = 0, bool includeRect = false, bool includeText = false)
@@ -80,8 +83,9 @@ public static class GrapHelper
         System.Drawing.Rectangle? rect = null;
         if (includeRect)
             try { var r = el.Properties.BoundingRectangle.ValueOrDefault; rect = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
-        var label = FormatNodeLabel(ct.ToString(), aid, name, siblingIndex, rect);
-        // text= node's own text (Value pattern or Name, JS-string encoded)
+        // XML tag: <Type{N}id ltwh=... text="...">
+        var attrs = new List<string>(3);
+        if (rect.HasValue) attrs.Add($"ltwh={(int)rect.Value.X},{(int)rect.Value.Y},{(int)rect.Value.Width},{(int)rect.Value.Height}");
         if (includeText)
         {
             var text = "";
@@ -91,10 +95,33 @@ public static class GrapHelper
             {
                 var escaped = text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
                 if (escaped.Length > 50) escaped = escaped[..47] + "...";
-                label += $" text=\"{escaped}\"";
+                attrs.Add($"text=\"{escaped}\"");
             }
         }
-        return label;
+        var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
+        var id = aid.Length > 0 ? aid : (name.Length > 20 ? name[..17] + "..." : name);
+        var tag = $"{ct}{idx}{id}";
+        return attrs.Count > 0 ? $"<{tag} {string.Join(" ", attrs)}>" : $"<{tag}>";
+    }
+
+    /// <summary>Close tag: &lt;/Type{N}id&gt;</summary>
+    public static string FormatCloseTag(AutomationElement el, int siblingIndex = 0)
+    {
+        var ct = el.Properties.ControlType.ValueOrDefault;
+        var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
+        var name = el.Properties.Name.ValueOrDefault ?? "";
+        var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
+        var id = aid.Length > 0 ? aid : (name.Length > 20 ? name[..17] + "..." : name);
+        return $"</{ct}{idx}{id}>";
+    }
+
+    public static string FormatCloseTag(string controlType, string? automationId, string? name, int siblingIndex = 0)
+    {
+        var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
+        var id = !string.IsNullOrEmpty(automationId) ? automationId
+               : !string.IsNullOrEmpty(name) ? (name.Length > 20 ? name[..17] + "..." : name)
+               : "";
+        return $"</{controlType}{idx}{id}>";
     }
 
     /// <summary>
