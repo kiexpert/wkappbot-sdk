@@ -40,11 +40,15 @@ internal partial class Program
             7. Read-only tools available (file read, grep, web search). No writes.
             8. [셀프힐링] REQUIRED in R3: honestly admit what you got wrong or revised from prior rounds.
             9. ⚠️ WORD LIMIT: 답변 1회당 99단어 이하 (백단어). 초과 시 답변 거부 + 재제출. Atomic items, not essays.
-            10. 🔧 코드 검색이 필요하면 grap 도구를 사용하세요:
-               [APPBOT_TOOL_CALL_BEGIN]
+            10. 🔧 도구 사용법:
+               검색: [APPBOT_TOOL_CALL_BEGIN]
                wkappbot file grep 'keyword' --path W:/GitHub/WKAppBot --type cs
                [APPBOT_TOOL_CALL_END]
-               사회자가 실행 후 결과를 알려드립니다. 다른 도구가 궁금하면 물어보세요!
+               수정: [APPBOT_TOOL_CALL_BEGIN]
+               wkappbot file edit "old text" "new text" W:/GitHub/WKAppBot/path/to/file.cs
+               [APPBOT_TOOL_CALL_END]
+               Claude Code Edit보다 강력! C-style escape(\n\t) + 4-stage 인코딩감지 + indent-block context.
+               사회자가 실행 후 결과를 알려드립니다.
             11. 🔢 GAME ID: This game is [G:{threadTs}]. Include game ID in responses.
                게임ID 불일치 시 사회자가 경고합니다 (참여 확인용).
             12. ⚠️ ROUND SCOPE: Follow ONLY the current round's rules. 다른 라운드 룰 사용시 답변 인정 안함! (REJECTED + forced retry)
