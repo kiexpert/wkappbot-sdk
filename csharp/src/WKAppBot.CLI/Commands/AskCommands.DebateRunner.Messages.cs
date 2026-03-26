@@ -12,6 +12,22 @@ internal partial class Program
         // ── Game Start ──────────────────────────────────────────────────────
         public const string R2R3Start = "═══ *Moderator: R2(Critique) → R3(Synthesis)* ═══\nR1 already completed. Proceeding to cross-critique.";
 
+        /// <summary>Round-scoped rules: only inject relevant rules per round (token optimization)</summary>
+        public static string GetRulesForRound(string round) => round switch
+        {
+            "R2" => "[MODERATOR] R2 RULES:\n" +
+                "1. [DISPUTE]{target,reason}[/DISPUTE] — challenge peers (MANDATORY)\n" +
+                "2. [CLAIM]{claim,confidence}[/CLAIM] — 2-5 claims\n" +
+                "3. [STANCE N=? R=? C=? E=? D=?] (sum=9, D≥1)\n" +
+                "4. 답변 99단어 이하. [합의]/[CONCLUSION_KR] 사용 금지 (R3 only)!",
+            "R3" => "[MODERATOR] R3 RULES:\n" +
+                "1. [CONCLUSION_KR] with [합의]/[미합의]/[셀프힐링]/[개인의견]\n" +
+                "2. [합의] ATOMIC items with score (0-9). <7 = [미합의]\n" +
+                "3. [셀프힐링]: admit what you revised from prior rounds\n" +
+                "4. [STANCE N=? R=? C=? E=? D=?] (sum=9)",
+            _ => GameRules // full rules for R0/other
+        };
+
         public static string GameRules => """
             [MODERATOR] 🎮 정반합 게임 시작!
             RULES:

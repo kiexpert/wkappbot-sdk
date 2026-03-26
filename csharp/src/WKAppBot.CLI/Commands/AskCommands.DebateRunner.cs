@@ -384,7 +384,7 @@ internal partial class Program
         SlackPostToThread(DebateMsg.R2R3Start, "🦉 Moderator");
 
         // Inject debate rules to all AIs (game announcement, not persona)
-        var rules = DebateMsg.GameRules;
+        var rules = DebateMsg.GetRulesForRound("R2"); // token-optimized: R2 rules only at start
         foreach (var ai in ais)
         {
             if (ctx._cdpClients.ContainsKey(ai))
