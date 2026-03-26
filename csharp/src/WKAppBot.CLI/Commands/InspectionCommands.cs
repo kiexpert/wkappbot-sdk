@@ -1840,40 +1840,52 @@ internal partial class Program
             return cmd;
         }
 
+        // Pre-create matcher ONCE for all filter checks (avoid per-window regex compile)
+        var ownerCandidateMatcher = filterTitle != null ? PatternMatcher.Create(filterTitle) : null;
+
         // Get window info, apply filters. Returns null if filtered out or noise.
         (string title, string className, string process, uint pid, int w, int h, bool visible)?
             GetWindowInfo(IntPtr hWnd)
         {
-            var titleBuf = new StringBuilder(512);
-            NativeMethods.GetWindowTextW(hWnd, titleBuf, titleBuf.Capacity);
-            string title = titleBuf.ToString();
+            // Use timeout-safe version to avoid blocking on hung windows (50ms timeout)
+            string title = NativeMethods.GetWindowTextSafe(hWnd, 50);
 
             var classBuf = new StringBuilder(256);
             NativeMethods.GetClassNameW(hWnd, classBuf, classBuf.Capacity);
             string className = classBuf.ToString();
-
-            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
-            string processName = GetProcessName(pid);
 
             NativeMethods.GetWindowRect(hWnd, out var rect);
             int w = rect.Right - rect.Left;
             int h = rect.Bottom - rect.Top;
             bool visible = NativeMethods.IsWindowVisible(hWnd);
 
-            // Skip noise unless --all
+            // Skip noise unless --all (cheap checks first — no process lookup needed)
             if (!showAll && string.IsNullOrEmpty(title) && !visible) return null;
             if (!showAll && w == 0 && h == 0) return null;
 
-            // Skip wkappbot windows (Eye/Zoom overlays) — don't pollute results.
-            // --all overrides: useful to identify mcp/eye/a11y processes by args (--cmd).
+            // Fast title-only pre-filter: if title doesn't match AND className doesn't match,
+            // skip expensive GetProcessName. Most windows fail here → huge speedup.
+            if (ownerCandidateMatcher != null && !showAll
+                && !ownerCandidateMatcher.IsMatch(title)
+                && !ownerCandidateMatcher.IsMatch(className))
+            {
+                // Last chance: check process name (needed for "*wsl*" matching "wslhost")
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint fpid);
+                var fpn = GetProcessName(fpid);
+                if (!ownerCandidateMatcher.IsMatch(fpn)) return null;
+            }
+
+            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+            string processName = GetProcessName(pid);
+
+            // Skip wkappbot windows
             if (!showAll && processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
 
-            // Apply filters — ★ standard search key with focus flags
-            if (filterTitle != null)
+            // Apply filters — full search key check for remaining candidates
+            if (ownerCandidateMatcher != null)
             {
                 var searchKey = WindowFinder.BuildSearchKey(hWnd, className, title, processName, w, h, focus);
-                var m = PatternMatcher.Create(filterTitle);
-                if (!m.IsMatch(title) && !m.IsMatch(searchKey)) return null;
+                if (!ownerCandidateMatcher.IsMatch(title) && !ownerCandidateMatcher.IsMatch(searchKey)) return null;
             }
             if (filterProcess != null)
             {
@@ -2183,6 +2195,8 @@ internal partial class Program
 
         IntPtr fgWnd = NativeMethods.GetForegroundWindow();
         int totalCount = 0;
+        int visibleResultCount = 0;
+        var matchedHiddenHwnds = new List<IntPtr>();
         int uiaMatchWindows = 0;
 
         PulseStep.Mark("focus-snapshot");
@@ -2381,7 +2395,7 @@ internal partial class Program
                 else
                 {
                     // ── Regular search: keyword matches title OR UIA elements (OR logic) ──
-                    var titleMatch = PatternMatcher.Create(filterTitle).IsMatch(r.title);
+                    var titleMatch = ownerCandidateMatcher!.IsMatch(r.title);
 
                     var uiaMatches = uiaDeep
                         ? UiaLocator.QuickSearch(hWnd, filterTitle, maxDepth: 12, maxResults: 10, maxVisited: 1500, timeoutMs: 8000)
@@ -2429,8 +2443,23 @@ internal partial class Program
                     var v = info.Value;
                     PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
                     totalCount++;
+                    if (v.visible && v.w >= 50 && v.h >= 50) visibleResultCount++;
+                    else matchedHiddenHwnds.Add(hWnd);
                     parentPrinted = true;
                     if (limit > 0 && totalCount >= limit) { Console.Out.Flush(); return false; }
+                }
+                else if (ownerCandidateMatcher != null)
+                {
+                    // ── Owner chain candidate: even 0x0/hidden windows that match pattern ──
+                    // e.g. PseudoConsoleWindow(wsl.exe, 0x0) with owner=CASCADIA
+                    var owner = NativeMethods.GetWindow(hWnd, 4 /* GW_OWNER */);
+                    if (owner != IntPtr.Zero && owner != hWnd)
+                    {
+                        NativeMethods.GetWindowThreadProcessId(hWnd, out uint fpid);
+                        var fpn = GetProcessName(fpid);
+                        if (ownerCandidateMatcher.IsMatch(fpn))
+                            matchedHiddenHwnds.Add(hWnd);
+                    }
                 }
 
                 // Child windows (if --deep)
@@ -2469,6 +2498,136 @@ internal partial class Program
             return !(limit > 0 && totalCount >= limit);
         }, IntPtr.Zero);
         PulseStep.Done("enum-windows-done");
+
+        // ── Parent process fallback: find host windows for hidden child processes ──
+        // If filter matched only hidden/tiny windows (wslhost → WindowsTerminal, chrome renderer → Chrome),
+        // show their host windows too via WindowFinder parent chain.
+        // If only hidden/tiny windows matched, follow owner-window chain to find visible host.
+        // e.g. wslhost PseudoConsoleWindow(owner=CASCADIA) → WindowsTerminal CASCADIA tab.
+        // O(1) per matched window × max 3 hops — no re-enumeration needed.
+        if (filterTitle != null && visibleResultCount == 0 && matchedHiddenHwnds.Count > 0)
+        {
+            var hostHwnds = new HashSet<IntPtr>();
+            var progressSw = System.Diagnostics.Stopwatch.StartNew();
+            long lastCommitMs = 0;
+            uint lastReportedPid = 0;
+
+            void ReportProgress(IntPtr hwnd, uint pid, string tag)
+            {
+                if (pid == lastReportedPid) return; // same process → skip output
+                lastReportedPid = pid;
+                var t = new StringBuilder(256);
+                NativeMethods.GetWindowTextW(hwnd, t, t.Capacity);
+                var p = GetProcessName(pid);
+                var preview = t.Length > 40 ? t.ToString(0, 37) + "..." : t.ToString();
+                var line = $"[HOST:{tag}] {hwnd:X8} \"{preview}\" [{p}]";
+                var elapsed = progressSw.ElapsedMilliseconds;
+                if (elapsed - lastCommitMs >= 1000)
+                {
+                    Console.Error.WriteLine(line);
+                    lastCommitMs = elapsed;
+                }
+                else
+                    Console.Error.Write($"\r{line,-100}");
+            }
+
+            // ── Strategy 1: Owner chain (O(1) per hidden window, max 3 hops) ──
+            foreach (var hiddenHwnd in matchedHiddenHwnds)
+            {
+                var cur = hiddenHwnd;
+                for (int hop = 0; hop < 3; hop++)
+                {
+                    var owner = NativeMethods.GetWindow(cur, 4 /* GW_OWNER */);
+                    if (owner == IntPtr.Zero || owner == cur) break;
+                    NativeMethods.GetWindowThreadProcessId(owner, out uint opid);
+                    ReportProgress(owner, opid, "owner");
+                    if (NativeMethods.IsWindowVisible(owner))
+                    {
+                        NativeMethods.GetWindowRect(owner, out var or);
+                        if (or.Right - or.Left >= 50 && or.Bottom - or.Top >= 50)
+                            hostHwnds.Add(owner);
+                        break;
+                    }
+                    cur = owner;
+                }
+            }
+
+            // ── Strategy 2: Top-down child process scan (only if owner chain found nothing) ──
+            // For each visible top-level window, check if ANY child belongs to a matching process.
+            // ClassName pre-filter: only scan known host classes (삼두 optimization #2).
+            // Fast skip: no children=skip, same-PID children=skip.
+            if (hostHwnds.Count == 0)
+            {
+                // Known host window classes that may host cross-process children
+                var hostClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "CASCADIA_HOSTING_WINDOW_CLASS",  // Windows Terminal (WSL, PowerShell)
+                    "Chrome_WidgetWin_1",             // Chrome/Edge/Electron (renderer processes)
+                    "ConsoleWindowClass",             // Classic conhost
+                    "ApplicationFrameWindow",         // UWP apps
+                    "Windows.UI.Core.CoreWindow",     // WinUI
+                };
+
+                var fmatch = PatternMatcher.Create(filterTitle);
+                NativeMethods.EnumWindows((topWnd, _) =>
+                {
+                    if (!NativeMethods.IsWindowVisible(topWnd)) return true;
+                    NativeMethods.GetWindowRect(topWnd, out var tr);
+                    if (tr.Right - tr.Left < 50 || tr.Bottom - tr.Top < 50) return true;
+
+                    // ClassName pre-filter — skip windows that never host cross-process children
+                    var clsBuf = new StringBuilder(256);
+                    NativeMethods.GetClassNameW(topWnd, clsBuf, clsBuf.Capacity);
+                    if (!hostClasses.Contains(clsBuf.ToString())) return true;
+
+                    NativeMethods.GetWindowThreadProcessId(topWnd, out uint topPid);
+
+                    // Quick skip: check first child's PID — if same as parent, no cross-process children likely
+                    bool hasCrossProcess = false;
+                    bool foundMatch = false;
+                    NativeMethods.EnumChildWindows(topWnd, (childWnd, _) =>
+                    {
+                        NativeMethods.GetWindowThreadProcessId(childWnd, out uint childPid);
+                        if (childPid == topPid) return true; // same process → keep scanning
+                        hasCrossProcess = true;
+                        // Different process child! Check if it matches the search pattern
+                        var cn = GetProcessName(childPid);
+                        if (fmatch.IsMatch(cn))
+                        {
+                            foundMatch = true;
+                            return false; // early exit — found it!
+                        }
+                        return true;
+                    }, IntPtr.Zero);
+
+                    if (foundMatch && hostHwnds.Add(topWnd))
+                    {
+                        ReportProgress(topWnd, topPid, "child");
+                    }
+                    return true;
+                }, IntPtr.Zero);
+            }
+
+            // Final summary
+            Console.Error.WriteLine($"\r{"[HOST] " + matchedHiddenHwnds.Count + " hidden → " + hostHwnds.Count + " host(s)",-100}");
+
+            if (hostHwnds.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine("\n── host windows (owner/child) ──");
+                Console.ResetColor();
+                foreach (var oh in hostHwnds)
+                {
+                    var ht = WindowFinder.GetWindowText(oh);
+                    var hc = WindowFinder.GetClassName(oh);
+                    NativeMethods.GetWindowThreadProcessId(oh, out uint hpid);
+                    NativeMethods.GetWindowRect(oh, out var hrect);
+                    PrintWindow(oh, ht, hc, GetProcessName(hpid), hpid,
+                        hrect.Right - hrect.Left, hrect.Bottom - hrect.Top, true, false, oh == fgWnd);
+                    totalCount++;
+                }
+            }
+        }
 
         Console.WriteLine();
         string uiaNote = uiaSearch ? $", UIA matched in {uiaMatchWindows} window(s)" : "";

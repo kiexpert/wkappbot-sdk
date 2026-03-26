@@ -115,10 +115,91 @@ public static class WindowFinder
                 return covCmp != 0 ? covCmp : focus.GetPriority(b.Handle).CompareTo(focus.GetPriority(a.Handle));
             });
 
+        // ── Fallback: owner window chain for hidden child processes ──
+        // When grap matches only hidden/tiny windows (e.g. wsl PseudoConsoleWindow),
+        // follow GW_OWNER chain to find the visible host window (e.g. WindowsTerminal CASCADIA).
+        // This works because ConPTY/hosted windows set the owner to their host's tab window.
+        if (results.Count > 0 && results.All(r =>
+        {
+            NativeMethods.GetWindowRect(r.Handle, out var rr);
+            return !NativeMethods.IsWindowVisible(r.Handle)
+                || (rr.Right - rr.Left < 50 && rr.Bottom - rr.Top < 50);
+        }))
+        {
+            var hostFallback = FindHostByOwnerChain(results);
+            if (hostFallback.Count > 0)
+                results.AddRange(hostFallback);
+        }
+
         // ── Cache results for repeat searches ──
         _grapCache[titlePattern] = (results.Select(r => r.Handle).ToList(), DateTime.UtcNow);
 
         return results;
+    }
+
+    // ── Owner chain cache: hidden HWND → host HWND (2s TTL) ──
+    static readonly Dictionary<IntPtr, (IntPtr host, DateTime cachedAt)> _ownerHostCache = new();
+    static readonly TimeSpan _ownerCacheTtl = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Follow GW_OWNER chain from hidden windows to find visible host windows.
+    /// E.g. wsl PseudoConsoleWindow(owner=CASCADIA) → WindowsTerminal CASCADIA tab.
+    /// O(1) per window with 2s TTL cache. Max 3 hops on cache miss.
+    /// </summary>
+    static List<WindowInfo> FindHostByOwnerChain(List<WindowInfo> hiddenResults)
+    {
+        var hosts = new List<WindowInfo>();
+        var seen = new HashSet<IntPtr>();
+        var now = DateTime.UtcNow;
+
+        foreach (var hidden in hiddenResults)
+        {
+            // Cache hit?
+            if (_ownerHostCache.TryGetValue(hidden.Handle, out var cached)
+                && now - cached.cachedAt < _ownerCacheTtl
+                && NativeMethods.IsWindow(cached.host))
+            {
+                if (cached.host != IntPtr.Zero && seen.Add(cached.host))
+                {
+                    var info = WindowInfo.FromHwnd(cached.host);
+                    info.Coverage = 0.1;
+                    hosts.Add(info);
+                }
+                continue;
+            }
+
+            // Cache miss — walk owner chain
+            var current = hidden.Handle;
+            IntPtr foundHost = IntPtr.Zero;
+            for (int hop = 0; hop < 3; hop++)
+            {
+                var owner = NativeMethods.GetWindow(current, 4 /* GW_OWNER */);
+                if (owner == IntPtr.Zero || owner == current) break;
+
+                if (NativeMethods.IsWindowVisible(owner))
+                {
+                    NativeMethods.GetWindowRect(owner, out var rect);
+                    int w = rect.Right - rect.Left, h = rect.Bottom - rect.Top;
+                    if (w >= 50 && h >= 50)
+                    {
+                        foundHost = owner;
+                        if (seen.Add(owner))
+                        {
+                            var info = WindowInfo.FromHwnd(owner);
+                            info.Coverage = 0.1;
+                            hosts.Add(info);
+                        }
+                    }
+                    break;
+                }
+                current = owner;
+            }
+
+            // Cache result (even if not found — prevents re-walk)
+            _ownerHostCache[hidden.Handle] = (foundHost, now);
+        }
+
+        return hosts;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -500,11 +581,7 @@ public static class WindowFinder
     // ── Helpers ──────────────────────────────────────────────────
 
     public static string GetWindowText(IntPtr hWnd)
-    {
-        var sb = new StringBuilder(512);
-        NativeMethods.GetWindowTextW(hWnd, sb, sb.Capacity);
-        return sb.ToString();
-    }
+        => NativeMethods.GetWindowTextSafe(hWnd, 50);
 
     public static string GetClassName(IntPtr hWnd)
     {

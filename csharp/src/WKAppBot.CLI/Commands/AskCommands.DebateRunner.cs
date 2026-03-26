@@ -373,11 +373,36 @@ internal partial class Program
     /// Full 정반합 debate: R1 → R2 → R3 with convergence checking.
     /// Called after initial triad parallel run (R1 data collected from TriadSharedContext).
     /// </summary>
+    static CancellationTokenSource? _debateCts;
+
     static void RunDebateLoop(string question, int timeoutSec, TriadSharedContext ctx)
     {
         // Debate rounds enforce dry-run: AI tool calls are read-only (inspect/read OK, click/type/edit blocked)
         _dryRunMode.Value = true;
 
+        // Ctrl+C graceful abort
+        _debateCts = new CancellationTokenSource();
+        var prevHandler = default(ConsoleCancelEventHandler);
+        prevHandler = (_, e) =>
+        {
+            e.Cancel = true;
+            _debateCts.Cancel();
+            Console.WriteLine("\n[DEBATE] ⛔ Ctrl+C — 긴급 중단!");
+            SlackPostToThread("⛔ *[Moderator]* 정반합 긴급 중단 (Ctrl+C by user)", "⚖️ Moderator");
+        };
+        Console.CancelKeyPress += prevHandler;
+
+        try { RunDebateLoopCore(question, timeoutSec, ctx); }
+        finally
+        {
+            Console.CancelKeyPress -= prevHandler;
+            _debateCts.Dispose();
+            _debateCts = null;
+        }
+    }
+
+    static void RunDebateLoopCore(string question, int timeoutSec, TriadSharedContext ctx)
+    {
         var ais = new[] { "gemini", "gpt", "claude" };
 
         Console.WriteLine("\n[DEBATE] ═══ 사회자: R2/R3 시작 (R1 이미 완료) ═══");
@@ -410,8 +435,11 @@ internal partial class Program
             return;
         }
 
+        if (_debateCts?.IsCancellationRequested == true) return;
+
         // ── Streaming cross-prompt: AIs react to each other in real-time ──
         RunCrossPromptLoop(ais, Math.Min(timeoutSec, 90), ctx);
+        if (_debateCts?.IsCancellationRequested == true) return;
 
         // Check convergence after cross-prompting
         var r1Convergence = TriadDebateLoop.CalculateConvergence(r1Results);
@@ -443,6 +471,7 @@ internal partial class Program
                     return basePrompt + $"\n\n⚠️ {AiDisplayName(dissenter)} is [DISSENTER] this round. Expect strong pushback from them.";
             });
         var r2Results = RunDebateRound("R2", r2Prompts, timeoutSec, ctx);
+        if (_debateCts?.IsCancellationRequested == true) return;
 
         // Proceed with whatever we have (even 1 response)
         var bestResults = r2Results.Count > 0 ? r2Results : r1Results;
@@ -467,6 +496,7 @@ internal partial class Program
 
         for (int r3i = 0; r3i < maxR3Loops; r3i++)
         {
+            if (_debateCts?.IsCancellationRequested == true) break;
             Console.WriteLine($"[DEBATE:R3-{r3i + 1}] Consensus attempt {r3i + 1}/{maxR3Loops}");
             SlackPostToThread($"🔄 *R3-{r3i + 1}* Consensus attempt", "🦉 Moderator");
 
@@ -881,7 +911,7 @@ internal partial class Program
 
             for (int round = 0; round < maxCrossRounds; round++)
             {
-                if (sw.Elapsed.TotalSeconds > timeoutSec) break;
+                if (sw.Elapsed.TotalSeconds > timeoutSec || _debateCts?.IsCancellationRequested == true) break;
 
                 // Wait for peer chunks to accumulate
                 await Task.Delay(5000);

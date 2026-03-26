@@ -221,6 +221,39 @@ Then immediately:
             SkipKnowhow = true,
         });
 
+        // ── Step 0.5: Compress context (--compress) ──
+        if (args.Contains("--compress"))
+        {
+            Console.WriteLine("[NEWCHAT] Compressing context before /clear...");
+            var compressPrompt = "Summarize this entire conversation as a concise handoff note for the next session. " +
+                "Include: (1) what was accomplished, (2) what's in progress, (3) key decisions made, " +
+                "(4) unresolved issues. Format as bullet points. Keep under 500 words. " +
+                "Start with '## Session Summary' and end with '---'.";
+            if (SetValueAndSubmit(editEl, vsHwnd, compressPrompt))
+            {
+                Console.WriteLine("[NEWCHAT] Compress prompt sent — waiting for response (30s)...");
+                Thread.Sleep(30000); // wait for AI to respond
+                // Summary is now in the conversation history — it will be saved in JSONL
+                // The handoff prompt already references prior session context
+                Console.WriteLine("[NEWCHAT] Compress complete — proceeding to /clear");
+            }
+            else
+                Console.Error.WriteLine("[NEWCHAT] Compress prompt failed — proceeding without summary");
+
+            // Re-find edit element (DOM may have changed after compress)
+            root = automation.FromHandle(vsHwnd);
+            editEl = root != null ? GrapHelper.WalkTree(root, maxDepth: 25, el =>
+            {
+                try
+                {
+                    if (el.Properties.ControlType.ValueOrDefault != ControlType.Edit) return false;
+                    return (el.Properties.Name.ValueOrDefault ?? "") == "Message input";
+                }
+                catch { return false; }
+            }) : null;
+            if (editEl == null) return Error("[NEWCHAT] Edit element lost after compress");
+        }
+
         // ── Step 1: /clear via keyboard (slash command menu needs keystroke input!) ──
         Console.WriteLine("[NEWCHAT] Using keyboard input for slash command (v2)");
         if (!TypeSlashCommandAndSubmit(editEl, vsHwnd, "/clear"))

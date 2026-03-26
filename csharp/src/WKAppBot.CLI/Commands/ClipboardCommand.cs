@@ -42,6 +42,8 @@ internal partial class Program
     const uint CF_HDROP = 15;
     const uint GMEM_MOVEABLE = 0x0002;
 
+    [DllImport("user32.dll")] static extern uint RegisterClipboardFormatW([MarshalAs(UnmanagedType.LPWStr)] string lpszFormat);
+
     static int ClipboardRead()
     {
         if (!OpenClipboard(IntPtr.Zero))
@@ -145,7 +147,7 @@ internal partial class Program
         return i > 0 && bytes.Any(b => b > 0x7F); // must have non-ASCII to be "detected" as UTF-8
     }
 
-    static int ClipboardWrite(string text)
+    static int ClipboardWrite(string text, bool asHtml = false)
     {
         if (!OpenClipboard(IntPtr.Zero))
         {
@@ -157,43 +159,77 @@ internal partial class Program
         {
             EmptyClipboard();
 
-            // CF_UNICODETEXT: UTF-16LE null-terminated
-            var chars = text.ToCharArray();
-            int byteCount = (chars.Length + 1) * 2; // +1 for null terminator
-            var hMem = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)byteCount);
-            if (hMem == IntPtr.Zero)
+            // CF_UNICODETEXT: always set plain text (strip HTML tags for plain text fallback)
+            var plainText = asHtml ? System.Text.RegularExpressions.Regex.Replace(text, "<[^>]+>", "") : text;
+            SetClipboardUnicode(plainText);
+
+            // CF_HTML: rich paste for Gmail/Outlook/etc.
+            if (asHtml)
             {
-                Console.Error.WriteLine("[CLIPBOARD] GlobalAlloc failed");
-                return 1;
+                var cfHtml = RegisterClipboardFormatW("HTML Format");
+                if (cfHtml != 0)
+                {
+                    // CF_HTML requires a specific header format (UTF-8):
+                    // Version:0.9\r\nStartHTML:XXXXX\r\nEndHTML:XXXXX\r\nStartFragment:XXXXX\r\nEndFragment:XXXXX\r\n
+                    const string startFrag = "<!--StartFragment-->";
+                    const string endFrag = "<!--EndFragment-->";
+                    var header = "Version:0.9\r\nStartHTML:{0:D10}\r\nEndHTML:{1:D10}\r\nStartFragment:{2:D10}\r\nEndFragment:{3:D10}\r\n";
+                    var htmlBody = $"<html><body>\r\n{startFrag}{text}{endFrag}\r\n</body></html>";
+
+                    // Calculate offsets (header is variable-length due to number formatting)
+                    var headerLen = string.Format(header, 0, 0, 0, 0).Length;
+                    var startHtml = headerLen;
+                    var startFragment = startHtml + htmlBody.IndexOf(startFrag, StringComparison.Ordinal) + startFrag.Length;
+                    var endFragment = startHtml + htmlBody.IndexOf(endFrag, StringComparison.Ordinal);
+                    var endHtml = startHtml + htmlBody.Length;
+
+                    var cfHtmlStr = string.Format(header, startHtml, endHtml, startFragment, endFragment) + htmlBody;
+                    var cfHtmlBytes = Encoding.UTF8.GetBytes(cfHtmlStr + "\0");
+
+                    var hMemHtml = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)cfHtmlBytes.Length);
+                    if (hMemHtml != IntPtr.Zero)
+                    {
+                        var ptrHtml = GlobalLock(hMemHtml);
+                        if (ptrHtml != IntPtr.Zero)
+                        {
+                            Marshal.Copy(cfHtmlBytes, 0, ptrHtml, cfHtmlBytes.Length);
+                            GlobalUnlock(hMemHtml);
+                            if (SetClipboardData(cfHtml, hMemHtml) == IntPtr.Zero)
+                                GlobalFree(hMemHtml);
+                            else
+                                Console.WriteLine($"[CLIPBOARD] CF_HTML set ({cfHtmlBytes.Length} bytes)");
+                        }
+                        else
+                            GlobalFree(hMemHtml);
+                    }
+                }
             }
 
-            var ptr = GlobalLock(hMem);
-            if (ptr == IntPtr.Zero)
-            {
-                GlobalFree(hMem);
-                Console.Error.WriteLine("[CLIPBOARD] GlobalLock failed");
-                return 1;
-            }
-
-            Marshal.Copy(chars, 0, ptr, chars.Length);
-            Marshal.WriteInt16(ptr, chars.Length * 2, 0); // null terminator
-            GlobalUnlock(hMem);
-
-            if (SetClipboardData(CF_UNICODETEXT, hMem) == IntPtr.Zero)
-            {
-                GlobalFree(hMem);
-                Console.Error.WriteLine("[CLIPBOARD] SetClipboardData failed");
-                return 1;
-            }
-
-            // hMem now owned by clipboard — do NOT free
-            Console.WriteLine($"[CLIPBOARD] wrote {text.Length} chars");
+            Console.WriteLine($"[CLIPBOARD] wrote {text.Length} chars{(asHtml ? " (HTML+text)" : "")}");
             return 0;
         }
         finally
         {
             CloseClipboard();
         }
+    }
+
+    static void SetClipboardUnicode(string text)
+    {
+        var chars = text.ToCharArray();
+        int byteCount = (chars.Length + 1) * 2;
+        var hMem = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)byteCount);
+        if (hMem == IntPtr.Zero) return;
+
+        var ptr = GlobalLock(hMem);
+        if (ptr == IntPtr.Zero) { GlobalFree(hMem); return; }
+
+        Marshal.Copy(chars, 0, ptr, chars.Length);
+        Marshal.WriteInt16(ptr, chars.Length * 2, 0);
+        GlobalUnlock(hMem);
+
+        if (SetClipboardData(CF_UNICODETEXT, hMem) == IntPtr.Zero)
+            GlobalFree(hMem);
     }
 
     [StructLayout(LayoutKind.Sequential)]
