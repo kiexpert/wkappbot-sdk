@@ -16,6 +16,23 @@ internal partial class Program
     // Unified pattern: find all -> select (--nth/--all) -> dispatch targets
     static int A11yCommand(string[] args)
     {
+        // ═══ Focus Hot-Chain: show current keyboard focus on every a11y command ═══
+        try
+        {
+            using var focusUia = new FlaUI.UIA3.UIA3Automation();
+            var focusEl = focusUia.FocusedElement();
+            if (focusEl != null)
+            {
+                var fg = NativeMethods.GetForegroundWindow();
+                var grapExpr = WKAppBot.Win32.Accessibility.GrapHelper.BuildGrapExpression(fg, focusEl);
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.Write("[FOCUS] ");
+                Console.ResetColor();
+                Console.WriteLine(grapExpr);
+            }
+        }
+        catch { }
+
         // ═══ ADB early dispatch: adb:// prefix → Android pipeline ═══
         if (args.Length >= 2 && Android.AdbGrapRouter.IsAdbGrap(args[1]))
             return AdbA11yDispatch(args);

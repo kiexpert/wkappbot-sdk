@@ -2030,7 +2030,7 @@ internal partial class Program
                         try
                         {
                             var hwndRoot = uia.FromHandle(gti.hwndFocus);
-                            focusEl = GrapHelper.FindFocusedLeaf(uia, hwndRoot) ?? hwndRoot;
+                            focusEl = GrapHelper.FindFocusedLeaf(uia, hwndRoot, hWnd) ?? hwndRoot;
                         }
                         catch { }
                         if (focusEl == null) try { focusEl = uia.FocusedElement(); } catch { } // global fallback
