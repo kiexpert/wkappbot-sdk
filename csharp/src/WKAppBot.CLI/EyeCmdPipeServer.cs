@@ -103,6 +103,7 @@ internal static class EyeCmdPipeServer
             "help" or "--help" or "-h" => false,
             "mcp" => false,       // MCP server itself (avoid recursion)
             "newchat" => false,   // focusless clipboard-based
+            "dashboard" => false, // long-running HTTP server (no UIA)
             "ask" => false,       // long-running CDP + Slack streaming (MCP 60s timeout too short)
             "agent" => false,     // long-running loop (MCP 60s timeout too short)
             _ => true             // a11y, inspect, windows, prompt, capture, ocr, scan, etc.

@@ -39,6 +39,11 @@
     <ProjectReference Include="..\WKAppBot.Android\WKAppBot.Android.csproj" />
   </ItemGroup>
 
+  <!-- Dashboard HTML embedded resource -->
+  <ItemGroup>
+    <EmbeddedResource Include="Commands\DashboardPage.html" />
+  </ItemGroup>
+
   <!-- Copy handler YAML files from project root to output + publish -->
   <ItemGroup>
     <Content Include="..\..\..\handlers\**\*.yaml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="handlers" ExcludeFromSingleFile="true" />
