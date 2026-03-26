@@ -153,7 +153,7 @@ internal partial class Program
         // Thread reply: send as-is (no splitting — already in thread context).
         // Channel post (no threadTs): use PostWithOverflow — first paragraph + overflow as thread.
         bool hasTargetThread = !string.IsNullOrEmpty(threadTs);
-        bool ok;
+        bool ok = false;
         string? postedTs = null;
 
         // Auto-broadcast: completion/report messages also appear in channel
@@ -161,10 +161,51 @@ internal partial class Program
         if (autoBroadcast)
             Console.WriteLine("[SLACK] Auto-broadcast: completion message detected");
 
-        if (hasTargetThread)
-            (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName, replyBroadcast: autoBroadcast).GetAwaiter().GetResult();
-        else
-            (ok, postedTs) = PostWithOverflow(botToken, channel, replyText, username: senderName);
+        // Smart merge: if last message in thread is from same sender, no attachments,
+        // same minute, and combined size < 3800 → edit instead of new message (saves message quota)
+        bool merged = false;
+        if (hasTargetThread && filePaths.Count == 0)
+        {
+            try
+            {
+                var historyUrl = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=1&oldest={threadTs}";
+                using var http = new HttpClient();
+                http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+                // Get latest reply in thread
+                var histResp = http.GetStringAsync($"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=50").GetAwaiter().GetResult();
+                var histJson = JsonSerializer.Deserialize<JsonNode>(histResp);
+                var msgs = histJson?["messages"]?.AsArray();
+                if (msgs != null && msgs.Count > 1)
+                {
+                    var last = msgs[^1]; // last reply (not thread starter)
+                    var lastUser = last?["username"]?.GetValue<string>() ?? "";
+                    var lastTs = last?["ts"]?.GetValue<string>() ?? "";
+                    var lastText = last?["text"]?.GetValue<string>() ?? "";
+                    var lastFiles = last?["files"]?.AsArray();
+                    var lastTime = double.TryParse(lastTs, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var lt) ? lt : 0;
+                    var nowTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                    bool sameAuthor = lastUser == senderName;
+                    bool noFiles = lastFiles == null || lastFiles.Count == 0;
+                    bool sameMinute = (nowTime - lastTime) < 60;
+                    bool sizeOk = (lastText.Length + replyText.Length + 2) < 3800;
+                    if (sameAuthor && noFiles && sameMinute && sizeOk)
+                    {
+                        var combined = lastText + "\n\n" + replyText;
+                        var (updOk, _, _) = SlackUpdateMessageAsync(botToken, channel, lastTs, combined).GetAwaiter().GetResult();
+                        if (updOk) { merged = true; ok = true; Console.WriteLine("[SLACK] Merged with previous message (same author, <1min)"); }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        if (!merged)
+        {
+            if (hasTargetThread)
+                (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName, replyBroadcast: autoBroadcast).GetAwaiter().GetResult();
+            else
+                (ok, postedTs) = PostWithOverflow(botToken, channel, replyText, username: senderName);
+        }
 
         var threadNote = hasTargetThread ? " (in-thread)" : "";
         if (ok)
