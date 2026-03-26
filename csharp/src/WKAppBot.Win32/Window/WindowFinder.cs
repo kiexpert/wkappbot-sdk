@@ -195,16 +195,16 @@ public static class WindowFinder
         string procName, int w, int h, FocusSnapshot? focus = null)
     {
         var flags = focus?.GetFlags(hWnd) ?? "";
-        // WkArgs: appbot-specific props cached via SetPropW → enriches search key
+        // wkappbot.* props → "wkappbot" 딱지 + 상세 props
         var wkArgs = "";
-        var isWebbot = NativeMethods.GetPropW(hWnd, "wkwebbot") != IntPtr.Zero;
-        var cdpPort = NativeMethods.GetPropW(hWnd, "cdp").ToInt32();
+        var isWebbot = NativeMethods.GetPropW(hWnd, "wkappbot.webbot") != IntPtr.Zero;
+        var cdpPort = NativeMethods.GetPropW(hWnd, "wkappbot.cdp").ToInt32();
         if (isWebbot || cdpPort > 0)
         {
-            var parts = new List<string>(2);
-            if (isWebbot) parts.Add("wkwebbot");
+            var parts = new List<string>(3) { "wkappbot" }; // 딱지 항상 포함
+            if (isWebbot) parts.Add("webbot");
             if (cdpPort > 0) parts.Add($"cdp={cdpPort}");
-            wkArgs = $" {string.Join(" ", parts)}"; // IntPtr props only — auto-freed on window destroy, no leak!
+            wkArgs = $" {string.Join(" ", parts)}"; // IntPtr props — auto-freed on window destroy
         }
         return $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h}{flags}{wkArgs})";
     }
