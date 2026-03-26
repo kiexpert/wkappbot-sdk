@@ -195,14 +195,18 @@ public static class WindowFinder
         string procName, int w, int h, FocusSnapshot? focus = null)
     {
         var flags = focus?.GetFlags(hWnd) ?? "";
-        // wkwebbot + cdp prop: enriches search key for Chrome automation
-        var wkwebbot = "";
-        var cdpProp = NativeMethods.GetPropW(hWnd, "cdp");
-        if (NativeMethods.GetPropW(hWnd, "wkwebbot") != IntPtr.Zero)
-            wkwebbot = cdpProp != IntPtr.Zero ? $" wkwebbot cdp={cdpProp.ToInt32()}" : " wkwebbot";
-        else if (cdpProp != IntPtr.Zero)
-            wkwebbot = $" cdp={cdpProp.ToInt32()}";
-        return $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h}{flags}{wkwebbot})";
+        // WkArgs: appbot-specific props cached via SetPropW → enriches search key
+        var wkArgs = "";
+        var isWebbot = NativeMethods.GetPropW(hWnd, "wkwebbot") != IntPtr.Zero;
+        var cdpPort = NativeMethods.GetPropW(hWnd, "cdp").ToInt32();
+        if (isWebbot || cdpPort > 0)
+        {
+            var parts = new List<string>(2);
+            if (isWebbot) parts.Add("wkwebbot");
+            if (cdpPort > 0) parts.Add($"cdp={cdpPort}");
+            wkArgs = $" {string.Join(" ", parts)}"; // IntPtr props only — auto-freed on window destroy, no leak!
+        }
+        return $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h}{flags}{wkArgs})";
     }
 
     /// <summary>Check if childHwnd is a descendant of a top-level parentHwnd.</summary>
