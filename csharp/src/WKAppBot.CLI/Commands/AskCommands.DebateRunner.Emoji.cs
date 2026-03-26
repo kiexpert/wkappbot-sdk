@@ -34,7 +34,7 @@ internal partial class Program
         };
     }
 
-    /// <summary>Returns AiDisplayName if debate emoji assigned, otherwise 🤖 + fallback (always has emoji for profile pic).</summary>
+    /// <summary>Returns AiDisplayName if debate emoji assigned, otherwise 🚧 (under construction — no first chunk yet).</summary>
     static string SlackAiName(string aiKey, string fallback)
-        => _aiEmoji.ContainsKey(aiKey) ? AiDisplayName(aiKey) : $"🤖 {fallback}";
+        => _aiEmoji.ContainsKey(aiKey) ? AiDisplayName(aiKey) : $"🚧 {fallback}";
 }
