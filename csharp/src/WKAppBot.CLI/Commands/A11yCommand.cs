@@ -16,19 +16,32 @@ internal partial class Program
     // Unified pattern: find all -> select (--nth/--all) -> dispatch targets
     static int A11yCommand(string[] args)
     {
-        // ═══ Focus Hot-Chain: show current keyboard focus on every a11y command ═══
+        // ═══ Focus Hot-Chain (lightweight — Win32 only, no FlaUI/UIA DLL loading) ═══
         try
         {
-            using var focusUia = new FlaUI.UIA3.UIA3Automation();
-            var focusEl = focusUia.FocusedElement();
-            if (focusEl != null)
+            var fg = NativeMethods.GetForegroundWindow();
+            var fgTitle = NativeMethods.GetWindowTextW(fg);
+            var gti = new NativeMethods.GUITHREADINFO
+                { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+            if (NativeMethods.GetGUIThreadInfo(0, ref gti) && gti.hwndFocus != IntPtr.Zero)
             {
-                var fg = NativeMethods.GetForegroundWindow();
-                var grapExpr = WKAppBot.Win32.Accessibility.GrapHelper.BuildGrapExpression(fg, focusEl);
+                var focusTitle = NativeMethods.GetWindowTextW(gti.hwndFocus);
+                var focusClass = new System.Text.StringBuilder(128);
+                NativeMethods.GetClassNameW(gti.hwndFocus, focusClass, 128);
+                var winShort = fgTitle.Length > 30 ? fgTitle[..27] + "*" : fgTitle;
                 Console.ForegroundColor = ConsoleColor.DarkCyan;
                 Console.Write("[FOCUS] ");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write($"\"{winShort}\"");
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.Write($"#0x{gti.hwndFocus:X}({focusClass})");
+                if (focusTitle.Length > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.Write($" \"{(focusTitle.Length > 30 ? focusTitle[..27] + "..." : focusTitle)}\"");
+                }
                 Console.ResetColor();
-                Console.WriteLine(grapExpr);
+                Console.WriteLine();
             }
         }
         catch { }
