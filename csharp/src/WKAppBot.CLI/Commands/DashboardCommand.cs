@@ -37,12 +37,22 @@ internal partial class Program
         }
         catch (HttpListenerException ex) when (ex.ErrorCode == 5) // Access Denied
         {
-            // Retry with localhost-only (no netsh urlacl needed)
-            Console.Error.WriteLine($"[DASH] Access denied for {prefix} — falling back to localhost-only");
+            // http://+:port requires netsh urlacl. Fall back to http://*:port (same but different ACL)
+            // If that also fails, try localhost-only.
+            Console.Error.WriteLine($"[DASH] Access denied for {prefix} — trying http://*:{port}/");
             listener?.Close();
             listener = new HttpListener();
-            prefix = $"http://localhost:{port}/";
-            localUrl = prefix;
+            prefix = $"http://*:{port}/";
+            try { listener.Prefixes.Add(prefix); listener.Start(); }
+            catch
+            {
+                Console.Error.WriteLine($"[DASH] Also denied — falling back to 127.0.0.1");
+                listener?.Close();
+                listener = new HttpListener();
+                prefix = $"http://127.0.0.1:{port}/";
+                listener.Prefixes.Add(prefix);
+                listener.Start();
+            }
             listener.Prefixes.Add(prefix);
             listener.Start();
         }
