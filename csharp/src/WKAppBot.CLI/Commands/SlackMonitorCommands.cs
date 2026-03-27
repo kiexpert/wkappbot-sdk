@@ -1040,22 +1040,36 @@ internal partial class Program
             var msg = json?["messages"]?[0];
             if (msg == null) { Console.WriteLine($"{prefix} ts={ts} — not found"); return; }
 
-            var user = msg["username"]?.GetValue<string>() ?? msg["user"]?.GetValue<string>() ?? "?";
+            var username = msg["username"]?.GetValue<string>();
+            var userId = msg["user"]?.GetValue<string>();
             var text = msg["text"]?.GetValue<string>() ?? "";
             var botId = msg["bot_id"]?.GetValue<string>();
             var subtype = msg["subtype"]?.GetValue<string>();
             var threadTs = msg["thread_ts"]?.GetValue<string>();
             var replyCount = msg["reply_count"]?.GetValue<int>() ?? 0;
+
+            // Profile icons (multiple sources)
             var icons = msg["icons"];
             var emoji = icons?["emoji"]?.GetValue<string>();
             var iconUrl = icons?["image_48"]?.GetValue<string>() ?? icons?["image_36"]?.GetValue<string>();
 
+            // Bot profile (richer info)
+            var botProfile = msg["bot_profile"];
+            var botName = botProfile?["name"]?.GetValue<string>();
+            var botIcons = botProfile?["icons"];
+            var botIcon36 = botIcons?["image_36"]?.GetValue<string>();
+            var botIcon72 = botIcons?["image_72"]?.GetValue<string>();
+
             Console.WriteLine($"{prefix} ts={ts}");
-            Console.WriteLine($"  user: {user}");
+            Console.WriteLine($"  username: {username ?? "(none)"}");
+            if (userId != null) Console.WriteLine($"  user_id: {userId}");
             if (botId != null) Console.WriteLine($"  bot_id: {botId}");
+            if (botName != null) Console.WriteLine($"  bot_name: {botName}");
             if (subtype != null) Console.WriteLine($"  subtype: {subtype}");
-            if (emoji != null) Console.WriteLine($"  emoji: {emoji}");
-            if (iconUrl != null) Console.WriteLine($"  icon: {iconUrl}");
+            if (emoji != null) Console.WriteLine($"  icon_emoji: {emoji}");
+            if (iconUrl != null) Console.WriteLine($"  icon_url: {iconUrl}");
+            if (botIcon36 != null) Console.WriteLine($"  bot_icon_36: {botIcon36}");
+            if (botIcon72 != null) Console.WriteLine($"  bot_icon_72: {botIcon72}");
             if (threadTs != null) Console.WriteLine($"  thread_ts: {threadTs}");
             if (replyCount > 0) Console.WriteLine($"  replies: {replyCount}");
 
