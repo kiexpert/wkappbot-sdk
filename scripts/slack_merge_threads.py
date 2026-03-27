@@ -111,8 +111,11 @@ def merge_thread(thread_ts):
         ct = curr.get('text', '')
         pt = prev.get('text', '')
 
-        # Same bot author, no files on current → merge into previous
-        if ca and ca == pa and not cf:
+        # Both are bot messages (any author) + no files → merge into previous
+        # Separator shows icon+author, so different bots are distinguishable
+        c_is_bot = curr.get('bot_id') or curr.get('subtype') == 'bot_message'
+        p_is_bot = prev.get('bot_id') or prev.get('subtype') == 'bot_message'
+        if c_is_bot and p_is_bot and not cf:
             icon = get_icon(curr) or get_icon(prev)
             sep_icon = f'{icon} ' if icon else ''
             time_mark = smart_time(prev.get('ts', ''), curr.get('ts', ''))
