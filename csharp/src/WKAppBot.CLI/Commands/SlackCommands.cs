@@ -555,9 +555,15 @@ internal partial class Program
             cutAt--;
 
         var result = cutAt > 0 ? now[cutAt..] : now;
-        // Seconds-only (no delimiter in result) → append "s" for clarity: "58" → "58s"
+        // Seconds-only → "58s"
         if (!result.Contains(':') && !result.Contains('-') && !result.Contains(' '))
-            result += "s";
+            return result + "s";
+        // Minutes+ changed → trim trailing :ss, add "m" if minutes-only
+        // e.g. "48:10" → "48m", "16:01:05" → "16:01", "28 09:00:05" → "28 09:00"
+        if (result.Length >= 5 && result[^3] == ':')
+            result = result[..^3]; // trim :ss
+        if (!result.Contains(':') && !result.Contains('-') && !result.Contains(' '))
+            return result + "m"; // minutes-only → "48m"
         return result;
     }
 
