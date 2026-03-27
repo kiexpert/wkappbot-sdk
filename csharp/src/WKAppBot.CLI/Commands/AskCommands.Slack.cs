@@ -104,7 +104,7 @@ internal partial class Program
                 var iconEmoji = ExtractDebateIconEmoji(uname);
                 var sepIcon = !string.IsNullOrEmpty(iconEmoji) ? $"{iconEmoji} " : "";
                 var timeMark = SmartTimeMark(last.text);
-                var combined = last.text + $"\n{sepIcon}━━ {timeMark} ━━\n" + msg;
+                var combined = last.text + $"\n{sepIcon}*{uname}* ━━ {timeMark} ━━\n" + msg;
 
                 if (combined.Length <= SlackMaxAppendLength)
                 {
