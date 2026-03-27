@@ -718,13 +718,22 @@ public sealed partial class CdpClient
         {
             // Tab is not active → minimize Chrome before activation to prevent OS focus theft
             var hwnd = GetChromeWindowHandle();
+            bool didMinimize = false;
             if (hwnd != IntPtr.Zero && !IsIconic(hwnd))
             {
+                Console.Error.WriteLine($"[CDP] Chrome minimized for tab switch (hwnd={hwnd:X8})");
                 ShowWindowNative(hwnd, 6); // SW_MINIMIZE
+                didMinimize = true;
                 await Task.Delay(50);
             }
+            await SendAsync("Page.bringToFront");
+            // Restore after tab switch settles
+            if (didMinimize)
+            {
+                await Task.Delay(200);
+                RestoreChromeNoActivate();
+            }
         }
-        await SendAsync("Page.bringToFront");
     }
 
     /// <summary>
@@ -752,7 +761,9 @@ public sealed partial class CdpClient
         if (hwnd == IntPtr.Zero) { Console.WriteLine("[CDP] MinimizeChrome: hwnd=zero (Chrome not found)"); return; }
         // SW_MINIMIZE=6
         ShowWindowNative(hwnd, 6);
-        Console.WriteLine($"[CDP] Chrome minimized (hwnd={hwnd:X8})");
+        var stack = new System.Diagnostics.StackTrace(1, true).ToString();
+        var caller = stack.Length > 200 ? stack[..200] : stack;
+        Console.Error.WriteLine($"[CDP:MINIMIZE] Chrome minimized (hwnd={hwnd:X8})\n  callstack: {caller.Replace("\n", "\n  ")}");
     }
 
     /// <summary>Legacy recovery — replaced by RestoreChromeNoActivate. Kept as no-op.</summary>

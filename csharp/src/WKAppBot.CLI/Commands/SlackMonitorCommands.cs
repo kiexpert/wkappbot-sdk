@@ -968,13 +968,60 @@ internal partial class Program
     static async Task<bool> SlackDeleteMessageAsync(string botToken, string channel, string ts,
         bool guardThreadStarter = true)
     {
+        // ── Orphan detection: reply whose thread starter was deleted → always delete ──
+        // Fetch message info to check if it's an orphaned reply
+        try
+        {
+            var replies = await SlackGetThreadRepliesAsync(botToken, channel, ts);
+            if (replies != null && replies.Count >= 1)
+            {
+                var starter = replies[0];
+                var starterTs = starter?["ts"]?.GetValue<string>();
+                var starterSubtype = starter?["subtype"]?.GetValue<string>();
+                // If starter ts != our ts, we're a reply — check if starter is tombstone
+                if (starterTs != ts && (starterSubtype == "tombstone" || starter?["text"]?.GetValue<string>() == "This message was deleted."))
+                {
+                    Console.WriteLine($"[SLACK] Orphan reply ts={ts} — thread starter deleted → force delete");
+                    await SlackDeleteRawAsync(botToken, channel, ts);
+                    return true;
+                }
+            }
+        }
+        catch { /* best-effort orphan check */ }
+
         if (guardThreadStarter)
         {
-            var hasReplies = await SlackMessageHasRepliesAsync(botToken, channel, ts);
-            if (hasReplies)
+            // Loop: delete bot replies, re-check, repeat until clean or user reply found
+            for (int pass = 0; pass < 10; pass++) // max 10 passes (safety)
             {
-                Console.WriteLine($"[SLACK] SKIP delete ts={ts} — thread starter (has replies)");
-                return false;
+                var threadReplies = await SlackGetThreadRepliesAsync(botToken, channel, ts);
+                if (threadReplies == null || threadReplies.Count <= 1) break; // no replies → proceed to delete starter
+
+                // Check for human replies
+                bool hasUserReply = false;
+                var botReplies = new List<string>();
+                for (int ri = 1; ri < threadReplies.Count; ri++)
+                {
+                    var r = threadReplies[ri];
+                    var subtype = r?["subtype"]?.GetValue<string>();
+                    if (subtype != "bot_message" && r?["bot_id"] == null)
+                    { hasUserReply = true; break; }
+                    var rTs = r?["ts"]?.GetValue<string>();
+                    if (rTs != null) botReplies.Add(rTs);
+                }
+
+                if (hasUserReply)
+                {
+                    Console.WriteLine($"[SLACK] SKIP delete ts={ts} — thread has user replies");
+                    return false;
+                }
+
+                if (botReplies.Count == 0) break; // all clean
+
+                // Delete first bot reply (repeat loop will pick up the rest)
+                Console.WriteLine($"[SLACK] Clearing bot reply {botReplies[0]} (pass {pass + 1}, {botReplies.Count} remaining)");
+                await SlackDeleteRawAsync(botToken, channel, botReplies[0]);
+                await Task.Delay(300); // rate limit
             }
         }
 
@@ -1176,6 +1223,39 @@ internal partial class Program
     /// Uses conversations.replies (more reliable than history reply_count field).
     /// Returns true on API failure (conservative: don't delete if uncertain).
     /// </summary>
+    /// <summary>Get all replies for a thread (including starter at index 0). Returns null on error.</summary>
+    static async Task<JsonArray?> SlackGetThreadRepliesAsync(string botToken, string channel, string messageTs)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            using var req = new HttpRequestMessage(HttpMethod.Get,
+                $"https://slack.com/api/conversations.replies?channel={Uri.EscapeDataString(channel)}&ts={Uri.EscapeDataString(messageTs)}&limit=100");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+            var resp = await http.SendAsync(req);
+            var body = await resp.Content.ReadAsStringAsync();
+            var json = JsonSerializer.Deserialize<JsonNode>(body);
+            if (json?["ok"]?.GetValue<bool>() != true) return null;
+            return json?["messages"]?.AsArray();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Raw chat.delete — no guards, no audit. For cleaning bot replies before thread starter delete.</summary>
+    static async Task SlackDeleteRawAsync(string botToken, string channel, string ts)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            var payload = JsonSerializer.Serialize(new { channel, ts });
+            using var req = new HttpRequestMessage(HttpMethod.Post, "https://slack.com/api/chat.delete");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+            req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+            await http.SendAsync(req);
+        }
+        catch { }
+    }
+
     static async Task<bool> SlackMessageHasRepliesAsync(string botToken, string channel, string messageTs)
     {
         try

@@ -5,7 +5,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // wkappbot logcat [regex] [file1.glob] [file2.glob ...] [grep-opts] [--hq] [--past N] [-f] [--timeout N] [-r]
+    // wkappbot logcat [regex] [file1.glob] [file2.glob ...] [grep-opts] [--hq] [--past N] [-f] [--timeout N] [-r] [--dbg [pid]]
     // grep-style: first positional = content regex, remaining = file globs (OR joined, "**" = all)
     // grep-compatible options:
     //   -A N / -B N / -C N  after/before/context lines
@@ -15,6 +15,7 @@ internal partial class Program
     //   -m N                stop after N matches per file
     //   -i                     ignore case (grap default: case-sensitive; logcat default: insensitive)
     //   -n                     show line numbers
+    //   --dbg [pid]            capture OutputDebugString (DBWIN_BUFFER shared memory)
     static int LogcatCommand(string[] args)
     {
         var selfPid = Environment.ProcessId;
@@ -36,6 +37,8 @@ internal partial class Program
         int maxCount = int.MaxValue; // -m N: max matches per file
         bool showLineNums = false; // -n: prepend line numbers
         bool jsonMode = false;    // --json: structural JSON key+value matching
+        bool dbgMode = false;     // --dbg: capture OutputDebugString via DBWIN_BUFFER
+        int dbgPid = 0;           // --dbg PID filter (0 = all processes)
         // (removed --max-context-lines — indent context limit is in file edit, not grap)
         // Case: grap/grep default = case-sensitive (grep compat); logcat default = insensitive
         bool ignoreCase = !GrapMode;
@@ -69,6 +72,13 @@ internal partial class Program
             else if (a is "--case-sensitive" or "--no-ignore-case") { ignoreCase = false; }
             else if (a is "-n" or "--line-number")           { showLineNums = true; }
             else if (a is "--json")                            { jsonMode = true; }
+            else if (a is "--dbg")
+            {
+                dbgMode = true;
+                // Optional PID: --dbg 1234 or just --dbg (all)
+                if (i + 1 < args.Length && int.TryParse(args[i + 1], out var dp) && dp > 0)
+                    { dbgPid = dp; i++; }
+            }
             // --max-lines removed (was never wired up)
             else if (a == "--timeout" && i + 1 < args.Length) { timeoutSeconds = ParsePastDuration(args[++i]); }
             else if (a.StartsWith("--timeout=")) { timeoutSeconds = ParsePastDuration(a[10..]); }
@@ -215,15 +225,16 @@ internal partial class Program
         // result=$(grap pattern *.txt) should work like grep: scan files, output matches, exit.
         // Diagnostic lines go to stderr so stdout contains only matches (grep-compatible).
         // grep-compat: one-shot when piped OR when called as grap/grep (TTY or not)
-        bool autoOneShot = (Console.IsOutputRedirected || GrapMode) && pastSeconds == 0 && !follow && timeoutSeconds == 0;
+        bool autoOneShot = (Console.IsOutputRedirected || GrapMode) && pastSeconds == 0 && !follow && timeoutSeconds == 0 && !dbgMode;
 
         var depthLabel   = maxDepth == 0 ? "" : maxDepth == -1 ? " -r" : $" -r={maxDepth}";
         var pastLabel    = pastSeconds    > 0 ? $" --past {FormatDuration(pastSeconds)}" : "";
         var timeoutLabel = timeoutSeconds > 0 ? $" --timeout {FormatDuration(timeoutSeconds)}" : "";
         // GrapMode: diagnostics always to stderr (stdout = grep-compatible matches only)
         var diagOut = (autoOneShot || GrapMode) ? Console.Error : Console.Out;
+        var dbgLabel = dbgMode ? $" --dbg{(dbgPid > 0 ? $" {dbgPid}" : "")}" : "";
         if (!autoOneShot || !GrapMode)
-            diagOut.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")}{pastLabel}{timeoutLabel}{(autoOneShot ? " (grep-mode)" : " (Ctrl+C to stop)")}");
+            diagOut.WriteLine($"[LOGCAT] start file='{fileFilterArg}' msg='{messageFilterArg}' basedir='{baseDir}'{depthLabel}{(includeHq ? " --hq" : "")}{pastLabel}{timeoutLabel}{dbgLabel}{(autoOneShot ? " (grep-mode)" : " (Ctrl+C to stop)")}");
 
         // Debug: write timing to C:\Temp\grap_fast_exit.txt (shared with FastExit debug)
         var _lcSw = System.Diagnostics.Stopwatch.StartNew();
@@ -329,50 +340,80 @@ internal partial class Program
         var lineCounts = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         string lastHeaderPath = "";
 
-        foreach (var dir in dirs.Distinct(StringComparer.OrdinalIgnoreCase))
+        // --dbg: start OutputDebugString listener (DBWIN_BUFFER shared memory)
+        DbgViewListener? dbgListener = null;
+        if (dbgMode)
         {
-            if (!Directory.Exists(dir)) continue;
-
-            var watchDir = dir;
-            var w = new FileSystemWatcher(watchDir)
+            dbgListener = new DbgViewListener { FilterPid = dbgPid };
+            var capturedMsgRegex = msgRegex;
+            dbgListener.MessageReceived += (pid, msg) =>
             {
-                IncludeSubdirectories = maxDepth != 0,
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
-                Filter = "*",
-                EnableRaisingEvents = true
+                // Apply content filter (same regex as file logcat)
+                if (capturedMsgRegex != null && !capturedMsgRegex.IsMatch(msg)) return;
+                if (_jsonMatchFn != null && !_jsonMatchFn(msg)) return;
+
+                var prefix = $"[DBG:{pid}]";
+                var ts = DateTime.Now.ToString("HH:mm:ss.fff");
+                if (GrapMode || Console.IsOutputRedirected)
+                    (OriginalStdout ?? Console.Out).WriteLine($"{prefix} {msg}");
+                else
+                    Console.WriteLine($"{prefix} {msg}  ({ts})");
             };
+            if (dbgListener.TryStart())
+                diagOut.WriteLine($"[DBG] Listening for OutputDebugString{(dbgPid > 0 ? $" (pid={dbgPid})" : "")}...");
+            else
+                dbgListener = null; // failed to start
+        }
 
-            var capturedDir = watchDir; // closure capture
-            FileSystemEventHandler onChange = (_, e) =>
+        // --dbg without file sources: skip file watchers entirely
+        bool watchFiles = !dbgMode || positional.Count > 1 || follow;
+        if (watchFiles)
+        {
+            foreach (var dir in dirs.Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                try
+                if (!Directory.Exists(dir)) continue;
+
+                var watchDir = dir;
+                var w = new FileSystemWatcher(watchDir)
                 {
-                    if (maxDepth > 0 && GetRelativeDepth(e.FullPath, capturedDir) > maxDepth) return;
-                    var fn = Path.GetFileName(e.FullPath);
-                    if (!IsFilePatternMatch(fn, filePatterns)) return;
-                    if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
-                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount);
-                }
-                catch { }
-            };
+                    IncludeSubdirectories = maxDepth != 0,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                    Filter = "*",
+                    EnableRaisingEvents = true
+                };
 
-            RenamedEventHandler onRename = (_, e) =>
-            {
-                try
+                var capturedDir = watchDir; // closure capture
+                FileSystemEventHandler onChange = (_, e) =>
                 {
-                    if (maxDepth > 0 && GetRelativeDepth(e.FullPath, capturedDir) > maxDepth) return;
-                    var fn = Path.GetFileName(e.FullPath);
-                    if (!IsFilePatternMatch(fn, filePatterns)) return;
-                    if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
-                    EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount);
-                }
-                catch { }
-            };
+                    try
+                    {
+                        if (maxDepth > 0 && GetRelativeDepth(e.FullPath, capturedDir) > maxDepth) return;
+                        var fn = Path.GetFileName(e.FullPath);
+                        if (!IsFilePatternMatch(fn, filePatterns)) return;
+                        if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
+                        EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount);
+                    }
+                    catch { }
+                };
 
-            w.Changed += onChange;
-            w.Created += onChange;
-            w.Renamed += onRename;
-            watchers.Add(w);
+                RenamedEventHandler onRename = (_, e) =>
+                {
+                    try
+                    {
+                        if (maxDepth > 0 && GetRelativeDepth(e.FullPath, capturedDir) > maxDepth) return;
+                        var fn = Path.GetFileName(e.FullPath);
+                        if (!IsFilePatternMatch(fn, filePatterns)) return;
+                        if (fn.Contains(selfLogMarker, StringComparison.OrdinalIgnoreCase)) return;
+                        EmitDeltaLines(e.FullPath, offsets, lineCounts, msgRegex, ref lastHeaderPath, contextLines, afterLines, beforeLines, invertMatch, filesOnly, countOnly, maxCount);
+                    }
+                    catch { }
+                };
+
+                w.Changed += onChange;
+                w.Created += onChange;
+                w.Renamed += onRename;
+                watchers.Add(w);
+            }
         }
 
         while (!cts.IsCancellationRequested)
@@ -383,6 +424,7 @@ internal partial class Program
             catch (IOException) { break; }
         }
 
+        dbgListener?.Dispose();
         foreach (var w in watchers)
         {
             try { w.EnableRaisingEvents = false; w.Dispose(); } catch { }

@@ -115,9 +115,6 @@ internal partial class Program
             try { XRayHelper.RestoreAll(); } catch { }
             try { Console.Out.Flush(); } catch { }
             // Signal Launcher to TerminateSelf immediately — don't wait for Core's ~30s OS cleanup.
-            // Launcher stdout relay detects "\0UIT" sentinel → TerminateSelf → bash gets control back.
-            // Core's SMB console handle cleanup (~30s) continues in background after Launcher exits.
-            // Sentinel via stderr (not stdout) — keeps stdout clean for pipes, MCP JSON-RPC, etc.
             try
             {
                 var raw = Console.OpenStandardError();
@@ -176,10 +173,15 @@ internal partial class Program
 
         // Force UTF-8 globally — console + child processes inherit codepage 65001
         // Use no-BOM variant: BOM is noise in pipes/relay, Console.Out is not a file
+        // Force UTF-8 globally — console + child processes inherit codepage 65001
+        // Use no-BOM variant: BOM is noise in pipes/relay, Console.Out is not a file
         try { Console.OutputEncoding = new System.Text.UTF8Encoding(false); } catch { }
         try { Console.InputEncoding = Encoding.UTF8; } catch { }
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
+
+        // TODO: stderr dim output — rolled back until MCP stderr relay preserves ANSI + encoding
+        // Console.SetError(new DimTextWriter(Console.Error));
 
         // --args-file <path>: UTF-8 file fallback for Korean args garbled via bash→PowerShell CP949
         {

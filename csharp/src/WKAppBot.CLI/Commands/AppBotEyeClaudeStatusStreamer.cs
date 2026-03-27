@@ -962,18 +962,49 @@ internal partial class Program
                     if (json?["ok"]?.GetValue<bool>() != true) return;
                     var msgs = json["messages"] as System.Text.Json.Nodes.JsonArray;
                     if (msgs == null) return;
+                    // Collect status messages per author (newest first — Slack returns newest first)
+                    var statusByAuthor = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                    var orphanReplies = new List<string>();
+
                     foreach (var m in msgs)
                     {
                         var mTs = m?["ts"]?.GetValue<string>();
                         var mUser = m?["username"]?.GetValue<string>();
                         var mText = m?["text"]?.GetValue<string>() ?? "";
-                        if (mTs == null || mTs == ts || mUser != instanceUsername) continue;
-                        // Only delete status messages (defined in StatusEmojis), not user conversations
-                        if (!IsStatusEmoji(mText)) continue;
-                        var replyCount = m?["reply_count"]?.GetValue<int>() ?? 0;
-                        if (replyCount > 0) continue; // protect threads
-                        await SlackDeleteMessageAsync(slackBotToken, slackChannel, mTs);
-                        Console.WriteLine($"[EYE] Cleaned stale status for '{instanceUsername}': {mTs}");
+                        if (mTs == null) continue;
+
+                        // Detect orphan replies (thread_ts set but starter deleted)
+                        var threadTs2 = m?["thread_ts"]?.GetValue<string>();
+                        if (threadTs2 != null && threadTs2 != mTs && (mText == "This message was deleted." || m?["subtype"]?.GetValue<string>() == "tombstone"))
+                        { orphanReplies.Add(mTs); continue; }
+
+                        // Collect status messages per author
+                        if (mUser != null && IsStatusEmoji(mText))
+                        {
+                            if (!statusByAuthor.ContainsKey(mUser))
+                                statusByAuthor[mUser] = new List<string>();
+                            statusByAuthor[mUser].Add(mTs);
+                        }
+                    }
+
+                    // Delete: per-author status messages, keep latest 2
+                    foreach (var (author, tsList) in statusByAuthor)
+                    {
+                        if (tsList.Count <= 2) continue; // newest first, keep first 2
+                        for (int si = 2; si < tsList.Count; si++)
+                        {
+                            await SlackDeleteMessageAsync(slackBotToken, slackChannel, tsList[si], guardThreadStarter: true);
+                            Console.WriteLine($"[EYE] Cleaned stale status for '{author}': {tsList[si]}");
+                            await Task.Delay(300);
+                        }
+                    }
+
+                    // Delete orphan replies
+                    foreach (var ots in orphanReplies)
+                    {
+                        await SlackDeleteRawAsync(slackBotToken, slackChannel, ots);
+                        Console.WriteLine($"[EYE] Cleaned orphan reply: {ots}");
+                        await Task.Delay(300);
                     }
                 }
                 catch { /* best effort */ }

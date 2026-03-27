@@ -62,7 +62,7 @@ public static class GrapHelper
     /// </summary>
     /// <summary>String-based overload for pre-extracted info (ElementAtPointInfo etc.)</summary>
     public static string FormatNodeLabel(string controlType, string? automationId, string? name,
-        int siblingIndex = 0, System.Drawing.Rectangle? rect = null)
+        int siblingIndex = 0, System.Drawing.Rectangle? rect = null, List<string>? actions = null)
     {
         var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
         var id = !string.IsNullOrEmpty(automationId) ? automationId
@@ -75,6 +75,7 @@ public static class GrapHelper
         var tag = $"{controlType}{numPart}{id}";
         var attrs = new List<string>(3);
         if (rect.HasValue) attrs.Add($"ltwh={rect.Value.X},{rect.Value.Y},{rect.Value.Width},{rect.Value.Height}");
+        if (actions != null && actions.Count > 0) attrs.Add($"actions=\"{string.Join(",", actions)}\"");
         return attrs.Count > 0 ? $"<{tag} {string.Join(" ", attrs)}>" : $"<{tag}>";
     }
 

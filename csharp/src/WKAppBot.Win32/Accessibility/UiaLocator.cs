@@ -1309,7 +1309,7 @@ public sealed partial class UiaLocator : IDisposable
         }
     }
 
-    private void DumpElement(AutomationElement element, System.Text.StringBuilder sb, int depth, int maxDepth)
+    private void DumpElement(AutomationElement element, System.Text.StringBuilder sb, int depth, int maxDepth, int siblingIndex = 0)
     {
         if (depth > maxDepth) return;
 
@@ -1328,27 +1328,32 @@ public sealed partial class UiaLocator : IDisposable
         catch { rectStr = "(?)"; }
 
         // Gather supported patterns for this element
-        var patternStr = "";
-        try
-        {
-            var patterns = GetSupportedPatterns(element);
-            if (patterns.Count > 0)
-                patternStr = $" ({string.Join(",", patterns)})";
-        }
-        catch { }
+        List<string>? patterns = null;
+        try { patterns = GetSupportedPatterns(element); } catch { }
 
         var rectParsed2 = new System.Drawing.Rectangle();
         try { var r = element.BoundingRectangle; rectParsed2 = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
-        var tag = GrapHelper.FormatNodeLabel(ctStr, aid, name == "(null)" || name == "(err)" ? "" : name, rect: rectParsed2);
-        sb.AppendLine($"{indent}{tag}{patternStr}");
+        var tag = GrapHelper.FormatNodeLabel(ctStr, aid, name == "(null)" || name == "(err)" ? "" : name, siblingIndex: siblingIndex, rect: rectParsed2, actions: patterns);
+        sb.AppendLine($"{indent}{tag}");
 
         if (depth < maxDepth)
         {
             try
             {
                 var children = element.FindAllChildren();
+                // Assign sibling index: per ControlType counter (always increment, display only when no aid+name)
+                var typeCounts = new Dictionary<string, int>();
                 foreach (var child in children)
-                    DumpElement(child, sb, depth + 1, maxDepth);
+                {
+                    string cCt = "?";
+                    try { cCt = child.ControlType.ToString(); } catch { }
+
+                    typeCounts.TryGetValue(cCt, out var idx);
+                    idx++;
+                    typeCounts[cCt] = idx;
+
+                    DumpElement(child, sb, depth + 1, maxDepth, idx);
+                }
             }
             catch { /* some elements throw on FindAllChildren */ }
         }

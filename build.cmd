@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 rem ═══════════════════════════════════════════════════════════════════════════
 rem  WKAppBot build.cmd  —  Publish, copy, and hot-swap deploy
@@ -88,12 +88,24 @@ if "%DEPLOY_ONLY%"=="0" (
 
 echo [3/4] Deploy binaries to %BIN_DIR%
 rem Core deploy: handled by csproj post-publish target (copies to .new.exe for hot-swap).
-rem Launcher deploy: no csproj target — copied explicitly here.
-echo [BUILD]   copy launcher: %LAUNCHER_OUT%\wkappbot.exe → %BIN_DIR%\wkappbot.new.exe
-copy /y "%LAUNCHER_OUT%\wkappbot.exe" "%BIN_DIR%\wkappbot.new.exe" >nul
+
+rem Launcher deploy: rename current to .old, put new at original path.
+rem Running launcher can be renamed on Windows NTFS; new connections use the new file.
+set "TS=%date:~0,4%%date:~5,2%%date:~8,2%-%time:~0,2%%time:~3,2%"
+set "TS=!TS: =0!"
+if exist "%BIN_DIR%\wkappbot.exe" (
+  echo [BUILD]   rename launcher: wkappbot.exe → wkappbot.old-!TS!.exe
+  move /y "%BIN_DIR%\wkappbot.exe" "%BIN_DIR%\wkappbot.old-!TS!.exe" >nul 2>nul
+)
+echo [BUILD]   copy launcher: %LAUNCHER_OUT%\wkappbot.exe → %BIN_DIR%\wkappbot.exe
+copy /y "%LAUNCHER_OUT%\wkappbot.exe" "%BIN_DIR%\wkappbot.exe" >nul
 if errorlevel 1 (
   echo [BUILD] launcher copy failed
   exit /b 1
+)
+rem Update busybox symlink aliases
+for %%A in (a11y wka11y wkedit grap grep) do (
+  if exist "%BIN_DIR%\%%A.exe" copy /y "%BIN_DIR%\wkappbot.exe" "%BIN_DIR%\%%A.exe" >nul
 )
 
 if not exist "%BIN_DIR%\wkappbot.exe" (
@@ -126,31 +138,10 @@ call "%BIN_DIR%\wkappbot-core.exe" eye tick --timeout 15 >nul 2>nul
 
 rem Hot-swap watchdog:
 rem If *.new.exe is still present after 3s, treat as failure, kill all, and promote .new -> .exe.
-if exist "%BIN_DIR%\wkappbot.new.exe" (
-  echo [BUILD] waiting launcher hot-swap ^(max 3s^)...
-  for /L %%I in (1,1,3) do (
-    if exist "%BIN_DIR%\wkappbot.new.exe" timeout /t 1 /nobreak >nul
-  )
-  if exist "%BIN_DIR%\wkappbot.new.exe" (
-    echo [BUILD] launcher hot-swap timeout -> kill all and retry promote
-    taskkill /f /im wkappbot.exe >nul 2>nul
-    taskkill /f /im wkappbot-core.exe >nul 2>nul
-    if exist "%BIN_DIR%\wkappbot.new.exe" (
-      move /Y "%BIN_DIR%\wkappbot.new.exe" "%BIN_DIR%\wkappbot.exe" >nul 2>nul
-      if errorlevel 1 (
-        if exist "%BIN_DIR%\wkappbot.exe" (
-          echo [BUILD] launcher promote race resolved by existing exe
-        ) else (
-          echo [BUILD] launcher promote failed: "%BIN_DIR%\wkappbot.new.exe"
-          exit /b 1
-        )
-      ) else (
-        echo [BUILD] launcher promote ok
-      )
-    ) else (
-      echo [BUILD] launcher .new disappeared after kill
-    )
-  )
+rem Launcher: no .new.exe watchdog needed — deployed directly to wkappbot.exe
+rem Old launcher (.old-*.exe) cleanup: delete anything older than current
+for %%F in ("%BIN_DIR%\wkappbot.old-*.exe") do (
+  del /q "%%F" >nul 2>nul
 )
 
 if exist "%BIN_DIR%\wkappbot-core.new.exe" (
@@ -182,9 +173,7 @@ if exist "%BIN_DIR%\wkappbot-core.new.exe" (
 )
 
 rem Cleanup stale handoff artifacts after promote/kill paths.
-if exist "%BIN_DIR%\wkappbot.exe" del /q "%BIN_DIR%\wkappbot.new.exe" >nul 2>nul
 if exist "%BIN_DIR%\wkappbot-core.exe" del /q "%BIN_DIR%\wkappbot-core.new.exe" >nul 2>nul
-del /q "%BIN_DIR%\wkappbot.old.exe" >nul 2>nul
 del /q "%BIN_DIR%\wkappbot-core.old.exe" >nul 2>nul
 
 echo [BUILD] done

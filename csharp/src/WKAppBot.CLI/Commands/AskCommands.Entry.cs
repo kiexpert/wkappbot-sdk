@@ -298,8 +298,11 @@ Examples:
             if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
             {
                 // Use SlackSendWithThread: auto-splits long messages (header → channel, overflow → thread)
-                var (ok, ts) = PostWithOverflow(botToken, channel,
-                    debateMode ? $"🎙️⚔️ *[정반합]* {question}" : $"*[🔱 TRIAD]* {question}", username: GetSendReplyUsername());
+                var toolTag = loopMode ? "+🔧" : "";
+                var slackHeader = debateMode
+                    ? $"🎙️⚔️ *[정반합{toolTag}]* {question}"
+                    : $"*[🔱 TRIAD{toolTag}]* {question}";
+                var (ok, ts) = PostWithOverflow(botToken, channel, slackHeader, username: GetSendReplyUsername());
                 if (ok && ts != null)
                 {
                     _slackSessionThreadTs.Value = ts;
@@ -313,7 +316,21 @@ Examples:
         // Game ID = thread ts (unique per debate, linkable)
         var gameId = _slackSessionThreadTs.Value ?? DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
         question = $"[G:{gameId}] {question}";
-        Console.WriteLine($"[{modeLabel}] Game {gameId}: Launching Gemini + GPT + Claude in parallel...");
+        var hints = new List<string>();
+        // debate status
+        if (debateMode)
+        {
+            var dbInfo = "정반합 ON, max 3 rounds";
+            if (_debateTargetConsensus > 0) dbInfo += $", target={_debateTargetConsensus}";
+            hints.Add(dbInfo);
+        }
+        else
+            hints.Add("정반합 OFF — add --debate");
+        // tools status (ask = always dry-run; use `agent` command for write access)
+        if (loopMode) hints.Add("🔧 tools ON (dry-run — use agent cmd for writes)");
+        else hints.Add("tools OFF — add --use-tools");
+        var debateHint = $" ({string.Join(" | ", hints)})";
+        Console.WriteLine($"[{modeLabel}] Game {gameId}: Launching Gemini + GPT + Claude in parallel...{debateHint}");
 
         // ── Shared context for recovery (in-memory + JSONL files) ────────────────────────
         // Session folder: {DataDir}/triad/{yyyyMMdd_HHmmss} — one folder per triad run.
@@ -387,6 +404,28 @@ Examples:
         // ── 정반합 사회자 루프 (--debate 플래그 시에만) ──
         if (debateMode && !noWait && results.Count(r => r == 0) >= 2)
         {
+            // Off-topic detection: check if each AI's answer addresses the original question
+            var rawQuestion = question.Contains("] ") ? question[(question.IndexOf("] ") + 2)..] : question;
+            var qKeywords = TriadDebateLoop.Tokenize(rawQuestion);
+            foreach (var ai in aiNames)
+            {
+                var answer = ctx.GetLatestChunk(ai);
+                if (answer == null || answer.Length < 50) continue;
+                var aKeywords = TriadDebateLoop.Tokenize(answer);
+                var overlap = qKeywords.Intersect(aKeywords, StringComparer.OrdinalIgnoreCase).Count();
+                var ratio = qKeywords.Count > 0 ? (double)overlap / qKeywords.Count : 1.0;
+                if (ratio < 0.15) // less than 15% keyword overlap → likely off-topic
+                {
+                    var redirect = $"[MODERATOR]: ⚠️ Your response appears off-topic. The question is: \"{rawQuestion}\"\n" +
+                        $"Please answer the ACTUAL question directly. Do not explore tools or help menus.";
+                    ctx.InjectToSingle(ai, redirect);
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[정반합] {ai} off-topic detected (keyword overlap {overlap}/{qKeywords.Count} = {ratio:P0}) → redirect sent");
+                    Console.ResetColor();
+                    SlackPostToThread($"⚠️ *[Moderator→{ai}]* Off-topic detected! Redirect sent.", "🦉 Moderator");
+                }
+            }
+
             // R0 done → enable moderator for debate rounds
             ctx.ModeratorEnabled = true;
             Console.WriteLine($"[정반합] R0 complete. Cross-prompting ON. Moderator starting R1...");

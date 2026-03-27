@@ -447,35 +447,20 @@ internal partial class Program
             var error = json?["error"]?.GetValue<string>() ?? "";
             Console.WriteLine($"[SLACK] API error: {error}");
 
-            // ── message_limit fallback: append to last message from same author ──
-            if (error == "message_limit_exceeded" && !string.IsNullOrEmpty(username))
+            // ── message_limit fallback: merge into existing message (thread replies only) ──
+            // Channel messages: no merge — orphan cleanup handles spam instead
+            if (error == "message_limit_exceeded" && !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(threadTs))
             {
                 var appendTs = FindLastMessageTsByAuthor(botToken, channel, threadTs, username);
                 if (appendTs != null)
                 {
-                    // Fetch existing text
                     var existing = await GetMessageTextAsync(botToken, channel, appendTs);
                     if (existing != null)
                     {
-                        // Profile icon + author for separator
                         var sepIcon = dict.TryGetValue("icon_emoji", out var emo) ? $"{emo} " : "";
                         var sepUser = !string.IsNullOrEmpty(username) ? $"*{username}* " : "";
-
-                        // Thread starter (appendTs == threadTs or no thread) → replace with last chunk only
-                        bool isThreadStarter = string.IsNullOrEmpty(threadTs) || appendTs == threadTs;
-                        string combined;
-                        if (isThreadStarter)
-                        {
-                            var timeMark = SmartTimeMark(existing);
-                            combined = $"{sepIcon}{sepUser}━━ {timeMark} ━━\n" + text;
-                        }
-                        else
-                        {
-                            // Thread reply → accumulate with smart timestamp separator
-                            var timeMark = SmartTimeMark(existing);
-                            combined = existing + $"\n{sepIcon}{sepUser}━━ {timeMark} ━━\n" + text;
-                        }
-                        // If too long, trim from the front (keep latest content)
+                        var timeMark = SmartTimeMark(existing);
+                        var combined = existing + $"\n{sepIcon}{sepUser}━━ {timeMark} ━━\n" + text;
                         if (combined.Length > 3800)
                         {
                             var cutLen = combined.Length - 3800;
@@ -492,7 +477,7 @@ internal partial class Program
                         }
                     }
                 }
-                Console.Error.WriteLine($"[SLACK] message_limit — append fallback also failed");
+                Console.Error.WriteLine($"[SLACK] message_limit — {(string.IsNullOrEmpty(threadTs) ? "channel msg (no merge)" : "append fallback failed")}");
             }
         }
 
@@ -520,12 +505,26 @@ internal partial class Program
             if (msgs == null) return null;
 
             // Reverse scan: find last message with matching username
+            // Guard: skip thread starters (have reply_count) and first 3 thread replies (need stable ts for --msg)
+            int replyIdx = 0; // 0-based index within thread replies (skip element 0 = thread starter)
             for (int i = msgs.Count - 1; i >= 0; i--)
             {
                 var msg = msgs[i];
                 var msgUser = msg?["username"]?.GetValue<string>();
-                if (msgUser == username)
-                    return msg?["ts"]?.GetValue<string>();
+                if (msgUser != username) continue;
+
+                // Skip thread starter (has replies — editing it breaks thread context)
+                var replyCount = msg?["reply_count"]?.GetValue<int>() ?? 0;
+                if (replyCount > 0) continue;
+
+                // In thread mode: skip first 3 replies (preserve their ts for --msg references)
+                if (!string.IsNullOrEmpty(threadTs))
+                {
+                    // msgs[0] = thread starter, replies start at index 1
+                    if (i <= 3) continue; // indices 0,1,2,3 = starter + first 3 replies
+                }
+
+                return msg?["ts"]?.GetValue<string>();
             }
         }
         catch (Exception ex)

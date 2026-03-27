@@ -283,6 +283,11 @@ public sealed partial class CdpClient
         // Proactive focusless measures — best-effort, non-fatal
         await EmulateActiveTabAsync();
 
+        // Restore Chrome to visible (non-minimized) after tab switch is complete
+        // Delay to ensure Chrome has fully settled the internal tab change
+        await Task.Delay(200);
+        RestoreChromeNoActivate();
+
         return true;
     }
 

@@ -139,7 +139,11 @@ internal partial class Program
                 // Touch FlaUI types to trigger assembly loading
                 _ = typeof(FlaUI.UIA3.UIA3Automation).Assembly;
                 _ = typeof(FlaUI.Core.AutomationElements.AutomationElement).Assembly;
-                Console.Error.WriteLine($"[MCP] FlaUI preloaded in {sw.ElapsedMilliseconds}ms");
+                Console.Error.WriteLine($"[MCP] FlaUI assemblies loaded in {sw.ElapsedMilliseconds}ms");
+                // Actually create UIA3Automation to trigger COM initialization (the real 30s bottleneck)
+                using var uia = new FlaUI.UIA3.UIA3Automation();
+                uia.ConnectionTimeout = TimeSpan.FromSeconds(2);
+                Console.Error.WriteLine($"[MCP] FlaUI UIA3Automation initialized in {sw.ElapsedMilliseconds}ms");
             }
             catch (Exception ex)
             {
