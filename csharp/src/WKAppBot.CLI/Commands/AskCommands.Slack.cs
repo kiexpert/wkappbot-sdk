@@ -97,21 +97,32 @@ internal partial class Program
             if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return;
             var uname = username ?? BotUsername;
 
-            // Append via chat.update if the latest thread comment is from the same AI
+            // ── Always merge bot replies: same author in thread → edit with separator ──
+            // No time limit — bot replies always merge. Keeps thread compact + saves quota.
             if (_slackThreadLastPost.TryGetValue(sessionTs, out var last) && last.user == uname)
             {
-                var combined = last.text + "\n\n" + msg;
-                if (combined.Length <= SlackMaxAppendLength)
+                var iconEmoji = ExtractDebateIconEmoji(uname);
+                var sepIcon = !string.IsNullOrEmpty(iconEmoji) ? $"{iconEmoji} " : "";
+                var timeMark = SmartTimeMark(last.text);
+                var combined = last.text + $"\n{sepIcon}━━ {timeMark} ━━\n" + msg;
+
+                // If too long, trim from front (keep latest)
+                if (combined.Length > SlackMaxAppendLength)
                 {
-                    var (ok, _, _) = SlackUpdateMessageAsync(botToken, channel, last.msgTs, combined).GetAwaiter().GetResult();
-                    if (ok)
-                    {
-                        _slackThreadLastPost[sessionTs] = (last.msgTs, uname, combined);
-                        return;
-                    }
-                    // If update fails, fall through to post new
+                    var cutLen = combined.Length - SlackMaxAppendLength;
+                    var cutIdx = combined.IndexOf("\n━━", cutLen, StringComparison.Ordinal);
+                    combined = cutIdx >= 0
+                        ? "…(trimmed)" + combined[cutIdx..]
+                        : "…(trimmed)\n" + combined[cutLen..];
                 }
-                // Combined too long — fall through to new post
+
+                var (ok, _, _) = SlackUpdateMessageAsync(botToken, channel, last.msgTs, combined).GetAwaiter().GetResult();
+                if (ok)
+                {
+                    _slackThreadLastPost[sessionTs] = (last.msgTs, uname, combined);
+                    return;
+                }
+                // If update fails, fall through to post new
             }
 
             // Post new message (chunked for long content)
