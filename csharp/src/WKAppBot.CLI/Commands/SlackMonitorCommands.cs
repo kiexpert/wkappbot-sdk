@@ -978,6 +978,16 @@ internal partial class Program
             }
         }
 
+        // ── Guard: protect last 2 messages per author+profile (message_limit fallback target) ──
+        if (await IsProtectedLastMessageAsync(botToken, channel, ts))
+        {
+            Console.WriteLine($"[SLACK] SKIP delete ts={ts} — protected (last 2 per author)");
+            return false;
+        }
+
+        // ── Pre-delete: dump full message data for audit trail ──
+        SlackDumpMessage(botToken, channel, ts, "[SLACK:DELETE]");
+
         using var http = new HttpClient();
         var payload = JsonSerializer.Serialize(new { channel, ts });
         var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
@@ -995,6 +1005,133 @@ internal partial class Program
             Console.WriteLine($"[SLACK] chat.delete error: {json?["error"]}");
 
         return ok;
+    }
+
+    /// <summary>
+    /// wkappbot slack read <ts> — dump full message data (text, user, emoji, files, reactions, etc.)
+    /// </summary>
+    static int SlackReadCommand(string[] args)
+    {
+        if (args.Length < 2 || args[1] is "-h" or "--help")
+        {
+            Console.WriteLine("Usage: wkappbot slack read <ts>");
+            Console.WriteLine("  Dump full Slack message data (text, user, emoji, files, reactions).");
+            return 1;
+        }
+        var ts = args[1];
+        var config = LoadSlackConfig();
+        var botToken = config?["bot_token"]?.GetValue<string>();
+        var channel  = config?["channel"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
+            return Error("Slack config not found");
+        SlackDumpMessage(botToken, channel, ts, "[SLACK:READ]");
+        return 0;
+    }
+
+    /// <summary>Dump full message data to console (shared by read + delete pre-dump).</summary>
+    static void SlackDumpMessage(string botToken, string channel, string ts, string prefix)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+            var resp = http.GetStringAsync($"https://slack.com/api/conversations.replies?channel={channel}&ts={ts}&limit=1&inclusive=true").GetAwaiter().GetResult();
+            var json = JsonSerializer.Deserialize<JsonNode>(resp);
+            var msg = json?["messages"]?[0];
+            if (msg == null) { Console.WriteLine($"{prefix} ts={ts} — not found"); return; }
+
+            var user = msg["username"]?.GetValue<string>() ?? msg["user"]?.GetValue<string>() ?? "?";
+            var text = msg["text"]?.GetValue<string>() ?? "";
+            var botId = msg["bot_id"]?.GetValue<string>();
+            var subtype = msg["subtype"]?.GetValue<string>();
+            var threadTs = msg["thread_ts"]?.GetValue<string>();
+            var replyCount = msg["reply_count"]?.GetValue<int>() ?? 0;
+            var icons = msg["icons"];
+            var emoji = icons?["emoji"]?.GetValue<string>();
+            var iconUrl = icons?["image_48"]?.GetValue<string>() ?? icons?["image_36"]?.GetValue<string>();
+
+            Console.WriteLine($"{prefix} ts={ts}");
+            Console.WriteLine($"  user: {user}");
+            if (botId != null) Console.WriteLine($"  bot_id: {botId}");
+            if (subtype != null) Console.WriteLine($"  subtype: {subtype}");
+            if (emoji != null) Console.WriteLine($"  emoji: {emoji}");
+            if (iconUrl != null) Console.WriteLine($"  icon: {iconUrl}");
+            if (threadTs != null) Console.WriteLine($"  thread_ts: {threadTs}");
+            if (replyCount > 0) Console.WriteLine($"  replies: {replyCount}");
+
+            // Files
+            var files = msg["files"]?.AsArray();
+            if (files != null && files.Count > 0)
+            {
+                Console.WriteLine($"  files: {files.Count}");
+                foreach (var f in files)
+                    Console.WriteLine($"    - {f?["name"]} ({f?["mimetype"]}, {f?["size"]}B)");
+            }
+
+            // Reactions
+            var reactions = msg["reactions"]?.AsArray();
+            if (reactions != null && reactions.Count > 0)
+            {
+                Console.Write("  reactions: ");
+                foreach (var r in reactions)
+                    Console.Write($":{r?["name"]}: ({r?["count"]}) ");
+                Console.WriteLine();
+            }
+
+            // Text (full)
+            Console.WriteLine($"  text ({text.Length}ch):");
+            Console.WriteLine($"  {text.Replace("\n", "\n  ")}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"{prefix} error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Check if a message is one of the last 2 messages by its author (username).
+    /// Protected messages are fallback targets for message_limit append — deleting them breaks the chain.
+    /// </summary>
+    static async Task<bool> IsProtectedLastMessageAsync(string botToken, string channel, string ts)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+            var resp = await http.GetStringAsync($"https://slack.com/api/conversations.history?channel={channel}&limit=30");
+            var json = JsonSerializer.Deserialize<JsonNode>(resp);
+            var msgs = json?["messages"]?.AsArray();
+            if (msgs == null) return false;
+
+            // Find the target message's username
+            string? targetUser = null;
+            foreach (var m in msgs)
+            {
+                if (m?["ts"]?.GetValue<string>() == ts)
+                {
+                    targetUser = m?["username"]?.GetValue<string>();
+                    break;
+                }
+            }
+            if (targetUser == null) return false; // message not found or no username
+
+            // Count how many messages this author has (newest first)
+            int authorCount = 0;
+            foreach (var m in msgs)
+            {
+                if (m?["username"]?.GetValue<string>() == targetUser)
+                {
+                    authorCount++;
+                    if (m?["ts"]?.GetValue<string>() == ts)
+                        return authorCount <= 2; // protected if it's in the last 2
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SLACK] IsProtectedLastMessage error: {ex.Message}");
+        }
+        return false; // not found → allow delete
     }
 
     /// <summary>

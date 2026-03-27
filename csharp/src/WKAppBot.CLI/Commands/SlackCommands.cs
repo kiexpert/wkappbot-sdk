@@ -44,6 +44,7 @@ internal partial class Program
             "schedule" => SlackScheduleCommand(args),
             "list" or "ls" => SlackListCommand(args),
             "delete" or "del" => SlackDeleteCommand(args),
+            "read" => SlackReadCommand(args),
             _ => SlackUsage()
         };
     }
