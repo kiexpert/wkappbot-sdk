@@ -647,12 +647,16 @@ internal partial class Program
 
         // ═══ STEP 5: Execute on each target ═══
         int ok = 0, fail = 0;
+        PulseStep.Mark("uia-init");
         using var automation = new UIA3Automation();
+        PulseStep.Mark("uia-timeout-set");
         automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
         automation.TransactionTimeout = TimeSpan.FromSeconds(5);
         var readiness = CreateInputReadiness();
         var aar = CreateActionReadiness(readiness);
         var gapCollector = new OcrGapCollector();
+
+        PulseStep.Mark("uia-ready");
 
         foreach (var win in targets)
         {
