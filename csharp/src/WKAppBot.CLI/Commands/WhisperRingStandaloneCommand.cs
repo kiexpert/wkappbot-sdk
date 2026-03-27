@@ -55,12 +55,15 @@ internal partial class Program
             exp.StartLogging();
             bool sttOk = exp.StartStt();
 
-            // Auto-study
+            // Auto-study (only when user idle >= 1 hour)
             DateTime lastStudyTime = DateTime.MinValue;
             var startTime = DateTime.UtcNow;
             exp.OnAutoStudyNeeded += (count) =>
             {
                 var now = DateTime.UtcNow;
+                var userIdleMs = WKAppBot.Win32.Native.NativeMethods.GetUserIdleMs();
+                if (userIdleMs < 3600_000) // 1 hour idle required
+                { exp.NotifyAutoStudyDone(); return; }
                 if ((now - startTime).TotalMinutes < 2 || (now - lastStudyTime).TotalMinutes < 2)
                 { exp.NotifyAutoStudyDone(); return; }
                 lastStudyTime = now;

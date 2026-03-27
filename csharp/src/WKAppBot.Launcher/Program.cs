@@ -50,6 +50,10 @@ class Program
     {
         // backward-compat local alias so existing prof("...") calls in Main still work
         Action<string> prof = Prof;
+
+        // TODO: stderr dim — rolled back until MCP stderr relay preserves ANSI + encoding
+        // Console.SetError(new DimStderrWriter(Console.Error));
+
         prof("Main() entered");
 
         // ── Encoding recovery: GetCommandLineA() → system codepage raw bytes ──
@@ -750,11 +754,12 @@ class Program
         Console.Error.WriteLine($"[LAUNCHER:MCP] core started via pipe (pid={pi.dwProcessId})");
 
         // ── State machine for MCP relay ──
-        // Tracks JSON-RPC requests by id for routing during elevation handoff
+        // Tracks JSON-RPC requests by id for routing during elevation handoff AND hot-swap
         var _inflight = new Dictionary<string, string>(); // id → raw request line
         var _gate = new object();
         var _outLock = new object();
-        string? _initializeLine = null; // cached for admin Core synthetic init
+        string? _initializeLine = null; // cached for admin/new Core synthetic init
+        string? _toolsListLine = null;  // cached tools/list for new Core replay
         IntPtr _activeStdinWrite = hCoreStdinWrite; // current target for new requests
         System.IO.TextWriter? _activeStdinWriter = null; // current line writer after admin handoff
         IntPtr _adminStdinWrite = IntPtr.Zero;
@@ -762,6 +767,161 @@ class Program
         IntPtr _adminProc = IntPtr.Zero;
         string? _elevationRequestLine = null; // saved for re-send to admin Core
         bool _adminMode = false;
+
+        // stdout handle (needed early for hot-swap FSW closure)
+        var hOut = GetStdHandle(-11);
+
+        // ── Hot-swap: FSW watches for .new.exe ──
+        IntPtr _oldCoreStdinWrite = IntPtr.Zero; // drain pipe for old Core during swap
+        IntPtr _oldCoreStdoutRead = IntPtr.Zero;
+        var _oldInflight = new Dictionary<string, string>(); // requests still in old Core
+        bool _swapInProgress = false;
+        var _swapDrainEvent = new ManualResetEventSlim(false); // signaled when old Core drain completes
+
+        var exePath = core; // path to wkappbot-core.exe
+        var exeDir = System.IO.Path.GetDirectoryName(exePath) ?? ".";
+        var exeName = System.IO.Path.GetFileName(exePath);
+        var newExePath = System.IO.Path.Combine(exeDir, System.IO.Path.GetFileNameWithoutExtension(exeName) + ".new.exe");
+
+        // FSW for .new.exe detection (500ms debounce, same as Eye)
+        System.Threading.Timer? _fswDebounce = null;
+        var fsw = new FileSystemWatcher(exeDir)
+        {
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.CreationTime | NotifyFilters.LastWrite,
+            Filter = "*core*.exe",
+            EnableRaisingEvents = true
+        };
+        // Trigger on: core exe replaced at original path (Eye rename-swap or external overwrite)
+        fsw.Created += OnFswEvent;
+        fsw.Changed += OnFswEvent;
+        void OnFswEvent(object? _, FileSystemEventArgs e)
+        {
+            var fn = e.Name ?? "";
+            // Detect: core exe was replaced at original path (Eye did rename-swap, or external tool replaced it)
+            bool isCoreReplaced = string.Equals(System.IO.Path.GetFullPath(e.FullPath), System.IO.Path.GetFullPath(core), StringComparison.OrdinalIgnoreCase);
+            if (!isCoreReplaced) return;
+            // Debounce: 500ms after last event
+            _fswDebounce?.Dispose();
+            _fswDebounce = new System.Threading.Timer(_ =>
+            {
+                if (_swapInProgress) { Console.Error.WriteLine("[HOT-SWAP] Already in progress — ignoring"); return; }
+                _swapInProgress = true;
+                Console.Error.WriteLine($"[HOT-SWAP] core exe changed — starting graceful swap");
+
+                try
+                {
+                    // External tool (Eye or publish) already did the rename-swap.
+                    // We just need to drain old Core and spawn new one from the updated path.
+
+                    // 2. Move current Core to old pipe (drain mode)
+                    lock (_gate)
+                    {
+                        _oldCoreStdinWrite = _activeStdinWrite;
+                        _activeStdinWrite = IntPtr.Zero;
+                        _activeStdinWriter = null;
+                        // Move inflight to old
+                        foreach (var kv in _inflight)
+                            _oldInflight[kv.Key] = kv.Value;
+                        _inflight.Clear();
+                    }
+                    Console.Error.WriteLine($"[HOT-SWAP] old Core draining ({_oldInflight.Count} inflight)");
+
+                    // 3. Spawn new Core with fresh pipes
+                    if (!CreatePipe(out var hNewStdinRead, out var hNewStdinWrite, IntPtr.Zero, 0))
+                    { Console.Error.WriteLine("[HOT-SWAP] CreatePipe(stdin) failed"); _swapInProgress = false; return; }
+                    SetHandleInformation(hNewStdinRead, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+
+                    if (!CreatePipe(out var hNewStdoutRead, out var hNewStdoutWrite, IntPtr.Zero, 0))
+                    { CloseHandle(hNewStdinRead); CloseHandle(hNewStdinWrite); Console.Error.WriteLine("[HOT-SWAP] CreatePipe(stdout) failed"); _swapInProgress = false; return; }
+                    SetHandleInformation(hNewStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+
+                    var newSi = new STARTUPINFOW
+                    {
+                        cb = System.Runtime.InteropServices.Marshal.SizeOf<STARTUPINFOW>(),
+                        dwFlags = STARTF_USESTDHANDLES,
+                        hStdInput = hNewStdinRead,
+                        hStdOutput = hNewStdoutWrite,
+                        hStdError = GetStdHandle(-12),
+                    };
+                    var newCmdSb = new StringBuilder($"\"{core.Replace("\"", "\\\"")}\"");
+                    foreach (var a in args) newCmdSb.Append(" \"").Append(a.Replace("\"", "\\\"")).Append('"');
+                    var newCmdArr = (newCmdSb.ToString() + "\0").ToCharArray();
+
+                    if (!CreateProcessW(null, newCmdArr, IntPtr.Zero, IntPtr.Zero, true,
+                        CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, null, ref newSi, out var newPi))
+                    {
+                        Console.Error.WriteLine($"[HOT-SWAP] CreateProcess failed — restoring old Core");
+                        lock (_gate) { _activeStdinWrite = _oldCoreStdinWrite; _oldCoreStdinWrite = IntPtr.Zero; foreach (var kv in _oldInflight) _inflight[kv.Key] = kv.Value; _oldInflight.Clear(); }
+                        _swapInProgress = false; return;
+                    }
+                    CloseHandle(hNewStdinRead);
+                    CloseHandle(hNewStdoutWrite);
+                    CloseHandle(newPi.hThread);
+                    Console.Error.WriteLine($"[HOT-SWAP] new Core started (pid={newPi.dwProcessId})");
+
+                    // 4. Replay initialize + tools/list to new Core
+                    lock (_gate)
+                    {
+                        _activeStdinWrite = hNewStdinWrite;
+                        if (_initializeLine != null)
+                        {
+                            var initBytes = System.Text.Encoding.UTF8.GetBytes(_initializeLine + "\n");
+                            WriteFile(hNewStdinWrite, initBytes, (uint)initBytes.Length, out uint _ign1, IntPtr.Zero);
+                            FlushFileBuffers(hNewStdinWrite);
+                            Console.Error.WriteLine("[HOT-SWAP] replayed initialize");
+                        }
+                        if (_toolsListLine != null)
+                        {
+                            var tlBytes = System.Text.Encoding.UTF8.GetBytes(_toolsListLine + "\n");
+                            WriteFile(hNewStdinWrite, tlBytes, (uint)tlBytes.Length, out uint _ign2, IntPtr.Zero);
+                            FlushFileBuffers(hNewStdinWrite);
+                            Console.Error.WriteLine("[HOT-SWAP] replayed tools/list");
+                        }
+                    }
+
+                    // 5. Start new Core stdout relay thread
+                    new Thread(() => RelayStdout(hNewStdoutRead, "new-core", detectElevation: true))
+                    { IsBackground = true, Name = "mcp-newcore-stdout" }.Start();
+
+                    // 6. Wait for old Core drain (60s timeout)
+                    var drainSw = System.Diagnostics.Stopwatch.StartNew();
+                    while (drainSw.Elapsed.TotalSeconds < 60)
+                    {
+                        lock (_gate) { if (_oldInflight.Count == 0) break; }
+                        Thread.Sleep(500);
+                    }
+
+                    lock (_gate)
+                    {
+                        if (_oldInflight.Count > 0)
+                        {
+                            Console.Error.WriteLine($"[HOT-SWAP] drain timeout — {_oldInflight.Count} requests orphaned, re-routing to new Core");
+                            foreach (var kv in _oldInflight)
+                            {
+                                var reBytes = System.Text.Encoding.UTF8.GetBytes(kv.Value + "\n");
+                                WriteFile(_activeStdinWrite, reBytes, (uint)reBytes.Length, out uint _ign3, IntPtr.Zero);
+                                _inflight[kv.Key] = kv.Value;
+                            }
+                            FlushFileBuffers(_activeStdinWrite);
+                        }
+                        _oldInflight.Clear();
+                    }
+
+                    // 7. Close old Core stdin → graceful exit
+                    if (_oldCoreStdinWrite != IntPtr.Zero)
+                    { CloseHandle(_oldCoreStdinWrite); _oldCoreStdinWrite = IntPtr.Zero; }
+                    Console.Error.WriteLine("[HOT-SWAP] old Core stdin closed — graceful exit");
+
+                    _swapInProgress = false;
+                    Console.Error.WriteLine("[HOT-SWAP] swap complete!");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[HOT-SWAP] error: {ex.Message}");
+                    _swapInProgress = false;
+                }
+            }, null, 500, Timeout.Infinite);
+        };
 
         // Stdin router: line-buffered, tracks JSON-RPC id, routes to active Core
         var stdinRelay = new Thread(() =>
@@ -788,9 +948,11 @@ class Program
 
                     lock (_gate)
                     {
-                        // Cache initialize for admin Core replay
+                        // Cache initialize + tools/list for hot-swap/admin Core replay
                         if (line.Contains("\"method\":\"initialize\""))
                             _initializeLine = line;
+                        else if (line.Contains("\"method\":\"tools/list\""))
+                            _toolsListLine = line;
 
                         // Track in-flight requests
                         if (id != null)
@@ -833,7 +995,6 @@ class Program
         stdinRelay.Start();
 
         // ── Normal Core stdout relay (main thread) ──
-        var hOut = GetStdHandle(-11);
 
         // Shared helper: relay one Core's stdout to hOut, with elevation detection
         void RelayStdout(IntPtr hRead, string label, bool detectElevation)
@@ -874,10 +1035,10 @@ class Program
                         continue; // suppress elevation error from reaching client
                     }
 
-                    // Remove from inflight
+                    // Remove from inflight (both current and old-drain)
                     var id = ExtractJsonRpcId(line);
                     if (id != null)
-                        lock (_gate) { _inflight.Remove(id); }
+                        lock (_gate) { _inflight.Remove(id); _oldInflight.Remove(id); }
 
                     // Forward to client
                     lock (_outLock)
@@ -915,6 +1076,10 @@ class Program
             CloseHandle(_adminProc);
             Console.Error.WriteLine($"[LAUNCHER:MCP] admin core exited (code={adminExit})");
         }
+
+        fsw.EnableRaisingEvents = false;
+        fsw.Dispose();
+        _fswDebounce?.Dispose();
 
         WaitForSingleObject(pi.hProcess, 5000);
         GetExitCodeProcess(pi.hProcess, out uint exitCode2);
@@ -1841,4 +2006,31 @@ static class FocusGuard
     public static extern IntPtr GetForegroundWindow();
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
+}
+
+/// <summary>Dim stderr writer — ANSI dim for console, passthrough for pipes.</summary>
+sealed class DimStderrWriter : System.IO.TextWriter
+{
+    private readonly System.IO.TextWriter _inner;
+    public DimStderrWriter(System.IO.TextWriter inner)
+    {
+        _inner = inner;
+        // Enable VT processing on stderr for ANSI codes on Windows console
+        try
+        {
+            var hErr = GetStdHandle(-12);
+            if (GetConsoleMode(hErr, out uint mode))
+                SetConsoleMode(hErr, mode | 0x0004); // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        }
+        catch { }
+    }
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr GetStdHandle(int n);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool GetConsoleMode(IntPtr h, out uint m);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool SetConsoleMode(IntPtr h, uint m);
+    public override System.Text.Encoding Encoding => _inner.Encoding;
+    public override void Write(char value) => _inner.Write(value);
+    public override void Write(string? value) { if (value != null) { _inner.Write("\x1b[2m"); _inner.Write(value); _inner.Write("\x1b[0m"); } }
+    public override void WriteLine(string? value) { _inner.Write("\x1b[2m"); _inner.WriteLine(value); _inner.Write("\x1b[0m"); }
+    public override void WriteLine() => _inner.WriteLine();
+    public override void Flush() => _inner.Flush();
 }

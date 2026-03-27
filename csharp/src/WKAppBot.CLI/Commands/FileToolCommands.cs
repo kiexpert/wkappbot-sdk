@@ -901,33 +901,56 @@ Examples:
             return 1;
         }
 
-        // Search recursively for .bak-{atPrefix}*.txt files
-        var bakPattern = $".bak-{atPrefix}";
-        var bakFiles = Directory.EnumerateFiles(baseDir, "*.txt", SearchOption.AllDirectories)
-            .Where(f => Path.GetFileName(f).Contains(bakPattern))
-            .OrderBy(f => f)
-            .ToList();
+        // Search for backups in two formats:
+        // 1. New: .bak/ subfolder — {dir}/.bak/{filename}.{timestamp}
+        // 2. Legacy: sibling files — {original}.bak-{timestamp}.txt
+        var restorePairs = new List<(string backup, string original)>();
 
-        if (bakFiles.Count == 0)
+        // New format: search .bak/ folders recursively
+        var bakDirs = Directory.EnumerateDirectories(baseDir, ".bak", SearchOption.AllDirectories);
+        foreach (var bakDir in bakDirs)
         {
-            Console.WriteLine($"[file undo] no backups found matching .bak-{atPrefix}* in {baseDir}");
+            var parentDir = Path.GetDirectoryName(bakDir)!;
+            foreach (var bakFile in Directory.EnumerateFiles(bakDir))
+            {
+                var fn = Path.GetFileName(bakFile);
+                // Format: {originalFilename}.{YYYYMMDD-HHmmss.fff}
+                // Find last dot-separated timestamp (20-char: YYYYMMDD-HHmmss.fff)
+                if (!fn.Contains(atPrefix)) continue;
+                var lastDot = fn.LastIndexOf('.');
+                if (lastDot < 0) continue;
+                var tsCandidate = fn[(lastDot + 1)..];
+                // Timestamp should be >= 15 chars (YYYYMMDD-HHmmss)
+                if (tsCandidate.Length >= 15 && tsCandidate.Contains(atPrefix))
+                {
+                    var origName = fn[..lastDot];
+                    var origPath = Path.Combine(parentDir, origName);
+                    restorePairs.Add((bakFile, origPath));
+                }
+            }
+        }
+
+        // Legacy format: sibling .bak-{ts}.txt files
+        var legacyPattern = $".bak-{atPrefix}";
+        var legacyFiles = Directory.EnumerateFiles(baseDir, "*.txt", SearchOption.AllDirectories)
+            .Where(f => Path.GetFileName(f).Contains(legacyPattern));
+        foreach (var bak in legacyFiles)
+        {
+            var bakIdx = bak.LastIndexOf(".bak-", StringComparison.Ordinal);
+            if (bakIdx < 0) continue;
+            var originalPath = bak[..bakIdx];
+            restorePairs.Add((bak, originalPath));
+        }
+
+        restorePairs = restorePairs.OrderBy(p => p.backup).ToList();
+
+        if (restorePairs.Count == 0)
+        {
+            Console.WriteLine($"[file undo] no backups found matching *{atPrefix}* in {baseDir}");
             return 1;
         }
 
-        Console.WriteLine($"[file undo] found {bakFiles.Count} backup(s) matching .bak-{atPrefix}*");
-
-        // Parse each backup → derive original file path
-        // Backup format: {original}.bak-YYYYMMDD-HHmmss.fff.txt
-        var restorePairs = new List<(string backup, string original)>();
-        foreach (var bak in bakFiles)
-        {
-            var fileName = bak;
-            // Find ".bak-" to split: everything before is the original path
-            var bakIdx = fileName.LastIndexOf(".bak-", StringComparison.Ordinal);
-            if (bakIdx < 0) continue;
-            var originalPath = fileName[..bakIdx];
-            restorePairs.Add((bak, originalPath));
-        }
+        Console.WriteLine($"[file undo] found {restorePairs.Count} backup(s) matching *{atPrefix}*");
 
         if (restorePairs.Count == 0)
         {
@@ -1080,26 +1103,39 @@ Examples:
         if (paths.Count == 0) return Error("[file edit] no target files resolved");
         bool multi = paths.Count > 1;
 
-        // --undo: restore each file from its .bak-{timestamp} backup before editing
+        // --undo: restore each file from its .bak/{filename}.{timestamp} or legacy .bak-{timestamp}.txt
         if (undoTimestamp != null)
         {
-            var bakPattern = $".bak-{undoTimestamp}";
             int restored = 0;
             foreach (var path in paths)
             {
-                // Search for backup: {path}.bak-{timestamp}*.txt
                 var dir = Path.GetDirectoryName(path) ?? ".";
                 var baseName = Path.GetFileName(path);
-                var bakFile = Directory.Exists(dir)
-                    ? Directory.EnumerateFiles(dir, $"{baseName}.bak-*", SearchOption.TopDirectoryOnly)
-                        .Where(f => Path.GetFileName(f).Contains(bakPattern))
-                        .OrderByDescending(f => f) // latest matching backup
-                        .FirstOrDefault()
-                    : null;
+
+                // Try new format first: .bak/{baseName}.{timestamp}
+                string? bakFile = null;
+                var bakSubDir = Path.Combine(dir, ".bak");
+                if (Directory.Exists(bakSubDir))
+                {
+                    bakFile = Directory.EnumerateFiles(bakSubDir, $"{baseName}.*")
+                        .Where(f => Path.GetFileName(f).Contains(undoTimestamp))
+                        .OrderByDescending(f => f)
+                        .FirstOrDefault();
+                }
+
+                // Fallback: legacy sibling format {path}.bak-{timestamp}*.txt
+                if (bakFile == null && Directory.Exists(dir))
+                {
+                    var legacyPattern = $".bak-{undoTimestamp}";
+                    bakFile = Directory.EnumerateFiles(dir, $"{baseName}.bak-*", SearchOption.TopDirectoryOnly)
+                        .Where(f => Path.GetFileName(f).Contains(legacyPattern))
+                        .OrderByDescending(f => f)
+                        .FirstOrDefault();
+                }
 
                 if (bakFile == null)
                 {
-                    Console.Error.WriteLine($"[file edit --undo] no backup matching {baseName}{bakPattern}* in {dir}");
+                    Console.Error.WriteLine($"[file edit --undo] no backup matching {baseName}*{undoTimestamp}* in {dir}");
                     return 1;
                 }
 
@@ -1268,15 +1304,22 @@ Examples:
         else if (backup)
         {
             // Timestamp in backup name = original file's LastWriteTime (ms precision) — "파일타임표준"
+            // Backup goes to .bak/ subfolder to keep source directories clean
             var origMtime = File.GetLastWriteTime(plan.Path);
             var ts = origMtime.ToString("yyyyMMdd-HHmmss.fff");
-            var bakPath = $"{plan.Path}.bak-{ts}.txt"; // .txt so build systems ignore it
+            var fileName = Path.GetFileName(plan.Path);
+            var bakDir = Path.Combine(Path.GetDirectoryName(plan.Path)!, ".bak");
+            var bakPath = Path.Combine(bakDir, $"{fileName}.{ts}");
             try
             {
+                Directory.CreateDirectory(bakDir);
                 File.Copy(plan.Path, bakPath, overwrite: true);
                 File.SetCreationTime(bakPath, File.GetCreationTime(plan.Path));
                 File.SetLastWriteTime(bakPath, File.GetLastWriteTime(plan.Path));
                 Console.WriteLine($"[file edit] backup → {bakPath}");
+
+                // Auto-migrate legacy sibling .bak-*.txt files into .bak/ subfolder
+                MigrateLegacyBackups(Path.GetDirectoryName(plan.Path)!, bakDir);
             }
             catch (Exception ex)
             {
@@ -1291,9 +1334,12 @@ Examples:
             {
                 var aiName = Environment.GetEnvironmentVariable("WKAPPBOT_LOOP_CALLER") ?? "ai";
                 var ts = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-                var backupPath = $"{plan.Path}.{aiName}-{ts}.txt";
+                var dryBakDir = Path.Combine(Path.GetDirectoryName(plan.Path)!, ".bak");
+                var dryFileName = Path.GetFileName(plan.Path);
+                var backupPath = Path.Combine(dryBakDir, $"{dryFileName}.{aiName}-{ts}");
                 try
                 {
+                    Directory.CreateDirectory(dryBakDir);
                     File.WriteAllBytes(backupPath, plan.OutBytes);
                     Console.Error.WriteLine("[DRY-RUN] ⚠ Your edit has been PROPOSED. The original file was NOT modified.");
                     Console.WriteLine($"[file edit] backup → {backupPath}");
@@ -1414,6 +1460,52 @@ Examples:
             }
         }
         return 0;
+    }
+
+    /// <summary>
+    /// Migrate legacy sibling .bak-*.txt backup files into .bak/ subfolder.
+    /// Called once per file-edit, scoped to the edited file's directory only.
+    /// Format: {original}.bak-YYYYMMDD-HHmmss.fff.txt → .bak/{original}.YYYYMMDD-HHmmss.fff
+    /// </summary>
+    static void MigrateLegacyBackups(string sourceDir, string bakDir)
+    {
+        try
+        {
+            var legacyFiles = Directory.EnumerateFiles(sourceDir, "*.bak-*.txt", SearchOption.TopDirectoryOnly).ToList();
+            if (legacyFiles.Count == 0) return;
+
+            int moved = 0;
+            foreach (var legacy in legacyFiles)
+            {
+                var fn = Path.GetFileName(legacy);
+                // Parse: {originalName}.bak-{timestamp}.txt
+                var bakIdx = fn.LastIndexOf(".bak-", StringComparison.Ordinal);
+                if (bakIdx < 0) continue;
+                var origName = fn[..bakIdx];
+                var tsPart = fn[(bakIdx + 5)..]; // after ".bak-"
+                if (tsPart.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+                    tsPart = tsPart[..^4]; // strip .txt
+                var newPath = Path.Combine(bakDir, $"{origName}.{tsPart}");
+                try
+                {
+                    if (!File.Exists(newPath))
+                    {
+                        File.Move(legacy, newPath);
+                        moved++;
+                    }
+                    else
+                    {
+                        // Already exists in .bak/ — delete legacy duplicate
+                        File.Delete(legacy);
+                        moved++;
+                    }
+                }
+                catch { /* skip individual file errors silently */ }
+            }
+            if (moved > 0)
+                Console.WriteLine($"[file edit] migrated {moved} legacy backup(s) → {bakDir}");
+        }
+        catch { /* directory access error — non-critical */ }
     }
 
     static int GetLineIndent(string[] lines, int tabSize, int idx)

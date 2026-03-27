@@ -160,14 +160,25 @@ Utility:
       Record/read per-control automation notes.
   schedule add|list|remove|clear
       Manage scheduled prompts for auto-recovery.
-  logcat <fileFilter> <messageFilter> [--basedir <dir>] [-r[=N]] [--hq]
-      Stream logs in real-time. Default: CWD only. -r unlimited, -r=3 depth 3. --hq adds HQ+openclaw.
-      File filter supports grap patterns: wildcards, regex: prefix, ';' OR.
+  logcat [regex] [file1.glob] [file2.glob ...] [options]
+      Stream/search logs. grep-style: first arg=content regex, rest=file globs.
+      --hq              Include wkappbot.hq/logs + openclaw dirs
+      --past <dur>      Scan existing files (e.g. 1h, 30m, 2d). Without -f: grep-style exit.
+      -f, --follow      Live tail after --past scan
+      --timeout <dur>   Auto-exit after duration (e.g. 30s, 5m)
+      -r[=N]            Recursive. -r=unlimited, -r=3=depth 3
+      --dbg [pid]       Capture OutputDebugString (DBWIN_BUFFER shared memory)
+      --json            Structural JSON key+value matching
+      -A/-B/-C N        After/before/context lines
+      -v -l -c -m N     Invert, filenames-only, count, max-matches
+      -i / -n           Case-insensitive / line numbers
+      Grap patterns: wildcards, regex: prefix, ';' OR, path-segment ';' expansion.
   grep / grap  <pattern> [files]   (logcat aliases, grep-compat arg order — run `grap --help` for details)
   ask gpt|gemini|claude ""question"" [file.png] [--slack] [--new-tab]
       Ask AI via CDP (focusless). Auto-closes blank tabs, validates URL.
-  ask triad ""question""
-      Parallel GPT + Gemini + Claude — three answers at once.
+  ask triad ""question"" [--debate [N]]
+      Parallel GPT + Gemini + Claude. --debate: 정반합 사회자 루프 (max 3 rounds, cross-prompting).
+      --debate N: N개 합의 도달 시 조기 종료. Without --debate: R0 only (one answer each).
   agent gemini|gpt|claude|triad ""task"" [--max-steps N] [--fresh]
       Autonomous sub-agent loop with filesystem + web tools.
   agent checkpoint [--label ""text""]

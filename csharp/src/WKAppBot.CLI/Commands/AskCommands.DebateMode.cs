@@ -332,12 +332,9 @@ internal partial class Program
     static string BuildDebateOnlyPersona()
     {
         return """
-You are in a structured dialectical debate. Respond with [DEBATE_JSON]...[/DEBATE_JSON]:
-
-[DEBATE_JSON]{"stance":{"N":2,"R":3,"C":1,"E":2,"D":1},"role":"YOUR_ROLE","position":"one sentence","claims":[{"claim":"...","confidence":0.85,"key_assumptions":["..."]}],"rebuttals":["..."],"disputes":[{"target_assumption":"...","reason":"..."}]}[/DEBATE_JSON]
-
-RULES: stance N+R+C+E+D must sum to 9. 2-5 claims. ENGLISH ONLY. Max 300 words.
-Free text allowed AFTER the JSON block.
+🎮 정반합 DEBATE. Answer the QUESTION directly. Off-topic = benched.
+Format: [DEBATE_JSON]{stance:{N,R,C,E,D},role,position,claims[],disputes[]}[/DEBATE_JSON]
+STANCE sum=9. 2-5 claims. ≤99 words. English claims, Korean [CONCLUSION_KR].
 """;
     }
 }
