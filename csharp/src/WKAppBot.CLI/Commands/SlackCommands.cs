@@ -554,7 +554,11 @@ internal partial class Program
         while (cutAt > 0 && !delimiters.Contains(now[cutAt - 1]))
             cutAt--;
 
-        return cutAt > 0 ? now[cutAt..] : now;
+        var result = cutAt > 0 ? now[cutAt..] : now;
+        // Seconds-only (no delimiter in result) → append "s" for clarity: "58" → "58s"
+        if (!result.Contains(':') && !result.Contains('-') && !result.Contains(' '))
+            result += "s";
+        return result;
     }
 
     /// <summary>Get the text of a specific message by ts.</summary>
