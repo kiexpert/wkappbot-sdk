@@ -456,15 +456,21 @@ internal partial class Program
                     var existing = await GetMessageTextAsync(botToken, channel, appendTs);
                     if (existing != null)
                     {
-                        var combined = existing + "\n\n" + text;
-                        if (combined.Length <= 3800)
+                        var combined = existing + "\n━━━\n" + text;
+                        // If too long, trim from the front (keep latest content)
+                        if (combined.Length > 3800)
                         {
-                            var (updOk, _, _) = await SlackUpdateMessageAsync(botToken, channel, appendTs, combined);
-                            if (updOk)
-                            {
-                                Console.WriteLine($"[SLACK] message_limit → appended to {appendTs} ({username})");
-                                return (true, appendTs);
-                            }
+                            var cutLen = combined.Length - 3800;
+                            var cutIdx = combined.IndexOf("\n━━━\n", cutLen, StringComparison.Ordinal);
+                            combined = cutIdx >= 0
+                                ? "…(trimmed)\n━━━\n" + combined[(cutIdx + "\n━━━\n".Length)..]
+                                : "…(trimmed)\n━━━\n" + combined[cutLen..];
+                        }
+                        var (updOk, _, _) = await SlackUpdateMessageAsync(botToken, channel, appendTs, combined);
+                        if (updOk)
+                        {
+                            Console.WriteLine($"[SLACK] message_limit → appended to {appendTs} ({username}, {combined.Length}ch)");
+                            return (true, appendTs);
                         }
                     }
                 }
