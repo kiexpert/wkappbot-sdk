@@ -1028,7 +1028,7 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>Dump full message data to console (shared by read + delete pre-dump).</summary>
+    /// <summary>Dump full message as pretty JSON with inline comments for key fields.</summary>
     static void SlackDumpMessage(string botToken, string channel, string ts, string prefix)
     {
         try
@@ -1040,71 +1040,49 @@ internal partial class Program
             var msg = json?["messages"]?[0];
             if (msg == null) { Console.WriteLine($"{prefix} ts={ts} — not found"); return; }
 
-            var username = msg["username"]?.GetValue<string>();
-            var userId = msg["user"]?.GetValue<string>();
-            var text = msg["text"]?.GetValue<string>() ?? "";
-            var botId = msg["bot_id"]?.GetValue<string>();
-            var subtype = msg["subtype"]?.GetValue<string>();
-            var threadTs = msg["thread_ts"]?.GetValue<string>();
-            var replyCount = msg["reply_count"]?.GetValue<int>() ?? 0;
-
-            // Profile icons (multiple sources)
-            var icons = msg["icons"];
-            var emoji = icons?["emoji"]?.GetValue<string>();
-            var iconUrl = icons?["image_48"]?.GetValue<string>() ?? icons?["image_36"]?.GetValue<string>();
-
-            // Bot profile (richer info)
-            var botProfile = msg["bot_profile"];
-            var botName = botProfile?["name"]?.GetValue<string>();
-            var botIcons = botProfile?["icons"];
-            var botIcon36 = botIcons?["image_36"]?.GetValue<string>();
-            var botIcon72 = botIcons?["image_72"]?.GetValue<string>();
-
             Console.WriteLine($"{prefix} ts={ts}");
-            Console.WriteLine($"  username: {username ?? "(none)"}");
-            if (userId != null) Console.WriteLine($"  user_id: {userId}");
-            if (botId != null) Console.WriteLine($"  bot_id: {botId}");
-            if (botName != null) Console.WriteLine($"  bot_name: {botName}");
-            if (subtype != null) Console.WriteLine($"  subtype: {subtype}");
-            if (emoji != null) Console.WriteLine($"  icon_emoji: {emoji}");
-            if (iconUrl != null) Console.WriteLine($"  icon_url: {iconUrl}");
-            if (botIcon36 != null) Console.WriteLine($"  bot_icon_36: {botIcon36}");
-            if (botIcon72 != null) Console.WriteLine($"  bot_icon_72: {botIcon72}");
-            if (threadTs != null) Console.WriteLine($"  thread_ts: {threadTs}");
-            if (replyCount > 0)
-            {
-                var replyUsersCount = msg["reply_users_count"]?.GetValue<int>() ?? 0;
-                var replyUsers = msg["reply_users"]?.AsArray();
-                Console.Write($"  replies: {replyCount} ({replyUsersCount} users)");
-                if (replyUsers != null && replyUsers.Count > 0)
-                    Console.Write($" [{string.Join(", ", replyUsers.Select(u => u?.GetValue<string>()))}]");
-                Console.WriteLine();
-                var latestReply = msg["latest_reply"]?.GetValue<string>();
-                if (latestReply != null) Console.WriteLine($"  latest_reply: {latestReply}");
-            }
 
-            // Files
-            var files = msg["files"]?.AsArray();
-            if (files != null && files.Count > 0)
-            {
-                Console.WriteLine($"  files: {files.Count}");
-                foreach (var f in files)
-                    Console.WriteLine($"    - {f?["name"]} ({f?["mimetype"]}, {f?["size"]}B)");
-            }
+            // Pretty-print with inline annotations
+            var pretty = msg.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
 
-            // Reactions
-            var reactions = msg["reactions"]?.AsArray();
-            if (reactions != null && reactions.Count > 0)
+            // Annotate known fields
+            var annotations = new Dictionary<string, string>
             {
-                Console.Write("  reactions: ");
-                foreach (var r in reactions)
-                    Console.Write($":{r?["name"]}: ({r?["count"]}) ");
-                Console.WriteLine();
-            }
+                ["\"username\""] = "// 표시 이름 (커스텀 가능)",
+                ["\"user\""] = "// Slack user/bot ID",
+                ["\"bot_id\""] = "// 봇 고유 ID",
+                ["\"bot_profile\""] = "// 봇 프로필 (이름+아이콘)",
+                ["\"icon_emoji\""] = "// 프로필 이모지 (:emoji:)",
+                ["\"image_36\""] = "// 프로필 사진 36px",
+                ["\"image_48\""] = "// 프로필 사진 48px",
+                ["\"image_72\""] = "// 프로필 사진 72px",
+                ["\"thread_ts\""] = "// 쓰레드 시작 ts (없으면 채널 글)",
+                ["\"reply_count\""] = "// 댓글 수",
+                ["\"reply_users\""] = "// 댓글 작성자 ID 목록",
+                ["\"reply_users_count\""] = "// 댓글 작성자 수",
+                ["\"latest_reply\""] = "// 마지막 댓글 ts",
+                ["\"files\""] = "// 첨부파일 배열",
+                ["\"reactions\""] = "// 리액션 이모지 목록",
+                ["\"edited\""] = "// 수정 이력",
+                ["\"subtype\""] = "// bot_message, thread_broadcast 등",
+                ["\"text\""] = "// 메시지 본문",
+                ["\"blocks\""] = "// 리치 텍스트 블록 (렌더링용)",
+            };
 
-            // Text (full)
-            Console.WriteLine($"  text ({text.Length}ch):");
-            Console.WriteLine($"  {text.Replace("\n", "\n  ")}");
+            foreach (var line in pretty.Split('\n'))
+            {
+                var trimmed = line.TrimStart();
+                var annotation = "";
+                foreach (var (key, comment) in annotations)
+                {
+                    if (trimmed.StartsWith(key))
+                    {
+                        annotation = $"  {comment}";
+                        break;
+                    }
+                }
+                Console.WriteLine($"{line}{annotation}");
+            }
         }
         catch (Exception ex)
         {
