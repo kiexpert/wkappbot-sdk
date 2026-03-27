@@ -456,7 +456,9 @@ internal partial class Program
                     var existing = await GetMessageTextAsync(botToken, channel, appendTs);
                     if (existing != null)
                     {
-                        var combined = existing + "\n━━━\n" + text;
+                        // Smart timestamp: only show time units that differ from original message
+                        var timeMark = SmartTimeMark(appendTs);
+                        var combined = existing + $"\n━━ {timeMark} ━━\n" + text;
                         // If too long, trim from the front (keep latest content)
                         if (combined.Length > 3800)
                         {
@@ -515,6 +517,29 @@ internal partial class Program
             Console.Error.WriteLine($"[SLACK] FindLastMessage error: {ex.Message}");
         }
         return null;
+    }
+
+    /// <summary>
+    /// Smart time mark: compare now vs original message ts, show only differing units.
+    /// Same minute: ":42" | Same hour: "32:42" | Same day: "15:32" | Different day: "03-27 15:32"
+    /// </summary>
+    static string SmartTimeMark(string slackTs)
+    {
+        try
+        {
+            var epoch = double.Parse(slackTs.Split('.')[0], System.Globalization.CultureInfo.InvariantCulture);
+            var orig = DateTimeOffset.FromUnixTimeSeconds((long)epoch).ToLocalTime().DateTime;
+            var now = DateTime.Now;
+
+            if (orig.Date != now.Date)
+                return now.ToString("MM-dd HH:mm");
+            if (orig.Hour != now.Hour)
+                return now.ToString("HH:mm");
+            if (orig.Minute != now.Minute)
+                return now.ToString("mm:ss");
+            return ":" + now.ToString("ss");
+        }
+        catch { return DateTime.Now.ToString("HH:mm:ss"); }
     }
 
     /// <summary>Get the text of a specific message by ts.</summary>
