@@ -97,47 +97,51 @@ def merge_thread(thread_ts):
     if len(msgs) < 2:
         return 0
 
+    # Bottom-up scan: start from end, merge same-author pairs upward.
+    # Less confusing — indices don't shift below current position.
     merged = 0
-    i = 0
-    while i < len(msgs) - 1 and merged < LIMIT:
-        curr = msgs[i]
-        nxt = msgs[i + 1]
+    i = len(msgs) - 1
+    while i >= 1 and merged < LIMIT:
+        curr = msgs[i]      # current (lower)
+        prev = msgs[i - 1]  # previous (upper) — merge target
 
         ca = get_author(curr)
-        na = get_author(nxt)
+        pa = get_author(prev)
         cf = curr.get('files', [])
-        nf = nxt.get('files', [])
         ct = curr.get('text', '')
-        nt = nxt.get('text', '')
+        pt = prev.get('text', '')
 
-        # Same username — merge all consecutive (with icon+author separator)
-        if ca and ca == na and not nf:  # skip if next has files
-            icon = get_icon(nxt) or get_icon(curr)
+        # Same bot author, no files on current → merge into previous
+        if ca and ca == pa and not cf:
+            icon = get_icon(curr) or get_icon(prev)
             sep_icon = f'{icon} ' if icon else ''
-            time_mark = smart_time(curr.get('ts', ''), nxt.get('ts', ''))
-            separator = f'\n{sep_icon}*{na}* ━━ {time_mark} ━━\n'
-            combined = ct + separator + nt
+            time_mark = smart_time(prev.get('ts', ''), curr.get('ts', ''))
+            separator = f'\n{sep_icon}*{ca}* ━━ {time_mark} ━━\n'
+            combined = pt + separator + ct
             if len(combined) > 3800:
-                i += 1  # too long → skip, post as separate
+                i -= 1  # too long → skip
                 continue
             if DRY_RUN:
-                print(f'  [DRY] Would merge: {ca[:25]} ({len(ct)}+{len(nt)}ch)')
-                i += 1
+                print(f'  [DRY] Would merge: {ca[:25]} ({len(pt)}+{len(ct)}ch)')
+                msgs.pop(i)
+                msgs[i - 1] = {**prev, 'text': combined}
                 merged += 1
+                # don't decrement i — re-check same position (prev may chain-merge)
                 continue
 
-            upd = api('chat.update', channel=CHANNEL, ts=curr['ts'], text=combined)
+            upd = api('chat.update', channel=CHANNEL, ts=prev['ts'], text=combined)
             if upd.get('ok'):
                 time.sleep(0.8)
-                dlt = api('chat.delete', channel=CHANNEL, ts=nxt['ts'])
+                dlt = api('chat.delete', channel=CHANNEL, ts=curr['ts'])
                 if dlt.get('ok'):
-                    msgs.pop(i + 1)
-                    msgs[i] = {**curr, 'text': combined}
+                    msgs.pop(i)
+                    msgs[i - 1] = {**prev, 'text': combined}
                     merged += 1
-                    print(f'  Merged+deleted: {ca[:25]} ({len(ct)}+{len(nt)}ch)')
+                    print(f'  Merged+deleted: {ca[:25]} ({len(pt)}+{len(ct)}ch)')
+                    # don't decrement — re-check for chain merge
+                    continue
                 else:
                     print(f'  Delete fail: {dlt.get("error")}')
-                    i += 1
                 time.sleep(0.8)
             else:
                 err = upd.get('error', '')
@@ -145,9 +149,7 @@ def merge_thread(thread_ts):
                 if err == 'message_limit_exceeded':
                     print('  Message limit! Stopping.')
                     return merged
-                i += 1
-        else:
-            i += 1
+        i -= 1
 
     return merged
 
