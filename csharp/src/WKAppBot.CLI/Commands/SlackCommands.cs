@@ -520,26 +520,41 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Smart time mark: compare now vs original message ts, show only differing units.
-    /// Same minute: ":42" | Same hour: "32:42" | Same day: "15:32" | Different day: "03-27 15:32"
+    /// Smart time mark: full timestamp, left-trimmed against previous separator.
+    /// Finds last ━━ in existing text, extracts prev time, trims common prefix at delimiter boundary.
+    /// "03-27 15:32:42" vs "03-27 15:32:58" → ":58"
     /// </summary>
-    static string SmartTimeMark(string slackTs)
+    static string SmartTimeMark(string existingText)
     {
-        try
-        {
-            var epoch = double.Parse(slackTs.Split('.')[0], System.Globalization.CultureInfo.InvariantCulture);
-            var orig = DateTimeOffset.FromUnixTimeSeconds((long)epoch).ToLocalTime().DateTime;
-            var now = DateTime.Now;
+        var now = DateTime.Now.ToString("MM-dd HH:mm:ss");
 
-            if (orig.Date != now.Date)
-                return now.ToString("MM-dd HH:mm");
-            if (orig.Hour != now.Hour)
-                return now.ToString("HH:mm");
-            if (orig.Minute != now.Minute)
-                return now.ToString("mm:ss");
-            return ":" + now.ToString("ss");
-        }
-        catch { return DateTime.Now.ToString("HH:mm:ss"); }
+        // Find previous separator time: last "━━ ... ━━" pattern
+        var lastSep = existingText.LastIndexOf("━━ ", StringComparison.Ordinal);
+        if (lastSep < 0) return now; // first separator → full time
+
+        var afterSep = lastSep + 3; // skip "━━ "
+        var endSep = existingText.IndexOf(" ━━", afterSep, StringComparison.Ordinal);
+        if (endSep < 0) return now;
+
+        var prev = existingText[afterSep..endSep];
+        if (prev.Length == 0) return now;
+
+        // Left-trim: find common prefix, back up to delimiter boundary (- : space)
+        int common = 0;
+        int maxLen = Math.Min(prev.Length, now.Length);
+        while (common < maxLen && prev[common] == now[common])
+            common++;
+
+        if (common == 0) return now; // completely different
+        if (common >= now.Length) return ":" + now[^2..]; // identical → show seconds
+
+        // Back up to last delimiter for clean cut
+        var delimiters = new[] { ':', '-', ' ' };
+        int cutAt = common;
+        while (cutAt > 0 && !delimiters.Contains(now[cutAt - 1]))
+            cutAt--;
+
+        return cutAt > 0 ? now[cutAt..] : now;
     }
 
     /// <summary>Get the text of a specific message by ts.</summary>
