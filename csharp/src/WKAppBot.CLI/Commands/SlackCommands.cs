@@ -442,10 +442,87 @@ internal partial class Program
         var ok = json?["ok"]?.GetValue<bool>() ?? false;
 
         if (!ok)
-            Console.WriteLine($"[SLACK] API error: {json?["error"]}");
+        {
+            var error = json?["error"]?.GetValue<string>() ?? "";
+            Console.WriteLine($"[SLACK] API error: {error}");
+
+            // ── message_limit fallback: append to last message from same author ──
+            if (error == "message_limit_exceeded" && !string.IsNullOrEmpty(username))
+            {
+                var appendTs = FindLastMessageTsByAuthor(botToken, channel, threadTs, username);
+                if (appendTs != null)
+                {
+                    // Fetch existing text
+                    var existing = await GetMessageTextAsync(botToken, channel, appendTs);
+                    if (existing != null)
+                    {
+                        var combined = existing + "\n\n" + text;
+                        if (combined.Length <= 3800)
+                        {
+                            var (updOk, _, _) = await SlackUpdateMessageAsync(botToken, channel, appendTs, combined);
+                            if (updOk)
+                            {
+                                Console.WriteLine($"[SLACK] message_limit → appended to {appendTs} ({username})");
+                                return (true, appendTs);
+                            }
+                        }
+                    }
+                }
+                Console.Error.WriteLine($"[SLACK] message_limit — append fallback also failed");
+            }
+        }
 
         var messageTs = json?["ts"]?.GetValue<string>();
         return (ok, messageTs);
+    }
+
+    /// <summary>Find the ts of the last message by a specific username in a channel/thread.</summary>
+    static string? FindLastMessageTsByAuthor(string botToken, string channel, string? threadTs, string username)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+
+            string url;
+            if (!string.IsNullOrEmpty(threadTs))
+                url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=20";
+            else
+                url = $"https://slack.com/api/conversations.history?channel={channel}&limit=20";
+
+            var resp = http.GetStringAsync(url).GetAwaiter().GetResult();
+            var json = JsonSerializer.Deserialize<JsonNode>(resp);
+            var msgs = json?["messages"]?.AsArray();
+            if (msgs == null) return null;
+
+            // Reverse scan: find last message with matching username
+            for (int i = msgs.Count - 1; i >= 0; i--)
+            {
+                var msg = msgs[i];
+                var msgUser = msg?["username"]?.GetValue<string>();
+                if (msgUser == username)
+                    return msg?["ts"]?.GetValue<string>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SLACK] FindLastMessage error: {ex.Message}");
+        }
+        return null;
+    }
+
+    /// <summary>Get the text of a specific message by ts.</summary>
+    static async Task<string?> GetMessageTextAsync(string botToken, string channel, string ts)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+            var resp = await http.GetStringAsync($"https://slack.com/api/conversations.replies?channel={channel}&ts={ts}&limit=1&inclusive=true");
+            var json = JsonSerializer.Deserialize<JsonNode>(resp);
+            return json?["messages"]?[0]?["text"]?.GetValue<string>();
+        }
+        catch { return null; }
     }
 
     /// <summary>
