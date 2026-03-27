@@ -667,6 +667,16 @@ internal partial class Program
                             if (replyOk && replyTs != null) _eyeSummaryReplyTs = replyTs;
                         }
                     }
+                    else
+                    {
+                        // message_limit fallback: find existing 앱봇아이 status message and reuse its ts
+                        var existingTs = FindLastMessageTsByAuthor(slackBotToken, slackChannel, null, "앱봇아이");
+                        if (existingTs != null)
+                        {
+                            _eyeStatusTs = existingTs;
+                            Console.Error.WriteLine($"[EYE] Reusing existing 앱봇아이 status ts={existingTs}");
+                        }
+                    }
                 }
                 catch { }
             }
@@ -1015,7 +1025,10 @@ internal partial class Program
                 if (_eyeStatusTs != null)
                     SlackUpdateMessageAsync(slackBotToken, slackChannel, _eyeStatusTs, msg).GetAwaiter().GetResult();
                 else
-                    SlackSendViaApi(slackBotToken, slackChannel, msg, username: "앱봇아이").GetAwaiter().GetResult();
+                {
+                    var (stopOk, _) = SlackSendViaApi(slackBotToken, slackChannel, msg, username: "앱봇아이").GetAwaiter().GetResult();
+                    // message_limit fallback handled inside SlackSendViaApi (appends to last 앱봇아이 message)
+                }
             }
             catch { }
         }
