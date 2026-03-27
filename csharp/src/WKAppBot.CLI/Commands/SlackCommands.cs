@@ -457,8 +457,9 @@ internal partial class Program
                     var existing = await GetMessageTextAsync(botToken, channel, appendTs);
                     if (existing != null)
                     {
-                        // Profile icon for separator (from the message we tried to send)
+                        // Profile icon + author for separator
                         var sepIcon = dict.TryGetValue("icon_emoji", out var emo) ? $"{emo} " : "";
+                        var sepUser = !string.IsNullOrEmpty(username) ? $"*{username}* " : "";
 
                         // Thread starter (appendTs == threadTs or no thread) → replace with last chunk only
                         bool isThreadStarter = string.IsNullOrEmpty(threadTs) || appendTs == threadTs;
@@ -466,13 +467,13 @@ internal partial class Program
                         if (isThreadStarter)
                         {
                             var timeMark = SmartTimeMark(existing);
-                            combined = $"{sepIcon}━━ {timeMark} ━━\n" + text;
+                            combined = $"{sepIcon}{sepUser}━━ {timeMark} ━━\n" + text;
                         }
                         else
                         {
                             // Thread reply → accumulate with smart timestamp separator
                             var timeMark = SmartTimeMark(existing);
-                            combined = existing + $"\n{sepIcon}━━ {timeMark} ━━\n" + text;
+                            combined = existing + $"\n{sepIcon}{sepUser}━━ {timeMark} ━━\n" + text;
                         }
                         // If too long, trim from the front (keep latest content)
                         if (combined.Length > 3800)
