@@ -675,6 +675,11 @@ internal partial class Program
                         {
                             _eyeStatusTs = existingTs;
                             Console.Error.WriteLine($"[EYE] Reusing existing 앱봇아이 status ts={existingTs}");
+                            // Immediately update to show alive (may have been "stopped" from previous session)
+                            var uptime = DateTime.UtcNow - eyeStartTime;
+                            var memMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+                            var aliveMsg = $"🟢 Eye alive (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, mem={memMB}MB, frame=0)";
+                            _ = SlackUpdateMessageAsync(slackBotToken, slackChannel, existingTs, aliveMsg);
                         }
                     }
                 }
