@@ -1071,7 +1071,17 @@ internal partial class Program
             if (botIcon36 != null) Console.WriteLine($"  bot_icon_36: {botIcon36}");
             if (botIcon72 != null) Console.WriteLine($"  bot_icon_72: {botIcon72}");
             if (threadTs != null) Console.WriteLine($"  thread_ts: {threadTs}");
-            if (replyCount > 0) Console.WriteLine($"  replies: {replyCount}");
+            if (replyCount > 0)
+            {
+                var replyUsersCount = msg["reply_users_count"]?.GetValue<int>() ?? 0;
+                var replyUsers = msg["reply_users"]?.AsArray();
+                Console.Write($"  replies: {replyCount} ({replyUsersCount} users)");
+                if (replyUsers != null && replyUsers.Count > 0)
+                    Console.Write($" [{string.Join(", ", replyUsers.Select(u => u?.GetValue<string>()))}]");
+                Console.WriteLine();
+                var latestReply = msg["latest_reply"]?.GetValue<string>();
+                if (latestReply != null) Console.WriteLine($"  latest_reply: {latestReply}");
+            }
 
             // Files
             var files = msg["files"]?.AsArray();
