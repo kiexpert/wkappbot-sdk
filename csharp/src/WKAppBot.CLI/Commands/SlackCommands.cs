@@ -456,9 +456,19 @@ internal partial class Program
                     var existing = await GetMessageTextAsync(botToken, channel, appendTs);
                     if (existing != null)
                     {
-                        // Smart timestamp: only show time units that differ from original message
-                        var timeMark = SmartTimeMark(appendTs);
-                        var combined = existing + $"\n━━ {timeMark} ━━\n" + text;
+                        // Thread starter (appendTs == threadTs or no thread) → replace with last chunk only
+                        bool isThreadStarter = string.IsNullOrEmpty(threadTs) || appendTs == threadTs;
+                        string combined;
+                        if (isThreadStarter)
+                        {
+                            combined = text; // overwrite — thread starter shows latest state only
+                        }
+                        else
+                        {
+                            // Thread reply → accumulate with smart timestamp separator
+                            var timeMark = SmartTimeMark(existing);
+                            combined = existing + $"\n━━ {timeMark} ━━\n" + text;
+                        }
                         // If too long, trim from the front (keep latest content)
                         if (combined.Length > 3800)
                         {
