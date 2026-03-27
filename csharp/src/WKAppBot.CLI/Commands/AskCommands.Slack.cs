@@ -106,23 +106,17 @@ internal partial class Program
                 var timeMark = SmartTimeMark(last.text);
                 var combined = last.text + $"\n{sepIcon}━━ {timeMark} ━━\n" + msg;
 
-                // If too long, trim from front (keep latest)
-                if (combined.Length > SlackMaxAppendLength)
+                if (combined.Length <= SlackMaxAppendLength)
                 {
-                    var cutLen = combined.Length - SlackMaxAppendLength;
-                    var cutIdx = combined.IndexOf("\n━━", cutLen, StringComparison.Ordinal);
-                    combined = cutIdx >= 0
-                        ? "…(trimmed)" + combined[cutIdx..]
-                        : "…(trimmed)\n" + combined[cutLen..];
+                    var (ok, _, _) = SlackUpdateMessageAsync(botToken, channel, last.msgTs, combined).GetAwaiter().GetResult();
+                    if (ok)
+                    {
+                        _slackThreadLastPost[sessionTs] = (last.msgTs, uname, combined);
+                        return;
+                    }
                 }
-
-                var (ok, _, _) = SlackUpdateMessageAsync(botToken, channel, last.msgTs, combined).GetAwaiter().GetResult();
-                if (ok)
-                {
-                    _slackThreadLastPost[sessionTs] = (last.msgTs, uname, combined);
-                    return;
-                }
-                // If update fails, fall through to post new
+                // Too long or update failed → fall through to post new message
+                // (message_limit fallback in SlackSendViaApi will trim if needed)
             }
 
             // Post new message (chunked for long content)
