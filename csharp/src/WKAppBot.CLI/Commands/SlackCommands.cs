@@ -461,7 +461,8 @@ internal partial class Program
                         string combined;
                         if (isThreadStarter)
                         {
-                            combined = text; // overwrite — thread starter shows latest state only
+                            var timeMark = SmartTimeMark(existing);
+                            combined = $"━━ {timeMark} ━━\n" + text; // overwrite with timestamp header
                         }
                         else
                         {
