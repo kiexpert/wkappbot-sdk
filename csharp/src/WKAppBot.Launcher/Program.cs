@@ -425,7 +425,13 @@ partial class Program
             return code; // unreachable
         }
 
-        int finalCode = RunCoreDetachedNormal(forwardArgs, showStderr, stderrBuf);
+        // Eye daemon: use RunCore (Process.Start) — needs console, can't use DETACHED_PROCESS
+        // Other commands: RunCoreDetachedNormal (IOCP relay) — avoids ConPTY LPC deadlock
+        int finalCode;
+        if (isEyeDaemon)
+            finalCode = RunCore(forwardArgs);
+        else
+            finalCode = RunCoreDetachedNormal(forwardArgs, showStderr, stderrBuf);
         AppBotExit(finalCode);
         return finalCode; // unreachable
     }
