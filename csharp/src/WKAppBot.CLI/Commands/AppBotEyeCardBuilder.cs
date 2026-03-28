@@ -185,6 +185,7 @@ internal partial class Program
             {
                 if (Directory.Exists(Path.Combine(dir, ".git"))
                     || Directory.Exists(Path.Combine(dir, ".svn"))
+                    || Directory.Exists(Path.Combine(dir, ".wkappbot"))
                     || File.Exists(Path.Combine(dir, ".wkappbot")))
                 { cwd = dir; break; }
                 var parent = Path.GetDirectoryName(dir);

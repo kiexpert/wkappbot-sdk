@@ -18,6 +18,9 @@ using System.Text;
 
 namespace WKAppBot.CLI;
 
+// PulseStep output goes to stderr only when profiling is explicitly enabled.
+// Default: suppressed (ErrorScope buffers it, and MCP pipe would leak it to user).
+
 // ── Static zero-instance entry point ────────────────────────────────────────
 // One implicit session per caller method. Lifecycle: Init → Mark* → Done.
 internal static class PulseStep
@@ -88,13 +91,18 @@ internal sealed class StepProfiler
 
     private static long GetWsMB() => Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
 
+    // PULSE output: only when WKAPPBOT_PROFILE=1 (explicit profiling).
+    // Default: silent — prevents stderr noise leaking through MCP/Eye/Launcher pipes.
+    private static readonly bool _profEnabled = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1";
+    private void Emit(string msg) { if (_profEnabled) try { Console.Error.WriteLine(msg); } catch { } }
+
     /// <summary>Print init line unconditionally (no threshold). Resets last-step timer.</summary>
     public void Init(string label, string callerHint = "")
     {
         _lastMs = _sw.ElapsedMilliseconds;
         _initMemMB = GetWsMB();
         _lastMemMB = _initMemMB;
-        Console.Error.WriteLine($"[PULSE:{_name}] ── init \"{label}\" @{_startedAt} mem={_initMemMB}MB ──");
+        Emit($"[PULSE:{_name}] ── init \"{label}\" @{_startedAt} mem={_initMemMB}MB ──");
     }
 
     public void Step(
@@ -115,9 +123,8 @@ internal sealed class StepProfiler
 
         var chain = BuildCallChain(skipFrames + 1);
         var memStr = memDelta != 0 ? $" mem={curMem}MB({(memDelta >= 0 ? "+" : "")}{memDelta})" : "";
-        Console.Error.WriteLine(
-            $"[PULSE:{_name}] {callerHint} \"{label}\" +{delta}ms (total={nowMs}ms @{_startedAt}){memStr}");
-        Console.Error.WriteLine($"  callchain: {chain}");
+        Emit($"[PULSE:{_name}] {callerHint} \"{label}\" +{delta}ms (total={nowMs}ms @{_startedAt}){memStr}");
+        Emit($"  callchain: {chain}");
     }
 
     public void Done(
@@ -133,7 +140,7 @@ internal sealed class StepProfiler
         var finalMem = GetWsMB();
         var totalMemDelta = finalMem - _initMemMB;
         var memStr = totalMemDelta != 0 ? $" mem={finalMem}MB({(totalMemDelta >= 0 ? "+" : "")}{totalMemDelta})" : "";
-        Console.Error.WriteLine($"[PULSE:{_name}] ── total {totalMs}ms{memStr} ──");
+        Emit($"[PULSE:{_name}] ── total {totalMs}ms{memStr} ──");
     }
 
     /// <summary>
