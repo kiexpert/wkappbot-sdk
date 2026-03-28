@@ -298,10 +298,13 @@ internal sealed class ScreenSaverOverlay : IDisposable
 
                         if (wasHidden)
                         {
+                            mwin.Window.Opacity = 0;
                             mwin.Window.Visibility = Visibility.Visible;
                             var helper = new WindowInteropHelper(mwin.Window);
                             SetWindowPos(helper.Handle, (IntPtr)HWND_TOPMOST, 0, 0, 0, 0,
                                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                            // Skip opacity jump — start from 0, next tick will fade in naturally
+                            continue;
                         }
                         mwin.Window.Opacity = targetOpacity;
                         UpdateMonitorVisuals(mwin, t);
