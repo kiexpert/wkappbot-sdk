@@ -382,7 +382,7 @@ internal partial class Program
     static async Task HandleToolsCallAsync(JsonObject? @params, StreamWriter writer, JsonNode? requestId)
     {
         JsonObject? response = null;
-        using var errScope = ErrorScope.Begin(); // auto-capture Console.Error with timestamps
+        // NO ErrorScope here — MCP worker is a piped process, stderr must pass through!
         // Extract APSP progressToken from _meta
         var progressToken = @params?["_meta"]?["progressToken"];
         var progressCounter = new int[1];
@@ -481,20 +481,8 @@ internal partial class Program
             };
         }
 
-        // Finalize: on error → append timestamped error log; on success → discard
         if (response != null)
-        {
-            var isError = response["result"]?["isError"]?.GetValue<bool>() == true;
-            var errorLog = errScope.Finalize(isError);
-            if (isError && errorLog.Length > 0)
-            {
-                var content = response["result"]?["content"]?.AsArray();
-                if (content?.Count > 0)
-                    content[0]!["text"] = (content[0]?["text"]?.GetValue<string>() ?? "") + errorLog;
-            }
             WriteJsonRpc(writer, response);
-        }
-        // Note: CLI commands can also use `return AppBotExit(code);` for the same pattern
     }
 
     static string GetActionGateKey(string action, string grap)
