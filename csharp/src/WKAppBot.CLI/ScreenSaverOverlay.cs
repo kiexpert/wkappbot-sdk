@@ -39,6 +39,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
         public Window Window = null!;
         public int X, Y, W, H;
         public bool XRayActive; // independent X-ray per monitor
+        public double LastT;    // per-monitor visual throttle (was global _lastT → only first monitor updated)
     }
 
     private Thread? _thread;
@@ -48,7 +49,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
     private volatile bool _isVisible;
     private volatile bool _disposed;
     private double _currentOpacity;
-    private double _lastT = -1;
+    // _lastT removed — now per-monitor (MonitorWindow.LastT)
 
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TOOLWINDOW   = 0x00000080;
@@ -333,8 +334,9 @@ internal sealed class ScreenSaverOverlay : IDisposable
 
     private void UpdateMonitorVisuals(MonitorWindow mwin, double t)
     {
-        if (Math.Abs(t - _lastT) < 0.01) return;
-        _lastT = t;
+        // Per-monitor throttle: skip if this monitor's visuals haven't changed enough
+        if (Math.Abs(t - mwin.LastT) < 0.01) return;
+        mwin.LastT = t;
 
         var color = InterpolateSunset(t);
         if (mwin.Window.Content is not System.Windows.Controls.Grid grid) return;
