@@ -56,6 +56,89 @@ partial class Program
 
         prof("Main() entered");
 
+        // ── Identity: who am I, who's my parent, what terminal am I in? ──
+        try
+        {
+            var myPid = Environment.ProcessId;
+            var parentPid = 0;
+            var parentName = "?";
+            var consoleHwnd = GetConsoleWindow();
+            var consoleName = "(none)";
+            try
+            {
+                using var me = System.Diagnostics.Process.GetCurrentProcess();
+                // .NET doesn't expose PPID directly on Windows — use WMI-free P/Invoke
+                parentPid = GetParentProcessId(myPid);
+                if (parentPid > 0) try { parentName = System.Diagnostics.Process.GetProcessById(parentPid).ProcessName; } catch { }
+            }
+            catch { }
+            if (consoleHwnd != IntPtr.Zero)
+            {
+                var cls = new System.Text.StringBuilder(256);
+                GetClassNameW(consoleHwnd, cls, 256);
+                consoleName = cls.ToString();
+            }
+            var cwd = Environment.CurrentDirectory;
+            var exePath = Environment.ProcessPath ?? "";
+            var sid = System.Diagnostics.Process.GetCurrentProcess().SessionId;
+            // Host window: parent process's main window (VS Code, Terminal, etc.)
+            var hostHwnd = IntPtr.Zero;
+            var hostTitle = "";
+            try
+            {
+                if (parentPid > 0)
+                {
+                    var pp = System.Diagnostics.Process.GetProcessById(parentPid);
+                    hostHwnd = pp.MainWindowHandle;
+                    if (hostHwnd != IntPtr.Zero)
+                    {
+                        var tb = new System.Text.StringBuilder(256);
+                        GetWindowTextW(hostHwnd, tb, 256);
+                        hostTitle = tb.ToString();
+                        if (hostTitle.Length > 60) hostTitle = hostTitle[..57] + "...";
+                    }
+                }
+            }
+            catch { }
+            // Foreground window at launch time
+            var fgHwnd = GetForegroundWindow();
+            var fgTitle = "";
+            try { var fb = new System.Text.StringBuilder(256); GetWindowTextW(fgHwnd, fb, 256); fgTitle = fb.ToString(); if (fgTitle.Length > 60) fgTitle = fgTitle[..57] + "..."; } catch { }
+            // Build JSON — all owners of this process
+            var j = new System.Text.StringBuilder(512);
+            j.Append($"{{\"_\":\"LAUNCH\",\"pid\":{myPid},\"sid\":{sid}");
+            if (consoleHwnd != IntPtr.Zero) j.Append($",\"con\":\"0x{consoleHwnd:X}\",\"cls\":\"{consoleName}\"");
+            if (fgHwnd != IntPtr.Zero) { j.Append($",\"fg\":\"0x{fgHwnd:X}\""); if (fgTitle.Length > 0) j.Append($",\"fgT\":\"{fgTitle.Replace("\"","'")}\""); }
+            j.Append($",\"cwd\":\"{cwd.Replace("\\","\\\\")}\"");
+            // Parent chain: walk up until root
+            j.Append(",\"chain\":[");
+            var chainPid = myPid;
+            for (int ci = 0; ci < 10; ci++)
+            {
+                var pp = GetParentProcessId(chainPid);
+                if (pp <= 0 || pp == chainPid) break;
+                var pName = "?"; var pHwnd = IntPtr.Zero; var pTitle = "";
+                try
+                {
+                    var p = System.Diagnostics.Process.GetProcessById(pp);
+                    pName = p.ProcessName;
+                    pHwnd = p.MainWindowHandle;
+                    if (pHwnd != IntPtr.Zero) { var tb = new System.Text.StringBuilder(80); GetWindowTextW(pHwnd, tb, 80); pTitle = tb.ToString(); }
+                }
+                catch { }
+                if (ci > 0) j.Append(',');
+                j.Append($"{{\"pid\":{pp},\"name\":\"{pName}\"");
+                if (pHwnd != IntPtr.Zero) j.Append($",\"hwnd\":\"0x{pHwnd:X}\"");
+                if (pTitle.Length > 0) j.Append($",\"title\":\"{(pTitle.Length > 50 ? pTitle[..47] + "..." : pTitle).Replace("\"","'")}\"");
+                j.Append('}');
+                chainPid = pp;
+            }
+            j.Append("]}");
+            Console.Error.WriteLine(j);
+            Console.Error.Flush();
+        }
+        catch { }
+
         // ── Encoding recovery: GetCommandLineA() → system codepage raw bytes ──
         // bash (Git Bash/MSYS2) corrupts Korean args at UTF-8↔CP949 boundary.
         // GetCommandLineA() returns raw system-codepage bytes — decode with system encoding.
@@ -360,6 +443,29 @@ partial class Program
     static extern bool CloseHandle(IntPtr hObject);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
     static extern IntPtr GetStdHandle(int nStdHandle);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern IntPtr GetConsoleWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern int GetWindowTextW(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
+    static int GetParentProcessId(int pid)
+    {
+        try
+        {
+            var handle = System.Diagnostics.Process.GetProcessById(pid).Handle;
+            var pbi = new byte[48]; // PROCESS_BASIC_INFORMATION
+            int retLen = 0;
+            NtQueryInformationProcess(handle, 0, pbi, pbi.Length, ref retLen);
+            return (int)BitConverter.ToInt64(pbi, 24); // InheritedFromUniqueProcessId at offset 24
+        }
+        catch { return 0; }
+    }
+    [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+    static extern int NtQueryInformationProcess(IntPtr handle, int infoClass, byte[] info, int infoLen, ref int retLen);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
     static extern bool SetConsoleOutputCP(uint wCodePageID);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
