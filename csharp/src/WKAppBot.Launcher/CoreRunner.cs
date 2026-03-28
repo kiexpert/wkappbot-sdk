@@ -1,0 +1,365 @@
+using System.Diagnostics;
+using System.Text;
+
+namespace WKAppBot.Launcher;
+
+partial class Program
+{
+
+    /// <param name="fastExitTimeoutMs">If >0, kills Core if it doesn't exit within this time (ms) and returns exit 0.
+    /// Used for fast-exit commands (help) where Core may hang 26s due to RotateOldLogs on W: drive.</param>
+    /// <param name="stdoutRelayOnly">If true, redirect only stdout (not stdin/stderr) and relay it.
+    /// Used for grap/grep with args — prevents MSYS2 PTY drain (~31s) from large stdout output.
+    /// Core inherits stdin/stderr from Launcher (PTY) so interactive features still work.</param>
+    /// <summary>
+    /// Spawn Core with CreateNoWindow=true and stdin piped (no ConPTY inheritance).
+    /// stdout/stderr are NOT redirected — Core writes directly to Launcher's terminal handles.
+    /// This avoids both: the ~27s ConPTY bash wait AND the unreliable pipe relay mechanism.
+    /// </summary>
+    static int RunCoreNoConPty(string[] args)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
+            var core = ResolveCoreExe();
+            if (!File.Exists(core)) { Console.Error.WriteLine($"[LAUNCHER] wkappbot-core.exe not found at: {core}"); return 1; }
+
+            using var proc = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = core,
+                    UseShellExecute       = false,
+                    CreateNoWindow        = true,  // no ConPTY handle → bash won't wait 27s
+                    RedirectStandardInput = true,  // pipe stdin → Core holds no ConPTY stdin
+                    RedirectStandardOutput = false, // Core writes directly to Launcher's stdout handle
+                    RedirectStandardError  = false, // Core writes directly to Launcher's stderr handle
+                }
+            };
+            // Strip MSYS2/Cygwin PTY env vars — AppHost deadlock prevention (same as fastExit path)
+            foreach (var v in new[] { "TERM", "MSYSTEM", "MSYS", "MSYS2_ARG_CONV_EXCL",
+                                      "ConEmuANSI", "CYGWIN", "MINGW_PREFIX", "MINGW_CHOST",
+                                      "MINGW_PACKAGE_PREFIX", "MSYS2_PATH_TYPE" })
+                proc.StartInfo.EnvironmentVariables.Remove(v);
+            foreach (var a in args) proc.StartInfo.ArgumentList.Add(a);
+
+            proc.Start();
+            try { proc.StandardInput.Close(); } catch { } // EOF stdin immediately
+            // Use WaitForExit(timeout) instead of blocking WaitForExit() — avoids potential
+            // .NET internal async-stream-completion wait that can block 27-35s in AOT builds.
+            if (!proc.WaitForExit(5000)) proc.Kill(entireProcessTree: false);
+            return proc.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[LAUNCHER] RunCoreNoConPty error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    static int RunCore(string[] args, int fastExitTimeoutMs = 0, bool stdoutRelayOnly = false)
+    {
+        try
+        {
+            // wkappbot-core.exe lives next to wkappbot.exe in SDK/bin/
+            var dir = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
+            var core = ResolveCoreExe();
+
+            if (!File.Exists(core))
+            {
+                Console.Error.WriteLine($"[LAUNCHER] wkappbot-core.exe not found at: {core}");
+                Console.Error.WriteLine("[LAUNCHER] Run: dotnet publish WKAppBot.CLI to deploy core.");
+                return 1;
+            }
+
+            // Parse --timeout N (seconds) — Launcher-level watchdog.
+            // Works for ALL commands, including ones that don't implement their own timeout.
+            // stdout/stderr inherited (no piping overhead); Launcher simply kills Core if exceeded.
+            int timeoutSec  = 0;
+            int timeoutExit = 2;
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (args[i] == "--timeout"      && int.TryParse(args[i + 1], out var t) && t > 0) timeoutSec  = t;
+                if (args[i] == "--timeout-exit" && int.TryParse(args[i + 1], out var e))           timeoutExit = e;
+            }
+
+            bool useFastExit   = fastExitTimeoutMs > 0;
+            bool useStdoutRelay = stdoutRelayOnly && !useFastExit;
+            // For grap/grep one-shot: temp file relay avoids all pipe/ConPTY handle issues.
+            // ConPTY (bash → Launcher → Core) swaps stdout/stderr handles in Core when UseShellExecute=false
+            // redirects both streams; and CreateNoWindow=true prevents .NET 8 from initializing Console.
+            // Solution: Core writes to a local temp file (WKAPPBOT_RELAY_FILE env var), Launcher reads after.
+            // For --follow mode: run Core normally (no temp file, output goes to terminal, Ctrl+C to stop).
+            bool followMode = useStdoutRelay && args.Any(a => a is "-f" or "--follow");
+            string? relayFilePath = null;
+            if (useStdoutRelay && !followMode)
+            {
+                // Use C:\Temp\ instead of GetTempPath() — AppData\Local\Temp has 28s visibility delay
+                // when Core's SMB handles are being cleaned up after TerminateProcess.
+                relayFilePath = System.IO.Directory.Exists(@"C:\Temp")
+                    ? $@"C:\Temp\wkappbot-relay-{Environment.ProcessId}.txt"
+                    : System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"wkappbot-relay-{Environment.ProcessId}.txt");
+                // File will be created by Core; delete any stale file from previous run
+                try { System.IO.File.Delete(relayFilePath); } catch { }
+            }
+
+            using var proc = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = core,
+                    UseShellExecute = false,
+                    // ALL 3 streams redirected + CreateNoWindow=true for ALL spawns.
+                    // Root cause of bash/MSYS2 LPC deadlock: ConPTY slave handles inherited via
+                    // stdin/stderr trigger .NET 8 AppHost console init (SetConsoleMode LPC → csrss.exe).
+                    // Fix: redirect stdin+stderr so Core receives pipes (not ConPTY handles).
+                    // Core detects piped stdin → Console.IsInputRedirected=true → skips interactive init.
+                    // "\0UIT" (4 bytes, exact flush) = Core signaling Launcher to TerminateSelf immediately.
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                    RedirectStandardInput  = true,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8,
+                    StandardErrorEncoding  = System.Text.Encoding.UTF8,
+                    // CreateNoWindow=true: prevents console window creation for ALL Core spawns.
+                    // Together with all-streams-redirected, Core has zero ConPTY handles → no LPC init.
+                    CreateNoWindow         = true,
+                }
+            };
+            // File-based handshake: Core creates .ready BEFORE TerminateProcess (file visible immediately).
+            // Launcher polls for .ready, reads relay file while Core is alive, then creates .ack.
+            // Core waits for .ack (max 500ms), then calls TerminateProcess.
+            // No named kernel objects — avoids ConPTY/session namespace issues.
+
+            // Pass relay file path to Core via env var (one-shot only)
+            if (relayFilePath != null)
+                proc.StartInfo.EnvironmentVariables["WKAPPBOT_RELAY_FILE"] = relayFilePath;
+
+            // Strip MSYS2/Cygwin PTY env vars for ALL Core spawns (not just fast-exit).
+            // .NET 8 single-file AppHost deadlocks when TERM/MSYSTEM/MSYS/etc. are set,
+            // regardless of CreateNoWindow mode. These vars tell the AppHost to reconcile
+            // PTY handles at startup, causing an LPC deadlock before Main() is reached.
+            foreach (var v in new[] { "TERM", "MSYSTEM", "MSYS", "MSYS2_ARG_CONV_EXCL",
+                                      "ConEmuANSI", "CYGWIN", "MINGW_PREFIX", "MINGW_CHOST",
+                                      "MINGW_PACKAGE_PREFIX", "MSYS2_PATH_TYPE" })
+                proc.StartInfo.EnvironmentVariables.Remove(v);
+
+            // Forward all args as-is
+            foreach (var a in args)
+                proc.StartInfo.ArgumentList.Add(a);
+
+
+            _lDiagStep = "proc-starting";
+            Prof("proc.Start()");
+            // Detach Launcher from ConPTY console BEFORE spawning Core.
+            // CREATE_NO_WINDOW still attaches Core to parent's ConPTY console session → LPC deadlock
+            // in .NET 8 AppHost during console init (SetConsoleMode → csrss.exe LPC → never returns).
+            // FreeConsole(): Launcher releases its console → child inherits nothing → no LPC deadlock.
+            // Stdout/stderr file handles (ConPTY slave) remain valid for WriteFile after FreeConsole().
+            FreeConsole();
+            proc.Start();
+            // Close stdin immediately — Core doesn't read stdin interactively.
+            // Stdin is always redirected (pipe) so Core never inherits a ConPTY stdin handle.
+            try { proc.StandardInput.Close(); } catch { }
+            _lDiagStep = $"proc-waitforexit(pid={proc.Id})";
+            Prof($"proc.WaitForExit pid={proc.Id}");
+
+            if (useFastExit)
+            {
+                // stdin already closed above.
+                // Relay Core's stdout and stderr to Launcher's stdout/stderr in background.
+                // DO NOT set Console.OutputEncoding here — that calls SetConsoleOutputCP(65001),
+                // initializing SMB-backed console kernel objects. TerminateSelf after that = ~27s.
+                // Instead, write bytes directly to the underlying stdout stream (bypasses encoding).
+                var stdoutStream = Console.OpenStandardOutput();
+                var stderrStream = Console.OpenStandardError();
+                var stdoutRelay = System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        var buf = new byte[4096];
+                        int n;
+                        while ((n = proc.StandardOutput.BaseStream.Read(buf, 0, buf.Length)) > 0)
+                        {
+                            stdoutStream.Write(buf, 0, n);
+                            stdoutStream.Flush();
+                        }
+                        Console.Out.Flush();
+                    }
+                    catch { }
+                });
+                var stderrRelay = System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        var buf = new byte[4096];
+                        int n;
+                        while ((n = proc.StandardError.BaseStream.Read(buf, 0, buf.Length)) > 0)
+                        {
+                            stderrStream.Write(buf, 0, n);
+                            stderrStream.Flush();
+                        }
+                    }
+                    catch { }
+                });
+                // Core calls FastExit (TerminateProcess) after flushing help output.
+                // If it doesn't exit within timeout, kill it (safety net for hangs).
+                bool exited = proc.WaitForExit(fastExitTimeoutMs);
+                _lDiagStep = exited ? "fast-exit-ok" : "fast-exit-timeout-kill";
+                Prof(exited
+                    ? $"fast-exit: core exited naturally pid={proc.Id}"
+                    : $"fast-exit: timeout {fastExitTimeoutMs}ms — kill core pid={proc.Id}");
+                if (!exited)
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                // Wait for relay to flush all output before Launcher exits
+                System.Threading.Tasks.Task.WhenAll(stdoutRelay, stderrRelay).Wait(500);
+                stdoutStream.Flush();
+                _lDiagStep = "TerminateSelf";
+                TerminateSelf(0);
+                return 0; // unreachable
+            }
+
+            // Stdout-relay path (grap/grep with args):
+            // Fast path: named pipe (if set up above) — Core closes pipe BEFORE TerminateProcess.
+            //   Launcher gets EOF at ~20ms, outputs content, exits fast. 27s cleanup in background.
+            // Fallback: relay file (WKAPPBOT_RELAY_FILE) — visible after ~27s (proc object signaled).
+            // Follow mode: Core output goes directly to the terminal (Ctrl+C to stop).
+            if (useStdoutRelay)
+            {
+                if (relayFilePath != null)
+                {
+                    // File-based fast path: poll for .ready (Core creates it BEFORE TerminateProcess).
+                    // File created by live process → visible to GetFileAttributesW immediately (no 27s delay).
+                    var readyPath = relayFilePath + ".ready";
+                    var ackPath   = relayFilePath + ".ack";
+                    Prof($"relay: polling .ready path={readyPath}");
+                    var readyDeadline = _sw.ElapsedMilliseconds + 5000;
+                    bool readyFound = false;
+                    while (_sw.ElapsedMilliseconds < readyDeadline)
+                    {
+                        if (GetFileAttributesW(readyPath) != 0xFFFFFFFF) { readyFound = true; break; }
+                        System.Threading.Thread.Sleep(5);
+                    }
+                    Prof(readyFound ? $"relay: .ready found pid={proc.Id}" : $"relay: .ready timeout pid={proc.Id}");
+                    if (readyFound)
+                    {
+                        try
+                        {
+                            var content = System.IO.File.ReadAllText(relayFilePath, System.Text.Encoding.UTF8);
+                            Console.Out.Write(content);
+                            Console.Out.Flush();
+                            Prof($"relay: {content.Length} chars written");
+                        }
+                        catch (Exception ex) { Prof($"relay: read error: {ex.Message}"); }
+                        finally
+                        {
+                            try { System.IO.File.WriteAllText(ackPath, "1"); } catch { } // signal Core: done
+                            try { System.IO.File.Delete(relayFilePath); } catch { }
+                            try { System.IO.File.Delete(readyPath); } catch { }
+                            try { System.IO.File.Delete(ackPath); } catch { }
+                        }
+                        TerminateSelf(0);
+                        return 0; // unreachable
+                    }
+                    Prof("relay: .ready timeout → killing Core, no output");
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    try { System.IO.File.Delete(relayFilePath); } catch { }
+                    try { System.IO.File.Delete(readyPath); } catch { }
+                    Prof($"relay: done (timeout, {_sw.ElapsedMilliseconds}ms)");
+                    return 0;
+                }
+                else
+                {
+                    // Follow mode: relay stdout+stderr in background, wait for Ctrl+C / natural exit.
+                    Prof("relay-follow: Core running (Ctrl+C to stop)");
+                    var fStdout = Console.OpenStandardOutput();
+                    var fStderr = Console.OpenStandardError();
+                    var fOut = System.Threading.Tasks.Task.Run(() => {
+                        try { var b = new byte[4096]; int n;
+                              while ((n = proc.StandardOutput.BaseStream.Read(b,0,b.Length)) > 0) { fStdout.Write(b,0,n); fStdout.Flush(); } } catch { }
+                    });
+                    var fErr = System.Threading.Tasks.Task.Run(() => {
+                        try { var b = new byte[4096]; int n;
+                              while ((n = proc.StandardError.BaseStream.Read(b,0,b.Length)) > 0) { fStderr.Write(b,0,n); fStderr.Flush(); } } catch { }
+                    });
+                    proc.WaitForExit();
+                    System.Threading.Tasks.Task.WhenAll(fOut, fErr).Wait(500);
+                    Prof($"relay-follow: Core exited code={proc.ExitCode}");
+                    return proc.ExitCode;
+                }
+            }
+
+            // Normal path: relay Core's stdout/stderr to Launcher's stdout/stderr in real-time.
+            // Sentinel \0UIT on stderr (control signal) → TerminateSelf immediately.
+            // Core's ~30s SMB console cleanup runs in background; bash gets control back right away.
+            var _stderr = Console.OpenStandardError();
+            var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
+            _ = System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    var buf = new byte[4096];
+                    int n;
+                    while ((n = proc.StandardError.BaseStream.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        // Exact 4-byte sentinel on stderr → TerminateSelf
+                        if (n == 4 && buf[0] == sentinel[0] && buf[1] == sentinel[1]
+                                   && buf[2] == sentinel[2] && buf[3] == sentinel[3])
+                        {
+                            Prof($"relay: \\0UIT sentinel (stderr) → TerminateSelf");
+                            try { Console.Out.Flush(); CloseHandle(GetStdHandle(-11)); } catch { }
+                            var ec = proc.WaitForExit(500) ? proc.ExitCode : 0;
+                            TerminateSelf((uint)ec);
+                            return;
+                        }
+                        _stderr.Write(buf, 0, n); _stderr.Flush();
+                    }
+                }
+                catch { }
+            });
+            var _stdout = Console.OpenStandardOutput();
+            int effectiveTimeoutMs = timeoutSec > 0 ? timeoutSec * 1000 : 0;
+            var relayBuf = new byte[65536];
+            int coreExitFromRelay = -1;
+            while (true)
+            {
+                int n;
+                try { n = proc.StandardOutput.BaseStream.Read(relayBuf, 0, relayBuf.Length); }
+                catch { break; }
+                if (n == 0) break; // EOF — Core exited normally
+
+                // Timeout check (--timeout N flag)
+                if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
+                {
+                    Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s exceeded — killing core (pid={proc.Id})");
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    try { _stdout.Flush(); } catch { }
+                    TerminateSelf((uint)timeoutExit);
+                    return timeoutExit; // unreachable
+                }
+
+                try { _stdout.Write(relayBuf, 0, n); _stdout.Flush(); } catch { break; }
+            }
+            try { _stdout.Flush(); } catch { }
+            if (!proc.HasExited) proc.WaitForExit();
+
+            _lDiagStep = $"proc-exited(code={proc.ExitCode})";
+            Prof($"proc exited code={proc.ExitCode}");
+            int coreExitCode = proc.ExitCode;
+            Console.Out.Flush();
+            Console.Error.Flush();
+            // TerminateSelf: avoid 27s CLR/ConPTY handle cleanup delay after Core exits.
+            // Core's output is already written (inherited handles); hard-kill Launcher immediately.
+            TerminateSelf((uint)coreExitCode);
+            return coreExitCode; // unreachable
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[LAUNCHER] Failed to run core: {ex.Message}");
+            return 1;
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
+
+}
