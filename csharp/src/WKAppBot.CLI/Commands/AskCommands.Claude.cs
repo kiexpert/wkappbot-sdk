@@ -560,6 +560,9 @@ internal partial class Program
         PulseStep.Done();
         if (triadCtx != null && ok)
             SendPendingCrossPromptAsync(cdp, "claude", "div.tiptap.ProseMirror").GetAwaiter().GetResult();
+        // Write ask result to .wkappbot/ask/ MD file
+        if (ok && !string.IsNullOrEmpty(answer) && triadCtx == null)
+            WriteAskMd("claude", question, answer);
         cdp.Dispose();
         return ok ? 0 : 1;
     }

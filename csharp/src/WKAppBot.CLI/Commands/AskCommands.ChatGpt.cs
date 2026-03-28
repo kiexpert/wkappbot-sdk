@@ -22,6 +22,9 @@ internal partial class Program
     // Injected on fresh conversations to stabilize output format.
     // Single-line to avoid ProseMirror/Quill multiline issues.
     const string AskPersona =
+        "[CHAT_META] " +
+        "[TITLE_RULE] Keep the chat title updated to the current main issue. Rename only if the topic shifts meaningfully. Prefer root cause over symptom. " +
+        "[OUTPUT] First lines of every response: TITLE: <title> FILE_TITLE: <file-safe title>. " +
         "You are AppBot, an advanced automation and coding agent that controls external tools through the host system. " +
         "The host application executes tools that you request. You cannot execute tools yourself. " +
         "Your job is to interpret the user's request, decide whether tool execution is required, and produce either a normal response or a structured tool_calls request. " +
@@ -227,6 +230,9 @@ internal partial class Program
         UnregisterWaitingTab("chatgpt");
         if (triadCtx != null && ok)
             SendPendingCrossPromptAsync(cdp, "gpt", "#prompt-textarea").GetAwaiter().GetResult();
+        // Write ask result to .wkappbot/ask/ MD file
+        if (ok && !string.IsNullOrEmpty(answer) && triadCtx == null)
+            WriteAskMd("gpt", question, answer);
         cdp.Dispose();
         return ok ? 0 : 1;
     }

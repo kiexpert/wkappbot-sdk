@@ -67,6 +67,8 @@ internal partial class Program
     // Relay file path for grap/grep one-shot mode (WKAPPBOT_RELAY_FILE env var).
     // FastExit creates {relayFilePath}.done sentinel after closing the file.
     internal static string? RelayFilePath = null;
+    static string? _exitFilePath = null; // --exit-file arg from Launcher (IOCP exit sentinel)
+    static string? _exitEventName = null; // --exit-event arg from Launcher (named event for instant signaling)
 
     /// <summary>Original Console.Out before TeeTextWriter is installed. Used by grep-mode to write matches to real stdout.</summary>
     internal static TextWriter OriginalStdout = Console.Out;
@@ -173,8 +175,6 @@ internal partial class Program
 
         // Force UTF-8 globally — console + child processes inherit codepage 65001
         // Use no-BOM variant: BOM is noise in pipes/relay, Console.Out is not a file
-        // Force UTF-8 globally — console + child processes inherit codepage 65001
-        // Use no-BOM variant: BOM is noise in pipes/relay, Console.Out is not a file
         try { Console.OutputEncoding = new System.Text.UTF8Encoding(false); } catch { }
         try { Console.InputEncoding = Encoding.UTF8; } catch { }
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
@@ -195,6 +195,27 @@ internal partial class Program
                         .Where(l => l.Length > 0).ToArray();
                     args = args[..argsFileIdx].Concat(fileArgs).Concat(args[(argsFileIdx + 2)..]).ToArray();
                 }
+            }
+        }
+
+        // --exit-file <path>: Launcher passes exit sentinel file path for IOCP relay.
+        // Core writes exit code to this file in WriteExitFile() → Launcher polls and exits fast.
+        {
+            var efIdx = Array.FindIndex(args, a => a == "--exit-file");
+            if (efIdx >= 0 && efIdx + 1 < args.Length)
+            {
+                _exitFilePath = args[efIdx + 1];
+                args = args[..efIdx].Concat(args[(efIdx + 2)..]).ToArray();
+            }
+        }
+        // --exit-event <name>: Launcher passes named event for instant Core→Launcher signaling.
+        // Core opens and signals this event in WriteExitFile() → Launcher WaitForSingleObject returns immediately.
+        {
+            var eeIdx = Array.FindIndex(args, a => a == "--exit-event");
+            if (eeIdx >= 0 && eeIdx + 1 < args.Length)
+            {
+                _exitEventName = args[eeIdx + 1];
+                args = args[..eeIdx].Concat(args[(eeIdx + 2)..]).ToArray();
             }
         }
 
@@ -537,6 +558,15 @@ internal partial class Program
             if (!GrepModeActive && !GrapMode && !IsPipeMode) try { Console.Error.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
             prof("dispatch");
 
+            // ErrorScope: stderr auto-captured with timestamps (default: hidden from console).
+            // --stderr: bypass ErrorScope, show stderr in real-time (debug/troubleshooting).
+            // Success → clean output. Error → timestamped error log via AppBotExit.
+            // Errors always logged to TeeWriter log file regardless.
+            // ErrorScope: suppress stderr only when directly connected to user console.
+            // Piped processes (MCP, Eye, pipe) → stderr pass-through (immediate output + flush).
+            bool isConsoleDirect = !IsPipeMode && !RunningInEye && !IsMcpMode;
+            using var _errScope = isConsoleDirect ? ErrorScope.Begin() : null;
+
             exitCode = command switch
             {
                 // Primary: a11y universal interface (busybox: a11y.exe symlink)
@@ -701,11 +731,16 @@ internal partial class Program
                 EmitEyeTick(cmd, cmdTag, $"end:{exitCode}");
             }
             catch { }
+            // Write exit-file FIRST — before tee.Dispose() which may block on SMB I/O.
+            // Launcher polls this file every 50ms and exits immediately when found.
+            if (!_fastExitAfterCommand)
+                WriteExitFile(exitCode);
+
             if (tee != null) Console.SetOut(tee.OriginalConsole);
             tee?.Dispose(); // normal-exit atexit-style move to logs/old
             if (tee != null) Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
             timeoutTimer?.Dispose();
-            // grap/grep alias → FastExit to bypass EnsureBusyboxAliases DLL-detach deadlock (26s hang)
+            // grap/grep path still uses FastExit (relay file + TerminateProcess).
             if (_fastExitAfterCommand)
                 FastExit(exitCode);
         }
@@ -1592,11 +1627,23 @@ internal partial class Program
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
     private static extern IntPtr GetStdHandle(int nStdHandle);
 
+    // Named event for Core→Launcher instant exit signaling
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr OpenEventW(uint dwDesiredAccess, bool bInheritHandle, string lpName);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetEvent(IntPtr hEvent);
+
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool SetStdHandle(int nStdHandle, IntPtr hHandle);
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool FlushFileBuffers(IntPtr hFile);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool WriteFile(IntPtr hFile, byte[] lpBuffer, uint nNumberOfBytesToWrite, out uint lpNumberOfBytesWritten, IntPtr lpOverlapped);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateFileW(string lpFileName, uint dwDesiredAccess, uint dwShareMode, IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
 
     /// <summary>
     /// For grap/grep fast-exit: replace Console.Out with a synchronous (non-IOCP) pipe writer.
@@ -1609,6 +1656,70 @@ internal partial class Program
     {
         // No-op: sync FileStream on overlapped pipe handles throws ArgumentException.
         // FastExit() uses FlushFileBuffers + TerminateProcess instead — see FastExit comments.
+    }
+
+    /// <summary>
+    /// Write exit-file sentinel for Launcher's IOCP poll. Uses Win32 API directly.
+    /// Does NOT call TerminateProcess — caller should return normally from Main.
+    /// </summary>
+    static void WriteExitFile(int code)
+    {
+        void Dbg(string s) { try { System.IO.File.AppendAllText(@"C:\Temp\exitfile_dbg.txt", $"{DateTime.Now:HH:mm:ss.fff} {s}\n"); } catch { } }
+        Dbg($"WriteExitFile enter code={code} _exitFilePath={_exitFilePath ?? "(null)"}");
+        try { Console.Out.Flush(); } catch { }
+        try
+        {
+            var hOut = GetStdHandle(-11);
+            if (hOut != IntPtr.Zero && hOut != new IntPtr(-1))
+                FlushFileBuffers(hOut);
+        }
+        catch { }
+        try
+        {
+            var exitFile = _exitFilePath ?? Environment.GetEnvironmentVariable("WKAPPBOT_EXIT_FILE");
+            Dbg($"exitFile={exitFile ?? "(null)"}");
+            if (!string.IsNullOrEmpty(exitFile))
+            {
+                // Use Win32 API directly — File.WriteAllText may leave pending I/O
+                // that GetFileAttributesW on the parent side doesn't see for ~30s.
+                var hFile = CreateFileW(exitFile, 0x40000000 /*GENERIC_WRITE*/, 0, IntPtr.Zero,
+                    2 /*CREATE_ALWAYS*/, 0x80 /*FILE_ATTRIBUTE_NORMAL*/, IntPtr.Zero);
+                if (hFile != IntPtr.Zero && hFile != new IntPtr(-1))
+                {
+                    var ecBytes = System.Text.Encoding.UTF8.GetBytes(code.ToString());
+                    WriteFile(hFile, ecBytes, (uint)ecBytes.Length, out _, IntPtr.Zero);
+                    FlushFileBuffers(hFile);
+                    CloseHandle(hFile);
+                    Dbg($"written (Win32): {exitFile}");
+                }
+                else
+                {
+                    Dbg($"CreateFileW failed err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
+                }
+            }
+        }
+        catch (Exception ex) { Dbg($"FAILED: {ex.Message}"); }
+
+        // Signal named event (Launcher waits on this — instant, no FS visibility delay)
+        if (!string.IsNullOrEmpty(_exitEventName))
+        {
+            try
+            {
+                const uint EVENT_MODIFY_STATE = 0x0002;
+                var hEvt = OpenEventW(EVENT_MODIFY_STATE, false, _exitEventName);
+                if (hEvt != IntPtr.Zero)
+                {
+                    SetEvent(hEvt);
+                    CloseHandle(hEvt);
+                    Dbg($"exit event signaled: {_exitEventName}");
+                }
+                else
+                {
+                    Dbg($"OpenEventW failed err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
+                }
+            }
+            catch (Exception ex) { Dbg($"exit event FAILED: {ex.Message}"); }
+        }
     }
 
     /// <summary>
@@ -1651,6 +1762,46 @@ internal partial class Program
                     FlushFileBuffers(hOut);
                     Dbg("FlushFileBuffers done");
                 }
+                // File-based exit sentinel: create via Win32 API directly (not .NET File I/O).
+                // .NET File.WriteAllText leaves pending I/O that TerminateProcess doesn't flush for ~30s.
+                // Win32 CreateFileW + WriteFile + FlushFileBuffers + CloseHandle is immediate.
+                Dbg("writing exit-file sentinel (Win32)");
+                try
+                {
+                    var exitDir = System.IO.Directory.Exists(@"C:\Temp") ? @"C:\Temp" : System.IO.Path.GetTempPath();
+                    var exitFile = System.IO.Path.Combine(exitDir, $"wkappbot-exit-{Environment.ProcessId}");
+                    var hFile = CreateFileW(exitFile, 0x40000000 /*GENERIC_WRITE*/, 0, IntPtr.Zero,
+                        2 /*CREATE_ALWAYS*/, 0x80 /*FILE_ATTRIBUTE_NORMAL*/, IntPtr.Zero);
+                    if (hFile != IntPtr.Zero && hFile != new IntPtr(-1))
+                    {
+                        var ecBytes = System.Text.Encoding.UTF8.GetBytes(code.ToString());
+                        WriteFile(hFile, ecBytes, (uint)ecBytes.Length, out _, IntPtr.Zero);
+                        FlushFileBuffers(hFile);
+                        CloseHandle(hFile);
+                        Dbg($"exit-file written (Win32): {exitFile}");
+                    }
+                    else
+                    {
+                        Dbg($"CreateFileW failed err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
+                    }
+                }
+                catch (Exception ex) { Dbg($"exit-file FAILED: {ex.Message}"); }
+                // Verify the file is visible to other processes BEFORE TerminateProcess.
+                // NTFS directory entry may not be committed yet after CloseHandle.
+                // FlushFileBuffers on the parent directory forces metadata commit.
+                try
+                {
+                    var exitDir2 = System.IO.Directory.Exists(@"C:\Temp") ? @"C:\Temp" : System.IO.Path.GetTempPath();
+                    var hDir = CreateFileW(exitDir2, 0x40000000 /*GENERIC_WRITE*/, 7 /*RW|DELETE*/,
+                        IntPtr.Zero, 3 /*OPEN_EXISTING*/, 0x02000000 /*FILE_FLAG_BACKUP_SEMANTICS*/, IntPtr.Zero);
+                    if (hDir != IntPtr.Zero && hDir != new IntPtr(-1))
+                    {
+                        FlushFileBuffers(hDir);
+                        CloseHandle(hDir);
+                        Dbg("directory flushed");
+                    }
+                }
+                catch { }
             }
 
             if (RelayFilePath != null)

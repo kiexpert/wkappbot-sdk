@@ -341,6 +341,16 @@ Examples:
         _triadLastSessionDir = sessionDir;
         Console.WriteLine($"[TRIAD] Session dir: {sessionDir}");
 
+        // ── Live MD minutes: auto-generate debate transcript ──
+        ctx.InitLiveMinutes(question);
+        _activeTriadCtx = ctx; // enable MD recording for all SlackPostToThread calls
+        if (ctx.MdPath != null)
+        {
+            Console.WriteLine($"[TRIAD] Live MD: {ctx.MdPath}");
+            // Open in VS Code for real-time preview
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "code", Arguments = $"\"{ctx.MdPath}\"", UseShellExecute = true, CreateNoWindow = true }); } catch { }
+        }
+
         var triadCwd = EyeCmdPipeServer.CallerCwd.Value;
         var triadHwnd = EyeCmdPipeServer.CallerHwnd.Value;
         var tasks = new[]

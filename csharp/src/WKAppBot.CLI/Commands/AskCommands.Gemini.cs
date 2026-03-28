@@ -692,7 +692,10 @@ internal partial class Program
         // Cross-prompt: send pending peer text if pre-typed in editor
         if (triadCtx != null && ok)
             SendPendingCrossPromptAsync(cdp, "gemini", ".ql-editor").GetAwaiter().GetResult();
-        // Preserve Chrome's original state ??don't force minimize
+        // Write ask result to .wkappbot/ask/ MD file
+        if (ok && !string.IsNullOrEmpty(answer) && triadCtx == null)
+            WriteAskMd("gemini", question, answer);
+        // Preserve Chrome's original state — don't force minimize
         cdp.Dispose();
         return ok ? 0 : 1;
     }

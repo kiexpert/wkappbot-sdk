@@ -10,6 +10,8 @@
     <RootNamespace>WKAppBot.CLI</RootNamespace>
     <Version>$(WKAppBotVersion)</Version>
     <UseWPF>true</UseWPF>
+    <!-- UTF-8 active code page via manifest: OS sets CP65001 at process load, no runtime SetConsoleOutputCP needed -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
 
     <!-- Deploy-friendly: single self-contained exe so SDK/bin doesn't get DLL clutter -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

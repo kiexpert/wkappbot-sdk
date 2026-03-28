@@ -18,7 +18,7 @@ namespace WKAppBot.Launcher;
 ///   mcp  → Launcher owns stdio pipe permanently; Core runs behind proxy (restartable)
 ///   eye  → Core directly (eye IS the daemon)
 /// </summary>
-class Program
+partial class Program
 {
     // Busybox aliases: symlink names that map to an implicit first argument
     static readonly (string name, string cmd)[] BusyboxAliases =
@@ -147,6 +147,27 @@ class Program
         var cmd = args[0].ToLowerInvariant();
         prof($"cmd={cmd}");
 
+        // --stderr: show stderr in real-time (default: buffered, shown only on error)
+        bool showStderr = args.Any(a => a == "--stderr");
+        var stderrBuf = !showStderr ? new System.Collections.Generic.List<(long ms, string msg)>() : null;
+        _stderrBuf = stderrBuf; // for AppBotExit
+        _originalStderr = Console.Error; // save before redirect
+        if (stderrBuf != null)
+        {
+            Console.SetError(new LauncherStderrCapture(_originalStderr, stderrBuf, _sw));
+        }
+
+        // --core <path>: override core module name (default: wkappbot-core.exe next to launcher)
+        {
+            var coreIdx = Array.FindIndex(args, a => a == "--core");
+            if (coreIdx >= 0 && coreIdx + 1 < args.Length)
+            {
+                _coreExePath = args[coreIdx + 1];
+                args = args[..coreIdx].Concat(args[(coreIdx + 2)..]).ToArray();
+                prof($"--core override: {_coreExePath}");
+            }
+        }
+
         // Routing control flags — parsed by Launcher, stripped before forwarding to Eye/Core
         bool onlyEye  = args.Any(a => a == "--only-eye");
         bool onlyCore = args.Any(a => a == "--only-core");
@@ -223,7 +244,7 @@ class Program
             if (!isFollowMode)
             {
                 var _dir2 = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-                var _core2 = Path.Combine(_dir2, "wkappbot-core.exe");
+                var _core2 = ResolveCoreExe();
                 var _relayBase = Directory.Exists(@"C:\Temp") ? @"C:\Temp" : Path.GetTempPath();
                 var _relayFile    = Path.Combine(_relayBase, $"wkappbot-relay-{Environment.ProcessId}.txt");
                 var _readyPath    = _relayFile + ".ready";
@@ -317,9 +338,8 @@ class Program
             return code; // unreachable
         }
 
-        int finalCode = RunCoreDetachedNormal(forwardArgs);
-        Console.Out.Flush(); Console.Error.Flush();
-        TerminateSelf((uint)finalCode);
+        int finalCode = RunCoreDetachedNormal(forwardArgs, showStderr, stderrBuf);
+        AppBotExit(finalCode);
         return finalCode; // unreachable
     }
 
@@ -367,15 +387,43 @@ class Program
     static extern bool CreatePipe(out IntPtr hRead, out IntPtr hWrite, IntPtr lpPipeAttributes, uint size);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     static extern bool SetHandleInformation(IntPtr h, uint mask, uint flags);
-    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     static extern bool ReadFile(IntPtr h, byte[] buf, uint toRead, out uint read, IntPtr ov);
+    // Overlapped ReadFile for IOCP
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true, EntryPoint = "ReadFile")]
+    static extern bool ReadFileOv(IntPtr h, byte[] buf, uint toRead, out uint read, ref System.Threading.NativeOverlapped ov);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     static extern bool WriteFile(IntPtr h, byte[] buf, uint toWrite, out uint written, IntPtr ov);
+    // Named pipe + IOCP
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern IntPtr CreateNamedPipeW(string name, uint openMode, uint pipeMode,
+        uint maxInstances, uint outBufSize, uint inBufSize, uint defaultTimeout, IntPtr secAttr);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool ConnectNamedPipe(IntPtr hPipe, ref System.Threading.NativeOverlapped ov);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr secAttr,
+        uint disposition, uint flags, IntPtr template);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr CreateIoCompletionPort(IntPtr fileHandle, IntPtr existingPort,
+        UIntPtr completionKey, uint numThreads);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetQueuedCompletionStatus(IntPtr port, out uint bytes,
+        out UIntPtr key, out IntPtr ov, uint timeout);
+    const uint PIPE_ACCESS_INBOUND  = 0x00000001;
+    const uint FILE_FLAG_OVERLAPPED = 0x40000000;
+    const uint GENERIC_WRITE        = 0x40000000;
+    const uint OPEN_EXISTING        = 3;
     [System.Runtime.InteropServices.DllImport("kernel32.dll")]
     static extern bool FlushFileBuffers(IntPtr h);
     const uint HANDLE_FLAG_INHERIT = 0x1;
     const uint STARTF_USESTDHANDLES = 0x100;
     static readonly IntPtr INVALID_HANDLE = new IntPtr(-1);
+
+    // Named event for Core→Launcher exit signaling (bypasses FS visibility delay + process exit delay)
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern IntPtr CreateEventW(IntPtr lpEventAttributes, bool bManualReset, bool bInitialState, string lpName);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool SetEvent(IntPtr hEvent);
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
     struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public uint dwProcessId, dwThreadId; }
 
@@ -482,7 +530,7 @@ class Program
     static int RunGrapDetached(string[] args, int timeoutMs)
     {
         var dir  = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-        var core = Path.Combine(dir, "wkappbot-core.exe");
+        var core = ResolveCoreExe();
         if (!File.Exists(core))
         {
             Console.Error.WriteLine($"[LAUNCHER] wkappbot-core.exe not found: {core}");
@@ -547,1490 +595,65 @@ class Program
 
     static void TerminateSelf(uint code) => TerminateProcess(GetCurrentProcess(), code);
 
+    /// <summary>Core exe path override (--core flag). Null = default (wkappbot-core.exe next to launcher).</summary>
+    static string? _coreExePath;
+
+    /// <summary>Resolve core exe path: --core override or default.</summary>
+    static string ResolveCoreExe()
+    {
+        if (_coreExePath != null) return _coreExePath;
+        var dir = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
+        return Path.Combine(dir, "wkappbot-core.exe");
+    }
+
+    /// <summary>
+    /// Universal exit — flushes timestamped stderr log on error, then TerminateSelf.
+    /// Usage: AppBotExit(0);  // success, discard errors
+    ///        AppBotExit(1);  // error, flush stderr log
+    /// </summary>
+    [ThreadStatic] static System.Collections.Generic.List<(long ms, string msg)>? _stderrBuf;
+    static System.IO.TextWriter? _originalStderr;
+
+    static void AppBotExit(int code)
+    {
+        // Restore original stderr FIRST (bypass buffer), then write error log
+        if (_originalStderr != null) Console.SetError(_originalStderr);
+        if (code != 0 && _stderrBuf != null && _stderrBuf.Count > 0)
+        {
+            try
+            {
+                Console.Error.WriteLine("\n--- Error Log ---");
+                foreach (var (ms, msg) in _stderrBuf)
+                    Console.Error.WriteLine($"[+{ms / 1000.0:F1}s] {msg}");
+            }
+            catch { }
+        }
+        Console.Out.Flush(); Console.Error.Flush();
+        TerminateSelf((uint)code);
+    }
+
+    /// <summary>Lightweight stderr tee for Launcher: passes through + buffers with timestamps.</summary>
+    sealed class LauncherStderrCapture : System.IO.TextWriter
+    {
+        readonly System.IO.TextWriter _inner;
+        readonly System.Collections.Generic.List<(long ms, string msg)> _buf;
+        readonly System.Diagnostics.Stopwatch _sw;
+        public LauncherStderrCapture(System.IO.TextWriter inner,
+            System.Collections.Generic.List<(long ms, string msg)> buf,
+            System.Diagnostics.Stopwatch sw) { _inner = inner; _buf = buf; _sw = sw; }
+        public override System.Text.Encoding Encoding => _inner.Encoding;
+        public override void WriteLine(string? value)
+        {
+            _inner.WriteLine(value);
+            if (!string.IsNullOrEmpty(value))
+                lock (_buf) _buf.Add((_sw.ElapsedMilliseconds, value));
+        }
+        public override void Write(char value) => _inner.Write(value);
+        public override void Write(string? value) => _inner.Write(value);
+        public override void Flush() => _inner.Flush();
+    }
+
     /// <summary>
     /// Normal (non-fast-exit, non-relay) Core spawn via DETACHED_PROCESS + pipes.
     /// DETACHED_PROCESS prevents .NET 8 AppHost console LPC deadlock in bash/ConPTY context.
-    /// Relays stdout in real-time (with "\0UIT" sentinel support) and stderr in background.
-    /// Falls back to RunCore() if detached spawn fails (e.g., non-bash context).
-    /// </summary>
-    static int RunCoreDetachedNormal(string[] args)
-    {
-        var dir  = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-        var core = Path.Combine(dir, "wkappbot-core.exe");
-        if (!File.Exists(core)) return RunCore(args); // fallback
-
-        // Parse --timeout/--timeout-exit (same as RunCore)
-        int timeoutSec = 0, timeoutExit = 2;
-        for (int i = 0; i < args.Length - 1; i++)
-        {
-            if (args[i] == "--timeout"      && int.TryParse(args[i + 1], out var t) && t > 0) timeoutSec  = t;
-            if (args[i] == "--timeout-exit" && int.TryParse(args[i + 1], out var e))           timeoutExit = e;
-        }
-
-        // Build env: current process env minus MSYS2/PTY vars (no relay file for normal path)
-        var strip = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase)
-        {
-            "TERM", "MSYSTEM", "MSYS", "MSYS2_ARG_CONV_EXCL", "ConEmuANSI",
-            "CYGWIN", "MINGW_PREFIX", "MINGW_CHOST", "MINGW_PACKAGE_PREFIX", "MSYS2_PATH_TYPE",
-        };
-        var envSb = new StringBuilder();
-        foreach (System.Collections.DictionaryEntry kv in Environment.GetEnvironmentVariables())
-        {
-            var k = kv.Key?.ToString() ?? "";
-            if (strip.Contains(k)) continue;
-            envSb.Append(k).Append('=').Append(kv.Value?.ToString() ?? "").Append('\0');
-        }
-        envSb.Append('\0');
-        var envBytes = Encoding.Unicode.GetBytes(envSb.ToString());
-        var envPtr = System.Runtime.InteropServices.Marshal.AllocHGlobal(envBytes.Length);
-        System.Runtime.InteropServices.Marshal.Copy(envBytes, 0, envPtr, envBytes.Length);
-
-        try
-        {
-            if (!SpawnDetachedCoreWithPipes(core, args, envPtr, out var hProc, out var hOut, out var hErr))
-            {
-                Prof("detached-normal spawn failed → RunCore fallback");
-                return RunCore(args); // fallback
-            }
-            Prof($"detached-normal spawned, relaying stdout");
-
-            // Relay stderr in background — with sentinel detection (\0UIT on stderr since v5.1.31)
-            var _stderr = Console.OpenStandardError();
-            var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
-            var _hOut = hOut; var _hErr = hErr; var _hProc = hProc; // capture for lambda
-            _ = System.Threading.Tasks.Task.Run(() =>
-            {
-                var b = new byte[4096];
-                while (ReadFile(_hErr, b, (uint)b.Length, out uint n, IntPtr.Zero) && n > 0)
-                {
-                    // Exact 4-byte sentinel on stderr → TerminateSelf immediately
-                    if (n == 4 && b[0] == sentinel[0] && b[1] == sentinel[1]
-                               && b[2] == sentinel[2] && b[3] == sentinel[3])
-                    {
-                        Prof("detached-normal: \\0UIT sentinel (stderr) → TerminateSelf");
-                        try { Console.Out.Flush(); CloseHandle(GetStdHandle(-11)); } catch { }
-                        WaitForSingleObject(_hProc, 500);
-                        GetExitCodeProcess(_hProc, out uint ec);
-                        CloseHandle(_hOut); CloseHandle(_hErr); CloseHandle(_hProc);
-                        TerminateSelf(ec);
-                        return;
-                    }
-                    _stderr.Write(b, 0, (int)n); _stderr.Flush();
-                }
-            });
-
-            // Relay stdout in real-time (no sentinel here — sentinel moved to stderr)
-            var _stdout = Console.OpenStandardOutput();
-            int effectiveTimeoutMs = timeoutSec > 0 ? timeoutSec * 1000 : 0;
-            var relayBuf = new byte[65536];
-            uint exitCode = 0;
-
-            while (ReadFile(hOut, relayBuf, (uint)relayBuf.Length, out uint n, IntPtr.Zero) && n > 0)
-            {
-
-                // Timeout check: Launcher exits, Core continues running (DETACHED_PROCESS)
-                if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
-                {
-                    Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s — Launcher exiting, Core continues in background");
-                    try { _stdout.Flush(); } catch { }
-                    // Do NOT kill Core — it's detached and may still be working (e.g. agent triad)
-                    CloseHandle(hOut); CloseHandle(hErr); CloseHandle(hProc);
-                    TerminateSelf((uint)timeoutExit);
-                    return timeoutExit; // unreachable
-                }
-
-                _stdout.Write(relayBuf, 0, (int)n);
-                _stdout.Flush();
-            }
-
-            // EOF — Core exited normally
-            try { _stdout.Flush(); } catch { }
-            WaitForSingleObject(hProc, 500);
-            GetExitCodeProcess(hProc, out exitCode);
-            CloseHandle(hOut); CloseHandle(hErr); CloseHandle(hProc);
-            return exitCode == 259 ? 0 : (int)exitCode; // 259 = STILL_ACTIVE (shouldn't happen)
-        }
-        finally
-        {
-            System.Runtime.InteropServices.Marshal.FreeHGlobal(envPtr);
-        }
-    }
-
-    /// <summary>
-    /// MCP stdio proxy loop.
-    /// Launcher holds the stdio pipe to Claude Code permanently.
-    /// Core runs behind the proxy — if it exits with code 42, it is restarted automatically.
-    /// stdin broadcaster routes bytes to whichever Core instance is current.
-    /// </summary>
-    static int RunMcpProxy(string[] args)
-    {
-        var dir  = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-        var core = Path.Combine(dir, "wkappbot-core.exe");
-
-        if (!File.Exists(core))
-        {
-            Console.Error.WriteLine($"[LAUNCHER:MCP] wkappbot-core.exe not found at: {core}");
-            return 1;
-        }
-
-        int timeoutSec  = 0;
-        int timeoutExit = 2;
-        bool showWt     = args.Any(a => a == "--wt");
-        for (int i = 0; i < args.Length - 1; i++)
-        {
-            if (args[i] == "--timeout"      && int.TryParse(args[i + 1], out var t) && t > 0) timeoutSec  = t;
-            if (args[i] == "--timeout-exit" && int.TryParse(args[i + 1], out var e))           timeoutExit = e;
-        }
-
-        // --wt: redirect Core stderr to a temp log and open a Windows Terminal tab tailing it
-        string? wtLogFile = null;
-        if (showWt)
-        {
-            wtLogFile = Path.Combine(Path.GetTempPath(), $"wkappbot-mcp-{Environment.ProcessId}.log");
-            File.WriteAllText(wtLogFile, ""); // create empty log
-            var wtTitle = $"WKAppBot MCP ({Environment.ProcessId})";
-            var psCmd = $"Get-Content -Wait -Path '{wtLogFile}'";
-            try
-            {
-                // [FOCUS-GUARD] Capture foreground before wt.exe launch; restore if stolen.
-                var fgBeforeWt = FocusGuard.GetForegroundWindow();
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName        = "wt.exe",
-                    Arguments       = $"--window 0 new-tab --title \"{wtTitle}\" -- powershell -NoExit -Command \"{psCmd}\"",
-                    UseShellExecute = true,
-                });
-                Console.Error.WriteLine($"[LAUNCHER:MCP] WT monitor tab opened → {wtLogFile}");
-                Thread.Sleep(600);
-                if (fgBeforeWt != IntPtr.Zero && FocusGuard.GetForegroundWindow() != fgBeforeWt)
-                {
-                    Console.Error.WriteLine("[LAUNCHER:MCP] wt.exe stole focus — restoring");
-                    FocusGuard.SetForegroundWindow(fgBeforeWt);
-                }
-            }
-            catch (Exception ex) { Console.Error.WriteLine($"[LAUNCHER:MCP] wt.exe failed: {ex.Message}"); wtLogFile = null; }
-        }
-
-        var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
-
-        // MCP mode: pipe-based relay (same pattern as Eye↔Core).
-        // ConPTY doesn't pass stdin to grandchild, so we pipe explicitly:
-        //   Claude Code → ConPTY → Launcher (ReadFile stdin → WriteFile pipe) → Core
-        //   Core → pipe → Launcher (ReadFile pipe → WriteFile stdout) → ConPTY → Claude Code
-
-        // Create stdin pipe: Launcher writes → Core reads
-        if (!CreatePipe(out var hCoreStdinRead, out var hCoreStdinWrite, IntPtr.Zero, 0))
-        { Console.Error.WriteLine("[LAUNCHER:MCP] CreatePipe(stdin) failed"); return 1; }
-        SetHandleInformation(hCoreStdinRead, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-
-        // Create stdout pipe: Core writes → Launcher reads
-        if (!CreatePipe(out var hCoreStdoutRead, out var hCoreStdoutWrite, IntPtr.Zero, 0))
-        { CloseHandle(hCoreStdinRead); CloseHandle(hCoreStdinWrite); Console.Error.WriteLine("[LAUNCHER:MCP] CreatePipe(stdout) failed"); return 1; }
-        SetHandleInformation(hCoreStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-
-        var cmdSb = new StringBuilder($"\"{core.Replace("\"", "\\\"")}\"");
-        foreach (var a in args) cmdSb.Append(" \"").Append(a.Replace("\"", "\\\"")).Append('"');
-        var cmdArr = (cmdSb.ToString() + "\0").ToCharArray();
-        var si = new STARTUPINFOW
-        {
-            cb = System.Runtime.InteropServices.Marshal.SizeOf<STARTUPINFOW>(),
-            dwFlags = STARTF_USESTDHANDLES,
-            hStdInput  = hCoreStdinRead,   // Core reads from this pipe
-            hStdOutput = hCoreStdoutWrite,  // Core writes to this pipe
-            hStdError  = GetStdHandle(-12), // stderr inherited directly
-        };
-        if (!CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, true,
-            CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, null, ref si, out var pi))
-        {
-            Console.Error.WriteLine($"[LAUNCHER:MCP] CreateProcess failed (err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()})");
-            CloseHandle(hCoreStdinRead); CloseHandle(hCoreStdinWrite);
-            CloseHandle(hCoreStdoutRead); CloseHandle(hCoreStdoutWrite);
-            return 1;
-        }
-        // Close child-side handles in parent
-        CloseHandle(hCoreStdinRead);
-        CloseHandle(hCoreStdoutWrite);
-        CloseHandle(pi.hThread);
-        Console.Error.WriteLine($"[LAUNCHER:MCP] core started via pipe (pid={pi.dwProcessId})");
-
-        // ── State machine for MCP relay ──
-        // Tracks JSON-RPC requests by id for routing during elevation handoff AND hot-swap
-        var _inflight = new Dictionary<string, string>(); // id → raw request line
-        var _gate = new object();
-        var _outLock = new object();
-        string? _initializeLine = null; // cached for admin/new Core synthetic init
-        string? _toolsListLine = null;  // cached tools/list for new Core replay
-        IntPtr _activeStdinWrite = hCoreStdinWrite; // current target for new requests
-        System.IO.TextWriter? _activeStdinWriter = null; // current line writer after admin handoff
-        IntPtr _adminStdinWrite = IntPtr.Zero;
-        IntPtr _adminStdoutRead = IntPtr.Zero;
-        IntPtr _adminProc = IntPtr.Zero;
-        string? _elevationRequestLine = null; // saved for re-send to admin Core
-        bool _adminMode = false;
-
-        // stdout handle (needed early for hot-swap FSW closure)
-        var hOut = GetStdHandle(-11);
-
-        // ── Hot-swap: FSW watches for .new.exe ──
-        IntPtr _oldCoreStdinWrite = IntPtr.Zero; // drain pipe for old Core during swap
-        IntPtr _oldCoreStdoutRead = IntPtr.Zero;
-        var _oldInflight = new Dictionary<string, string>(); // requests still in old Core
-        bool _swapInProgress = false;
-        var _swapDrainEvent = new ManualResetEventSlim(false); // signaled when old Core drain completes
-
-        var exePath = core; // path to wkappbot-core.exe
-        var exeDir = System.IO.Path.GetDirectoryName(exePath) ?? ".";
-        var exeName = System.IO.Path.GetFileName(exePath);
-        var newExePath = System.IO.Path.Combine(exeDir, System.IO.Path.GetFileNameWithoutExtension(exeName) + ".new.exe");
-
-        // FSW for .new.exe detection (500ms debounce, same as Eye)
-        System.Threading.Timer? _fswDebounce = null;
-        var fsw = new FileSystemWatcher(exeDir)
-        {
-            NotifyFilter = NotifyFilters.FileName | NotifyFilters.CreationTime | NotifyFilters.LastWrite,
-            Filter = "*core*.exe",
-            EnableRaisingEvents = true
-        };
-        // Trigger on: core exe replaced at original path (Eye rename-swap or external overwrite)
-        fsw.Created += OnFswEvent;
-        fsw.Changed += OnFswEvent;
-        void OnFswEvent(object? _, FileSystemEventArgs e)
-        {
-            var fn = e.Name ?? "";
-            // Detect: core exe was replaced at original path (Eye did rename-swap, or external tool replaced it)
-            bool isCoreReplaced = string.Equals(System.IO.Path.GetFullPath(e.FullPath), System.IO.Path.GetFullPath(core), StringComparison.OrdinalIgnoreCase);
-            if (!isCoreReplaced) return;
-            // Debounce: 500ms after last event
-            _fswDebounce?.Dispose();
-            _fswDebounce = new System.Threading.Timer(_ =>
-            {
-                if (_swapInProgress) { Console.Error.WriteLine("[HOT-SWAP] Already in progress — ignoring"); return; }
-                _swapInProgress = true;
-                Console.Error.WriteLine($"[HOT-SWAP] core exe changed — starting graceful swap");
-
-                try
-                {
-                    // External tool (Eye or publish) already did the rename-swap.
-                    // We just need to drain old Core and spawn new one from the updated path.
-
-                    // 2. Move current Core to old pipe (drain mode)
-                    lock (_gate)
-                    {
-                        _oldCoreStdinWrite = _activeStdinWrite;
-                        _activeStdinWrite = IntPtr.Zero;
-                        _activeStdinWriter = null;
-                        // Move inflight to old
-                        foreach (var kv in _inflight)
-                            _oldInflight[kv.Key] = kv.Value;
-                        _inflight.Clear();
-                    }
-                    Console.Error.WriteLine($"[HOT-SWAP] old Core draining ({_oldInflight.Count} inflight)");
-
-                    // 3. Spawn new Core with fresh pipes
-                    if (!CreatePipe(out var hNewStdinRead, out var hNewStdinWrite, IntPtr.Zero, 0))
-                    { Console.Error.WriteLine("[HOT-SWAP] CreatePipe(stdin) failed"); _swapInProgress = false; return; }
-                    SetHandleInformation(hNewStdinRead, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-
-                    if (!CreatePipe(out var hNewStdoutRead, out var hNewStdoutWrite, IntPtr.Zero, 0))
-                    { CloseHandle(hNewStdinRead); CloseHandle(hNewStdinWrite); Console.Error.WriteLine("[HOT-SWAP] CreatePipe(stdout) failed"); _swapInProgress = false; return; }
-                    SetHandleInformation(hNewStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-
-                    var newSi = new STARTUPINFOW
-                    {
-                        cb = System.Runtime.InteropServices.Marshal.SizeOf<STARTUPINFOW>(),
-                        dwFlags = STARTF_USESTDHANDLES,
-                        hStdInput = hNewStdinRead,
-                        hStdOutput = hNewStdoutWrite,
-                        hStdError = GetStdHandle(-12),
-                    };
-                    var newCmdSb = new StringBuilder($"\"{core.Replace("\"", "\\\"")}\"");
-                    foreach (var a in args) newCmdSb.Append(" \"").Append(a.Replace("\"", "\\\"")).Append('"');
-                    var newCmdArr = (newCmdSb.ToString() + "\0").ToCharArray();
-
-                    if (!CreateProcessW(null, newCmdArr, IntPtr.Zero, IntPtr.Zero, true,
-                        CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, null, ref newSi, out var newPi))
-                    {
-                        Console.Error.WriteLine($"[HOT-SWAP] CreateProcess failed — restoring old Core");
-                        lock (_gate) { _activeStdinWrite = _oldCoreStdinWrite; _oldCoreStdinWrite = IntPtr.Zero; foreach (var kv in _oldInflight) _inflight[kv.Key] = kv.Value; _oldInflight.Clear(); }
-                        _swapInProgress = false; return;
-                    }
-                    CloseHandle(hNewStdinRead);
-                    CloseHandle(hNewStdoutWrite);
-                    CloseHandle(newPi.hThread);
-                    Console.Error.WriteLine($"[HOT-SWAP] new Core started (pid={newPi.dwProcessId})");
-
-                    // 4. Replay initialize + tools/list to new Core
-                    lock (_gate)
-                    {
-                        _activeStdinWrite = hNewStdinWrite;
-                        if (_initializeLine != null)
-                        {
-                            var initBytes = System.Text.Encoding.UTF8.GetBytes(_initializeLine + "\n");
-                            WriteFile(hNewStdinWrite, initBytes, (uint)initBytes.Length, out uint _ign1, IntPtr.Zero);
-                            FlushFileBuffers(hNewStdinWrite);
-                            Console.Error.WriteLine("[HOT-SWAP] replayed initialize");
-                        }
-                        if (_toolsListLine != null)
-                        {
-                            var tlBytes = System.Text.Encoding.UTF8.GetBytes(_toolsListLine + "\n");
-                            WriteFile(hNewStdinWrite, tlBytes, (uint)tlBytes.Length, out uint _ign2, IntPtr.Zero);
-                            FlushFileBuffers(hNewStdinWrite);
-                            Console.Error.WriteLine("[HOT-SWAP] replayed tools/list");
-                        }
-                    }
-
-                    // 5. Start new Core stdout relay thread
-                    new Thread(() => RelayStdout(hNewStdoutRead, "new-core", detectElevation: true))
-                    { IsBackground = true, Name = "mcp-newcore-stdout" }.Start();
-
-                    // 6. Wait for old Core drain (60s timeout)
-                    var drainSw = System.Diagnostics.Stopwatch.StartNew();
-                    while (drainSw.Elapsed.TotalSeconds < 60)
-                    {
-                        lock (_gate) { if (_oldInflight.Count == 0) break; }
-                        Thread.Sleep(500);
-                    }
-
-                    lock (_gate)
-                    {
-                        if (_oldInflight.Count > 0)
-                        {
-                            Console.Error.WriteLine($"[HOT-SWAP] drain timeout — {_oldInflight.Count} requests orphaned, re-routing to new Core");
-                            foreach (var kv in _oldInflight)
-                            {
-                                var reBytes = System.Text.Encoding.UTF8.GetBytes(kv.Value + "\n");
-                                WriteFile(_activeStdinWrite, reBytes, (uint)reBytes.Length, out uint _ign3, IntPtr.Zero);
-                                _inflight[kv.Key] = kv.Value;
-                            }
-                            FlushFileBuffers(_activeStdinWrite);
-                        }
-                        _oldInflight.Clear();
-                    }
-
-                    // 7. Close old Core stdin → graceful exit
-                    if (_oldCoreStdinWrite != IntPtr.Zero)
-                    { CloseHandle(_oldCoreStdinWrite); _oldCoreStdinWrite = IntPtr.Zero; }
-                    Console.Error.WriteLine("[HOT-SWAP] old Core stdin closed — graceful exit");
-
-                    _swapInProgress = false;
-                    Console.Error.WriteLine("[HOT-SWAP] swap complete!");
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"[HOT-SWAP] error: {ex.Message}");
-                    _swapInProgress = false;
-                }
-            }, null, 500, Timeout.Infinite);
-        };
-
-        // Stdin router: line-buffered, tracks JSON-RPC id, routes to active Core
-        var stdinRelay = new Thread(() =>
-        {
-            var hIn = GetStdHandle(-10);
-            Console.Error.WriteLine($"[LAUNCHER:MCP] stdin relay started (hIn=0x{hIn:X})");
-            var buf = new byte[4096];
-            var lineBuf = new System.Text.StringBuilder();
-
-            while (ReadFile(hIn, buf, (uint)buf.Length, out uint n, IntPtr.Zero) && n > 0)
-            {
-                lineBuf.Append(System.Text.Encoding.UTF8.GetString(buf, 0, (int)n));
-                var acc = lineBuf.ToString();
-                int nlIdx;
-                while ((nlIdx = acc.IndexOf('\n')) >= 0)
-                {
-                    var line = acc[..nlIdx].TrimEnd('\r');
-                    acc = acc[(nlIdx + 1)..];
-
-                    if (string.IsNullOrWhiteSpace(line)) continue;
-
-                    // Extract JSON-RPC id
-                    var id = ExtractJsonRpcId(line);
-
-                    lock (_gate)
-                    {
-                        // Cache initialize + tools/list for hot-swap/admin Core replay
-                        if (line.Contains("\"method\":\"initialize\""))
-                            _initializeLine = line;
-                        else if (line.Contains("\"method\":\"tools/list\""))
-                            _toolsListLine = line;
-
-                        // Track in-flight requests
-                        if (id != null)
-                            _inflight[id] = line;
-
-                        // Route to active Core
-                        if (_activeStdinWriter != null)
-                        {
-                            _activeStdinWriter.WriteLine(line);
-                            _activeStdinWriter.Flush();
-                        }
-                        else
-                        {
-                            var target = _activeStdinWrite;
-                            if (target != IntPtr.Zero)
-                            {
-                                var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
-                                WriteFile(target, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
-                                FlushFileBuffers(target);
-                                Console.Error.WriteLine($"[LAUNCHER:MCP] stdin→core: {line[..System.Math.Min(60, line.Length)]}");
-                            }
-                            else
-                                Console.Error.WriteLine("[LAUNCHER:MCP] stdin relay: target handle is ZERO!");
-                        }
-                    }
-                }
-                lineBuf.Clear();
-                if (acc.Length > 0) lineBuf.Append(acc);
-            }
-
-            Console.Error.WriteLine($"[LAUNCHER:MCP] stdin relay: ReadFile loop ended (EOF or error)");
-            // ConPTY stdin EOF → close all Core stdins
-            lock (_gate)
-            {
-                if (_activeStdinWrite != IntPtr.Zero) { CloseHandle(_activeStdinWrite); _activeStdinWrite = IntPtr.Zero; }
-                if (_activeStdinWriter is IDisposable d) { try { d.Dispose(); } catch { } _activeStdinWriter = null; }
-                if (_adminStdinWrite != IntPtr.Zero) { CloseHandle(_adminStdinWrite); _adminStdinWrite = IntPtr.Zero; }
-            }
-        }) { IsBackground = true, Name = "mcp-stdin-router" };
-        stdinRelay.Start();
-
-        // ── Normal Core stdout relay (main thread) ──
-
-        // Shared helper: relay one Core's stdout to hOut, with elevation detection
-        void RelayStdout(IntPtr hRead, string label, bool detectElevation)
-        {
-            var outBuf = new byte[4096];
-            var outLineBuf = new System.Text.StringBuilder();
-            while (ReadFile(hRead, outBuf, (uint)outBuf.Length, out uint outN, IntPtr.Zero) && outN > 0)
-            {
-                outLineBuf.Append(System.Text.Encoding.UTF8.GetString(outBuf, 0, (int)outN));
-                var acc = outLineBuf.ToString();
-                int nlIdx;
-                while ((nlIdx = acc.IndexOf('\n')) >= 0)
-                {
-                    var line = acc[..nlIdx].TrimEnd('\r');
-                    acc = acc[(nlIdx + 1)..];
-
-                    // Elevation intercept
-                    if (detectElevation && line.Contains("\"_elevationRequired\":true"))
-                    {
-                        var failedId = ExtractJsonRpcId(line);
-                        Console.Error.WriteLine($"[LAUNCHER:MCP] Elevation required (id={failedId}) — spawning admin Core");
-
-                        // Save the original request for re-send
-                        string? savedRequest = null;
-                        lock (_gate)
-                        {
-                            if (failedId != null && _inflight.TryGetValue(failedId, out var req))
-                                savedRequest = req;
-                        }
-                        _elevationRequestLine = savedRequest;
-
-                        // Spawn admin Core on background thread (runas blocks on UAC)
-                        new Thread(() => SpawnAdminCore(core, args, _initializeLine, _elevationRequestLine,
-                            ref _adminStdinWrite, ref _adminStdoutRead, ref _adminProc, ref _activeStdinWrite,
-                            ref _activeStdinWriter, ref _adminMode, hCoreStdinWrite, hOut, _gate, _outLock, _inflight))
-                        { IsBackground = true, Name = "mcp-admin-spawn" }.Start();
-
-                        continue; // suppress elevation error from reaching client
-                    }
-
-                    // Remove from inflight (both current and old-drain)
-                    var id = ExtractJsonRpcId(line);
-                    if (id != null)
-                        lock (_gate) { _inflight.Remove(id); _oldInflight.Remove(id); }
-
-                    // Forward to client
-                    lock (_outLock)
-                    {
-                        var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
-                        WriteFile(hOut, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
-                        FlushFileBuffers(hOut);
-                    }
-                }
-                outLineBuf.Clear();
-                if (acc.Length > 0) outLineBuf.Append(acc);
-            }
-            // Flush remaining
-            if (outLineBuf.Length > 0)
-            {
-                lock (_outLock)
-                {
-                    var rem = System.Text.Encoding.UTF8.GetBytes(outLineBuf.ToString());
-                    WriteFile(hOut, rem, (uint)rem.Length, out _, IntPtr.Zero);
-                    FlushFileBuffers(hOut);
-                }
-            }
-            CloseHandle(hRead);
-            Console.Error.WriteLine($"[LAUNCHER:MCP] {label} stdout EOF");
-        }
-
-        // Run normal Core relay on main thread
-        RelayStdout(hCoreStdoutRead, "normal-core", detectElevation: true);
-
-        // If admin Core was spawned, wait for it too
-        if (_adminProc != IntPtr.Zero)
-        {
-            WaitForSingleObject(_adminProc, 0xFFFFFFFF);
-            GetExitCodeProcess(_adminProc, out uint adminExit);
-            CloseHandle(_adminProc);
-            Console.Error.WriteLine($"[LAUNCHER:MCP] admin core exited (code={adminExit})");
-        }
-
-        fsw.EnableRaisingEvents = false;
-        fsw.Dispose();
-        _fswDebounce?.Dispose();
-
-        WaitForSingleObject(pi.hProcess, 5000);
-        GetExitCodeProcess(pi.hProcess, out uint exitCode2);
-        CloseHandle(pi.hProcess);
-        Console.Error.WriteLine($"[LAUNCHER:MCP] core exited (code={exitCode2})");
-        return (int)exitCode2;
-    }
-
-    /// <summary>Extract JSON-RPC "id" from a JSON line (naive string search, sufficient for MCP).</summary>
-    static string? ExtractJsonRpcId(string line)
-    {
-        // Find "id": followed by value (number or string)
-        var idx = line.IndexOf("\"id\"", StringComparison.Ordinal);
-        if (idx < 0) return null;
-        var colonIdx = line.IndexOf(':', idx + 4);
-        if (colonIdx < 0) return null;
-        var rest = line[(colonIdx + 1)..].TrimStart();
-        if (rest.Length == 0) return null;
-        if (rest[0] == '"')
-        {
-            var endQuote = rest.IndexOf('"', 1);
-            return endQuote > 0 ? rest[1..endQuote] : null;
-        }
-        // Numeric id
-        int end = 0;
-        while (end < rest.Length && (char.IsDigit(rest[end]) || rest[end] == '-')) end++;
-        return end > 0 ? rest[..end] : null;
-    }
-
-    [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-    static extern bool ShellExecuteExW(ref SHELLEXECUTEINFOW lpExecInfo);
-
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
-    struct SHELLEXECUTEINFOW
-    {
-        public uint cbSize;
-        public uint fMask;
-        public IntPtr hwnd;
-        public string lpVerb;
-        public string lpFile;
-        public string lpParameters;
-        public string? lpDirectory;
-        public int nShow;
-        public IntPtr hInstApp;
-        public IntPtr lpIDList;
-        public string? lpClass;
-        public IntPtr hkeyClass;
-        public uint dwHotKey;
-        public IntPtr hIcon; // union with hMonitor
-        public IntPtr hProcess;
-    }
-
-    const uint SEE_MASK_NOCLOSEPROCESS = 0x00000040;
-
-    /// <summary>Spawn elevated admin Core with named pipes for MCP relay.</summary>
-    static void SpawnAdminCore(string corePath, string[] mcpArgs,
-        string? initLine, string? elevationRequestLine,
-        ref IntPtr adminStdinWrite, ref IntPtr adminStdoutRead, ref IntPtr adminProc,
-        ref IntPtr activeStdinWrite, ref System.IO.TextWriter? activeStdinWriter, ref bool adminMode,
-        IntPtr oldCoreStdinWrite, IntPtr hOut, object gate, object outLock,
-        Dictionary<string, string> inflight)
-    {
-        System.IO.StreamWriter? stdinWriter = null;
-        System.IO.StreamReader? stdoutReader = null;
-        var pipeName = $"wkappbot-mcp-admin-{Environment.ProcessId}";
-        var stdinPipeName = $"{pipeName}-stdin";
-        var stdoutPipeName = $"{pipeName}-stdout";
-
-        // Launch admin Core via ShellExecuteExW runas
-        var paramStr = $"mcp --admin-pipes {stdinPipeName} {stdoutPipeName}";
-        var sei = new SHELLEXECUTEINFOW
-        {
-            cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<SHELLEXECUTEINFOW>(),
-            fMask = SEE_MASK_NOCLOSEPROCESS,
-            lpVerb = "runas",
-            lpFile = corePath,
-            lpParameters = paramStr,
-            nShow = 0, // SW_HIDE
-        };
-
-        Console.Error.WriteLine($"[LAUNCHER:MCP] Requesting admin elevation (runas)...");
-        if (!ShellExecuteExW(ref sei))
-        {
-            var err = System.Runtime.InteropServices.Marshal.GetLastWin32Error();
-            Console.Error.WriteLine($"[LAUNCHER:MCP] UAC denied or failed (err={err})");
-            // Send error for the elevation-failed request
-            if (elevationRequestLine != null)
-            {
-                var failId = ExtractJsonRpcId(elevationRequestLine);
-                var errJson = $"{{\"jsonrpc\":\"2.0\",\"id\":{failId},\"error\":{{\"code\":-32001,\"message\":\"Elevation denied by user\"}}}}\n";
-                lock (outLock)
-                {
-                    var errBytes = System.Text.Encoding.UTF8.GetBytes(errJson);
-                    WriteFile(hOut, errBytes, (uint)errBytes.Length, out _, IntPtr.Zero);
-                    FlushFileBuffers(hOut);
-                }
-                lock (gate) { if (failId != null) inflight.Remove(failId); }
-            }
-            return;
-        }
-
-        Console.Error.WriteLine($"[LAUNCHER:MCP] Admin Core launched (pid=?) — waiting for pipe connection (60s)...");
-        adminProc = sei.hProcess;
-
-        // Wait for admin Core to connect to named pipes (it uses NamedPipeClientStream)
-        // We create server-side named pipes that admin Core connects to
-        try
-        {
-            using var pipeStdinServer = new System.IO.Pipes.NamedPipeServerStream(stdinPipeName,
-                System.IO.Pipes.PipeDirection.Out, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.None);
-            using var pipeStdoutServer = new System.IO.Pipes.NamedPipeServerStream(stdoutPipeName,
-                System.IO.Pipes.PipeDirection.In, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.None);
-
-            // Wait for connections (60s timeout for UAC)
-            var cts = new System.Threading.CancellationTokenSource(60_000);
-            pipeStdinServer.WaitForConnectionAsync(cts.Token).GetAwaiter().GetResult();
-            pipeStdoutServer.WaitForConnectionAsync(cts.Token).GetAwaiter().GetResult();
-            Console.Error.WriteLine("[LAUNCHER:MCP] Admin Core connected to pipes!");
-
-            // Transition: close old Core stdin (drain), switch to admin
-            lock (gate)
-            {
-                CloseHandle(oldCoreStdinWrite); // EOF to old Core → drain remaining work
-                activeStdinWrite = IntPtr.Zero; // temporarily null until we set up admin pipe handle
-            }
-
-            // Send initialize + elevation request to admin Core
-            // NOTE: NOT using 'using' — lifetime managed by finally block below.
-            // 'using' would dispose at method exit while _activeStdinWriter still references it (race).
-            stdinWriter = new System.IO.StreamWriter(pipeStdinServer, new System.Text.UTF8Encoding(false)) { AutoFlush = true };
-            if (initLine != null)
-            {
-                lock (gate)
-                {
-                    stdinWriter.WriteLine(initLine);
-                    stdinWriter.Flush();
-                }
-            }
-            // Wait briefly for initialize response (read and forward)
-            stdoutReader = new System.IO.StreamReader(pipeStdoutServer, System.Text.Encoding.UTF8);
-            var initResp = stdoutReader.ReadLine(); // initialize response
-            if (initResp != null)
-            {
-                // Don't forward init response (client already initialized)
-                Console.Error.WriteLine($"[LAUNCHER:MCP] Admin init OK: {initResp[..Math.Min(80, initResp.Length)]}...");
-            }
-
-            lock (gate)
-            {
-                activeStdinWriter = stdinWriter;
-                adminMode = true;
-            }
-
-            // Re-send the elevation-failed request
-            if (elevationRequestLine != null)
-            {
-                lock (gate)
-                {
-                    stdinWriter.WriteLine(elevationRequestLine);
-                    stdinWriter.Flush();
-                }
-                Console.Error.WriteLine($"[LAUNCHER:MCP] Re-sent elevation request to admin Core");
-            }
-
-            // Relay admin Core stdout on this thread
-            string? adminLine;
-            while ((adminLine = stdoutReader.ReadLine()) != null)
-            {
-                var id = ExtractJsonRpcId(adminLine);
-                if (id != null)
-                    lock (gate) { inflight.Remove(id); }
-
-                lock (outLock)
-                {
-                    var lineBytes = System.Text.Encoding.UTF8.GetBytes(adminLine + "\n");
-                    WriteFile(hOut, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
-                    FlushFileBuffers(hOut);
-                }
-            }
-            Console.Error.WriteLine("[LAUNCHER:MCP] Admin Core stdout EOF");
-        }
-        catch (OperationCanceledException)
-        {
-            Console.Error.WriteLine("[LAUNCHER:MCP] Admin Core connection timeout (60s) — elevation failed");
-            try { TerminateProcess(adminProc, 1); } catch { }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[LAUNCHER:MCP] Admin Core error: {ex.Message}");
-        }
-        finally
-        {
-            lock (gate)
-            {
-                activeStdinWriter = null; // prevent other threads from writing
-            }
-            // Dispose after nulling reference — no race
-            try { stdinWriter?.Dispose(); } catch { }
-            try { stdoutReader?.Dispose(); } catch { }
-        }
-    }
-
-    /// <param name="fastExitTimeoutMs">If >0, kills Core if it doesn't exit within this time (ms) and returns exit 0.
-    /// Used for fast-exit commands (help) where Core may hang 26s due to RotateOldLogs on W: drive.</param>
-    /// <param name="stdoutRelayOnly">If true, redirect only stdout (not stdin/stderr) and relay it.
-    /// Used for grap/grep with args — prevents MSYS2 PTY drain (~31s) from large stdout output.
-    /// Core inherits stdin/stderr from Launcher (PTY) so interactive features still work.</param>
-    /// <summary>
-    /// Spawn Core with CreateNoWindow=true and stdin piped (no ConPTY inheritance).
-    /// stdout/stderr are NOT redirected — Core writes directly to Launcher's terminal handles.
-    /// This avoids both: the ~27s ConPTY bash wait AND the unreliable pipe relay mechanism.
-    /// </summary>
-    static int RunCoreNoConPty(string[] args)
-    {
-        try
-        {
-            var dir = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-            var core = Path.Combine(dir, "wkappbot-core.exe");
-            if (!File.Exists(core)) { Console.Error.WriteLine($"[LAUNCHER] wkappbot-core.exe not found at: {core}"); return 1; }
-
-            using var proc = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = core,
-                    UseShellExecute       = false,
-                    CreateNoWindow        = true,  // no ConPTY handle → bash won't wait 27s
-                    RedirectStandardInput = true,  // pipe stdin → Core holds no ConPTY stdin
-                    RedirectStandardOutput = false, // Core writes directly to Launcher's stdout handle
-                    RedirectStandardError  = false, // Core writes directly to Launcher's stderr handle
-                }
-            };
-            // Strip MSYS2/Cygwin PTY env vars — AppHost deadlock prevention (same as fastExit path)
-            foreach (var v in new[] { "TERM", "MSYSTEM", "MSYS", "MSYS2_ARG_CONV_EXCL",
-                                      "ConEmuANSI", "CYGWIN", "MINGW_PREFIX", "MINGW_CHOST",
-                                      "MINGW_PACKAGE_PREFIX", "MSYS2_PATH_TYPE" })
-                proc.StartInfo.EnvironmentVariables.Remove(v);
-            foreach (var a in args) proc.StartInfo.ArgumentList.Add(a);
-
-            proc.Start();
-            try { proc.StandardInput.Close(); } catch { } // EOF stdin immediately
-            // Use WaitForExit(timeout) instead of blocking WaitForExit() — avoids potential
-            // .NET internal async-stream-completion wait that can block 27-35s in AOT builds.
-            if (!proc.WaitForExit(5000)) proc.Kill(entireProcessTree: false);
-            return proc.ExitCode;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[LAUNCHER] RunCoreNoConPty error: {ex.Message}");
-            return 1;
-        }
-    }
-
-    static int RunCore(string[] args, int fastExitTimeoutMs = 0, bool stdoutRelayOnly = false)
-    {
-        try
-        {
-            // wkappbot-core.exe lives next to wkappbot.exe in SDK/bin/
-            var dir = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-            var core = Path.Combine(dir, "wkappbot-core.exe");
-
-            if (!File.Exists(core))
-            {
-                Console.Error.WriteLine($"[LAUNCHER] wkappbot-core.exe not found at: {core}");
-                Console.Error.WriteLine("[LAUNCHER] Run: dotnet publish WKAppBot.CLI to deploy core.");
-                return 1;
-            }
-
-            // Parse --timeout N (seconds) — Launcher-level watchdog.
-            // Works for ALL commands, including ones that don't implement their own timeout.
-            // stdout/stderr inherited (no piping overhead); Launcher simply kills Core if exceeded.
-            int timeoutSec  = 0;
-            int timeoutExit = 2;
-            for (int i = 0; i < args.Length - 1; i++)
-            {
-                if (args[i] == "--timeout"      && int.TryParse(args[i + 1], out var t) && t > 0) timeoutSec  = t;
-                if (args[i] == "--timeout-exit" && int.TryParse(args[i + 1], out var e))           timeoutExit = e;
-            }
-
-            bool useFastExit   = fastExitTimeoutMs > 0;
-            bool useStdoutRelay = stdoutRelayOnly && !useFastExit;
-            // For grap/grep one-shot: temp file relay avoids all pipe/ConPTY handle issues.
-            // ConPTY (bash → Launcher → Core) swaps stdout/stderr handles in Core when UseShellExecute=false
-            // redirects both streams; and CreateNoWindow=true prevents .NET 8 from initializing Console.
-            // Solution: Core writes to a local temp file (WKAPPBOT_RELAY_FILE env var), Launcher reads after.
-            // For --follow mode: run Core normally (no temp file, output goes to terminal, Ctrl+C to stop).
-            bool followMode = useStdoutRelay && args.Any(a => a is "-f" or "--follow");
-            string? relayFilePath = null;
-            if (useStdoutRelay && !followMode)
-            {
-                // Use C:\Temp\ instead of GetTempPath() — AppData\Local\Temp has 28s visibility delay
-                // when Core's SMB handles are being cleaned up after TerminateProcess.
-                relayFilePath = System.IO.Directory.Exists(@"C:\Temp")
-                    ? $@"C:\Temp\wkappbot-relay-{Environment.ProcessId}.txt"
-                    : System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"wkappbot-relay-{Environment.ProcessId}.txt");
-                // File will be created by Core; delete any stale file from previous run
-                try { System.IO.File.Delete(relayFilePath); } catch { }
-            }
-
-            using var proc = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = core,
-                    UseShellExecute = false,
-                    // ALL 3 streams redirected + CreateNoWindow=true for ALL spawns.
-                    // Root cause of bash/MSYS2 LPC deadlock: ConPTY slave handles inherited via
-                    // stdin/stderr trigger .NET 8 AppHost console init (SetConsoleMode LPC → csrss.exe).
-                    // Fix: redirect stdin+stderr so Core receives pipes (not ConPTY handles).
-                    // Core detects piped stdin → Console.IsInputRedirected=true → skips interactive init.
-                    // "\0UIT" (4 bytes, exact flush) = Core signaling Launcher to TerminateSelf immediately.
-                    RedirectStandardOutput = true,
-                    RedirectStandardError  = true,
-                    RedirectStandardInput  = true,
-                    StandardOutputEncoding = System.Text.Encoding.UTF8,
-                    StandardErrorEncoding  = System.Text.Encoding.UTF8,
-                    // CreateNoWindow=true: prevents console window creation for ALL Core spawns.
-                    // Together with all-streams-redirected, Core has zero ConPTY handles → no LPC init.
-                    CreateNoWindow         = true,
-                }
-            };
-            // File-based handshake: Core creates .ready BEFORE TerminateProcess (file visible immediately).
-            // Launcher polls for .ready, reads relay file while Core is alive, then creates .ack.
-            // Core waits for .ack (max 500ms), then calls TerminateProcess.
-            // No named kernel objects — avoids ConPTY/session namespace issues.
-
-            // Pass relay file path to Core via env var (one-shot only)
-            if (relayFilePath != null)
-                proc.StartInfo.EnvironmentVariables["WKAPPBOT_RELAY_FILE"] = relayFilePath;
-
-            // Strip MSYS2/Cygwin PTY env vars for ALL Core spawns (not just fast-exit).
-            // .NET 8 single-file AppHost deadlocks when TERM/MSYSTEM/MSYS/etc. are set,
-            // regardless of CreateNoWindow mode. These vars tell the AppHost to reconcile
-            // PTY handles at startup, causing an LPC deadlock before Main() is reached.
-            foreach (var v in new[] { "TERM", "MSYSTEM", "MSYS", "MSYS2_ARG_CONV_EXCL",
-                                      "ConEmuANSI", "CYGWIN", "MINGW_PREFIX", "MINGW_CHOST",
-                                      "MINGW_PACKAGE_PREFIX", "MSYS2_PATH_TYPE" })
-                proc.StartInfo.EnvironmentVariables.Remove(v);
-
-            // Forward all args as-is
-            foreach (var a in args)
-                proc.StartInfo.ArgumentList.Add(a);
-
-
-            _lDiagStep = "proc-starting";
-            Prof("proc.Start()");
-            // Detach Launcher from ConPTY console BEFORE spawning Core.
-            // CREATE_NO_WINDOW still attaches Core to parent's ConPTY console session → LPC deadlock
-            // in .NET 8 AppHost during console init (SetConsoleMode → csrss.exe LPC → never returns).
-            // FreeConsole(): Launcher releases its console → child inherits nothing → no LPC deadlock.
-            // Stdout/stderr file handles (ConPTY slave) remain valid for WriteFile after FreeConsole().
-            FreeConsole();
-            proc.Start();
-            // Close stdin immediately — Core doesn't read stdin interactively.
-            // Stdin is always redirected (pipe) so Core never inherits a ConPTY stdin handle.
-            try { proc.StandardInput.Close(); } catch { }
-            _lDiagStep = $"proc-waitforexit(pid={proc.Id})";
-            Prof($"proc.WaitForExit pid={proc.Id}");
-
-            if (useFastExit)
-            {
-                // stdin already closed above.
-                // Relay Core's stdout and stderr to Launcher's stdout/stderr in background.
-                // DO NOT set Console.OutputEncoding here — that calls SetConsoleOutputCP(65001),
-                // initializing SMB-backed console kernel objects. TerminateSelf after that = ~27s.
-                // Instead, write bytes directly to the underlying stdout stream (bypasses encoding).
-                var stdoutStream = Console.OpenStandardOutput();
-                var stderrStream = Console.OpenStandardError();
-                var stdoutRelay = System.Threading.Tasks.Task.Run(() =>
-                {
-                    try
-                    {
-                        var buf = new byte[4096];
-                        int n;
-                        while ((n = proc.StandardOutput.BaseStream.Read(buf, 0, buf.Length)) > 0)
-                        {
-                            stdoutStream.Write(buf, 0, n);
-                            stdoutStream.Flush();
-                        }
-                        Console.Out.Flush();
-                    }
-                    catch { }
-                });
-                var stderrRelay = System.Threading.Tasks.Task.Run(() =>
-                {
-                    try
-                    {
-                        var buf = new byte[4096];
-                        int n;
-                        while ((n = proc.StandardError.BaseStream.Read(buf, 0, buf.Length)) > 0)
-                        {
-                            stderrStream.Write(buf, 0, n);
-                            stderrStream.Flush();
-                        }
-                    }
-                    catch { }
-                });
-                // Core calls FastExit (TerminateProcess) after flushing help output.
-                // If it doesn't exit within timeout, kill it (safety net for hangs).
-                bool exited = proc.WaitForExit(fastExitTimeoutMs);
-                _lDiagStep = exited ? "fast-exit-ok" : "fast-exit-timeout-kill";
-                Prof(exited
-                    ? $"fast-exit: core exited naturally pid={proc.Id}"
-                    : $"fast-exit: timeout {fastExitTimeoutMs}ms — kill core pid={proc.Id}");
-                if (!exited)
-                    try { proc.Kill(entireProcessTree: true); } catch { }
-                // Wait for relay to flush all output before Launcher exits
-                System.Threading.Tasks.Task.WhenAll(stdoutRelay, stderrRelay).Wait(500);
-                stdoutStream.Flush();
-                _lDiagStep = "TerminateSelf";
-                TerminateSelf(0);
-                return 0; // unreachable
-            }
-
-            // Stdout-relay path (grap/grep with args):
-            // Fast path: named pipe (if set up above) — Core closes pipe BEFORE TerminateProcess.
-            //   Launcher gets EOF at ~20ms, outputs content, exits fast. 27s cleanup in background.
-            // Fallback: relay file (WKAPPBOT_RELAY_FILE) — visible after ~27s (proc object signaled).
-            // Follow mode: Core output goes directly to the terminal (Ctrl+C to stop).
-            if (useStdoutRelay)
-            {
-                if (relayFilePath != null)
-                {
-                    // File-based fast path: poll for .ready (Core creates it BEFORE TerminateProcess).
-                    // File created by live process → visible to GetFileAttributesW immediately (no 27s delay).
-                    var readyPath = relayFilePath + ".ready";
-                    var ackPath   = relayFilePath + ".ack";
-                    Prof($"relay: polling .ready path={readyPath}");
-                    var readyDeadline = _sw.ElapsedMilliseconds + 5000;
-                    bool readyFound = false;
-                    while (_sw.ElapsedMilliseconds < readyDeadline)
-                    {
-                        if (GetFileAttributesW(readyPath) != 0xFFFFFFFF) { readyFound = true; break; }
-                        System.Threading.Thread.Sleep(5);
-                    }
-                    Prof(readyFound ? $"relay: .ready found pid={proc.Id}" : $"relay: .ready timeout pid={proc.Id}");
-                    if (readyFound)
-                    {
-                        try
-                        {
-                            var content = System.IO.File.ReadAllText(relayFilePath, System.Text.Encoding.UTF8);
-                            Console.Out.Write(content);
-                            Console.Out.Flush();
-                            Prof($"relay: {content.Length} chars written");
-                        }
-                        catch (Exception ex) { Prof($"relay: read error: {ex.Message}"); }
-                        finally
-                        {
-                            try { System.IO.File.WriteAllText(ackPath, "1"); } catch { } // signal Core: done
-                            try { System.IO.File.Delete(relayFilePath); } catch { }
-                            try { System.IO.File.Delete(readyPath); } catch { }
-                            try { System.IO.File.Delete(ackPath); } catch { }
-                        }
-                        TerminateSelf(0);
-                        return 0; // unreachable
-                    }
-                    Prof("relay: .ready timeout → killing Core, no output");
-                    try { proc.Kill(entireProcessTree: true); } catch { }
-                    try { System.IO.File.Delete(relayFilePath); } catch { }
-                    try { System.IO.File.Delete(readyPath); } catch { }
-                    Prof($"relay: done (timeout, {_sw.ElapsedMilliseconds}ms)");
-                    return 0;
-                }
-                else
-                {
-                    // Follow mode: relay stdout+stderr in background, wait for Ctrl+C / natural exit.
-                    Prof("relay-follow: Core running (Ctrl+C to stop)");
-                    var fStdout = Console.OpenStandardOutput();
-                    var fStderr = Console.OpenStandardError();
-                    var fOut = System.Threading.Tasks.Task.Run(() => {
-                        try { var b = new byte[4096]; int n;
-                              while ((n = proc.StandardOutput.BaseStream.Read(b,0,b.Length)) > 0) { fStdout.Write(b,0,n); fStdout.Flush(); } } catch { }
-                    });
-                    var fErr = System.Threading.Tasks.Task.Run(() => {
-                        try { var b = new byte[4096]; int n;
-                              while ((n = proc.StandardError.BaseStream.Read(b,0,b.Length)) > 0) { fStderr.Write(b,0,n); fStderr.Flush(); } } catch { }
-                    });
-                    proc.WaitForExit();
-                    System.Threading.Tasks.Task.WhenAll(fOut, fErr).Wait(500);
-                    Prof($"relay-follow: Core exited code={proc.ExitCode}");
-                    return proc.ExitCode;
-                }
-            }
-
-            // Normal path: relay Core's stdout/stderr to Launcher's stdout/stderr in real-time.
-            // Sentinel \0UIT on stderr (control signal) → TerminateSelf immediately.
-            // Core's ~30s SMB console cleanup runs in background; bash gets control back right away.
-            var _stderr = Console.OpenStandardError();
-            var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
-            _ = System.Threading.Tasks.Task.Run(() =>
-            {
-                try
-                {
-                    var buf = new byte[4096];
-                    int n;
-                    while ((n = proc.StandardError.BaseStream.Read(buf, 0, buf.Length)) > 0)
-                    {
-                        // Exact 4-byte sentinel on stderr → TerminateSelf
-                        if (n == 4 && buf[0] == sentinel[0] && buf[1] == sentinel[1]
-                                   && buf[2] == sentinel[2] && buf[3] == sentinel[3])
-                        {
-                            Prof($"relay: \\0UIT sentinel (stderr) → TerminateSelf");
-                            try { Console.Out.Flush(); CloseHandle(GetStdHandle(-11)); } catch { }
-                            var ec = proc.WaitForExit(500) ? proc.ExitCode : 0;
-                            TerminateSelf((uint)ec);
-                            return;
-                        }
-                        _stderr.Write(buf, 0, n); _stderr.Flush();
-                    }
-                }
-                catch { }
-            });
-            var _stdout = Console.OpenStandardOutput();
-            int effectiveTimeoutMs = timeoutSec > 0 ? timeoutSec * 1000 : 0;
-            var relayBuf = new byte[65536];
-            int coreExitFromRelay = -1;
-            while (true)
-            {
-                int n;
-                try { n = proc.StandardOutput.BaseStream.Read(relayBuf, 0, relayBuf.Length); }
-                catch { break; }
-                if (n == 0) break; // EOF — Core exited normally
-
-                // Timeout check (--timeout N flag)
-                if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
-                {
-                    Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s exceeded — killing core (pid={proc.Id})");
-                    try { proc.Kill(entireProcessTree: true); } catch { }
-                    try { _stdout.Flush(); } catch { }
-                    TerminateSelf((uint)timeoutExit);
-                    return timeoutExit; // unreachable
-                }
-
-                try { _stdout.Write(relayBuf, 0, n); _stdout.Flush(); } catch { break; }
-            }
-            try { _stdout.Flush(); } catch { }
-            if (!proc.HasExited) proc.WaitForExit();
-
-            _lDiagStep = $"proc-exited(code={proc.ExitCode})";
-            Prof($"proc exited code={proc.ExitCode}");
-            int coreExitCode = proc.ExitCode;
-            Console.Out.Flush();
-            Console.Error.Flush();
-            // TerminateSelf: avoid 27s CLR/ConPTY handle cleanup delay after Core exits.
-            // Core's output is already written (inherited handles); hard-kill Launcher immediately.
-            TerminateSelf((uint)coreExitCode);
-            return coreExitCode; // unreachable
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[LAUNCHER] Failed to run core: {ex.Message}");
-            return 1;
-        }
-    }
-
-    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-    static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
-
-    // ── Encoding recovery ────────────────────────────────────────────────────
-    /// <summary>
-    /// Recover Korean (and other multibyte) args corrupted by bash/MSYS2.
-    /// GetCommandLineA() → raw system-codepage bytes → decode with system encoding.
-    /// Compare each arg: if Unicode version has replacement chars (U+FFFD) or
-    /// differs from ANSI-decoded version, use the ANSI version.
-    /// </summary>
-    static string[] TryRecoverEncodingFromAnsiCommandLine(string[] args)
-    {
-        try
-        {
-            var ansiPtr = GetCommandLineA();
-            if (ansiPtr == IntPtr.Zero) return args;
-
-            // Read raw ANSI command line as bytes
-            var ansiStr = System.Runtime.InteropServices.Marshal.PtrToStringAnsi(ansiPtr);
-            if (string.IsNullOrEmpty(ansiStr)) return args;
-
-            // Parse ANSI command line into args (same logic as Windows CommandLineToArgvW but for ANSI)
-            var ansiArgs = ParseCommandLineArgs(ansiStr);
-            if (ansiArgs.Length == 0) return args;
-
-            // Skip argv[0] (exe path) — compare only actual args
-            var unicodeAll = Environment.GetCommandLineArgs();
-            if (unicodeAll.Length <= 1) return args;
-
-            var unicodeArgs = unicodeAll[1..]; // skip exe
-            if (ansiArgs.Length <= 0) return args;
-
-            // Also decode using system codepage for comparison
-            // Marshal.PtrToStringAnsi uses system ANSI codepage (CP949 on Korean Windows)
-            bool anyRecovered = false;
-            var result = new string[args.Length];
-            Array.Copy(args, result, args.Length);
-
-            for (int i = 0; i < result.Length && i < ansiArgs.Length; i++)
-            {
-                var uArg = result[i];
-                var aArg = ansiArgs[i];
-
-                // Check if Unicode version has corruption indicators
-                bool hasReplacementChar = uArg.Contains('\uFFFD');
-                bool hasMojibake = false;
-
-                // Detect common mojibake: high bytes in Latin range that shouldn't be there
-                // e.g. "í\u0085\u008c스í\u008a\u00b8" instead of "테스트"
-                if (!hasReplacementChar && uArg.Length > 0)
-                {
-                    int suspiciousChars = 0;
-                    foreach (var c in uArg)
-                    {
-                        if (c >= 0x80 && c <= 0xFF) suspiciousChars++;
-                    }
-                    // If >30% of chars are in the suspicious range, likely mojibake
-                    hasMojibake = suspiciousChars > 0 && (double)suspiciousChars / uArg.Length > 0.3;
-                }
-
-                if ((hasReplacementChar || hasMojibake) && aArg != uArg && aArg.Length > 0)
-                {
-                    result[i] = aArg;
-                    anyRecovered = true;
-                    Console.Error.WriteLine($"[ENCODING] Recovered arg[{i}]: \"{uArg}\" → \"{aArg}\" (system codepage)");
-                }
-            }
-
-            if (anyRecovered)
-                Console.Error.WriteLine($"[ENCODING] {result.Length} arg(s) checked, recovery applied (codepage={GetConsoleCP()})");
-
-            return result;
-        }
-        catch
-        {
-            return args; // any failure → use original args
-        }
-    }
-
-    /// <summary>Simple command line parser (handles quoted args).</summary>
-    static string[] ParseCommandLineArgs(string cmdLine)
-    {
-        var args = new System.Collections.Generic.List<string>();
-        int i = 0;
-
-        // Skip executable path (first arg)
-        if (i < cmdLine.Length)
-        {
-            if (cmdLine[i] == '"')
-            {
-                i++; while (i < cmdLine.Length && cmdLine[i] != '"') i++; i++; // skip closing quote
-            }
-            else
-            {
-                while (i < cmdLine.Length && cmdLine[i] != ' ') i++;
-            }
-            while (i < cmdLine.Length && cmdLine[i] == ' ') i++; // skip spaces
-        }
-
-        // Parse remaining args
-        while (i < cmdLine.Length)
-        {
-            if (cmdLine[i] == '"')
-            {
-                i++; // skip opening quote
-                int start = i;
-                while (i < cmdLine.Length && cmdLine[i] != '"') i++;
-                args.Add(cmdLine[start..i]);
-                if (i < cmdLine.Length) i++; // skip closing quote
-            }
-            else
-            {
-                int start = i;
-                while (i < cmdLine.Length && cmdLine[i] != ' ') i++;
-                args.Add(cmdLine[start..i]);
-            }
-            while (i < cmdLine.Length && cmdLine[i] == ' ') i++;
-        }
-
-        return args.ToArray();
-    }
-
-    /// <summary>
-    /// Auto-create busybox symlinks (a11y.exe, wka11y.exe → wkappbot.exe) if missing.
-    /// Symlink preferred; falls back to hardlink if no permission.
-    /// Stale hardlinks (size mismatch after hot-swap) are deleted and recreated.
-    /// </summary>
-    static void EnsureBusyboxAliases()
-    {
-        try
-        {
-            var exePath = Environment.ProcessPath;
-            if (string.IsNullOrEmpty(exePath)) return;
-            var dir = Path.GetDirectoryName(exePath);
-            if (string.IsNullOrEmpty(dir)) return;
-
-            var launcherName = Path.GetFileName(exePath); // wkappbot.exe
-            var coreName     = Path.GetFileNameWithoutExtension(exePath) + "-core.exe"; // wkappbot-core.exe
-            var corePath     = Path.Combine(dir, coreName);
-            long launcherSize = new FileInfo(exePath).Length;
-
-            var aliasNames = BusyboxAliases.Select(x => x.name).Distinct();
-            foreach (var alias in aliasNames)
-            {
-                var linkPath   = Path.Combine(dir, alias + ".exe");
-                // grap/grep/logcat → Core directly (no Launcher relay needed, ~0.2s startup)
-                var targetName = CoreDirectAliases.Contains(alias) && File.Exists(corePath)
-                    ? coreName : launcherName;
-                var targetSize = targetName == coreName
-                    ? new FileInfo(corePath).Length : launcherSize;
-
-                if (File.Exists(linkPath))
-                {
-                    bool isSymlink = File.ResolveLinkTarget(linkPath, returnFinalTarget: false) != null;
-                    if (!isSymlink)
-                    {
-                        // Stale hardlink check
-                        if (new FileInfo(linkPath).Length != targetSize)
-                            try { File.Delete(linkPath); } catch { continue; }
-                        else continue;
-                    }
-                    else continue; // symlink exists → keep as-is
-                }
-                else
-                {
-                    try { if (File.GetAttributes(linkPath) != 0) continue; } catch { }
-                }
-
-                try
-                {
-                    File.CreateSymbolicLink(linkPath, targetName);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    var targetFull = Path.Combine(dir, targetName);
-                    try { CreateHardLink(linkPath, targetFull, IntPtr.Zero); } catch { }
-                }
-                catch { }
-            }
-        }
-        catch { }
-    }
-
-    /// <summary>
-    /// grap/grep one-shot: named pipe relay.
-    /// Creates a named pipe server, spawns Core with WKAPPBOT_NAMED_PIPE env var (no stream redirect),
-    /// reads output until Core closes the pipe (before TerminateProcess), outputs to Console, exits.
-    /// Core's 27s SMB cleanup continues in the background — Launcher is already gone by then.
-    /// </summary>
-    static int RunGrapWithNamedPipe(string[] args)
-    {
-        var core = Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot-core.exe");
-        if (!File.Exists(core)) { Console.Error.WriteLine($"[ERROR] wkappbot-core.exe not found at: {core}"); return 1; }
-
-        // DIAGNOSTIC: start Core with NO pipe, just env var, and see if it starts
-        using var proc = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = core,
-                UseShellExecute = false,
-            }
-        };
-        // Minimal env var to trigger startup log
-        proc.StartInfo.EnvironmentVariables["WKAPPBOT_NAMED_PIPE"] = "test-no-pipe";
-        foreach (var a in args)
-            proc.StartInfo.ArgumentList.Add(a);
-
-        Prof("RunGrapWithNamedPipe: proc.Start()");
-        proc.Start();
-        Prof($"RunGrapWithNamedPipe: waiting pid={proc.Id}");
-
-        // Just wait 5s and see if Core reaches Main()
-        System.Threading.Thread.Sleep(5000);
-        Prof("RunGrapWithNamedPipe: done waiting");
-        TerminateSelf(0);
-        return 0; // unreachable
-    }
-
-    /// <summary>
-    /// Prints wkappbot usage directly from the Launcher — no Core spawn required.
-    /// Kept in sync with UsageCommand.GetUsageText in WKAppBot.CLI.
-    /// Called from no-args fast path (before Console.OutputEncoding setup) → TerminateSelf is fast.
-    /// </summary>
-    static void PrintUsage()
-    {
-        var ver = typeof(Program).Assembly.GetName().Version;
-        var verStr = ver != null ? $" v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
-        Console.Write($@"
-WKAppBot{verStr} - Windows App Automation Test Framework
-Building the Eyes of Claude to realize WilKim's vision of autonomous secretarial ops.
-All AI agents welcome — Claude, GPT, Gemini, Copilot, and beyond.
-Your testing, coding, and ideas are appreciated. Let's build together.
-
-Usage:
-  wkappbot <command> [options]
-
-═══ Public Commands ═══════════════════════════════════════════
-
-  a11y <action> <grap>[#uia-scope] [options]        (alias: a11y.exe / wka11y.exe)
-      Universal accessibility interface — 20 standard actions for ANY window.
-      3-tier fallback: UIA → Win32 → SendInput. Busybox: symlink `a11y.exe` works.
-
-      Auto-pipeline per action: blocker dismiss → minimize restore → tab activate
-        → zoom/magnifier → execute (3-tier) → result feedback (green/amber) → fade
-
-      Window (7):  close  minimize  maximize  restore  focus  move  resize
-      Element (13): read  find  highlight  invoke  click  toggle
-                    expand  collapse  select  scroll  type  set-value  set-range
-      Utility:     clipboard  clipboard-read  clipboard-write (text/files/mixed)
-
-      Target:  --nth 3 | 3~ | ~3 | 2~4    --all    (default: first match)
-      Options: --depth N  --force  --value N  --direction  --amount
-      Grap:    ';' OR  #scope  Ex: ""*Notepad*#*File*"" → Notepad's File menu
-
-      a11y find ""*app*"" --depth 5       # MUD: look (Win32 + UIA children)
-      a11y highlight ""*app*#*button*""   # visualize target with zoom overlay
-      a11y invoke ""*app*#*button*""      # click (UIA Invoke → BM_CLICK → SendInput)
-      a11y close ""*Chrome*"" --nth 2~    # close 2nd window onwards
-      a11y type ""*app*#*edit*"" ""hello""
-
-  find <keyword> [--deep] [--limit N] [--process <name>]
-      Unified search: window titles + UIA accessibility elements.
-      --deep: Thorough search (depth 12, slower but finds more).
-  run <scenario.yaml> [-v] [--no-watch]
-      Run a YAML test scenario with background element tracking.
-  do <window-title> <form-id> <button-text> [--confirm]
-      Full automation: combo select + button click + dialog handling.
-  scan <window-title> [--save] [--ocr] [--detail]
-      Scan app structure, learn controls, build Experience DB.
-  ocr <window-title|image.png> [--save] [-o file]
-      Extract text from window/image using Windows.Media.Ocr.
-  capture <window-title> [-o output.png] [--form <id>]
-      Capture a screenshot of a window or MDI child form.
-  dismiss <window-title> [keywords...]
-      Auto-dismiss notice/popup windows (OCR importance check).
-  input <window-title> <text>
-      Type text into a window (focusless PostMessage preferred).
-  eye [--interval N] [--size WxH] [--pos X,Y]
-      WK AppBot Eye — live overlay + Slack daemon (always on).
-      ctx=N% in tick output, auto-deletes stale idle messages on restart.
-  newchat ""prompt"" [--file prompt.txt]
-      Open new Claude Desktop chat + submit prompt (all focusless UIA).
-      Use for session handoff when context reaches 90%+.
-  slack send|reply|upload|screenshot|listen|catch-up
-      Slack messaging (Socket Mode, always-on prompt forwarding).
-  mcp
-      Start MCP stdio server (wkappbot_cli tool for JSON-RPC clients).
-  web fetch|search|read|html
-      Chrome DevTools Protocol web automation.
-  file read|grep|glob
-      File reading, search, and pattern matching.
-  ask gpt|gemini|claude|triad ""question"" [file.png]
-      Ask AI via CDP (focusless). ask triad = parallel 3-way.
-  logcat [regex] [files] [--past N] [-f] [--timeout N] [--hq]
-      Stream/search logs. grep/grap = aliases with grep-compat arg order.
-
-General Options:
-  -v, --verbose         Verbose output
-  --timeout <duration>  Hard kill after N time (exit 124). e.g. 30, 2m, 500ms
-  -h, --help            Show this help message
-
-Data Directory:
-  Runtime data (profiles, logs, handlers, output) stored in:
-  {{exe_dir}}/wkappbot.hq/
-
-Run 'wkappbot --help' for full command reference.
-");
-    }
-
-    /// <summary>
-    /// Prints grap/grep help directly from the Launcher — no Core spawn required.
-    /// Kept in sync with UsageCommand.PrintGrapHelp in WKAppBot.CLI.
-    /// </summary>
-    static void PrintGrapHelp(string alias)
-    {
-        var isgrap = alias == "grap";
-        Console.WriteLine($"""
-            {alias} — WKAppBot log search ({(isgrap ? "grab accessible pattern, official WKAppBot name" : "legacy grep alias")})
-            Internally: {alias} <pattern> [files...] → logcat <files> <pattern>
-
-            Usage:
-              {alias} <pattern> [files...] [options]
-
-            Arguments:
-              <pattern>     Regex pattern to search (case-insensitive by default)
-              [files...]    File glob(s) to search, ';' OR  e.g. "*.log;*.txt"
-                            Default: *.txt in current directory
-
-            Options:
-              -r, --recursive       Recursive (unlimited depth)
-              -r=N                  Recursive up to depth N
-              --basedir <dir>       Search root directory (default: CWD)
-              --hq                  Include wkappbot.hq + openclaw log dirs
-              --past <duration>     Scan files modified within duration (e.g. 1h, 30m, 2d)
-                                    Without --follow: scan and exit (grep-style, one-shot)
-              -f, --follow          Follow new log entries after --past scan (tail -f style)
-              --timeout <duration>  Watch mode: follow for duration then exit
-                                    e.g. --timeout 30s, --timeout 5m  (implies --follow)
-
-              -i, --case-sensitive  Case-sensitive match (default: insensitive)
-              -v, --invert-match    Invert match
-              -l, --files-with-matches  Print filenames only
-              -c, --count           Count matches per file
-              -m N, --max-count N   Stop after N matches per file
-              -A N                  N lines after match
-              -B N                  N lines before match
-              -C N                  N lines context (before + after)
-
-            Examples:
-              {alias} error                          # search *.txt in CWD
-              {alias} error *.log                    # search *.log files
-              {alias} "NullRef" *.log -C3            # 3 lines context
-              {alias} error *.log --past 1h          # last 1h, then exit
-              {alias} error *.log --past 1h -f       # last 1h, then follow
-              {alias} error *.log --timeout 30s      # watch for 30 seconds
-              {alias} error --hq -r                  # recursive in HQ logs
-            """);
-    }
-}
-
-/// <summary>
-/// Minimal focus-restore helper for Launcher (no Win32 project reference available).
-/// Only use for restore patterns — not for acquiring focus.
-/// </summary>
-static class FocusGuard
-{
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    public static extern IntPtr GetForegroundWindow();
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    public static extern bool SetForegroundWindow(IntPtr hWnd);
-}
-
-/// <summary>Dim stderr writer — ANSI dim for console, passthrough for pipes.</summary>
-sealed class DimStderrWriter : System.IO.TextWriter
-{
-    private readonly System.IO.TextWriter _inner;
-    public DimStderrWriter(System.IO.TextWriter inner)
-    {
-        _inner = inner;
-        // Enable VT processing on stderr for ANSI codes on Windows console
-        try
-        {
-            var hErr = GetStdHandle(-12);
-            if (GetConsoleMode(hErr, out uint mode))
-                SetConsoleMode(hErr, mode | 0x0004); // ENABLE_VIRTUAL_TERMINAL_PROCESSING
-        }
-        catch { }
-    }
-    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr GetStdHandle(int n);
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool GetConsoleMode(IntPtr h, out uint m);
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool SetConsoleMode(IntPtr h, uint m);
-    public override System.Text.Encoding Encoding => _inner.Encoding;
-    public override void Write(char value) => _inner.Write(value);
-    public override void Write(string? value) { if (value != null) { _inner.Write("\x1b[2m"); _inner.Write(value); _inner.Write("\x1b[0m"); } }
-    public override void WriteLine(string? value) { _inner.Write("\x1b[2m"); _inner.WriteLine(value); _inner.Write("\x1b[0m"); }
-    public override void WriteLine() => _inner.WriteLine();
-    public override void Flush() => _inner.Flush();
 }

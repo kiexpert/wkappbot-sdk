@@ -46,6 +46,79 @@ internal sealed class TriadSharedContext
     /// <summary>When true, moderator intervenes (STANCE check, format enforcement). Off during R0.</summary>
     public bool ModeratorEnabled { get; set; } = false;
 
+    // ── Live MD minutes: real-time debate transcript (APPEND mode) ──
+    private string? _mdPath;
+    private readonly object _mdLock = new();
+    private bool _mdHeaderWritten;
+    private string _mdQuestion = "";
+
+    /// <summary>Initialize live MD output. Call once after construction.</summary>
+    public void InitLiveMinutes(string question, string? mdPath = null)
+    {
+        _mdQuestion = question;
+        // Default path: triad session dir / 삼두 정반합 회의록 - {short question}.md
+        if (mdPath == null)
+        {
+            var shortQ = question.Length > 40 ? question[..40].Trim() + "..." : question;
+            // Sanitize filename
+            foreach (var c in Path.GetInvalidFileNameChars()) shortQ = shortQ.Replace(c, '_');
+            shortQ = shortQ.Replace("[", "").Replace("]", "").Replace("G:", "").Trim();
+            // Put in CWD/.wkappbot/ask/ folder (consistent with single ask MD output)
+            // Prefer CallerCwd (original invoker's working directory), then git root, then fallback
+            var cwd = EyeCmdPipeServer.CallerCwd.Value;
+            if (string.IsNullOrEmpty(cwd) || !Directory.Exists(Path.Combine(cwd, ".git")))
+            {
+                // Walk up from exe dir to find git root (most likely the project working directory)
+                var probe = Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory;
+                for (int i = 0; i < 10 && !string.IsNullOrEmpty(probe); i++)
+                {
+                    if (Directory.Exists(Path.Combine(probe, ".git"))) { cwd = probe; break; }
+                    probe = Path.GetDirectoryName(probe);
+                }
+                if (string.IsNullOrEmpty(cwd)) cwd = Environment.CurrentDirectory;
+            }
+            var askDir = Path.Combine(cwd, ".wkappbot", "ask");
+            Directory.CreateDirectory(askDir);
+            var ts = DateTime.Now.ToString("yyyyMMdd-HHmm");
+            var slug = Program.BuildSlug(shortQ, 40);
+            mdPath = Path.Combine(askDir, $"{ts}-triad-{slug}.md");
+        }
+        _mdPath = mdPath;
+        if (_mdPath != null)
+        {
+            // Write header once
+            lock (_mdLock)
+            {
+                File.WriteAllText(_mdPath, $"# Triad Debate\n\n> **Question**: {_mdQuestion}\n> **Started**: {DateTime.Now:yyyy-MM-dd HH:mm}\n\n---\n\n", Encoding.UTF8);
+                _mdHeaderWritten = true;
+            }
+        }
+    }
+
+    /// <summary>Path to the live MD file (null if not initialized).</summary>
+    public string? MdPath => _mdPath;
+
+    /// <summary>Append a line to the live MD (thread-safe). Used by all Slack relay points.</summary>
+    public void AppendMd(string line)
+    {
+        if (_mdPath == null) return;
+        lock (_mdLock)
+        {
+            try { File.AppendAllText(_mdPath, line + "\n", Encoding.UTF8); }
+            catch { }
+        }
+    }
+
+    /// <summary>Append a formatted section to MD (AI response with optional DEBATE_JSON parsing).</summary>
+    public void AppendMdAiResponse(string ai, string newText)
+    {
+        if (string.IsNullOrWhiteSpace(newText)) return;
+        var emojiMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            { ["gpt"] = "🤖", ["gemini"] = "💎", ["claude"] = "🧠" };
+        var emoji = emojiMap.GetValueOrDefault(ai, "🔮");
+        AppendMd($"\n### {emoji} {ai.ToUpperInvariant()} ({DateTime.Now:HH:mm})\n\n{newText.Trim()}\n");
+    }
+
     // ── EEP: Evidence Escalation Protocol — track claims per AI per round ──
     internal readonly ConcurrentDictionary<string, List<string>> _priorClaims = new(StringComparer.OrdinalIgnoreCase);
     internal readonly ConcurrentDictionary<string, int> _restatementCount = new(StringComparer.OrdinalIgnoreCase);
@@ -129,6 +202,11 @@ internal sealed class TriadSharedContext
         var prev = _latestChunks.GetValueOrDefault(ai, "");
         _latestChunks[ai] = chunk;
         _chunkVersions.AddOrUpdate(ai, 1, (_, v) => v + 1);
+
+        // Live MD: append new content (not full overwrite)
+        var mdDelta = chunk.Length > prev.Length ? chunk[prev.Length..].Trim() : "";
+        if (mdDelta.Length > 30)
+            AppendMdAiResponse(ai, mdDelta);
 
         // First meaningful chunk → assign emoji (speed-based: first responder = 🦊)
         if (prev.Length == 0 && chunk.Length > 20)

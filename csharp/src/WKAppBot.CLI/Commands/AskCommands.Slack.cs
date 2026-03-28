@@ -78,10 +78,16 @@ internal partial class Program
     // Ratelimit guard: min 800ms between Slack posts (prevents Slack API 429)
     static long _lastSlackPostTicks;
 
+    /// <summary>Active triad context for MD recording. Set by AskTriadParallel, cleared on exit.</summary>
+    internal static TriadSharedContext? _activeTriadCtx;
+
     internal static void SlackPostToThread(string msg, string? username = null)
     {
         // Dual sink: always broadcast to local dashboard (even if Slack fails)
         DashboardBroadcaster.Emit("slack", msg, username ?? BotUsername, _slackSessionThreadTs.Value);
+
+        // Live MD recording: append every slack message to MD transcript
+        _activeTriadCtx?.AppendMd($"> **{username ?? "system"}** ({DateTime.Now:HH:mm}): {msg}\n");
 
         var sessionTs = _slackSessionThreadTs.Value;
         if (sessionTs == null) return;
