@@ -1,0 +1,52 @@
+# Handoff 2026-03-28 Session
+
+## CRITICAL: Eye not launching
+- wkappbot-core.exe starts (process visible) but Main() never reached
+- No eye.pid=*.log created → AppHost init blocked
+- Suspect: app.manifest added to WKAppBot.CLI.csproj (REMOVED but not yet rebuilt)
+- Need: clean build + deploy without app.manifest, verify Eye starts
+
+## Uncommitted change
+- csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj: <ApplicationManifest> line REMOVED (needs commit)
+- csharp/src/WKAppBot.CLI/app.manifest: file exists but not referenced (can delete)
+
+## What was done (commits on main, ahead of origin by 11)
+1. 28c0791 - Split 6 large files (10,633→25+ files) + ErrorScope + ask MD + windows format
+2. 2ad9489 - Launcher LAUNCH JSON identity line
+3. 79b410e - Remove ErrorScope from MCP worker (FIX for find-prompts timeout)
+4. b571c12 - Stealth LAUNCH ANSI
+5. 05cb1cc - Stealth LAUNCH \r+spaces
+6. 903c0b8 - Console telepathy (UNTESTED)
+7. 7aa1c8f - Eye RunCore (REVERTED in 1207b0e)
+8. 272423d - Revert CMD-MCP to pipeWriter
+9. d476e76 - Revert EyeMcpClient error return
+
+## Bugs introduced and status
+1. ErrorScope in MCP HandleToolsCallAsync → FIXED (79b410e)
+2. [CMD-MCP] moved to stderr → FIXED (272423d)
+3. EyeMcpClient error to stderr → FIXED (d476e76)
+4. app.manifest added to Core → REMOVED from csproj but NOT YET REBUILT
+5. Eye launch path changed → REVERTED (1207b0e)
+
+## To restore working state
+1. Kill all wkappbot* processes
+2. Rebuild: dotnet publish WKAppBot.CLI.csproj -c Release
+3. Rebuild: dotnet publish WKAppBot.Launcher.csproj -c Release
+4. Deploy both to W:\SDK\bin\
+5. Launch: wkappbot eye
+6. Verify: wkappbot eye tick shows healthy output
+
+## 30s cold start issue
+- NOT solved. SetConsoleOutputCP is NOT the cause (tested, still 30s)
+- DETACHED_PROCESS + .NET 8 single-file = fundamental AppHost init delay
+- Eye pipe path (2.3s) works fine — only affects Core direct spawn fallback
+- Triad debate suggested CSRSS ALPC timeout but evidence doesn't match
+
+## Files to watch
+- WKAppBot.CLI.csproj: NO app.manifest reference
+- McpCommand.Helpers.cs: NO ErrorScope in HandleToolsCallAsync
+- McpCommand.Helpers.cs: WriteJsonRpc has smart flush (1s throttle)
+- EyeCmdPipeServer.cs: [CMD-MCP] uses pipeWriter (NOT Console.Error)
+- EyeMcpClient.cs: error returns as stdout string (NOT Console.Error)
+- Program.cs: ErrorScope only when isConsoleDirect
+- StepProfiler.cs: PulseStep silent unless WKAPPBOT_PROFILE=1
