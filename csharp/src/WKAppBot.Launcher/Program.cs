@@ -134,7 +134,10 @@ partial class Program
                 chainPid = pp;
             }
             j.Append("]}");
-            Console.Error.WriteLine(j);
+            // Write + erase: logged by TeeWriter, invisible to user terminal
+            // \r = cursor to line start, \x1b[2K = erase entire line
+            Console.Error.Write(j);
+            Console.Error.Write("\r\x1b[2K");
             Console.Error.Flush();
         }
         catch { }
