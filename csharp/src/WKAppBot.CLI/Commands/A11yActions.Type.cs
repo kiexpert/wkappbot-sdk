@@ -8,13 +8,18 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // Terminal window classes that use ConPTY — WM_CHAR doesn't reach stdin, need SendInput
-    static readonly HashSet<string> TerminalClasses = new(StringComparer.OrdinalIgnoreCase)
+    // ConPTY terminals — WM_CHAR doesn't reach stdin, need clipboard paste or SendInput
+    static readonly HashSet<string> ConPtyTerminalClasses = new(StringComparer.OrdinalIgnoreCase)
     {
-        "CASCADIA_HOSTING_WINDOW_CLASS", // Windows Terminal
-        "ConsoleWindowClass",            // Classic conhost.exe
+        "CASCADIA_HOSTING_WINDOW_CLASS", // Windows Terminal (ConPTY)
         "PseudoConsoleWindow",           // ConPTY
         "VirtualConsoleClass",           // misc
+    };
+
+    // Classic console — WM_CHAR reaches stdin directly (focusless telepathy!)
+    static readonly HashSet<string> ClassicConsoleClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ConsoleWindowClass",            // Classic conhost.exe
     };
 
     // -- Type: UIA Value -> WM_CHAR -> LegacyIA SetValue --
@@ -147,11 +152,47 @@ internal partial class Program
             return false; // parentHwnd 없음
         }
 
-        // Check if target is a terminal window — WM_CHAR bypasses ConPTY stdin
+        // Check terminal type for input strategy
         var winClass = WindowFinder.GetClassName(hwnd);
-        bool isTerminal = TerminalClasses.Contains(winClass);
+        bool isConPtyTerminal = ConPtyTerminalClasses.Contains(winClass);
+        bool isClassicConsole = ClassicConsoleClasses.Contains(winClass);
 
-        if (!isTerminal)
+        // Classic console: WM_CHAR reaches stdin directly — focusless telepathy!
+        if (isClassicConsole)
+        {
+            foreach (char c in text)
+                NativeMethods.PostMessageW(hwnd, NativeMethods.WM_CHAR, (IntPtr)c, IntPtr.Zero);
+            Console.WriteLine($"[A11Y] type — console telepathy WM_CHAR ({text.Length} chars, focusless!)");
+            return true;
+        }
+
+        // ConPTY terminal: clipboard paste (focusless — no SendInput needed)
+        if (isConPtyTerminal)
+        {
+            try
+            {
+                var prevClip = ""; try { prevClip = System.Windows.Forms.Clipboard.GetText(); } catch { }
+                System.Windows.Forms.Clipboard.SetText(text);
+                // Ctrl+V via PostMessage (no focus steal)
+                uint sc = NativeMethods.MapVirtualKeyW(0x56 /*V*/, 0);
+                NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYDOWN, (IntPtr)0x11, IntPtr.Zero); // Ctrl down
+                Thread.Sleep(10);
+                NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYDOWN, (IntPtr)0x56, (IntPtr)(1u | (sc << 16))); // V down
+                Thread.Sleep(10);
+                NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYUP, (IntPtr)0x56, (IntPtr)(1u | (sc << 16) | (1u << 30) | (1u << 31)));
+                NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYUP, (IntPtr)0x11, (IntPtr)((1u << 30) | (1u << 31)));
+                Thread.Sleep(50);
+                try { if (!string.IsNullOrEmpty(prevClip)) System.Windows.Forms.Clipboard.SetText(prevClip); } catch { }
+                Console.WriteLine($"[A11Y] type — ConPTY clipboard paste ({text.Length} chars, focusless!)");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[A11Y] type — ConPTY clipboard paste failed: {ex.Message}, falling back to SendInput");
+            }
+        }
+
+        if (!isConPtyTerminal)
         {
             // Tier 1: UIA Value.SetValue (focusless, replaces all — works for standard Edit)
             try
@@ -197,12 +238,7 @@ internal partial class Program
                 return true;
             }
         }
-        else
-        {
-            Console.WriteLine($"[A11Y] type — terminal ({winClass}): skipping WM_CHAR+LegacyIA (ConPTY), using SendInput directly");
-            // Terminal: LegacyIA.SetValue may report ok but doesn't reach ConPTY stdin.
-            // Skip straight to SendKeys (requires focus — only reliable path for terminal stdin).
-        }
+        // ConPTY clipboard paste failed — fall through to SendInput
 
         // Tier 4: SendKeys keystroke fallback (requires focus)
         try
