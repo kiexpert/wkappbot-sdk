@@ -123,6 +123,28 @@ Console.WriteLine("[EYE] ScreenSaver fade start (user
 
 ---
 
+## SUGGEST: Print Actionable Access Info for Open Pages
+
+**Problem**: When Chrome/webbot has a page open, the agent doesn't know how to target it efficiently. Wasted 30+ minutes trying different grap patterns (`*WKWebBot*`, `*Chrome*#api.slack.com`, `*hwnd=00140922*#api.slack.com`) before finding the right one.
+
+**Ideal Behavior**: When `web open` or `web read` loads a page, print a ready-to-copy command:
+```
+[WEB] Page loaded: Slack API: Applications | 앱봇알바생 Slack
+[WEB] URL: https://api.slack.com/apps/A0APH6RJ1AA
+[WEB] CDP Target: a11y read "*Slack API*chrome*#api.slack.com/apps/A0APH6RJ1AA" --eval-js "..."
+[WEB] HWND: 0x00140922
+[WEB] Tab ID: 01252F61E773
+```
+
+This saves agents from trial-and-error grap pattern discovery. The `CDP Target` line should be a working command that the agent can copy-paste.
+
+**Additional Suggestions**:
+- `eye tick` should show which Chrome tabs are CDP-accessible (port + tab ID)
+- `a11y windows` output should include CDP port info for Chrome windows
+- When `--eval-js` silently fails (UIA path taken instead of CDP), warn explicitly: `[WARN] --eval-js ignored: UIA path used. Use web read or #tab-hint for CDP.`
+
+---
+
 ## LOW: Multiple Duplicate Chrome Tabs
 
 **Symptom**: 6+ identical tabs (`api.slack.com/apps/A0APH6RJ1AA`) opened during Slack setup automation.
