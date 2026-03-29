@@ -49,6 +49,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
     private volatile bool _isVisible;
     private volatile bool _disposed;
     private double _currentOpacity;
+    private DateTime _lastTopmostUtc = DateTime.MinValue;
     /// <summary>Set when user input detected while visible — process should self-terminate.</summary>
     public volatile bool ShouldExit;
     // _lastT removed — now per-monitor (MonitorWindow.LastT)
@@ -290,10 +291,10 @@ internal sealed class ScreenSaverOverlay : IDisposable
             bool wasHidden = !_isVisible;
             if (wasHidden)
             {
-                // First show: make visible at opacity=0, set _currentOpacity=0
-                // Next tick will fade in naturally (targetOpacity > 0 → diff > 0.005)
+                // First show: opacity=0, then fade in naturally via subsequent ticks
                 _currentOpacity = 0;
                 _isVisible = true;
+                _lastTopmostUtc = DateTime.UtcNow;
                 _dispatcher.BeginInvoke(() =>
                 {
                     foreach (var mwin in _monitors)
@@ -318,11 +319,18 @@ internal sealed class ScreenSaverOverlay : IDisposable
                         if (mwin.XRayActive) continue;
                         mwin.Window.Opacity = targetOpacity;
                         UpdateMonitorVisuals(mwin, t);
-                    }
-                });
 
-                if (wasHidden)
-                    Console.WriteLine("[EYE] ScreenSaver fade start (user idle ≥10s)");
+                        // Re-topmost at most every 5 minutes (avoid blocking other windows)
+                        if ((DateTime.UtcNow - _lastTopmostUtc).TotalMinutes >= 5)
+                        {
+                            var helper = new WindowInteropHelper(mwin.Window);
+                            SetWindowPos(helper.Handle, (IntPtr)HWND_TOPMOST, 0, 0, 0, 0,
+                                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                        }
+                    }
+                    if ((DateTime.UtcNow - _lastTopmostUtc).TotalMinutes >= 5)
+                        _lastTopmostUtc = DateTime.UtcNow;
+                });
             }
         }
         else if (_isVisible)
