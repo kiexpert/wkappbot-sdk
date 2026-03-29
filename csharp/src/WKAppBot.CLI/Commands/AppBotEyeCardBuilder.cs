@@ -130,7 +130,8 @@ internal partial class Program
                     if (cardCtx >= 0)
                     {
                         var sizeMB = jsonlFileSize / (1024.0 * 1024.0);
-                        ctxTag = sizeMB >= 1.0 ? $" ctx={cardCtx}% ({sizeMB:F0}MB)" : $" ctx={cardCtx}%";
+                        var sizeTag = sizeMB >= 1.0 ? $"{sizeMB:F0}MB" : $"{jsonlFileSize / 1024}KB";
+                        ctxTag = $" ctx={cardCtx}% ({sizeTag})";
                     }
                     // For prompt-discovered cards, use JSONL age instead of tick age
                     if (c.LastTag == "prompt-discovered" && jsonlAge != null)
@@ -148,14 +149,18 @@ internal partial class Program
                         sb.AppendLine($"클롣 작업: {c.LastTag}");
                         sb.AppendLine($"클롣 상태: {c.LastStatus} ({ageText}){ctxTag}");
                     }
-                    // 클롣 생각: CWD별 Claude Code 세션에서 최신 assistant 텍스트
+                    // 클롣 프롬프트 + 생각: CWD별 Claude Code 세션에서 최신 user/assistant 텍스트
                     var clotThought = ReadClotThoughtForCwd(c.Cwd);
                     if (!string.IsNullOrWhiteSpace(clotThought))
                     {
-                        var truncClot = clotThought.Length > 120 ? clotThought[..120] + "..." : clotThought;
-                        sb.AppendLine($"클롣 생각: {truncClot}");
+                        // May contain "💬 user\n🤖 assistant" — split into separate lines
+                        foreach (var thoughtLine in clotThought.Split('\n'))
+                        {
+                            if (string.IsNullOrWhiteSpace(thoughtLine)) continue;
+                            var trunc = thoughtLine.Length > 120 ? thoughtLine[..120] + "..." : thoughtLine;
+                            sb.AppendLine($"클롣 생각: {trunc}");
+                        }
                     }
-                    // No else — skip "클롣 생각:" if no text found
                     sb.AppendLine("----");
                 }
                 else
