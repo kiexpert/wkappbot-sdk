@@ -210,16 +210,23 @@ internal partial class Program
                 Console.ResetColor();
             }
 
-            // Lightweight focus path for ALL windows (Win32 only, <1ms, generalized)
+            // Keyboard focus: show only if focus is on a CHILD (not the window itself)
             if (!isChild)
             {
-                var focusPath = GrapHelper.GetFocusPath(hWnd);
-                if (focusPath != null)
+                var tid = NativeMethods.GetWindowThreadProcessId(hWnd, out _);
+                var gti = new NativeMethods.GUITHREADINFO
+                    { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+                if (tid != 0 && NativeMethods.GetGUIThreadInfo(tid, ref gti) && gti.hwndFocus != IntPtr.Zero
+                    && gti.hwndFocus != hWnd) // different from window itself
                 {
-                    Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.Write("    ⌨ ");
-                    Console.ResetColor();
-                    Console.WriteLine(focusPath);
+                    var focusPath = GrapHelper.GetFocusPath(hWnd);
+                    if (focusPath != null)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Magenta;
+                        Console.Write("    ⌨key: ");
+                        Console.ResetColor();
+                        Console.WriteLine(focusPath);
+                    }
                 }
             }
             // Full UIA focus path — DISABLED for speed. Use GetFocusPath (Win32) above.
