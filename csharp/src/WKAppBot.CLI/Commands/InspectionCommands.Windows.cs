@@ -440,7 +440,9 @@ internal partial class Program
             : deep ? "windows (deep, Z-order ★=foreground)"
             : "windows (Z-order ★=foreground)";
         Console.WriteLine($"── {mode} ──");
-        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine("  [hwnd___] title_____________________________________  process______ ____WxH  flags");
+        Console.ResetColor();
 
         // Helper: get raw window info WITHOUT title filter (for --uia mode)
         (string title, string className, string process, uint pid, int w, int h, bool visible)?
