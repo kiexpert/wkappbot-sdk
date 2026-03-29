@@ -264,6 +264,8 @@ partial class Program
         CloseHandle(hExitEvent);
 
         try { _stdout.Flush(); } catch { }
+        // Kill Core if still alive — prevents zombie accumulation (30s DLL detach delay)
+        try { TerminateProcess(pi.hProcess, exitCode != 0 ? (uint)exitCode : 0); } catch { }
         CloseHandle(hPipeOut); CloseHandle(hPipeErr); CloseHandle(hIocp); CloseHandle(pi.hProcess);
         Prof($"IOCP: done exitCode={exitCode}");
         return (int)exitCode;
