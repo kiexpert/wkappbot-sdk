@@ -1000,7 +1000,8 @@ internal partial class Program
                         var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
                         File.WriteAllText(tmpFile, routeJson);
                         var corePath = Environment.ProcessPath ?? "wkappbot";
-                        var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory, caller: "EYE");
+                        var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory,
+                            env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE");
                         proc?.WaitForExit(60000);
                         proc?.Dispose();
                         try { File.Delete(tmpFile); } catch { }
@@ -1235,7 +1236,8 @@ internal partial class Program
                     var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
                     File.WriteAllText(tmpFile, routeJson);
                     var corePath = Environment.ProcessPath ?? "wkappbot";
-                    var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory, caller: "EYE");
+                    var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory,
+                        env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE");
                     proc?.WaitForExit(60000);
                     proc?.Dispose();
                     try { File.Delete(tmpFile); } catch { }
@@ -1350,7 +1352,8 @@ internal partial class Program
                     var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
                     File.WriteAllText(tmpFile, routeJson);
                     var corePath = Environment.ProcessPath ?? "wkappbot";
-                    var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory, caller: "EYE");
+                    var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory,
+                        env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE");
                     proc?.WaitForExit(60000);
                     proc?.Dispose();
                     try { File.Delete(tmpFile); } catch { }

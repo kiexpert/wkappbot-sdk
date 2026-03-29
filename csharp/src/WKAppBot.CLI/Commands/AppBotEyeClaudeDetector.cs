@@ -1068,7 +1068,7 @@ internal partial class Program
             var core = System.IO.Path.Combine(
                 System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot-core.exe");
             using var spawn = AppBotPipe.Spawn(core, "find-prompts", Environment.CurrentDirectory,
-                redirectStdOut: true, caller: "FIND-PROMPTS");
+                redirectStdOut: true, env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "FIND-PROMPTS");
             if (spawn == null) return;
             var output = spawn.StdOut!.ReadToEnd();
             spawn.WaitForExit(10_000);

@@ -548,7 +548,7 @@ internal partial class Program
             int ringY = posY;
             AppBotPipe.Spawn(wrPath, $"whisper-ring {ringX} {ringY}",
                 cwd: Environment.CurrentDirectory,
-                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString() },
+                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
                 caller: "EYE-WHISPER");
             PulseStep.Mark("whisper-spawned");
             Console.WriteLine($"[EYE] Whisper Ring spawned as separate process");
@@ -564,7 +564,7 @@ internal partial class Program
             var ssPath = Environment.ProcessPath ?? "wkappbot";
             AppBotPipe.Spawn(ssPath, "screensaver",
                 cwd: Environment.CurrentDirectory,
-                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString() },
+                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
                 caller: "EYE-SCREENSAVER");
             PulseStep.Mark("screensaver-spawned");
             Console.WriteLine("[EYE] ScreenSaver spawned as separate process");
