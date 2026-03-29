@@ -57,10 +57,18 @@ partial class Program
         prof("Main() entered");
 
         // ── Ensure UTF-8 console output (NativeAOT: app.manifest may not apply) ──
+        // Core always outputs UTF-8. Launcher transcodes if console can't do UTF-8.
         if (GetConsoleOutputCP() != 65001)
         {
             SetConsoleOutputCP(65001);
             SetConsoleCP(65001);
+        }
+        if (GetConsoleOutputCP() != 65001)
+        {
+            // SetConsoleOutputCP failed (restricted env) — enable transcoding in IOCP relay
+            _needsTranscode = true;
+            _consoleEncoding = System.Text.Encoding.GetEncoding((int)GetConsoleOutputCP());
+            prof($"UTF-8 codepage failed — transcoding to CP{GetConsoleOutputCP()}");
         }
 
         // ── Identity: who am I, who's my parent, what terminal am I in? ──
@@ -733,6 +741,10 @@ partial class Program
 
     /// <summary>Core exe path override (--core flag). Null = default (wkappbot-core.exe next to launcher).</summary>
     static string? _coreExePath;
+
+    /// <summary>True when console can't do UTF-8 — IOCP relay must transcode Core's UTF-8 output.</summary>
+    static bool _needsTranscode;
+    static System.Text.Encoding? _consoleEncoding;
 
     /// <summary>Resolve core exe path: --core override or default.</summary>
     static string ResolveCoreExe()
