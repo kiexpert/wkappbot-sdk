@@ -1068,13 +1068,19 @@ internal partial class Program
             var core = System.IO.Path.Combine(
                 System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot-core.exe");
             using var spawn = AppBotPipe.Spawn(core, "find-prompts", Environment.CurrentDirectory,
-                redirectStdOut: true, env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "FIND-PROMPTS");
+                redirectStdOut: true, redirectStdErr: true, env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "FIND-PROMPTS");
             if (spawn == null) return;
             var output = spawn.StdOut!.ReadToEnd();
-            spawn.WaitForExit(10_000);
+            var stderr = spawn.StdErr?.ReadToEnd() ?? "";
+            spawn.WaitForExit(60_000); // FlaUI cold-start takes ~25s
             var code = spawn.HasExited ? spawn.ExitCode : 1;
+            if (!string.IsNullOrWhiteSpace(stderr))
+                Console.Error.WriteLine($"[FIND-PROMPTS] stderr: {stderr.Trim()[..Math.Min(200, stderr.Trim().Length)]}");
             if (code != 0 || string.IsNullOrWhiteSpace(output))
+            {
+                Console.Error.WriteLine($"[FIND-PROMPTS] exit={code} stdout={output?.Length ?? 0}chars");
                 return;
+            }
 
             var arr = JsonNode.Parse(output) as JsonArray;
             if (arr == null)
