@@ -289,9 +289,16 @@ internal partial class Program
                 var pname = !string.IsNullOrWhiteSpace(t.HostName) ? t.HostName : (string.IsNullOrWhiteSpace(t.ParentName) ? "unknown" : t.ParentName);
                 var ptitle = t.HostTitle ?? "";
 
-                // CWD-based key: normalize to lowercase forward-slash, trimmed
-                var cwdRaw = (t.Cwd ?? "").Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
-                var cardKey = string.IsNullOrEmpty(cwdRaw) ? $"pid_{ppid}" : cwdRaw;
+                // Card key: PromptHwnd (session) when available, CWD fallback for legacy ticks.
+                var promptHwnd = t.PromptHwnd ?? "";
+                string cardKey;
+                if (!string.IsNullOrEmpty(promptHwnd))
+                    cardKey = promptHwnd;
+                else
+                {
+                    var cwdRaw = (t.Cwd ?? "").Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
+                    cardKey = string.IsNullOrEmpty(cwdRaw) ? $"pid_{ppid}" : cwdRaw;
+                }
 
                 // Always update timestamp with latest tick
                 // But for tag/status: meta tags (eye, snapshot) don't overwrite meaningful work tags

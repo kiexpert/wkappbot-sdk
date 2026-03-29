@@ -122,7 +122,7 @@ internal partial class Program
                     var header = string.IsNullOrWhiteSpace(cwdTag)
                         ? (string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : c.ParentTitle)
                         : cwdTag;
-                    sb.AppendLine($"[{header}] {c.ParentName}:{c.ParentPid}");
+                    sb.AppendLine($"[{header}]");
                     // Context % per card (CWD → session JSONL size → ctx%)
                     var ctxTag = "";
                     var (cardCtx, jsonlAge, _, jsonlFileSize) = GetContextInfoForCwdEx(c.Cwd);

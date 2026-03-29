@@ -94,20 +94,14 @@ internal partial class Program
         var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"{tr}\" /SC ONCE /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
         try
         {
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName        = "schtasks.exe",
-                Arguments       = args,
-                UseShellExecute = false,
-                CreateNoWindow  = true,
-            };
-            var proc = System.Diagnostics.Process.Start(psi);
-            proc?.WaitForExit(3000);
-            var ok = proc?.ExitCode == 0;
+            using var spawn = AppBotPipe.Spawn("schtasks.exe", args,
+                cwd: Environment.SystemDirectory, caller: "EYE-SCHED");
+            spawn?.WaitForExit(3000);
+            var ok = spawn != null && spawn.ExitCode == 0;
             if (ok)
                 Console.WriteLine($"[EYE] Watchdog: eye tick scheduled at {fireAt} (2 min from now)");
             else
-                Console.WriteLine($"[EYE] Watchdog schtasks exit={proc?.ExitCode} (non-fatal)");
+                Console.WriteLine($"[EYE] Watchdog schtasks exit={spawn?.ExitCode} (non-fatal)");
         }
         catch (Exception ex)
         {
@@ -258,25 +252,24 @@ internal partial class Program
             // Eye creates its own console via AllocConsole() — no stdio from parent needed.
             // Previously used UseShellExecute=true, but ShellExecuteEx fails silently
             // in DETACHED_PROCESS context (no shell/console to work with).
+            // CWD chain: user's project dir → Core → Eye → screensaver/whisper-ring/MCP
+            // Eye needs AllocConsole() — cannot use AppBotPipe.Spawn (CREATE_NO_WINDOW blocks it).
+            // Use Process.Start with explicit WorkingDirectory instead.
+            var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+            var eyeArgs = "eye" + (extraArgs.Length > 0 ? " " + extraArgs : "");
+            EyeLog($"Spawning: {corePath} {eyeArgs} cwd={callerCwd}");
             var psi = new ProcessStartInfo
             {
                 FileName        = corePath,
-                Arguments       = "eye" + (extraArgs.Length > 0 ? " " + extraArgs : ""),
+                Arguments       = eyeArgs,
                 UseShellExecute = false,
                 CreateNoWindow  = true,
-                // NO RedirectStandard* → bInheritHandles=false → no PTY leak
-                // WindowStyle=Hidden → STARTF_USESHOWWINDOW + SW_HIDE in STARTUPINFO.
-                // When Eye calls AllocConsole(), the console window is created HIDDEN
-                // from the start — no visible flash. (CreateNoWindow prevents the initial
-                // console; WindowStyle=Hidden prevents AllocConsole's window from showing.)
+                WorkingDirectory = callerCwd,
                 WindowStyle     = ProcessWindowStyle.Hidden,
             };
-
-            EyeLog($"Spawning: {corePath} {psi.Arguments}");
             var proc2 = Process.Start(psi);
             if (proc2 != null)
             {
-
                 Console.WriteLine($"[EYE] Launched (PID={proc2.Id})");
                 PulseStep.Mark("process-started");
 
@@ -326,6 +319,19 @@ internal partial class Program
 
     static int AppBotEyeCommand(string[] args)
     {
+        // Fix CWD: hot-swap inherits old Eye's CWD (often system32).
+        // Correct to callerCwd (from pipe) or exe directory as fallback.
+        var cwd = Environment.CurrentDirectory;
+        if (string.IsNullOrEmpty(cwd) || cwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
+            || cwd.Contains("System32", StringComparison.OrdinalIgnoreCase))
+        {
+            var fixedCwd = EyeCmdPipeServer.CallerCwd.Value
+                ?? Path.GetDirectoryName(Environment.ProcessPath)
+                ?? ".";
+            try { Environment.CurrentDirectory = fixedCwd; } catch { }
+            Console.Error.WriteLine($"[EYE] CWD fixed: {cwd} → {fixedCwd}");
+        }
+
         // one-shot diagnostic tick (must not enter global loop)
         if (args.Length > 0 && string.Equals(args[0], "tick", StringComparison.OrdinalIgnoreCase))
             return EyeTickCommand(args.Skip(1).ToArray());

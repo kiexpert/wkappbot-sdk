@@ -48,9 +48,9 @@ internal sealed class ScreenSaverOverlay : IDisposable
     private readonly ManualResetEventSlim _ready = new(false);
     private volatile bool _isVisible;
     private volatile bool _disposed;
-    /// <summary>Set to true after user input dismisses the screensaver — caller should exit process.</summary>
-    public volatile bool ShouldExit;
     private double _currentOpacity;
+    /// <summary>Set when user input detected while visible — process should self-terminate.</summary>
+    public volatile bool ShouldExit;
     // _lastT removed — now per-monitor (MonitorWindow.LastT)
 
     private const int GWL_EXSTYLE = -20;
@@ -299,7 +299,6 @@ internal sealed class ScreenSaverOverlay : IDisposable
                     foreach (var mwin in _monitors)
                     {
                         mwin.Window.Opacity = 0;
-                        mwin.LastT = -1; // reset so UpdateMonitorVisuals runs on next tick
                         mwin.Window.Visibility = Visibility.Visible;
                         var helper = new WindowInteropHelper(mwin.Window);
                         SetWindowPos(helper.Handle, (IntPtr)HWND_TOPMOST, 0, 0, 0, 0,
@@ -330,18 +329,17 @@ internal sealed class ScreenSaverOverlay : IDisposable
         {
             _isVisible = false;
             _currentOpacity = 0;
-            // Invoke (sync) — immediate transparency on ALL monitors, no queue delay
+            ShouldExit = true; // user input → self-terminate (free memory)
             _dispatcher.Invoke(() =>
             {
                 foreach (var mwin in _monitors)
                 {
+                    mwin.XRayActive = false; // reset X-ray
                     mwin.Window.Opacity = 0;
                     mwin.Window.Visibility = Visibility.Hidden;
-                    mwin.LastT = -1;
                 }
             });
-            Console.WriteLine("[EYE] ScreenSaver OFF (user input detected) — exiting process");
-            ShouldExit = true;
+            Console.WriteLine("[EYE] ScreenSaver OFF + ShouldExit (user input detected)");
         }
     }
 
@@ -425,6 +423,12 @@ internal sealed class ScreenSaverOverlay : IDisposable
                     {
                         mwin.Window.Opacity = 0;
                         mwin.Window.Visibility = Visibility.Hidden;
+                    }
+                    else
+                    {
+                        // X-ray OFF: restore visibility + current opacity
+                        mwin.Window.Visibility = Visibility.Visible;
+                        mwin.Window.Opacity = _currentOpacity;
                     }
                     Console.WriteLine($"[SCREENSAVER] X-ray {(mwin.XRayActive ? "ON" : "OFF")} for monitor at ({mwin.X},{mwin.Y} {mwin.W}x{mwin.H})");
                     break;

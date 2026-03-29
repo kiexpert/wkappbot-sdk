@@ -39,6 +39,10 @@
     <ProjectReference Include="..\WKAppBot.Android\WKAppBot.Android.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\AppBotPipe.cs" Link="Shared\AppBotPipe.cs" />
+  </ItemGroup>
+
   <!-- Dashboard HTML embedded resource -->
   <ItemGroup>
     <EmbeddedResource Include="Commands\DashboardPage.html" />
