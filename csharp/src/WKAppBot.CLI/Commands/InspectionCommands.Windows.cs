@@ -200,8 +200,24 @@ internal partial class Program
             int titleWidth = isChild ? 44 : 45; // child: └ takes 1 col → shrink title to keep alignment
             var trimTitle = TrimToWidth(displayTitle, titleWidth);
             var padTitle = PadToWidth(trimTitle, titleWidth);
-            // Child: omit process:pid (already shown on root) — show owner hwnd instead
-            var procPid = isChild ? "" : $"{process}:{pid}";
+            // Child: show injector module name instead of process:pid
+            string procPid;
+            if (isChild)
+            {
+                var modHandle = NativeMethods.GetClassLongPtrW(hWnd, -16 /*GCL_HMODULE*/);
+                var modName = "";
+                if (modHandle != IntPtr.Zero)
+                {
+                    var mb = new StringBuilder(260);
+                    NativeMethods.GetModuleFileNameW(modHandle, mb, 260);
+                    modName = Path.GetFileNameWithoutExtension(mb.ToString()).ToLowerInvariant();
+                }
+                procPid = !string.IsNullOrEmpty(modName) ? modName : process;
+            }
+            else
+            {
+                procPid = $"{process}:{pid}";
+            }
             var trimProc = procPid.Length > 16 ? procPid[..16] : procPid;
             var sizeStr = $"{w}x{h}";
             // Flags: single-char compact (H=hidden L=layered T=tool M=min X=max D=disabled ↑=topmost)
