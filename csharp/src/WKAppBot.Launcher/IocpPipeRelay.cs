@@ -152,7 +152,7 @@ partial class Program
         // Custom envBlock was failing to deliver env vars to .NET 8 single-file Core.
         bool ok = CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, true,
             DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB,
-            IntPtr.Zero, null, ref si, out var pi);
+            IntPtr.Zero, Environment.CurrentDirectory, ref si, out var pi);
 
         // Close client-side handles in parent (child holds them → EOF on child exit)
         CloseHandle(hClientOut);

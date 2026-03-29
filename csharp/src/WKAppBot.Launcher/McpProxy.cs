@@ -89,7 +89,7 @@ partial class Program
             hStdError  = GetStdHandle(-12), // stderr inherited directly
         };
         if (!CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, true,
-            CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, null, ref si, out var pi))
+            CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, Environment.CurrentDirectory, ref si, out var pi))
         {
             Console.Error.WriteLine($"[LAUNCHER:MCP] CreateProcess failed (err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()})");
             CloseHandle(hCoreStdinRead); CloseHandle(hCoreStdinWrite);
@@ -197,7 +197,7 @@ partial class Program
                     var newCmdArr = (newCmdSb.ToString() + "\0").ToCharArray();
 
                     if (!CreateProcessW(null, newCmdArr, IntPtr.Zero, IntPtr.Zero, true,
-                        CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, null, ref newSi, out var newPi))
+                        CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, Environment.CurrentDirectory, ref newSi, out var newPi))
                     {
                         Console.Error.WriteLine($"[HOT-SWAP] CreateProcess failed — restoring old Core");
                         lock (_gate) { _activeStdinWrite = _oldCoreStdinWrite; _oldCoreStdinWrite = IntPtr.Zero; foreach (var kv in _oldInflight) _inflight[kv.Key] = kv.Value; _oldInflight.Clear(); }
