@@ -238,23 +238,24 @@ internal partial class Program
                 Console.ResetColor();
             }
 
-            // Keyboard focus: show only if focus is on a CHILD (not the window itself)
+            // Keyboard focus: always show for root windows — important even when focus=self
             if (!isChild)
             {
                 var tid = NativeMethods.GetWindowThreadProcessId(hWnd, out _);
                 var gti = new NativeMethods.GUITHREADINFO
                     { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
-                if (tid != 0 && NativeMethods.GetGUIThreadInfo(tid, ref gti) && gti.hwndFocus != IntPtr.Zero
-                    && gti.hwndFocus != hWnd) // different from window itself
+                if (tid != 0 && NativeMethods.GetGUIThreadInfo(tid, ref gti) && gti.hwndFocus != IntPtr.Zero)
                 {
-                    var focusPath = GrapHelper.GetFocusPath(hWnd);
-                    if (focusPath != null)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Magenta;
-                        Console.Write("    ⌨key: ");
-                        Console.ResetColor();
-                        Console.WriteLine(focusPath);
-                    }
+                    var focusCls = new StringBuilder(128);
+                    NativeMethods.GetClassNameW(gti.hwndFocus, focusCls, 128);
+                    var focusTitle = NativeMethods.GetWindowTextW(gti.hwndFocus);
+                    var focusLabel = focusCls.ToString();
+                    if (focusTitle.Length > 0) focusLabel += $"(\"{(focusTitle.Length > 20 ? focusTitle[..17] + "..." : focusTitle)}\")";
+                    var selfNote = gti.hwndFocus == hWnd ? " ←self" : "";
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write("  ⌨ ");
+                    Console.ResetColor();
+                    Console.WriteLine($"[{gti.hwndFocus:X8}] {focusLabel}{selfNote}");
                 }
             }
             // Full UIA focus path — DISABLED for speed. Use GetFocusPath (Win32) above.
