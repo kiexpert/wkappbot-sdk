@@ -286,29 +286,34 @@ internal sealed class ScreenSaverOverlay : IDisposable
             double targetOpacity = t * MaxOpacity;
 
             bool wasHidden = !_isVisible;
-            // First show: force _currentOpacity to 0 so fade-in starts from transparent
-            if (wasHidden) _currentOpacity = 0;
-            if (Math.Abs(targetOpacity - _currentOpacity) >= 0.005)
+            if (wasHidden)
+            {
+                // First show: make visible at opacity=0, set _currentOpacity=0
+                // Next tick will fade in naturally (targetOpacity > 0 → diff > 0.005)
+                _currentOpacity = 0;
+                _isVisible = true;
+                _dispatcher.BeginInvoke(() =>
+                {
+                    foreach (var mwin in _monitors)
+                    {
+                        mwin.Window.Opacity = 0;
+                        mwin.Window.Visibility = Visibility.Visible;
+                        var helper = new WindowInteropHelper(mwin.Window);
+                        SetWindowPos(helper.Handle, (IntPtr)HWND_TOPMOST, 0, 0, 0, 0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    }
+                });
+                Console.WriteLine("[EYE] ScreenSaver fade start (user idle ≥10s)");
+            }
+            else if (Math.Abs(targetOpacity - _currentOpacity) >= 0.005)
             {
                 _currentOpacity = targetOpacity;
-                _isVisible = true;
 
                 _dispatcher.BeginInvoke(() =>
                 {
                     foreach (var mwin in _monitors)
                     {
-                        if (mwin.XRayActive) continue; // X-ray: skip this monitor
-
-                        if (wasHidden)
-                        {
-                            mwin.Window.Opacity = 0;
-                            mwin.Window.Visibility = Visibility.Visible;
-                            var helper = new WindowInteropHelper(mwin.Window);
-                            SetWindowPos(helper.Handle, (IntPtr)HWND_TOPMOST, 0, 0, 0, 0,
-                                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-                            // Skip opacity jump — start from 0, next tick will fade in naturally
-                            continue;
-                        }
+                        if (mwin.XRayActive) continue;
                         mwin.Window.Opacity = targetOpacity;
                         UpdateMonitorVisuals(mwin, t);
                     }
