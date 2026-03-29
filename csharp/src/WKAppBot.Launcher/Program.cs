@@ -134,11 +134,23 @@ partial class Program
                 chainPid = pp;
             }
             j.Append("]}");
-            // Write + blank: logged, invisible to user (no ANSI needed)
-            Console.Error.Write(j);
-            Console.Error.Write('\r');
-            Console.Error.Write(new string(' ', j.Length));
-            Console.Error.Write('\r');
+            // Stealth write: visible in log, invisible to user terminal.
+            // Launcher has no TeeWriter — stderr goes directly to console/pipe.
+            // Strategy: truncate to console width to prevent wrap, then \r+spaces+\r to erase.
+            // Full JSON is available via WKAPPBOT_PROFILE=1 (Prof already logs it).
+            var jStr = j.ToString();
+            Prof($"LAUNCH: {jStr}"); // full JSON to stderr (visible only with WKAPPBOT_PROFILE=1)
+            int conWidth = 0;
+            try { conWidth = Console.BufferWidth; } catch { }
+            if (conWidth > 20 && jStr.Length < conWidth)
+            {
+                // Fits in one line — stealth write + erase
+                Console.Error.Write(jStr);
+                Console.Error.Write('\r');
+                Console.Error.Write(new string(' ', jStr.Length));
+                Console.Error.Write('\r');
+            }
+            // else: too wide or no console — skip visual output (Prof already logged it)
             Console.Error.Flush();
         }
         catch { }
