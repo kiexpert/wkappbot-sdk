@@ -441,7 +441,8 @@ internal partial class Program
             : "windows (Z-order ★=foreground)";
         Console.WriteLine($"── {mode} ──");
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine("  [hwnd___] title_____________________________________  process______ ____WxH  flags");
+        //            "  [XXXXXXXX] {,-45}                                        {,-12}     {,9}  flags"
+        Console.WriteLine($"  {"[hwnd____]",-11}{"title",-45} {"process",-12} {"WxH",9}  flags");
         Console.ResetColor();
 
         // Helper: get raw window info WITHOUT title filter (for --uia mode)
