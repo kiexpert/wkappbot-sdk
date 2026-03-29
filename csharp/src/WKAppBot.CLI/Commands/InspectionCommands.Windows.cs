@@ -576,6 +576,10 @@ internal partial class Program
             return new Regex(rxStr, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         }
 
+        // 2-pass data: collect matched pids + all windows for sibling display
+        var _matchedPids = new HashSet<uint>();
+        var _allWindows = new List<(IntPtr hWnd, (string title, string className, string process, uint pid, int w, int h, bool visible) info, bool isFg)>();
+
         PulseStep.Mark("enum-windows-start");
         NativeMethods.EnumWindows((hWnd, _) =>
         {
@@ -684,12 +688,19 @@ internal partial class Program
                     if (v.visible && v.w >= 50 && v.h >= 50) visibleResultCount++;
                     else matchedHiddenHwnds.Add(hWnd);
                     parentPrinted = true;
+                    // Collect matched pid for sibling window display
+                    if (hasFilter) _matchedPids.Add(v.pid);
                     if (limit > 0 && totalCount >= limit) { Console.Out.Flush(); return false; }
                 }
-                else if (ownerCandidateMatcher != null)
+                else if (hasFilter)
+                {
+                    // Collect ALL windows for 2nd pass (sibling display)
+                    var raw = GetRawWindowInfo(hWnd);
+                    if (raw != null) _allWindows.Add((hWnd, raw.Value, isFg));
+                }
+                if (!hasFilter && ownerCandidateMatcher != null && info == null)
                 {
                     // ── Owner chain candidate: even 0x0/hidden windows that match pattern ──
-                    // e.g. PseudoConsoleWindow(wsl.exe, 0x0) with owner=CASCADIA
                     var owner = NativeMethods.GetWindow(hWnd, 4 /* GW_OWNER */);
                     if (owner != IntPtr.Zero && owner != hWnd)
                     {
@@ -864,6 +875,22 @@ internal partial class Program
                         hrect.Right - hrect.Left, hrect.Bottom - hrect.Top, true, false, oh == fgWnd);
                     totalCount++;
                 }
+            }
+        }
+
+        // 2nd pass: show sibling windows of matched processes (same pid, not yet printed)
+        if (hasFilter && _matchedPids.Count > 0 && _allWindows.Count > 0)
+        {
+            var siblings = _allWindows.Where(w => _matchedPids.Contains(w.info.pid)).ToList();
+            if (siblings.Count > 0)
+            {
+                Console.WriteLine();
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.WriteLine($"── sibling windows (same process) ──");
+                Console.ResetColor();
+                foreach (var (sHwnd, s, sFg) in siblings)
+                    PrintWindow(sHwnd, s.title, s.className, s.process, s.pid, s.w, s.h, s.visible, true, sFg);
+                totalCount += siblings.Count;
             }
         }
 
