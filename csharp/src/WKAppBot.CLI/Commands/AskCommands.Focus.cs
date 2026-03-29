@@ -256,22 +256,35 @@ internal partial class Program
 
             // Get element bounding rect in viewport coords
             // Task.Run avoids sync-over-async deadlock when caller is already on async context
-            var rectStr = Task.Run(() => cdp.GetElementRectAsync(cssSelector))
-                .WaitAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
+            string? rectStr = null;
+            try
+            {
+                rectStr = Task.Run(() => cdp.GetElementRectAsync(cssSelector))
+                    .WaitAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
+            }
+            catch { } // Fresh tab or stale context — fall through to client area fallback
 
-            if (string.IsNullOrEmpty(rectStr)) return null;
+            System.Drawing.Rectangle screenRect;
+            if (!string.IsNullOrEmpty(rectStr)
+                && rectStr.Split(',') is { Length: 4 } parts
+                && int.TryParse(parts[0], out int vx) && int.TryParse(parts[1], out int vy)
+                && int.TryParse(parts[2], out int vw) && int.TryParse(parts[3], out int vh)
+                && vw > 0 && vh > 0)
+            {
+                // Exact element rect
+                var pt0 = new WKAppBot.Win32.Native.POINT(0, 0);
+                NativeMethods.ClientToScreen(chromeHwnd, ref pt0);
+                screenRect = new System.Drawing.Rectangle(pt0.X + vx, pt0.Y + vy, vw, vh);
+            }
+            else
+            {
+                // Fallback: Chrome tab client area (JS eval failed — fresh tab or stale context)
+                NativeMethods.GetClientRect(chromeHwnd, out var cr);
+                var pt0 = new WKAppBot.Win32.Native.POINT(0, 0);
+                NativeMethods.ClientToScreen(chromeHwnd, ref pt0);
+                screenRect = new System.Drawing.Rectangle(pt0.X, pt0.Y, cr.Right, cr.Bottom);
+            }
 
-            var parts = rectStr.Split(',');
-            if (parts.Length != 4) return null;
-            int vx = int.Parse(parts[0]), vy = int.Parse(parts[1]);
-            int vw = int.Parse(parts[2]), vh = int.Parse(parts[3]);
-            if (vw <= 0 || vh <= 0) return null;
-
-            // Chrome window client area offset ??screen coords
-            var pt = new WKAppBot.Win32.Native.POINT(0, 0);
-            NativeMethods.ClientToScreen(chromeHwnd, ref pt);
-
-            var screenRect = new System.Drawing.Rectangle(pt.X + vx, pt.Y + vy, vw, vh);
             Console.Write($"[ZOOM:CDP {action}] ");
             return ClickZoomHelper.BeginFromRect(screenRect, chromeHwnd, $"cdp-{action}", label);
         }
