@@ -571,7 +571,8 @@ internal partial class Program
             // Errors always logged to TeeWriter log file regardless.
             // ErrorScope: suppress stderr only when directly connected to user console.
             // Piped processes (MCP, Eye, pipe) → stderr pass-through (immediate output + flush).
-            bool isConsoleDirect = !IsPipeMode && !RunningInEye && !IsMcpMode;
+            // stderr redirected → real-time output (like --stderr)
+            bool isConsoleDirect = !IsPipeMode && !RunningInEye && !IsMcpMode && !Console.IsErrorRedirected;
             using var _errScope = isConsoleDirect ? ErrorScope.Begin() : null;
 
             exitCode = command switch

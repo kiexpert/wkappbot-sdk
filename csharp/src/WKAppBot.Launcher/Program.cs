@@ -56,6 +56,9 @@ partial class Program
         // TODO: stderr dim — rolled back until MCP stderr relay preserves ANSI + encoding
         // Console.SetError(new DimStderrWriter(Console.Error));
 
+        // stderr AutoFlush: when redirected (piped to file/log), ensure real-time output
+        if (Console.IsErrorRedirected && Console.Error is System.IO.StreamWriter errSw)
+            errSw.AutoFlush = true;
         prof("Main() entered");
 
         // ── Ensure UTF-8 console output (NativeAOT: app.manifest may not apply) ──
