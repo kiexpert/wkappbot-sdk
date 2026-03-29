@@ -131,6 +131,14 @@ internal static class EyeMcpClient
         }
         catch (Exception ex)
         {
+            // Auto-restart MCP worker on pipe errors (hot-swap, process crash)
+            if (ex is IOException or ObjectDisposedException)
+            {
+                Console.Error.WriteLine($"[EYE-MCP] Pipe broken ({ex.GetType().Name}) — restarting MCP worker");
+                try { _process?.Kill(); } catch { }
+                _process = null; _stdin = null;
+                EnsureStarted(); // respawn
+            }
             return ($"[EYE-MCP] Error: {ex.Message}", 1);
         }
         finally

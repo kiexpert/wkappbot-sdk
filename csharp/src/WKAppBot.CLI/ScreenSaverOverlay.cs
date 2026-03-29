@@ -368,6 +368,31 @@ internal sealed class ScreenSaverOverlay : IDisposable
     {
         if (_disposed || _dispatcher == null || _monitors.Count == 0) return;
 
+        // Suppress screensaver while Eye has active automation (CDP/MCP commands)
+        // Eye writes runtime/eye_busy when executing commands — screensaver checks this
+        var busyFile = Path.Combine(
+            Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot.hq", "runtime", "eye_busy");
+        if (File.Exists(busyFile))
+        {
+            // Eye is busy with automation — don't activate screensaver
+            // If already visible, force hide (same as user input detection)
+            if (_isVisible)
+            {
+                _isVisible = false;
+                _currentOpacity = 0;
+                _dispatcher.BeginInvoke(() =>
+                {
+                    foreach (var mwin in _monitors)
+                    {
+                        mwin.Window.Opacity = 0;
+                        mwin.Window.Visibility = Visibility.Hidden;
+                    }
+                });
+                Console.WriteLine("[SCREENSAVER] Suppressed: Eye busy (automation active)");
+            }
+            return;
+        }
+
         var idleMs = NativeMethods.GetUserIdleMs();
 
         if (idleMs >= FadeStartMs)
