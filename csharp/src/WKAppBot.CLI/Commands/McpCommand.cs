@@ -59,6 +59,62 @@ internal partial class Program
     /// </summary>
     static bool McpLauncherMode = false;
 
+    /// <summary>CWD detected from parent VS Code/Claude Desktop at MCP startup. Fallback for _meta.callerCwd.</summary>
+    static string? _mcpDetectedCwd;
+
+    /// <summary>
+    /// Detect workspace CWD for MCP server session. Multi-strategy:
+    /// 1. Parent process chain: VS Code title → ExtractCwdFromVsCodeTitle
+    /// 2. CWD heuristic: if current directory has .mcp.json or .git → likely project root
+    /// 3. ~/.claude/projects/: find most recently modified session matching CWD
+    /// Works for VS Code, Claude Desktop, Codex, and any MCP client.
+    /// </summary>
+    static string? DetectMcpParentCwd()
+    {
+        // Strategy 1: walk parent process chain for VS Code / Claude Desktop
+        try
+        {
+            int cur = GetParentPid(Environment.ProcessId);
+            for (int depth = 0; cur > 0 && depth < 12; depth++)
+            {
+                try
+                {
+                    var p = Process.GetProcessById(cur);
+                    var name = (p.ProcessName ?? "").ToLowerInvariant();
+                    var title = GetMainWindowTitleSafe(p);
+
+                    // VS Code: extract CWD from window title
+                    if (name == "code" || title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var cwd = ExtractCwdFromVsCodeTitle(title);
+                        if (cwd != null) return cwd;
+                    }
+
+                    var next = GetParentPid(cur);
+                    if (next <= 0 || next == cur) break;
+                    cur = next;
+                }
+                catch { break; }
+            }
+        }
+        catch { }
+
+        // Strategy 2: CWD heuristic — MCP clients often set child CWD to project root
+        var envCwd = Environment.CurrentDirectory;
+        if (!string.IsNullOrEmpty(envCwd)
+            && !envCwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
+            && !envCwd.Equals(Path.GetDirectoryName(Environment.ProcessPath), StringComparison.OrdinalIgnoreCase))
+        {
+            // Project root markers: .mcp.json, .git, CLAUDE.md
+            if (File.Exists(Path.Combine(envCwd, ".mcp.json"))
+                || Directory.Exists(Path.Combine(envCwd, ".git"))
+                || File.Exists(Path.Combine(envCwd, "CLAUDE.md")))
+                return envCwd;
+        }
+
+        return null;
+    }
+
     [System.Runtime.InteropServices.DllImport("kernel32.dll")]
     static extern bool FreeConsole();
 
@@ -126,7 +182,19 @@ internal partial class Program
         Console.SetOut(new ThreadRoutingWriter(Console.Error));
 
         IsMcpMode = true; // global flag: no console windows, no Eye spawn, no elevation launch, no AllocConsole
-        Console.Error.WriteLine($"[MCP] Server starting... (launcher={McpLauncherMode})");
+
+        // Detect parent VS Code/Claude Desktop → extract workspace CWD for card system.
+        // MCP server is spawned by VS Code extension; parent chain: VS Code → node → wkappbot.
+        _mcpDetectedCwd = DetectMcpParentCwd();
+        if (_mcpDetectedCwd != null)
+            EyeCmdPipeServer.CallerCwd.Value = _mcpDetectedCwd;
+
+        Console.Error.WriteLine($"[MCP] Server starting... (launcher={McpLauncherMode}, cwd={_mcpDetectedCwd ?? "(none)"})");
+
+        // Register session for card system (MCP server = long-lived → one session per server)
+        SessionRegister(_mcpDetectedCwd);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => SessionUnregister();
+        Console.Error.WriteLine($"[MCP] Session registered: pid={Environment.ProcessId} cwd={_mcpDetectedCwd ?? "(none)"}");
 
         // ── FlaUI/UIA preload: background fire-and-forget ──
         // Cold-start FlaUI assembly loading takes ~30s. Preload while waiting for first command.

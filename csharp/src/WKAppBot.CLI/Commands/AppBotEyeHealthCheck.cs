@@ -268,74 +268,96 @@ internal partial class Program
     {
         // KEY = normalized CWD (folder-based grouping: same folder = one card, survives PID restart)
         var cards = new Dictionary<string, EyeParentCard>(StringComparer.OrdinalIgnoreCase);
-        var path = EyeTicksPath;
-        if (!File.Exists(path)) return cards.Values.ToList();
-
-        // 2MB tail: enough for ~24h of ticks (each tick ~200 bytes, tick every ~10s = ~1.7MB/day)
-        var lines = ReadTailLinesShared(path, 64 * 1024);
         var now = DateTime.UtcNow;
 
-        for (int i = 0; i < lines.Length; i++)
+        // ── Phase 1: Session registry (primary — MCP servers) ──
+        // Session files are authoritative: they have correct CWD, host type, and heartbeat.
+        try
         {
-            var line = lines[i];
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            try
+            var sessions = ReadActiveSessions(staleSeconds);
+            foreach (var s in sessions)
             {
-                var t = JsonSerializer.Deserialize<EyeTick>(line);
-                if (t == null) continue;
-                if (!DateTime.TryParse(t.Ts, out var tsLocal)) continue;
-                var tsUtc = tsLocal.ToUniversalTime();
-                var ppid = t.HostPid > 0 ? t.HostPid : (t.ParentPid > 0 ? t.ParentPid : t.Pid);
-                var pname = !string.IsNullOrWhiteSpace(t.HostName) ? t.HostName : (string.IsNullOrWhiteSpace(t.ParentName) ? "unknown" : t.ParentName);
-                var ptitle = t.HostTitle ?? "";
+                var cwdKey = (s.Cwd ?? "").Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
+                if (string.IsNullOrEmpty(cwdKey)) continue;
 
-                // Card key: PromptHwnd (session) when available, CWD fallback for legacy ticks.
-                var promptHwnd = t.PromptHwnd ?? "";
-                string cardKey;
-                if (!string.IsNullOrEmpty(promptHwnd))
-                    cardKey = promptHwnd;
-                else
+                var cardKey = !string.IsNullOrEmpty(s.PromptHwnd) ? s.PromptHwnd : cwdKey;
+                var hbUtc = DateTime.TryParse(s.Heartbeat, out var hb) ? hb.ToUniversalTime() : now;
+
+                cards[cardKey] = new EyeParentCard
                 {
+                    ParentPid = s.ParentPid > 0 ? s.ParentPid : s.Pid,
+                    ParentName = s.HostType,
+                    ParentTitle = s.HostTitle,
+                    LastTag = s.LastTag,
+                    LastStatus = s.LastStatus,
+                    LastTsUtc = hbUtc,
+                    Cwd = s.Cwd,
+                };
+            }
+        }
+        catch { }
+
+        // ── Phase 2: Tick fallback (legacy — direct CLI commands) ──
+        // Only adds cards for CWDs not already covered by sessions.
+        var path = EyeTicksPath;
+        if (File.Exists(path))
+        {
+            var lines = ReadTailLinesShared(path, 64 * 1024);
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i];
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                try
+                {
+                    var t = JsonSerializer.Deserialize<EyeTick>(line);
+                    if (t == null) continue;
+                    if (!DateTime.TryParse(t.Ts, out var tsLocal)) continue;
+                    var tsUtc = tsLocal.ToUniversalTime();
+                    var ppid = t.HostPid > 0 ? t.HostPid : (t.ParentPid > 0 ? t.ParentPid : t.Pid);
+                    var pname = !string.IsNullOrWhiteSpace(t.HostName) ? t.HostName : (string.IsNullOrWhiteSpace(t.ParentName) ? "unknown" : t.ParentName);
+                    var ptitle = t.HostTitle ?? "";
+
+                    // Skip ticks with unresolved CWD (empty, system32) — no real session matched.
                     var cwdRaw = (t.Cwd ?? "").Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
-                    cardKey = string.IsNullOrEmpty(cwdRaw) ? $"pid_{ppid}" : cwdRaw;
-                }
+                    if (string.IsNullOrEmpty(cwdRaw)
+                        || cwdRaw.EndsWith("/system32")
+                        || cwdRaw.EndsWith("/windows/system32"))
+                        continue;
 
-                // Always update timestamp with latest tick
-                // But for tag/status: meta tags (eye, snapshot) don't overwrite meaningful work tags
-                if (!cards.TryGetValue(cardKey, out var c))
-                {
-                    // First tick for this CWD — always accept
-                    cards[cardKey] = new EyeParentCard
-                    {
-                        ParentPid = ppid,
-                        ParentName = pname,
-                        ParentTitle = ptitle,
-                        LastTag = t.Tag,
-                        LastStatus = t.Status,
-                        LastTsUtc = tsUtc,
-                        Cwd = t.Cwd ?? "",
-                    };
-                }
-                else if (tsUtc > c.LastTsUtc)
-                {
-                    // Newer tick — always update timestamp and process info
-                    c.LastTsUtc = tsUtc;
-                    c.ParentPid = ppid; // latest PID for this CWD
-                    c.ParentName = pname;
-                    c.ParentTitle = ptitle;
-                    if (!string.IsNullOrWhiteSpace(t.Cwd)) c.Cwd = t.Cwd;
+                    var promptHwnd = t.PromptHwnd ?? "";
+                    string cardKey = !string.IsNullOrEmpty(promptHwnd) ? promptHwnd : cwdRaw;
 
-                    // Only update tag/status if:
-                    // 1. New tick is non-meta (real work always wins), OR
-                    // 2. Existing tag is also meta (meta→meta is fine)
-                    if (!IsMetaTag(t.Tag) || IsMetaTag(c.LastTag))
+                    if (!cards.TryGetValue(cardKey, out var c))
                     {
-                        c.LastTag = t.Tag;
-                        c.LastStatus = t.Status;
+                        cards[cardKey] = new EyeParentCard
+                        {
+                            ParentPid = ppid,
+                            ParentName = pname,
+                            ParentTitle = ptitle,
+                            LastTag = t.Tag,
+                            LastStatus = t.Status,
+                            LastTsUtc = tsUtc,
+                            Cwd = t.Cwd ?? "",
+                        };
+                    }
+                    else if (tsUtc > c.LastTsUtc)
+                    {
+                        c.LastTsUtc = tsUtc;
+                        c.ParentPid = ppid;
+                        c.ParentName = pname;
+                        c.ParentTitle = ptitle;
+                        if (!string.IsNullOrWhiteSpace(t.Cwd)) c.Cwd = t.Cwd;
+
+                        if (!IsMetaTag(t.Tag) || IsMetaTag(c.LastTag))
+                        {
+                            c.LastTag = t.Tag;
+                            c.LastStatus = t.Status;
+                        }
                     }
                 }
+                catch { }
             }
-            catch { }
         }
 
         return cards.Values.Where(c => (now - c.LastTsUtc).TotalSeconds <= staleSeconds).ToList();

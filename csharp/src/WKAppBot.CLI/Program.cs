@@ -180,6 +180,11 @@ internal partial class Program
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
 
+        // Worker processes spawned by Eye (screensaver, whisper-ring, find-prompts, analyze-hack, slack-route)
+        // inherit WKAPPBOT_WORKER=1 env → suppress ticks, TeeWriter, crash handler, LaunchEye (same as RunningInEye).
+        if (Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1")
+            RunningInEye = true;
+
         // TODO: stderr dim output — rolled back until MCP stderr relay preserves ANSI + encoding
         // Console.SetError(new DimTextWriter(Console.Error));
 

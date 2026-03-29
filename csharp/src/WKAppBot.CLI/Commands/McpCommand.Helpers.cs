@@ -61,12 +61,19 @@ internal partial class Program
         var action = arguments["action"]?.GetValue<string>() ?? "";
 
         // Extract per-call caller context from _meta (set by EyeMcpClient)
+        // Fallback to _mcpDetectedCwd (VS Code parent process title → workspace folder)
         var meta = @params?["_meta"] as JsonObject;
-        var metaCwd = meta?["callerCwd"]?.GetValue<string>();
+        var metaCwd = meta?["callerCwd"]?.GetValue<string>() ?? _mcpDetectedCwd;
         var metaHwnd = meta?["callerHwnd"]?.GetValue<string>();
         if (metaCwd != null) EyeCmdPipeServer.CallerCwd.Value = metaCwd;
         if (metaHwnd != null && long.TryParse(metaHwnd, System.Globalization.NumberStyles.HexNumber, null, out var hwndVal))
             EyeCmdPipeServer.CallerHwnd.Value = new IntPtr(hwndVal);
+
+        // Update session card: command start
+        var cmdSummary = toolName == "wkappbot_cli"
+            ? string.Join(" ", (arguments["argv"] as System.Text.Json.Nodes.JsonArray)?.Select(a => a?.GetValue<string>() ?? "") ?? [])
+            : $"{toolName} {action}".Trim();
+        SessionUpdate(command: cmdSummary, tag: cmdSummary.Split(' ').FirstOrDefault(), status: "executing");
 
         try
         {
@@ -116,6 +123,9 @@ internal partial class Program
                     ["_elevationRequired"] = true // Launcher intercepts this
                 };
             }
+
+            // Update session card: command done
+            SessionUpdate(status: exitCode == 0 ? "result=ok" : $"result=err:{exitCode}");
 
             var result = new JsonObject
             {
