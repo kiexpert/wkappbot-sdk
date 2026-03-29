@@ -346,7 +346,11 @@ internal partial class Program
                     slackClient.ConnectAsync(appToken, slackBotToken).GetAwaiter().GetResult();
                     EyeColor(ConsoleColor.Green);
                     PulseStep.Mark("slack-connected");
-                    Console.WriteLine("[EYE] Slack Socket Mode connected (GlobalMode)");
+                    var workspace = json?["workspace"]?.GetValue<string>() ?? "?";
+                    var channelName = json?["channel_name"]?.GetValue<string>() ?? slackChannel;
+                    var maskApp = appToken.Length > 12 ? appToken[..8] + "..." + appToken[^4..] : "***";
+                    var maskBot = slackBotToken.Length > 12 ? slackBotToken[..8] + "..." + slackBotToken[^4..] : "***";
+                    Console.WriteLine($"[EYE] Slack Socket Mode connected — workspace={workspace} channel={channelName} app={maskApp} bot={maskBot}");
                     EyeResetColor();
 
                     // Startup: collect stale status messages (reply_count==0) — do NOT delete yet.
