@@ -1035,24 +1035,42 @@ internal partial class Program
     private static List<ClaudePromptHelper.PromptInfo>? _mcpPromptCache;
     private static DateTime _mcpPromptCacheAt = DateTime.MinValue;
 
+    // Background find-prompts: runs on worker thread, never blocks MCP main thread
+    private static volatile bool _findPromptsRunning;
+
     internal static List<ClaudePromptHelper.PromptInfo> FindAllPromptsViaMcp(bool forceRefresh = false)
     {
-        // 2s cache to avoid MCP call on every tick
-        if (!forceRefresh && _mcpPromptCache != null && (DateTime.UtcNow - _mcpPromptCacheAt).TotalSeconds < 2)
+        // Cache: return immediately, refresh in background if stale
+        if (!forceRefresh && _mcpPromptCache != null && (DateTime.UtcNow - _mcpPromptCacheAt).TotalSeconds < 10)
             return _mcpPromptCache;
 
         if (!EyeMcpClient.IsRunning)
             return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
 
+        // Fire-and-forget background refresh — never blocks caller
+        if (!_findPromptsRunning)
+        {
+            _findPromptsRunning = true;
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try { FindAllPromptsViaMcpCore(); }
+                finally { _findPromptsRunning = false; }
+            });
+        }
+        return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
+    }
+
+    private static void FindAllPromptsViaMcpCore()
+    {
         try
         {
             var (output, code) = EyeMcpClient.CallAsync(["find-prompts"], timeoutMs: 10_000).GetAwaiter().GetResult();
             if (code != 0 || string.IsNullOrWhiteSpace(output))
-                return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
+                return;
 
             var arr = JsonNode.Parse(output) as JsonArray;
             if (arr == null)
-                return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
+                return;
 
             var result = new List<ClaudePromptHelper.PromptInfo>();
             foreach (var item in arr)
@@ -1076,12 +1094,8 @@ internal partial class Program
 
             _mcpPromptCache = result;
             _mcpPromptCacheAt = DateTime.UtcNow;
-            return result;
         }
-        catch
-        {
-            return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
-        }
+        catch { }
     }
 
     /// <summary>

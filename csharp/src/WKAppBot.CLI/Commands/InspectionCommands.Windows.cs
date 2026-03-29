@@ -130,7 +130,7 @@ internal partial class Program
             uint pid, int w, int h, bool visible, bool isChild, bool isForeground)
         {
             string vis = visible ? "" : " [hidden]";
-            string prefix = isChild ? "  └" : "  ";
+            string prefix = isChild ? "  +" : "  ";
             string displayTitle = title.Length > 60 ? title[..57] + "..." : title;
             if (string.IsNullOrEmpty(displayTitle)) displayTitle = "(no title)";
 
@@ -222,9 +222,9 @@ internal partial class Program
             Console.Write(padTitle);
             Console.ResetColor();
             Console.Write($" {trimProc,-16} {sizeStr,9}");
-            if (isForeground) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" ★"); Console.ResetColor(); }
+            if (isForeground) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" *"); Console.ResetColor(); }
             if (flagStr.Length > 0) { Console.ForegroundColor = ConsoleColor.DarkCyan; Console.Write(flagStr); Console.ResetColor(); }
-            if (ownerHwnd != IntPtr.Zero) { Console.ForegroundColor = ConsoleColor.DarkGray; Console.Write($" ◇{ownerHwnd:X}"); Console.ResetColor(); }
+            if (ownerHwnd != IntPtr.Zero) { Console.ForegroundColor = ConsoleColor.DarkGray; Console.Write($" ^{ownerHwnd:X}"); Console.ResetColor(); }
             Console.WriteLine();
 
             // --cmd: print process exe path + args
@@ -245,7 +245,7 @@ internal partial class Program
                 if (focusPath != null)
                 {
                     Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.Write("  ⌨ ");
+                    Console.Write("  > ");
                     Console.ResetColor();
                     Console.WriteLine(focusPath);
                 }
