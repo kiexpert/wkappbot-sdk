@@ -328,12 +328,14 @@ internal sealed class ScreenSaverOverlay : IDisposable
         {
             _isVisible = false;
             _currentOpacity = 0;
-            _dispatcher.BeginInvoke(() =>
+            // Invoke (sync) — immediate transparency on ALL monitors, no queue delay
+            _dispatcher.Invoke(() =>
             {
                 foreach (var mwin in _monitors)
                 {
                     mwin.Window.Opacity = 0;
                     mwin.Window.Visibility = Visibility.Hidden;
+                    mwin.LastT = -1;
                 }
             });
             Console.WriteLine("[EYE] ScreenSaver OFF (user input detected)");
