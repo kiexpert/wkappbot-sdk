@@ -41,6 +41,13 @@ internal static class EyeCmdPipeServer
     /// </summary>
     public static volatile string[]? CurrentCommandGlobal;
 
+    /// <summary>Active command count — screensaver checks eye_busy file to suppress during automation.</summary>
+    static int _activeCommandCount;
+    static readonly string EyeBusyFile = Path.Combine(
+        Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot.hq", "runtime", "eye_busy");
+    internal static void BeginCommand() { if (Interlocked.Increment(ref _activeCommandCount) == 1) try { File.WriteAllText(EyeBusyFile, DateTime.UtcNow.ToString("O")); } catch { } }
+    internal static void EndCommand() { if (Interlocked.Decrement(ref _activeCommandCount) <= 0) try { File.Delete(EyeBusyFile); } catch { } }
+
     private static readonly CancellationTokenSource _acceptCts = new();
     private static int _activeConnections = 0;
 
@@ -259,18 +266,21 @@ internal static class EyeCmdPipeServer
 
             var delegName = Program.GetSendReplyUsername();
             var cmdLine = string.Join(" ", args);
-            // stderr: diagnostic only (pipeWriter → stdout → user console, stderr → Eye log only)
             Console.Error.WriteLine($"[CMD-MCP] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"} hwnd=0x{callerHwnd?.ToInt64():X}");
 
-            // Set per-call caller context (read by MCP worker via _meta in JSON-RPC)
             EyeMcpClient.CurrentCallerCwd = callerCwd;
             EyeMcpClient.CurrentCallerHwnd = callerHwnd?.ToInt64().ToString("X");
-            var _mcpSw = System.Diagnostics.Stopwatch.StartNew();
-            var (output, exitCode) = EyeMcpClient.CallAsync(args).GetAwaiter().GetResult();
-            Console.Error.WriteLine($"[MCP-PERF] cmd={cmdLine} mcp={_mcpSw.ElapsedMilliseconds}ms exit={exitCode} len={output?.Length ?? 0}");
-            pipeWriter.Write(output);
-            if (!output.EndsWith('\n')) pipeWriter.WriteLine();
-            return exitCode;
+            BeginCommand();
+            try
+            {
+                var _mcpSw = System.Diagnostics.Stopwatch.StartNew();
+                var (output, exitCode) = EyeMcpClient.CallAsync(args).GetAwaiter().GetResult();
+                Console.Error.WriteLine($"[MCP-PERF] cmd={cmdLine} mcp={_mcpSw.ElapsedMilliseconds}ms exit={exitCode} len={output?.Length ?? 0}");
+                pipeWriter.Write(output);
+                if (!output.EndsWith('\n')) pipeWriter.WriteLine();
+                return exitCode;
+            }
+            finally { EndCommand(); }
         }
 
         // ── Long-running commands (ask/agent): dispatch as background task ──
