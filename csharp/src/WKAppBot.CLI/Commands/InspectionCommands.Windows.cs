@@ -226,20 +226,9 @@ internal partial class Program
             if (flagStr.Length > 0) { Console.ForegroundColor = ConsoleColor.DarkCyan; Console.Write(flagStr); Console.ResetColor(); }
             if (ownerHwnd != IntPtr.Zero)
             {
-                // Resolve: who injected this window? Module that registered the class
-                var modHandle = NativeMethods.GetClassLongPtrW(hWnd, -16 /*GCL_HMODULE*/);
-                var modName = "";
-                if (modHandle != IntPtr.Zero)
-                {
-                    var mb = new StringBuilder(260);
-                    NativeMethods.GetModuleFileNameW(modHandle, mb, 260);
-                    modName = Path.GetFileNameWithoutExtension(mb.ToString());
-                }
-                var ownerTitle = NativeMethods.GetWindowTextSafe(ownerHwnd, 30);
-                var ownerShort = string.IsNullOrEmpty(ownerTitle) ? $"{ownerHwnd:X}" : (ownerTitle.Length > 15 ? ownerTitle[..12] + "..." : ownerTitle);
-                var injector = !string.IsNullOrEmpty(modName) && !modName.Equals(process, StringComparison.OrdinalIgnoreCase)
-                    ? $"{modName}:" : "";
-                Console.ForegroundColor = ConsoleColor.DarkGray; Console.Write($" ^{injector}{ownerShort}"); Console.ResetColor();
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($" ^{ownerHwnd:X}");
+                Console.ResetColor();
             }
             Console.WriteLine();
 
