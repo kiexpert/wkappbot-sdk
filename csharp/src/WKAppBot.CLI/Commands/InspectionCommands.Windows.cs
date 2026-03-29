@@ -577,9 +577,8 @@ internal partial class Program
             return new Regex(rxStr, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         }
 
-        // Sibling display: collect non-matched windows by pid, print under matched root
-        var _siblingsByPid = new Dictionary<uint, List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible, bool isFg)>>();
-        var _printedSiblingPids = new HashSet<uint>();
+        // 2-pass: collect all windows, then group by matched pid
+        var _allCollected = new List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible, bool isFg, bool matched)>();
 
         PulseStep.Mark("enum-windows-start");
         NativeMethods.EnumWindows((hWnd, _) =>
@@ -681,38 +680,33 @@ internal partial class Program
                 // ── Original mode: title/process/class filter only ──
                 var info = GetWindowInfo(hWnd);
 
-                if (info != null)
+                if (hasFilter)
+                {
+                    // 2-pass: collect ALL windows (matched or not)
+                    if (info != null)
+                    {
+                        var v = info.Value;
+                        _allCollected.Add((hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, isFg, true));
+                    }
+                    else
+                    {
+                        NativeMethods.GetWindowThreadProcessId(hWnd, out uint sPid);
+                        var sTitle = NativeMethods.GetWindowTextSafe(hWnd, 50);
+                        var sCls = new StringBuilder(128); NativeMethods.GetClassNameW(hWnd, sCls, 128);
+                        NativeMethods.GetWindowRect(hWnd, out var sRect);
+                        int sW = sRect.Right - sRect.Left, sH = sRect.Bottom - sRect.Top;
+                        bool sVis = NativeMethods.IsWindowVisible(hWnd);
+                        var sProc = GetProcessName(sPid);
+                        if (!string.IsNullOrEmpty(sTitle) || sVis || showAll)
+                            _allCollected.Add((hWnd, sTitle, sCls.ToString(), sProc, sPid, sW, sH, sVis, isFg, false));
+                    }
+                }
+                else if (info != null)
                 {
                     var v = info.Value;
                     PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
                     totalCount++;
-                    if (v.visible && v.w >= 50 && v.h >= 50) visibleResultCount++;
-                    else matchedHiddenHwnds.Add(hWnd);
                     parentPrinted = true;
-                    // Print already-collected siblings of same pid under this root
-                    if (hasFilter && _printedSiblingPids.Add(v.pid) && _siblingsByPid.TryGetValue(v.pid, out var sibs))
-                    {
-                        foreach (var s in sibs)
-                        { PrintWindow(s.hWnd, s.title, s.className, s.process, s.pid, s.w, s.h, s.visible, true, s.isFg); totalCount++; }
-                    }
-                    if (limit > 0 && totalCount >= limit) { Console.Out.Flush(); return false; }
-                }
-                else if (hasFilter)
-                {
-                    // Collect non-matched window by pid — printed inline when root matches
-                    NativeMethods.GetWindowThreadProcessId(hWnd, out uint sPid);
-                    var sTitle = NativeMethods.GetWindowTextSafe(hWnd, 50);
-                    var sCls = new StringBuilder(128); NativeMethods.GetClassNameW(hWnd, sCls, 128);
-                    NativeMethods.GetWindowRect(hWnd, out var sRect);
-                    int sW = sRect.Right - sRect.Left, sH = sRect.Bottom - sRect.Top;
-                    bool sVis = NativeMethods.IsWindowVisible(hWnd);
-                    var sProc = GetProcessName(sPid);
-                    if (!string.IsNullOrEmpty(sTitle) || sVis || showAll)
-                    {
-                        if (!_siblingsByPid.TryGetValue(sPid, out var list))
-                            _siblingsByPid[sPid] = list = new();
-                        list.Add((hWnd, sTitle, sCls.ToString(), sProc, sPid, sW, sH, sVis, isFg));
-                    }
                 }
                 if (!hasFilter && ownerCandidateMatcher != null && info == null)
                 {
@@ -889,6 +883,33 @@ internal partial class Program
                     NativeMethods.GetWindowRect(oh, out var hrect);
                     PrintWindow(oh, ht, hc, GetProcessName(hpid), hpid,
                         hrect.Right - hrect.Left, hrect.Bottom - hrect.Top, true, false, oh == fgWnd);
+                    totalCount++;
+                }
+            }
+        }
+
+        // 2nd pass: group by pid — root window + children inline
+        if (hasFilter && _allCollected.Count > 0)
+        {
+            var matchedPids = new HashSet<uint>(_allCollected.Where(w => w.matched).Select(w => w.pid));
+            var byPid = _allCollected.GroupBy(w => w.pid);
+            foreach (var grp in byPid)
+            {
+                var items = grp.ToList();
+                bool hasMatch = items.Any(w => w.matched);
+                if (!hasMatch && !matchedPids.Contains(grp.Key)) continue;
+                // Find root: largest visible matched window, or first matched
+                var root = items.Where(w => w.matched && w.visible).OrderByDescending(w => w.w * w.h).FirstOrDefault();
+                if (root.hWnd == IntPtr.Zero) root = items.FirstOrDefault(w => w.matched);
+                if (root.hWnd == IntPtr.Zero) root = items.First();
+                // Print root
+                PrintWindow(root.hWnd, root.title, root.className, root.process, root.pid, root.w, root.h, root.visible, false, root.isFg);
+                totalCount++;
+                // Print children (everything else in this pid)
+                foreach (var c in items)
+                {
+                    if (c.hWnd == root.hWnd) continue;
+                    PrintWindow(c.hWnd, c.title, c.className, c.process, c.pid, c.w, c.h, c.visible, true, c.isFg);
                     totalCount++;
                 }
             }
