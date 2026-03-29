@@ -73,6 +73,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
     [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
     private const uint LWA_ALPHA = 0x02;
     private const uint WM_CLOSE = 0x0010;
+    [DllImport("user32.dll")] private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
 
     // EnumDisplayMonitors for per-monitor enumeration
     private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
@@ -132,6 +133,38 @@ internal sealed class ScreenSaverOverlay : IDisposable
                     try { Environment.Exit(0); } catch { }
                     Thread.Sleep(200);
                     try { System.Diagnostics.Process.GetCurrentProcess().Kill(); } catch { }
+                }
+                // Dispatcher liveness ping: send WM_NULL to STA thread's message pump.
+                // If Dispatcher is frozen/deadlocked, SendMessageTimeout returns 0 → kill.
+                if (_isVisible && _monitors.Count > 0)
+                {
+                    try
+                    {
+                        var hwnd = IntPtr.Zero;
+                        try { _dispatcher?.Invoke(() => hwnd = new WindowInteropHelper(_monitors[0].Window).Handle); } catch { }
+                        if (hwnd != IntPtr.Zero)
+                        {
+                            var ok = SendMessageTimeout(hwnd, 0 /*WM_NULL*/, IntPtr.Zero, IntPtr.Zero,
+                                0x0002 /*SMTO_ABORTIFHUNG*/, 100, out _);
+                            if (ok == IntPtr.Zero)
+                            {
+                                Console.WriteLine("[SS:MASTER] Dispatcher frozen (WM_NULL timeout 100ms) — force kill!");
+                                foreach (var mwin in _monitors)
+                                {
+                                    try
+                                    {
+                                        var h = new WindowInteropHelper(mwin.Window).Handle;
+                                        ShowWindow(h, 0);
+                                        SetWindowPos(h, (IntPtr)(-2), -32000, -32000, 1, 1, SWP_NOACTIVATE);
+                                    }
+                                    catch { }
+                                }
+                                try { Environment.Exit(0); } catch { }
+                                try { System.Diagnostics.Process.GetCurrentProcess().Kill(); } catch { }
+                            }
+                        }
+                    }
+                    catch { }
                 }
             }
         }) { IsBackground = true, Name = "SS-Master" }.Start();
