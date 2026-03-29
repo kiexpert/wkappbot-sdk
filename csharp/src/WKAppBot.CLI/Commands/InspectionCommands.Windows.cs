@@ -200,24 +200,7 @@ internal partial class Program
             int titleWidth = isChild ? 44 : 45; // child: └ takes 1 col → shrink title to keep alignment
             var trimTitle = TrimToWidth(displayTitle, titleWidth);
             var padTitle = PadToWidth(trimTitle, titleWidth);
-            // Child: show injector module name instead of process:pid
-            string procPid;
-            if (isChild)
-            {
-                var modHandle = NativeMethods.GetClassLongPtrW(hWnd, -16 /*GCL_HMODULE*/);
-                var modName = "";
-                if (modHandle != IntPtr.Zero)
-                {
-                    var mb = new StringBuilder(260);
-                    NativeMethods.GetModuleFileNameW(modHandle, mb, 260);
-                    modName = Path.GetFileNameWithoutExtension(mb.ToString()).ToLowerInvariant();
-                }
-                procPid = !string.IsNullOrEmpty(modName) ? modName : process;
-            }
-            else
-            {
-                procPid = $"{process}:{pid}";
-            }
+            var procPid = $"{process}:{pid}";
             var trimProc = procPid.Length > 16 ? procPid[..16] : procPid;
             var sizeStr = $"{w}x{h}";
             // Flags: single-char compact (H=hidden L=layered T=tool M=min X=max D=disabled ↑=topmost)
@@ -619,29 +602,16 @@ internal partial class Program
             return new Regex(rxStr, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         }
 
-        // Pre-scan: single EnumWindows pass → Z-order list + pid→windows map
-        // Used for both matching and sibling display (no Z-order drift between scans)
-        var _preScanned = new List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible)>();
-        var _pidWindows = new Dictionary<uint, List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible)>>();
+        // Pre-scan: lightweight pid→hwnd map only (no GetProcessName — that's expensive!)
+        var _pidWindows = new Dictionary<uint, List<(IntPtr hWnd, uint pid)>>();
         if (hasFilter)
         {
             NativeMethods.EnumWindows((hWnd, _) =>
             {
                 NativeMethods.GetWindowThreadProcessId(hWnd, out uint p);
-                var t = NativeMethods.GetWindowTextSafe(hWnd, 50);
-                var cb = new StringBuilder(128); NativeMethods.GetClassNameW(hWnd, cb, 128);
-                NativeMethods.GetWindowRect(hWnd, out var r);
-                int rw = r.Right - r.Left, rh = r.Bottom - r.Top;
-                bool vis = NativeMethods.IsWindowVisible(hWnd);
-                var pn = GetProcessName(p);
-                var entry = (hWnd, t, cb.ToString(), pn, p, rw, rh, vis);
-                _preScanned.Add(entry);
-                if (!string.IsNullOrEmpty(t) || vis || showAll)
-                {
-                    if (!_pidWindows.TryGetValue(p, out var list))
-                        _pidWindows[p] = list = new();
-                    list.Add(entry);
-                }
+                if (!_pidWindows.TryGetValue(p, out var list))
+                    _pidWindows[p] = list = new();
+                list.Add((hWnd, p));
                 return true;
             }, IntPtr.Zero);
         }
@@ -753,14 +723,19 @@ internal partial class Program
                     PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
                     totalCount++;
                     parentPrinted = true;
-                    // Immediately print same-pid siblings from pre-scanned map
+                    // Immediately print same-pid siblings from pre-scanned pid→hwnd map
                     if (_printedChildPids.Add(v.pid) && _pidWindows.TryGetValue(v.pid, out var siblings))
                     {
                         foreach (var s in siblings)
                         {
                             if (s.hWnd == hWnd) continue;
-                            PrintWindow(s.hWnd, s.title, s.className, s.process, s.pid, s.w, s.h, s.visible, true, false);
-                            totalCount++;
+                            var si = GetRawWindowInfo(s.hWnd);
+                            if (si != null)
+                            {
+                                var sv = si.Value;
+                                PrintWindow(s.hWnd, sv.title, sv.className, sv.process, sv.pid, sv.w, sv.h, sv.visible, true, false);
+                                totalCount++;
+                            }
                         }
                     }
                 }
