@@ -586,7 +586,7 @@ partial class Program
         var si = new STARTUPINFOW { cb = System.Runtime.InteropServices.Marshal.SizeOf<STARTUPINFOW>() };
         bool ok = CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, false,
             DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB | CREATE_UNICODE_ENVIRONMENT,
-            envBlock, null, ref si, out var pi);
+            envBlock, Environment.CurrentDirectory, ref si, out var pi);
         if (!ok) return IntPtr.Zero;
         CloseHandle(pi.hThread);
         return pi.hProcess;
@@ -622,7 +622,7 @@ partial class Program
         };
         bool ok = CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, true, // bInheritHandles=true for pipe handles
             DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB | CREATE_UNICODE_ENVIRONMENT,
-            envBlock, null, ref si, out var pi);
+            envBlock, Environment.CurrentDirectory, ref si, out var pi);
         // Close write ends in parent — child holds them; closing here causes EOF when child exits
         CloseHandle(hStdoutWrite);
         CloseHandle(hStderrWrite);
