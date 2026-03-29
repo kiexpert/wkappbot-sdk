@@ -537,9 +537,28 @@ partial class Program
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
     struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public uint dwProcessId, dwThreadId; }
 
-    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-    static extern bool CreateProcessW(string? app, char[] cmd, IntPtr pa, IntPtr ta,
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true, EntryPoint = "CreateProcessW")]
+    static extern bool _CreateProcessW(string? app, char[] cmd, IntPtr pa, IntPtr ta,
         bool inh, uint flags, IntPtr env, string? cwd, ref STARTUPINFOW si, out PROCESS_INFORMATION pi);
+
+    /// <summary>Traced CreateProcessW — logs all args to stderr for debugging.</summary>
+    static bool CreateProcessW(string? app, char[] cmd, IntPtr pa, IntPtr ta,
+        bool inh, uint flags, IntPtr env, string? cwd, ref STARTUPINFOW si, out PROCESS_INFORMATION pi)
+    {
+        var cmdStr = new string(cmd).TrimEnd('\0');
+        var flagNames = new System.Collections.Generic.List<string>();
+        if ((flags & DETACHED_PROCESS) != 0) flagNames.Add("DETACHED");
+        if ((flags & CREATE_BREAKAWAY_FROM_JOB) != 0) flagNames.Add("BREAKAWAY");
+        if ((flags & CREATE_UNICODE_ENVIRONMENT) != 0) flagNames.Add("UNICODE_ENV");
+        var flagStr = flagNames.Count > 0 ? string.Join("|", flagNames) : $"0x{flags:X}";
+        Prof($"CreateProcessW cmd=\"{(cmdStr.Length > 80 ? cmdStr[..77] + "..." : cmdStr)}\" cwd=\"{cwd ?? "(null)"}\" flags={flagStr} inherit={inh} stdin=0x{si.hStdInput:X} stdout=0x{si.hStdOutput:X} stderr=0x{si.hStdError:X}");
+        var ok = _CreateProcessW(app, cmd, pa, ta, inh, flags, env, cwd, ref si, out pi);
+        if (ok)
+            Prof($"CreateProcessW → pid={pi.dwProcessId}");
+        else
+            Prof($"CreateProcessW → FAILED err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
+        return ok;
+    }
 
     const uint DETACHED_PROCESS          = 0x00000008;
     const uint CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
