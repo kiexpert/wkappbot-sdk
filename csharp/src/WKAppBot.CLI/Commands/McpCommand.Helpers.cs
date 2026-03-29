@@ -35,6 +35,7 @@ internal partial class Program
         var arguments = @params?["arguments"] as JsonObject ?? new JsonObject();
         var action = arguments["action"]?.GetValue<string>() ?? "";
 
+        var _toolSw = Stopwatch.StartNew();
         Console.Error.WriteLine($"[MCP] Tool: {toolName} args={arguments.ToJsonString()}");
 
         // Extract APSP progressToken from _meta
@@ -44,7 +45,9 @@ internal partial class Program
         Action<string> emitProgress = line =>
             EmitToolProgress(writer, progressToken, line, progressCounter, progressSw);
 
-        return RunToolCore(@params, emitProgress) ?? new JsonObject
+        var _result = RunToolCore(@params, emitProgress);
+        Console.Error.WriteLine($"[MCP-PERF] {toolName} total={_toolSw.ElapsedMilliseconds}ms");
+        return _result ?? new JsonObject
         {
             ["content"] = new JsonArray { new JsonObject { ["type"] = "text", ["text"] = "Error: unknown tool" } },
             ["isError"] = true

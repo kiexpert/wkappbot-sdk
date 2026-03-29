@@ -265,7 +265,9 @@ internal static class EyeCmdPipeServer
             // Set per-call caller context (read by MCP worker via _meta in JSON-RPC)
             EyeMcpClient.CurrentCallerCwd = callerCwd;
             EyeMcpClient.CurrentCallerHwnd = callerHwnd?.ToInt64().ToString("X");
+            var _mcpSw = System.Diagnostics.Stopwatch.StartNew();
             var (output, exitCode) = EyeMcpClient.CallAsync(args).GetAwaiter().GetResult();
+            Console.Error.WriteLine($"[MCP-PERF] cmd={cmdLine} mcp={_mcpSw.ElapsedMilliseconds}ms exit={exitCode} len={output?.Length ?? 0}");
             pipeWriter.Write(output);
             if (!output.EndsWith('\n')) pipeWriter.WriteLine();
             return exitCode;
