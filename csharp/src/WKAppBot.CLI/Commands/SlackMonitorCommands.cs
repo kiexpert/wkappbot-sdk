@@ -691,7 +691,7 @@ internal partial class Program
 
     static string GetSlackFolderTag()
     {
-        var cwd = Environment.CurrentDirectory;
+        var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
         if (string.IsNullOrWhiteSpace(cwd))
             return Environment.MachineName;
 

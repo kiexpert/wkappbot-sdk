@@ -546,15 +546,10 @@ internal partial class Program
             var wrPath = Environment.ProcessPath ?? "wkappbot";
             int ringX = Math.Max(0, posX - 190);
             int ringY = posY;
-            var wrPsi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = wrPath,
-                Arguments = $"whisper-ring {ringX} {ringY}",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            wrPsi.Environment["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString();
-            System.Diagnostics.Process.Start(wrPsi);
+            AppBotPipe.Spawn(wrPath, $"whisper-ring {ringX} {ringY}",
+                cwd: Environment.CurrentDirectory,
+                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString() },
+                caller: "EYE-WHISPER");
             PulseStep.Mark("whisper-spawned");
             Console.WriteLine($"[EYE] Whisper Ring spawned as separate process");
         }
@@ -567,15 +562,10 @@ internal partial class Program
         try
         {
             var ssPath = Environment.ProcessPath ?? "wkappbot";
-            var ssPsi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = ssPath,
-                Arguments = "screensaver",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            ssPsi.Environment["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString();
-            System.Diagnostics.Process.Start(ssPsi);
+            AppBotPipe.Spawn(ssPath, "screensaver",
+                cwd: Environment.CurrentDirectory,
+                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString() },
+                caller: "EYE-SCREENSAVER");
             PulseStep.Mark("screensaver-spawned");
             Console.WriteLine("[EYE] ScreenSaver spawned as separate process");
         }
@@ -730,6 +720,33 @@ internal partial class Program
                     }, IntPtr.Zero);
                     if (cleaned > 0)
                         Console.WriteLine($"[EYE] Cleaned {cleaned} stale zoom overlay(s)");
+                }
+                catch { }
+            }
+
+            // ── Screensaver kill: user active → kill screensaver process (every 5s) ──
+            // Screensaver self-exit is unreliable — Eye enforces kill from outside.
+            if (frameCount % 50 == 25) // every 5s at 100ms interval
+            {
+                try
+                {
+                    var userIdleMs = NativeMethods.GetUserIdleMs();
+                    if (userIdleMs < 3000) // user active
+                    {
+                        foreach (var p in Process.GetProcessesByName("wkappbot-core"))
+                        {
+                            try
+                            {
+                                var cmd = WKAppBot.Win32.Native.NativeMethods.GetProcessCommandLine(p.Id);
+                                if (cmd != null && cmd.Contains("screensaver"))
+                                {
+                                    p.Kill();
+                                    Console.WriteLine($"[EYE] Killed screensaver (PID={p.Id}) — user active");
+                                }
+                            }
+                            catch { }
+                        }
+                    }
                 }
                 catch { }
             }
@@ -1105,35 +1122,25 @@ internal partial class Program
                 Console.WriteLine($"[EYE:HOT-SWAP] Launching new Eye: {Path.GetFileName(exePath)} {argsStr}");
                 EyeResetColor();
 
-                var psi = new ProcessStartInfo
-                {
-                    FileName = exePath,  // always original path (rename-swap already done)
-                    Arguments = argsStr,
-                    UseShellExecute        = false, // inherit admin token from parent
-                    CreateNoWindow         = true,  // Eye is a daemon — no console window
-                    RedirectStandardInput  = true,  // detach from parent's stdin/stdout/stderr
-                    RedirectStandardOutput = true,
-                    RedirectStandardError  = true,
-                };
-                var newProc = Process.Start(psi);
+                var newProc = AppBotPipe.Spawn(exePath, argsStr, Environment.CurrentDirectory,
+                    redirectStdIn: true, redirectStdOut: true, redirectStdErr: true, caller: "EYE-HOTSWAP");
                 if (newProc != null)
                 {
                     // Close pipe ends immediately — new Eye writes to its own AllocConsole (hidden).
-                    try { newProc.StandardInput.Close(); } catch { }
-                    try { newProc.StandardOutput.Close(); } catch { }
-                    try { newProc.StandardError.Close(); } catch { }
+                    try { newProc.StdIn?.Close(); } catch { }
+                    try { newProc.StdOut?.Close(); } catch { }
+                    try { newProc.StdErr?.Close(); } catch { }
                 }
                 if (newProc != null)
                 {
                     // Wait for new Eye's window to appear (pipe server is up by then) before closing old Eye.
                     // Both old+new Eye can listen on the same named pipe (MaxAllowedServerInstances) — no gap.
-                    Console.WriteLine($"[EYE:HOT-SWAP] New Eye PID={newProc.Id} — waiting for window...");
+                    Console.WriteLine($"[EYE:HOT-SWAP] New Eye PID={newProc.Pid} — waiting for window...");
                     var hsw = System.Diagnostics.Stopwatch.StartNew();
                     var warnAt = 9.0;
                     while (true)
                     {
-                        newProc.Refresh();
-                        if (newProc.HasExited || newProc.Responding) break;
+                        if (newProc.HasExited || hsw.Elapsed.TotalSeconds >= 30) break;
                         if (hsw.Elapsed.TotalSeconds >= warnAt)
                         {
                             Console.WriteLine($"[EYE:HOT-SWAP] still waiting for new Eye message loop... ({warnAt:F0}s)");

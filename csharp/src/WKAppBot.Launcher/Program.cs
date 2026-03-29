@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text;
+using STARTUPINFOW = AppBotPipe.STARTUPINFOW;
+using PROCESS_INFORMATION = AppBotPipe.PROCESS_INFORMATION;
 
 namespace WKAppBot.Launcher;
 
@@ -502,17 +504,8 @@ partial class Program
     static extern uint GetConsoleCP();
 
     // CreateProcessW with DETACHED_PROCESS: spawns Core outside bash's ConPTY session.
-    // bash tracks processes via the ConPTY session (PTY slave handles). DETACHED_PROCESS prevents
-    // Core from inheriting or attaching to any console, so bash doesn't wait for Core's 27s SMB
-    // image-section cleanup. Launcher exits quickly; Core's cleanup runs in background.
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    struct STARTUPINFOW
-    {
-        public int cb, _res0; public IntPtr lpReserved, lpDesktop, lpTitle;
-        public uint dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute;
-        public uint dwFlags; public ushort wShowWindow, cbReserved2; public IntPtr lpReserved2;
-        public IntPtr hStdInput, hStdOutput, hStdError;
-    }
+    // Structs + guard: AppBotPipe.cs (shared between Launcher and Core)
+    // Thin delegate: all calls route through AppBotPipe.CreateProcess (null CWD guard)
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     static extern bool CreatePipe(out IntPtr hRead, out IntPtr hWrite, IntPtr lpPipeAttributes, uint size);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
@@ -545,8 +538,8 @@ partial class Program
     const uint OPEN_EXISTING        = 3;
     [System.Runtime.InteropServices.DllImport("kernel32.dll")]
     static extern bool FlushFileBuffers(IntPtr h);
-    const uint HANDLE_FLAG_INHERIT = 0x1;
-    const uint STARTF_USESTDHANDLES = 0x100;
+    const uint HANDLE_FLAG_INHERIT = AppBotPipe.HANDLE_FLAG_INHERIT;
+    const uint STARTF_USESTDHANDLES = AppBotPipe.STARTF_USESTDHANDLES;
     static readonly IntPtr INVALID_HANDLE = new IntPtr(-1);
 
     // Named event for Core→Launcher exit signaling (bypasses FS visibility delay + process exit delay)
@@ -554,35 +547,15 @@ partial class Program
     static extern IntPtr CreateEventW(IntPtr lpEventAttributes, bool bManualReset, bool bInitialState, string lpName);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     static extern bool SetEvent(IntPtr hEvent);
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public uint dwProcessId, dwThreadId; }
 
-    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true, EntryPoint = "CreateProcessW")]
-    static extern bool _CreateProcessW(string? app, char[] cmd, IntPtr pa, IntPtr ta,
-        bool inh, uint flags, IntPtr env, string? cwd, ref STARTUPINFOW si, out PROCESS_INFORMATION pi);
-
-    /// <summary>Traced CreateProcessW — logs all args to stderr for debugging.</summary>
+    /// <summary>Thin delegate to AppBotPipe.CreateProcess — null CWD guard + trace.</summary>
     static bool CreateProcessW(string? app, char[] cmd, IntPtr pa, IntPtr ta,
         bool inh, uint flags, IntPtr env, string? cwd, ref STARTUPINFOW si, out PROCESS_INFORMATION pi)
-    {
-        var cmdStr = new string(cmd).TrimEnd('\0');
-        var flagNames = new System.Collections.Generic.List<string>();
-        if ((flags & DETACHED_PROCESS) != 0) flagNames.Add("DETACHED");
-        if ((flags & CREATE_BREAKAWAY_FROM_JOB) != 0) flagNames.Add("BREAKAWAY");
-        if ((flags & CREATE_UNICODE_ENVIRONMENT) != 0) flagNames.Add("UNICODE_ENV");
-        var flagStr = flagNames.Count > 0 ? string.Join("|", flagNames) : $"0x{flags:X}";
-        Prof($"CreateProcessW cmd=\"{(cmdStr.Length > 80 ? cmdStr[..77] + "..." : cmdStr)}\" cwd=\"{cwd ?? "(null)"}\" flags={flagStr} inherit={inh} stdin=0x{si.hStdInput:X} stdout=0x{si.hStdOutput:X} stderr=0x{si.hStdError:X}");
-        var ok = _CreateProcessW(app, cmd, pa, ta, inh, flags, env, cwd, ref si, out pi);
-        if (ok)
-            Prof($"CreateProcessW → pid={pi.dwProcessId}");
-        else
-            Prof($"CreateProcessW → FAILED err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
-        return ok;
-    }
+        => AppBotPipe.CreateProcess(app, cmd, pa, ta, inh, flags, env, cwd, ref si, out pi, "LAUNCHER");
 
-    const uint DETACHED_PROCESS          = 0x00000008;
-    const uint CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
-    const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
+    const uint DETACHED_PROCESS          = AppBotPipe.DETACHED_PROCESS;
+    const uint CREATE_BREAKAWAY_FROM_JOB = AppBotPipe.CREATE_BREAKAWAY_FROM_JOB;
+    const uint CREATE_UNICODE_ENVIRONMENT = AppBotPipe.CREATE_UNICODE_ENVIRONMENT;
 
     /// <summary>
     /// Build a Unicode environment block for Core: current env + WKAPPBOT_RELAY_FILE, minus PTY vars.

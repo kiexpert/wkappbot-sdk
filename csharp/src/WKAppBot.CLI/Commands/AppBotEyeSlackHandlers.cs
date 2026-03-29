@@ -1000,15 +1000,9 @@ internal partial class Program
                         var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
                         File.WriteAllText(tmpFile, routeJson);
                         var corePath = Environment.ProcessPath ?? "wkappbot";
-                        var psi = new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = corePath,
-                            Arguments = $"slack route --file \"{tmpFile}\"",
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                        };
-                        var proc = System.Diagnostics.Process.Start(psi);
+                        var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory, caller: "EYE");
                         proc?.WaitForExit(60000);
+                        proc?.Dispose();
                         try { File.Delete(tmpFile); } catch { }
                     }
                     catch (Exception ex) { Console.Error.WriteLine($"[EYE] Mention route spawn error: {ex.Message}"); }
@@ -1241,15 +1235,9 @@ internal partial class Program
                     var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
                     File.WriteAllText(tmpFile, routeJson);
                     var corePath = Environment.ProcessPath ?? "wkappbot";
-                    var psi = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = corePath,
-                        Arguments = $"slack route --file \"{tmpFile}\"",
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                    };
-                    var proc = System.Diagnostics.Process.Start(psi);
+                    var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory, caller: "EYE");
                     proc?.WaitForExit(60000);
+                    proc?.Dispose();
                     try { File.Delete(tmpFile); } catch { }
                 }
                 catch (Exception ex) { Console.Error.WriteLine($"[EYE] Route spawn error: {ex.Message}"); }
@@ -1362,15 +1350,9 @@ internal partial class Program
                     var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
                     File.WriteAllText(tmpFile, routeJson);
                     var corePath = Environment.ProcessPath ?? "wkappbot";
-                    var psi = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = corePath,
-                        Arguments = $"slack route --file \"{tmpFile}\"",
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                    };
-                    var proc = System.Diagnostics.Process.Start(psi);
+                    var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory, caller: "EYE");
                     proc?.WaitForExit(60000);
+                    proc?.Dispose();
                     try { File.Delete(tmpFile); } catch { }
                 }
                 catch (Exception ex) { Console.Error.WriteLine($"[EYE] Reaction route error: {ex.Message}"); }
@@ -1396,16 +1378,11 @@ internal partial class Program
                 if (item.NotifySlack)
                     ScheduleNotifySlack(slackBotToken, slackChannel,
                         $":rocket: 스케줄 커맨드 실행: `{item.Command}`");
-                var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c {item.Command}")
-                {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    WorkingDirectory = item.Cwd ?? Environment.CurrentDirectory,
-                };
-                using var proc = System.Diagnostics.Process.Start(psi)!;
-                var stdout = proc.StandardOutput.ReadToEnd();
-                var stderr = proc.StandardError.ReadToEnd();
+                using var proc = AppBotPipe.Spawn("cmd.exe", $"/c {item.Command}",
+                    cwd: item.Cwd ?? Environment.CurrentDirectory,
+                    redirectStdOut: true, redirectStdErr: true, caller: "EYE")!;
+                var stdout = proc.StdOut!.ReadToEnd();
+                var stderr = proc.StdErr!.ReadToEnd();
                 proc.WaitForExit(30_000);
                 var output = (stdout + stderr).Trim();
                 Console.WriteLine($"[SCHEDULE:CMD] exit={proc.ExitCode} output={output.Length}ch");

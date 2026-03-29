@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text;
+using STARTUPINFOW = AppBotPipe.STARTUPINFOW;
+using PROCESS_INFORMATION = AppBotPipe.PROCESS_INFORMATION;
 
 namespace WKAppBot.Launcher;
 

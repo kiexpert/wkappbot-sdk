@@ -1,0 +1,241 @@
+// AppBotPipe.cs — shared between Launcher (NativeAOT) and Core.
+// Linked via csproj: <Compile Include="..\..\Shared\AppBotPipe.cs" Link="Shared\AppBotPipe.cs" />
+// No project dependencies — pure kernel32 P/Invoke only.
+//
+// ALL process creation MUST go through this class:
+//   Low-level:  AppBotPipe.CreateProcess(...)   — raw CreateProcessW with null-CWD guard
+//   High-level: AppBotPipe.Spawn(...)           — Process.Start replacement, also uses CreateProcessW guard
+
+using System.Runtime.InteropServices;
+
+/// <summary>
+/// Guarded CreateProcessW + high-level Spawn().
+/// Null CWD guard: DETACHED_PROCESS with null lpCurrentDirectory defaults to C:\Windows\System32.
+/// </summary>
+internal static class AppBotPipe
+{
+    // ── Structs ──────────────────────────────────────────────
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct STARTUPINFOW
+    {
+        public int cb, _res0; // explicit padding for NativeAOT safety (int=4B → IntPtr=8B on x64)
+        public IntPtr lpReserved, lpDesktop, lpTitle;
+        public uint dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute;
+        public uint dwFlags; public ushort wShowWindow, cbReserved2; public IntPtr lpReserved2;
+        public IntPtr hStdInput, hStdOutput, hStdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct PROCESS_INFORMATION
+    {
+        public IntPtr hProcess, hThread; public uint dwProcessId, dwThreadId;
+    }
+
+    // ── Constants ────────────────────────────────────────────
+
+    internal const uint DETACHED_PROCESS          = 0x00000008;
+    internal const uint CREATE_NO_WINDOW          = 0x08000000;
+    internal const uint CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
+    internal const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
+    internal const uint STARTF_USESTDHANDLES      = 0x100;
+    internal const uint STARTF_USESHOWWINDOW      = 0x1;
+    internal const uint HANDLE_FLAG_INHERIT        = 0x1;
+
+    // ── P/Invoke ─────────────────────────────────────────────
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateProcessW")]
+    private static extern bool RawCreateProcessW(string? app, char[] cmd, IntPtr pa, IntPtr ta,
+        bool inh, uint flags, IntPtr env, string? cwd,
+        ref STARTUPINFOW si, out PROCESS_INFORMATION pi);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CreatePipe(out IntPtr hRead, out IntPtr hWrite, IntPtr sa, uint size);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetHandleInformation(IntPtr h, uint mask, uint flags);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr h);
+
+    // ── Low-level: guarded CreateProcessW ────────────────────
+
+    /// <summary>
+    /// Guarded CreateProcessW — blocks null/empty CWD to prevent system32 zombie processes.
+    /// </summary>
+    internal static bool CreateProcess(string? app, char[] cmd, IntPtr pa, IntPtr ta,
+        bool inh, uint flags, IntPtr env, string? cwd,
+        ref STARTUPINFOW si, out PROCESS_INFORMATION pi,
+        string caller = "PROC")
+    {
+        var cmdStr = new string(cmd).TrimEnd('\0');
+
+        // ── FOCUSLESS GUARD ─────────────────────────────────────
+        // wShowWindow > 0 without SW_HIDE = potential focus steal
+        if ((si.dwFlags & STARTF_USESHOWWINDOW) != 0 && si.wShowWindow > 0)
+        {
+            try { Console.Error.WriteLine($"[{caller}:BUG] CreateProcessW BLOCKED — wShowWindow={si.wShowWindow} violates focusless! cmd={Trunc(cmdStr, 60)}"); } catch { }
+            pi = default;
+            return false;
+        }
+
+        // ── NULL CWD GUARD ──────────────────────────────────────
+        if (string.IsNullOrEmpty(cwd))
+        {
+            try { Console.Error.WriteLine($"[{caller}:BUG] CreateProcessW BLOCKED — null CWD! cmd={Trunc(cmdStr, 60)}"); } catch { }
+            pi = default;
+            return false;
+        }
+        try { Console.Error.WriteLine($"[{caller}] CreateProcessW cwd=\"{cwd}\" cmd={Trunc(cmdStr, 80)} flags=0x{flags:X}"); } catch { }
+        var ok = RawCreateProcessW(app, cmd, pa, ta, inh, flags, env, cwd, ref si, out pi);
+        try
+        {
+            if (ok) Console.Error.WriteLine($"[{caller}] CreateProcessW → pid={pi.dwProcessId}");
+            else    Console.Error.WriteLine($"[{caller}] CreateProcessW FAILED err={Marshal.GetLastWin32Error()}");
+        }
+        catch { }
+        return ok;
+    }
+
+    // ── High-level: Spawn() — Process.Start replacement ─────
+
+    /// <summary>
+    /// Spawn result — process handle + optional redirected streams.
+    /// Dispose closes all handles. Use WaitForExit/ExitCode as needed.
+    /// </summary>
+    internal sealed class SpawnResult : IDisposable
+    {
+        public int Pid;
+        public IntPtr Handle;
+        public System.IO.StreamWriter? StdIn;
+        public System.IO.StreamReader? StdOut;
+        public System.IO.StreamReader? StdErr;
+        private IntPtr _hStdInWrite, _hStdOutRead, _hStdErrRead;
+
+        internal SpawnResult(int pid, IntPtr handle,
+            IntPtr hStdInWrite, IntPtr hStdOutRead, IntPtr hStdErrRead)
+        {
+            Pid = pid; Handle = handle;
+            _hStdInWrite = hStdInWrite; _hStdOutRead = hStdOutRead; _hStdErrRead = hStdErrRead;
+            if (hStdInWrite != IntPtr.Zero)
+                StdIn = new System.IO.StreamWriter(
+                    new System.IO.FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle(hStdInWrite, true), System.IO.FileAccess.Write),
+                    new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+            if (hStdOutRead != IntPtr.Zero)
+                StdOut = new System.IO.StreamReader(
+                    new System.IO.FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle(hStdOutRead, true), System.IO.FileAccess.Read),
+                    System.Text.Encoding.UTF8);
+            if (hStdErrRead != IntPtr.Zero)
+                StdErr = new System.IO.StreamReader(
+                    new System.IO.FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle(hStdErrRead, true), System.IO.FileAccess.Read),
+                    System.Text.Encoding.UTF8);
+        }
+
+        public bool HasExited { get { if (Handle == IntPtr.Zero) return true; uint code; GetExitCodeProcess(Handle, out code); return code != 259; } }
+        public int ExitCode { get { uint code; GetExitCodeProcess(Handle, out code); return (int)code; } }
+        public bool WaitForExit(int ms) => WaitForSingleObject(Handle, (uint)ms) == 0;
+        public void Kill() { if (Handle != IntPtr.Zero) TerminateProcess(Handle, 1); }
+
+        public void Dispose()
+        {
+            StdIn?.Dispose(); StdOut?.Dispose(); StdErr?.Dispose();
+            if (Handle != IntPtr.Zero) { CloseHandle(Handle); Handle = IntPtr.Zero; }
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
+    }
+
+    /// <summary>
+    /// High-level process spawn — replaces Process.Start, goes through CreateProcessW guard.
+    /// CWD is REQUIRED — null/empty CWD is blocked (same as CreateProcess guard).
+    /// env: optional environment variables to set in child (set before CreateProcess, restored after).
+    /// </summary>
+    internal static SpawnResult? Spawn(string exe, string args, string cwd,
+        bool redirectStdIn = false, bool redirectStdOut = false, bool redirectStdErr = false,
+        System.Collections.Generic.Dictionary<string, string>? env = null,
+        string caller = "PROC")
+    {
+        // Save + set env vars (inherited via CreateProcess), restore after
+        System.Collections.Generic.Dictionary<string, string?>? savedEnv = null;
+        if (env != null && env.Count > 0)
+        {
+            savedEnv = new();
+            foreach (var kv in env)
+            {
+                savedEnv[kv.Key] = Environment.GetEnvironmentVariable(kv.Key);
+                Environment.SetEnvironmentVariable(kv.Key, kv.Value);
+            }
+        }
+
+        var cmdLine = $"\"{exe}\" {args}\0".ToCharArray();
+        // Focusless: STARTF_USESHOWWINDOW + SW_HIDE — never steal focus, never show window
+        var si = new STARTUPINFOW
+        {
+            cb = Marshal.SizeOf<STARTUPINFOW>(),
+            dwFlags = STARTF_USESHOWWINDOW,
+            wShowWindow = 0, // SW_HIDE
+        };
+
+        IntPtr hStdInRead = IntPtr.Zero, hStdInWrite = IntPtr.Zero;
+        IntPtr hStdOutRead = IntPtr.Zero, hStdOutWrite = IntPtr.Zero;
+        IntPtr hStdErrRead = IntPtr.Zero, hStdErrWrite = IntPtr.Zero;
+
+        bool needPipes = redirectStdIn || redirectStdOut || redirectStdErr;
+        if (needPipes)
+        {
+            si.dwFlags |= STARTF_USESTDHANDLES;
+            if (redirectStdIn)
+            {
+                CreatePipe(out hStdInRead, out hStdInWrite, IntPtr.Zero, 0);
+                SetHandleInformation(hStdInRead, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+                si.hStdInput = hStdInRead;
+            }
+            if (redirectStdOut)
+            {
+                CreatePipe(out hStdOutRead, out hStdOutWrite, IntPtr.Zero, 0);
+                SetHandleInformation(hStdOutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+                si.hStdOutput = hStdOutWrite;
+            }
+            if (redirectStdErr)
+            {
+                CreatePipe(out hStdErrRead, out hStdErrWrite, IntPtr.Zero, 0);
+                SetHandleInformation(hStdErrWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+                si.hStdError = hStdErrWrite;
+            }
+        }
+
+        bool ok = CreateProcess(null, cmdLine, IntPtr.Zero, IntPtr.Zero,
+            needPipes, // bInheritHandles only when pipes are used
+            CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB, IntPtr.Zero, cwd,
+            ref si, out var pi, caller);
+
+        // Restore parent env (don't pollute caller process)
+        if (savedEnv != null)
+            foreach (var kv in savedEnv)
+                Environment.SetEnvironmentVariable(kv.Key, kv.Value);
+
+        // Close child-side pipe handles in parent
+        if (hStdInRead  != IntPtr.Zero) CloseHandle(hStdInRead);
+        if (hStdOutWrite != IntPtr.Zero) CloseHandle(hStdOutWrite);
+        if (hStdErrWrite != IntPtr.Zero) CloseHandle(hStdErrWrite);
+
+        if (!ok)
+        {
+            if (hStdInWrite  != IntPtr.Zero) CloseHandle(hStdInWrite);
+            if (hStdOutRead  != IntPtr.Zero) CloseHandle(hStdOutRead);
+            if (hStdErrRead  != IntPtr.Zero) CloseHandle(hStdErrRead);
+            return null;
+        }
+        CloseHandle(pi.hThread);
+        return new SpawnResult(
+            (int)pi.dwProcessId, pi.hProcess,
+            hStdInWrite, hStdOutRead, hStdErrRead);
+    }
+
+    private static string Trunc(string s, int max) => s.Length > max ? s[..(max - 3)] + "..." : s;
+}

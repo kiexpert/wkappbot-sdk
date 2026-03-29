@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using STARTUPINFOW = AppBotPipe.STARTUPINFOW;
+using PROCESS_INFORMATION = AppBotPipe.PROCESS_INFORMATION;
 
 namespace WKAppBot.CLI;
 
@@ -175,27 +177,15 @@ internal static class EyeMcpClient
     }
 
     // ── P/Invoke for DETACHED_PROCESS spawn ─────────────────
+    // Structs + guard: AppBotPipe.cs (shared between Launcher and Core)
 
-    const uint DETACHED_PROCESS = 0x00000008;
-    const uint CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
-    const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
-    const uint STARTF_USESTDHANDLES = 0x00000100;
-    const uint HANDLE_FLAG_INHERIT = 0x00000001;
+    const uint DETACHED_PROCESS = AppBotPipe.DETACHED_PROCESS;
+    const uint CREATE_UNICODE_ENVIRONMENT = AppBotPipe.CREATE_UNICODE_ENVIRONMENT;
+    const uint STARTF_USESTDHANDLES = AppBotPipe.STARTF_USESTDHANDLES;
+    const uint HANDLE_FLAG_INHERIT = AppBotPipe.HANDLE_FLAG_INHERIT;
 
     [StructLayout(LayoutKind.Sequential)]
     struct SECURITY_ATTRIBUTES { public int nLength; public IntPtr lpSecurityDescriptor; public bool bInheritHandle; }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    struct STARTUPINFOW
-    {
-        public int cb; public IntPtr lpReserved, lpDesktop, lpTitle;
-        public int dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute;
-        public uint dwFlags; public short wShowWindow; public short cbReserved2;
-        public IntPtr lpReserved2, hStdInput, hStdOutput, hStdError;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public uint dwProcessId, dwThreadId; }
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool CreatePipe(out IntPtr hReadPipe, out IntPtr hWritePipe, ref SECURITY_ATTRIBUTES lpPipeAttributes, uint nSize);
@@ -205,16 +195,6 @@ internal static class EyeMcpClient
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool SetHandleInformation(IntPtr hObject, uint dwMask, uint dwFlags);
-
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    static extern bool CreateProcessW(
-        string? lpApplicationName, char[] lpCommandLine,
-        IntPtr lpProcessAttributes, IntPtr lpThreadAttributes,
-        [MarshalAs(UnmanagedType.Bool)] bool bInheritHandles,
-        uint dwCreationFlags,
-        IntPtr lpEnvironment, string? lpCurrentDirectory,
-        ref STARTUPINFOW lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool CloseHandle(IntPtr hObject);
@@ -284,15 +264,13 @@ internal static class EyeMcpClient
 
             var cmdLine = ($"\"{exe}\" mcp" + '\0').ToCharArray();
             var cwd = Environment.CurrentDirectory;
-            Console.Error.WriteLine($"[EYE-MCP] CreateProcessW: exe={exe} cwd={cwd} si.cb={si.cb} flags=0x{(DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT):X}");
-            bool ok = CreateProcessW(
+            bool ok = AppBotPipe.CreateProcess(
                 null, cmdLine,
                 IntPtr.Zero, IntPtr.Zero,
                 true, // bInheritHandles
                 DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT, // no CREATE_BREAKAWAY_FROM_JOB (ACCESS_DENIED in some job contexts)
                 envBlock, cwd,
-                ref si, out var pi);
-            Console.Error.WriteLine($"[EYE-MCP] CreateProcessW result: ok={ok} pid={pi.dwProcessId} err={Marshal.GetLastWin32Error()}");
+                ref si, out var pi, "EYE-MCP");
 
             // Free environment block
             if (envBlock != IntPtr.Zero) Marshal.FreeHGlobal(envBlock);

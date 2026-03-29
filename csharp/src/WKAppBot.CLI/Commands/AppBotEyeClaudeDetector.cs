@@ -1067,19 +1067,12 @@ internal partial class Program
             // Dedicated worker: spawn separate process (NOT through MCP pipe — that blocks user commands)
             var core = System.IO.Path.Combine(
                 System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot-core.exe");
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = core,
-                Arguments = "find-prompts",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true,
-            };
-            using var proc = System.Diagnostics.Process.Start(psi);
-            if (proc == null) return;
-            var output = proc.StandardOutput.ReadToEnd();
-            proc.WaitForExit(10_000);
-            var code = proc.HasExited ? proc.ExitCode : 1;
+            using var spawn = AppBotPipe.Spawn(core, "find-prompts", Environment.CurrentDirectory,
+                redirectStdOut: true, caller: "FIND-PROMPTS");
+            if (spawn == null) return;
+            var output = spawn.StdOut!.ReadToEnd();
+            spawn.WaitForExit(10_000);
+            var code = spawn.HasExited ? spawn.ExitCode : 1;
             if (code != 0 || string.IsNullOrWhiteSpace(output))
                 return;
 

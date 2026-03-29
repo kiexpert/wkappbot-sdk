@@ -58,6 +58,9 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe))
             return ($"Error: process path unavailable for out-of-proc run ({exe})", 1);
 
+        // Propagate callerCwd to subprocess: set WorkingDirectory + env var
+        // so EmitEyeTick in the child process uses the correct CWD for card display.
+        var callerCwd = EyeCmdPipeServer.CallerCwd.Value;
         var psi = new ProcessStartInfo(exe)
         {
             UseShellExecute = false,
@@ -65,7 +68,8 @@ internal partial class Program
             RedirectStandardError = true,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
+            StandardErrorEncoding = Encoding.UTF8,
+            WorkingDirectory = callerCwd ?? Path.GetDirectoryName(exe) ?? ".",
         };
         psi.ArgumentList.Add(command);
         foreach (var arg in args) psi.ArgumentList.Add(arg);

@@ -458,6 +458,7 @@ internal partial class Program
         };
 
         int exitCode = 1;
+        bool _skipTick = true; // default skip; set to false once command is known
         System.Threading.Timer? timeoutTimer = null;
         try
         {
@@ -532,7 +533,9 @@ internal partial class Program
             // Global Eye tick (for eye --global multi-parent monitor)
             // Skip for grap/grep alias — EmitEyeTick calls FindLogicalHost which may leave pending
             // I/O (UIA/WMI) that prevents TerminateProcess from completing for ~28s.
-            if (!_fastExitAfterCommand)
+            // Skip tick for fast-exit aliases (grap/grep) and Eye pipe commands.
+            _skipTick = _fastExitAfterCommand || RunningInEye;
+            if (!_skipTick)
             {
                 try { EmitEyeTick(command, cmdTag, "start"); } catch { }
                 if (!GrepModeActive && !IsPipeMode) Console.Error.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
@@ -555,7 +558,7 @@ internal partial class Program
             // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
             // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
             var isMcpCommand = command == "mcp";
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" or "dashboard" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || isMcpCommand || _fastExitAfterCommand;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" or "dashboard" or "find-prompts" or "claude-detect" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || isMcpCommand || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
@@ -730,7 +733,7 @@ internal partial class Program
         }
         finally
         {
-            if (!_fastExitAfterCommand)
+            if (!_skipTick)
             try
             {
                 var cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "noargs";
@@ -995,6 +998,7 @@ internal partial class Program
         public string Tag { get; set; } = "";
         public string Status { get; set; } = "";
         public string Cwd { get; set; } = "";
+        public string PromptHwnd { get; set; } = ""; // caller prompt window handle (session key)
         public string Args { get; set; } = "";  // command-line args (skip argv[0] exe path)
     }
 
@@ -1033,7 +1037,9 @@ internal partial class Program
                 Command = command,
                 Tag = tag,
                 Status = status,
-                Cwd = Environment.CurrentDirectory,
+                Cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory,
+                PromptHwnd = EyeCmdPipeServer.CallerHwnd.Value is IntPtr h && h != IntPtr.Zero
+                    ? $"0x{h.ToInt64():X}" : "",
                 Args = args,
             };
 
@@ -1102,7 +1108,7 @@ internal partial class Program
                 Command = command,
                 Tag = tag,
                 Status = status,
-                Cwd = Environment.CurrentDirectory,
+                Cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory,
             };
 
             File.AppendAllText(EyeTicksPath, JsonSerializer.Serialize(tick) + Environment.NewLine);

@@ -51,7 +51,7 @@ internal partial class Program
                     {
                         _hackServerStdin.WriteLine(request);
                         _hackServerStdin.Flush();
-                        response = _hackServerProcess!.StandardOutput.ReadLine();
+                        response = _hackServerProcess!.StdOut!.ReadLine();
                     }
 
                     if (!string.IsNullOrEmpty(response))
@@ -67,7 +67,7 @@ internal partial class Program
     }
 
     // ── Analyze-hack server process ──
-    static System.Diagnostics.Process? _hackServerProcess;
+    static AppBotPipe.SpawnResult? _hackServerProcess;
     static StreamWriter? _hackServerStdin;
     static string _lastHackNodeKey = ""; // change detection: hwnd+elName+elAid
 
@@ -84,21 +84,12 @@ internal partial class Program
         try
         {
             var corePath = Environment.ProcessPath ?? "wkappbot";
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = corePath,
-                Arguments = "analyze-hack --server",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = false,
-            };
-            _hackServerProcess = System.Diagnostics.Process.Start(psi);
+            _hackServerProcess = AppBotPipe.Spawn(corePath, "analyze-hack --server", Environment.CurrentDirectory,
+                redirectStdIn: true, redirectStdOut: true, caller: "EYE-HACK");
             if (_hackServerProcess != null)
             {
-                _hackServerStdin = _hackServerProcess.StandardInput;
-                Console.WriteLine($"[MOUSE-CCA] analyze-hack server started (PID={_hackServerProcess.Id})");
+                _hackServerStdin = _hackServerProcess.StdIn;
+                Console.WriteLine($"[MOUSE-CCA] analyze-hack server started (PID={_hackServerProcess.Pid})");
             }
         }
         catch (Exception ex) { Console.Error.WriteLine($"[MOUSE-CCA] Server spawn failed: {ex.Message}"); }
@@ -172,7 +163,7 @@ internal partial class Program
                     _hackServerStdin.Flush();
 
                     // Read response (one JSON line)
-                    var responseLine = await Task.Run(() => _hackServerProcess.StandardOutput.ReadLine(), ct)
+                    var responseLine = await Task.Run(() => _hackServerProcess.StdOut!.ReadLine(), ct)
                         .WaitAsync(TimeSpan.FromSeconds(10), ct);
                     if (string.IsNullOrEmpty(responseLine)) continue;
 
@@ -231,7 +222,7 @@ internal partial class Program
                 {
                     _hackServerStdin!.WriteLine("{\"type\":\"focus\"}");
                     _hackServerStdin.Flush();
-                    var focusLine = await Task.Run(() => _hackServerProcess!.StandardOutput.ReadLine(), ct)
+                    var focusLine = await Task.Run(() => _hackServerProcess!.StdOut!.ReadLine(), ct)
                         .WaitAsync(TimeSpan.FromSeconds(5), ct);
                     if (!string.IsNullOrEmpty(focusLine))
                     {
@@ -316,7 +307,7 @@ internal partial class Program
                     _hackServerStdin.WriteLine("{\"type\":\"focus\"}");
                     _hackServerStdin.Flush();
 
-                    var responseLine = await Task.Run(() => _hackServerProcess.StandardOutput.ReadLine(), ct)
+                    var responseLine = await Task.Run(() => _hackServerProcess.StdOut!.ReadLine(), ct)
                         .WaitAsync(TimeSpan.FromSeconds(5), ct);
                     if (string.IsNullOrEmpty(responseLine)) continue;
 

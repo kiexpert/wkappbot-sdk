@@ -17,6 +17,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\AppBotPipe.cs" Link="Shared\AppBotPipe.cs" />
+  </ItemGroup>
+
   <!-- Post-publish: deploy launcher directly (running exe can be renamed on NTFS) -->
   <!-- build.cmd renames current→.old-timestamp.exe, then copies new one to original path -->
   <!-- Standalone publish (no build.cmd): ContinueOnError=true if locked, .new.exe as fallback -->
