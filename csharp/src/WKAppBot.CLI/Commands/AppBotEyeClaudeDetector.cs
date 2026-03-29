@@ -1064,24 +1064,13 @@ internal partial class Program
     {
         try
         {
-            // Dedicated worker: spawn separate process (NOT through MCP pipe — that blocks user commands)
-            var core = System.IO.Path.Combine(
-                System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot-core.exe");
-            using var spawn = AppBotPipe.Spawn(core, "find-prompts", Environment.CurrentDirectory,
-                redirectStdOut: true, redirectStdErr: true, env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "FIND-PROMPTS");
-            if (spawn == null) return;
-            // Read stderr async to avoid deadlock (stderr buffer full → stdout blocks → deadlock)
-            string stderr = "";
-            var stderrTask = Task.Run(() => { try { stderr = spawn.StdErr?.ReadToEnd() ?? ""; } catch { } });
-            var output = spawn.StdOut!.ReadToEnd();
-            stderrTask.Wait(5_000);
-            spawn.WaitForExit(60_000); // FlaUI cold-start takes ~25s
-            var code = spawn.HasExited ? spawn.ExitCode : 1;
-            if (!string.IsNullOrWhiteSpace(stderr))
-                Console.Error.WriteLine($"[FIND-PROMPTS] stderr: {stderr.Trim()[..Math.Min(200, stderr.Trim().Length)]}");
+            // Route through MCP worker where FlaUI is already warm (~1s vs 25s cold-start).
+            // MCP worker preloads FlaUI assemblies at startup.
+            var (output, code) = EyeMcpClient.CallAsync(["find-prompts"], timeoutMs: 30_000)
+                .GetAwaiter().GetResult();
             if (code != 0 || string.IsNullOrWhiteSpace(output))
             {
-                Console.Error.WriteLine($"[FIND-PROMPTS] exit={code} stdout={output?.Length ?? 0}chars");
+                Console.Error.WriteLine($"[FIND-PROMPTS] MCP exit={code} len={output?.Length ?? 0}");
                 return;
             }
 
