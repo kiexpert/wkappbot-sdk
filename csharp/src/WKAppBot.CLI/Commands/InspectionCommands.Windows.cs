@@ -176,7 +176,7 @@ internal partial class Program
             static int DisplayWidth(string s)
             {
                 int w = 0;
-                foreach (var c in s) w += (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) ? 2 : 1;
+                foreach (var c in s) w += (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x2500 && c <= 0x27FF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) || c >= 0x10000 ? 2 : 1;
                 return w;
             }
             static string TrimToWidth(string s, int maxW)
@@ -185,7 +185,7 @@ internal partial class Program
                 for (int i = 0; i < s.Length; i++)
                 {
                     var c = s[i];
-                    int cw = (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) ? 2 : 1;
+                    int cw = (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x2500 && c <= 0x27FF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) || c >= 0x10000 ? 2 : 1;
                     if (w + cw > maxW - 3) return s[..i] + "...";
                     w += cw;
                 }
@@ -194,7 +194,7 @@ internal partial class Program
             static string PadToWidth(string s, int targetW)
             {
                 int w = 0;
-                foreach (var c in s) w += (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) ? 2 : 1;
+                foreach (var c in s) w += (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x2500 && c <= 0x27FF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) || c >= 0x10000 ? 2 : 1;
                 return w < targetW ? s + new string(' ', targetW - w) : s;
             }
             int titleWidth = isChild ? 44 : 45; // child: └ takes 1 col → shrink title to keep alignment
