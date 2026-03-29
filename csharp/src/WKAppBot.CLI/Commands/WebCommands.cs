@@ -463,6 +463,12 @@ Options:
         var pageUrl = cdp.GetUrlAsync().GetAwaiter().GetResult();
         Console.WriteLine($"[WEB] Title: {title}");
         Console.WriteLine($"[WEB] URL:   {pageUrl}");
+        Console.WriteLine($"[WEB] HWND:  0x{cdp.ChromeWindowHandle:X}");
+        // Print ready-to-copy CDP command for agents
+        var urlHost = "";
+        try { urlHost = new Uri(pageUrl ?? "").Host; } catch { }
+        if (!string.IsNullOrEmpty(urlHost))
+            Console.WriteLine($"[WEB] CDP:   a11y read \"*chrome*#{urlHost}\" --eval-js \"document.title\"");
 
         // Verify this is our WebBot window, not user's normal Chrome
         if (title == null || !title.Contains("WKWebBot"))

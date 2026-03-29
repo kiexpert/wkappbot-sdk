@@ -202,7 +202,15 @@ internal partial class Program
         if (!merged)
         {
             if (hasTargetThread)
+            {
                 (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName, replyBroadcast: autoBroadcast).GetAwaiter().GetResult();
+                // Fallback: thread not found (old workspace, deleted thread) → post as new message
+                if (!ok)
+                {
+                    Console.WriteLine("[SLACK] Thread reply failed — falling back to new message");
+                    (ok, postedTs) = PostWithOverflow(botToken, channel, replyText, username: senderName);
+                }
+            }
             else
                 (ok, postedTs) = PostWithOverflow(botToken, channel, replyText, username: senderName);
         }
