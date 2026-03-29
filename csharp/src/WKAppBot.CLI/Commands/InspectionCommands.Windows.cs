@@ -130,7 +130,7 @@ internal partial class Program
             uint pid, int w, int h, bool visible, bool isChild, bool isForeground)
         {
             string vis = visible ? "" : " [hidden]";
-            string prefix = isChild ? " └" : "  ";
+            string prefix = isChild ? "  └" : "  ";
             string displayTitle = title.Length > 60 ? title[..57] + "..." : title;
             if (string.IsNullOrEmpty(displayTitle)) displayTitle = "(no title)";
 
@@ -197,8 +197,9 @@ internal partial class Program
                 foreach (var c in s) w += (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) ? 2 : 1;
                 return w < targetW ? s + new string(' ', targetW - w) : s;
             }
-            var trimTitle = TrimToWidth(displayTitle, 45);
-            var padTitle = PadToWidth(trimTitle, 45);
+            int titleWidth = isChild ? 44 : 45; // child: └ takes 1 col → shrink title to keep alignment
+            var trimTitle = TrimToWidth(displayTitle, titleWidth);
+            var padTitle = PadToWidth(trimTitle, titleWidth);
             var procPid = $"{process}:{pid}";
             var trimProc = procPid.Length > 16 ? procPid[..16] : procPid;
             var sizeStr = $"{w}x{h}";
