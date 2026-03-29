@@ -18,6 +18,7 @@ internal partial class Program
         public int ParentPid { get; set; }
         public string ParentName { get; set; } = "";
         public string ParentTitle { get; set; } = "";
+        public string HostType { get; set; } = "";     // vscode, claude-desktop, codex, cursor, terminal
         public string LastTag { get; set; } = "";
         public string LastStatus { get; set; } = "";
         public DateTime LastTsUtc { get; set; }

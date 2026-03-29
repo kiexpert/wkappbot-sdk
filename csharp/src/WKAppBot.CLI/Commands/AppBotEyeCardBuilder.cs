@@ -118,11 +118,12 @@ internal partial class Program
                     var cwdTag = AbbreviateCwd(c.Cwd);
                     var ageText = age < 60 ? $"{age}초 전" : age < 3600 ? $"{age / 60}분 전" : $"{age / 3600}시간 전";
 
-                    // Header: [CWD] or process info
+                    // Header: [icon CWD] or process info
+                    var hostIcon = HostTypeIcon(c.HostType);
                     var header = string.IsNullOrWhiteSpace(cwdTag)
                         ? (string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : c.ParentTitle)
                         : cwdTag;
-                    sb.AppendLine($"[{header}]");
+                    sb.AppendLine(string.IsNullOrEmpty(hostIcon) ? $"[{header}]" : $"{hostIcon} [{header}]");
                     // Context % per card (CWD → session JSONL size → ctx%)
                     var ctxTag = "";
                     var (cardCtx, jsonlAge, _, jsonlFileSize) = GetContextInfoForCwdEx(c.Cwd);
@@ -166,6 +167,18 @@ internal partial class Program
 
         return sb.ToString().TrimEnd();
     }
+
+    /// <summary>Map host type to Slack emoji icon for card header.</summary>
+    static string HostTypeIcon(string? hostType) => (hostType ?? "").ToLowerInvariant() switch
+    {
+        "vscode" => ":vs:",
+        "claude-desktop" => ":claude:",
+        "codex" => ":openai:",
+        "cursor" => ":cursor:",
+        "copilot" => ":github:",
+        "terminal" => ":terminal:",
+        _ => "",
+    };
 
     /// <summary>
     /// Abbreviate a working directory path for compact display.
