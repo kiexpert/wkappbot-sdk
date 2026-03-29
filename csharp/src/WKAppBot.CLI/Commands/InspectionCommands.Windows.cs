@@ -577,8 +577,28 @@ internal partial class Program
             return new Regex(rxStr, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         }
 
-        // 2-pass: collect all windows, then group by matched pid
-        var _allCollected = new List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible, bool isFg, bool matched)>();
+        // Pre-scan: build pid→windows map for instant sibling lookup
+        var _pidWindows = new Dictionary<uint, List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible)>>();
+        if (hasFilter)
+        {
+            NativeMethods.EnumWindows((hWnd, _) =>
+            {
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint p);
+                var t = NativeMethods.GetWindowTextSafe(hWnd, 50);
+                var cb = new StringBuilder(128); NativeMethods.GetClassNameW(hWnd, cb, 128);
+                NativeMethods.GetWindowRect(hWnd, out var r);
+                int rw = r.Right - r.Left, rh = r.Bottom - r.Top;
+                bool vis = NativeMethods.IsWindowVisible(hWnd);
+                if (!string.IsNullOrEmpty(t) || vis || showAll)
+                {
+                    if (!_pidWindows.TryGetValue(p, out var list))
+                        _pidWindows[p] = list = new();
+                    list.Add((hWnd, t, cb.ToString(), GetProcessName(p), p, rw, rh, vis));
+                }
+                return true;
+            }, IntPtr.Zero);
+        }
+        var _printedChildPids = new HashSet<uint>();
 
         PulseStep.Mark("enum-windows-start");
         NativeMethods.EnumWindows((hWnd, _) =>
@@ -680,25 +700,21 @@ internal partial class Program
                 // ── Original mode: title/process/class filter only ──
                 var info = GetWindowInfo(hWnd);
 
-                if (hasFilter)
+                if (hasFilter && info != null)
                 {
-                    // 2-pass: collect ALL windows (matched or not)
-                    if (info != null)
+                    var v = info.Value;
+                    PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
+                    totalCount++;
+                    parentPrinted = true;
+                    // Immediately print same-pid siblings from pre-scanned map
+                    if (_printedChildPids.Add(v.pid) && _pidWindows.TryGetValue(v.pid, out var siblings))
                     {
-                        var v = info.Value;
-                        _allCollected.Add((hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, isFg, true));
-                    }
-                    else
-                    {
-                        NativeMethods.GetWindowThreadProcessId(hWnd, out uint sPid);
-                        var sTitle = NativeMethods.GetWindowTextSafe(hWnd, 50);
-                        var sCls = new StringBuilder(128); NativeMethods.GetClassNameW(hWnd, sCls, 128);
-                        NativeMethods.GetWindowRect(hWnd, out var sRect);
-                        int sW = sRect.Right - sRect.Left, sH = sRect.Bottom - sRect.Top;
-                        bool sVis = NativeMethods.IsWindowVisible(hWnd);
-                        var sProc = GetProcessName(sPid);
-                        if (!string.IsNullOrEmpty(sTitle) || sVis || showAll)
-                            _allCollected.Add((hWnd, sTitle, sCls.ToString(), sProc, sPid, sW, sH, sVis, isFg, false));
+                        foreach (var s in siblings)
+                        {
+                            if (s.hWnd == hWnd) continue;
+                            PrintWindow(s.hWnd, s.title, s.className, s.process, s.pid, s.w, s.h, s.visible, true, false);
+                            totalCount++;
+                        }
                     }
                 }
                 else if (info != null)
@@ -889,38 +905,6 @@ internal partial class Program
         }
 
         // 2nd pass: group by pid — root window + children inline
-        if (hasFilter && _allCollected.Count > 0)
-        {
-            // Group by pid, keyed by pid → list
-            var byPid = new Dictionary<uint, List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible, bool isFg, bool matched)>>();
-            foreach (var w in _allCollected)
-            {
-                if (!byPid.TryGetValue(w.pid, out var list))
-                    byPid[w.pid] = list = new();
-                list.Add(w);
-            }
-            // Output order: matched windows in Z-order, each followed by same-pid children
-            var printedPids = new HashSet<uint>();
-            foreach (var w in _allCollected)
-            {
-                if (!w.matched) continue;
-                if (!printedPids.Add(w.pid)) continue; // already printed this pid group
-                var items = byPid[w.pid];
-                // Root: largest visible matched, or first matched
-                var root = items.Where(x => x.matched && x.visible).OrderByDescending(x => x.w * x.h).FirstOrDefault();
-                if (root.hWnd == IntPtr.Zero) root = items.First(x => x.matched);
-                PrintWindow(root.hWnd, root.title, root.className, root.process, root.pid, root.w, root.h, root.visible, false, root.isFg);
-                totalCount++;
-                // Children: same pid, not root
-                foreach (var c in items)
-                {
-                    if (c.hWnd == root.hWnd) continue;
-                    PrintWindow(c.hWnd, c.title, c.className, c.process, c.pid, c.w, c.h, c.visible, true, c.isFg);
-                    totalCount++;
-                }
-            }
-        }
-
         Console.WriteLine();
         string uiaNote = uiaSearch ? $", UIA matched in {uiaMatchWindows} window(s)" : "";
         string limitNote = limit > 0 ? $", --limit {limit}" : "";
