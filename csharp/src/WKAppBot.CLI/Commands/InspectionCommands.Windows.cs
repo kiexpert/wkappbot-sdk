@@ -891,21 +891,27 @@ internal partial class Program
         // 2nd pass: group by pid — root window + children inline
         if (hasFilter && _allCollected.Count > 0)
         {
-            var matchedPids = new HashSet<uint>(_allCollected.Where(w => w.matched).Select(w => w.pid));
-            var byPid = _allCollected.GroupBy(w => w.pid);
-            foreach (var grp in byPid)
+            // Group by pid, keyed by pid → list
+            var byPid = new Dictionary<uint, List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible, bool isFg, bool matched)>>();
+            foreach (var w in _allCollected)
             {
-                var items = grp.ToList();
-                bool hasMatch = items.Any(w => w.matched);
-                if (!hasMatch && !matchedPids.Contains(grp.Key)) continue;
-                // Find root: largest visible matched window, or first matched
-                var root = items.Where(w => w.matched && w.visible).OrderByDescending(w => w.w * w.h).FirstOrDefault();
-                if (root.hWnd == IntPtr.Zero) root = items.FirstOrDefault(w => w.matched);
-                if (root.hWnd == IntPtr.Zero) root = items.First();
-                // Print root
+                if (!byPid.TryGetValue(w.pid, out var list))
+                    byPid[w.pid] = list = new();
+                list.Add(w);
+            }
+            // Output order: matched windows in Z-order, each followed by same-pid children
+            var printedPids = new HashSet<uint>();
+            foreach (var w in _allCollected)
+            {
+                if (!w.matched) continue;
+                if (!printedPids.Add(w.pid)) continue; // already printed this pid group
+                var items = byPid[w.pid];
+                // Root: largest visible matched, or first matched
+                var root = items.Where(x => x.matched && x.visible).OrderByDescending(x => x.w * x.h).FirstOrDefault();
+                if (root.hWnd == IntPtr.Zero) root = items.First(x => x.matched);
                 PrintWindow(root.hWnd, root.title, root.className, root.process, root.pid, root.w, root.h, root.visible, false, root.isFg);
                 totalCount++;
-                // Print children (everything else in this pid)
+                // Children: same pid, not root
                 foreach (var c in items)
                 {
                     if (c.hWnd == root.hWnd) continue;
