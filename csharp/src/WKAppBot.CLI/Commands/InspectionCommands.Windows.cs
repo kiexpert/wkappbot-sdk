@@ -723,19 +723,19 @@ internal partial class Program
                     PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
                     totalCount++;
                     parentPrinted = true;
-                    // Immediately print same-pid siblings from pre-scanned pid→hwnd map
+                    // Immediately print same-pid siblings (no filter — IME, hidden windows all included)
                     if (_printedChildPids.Add(v.pid) && _pidWindows.TryGetValue(v.pid, out var siblings))
                     {
                         foreach (var s in siblings)
                         {
                             if (s.hWnd == hWnd) continue;
-                            var si = GetRawWindowInfo(s.hWnd);
-                            if (si != null)
-                            {
-                                var sv = si.Value;
-                                PrintWindow(s.hWnd, sv.title, sv.className, sv.process, sv.pid, sv.w, sv.h, sv.visible, true, false);
-                                totalCount++;
-                            }
+                            var st = NativeMethods.GetWindowTextSafe(s.hWnd, 50);
+                            var scb = new StringBuilder(128); NativeMethods.GetClassNameW(s.hWnd, scb, 128);
+                            NativeMethods.GetWindowRect(s.hWnd, out var sr);
+                            PrintWindow(s.hWnd, st, scb.ToString(), v.process, s.pid,
+                                sr.Right - sr.Left, sr.Bottom - sr.Top,
+                                NativeMethods.IsWindowVisible(s.hWnd), true, false);
+                            totalCount++;
                         }
                     }
                 }
