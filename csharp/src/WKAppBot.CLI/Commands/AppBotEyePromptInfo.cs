@@ -205,12 +205,20 @@ internal partial class Program
                         text = NormalizePrompt(text);
                         if (string.IsNullOrWhiteSpace(text)) continue;
                         if (role == "assistant" && string.IsNullOrWhiteSpace(bestAssistant))
-                        { bestAssistant = text; break; }
+                            bestAssistant = text;
                         if (role == "user" && string.IsNullOrWhiteSpace(bestUser))
-                            bestUser = $"유저> {text}";
+                            bestUser = text;
+                        if (!string.IsNullOrWhiteSpace(bestAssistant) && !string.IsNullOrWhiteSpace(bestUser))
+                            break;
                     }
                 }
-                selected = !string.IsNullOrWhiteSpace(bestAssistant) ? bestAssistant : bestUser;
+                // Show both: user prompt + assistant thought
+                if (!string.IsNullOrWhiteSpace(bestAssistant) && !string.IsNullOrWhiteSpace(bestUser))
+                    selected = $"💬 {bestUser}\n🤖 {bestAssistant}";
+                else if (!string.IsNullOrWhiteSpace(bestAssistant))
+                    selected = bestAssistant;
+                else if (!string.IsNullOrWhiteSpace(bestUser))
+                    selected = $"💬 {bestUser}";
                 if (!string.IsNullOrWhiteSpace(selected)) break;
             }
             _clotThoughtCache[cwd] = (latestFile, selected, fi.Length, fi.LastWriteTimeUtc);
