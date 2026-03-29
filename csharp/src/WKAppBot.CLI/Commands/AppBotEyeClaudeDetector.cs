@@ -1070,8 +1070,11 @@ internal partial class Program
             using var spawn = AppBotPipe.Spawn(core, "find-prompts", Environment.CurrentDirectory,
                 redirectStdOut: true, redirectStdErr: true, env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "FIND-PROMPTS");
             if (spawn == null) return;
+            // Read stderr async to avoid deadlock (stderr buffer full → stdout blocks → deadlock)
+            string stderr = "";
+            var stderrTask = Task.Run(() => { try { stderr = spawn.StdErr?.ReadToEnd() ?? ""; } catch { } });
             var output = spawn.StdOut!.ReadToEnd();
-            var stderr = spawn.StdErr?.ReadToEnd() ?? "";
+            stderrTask.Wait(5_000);
             spawn.WaitForExit(60_000); // FlaUI cold-start takes ~25s
             var code = spawn.HasExited ? spawn.ExitCode : 1;
             if (!string.IsNullOrWhiteSpace(stderr))
