@@ -172,7 +172,33 @@ internal partial class Program
 
             // ── Compact columnar output ──
             // [hwnd] title(40)  process(12)  WxH  flags
-            var trimTitle = displayTitle.Length > 45 ? displayTitle[..42] + "..." : displayTitle;
+            // Display width: CJK chars count as 2 columns
+            static int DisplayWidth(string s)
+            {
+                int w = 0;
+                foreach (var c in s) w += (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) ? 2 : 1;
+                return w;
+            }
+            static string TrimToWidth(string s, int maxW)
+            {
+                int w = 0;
+                for (int i = 0; i < s.Length; i++)
+                {
+                    var c = s[i];
+                    int cw = (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) ? 2 : 1;
+                    if (w + cw > maxW - 3) return s[..i] + "...";
+                    w += cw;
+                }
+                return s;
+            }
+            static string PadToWidth(string s, int targetW)
+            {
+                int w = 0;
+                foreach (var c in s) w += (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) ? 2 : 1;
+                return w < targetW ? s + new string(' ', targetW - w) : s;
+            }
+            var trimTitle = TrimToWidth(displayTitle, 45);
+            var padTitle = PadToWidth(trimTitle, 45);
             var procPid = $"{process}:{pid}";
             var trimProc = procPid.Length > 16 ? procPid[..16] : procPid;
             var sizeStr = $"{w}x{h}";
@@ -192,7 +218,7 @@ internal partial class Program
                 : ConsoleColor.DarkGray;
             Console.Write($"  {prefix}[{hWnd:X8}] ");
             Console.ForegroundColor = isForeground ? ConsoleColor.Green : ConsoleColor.Yellow;
-            Console.Write($"{trimTitle,-45}");
+            Console.Write(padTitle);
             Console.ResetColor();
             Console.Write($" {trimProc,-16} {sizeStr,9}");
             if (isForeground) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" ★"); Console.ResetColor(); }
