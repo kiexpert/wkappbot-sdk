@@ -297,6 +297,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
                     foreach (var mwin in _monitors)
                     {
                         mwin.Window.Opacity = 0;
+                        mwin.LastT = -1; // reset so UpdateMonitorVisuals runs on next tick
                         mwin.Window.Visibility = Visibility.Visible;
                         var helper = new WindowInteropHelper(mwin.Window);
                         SetWindowPos(helper.Handle, (IntPtr)HWND_TOPMOST, 0, 0, 0, 0,
