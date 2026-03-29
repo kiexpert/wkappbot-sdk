@@ -173,7 +173,8 @@ internal partial class Program
             // ── Compact columnar output ──
             // [hwnd] title(40)  process(12)  WxH  flags
             var trimTitle = displayTitle.Length > 45 ? displayTitle[..42] + "..." : displayTitle;
-            var trimProc = process.Length > 12 ? process[..12] : process;
+            var procPid = $"{process}:{pid}";
+            var trimProc = procPid.Length > 16 ? procPid[..16] : procPid;
             var sizeStr = $"{w}x{h}";
             // Flags: single-char compact (H=hidden L=layered T=tool M=min X=max D=disabled ↑=topmost)
             var flagChars = new StringBuilder();
@@ -193,7 +194,7 @@ internal partial class Program
             Console.ForegroundColor = isForeground ? ConsoleColor.Green : ConsoleColor.Yellow;
             Console.Write($"{trimTitle,-45}");
             Console.ResetColor();
-            Console.Write($" {trimProc,-12} {sizeStr,9}");
+            Console.Write($" {trimProc,-16} {sizeStr,9}");
             if (isForeground) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" ★"); Console.ResetColor(); }
             if (flagStr.Length > 0) { Console.ForegroundColor = ConsoleColor.DarkCyan; Console.Write(flagStr); Console.ResetColor(); }
             if (ownerHwnd != IntPtr.Zero) { Console.ForegroundColor = ConsoleColor.DarkGray; Console.Write($" ◇{ownerHwnd:X}"); Console.ResetColor(); }
@@ -449,7 +450,7 @@ internal partial class Program
         Console.WriteLine($"── {mode} ──");
         Console.ForegroundColor = ConsoleColor.DarkGray;
         //            "  [XXXXXXXX] {,-45}                                        {,-12}     {,9}  flags"
-        Console.WriteLine($"  {"[hwnd____]",-11}{"title",-45} {"process",-12} {"WxH",9}  flags");
+        Console.WriteLine($"  {"[hwnd____]",-11}{"title",-45} {"process:pid",-16} {"WxH",9}  flags");
         Console.ResetColor();
 
         // Helper: get raw window info WITHOUT title filter (for --uia mode)
@@ -576,9 +577,9 @@ internal partial class Program
             return new Regex(rxStr, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         }
 
-        // 2-pass data: collect matched pids + all windows for sibling display
-        var _matchedPids = new HashSet<uint>();
-        var _allWindows = new List<(IntPtr hWnd, (string title, string className, string process, uint pid, int w, int h, bool visible) info, bool isFg)>();
+        // Sibling display: collect non-matched windows by pid, print under matched root
+        var _siblingsByPid = new Dictionary<uint, List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible, bool isFg)>>();
+        var _printedSiblingPids = new HashSet<uint>();
 
         PulseStep.Mark("enum-windows-start");
         NativeMethods.EnumWindows((hWnd, _) =>
@@ -688,13 +689,17 @@ internal partial class Program
                     if (v.visible && v.w >= 50 && v.h >= 50) visibleResultCount++;
                     else matchedHiddenHwnds.Add(hWnd);
                     parentPrinted = true;
-                    // Collect matched pid for sibling window display
-                    if (hasFilter) _matchedPids.Add(v.pid);
+                    // Print already-collected siblings of same pid under this root
+                    if (hasFilter && _printedSiblingPids.Add(v.pid) && _siblingsByPid.TryGetValue(v.pid, out var sibs))
+                    {
+                        foreach (var s in sibs)
+                        { PrintWindow(s.hWnd, s.title, s.className, s.process, s.pid, s.w, s.h, s.visible, true, s.isFg); totalCount++; }
+                    }
                     if (limit > 0 && totalCount >= limit) { Console.Out.Flush(); return false; }
                 }
                 else if (hasFilter)
                 {
-                    // Collect window for 2nd pass — minimal filter (need all pids for sibling match)
+                    // Collect non-matched window by pid — printed inline when root matches
                     NativeMethods.GetWindowThreadProcessId(hWnd, out uint sPid);
                     var sTitle = NativeMethods.GetWindowTextSafe(hWnd, 50);
                     var sCls = new StringBuilder(128); NativeMethods.GetClassNameW(hWnd, sCls, 128);
@@ -703,7 +708,11 @@ internal partial class Program
                     bool sVis = NativeMethods.IsWindowVisible(hWnd);
                     var sProc = GetProcessName(sPid);
                     if (!string.IsNullOrEmpty(sTitle) || sVis || showAll)
-                        _allWindows.Add((hWnd, (sTitle, sCls.ToString(), sProc, sPid, sW, sH, sVis), isFg));
+                    {
+                        if (!_siblingsByPid.TryGetValue(sPid, out var list))
+                            _siblingsByPid[sPid] = list = new();
+                        list.Add((hWnd, sTitle, sCls.ToString(), sProc, sPid, sW, sH, sVis, isFg));
+                    }
                 }
                 if (!hasFilter && ownerCandidateMatcher != null && info == null)
                 {
@@ -882,22 +891,6 @@ internal partial class Program
                         hrect.Right - hrect.Left, hrect.Bottom - hrect.Top, true, false, oh == fgWnd);
                     totalCount++;
                 }
-            }
-        }
-
-        // 2nd pass: show sibling windows of matched processes (same pid, not yet printed)
-        if (hasFilter && _matchedPids.Count > 0 && _allWindows.Count > 0)
-        {
-            var siblings = _allWindows.Where(w => _matchedPids.Contains(w.info.pid)).ToList();
-            if (siblings.Count > 0)
-            {
-                Console.WriteLine();
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.WriteLine($"── sibling windows (same process) ──");
-                Console.ResetColor();
-                foreach (var (sHwnd, s, sFg) in siblings)
-                    PrintWindow(sHwnd, s.title, s.className, s.process, s.pid, s.w, s.h, s.visible, true, sFg);
-                totalCount += siblings.Count;
             }
         }
 
