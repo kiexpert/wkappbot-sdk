@@ -224,7 +224,12 @@ internal partial class Program
             Console.Write($" {trimProc,-16} {sizeStr,9}");
             if (isForeground) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" *"); Console.ResetColor(); }
             if (flagStr.Length > 0) { Console.ForegroundColor = ConsoleColor.DarkCyan; Console.Write(flagStr); Console.ResetColor(); }
-            if (ownerHwnd != IntPtr.Zero) { Console.ForegroundColor = ConsoleColor.DarkGray; Console.Write($" ^{ownerHwnd:X}"); Console.ResetColor(); }
+            if (ownerHwnd != IntPtr.Zero)
+            {
+                var ownerTitle = NativeMethods.GetWindowTextSafe(ownerHwnd, 30);
+                var ownerLabel = string.IsNullOrEmpty(ownerTitle) ? $"{ownerHwnd:X}" : (ownerTitle.Length > 15 ? ownerTitle[..12] + "..." : ownerTitle);
+                Console.ForegroundColor = ConsoleColor.DarkGray; Console.Write($" ^{ownerLabel}"); Console.ResetColor();
+            }
             Console.WriteLine();
 
             // --cmd: print process exe path + args
