@@ -479,8 +479,10 @@ Options:
         try { var uri = new Uri(pageUrl ?? ""); urlPath = uri.Host + uri.AbsolutePath.TrimEnd('/'); } catch { }
 
         // Build candidate grap patterns and verify each finds exactly 1 window
+        // Shortest unique match wins — agents should copy-paste without editing
         var candidates = new List<string>();
         if (chromeHwnd != IntPtr.Zero) candidates.Add($"*hwnd={chromeHwnd.ToInt64():X8}*#{urlPath}");
+        candidates.Add($"*WKWebBot*#{urlPath}"); // WebBot-only pattern (shortest)
         if (!string.IsNullOrEmpty(titlePrefix)) candidates.Add($"*{titlePrefix}*chrome*#{urlPath}");
         if (!string.IsNullOrEmpty(urlPath)) candidates.Add($"*chrome*#{urlPath}");
         // Shorter title variants
