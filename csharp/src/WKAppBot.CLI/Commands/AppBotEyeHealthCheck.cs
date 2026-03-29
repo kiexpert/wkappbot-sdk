@@ -223,7 +223,7 @@ internal partial class Program
             // but EnumWindows + process name lookup still costs ~5-20ms per tick; limit to once/second.
             List<ClaudePromptHelper.PromptInfo> allPrompts;
             var now = DateTime.UtcNow;
-            if (_cachedAllPrompts != null && (now - _lastFindAllPromptsAt).TotalMilliseconds < 10_000)
+            if (_cachedAllPrompts != null && (now - _lastFindAllPromptsAt).TotalMilliseconds < 60_000)
             {
                 allPrompts = _cachedAllPrompts;
             }
