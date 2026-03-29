@@ -104,14 +104,15 @@ partial class Program
             var fgHwnd = GetForegroundWindow();
             var fgTitle = "";
             try { var fb = new System.Text.StringBuilder(256); GetWindowTextW(fgHwnd, fb, 256); fgTitle = fb.ToString(); if (fgTitle.Length > 60) fgTitle = fgTitle[..57] + "..."; } catch { }
-            // Build JSON — all owners of this process
-            var j = new System.Text.StringBuilder(512);
-            j.Append($"{{\"_\":\"LAUNCH\",\"pid\":{myPid},\"sid\":{sid}");
-            if (consoleHwnd != IntPtr.Zero) j.Append($",\"con\":\"0x{consoleHwnd:X}\",\"cls\":\"{consoleName}\"");
-            if (fgHwnd != IntPtr.Zero) { j.Append($",\"fg\":\"0x{fgHwnd:X}\""); if (fgTitle.Length > 0) j.Append($",\"fgT\":\"{fgTitle.Replace("\"","'")}\""); }
-            j.Append($",\"cwd\":\"{cwd.Replace("\\","\\\\")}\"");
-            // Parent chain: walk up until root
-            j.Append(",\"chain\":[");
+            // Build JSON with stealth \r after each field — cursor resets, no wrap
+            var err = Console.Error;
+            void F(string s) { err.Write(s); err.Write('\r'); } // field + reset cursor
+            F($"{{\"_\":\"LAUNCH\",\"pid\":{myPid},\"sid\":{sid}");
+            if (consoleHwnd != IntPtr.Zero) F($",\"con\":\"0x{consoleHwnd:X}\",\"cls\":\"{consoleName}\"");
+            if (fgHwnd != IntPtr.Zero) { F($",\"fg\":\"0x{fgHwnd:X}\""); if (fgTitle.Length > 0) F($",\"fgT\":\"{fgTitle.Replace("\"","'")}\""); }
+            F($",\"cwd\":\"{cwd.Replace("\\","\\\\")}\"");
+            // Parent chain
+            F(",\"chain\":[");
             var chainPid = myPid;
             for (int ci = 0; ci < 10; ci++)
             {
@@ -126,27 +127,16 @@ partial class Program
                     if (pHwnd != IntPtr.Zero) { var tb = new System.Text.StringBuilder(80); GetWindowTextW(pHwnd, tb, 80); pTitle = tb.ToString(); }
                 }
                 catch { }
-                if (ci > 0) j.Append(',');
-                j.Append($"{{\"pid\":{pp},\"name\":\"{pName}\"");
-                if (pHwnd != IntPtr.Zero) j.Append($",\"hwnd\":\"0x{pHwnd:X}\"");
-                if (pTitle.Length > 0) j.Append($",\"title\":\"{(pTitle.Length > 50 ? pTitle[..47] + "..." : pTitle).Replace("\"","'")}\"");
-                j.Append('}');
+                if (ci > 0) err.Write(',');
+                F($"{{\"pid\":{pp},\"name\":\"{pName}\"");
+                if (pHwnd != IntPtr.Zero) F($",\"hwnd\":\"0x{pHwnd:X}\"");
+                if (pTitle.Length > 0) F($",\"title\":\"{(pTitle.Length > 50 ? pTitle[..47] + "..." : pTitle).Replace("\"","'")}\"");
+                err.Write('}');
                 chainPid = pp;
             }
-            j.Append("]}");
-            // Stealth write: each field followed by \r → cursor stays at line start.
-            // Terminal shows only the last field fragment; log captures full JSON.
-            // No line wrap possible since \r resets cursor before reaching terminal width.
-            var jStr = j.ToString();
-            foreach (var part in jStr.Split(','))
-            {
-                Console.Error.Write(part + ",");
-                Console.Error.Write('\r');
-            }
-            // Final erase: longest fragment + margin
-            Console.Error.Write(new string(' ', Math.Min(jStr.Length, 120)));
-            Console.Error.Write('\r');
-            Console.Error.Flush();
+            err.Write("]}");
+            err.Write("\r" + new string(' ', 80) + "\r"); // final erase
+            err.Flush();
         }
         catch { }
 
