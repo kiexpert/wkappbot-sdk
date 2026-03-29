@@ -694,9 +694,16 @@ internal partial class Program
                 }
                 else if (hasFilter)
                 {
-                    // Collect ALL windows for 2nd pass (sibling display)
-                    var raw = GetRawWindowInfo(hWnd);
-                    if (raw != null) _allWindows.Add((hWnd, raw.Value, isFg));
+                    // Collect window for 2nd pass — minimal filter (need all pids for sibling match)
+                    NativeMethods.GetWindowThreadProcessId(hWnd, out uint sPid);
+                    var sTitle = NativeMethods.GetWindowTextSafe(hWnd, 50);
+                    var sCls = new StringBuilder(128); NativeMethods.GetClassNameW(hWnd, sCls, 128);
+                    NativeMethods.GetWindowRect(hWnd, out var sRect);
+                    int sW = sRect.Right - sRect.Left, sH = sRect.Bottom - sRect.Top;
+                    bool sVis = NativeMethods.IsWindowVisible(hWnd);
+                    var sProc = GetProcessName(sPid);
+                    if (!string.IsNullOrEmpty(sTitle) || sVis || showAll)
+                        _allWindows.Add((hWnd, (sTitle, sCls.ToString(), sProc, sPid, sW, sH, sVis), isFg));
                 }
                 if (!hasFilter && ownerCandidateMatcher != null && info == null)
                 {
