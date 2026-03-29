@@ -138,16 +138,16 @@ internal partial class Program
                     {
                         var jAge = (int)jsonlAge.Value.TotalSeconds;
                         var jAgeText = jAge < 60 ? $"{jAge}초 전" : jAge < 3600 ? $"{jAge / 60}분 전" : $"{jAge / 3600}시간 전";
-                        sb.AppendLine($"클롣 상태: 대기중 ({jAgeText}){ctxTag}");
+                        sb.AppendLine($"상태: 대기중 ({jAgeText}){ctxTag}");
                     }
                     else if (age > 30)
                     {
-                        sb.AppendLine($"클롣 상태: 대기중 ({ageText}){ctxTag}");
+                        sb.AppendLine($"상태: 대기중 ({ageText}){ctxTag}");
                     }
                     else
                     {
-                        sb.AppendLine($"클롣 작업: {c.LastTag}");
-                        sb.AppendLine($"클롣 상태: {c.LastStatus} ({ageText}){ctxTag}");
+                        sb.AppendLine($"작업: {c.LastTag}");
+                        sb.AppendLine($"상태: {c.LastStatus} ({ageText}){ctxTag}");
                     }
                     // 클롣 프롬프트 + 생각: CWD별 Claude Code 세션에서 최신 user/assistant 텍스트
                     var clotThought = ReadClotThoughtForCwd(c.Cwd);
@@ -158,7 +158,7 @@ internal partial class Program
                         {
                             if (string.IsNullOrWhiteSpace(thoughtLine)) continue;
                             var trunc = thoughtLine.Length > 120 ? thoughtLine[..120] + "..." : thoughtLine;
-                            sb.AppendLine($"클롣 생각: {trunc}");
+                            sb.AppendLine($"생각: {trunc}");
                         }
                     }
                     sb.AppendLine("----");
