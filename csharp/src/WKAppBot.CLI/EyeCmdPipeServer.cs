@@ -260,7 +260,7 @@ internal static class EyeCmdPipeServer
             var delegName = Program.GetSendReplyUsername();
             var cmdLine = string.Join(" ", args);
             // stderr: diagnostic only (pipeWriter → stdout → user console, stderr → Eye log only)
-            Console.Error.WriteLine($"[CMD-MCP] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"}");
+            Console.Error.WriteLine($"[CMD-MCP] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"} hwnd=0x{callerHwnd?.ToInt64():X}");
 
             // Set per-call caller context (read by MCP worker via _meta in JSON-RPC)
             EyeMcpClient.CurrentCallerCwd = callerCwd;
