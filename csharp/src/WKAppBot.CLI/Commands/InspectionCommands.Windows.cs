@@ -577,7 +577,9 @@ internal partial class Program
             return new Regex(rxStr, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         }
 
-        // Pre-scan: build pid→windows map for instant sibling lookup
+        // Pre-scan: single EnumWindows pass → Z-order list + pid→windows map
+        // Used for both matching and sibling display (no Z-order drift between scans)
+        var _preScanned = new List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible)>();
         var _pidWindows = new Dictionary<uint, List<(IntPtr hWnd, string title, string className, string process, uint pid, int w, int h, bool visible)>>();
         if (hasFilter)
         {
@@ -589,11 +591,14 @@ internal partial class Program
                 NativeMethods.GetWindowRect(hWnd, out var r);
                 int rw = r.Right - r.Left, rh = r.Bottom - r.Top;
                 bool vis = NativeMethods.IsWindowVisible(hWnd);
+                var pn = GetProcessName(p);
+                var entry = (hWnd, t, cb.ToString(), pn, p, rw, rh, vis);
+                _preScanned.Add(entry);
                 if (!string.IsNullOrEmpty(t) || vis || showAll)
                 {
                     if (!_pidWindows.TryGetValue(p, out var list))
                         _pidWindows[p] = list = new();
-                    list.Add((hWnd, t, cb.ToString(), GetProcessName(p), p, rw, rh, vis));
+                    list.Add(entry);
                 }
                 return true;
             }, IntPtr.Zero);
