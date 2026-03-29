@@ -20,8 +20,10 @@ partial class Program
     static int RunCoreDetachedNormal(string[] args, bool showStderr = false,
         System.Collections.Generic.List<(long ms, string msg)>? stderrBuf = null)
     {
+        Prof("IOCP: RunCoreDetachedNormal enter");
         var dir  = System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
         var core = ResolveCoreExe();
+        Prof($"IOCP: core={core} exists={System.IO.File.Exists(core)}");
         if (!System.IO.File.Exists(core)) return RunCore(args); // fallback
 
         // Parse --timeout/--timeout-exit (same as RunCore)
