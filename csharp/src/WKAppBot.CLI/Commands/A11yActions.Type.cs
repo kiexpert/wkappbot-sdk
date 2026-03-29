@@ -157,6 +157,58 @@ internal partial class Program
         bool isConPtyTerminal = ConPtyTerminalClasses.Contains(winClass);
         bool isClassicConsole = ClassicConsoleClasses.Contains(winClass);
 
+        // Electron app (VS Code etc.): clipboard paste via keybd_event Ctrl+V
+        // xterm.js terminal inside Electron doesn't respond to WM_CHAR or LegacyIA
+        NativeMethods.GetWindowThreadProcessId(hwnd, out uint typePid);
+        var typeProcName = "";
+        try { typeProcName = System.Diagnostics.Process.GetProcessById((int)typePid).ProcessName; } catch { }
+        bool isElectronTerminal = winClass == "Chrome_WidgetWin_1"
+            && (typeProcName.Equals("Code", StringComparison.OrdinalIgnoreCase)
+                || typeProcName.Equals("Codex", StringComparison.OrdinalIgnoreCase));
+        if (isElectronTerminal)
+        {
+            try
+            {
+                // Clipboard requires STA thread — run on dedicated STA thread if needed
+                bool clipOk = false;
+                var prevClip = "";
+                void DoClipboard()
+                {
+                    try { if (System.Windows.Forms.Clipboard.ContainsText()) prevClip = System.Windows.Forms.Clipboard.GetText(); } catch { }
+                    System.Windows.Forms.Clipboard.SetText(text);
+                    clipOk = true;
+                }
+                if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+                    DoClipboard();
+                else
+                {
+                    var t = new Thread(() => DoClipboard());
+                    t.SetApartmentState(ApartmentState.STA);
+                    t.Start();
+                    t.Join(3000);
+                }
+                if (!clipOk) throw new Exception("Clipboard STA thread failed");
+
+                NativeMethods.SmartSetForegroundWindow(hwnd);
+                Thread.Sleep(200);
+                WKAppBot.Win32.Input.KeyboardInput.Hotkey(new[] { "Ctrl", "V" });
+                Thread.Sleep(200);
+
+                // Restore clipboard on STA
+                var restore = prevClip;
+                var rt = new Thread(() => { try { if (!string.IsNullOrEmpty(restore)) System.Windows.Forms.Clipboard.SetText(restore); else System.Windows.Forms.Clipboard.Clear(); } catch { } });
+                rt.SetApartmentState(ApartmentState.STA);
+                rt.Start();
+
+                Console.WriteLine($"[A11Y] type — Electron clipboard Ctrl+V ({text.Length} chars)");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[A11Y] type — Electron clipboard failed: {ex.Message}");
+            }
+        }
+
         // Classic console: WM_CHAR reaches stdin directly — focusless telepathy!
         if (isClassicConsole)
         {
