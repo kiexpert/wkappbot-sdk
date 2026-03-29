@@ -56,6 +56,13 @@ partial class Program
 
         prof("Main() entered");
 
+        // ── Ensure UTF-8 console output (NativeAOT: app.manifest may not apply) ──
+        if (GetConsoleOutputCP() != 65001)
+        {
+            SetConsoleOutputCP(65001);
+            SetConsoleCP(65001);
+        }
+
         // ── Identity: who am I, who's my parent, what terminal am I in? ──
         try
         {
@@ -446,6 +453,7 @@ partial class Program
     static extern IntPtr GetStdHandle(int nStdHandle);
     [System.Runtime.InteropServices.DllImport("kernel32.dll")]
     static extern IntPtr GetConsoleWindow();
+    // GetConsoleOutputCP/SetConsoleOutputCP/SetConsoleCP declared below (shared with CoreRunner)
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     static extern IntPtr GetForegroundWindow();
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
@@ -469,6 +477,8 @@ partial class Program
     static extern int NtQueryInformationProcess(IntPtr handle, int infoClass, byte[] info, int infoLen, ref int retLen);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
     static extern bool SetConsoleOutputCP(uint wCodePageID);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
+    static extern bool SetConsoleCP(uint wCodePageID);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
     static extern bool FreeConsole();
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false, CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
