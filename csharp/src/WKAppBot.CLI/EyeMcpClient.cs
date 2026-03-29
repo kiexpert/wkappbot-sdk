@@ -283,13 +283,14 @@ internal static class EyeMcpClient
             si.hStdError = hStderrWrite;
 
             var cmdLine = ($"\"{exe}\" mcp" + '\0').ToCharArray();
-            Console.Error.WriteLine($"[EYE-MCP] CreateProcessW: exe={exe} si.cb={si.cb} flags=0x{(DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB | CREATE_UNICODE_ENVIRONMENT):X}");
+            var cwd = Environment.CurrentDirectory;
+            Console.Error.WriteLine($"[EYE-MCP] CreateProcessW: exe={exe} cwd={cwd} si.cb={si.cb} flags=0x{(DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT):X}");
             bool ok = CreateProcessW(
                 null, cmdLine,
                 IntPtr.Zero, IntPtr.Zero,
                 true, // bInheritHandles
                 DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT, // no CREATE_BREAKAWAY_FROM_JOB (ACCESS_DENIED in some job contexts)
-                envBlock, null,
+                envBlock, cwd,
                 ref si, out var pi);
             Console.Error.WriteLine($"[EYE-MCP] CreateProcessW result: ok={ok} pid={pi.dwProcessId} err={Marshal.GetLastWin32Error()}");
 
