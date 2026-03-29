@@ -723,19 +723,26 @@ internal partial class Program
                     PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
                     totalCount++;
                     parentPrinted = true;
-                    // Immediately print same-pid siblings (no filter — IME, hidden windows all included)
-                    if (_printedChildPids.Add(v.pid) && _pidWindows.TryGetValue(v.pid, out var siblings))
+                    // Show cross-process children: other PIDs that injected windows into this root
+                    if (_printedChildPids.Add(v.pid))
                     {
-                        foreach (var s in siblings)
+                        // Scan all top-level windows: same owner chain → different pid = injected
+                        foreach (var entry in _pidWindows)
                         {
-                            if (s.hWnd == hWnd) continue;
-                            var st = NativeMethods.GetWindowTextSafe(s.hWnd, 50);
-                            var scb = new StringBuilder(128); NativeMethods.GetClassNameW(s.hWnd, scb, 128);
-                            NativeMethods.GetWindowRect(s.hWnd, out var sr);
-                            PrintWindow(s.hWnd, st, scb.ToString(), v.process, s.pid,
-                                sr.Right - sr.Left, sr.Bottom - sr.Top,
-                                NativeMethods.IsWindowVisible(s.hWnd), true, false);
-                            totalCount++;
+                            if (entry.Key == v.pid) continue; // same process = noise
+                            foreach (var s in entry.Value)
+                            {
+                                var owner = NativeMethods.GetWindow(s.hWnd, 4 /*GW_OWNER*/);
+                                if (owner != hWnd) continue; // not owned by this root
+                                var st = NativeMethods.GetWindowTextSafe(s.hWnd, 50);
+                                var scb = new StringBuilder(128); NativeMethods.GetClassNameW(s.hWnd, scb, 128);
+                                NativeMethods.GetWindowRect(s.hWnd, out var sr);
+                                var sProc = GetProcessName(entry.Key);
+                                PrintWindow(s.hWnd, st, scb.ToString(), sProc, entry.Key,
+                                    sr.Right - sr.Left, sr.Bottom - sr.Top,
+                                    NativeMethods.IsWindowVisible(s.hWnd), true, false);
+                                totalCount++;
+                            }
                         }
                     }
                 }
