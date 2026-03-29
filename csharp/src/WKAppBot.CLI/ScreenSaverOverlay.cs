@@ -81,6 +81,25 @@ internal sealed class ScreenSaverOverlay : IDisposable
         _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
         _ready.Wait(3000);
+
+        // Watchdog: independent thread that force-kills process on user input.
+        // Even if WPF Dispatcher is blocked/frozen, this thread runs independently.
+        new Thread(() =>
+        {
+            while (!_disposed)
+            {
+                Thread.Sleep(500);
+                var idleMs = NativeMethods.GetUserIdleMs();
+                if (_isVisible && idleMs < 3000)
+                {
+                    // User is active while screensaver is showing — FORCE KILL
+                    Console.WriteLine($"[SCREENSAVER:WATCHDOG] User input detected (idle={idleMs}ms) — force terminating!");
+                    try { Environment.Exit(0); } catch { }
+                    Thread.Sleep(200);
+                    try { System.Diagnostics.Process.GetCurrentProcess().Kill(); } catch { }
+                }
+            }
+        }) { IsBackground = true, Name = "SS-Watchdog" }.Start();
     }
 
     private void UiThread()
@@ -335,19 +354,35 @@ internal sealed class ScreenSaverOverlay : IDisposable
         }
         else if (_isVisible)
         {
+            // ── 9-layer user input safety: IMMEDIATELY vanish on ANY user activity ──
+            // 1) State flags
             _isVisible = false;
             _currentOpacity = 0;
-            ShouldExit = true; // user input → self-terminate (free memory)
+            ShouldExit = true;
+            // 2-6) Sync Invoke: opacity=0, hidden, un-topmost, all monitors
             _dispatcher.Invoke(() =>
             {
                 foreach (var mwin in _monitors)
                 {
-                    mwin.XRayActive = false; // reset X-ray
+                    mwin.XRayActive = false;
+                    // 2) Opacity zero
                     mwin.Window.Opacity = 0;
+                    // 3) Visibility hidden
                     mwin.Window.Visibility = Visibility.Hidden;
+                    // 4) Remove topmost (HWND_NOTOPMOST = -2)
+                    var helper = new WindowInteropHelper(mwin.Window);
+                    SetWindowPos(helper.Handle, (IntPtr)(-2), 0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    // 5) Move off-screen as extra safety
+                    SetWindowPos(helper.Handle, IntPtr.Zero, -32000, -32000, 1, 1, SWP_NOACTIVATE);
                 }
             });
+            // 7) Log
             Console.WriteLine("[EYE] ScreenSaver OFF + ShouldExit (user input detected)");
+            // 8) Process self-terminate (no lingering)
+            try { Environment.Exit(0); } catch { }
+            // 9) Force kill if Exit didn't work
+            try { System.Diagnostics.Process.GetCurrentProcess().Kill(); } catch { }
         }
     }
 
