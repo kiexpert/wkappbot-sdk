@@ -461,14 +461,67 @@ Options:
         // Print page info
         var title = cdp.GetTitleAsync().GetAwaiter().GetResult();
         var pageUrl = cdp.GetUrlAsync().GetAwaiter().GetResult();
+        // Resolve Chrome window handle for reliable targeting
+        var chromeHwnd = cdp.GetChromeWindowHandle();
+        cdp.ChromeWindowHandle = (nint)chromeHwnd;
+        var tabId = cdp.TargetId ?? "";
+
         Console.WriteLine($"[WEB] Title: {title}");
         Console.WriteLine($"[WEB] URL:   {pageUrl}");
-        Console.WriteLine($"[WEB] HWND:  0x{cdp.ChromeWindowHandle:X}");
-        // Print ready-to-copy CDP command for agents
-        var urlHost = "";
-        try { urlHost = new Uri(pageUrl ?? "").Host; } catch { }
-        if (!string.IsNullOrEmpty(urlHost))
-            Console.WriteLine($"[WEB] CDP:   a11y read \"*chrome*#{urlHost}\" --eval-js \"document.title\"");
+        Console.WriteLine($"[WEB] HWND:  0x{chromeHwnd:X}");
+        Console.WriteLine($"[WEB] TabID: {tabId}");
+
+        // Print VERIFIED working commands for agents (tested pattern: title grap + URL tab hint)
+        // Pattern: "*{first words of title}*chrome*#url-path" → CDP tab portal
+        var titlePrefix = (title ?? "").Split(" - ")[0].Trim();
+        if (titlePrefix.Length > 30) titlePrefix = titlePrefix[..30];
+        var urlPath = "";
+        try { var uri = new Uri(pageUrl ?? ""); urlPath = uri.Host + uri.AbsolutePath.TrimEnd('/'); } catch { }
+
+        // Build candidate grap patterns and verify each finds exactly 1 window
+        var candidates = new List<string>();
+        if (chromeHwnd != IntPtr.Zero) candidates.Add($"*hwnd={chromeHwnd.ToInt64():X8}*#{urlPath}");
+        if (!string.IsNullOrEmpty(titlePrefix)) candidates.Add($"*{titlePrefix}*chrome*#{urlPath}");
+        if (!string.IsNullOrEmpty(urlPath)) candidates.Add($"*chrome*#{urlPath}");
+        // Shorter title variants
+        var words = (title ?? "").Split(new[] { ' ', '-', '|' }, StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length >= 2) candidates.Add($"*{words[0]}*{words[1]}*chrome*#{urlPath}");
+
+        // Verify: find the shortest pattern that matches exactly 1 window
+        string? bestPattern = null;
+        foreach (var cand in candidates)
+        {
+            try
+            {
+                var grap = cand.Split('#')[0]; // window grap only (before #)
+                var matches = WKAppBot.Win32.Window.WindowFinder.FindByTitle(grap);
+                if (matches.Count == 1)
+                {
+                    bestPattern = cand;
+                    break; // first single-match wins
+                }
+            }
+            catch { }
+        }
+        if (bestPattern == null)
+        {
+            // No single-match found — dump all candidates for agent debugging
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("[WEB] WARNING: No unique window match found. Candidates tried:");
+            foreach (var cand in candidates)
+            {
+                var grap = cand.Split('#')[0];
+                int count = 0;
+                try { count = WKAppBot.Win32.Window.WindowFinder.FindByTitle(grap).Count; } catch { }
+                Console.WriteLine($"[WEB]   {cand}  → {count} match(es)");
+            }
+            Console.ResetColor();
+            bestPattern = candidates.FirstOrDefault() ?? $"*chrome*#{urlPath}";
+        }
+
+        Console.WriteLine($"[WEB] ── Agent Target (verified single-match) ──");
+        Console.WriteLine($"[WEB] eval:  a11y read \"{bestPattern}\" --eval-js \"document.title\"");
+        Console.WriteLine($"[WEB] read:  web read \"{pageUrl}\" --max-chars 3000");
 
         // Verify this is our WebBot window, not user's normal Chrome
         if (title == null || !title.Contains("WKWebBot"))
