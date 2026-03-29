@@ -285,10 +285,12 @@ internal sealed class ScreenSaverOverlay : IDisposable
             double t = Math.Min(1.0, (double)(idleMs - FadeStartMs) / (FadeEndMs - FadeStartMs));
             double targetOpacity = t * MaxOpacity;
 
+            bool wasHidden = !_isVisible;
+            // First show: force _currentOpacity to 0 so fade-in starts from transparent
+            if (wasHidden) _currentOpacity = 0;
             if (Math.Abs(targetOpacity - _currentOpacity) >= 0.005)
             {
                 _currentOpacity = targetOpacity;
-                bool wasHidden = !_isVisible;
                 _isVisible = true;
 
                 _dispatcher.BeginInvoke(() =>
