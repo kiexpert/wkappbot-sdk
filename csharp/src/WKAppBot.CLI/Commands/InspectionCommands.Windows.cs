@@ -130,7 +130,7 @@ internal partial class Program
             uint pid, int w, int h, bool visible, bool isChild, bool isForeground)
         {
             string vis = visible ? "" : " [hidden]";
-            string prefix = isChild ? "  └ " : "";
+            string prefix = isChild ? "   └" : "  ";
             string displayTitle = title.Length > 60 ? title[..57] + "..." : title;
             if (string.IsNullOrEmpty(displayTitle)) displayTitle = "(no title)";
 
