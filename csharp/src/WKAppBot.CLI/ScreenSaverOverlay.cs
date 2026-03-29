@@ -48,6 +48,8 @@ internal sealed class ScreenSaverOverlay : IDisposable
     private readonly ManualResetEventSlim _ready = new(false);
     private volatile bool _isVisible;
     private volatile bool _disposed;
+    /// <summary>Set to true after user input dismisses the screensaver — caller should exit process.</summary>
+    public volatile bool ShouldExit;
     private double _currentOpacity;
     // _lastT removed — now per-monitor (MonitorWindow.LastT)
 
@@ -338,7 +340,8 @@ internal sealed class ScreenSaverOverlay : IDisposable
                     mwin.LastT = -1;
                 }
             });
-            Console.WriteLine("[EYE] ScreenSaver OFF (user input detected)");
+            Console.WriteLine("[EYE] ScreenSaver OFF (user input detected) — exiting process");
+            ShouldExit = true;
         }
     }
 

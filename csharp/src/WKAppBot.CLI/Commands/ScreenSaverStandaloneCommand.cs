@@ -19,7 +19,7 @@ internal partial class Program
             Console.WriteLine("[SCREENSAVER] Overlay ready (idle ≥10s)");
 
             int parentCheck = 0;
-            while (true)
+            while (!ss.ShouldExit)
             {
                 ss.Tick();
                 Thread.Sleep(100);
@@ -29,6 +29,7 @@ internal partial class Program
                     catch { Console.WriteLine("[SCREENSAVER] Parent gone — exiting"); break; }
                 }
             }
+            if (ss.ShouldExit) Console.WriteLine("[SCREENSAVER] User input — process exiting (memory freed)");
             ss.Dispose();
         }
         catch (Exception ex)
