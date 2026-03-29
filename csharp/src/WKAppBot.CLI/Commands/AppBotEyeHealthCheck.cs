@@ -288,6 +288,7 @@ internal partial class Program
                     ParentPid = s.ParentPid > 0 ? s.ParentPid : s.Pid,
                     ParentName = s.HostType,
                     ParentTitle = s.HostTitle,
+                    HostType = s.HostType,
                     LastTag = s.LastTag,
                     LastStatus = s.LastStatus,
                     LastTsUtc = hbUtc,
