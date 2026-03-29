@@ -391,6 +391,13 @@ internal partial class Program
         // Print log path early — so if the caller times out, they know where to tail the live log.
         if (tee != null && !GrepModeActive)
             Console.Error.WriteLine($"[LOG] {logFile}");
+        // LAUNCH identity: callerCwd + callerHwnd → logged by TeeWriter for post-mortem analysis
+        {
+            var launchCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+            var launchHwnd = EyeCmdPipeServer.CallerHwnd.Value;
+            var launchCmd = string.Join(" ", args);
+            Console.Error.WriteLine($"[LAUNCH:CORE] cwd={launchCwd} hwnd=0x{launchHwnd:X} cmd={launchCmd}");
+        }
         // For grap/grep fast-exit: Launcher writes output path to WKAPPBOT_RELAY_FILE.
         // Core redirects Console.Out to that file. FastExit signals WKAPPBOT_RELAY_EVENT (EventWaitHandle)
         // after flushing — Launcher reads the file while Core is still alive (no 27s AV/SMB delay),
