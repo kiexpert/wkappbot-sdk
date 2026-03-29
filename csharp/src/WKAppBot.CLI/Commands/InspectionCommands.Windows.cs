@@ -200,7 +200,8 @@ internal partial class Program
             int titleWidth = isChild ? 44 : 45; // child: └ takes 1 col → shrink title to keep alignment
             var trimTitle = TrimToWidth(displayTitle, titleWidth);
             var padTitle = PadToWidth(trimTitle, titleWidth);
-            var procPid = $"{process}:{pid}";
+            // Child: omit process:pid (already shown on root) — show owner hwnd instead
+            var procPid = isChild ? "" : $"{process}:{pid}";
             var trimProc = procPid.Length > 16 ? procPid[..16] : procPid;
             var sizeStr = $"{w}x{h}";
             // Flags: single-char compact (H=hidden L=layered T=tool M=min X=max D=disabled ↑=topmost)
