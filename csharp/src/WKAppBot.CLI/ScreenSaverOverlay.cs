@@ -68,6 +68,11 @@ internal sealed class ScreenSaverOverlay : IDisposable
     [DllImport("user32.dll")] private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
     [DllImport("user32.dll")] private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
     [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+    [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+    private const uint LWA_ALPHA = 0x02;
+    private const uint WM_CLOSE = 0x0010;
 
     // EnumDisplayMonitors for per-monitor enumeration
     private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
@@ -82,24 +87,54 @@ internal sealed class ScreenSaverOverlay : IDisposable
         _thread.Start();
         _ready.Wait(3000);
 
-        // Watchdog: independent thread that force-kills process on user input.
-        // Even if WPF Dispatcher is blocked/frozen, this thread runs independently.
+        // Per-window watchdog: each monitor gets its own thread.
+        // If one window's Win32 call blocks, others still vanish independently.
+        for (int mi = 0; mi < _monitors.Count; mi++)
+        {
+            var mwin = _monitors[mi];
+            var idx = mi;
+            new Thread(() =>
+            {
+                IntPtr hwnd = IntPtr.Zero;
+                // Wait for HWND (window created on STA thread)
+                for (int retry = 0; retry < 20 && hwnd == IntPtr.Zero; retry++)
+                {
+                    Thread.Sleep(250);
+                    try { _dispatcher?.Invoke(() => hwnd = new WindowInteropHelper(mwin.Window).Handle); } catch { }
+                }
+                while (!_disposed)
+                {
+                    Thread.Sleep(500);
+                    if (_isVisible && NativeMethods.GetUserIdleMs() < 3000)
+                    {
+                        Console.WriteLine($"[SS:GUARD:{idx}] User input! 9-layer kill on monitor {idx} (hwnd=0x{hwnd:X})");
+                        if (hwnd != IntPtr.Zero)
+                        {
+                            try { SetLayeredWindowAttributes(hwnd, 0, 0, LWA_ALPHA); } catch { }  // 1) alpha=0
+                            try { ShowWindow(hwnd, 0); } catch { }                                // 2) SW_HIDE
+                            try { SetWindowPos(hwnd, (IntPtr)(-2), -32000, -32000, 1, 1, SWP_NOACTIVATE); } catch { } // 3) un-topmost + offscreen
+                            try { SendMessage(hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero); } catch { } // 4) WM_CLOSE
+                        }
+                    }
+                }
+            }) { IsBackground = true, Name = $"SS-Guard-{idx}" }.Start();
+        }
+        // Master watchdog: force-kills entire process (last resort)
         new Thread(() =>
         {
             while (!_disposed)
             {
                 Thread.Sleep(500);
-                var idleMs = NativeMethods.GetUserIdleMs();
-                if (_isVisible && idleMs < 3000)
+                if (_isVisible && NativeMethods.GetUserIdleMs() < 3000)
                 {
-                    // User is active while screensaver is showing — FORCE KILL
-                    Console.WriteLine($"[SCREENSAVER:WATCHDOG] User input detected (idle={idleMs}ms) — force terminating!");
+                    _isVisible = false;
+                    Console.WriteLine("[SS:MASTER] Force terminating process!");
                     try { Environment.Exit(0); } catch { }
                     Thread.Sleep(200);
                     try { System.Diagnostics.Process.GetCurrentProcess().Kill(); } catch { }
                 }
             }
-        }) { IsBackground = true, Name = "SS-Watchdog" }.Start();
+        }) { IsBackground = true, Name = "SS-Master" }.Start();
     }
 
     private void UiThread()
