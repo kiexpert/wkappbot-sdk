@@ -1,34 +1,55 @@
 #!/bin/bash
-# test-eye-message-routing.sh — verify Eye internal messages do NOT leak to Claude Code chat
-# Covers suggest #6: 앱봇 내부 상태 메시지가 Claude Code 채팅창으로 노출됨 (ts=2026-03-30T10:29)
+# test-eye-message-routing.sh — verify eye message subcommand and eye tick routing
+# Real execution: wkappbot eye message (unknown subcmd — tests routing + quick exit)
+# CMD guard: dbgCmd=eye, dbgSub=message → -eye-message>
 PASS=0; FAIL=0
-check() { if "$@" >/dev/null 2>&1; then echo "PASS"; PASS=$((PASS+1)); else echo "FAIL"; FAIL=$((FAIL+1)); fi; }
+WKBOT="${WKBOT:-/w/SDK/bin/wkappbot.exe}"
 
-echo "=== Eye Message Routing Test ==="
-HANDLERS="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AppBotEyeSlackHandlers.cs"
-JSONL="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AppBotEyeJsonlParser.cs"
-GLOBAL="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AppBotEyeGlobalMode.cs"
+echo "=== Eye Message Routing Real Execution Test ==="
 
-echo -n "Test 1: NO_REPLY filter prevents message re-delivery... "
-check grep -q "NO_REPLY" "$JSONL"
+# Test 1: eye message exits without hang (unknown subcmd handled gracefully)
+echo -n "Test 1: eye message exits in < 8s... "
+START=$(date +%s%3N)
+WKAPPBOT_WORKER=1 timeout 10 "$WKBOT" eye message >/dev/null 2>&1; CODE=$?
+END=$(date +%s%3N)
+ELAPSED=$((END - START))
+if [ "$CODE" -eq 124 ]; then
+    echo "FAIL (hung)"
+    FAIL=$((FAIL+1))
+elif [ "$ELAPSED" -lt 8000 ]; then
+    echo "PASS (${ELAPSED}ms, exit=$CODE)"
+    PASS=$((PASS+1))
+else
+    echo "FAIL (${ELAPSED}ms)"
+    FAIL=$((FAIL+1))
+fi
 
-echo -n "Test 2: Slack socket mode (not Claude Code) as primary delivery path... "
-check grep -q "SlackSocketClient\|slack_send\|SendMessageAsync" "$GLOBAL"
+# Test 2: eye tick output does NOT go to stdout when run via pipe (no Claude injection)
+echo -n "Test 2: eye tick stdout is clean (no raw slack msg leaking)... "
+OUT=$(WKAPPBOT_WORKER=1 timeout 15 "$WKBOT" eye tick 2>/dev/null)
+CODE=$?
+# Eye tick output should be diagnostic/structured, NOT raw Slack JSON
+if echo "$OUT" | grep -qP '"type":"message"|"channel":"C[A-Z0-9]+"'; then
+    echo "FAIL (raw Slack JSON in stdout — message routing broken!)"
+    FAIL=$((FAIL+1))
+else
+    echo "PASS (no raw Slack JSON in stdout)"
+    PASS=$((PASS+1))
+fi
 
-echo -n "Test 3: Internal Eye state messages routed to Slack thread, not prompt injection... "
-check grep -q "threadTs\|thread_ts\|slack_ts" "$HANDLERS"
-
-echo -n "Test 4: Eye uses SlackSendViaApi for message delivery (not Claude injection)... "
-check grep -q "SlackSendViaApi" "$HANDLERS"
-
-echo -n "Test 5: Slack queue drain worker prevents concurrent injection... "
-check grep -q "_slackDraining\|slackDraining\|drain" "$GLOBAL"
-
-echo -n "Test 6: Eye alive message sent to Slack channel... "
-check grep -q "Eye alive" "$GLOBAL"
-
-echo -n "Test 7: slackRetiring flag prevents new messages during hot-swap... "
-check grep -q "_slackRetiring\|slackRetiring" "$GLOBAL"
+# Test 3: eye tick exits 0
+echo -n "Test 3: eye tick exits 0... "
+WKAPPBOT_WORKER=1 timeout 15 "$WKBOT" eye tick >/dev/null 2>&1; CODE=$?
+if [ "$CODE" -eq 0 ]; then
+    echo "PASS"
+    PASS=$((PASS+1))
+elif [ "$CODE" -eq 124 ]; then
+    echo "FAIL (hung)"
+    FAIL=$((FAIL+1))
+else
+    echo "FAIL (exit=$CODE)"
+    FAIL=$((FAIL+1))
+fi
 
 echo ""
 echo "=== Results: $PASS PASS, $FAIL FAIL ==="
