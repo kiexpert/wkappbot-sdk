@@ -422,9 +422,9 @@ Options:
             }
         }
 
-        // Connect via CDP
+        // Connect via CDP — pass url so sandboxed tab reuse path is used (prevents tab accumulation)
         Console.Write($"[WEB] Connecting via CDP... ");
-        using var cdp = ConnectCdp(port);
+        using var cdp = ConnectCdp(port, navigateUrl: url);
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"Connected ({cdp.WebSocketUrl})");
         Console.ResetColor();
@@ -552,7 +552,7 @@ Options:
         int port = GetPort(args);
         string url = args[0];
 
-        using var cdp = ConnectCdp(port);
+        using var cdp = ConnectCdp(port, navigateUrl: url);
 
         Console.Write($"[WEB] Navigating to {url}... ");
         var sw = System.Diagnostics.Stopwatch.StartNew();
