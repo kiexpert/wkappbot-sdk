@@ -306,7 +306,8 @@ partial class Program
             && args[1].ToLowerInvariant() is "read-pdf";
         var isEyeDaemon = cmd == "eye"
             && !(forwardArgs.Length > 1 && forwardArgs[1].ToLowerInvariant() == "tick");
-        if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && cmd != "logcat" && cmd != "grep" && cmd != "grap"
+        var isWorkerMode = Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1";
+        if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
             // Parse --timeout / --timeout-exit for Eye pipe enforcement
