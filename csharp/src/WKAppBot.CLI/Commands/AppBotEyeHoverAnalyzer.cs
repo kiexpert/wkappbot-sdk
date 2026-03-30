@@ -213,12 +213,12 @@ internal partial class Program
 
                     // Build Slack message
                     var header = new StringBuilder();
-                    header.AppendLine($"🔍 **grap**: `{grapPath}`");
-                    header.AppendLine($"**pos**: ({pt.X},{pt.Y}) | **win**: _{winTitleShort}_ ({captureRect})");
-                    header.AppendLine($"**UIA**: `[{elType}]` \"{elName}\"");
-                    header.AppendLine($"**CCA**: {totalSeg} seg — T={textCnt} I={iconCnt} S={sepCnt} C={contCnt}{tableInfo}");
+                    header.AppendLine($"🖱️ Mouse: `{grapPath}`");
+                    header.AppendLine($"pos: ({pt.X},{pt.Y}) | win: {winTitleShort} ({captureRect})");
+                    header.AppendLine($"UIA: [{elType}] \"{elName}\"");
+                    header.AppendLine($"CCA: {totalSeg} seg — T={textCnt} I={iconCnt} S={sepCnt} C={contCnt}{tableInfo}");
                     if (!string.IsNullOrEmpty(fused))
-                        header.AppendLine($"**match**: {fused}");
+                        header.AppendLine($"match: {fused}");
 
                     serverResult = header.ToString().TrimEnd();
                     // Add tree as code block
@@ -260,20 +260,20 @@ internal partial class Program
                             {
                                 var fWinShort = fWin.Length > 30 ? fWin[..30] + "…" : fWin;
                                 var fsb = new StringBuilder();
-                                fsb.AppendLine($"⌨️ **grap**: `{fGrap}`");
-                                fsb.AppendLine($"**focus**: `[{fType}]` \"{fName}\"");
+                                fsb.AppendLine($"⌨️ Keyboard: `{fGrap}`");
+                                fsb.AppendLine($"focus: [{fType}] \"{fName}\"");
                                 if (!string.IsNullOrEmpty(fValue))
-                                    fsb.AppendLine($"**value**: \"{(fValue.Length > 50 ? fValue[..50] + "…" : fValue)}\"");
-                                fsb.AppendLine($"**win**: _{fWinShort}_");
+                                    fsb.AppendLine($"value: \"{(fValue)}\"");
+                                fsb.AppendLine($"win: {fWinShort}");
                                 var chain = fr?["chain"] as System.Text.Json.Nodes.JsonArray;
                                 if (chain?.Count > 0)
                                 {
-                                    fsb.AppendLine("**chain**:");
+                                    fsb.AppendLine("chain:");
                                     foreach (var p in chain)
-                                        fsb.AppendLine($"  └ `[{p?["type"]}]` {p?["name"]}");
+                                        fsb.AppendLine($"  └ [{p?["type"]}] {p?["name"]}");
                                 }
                                 if (!string.IsNullOrEmpty(fPatterns))
-                                    fsb.AppendLine($"**patterns**: {fPatterns}");
+                                    fsb.AppendLine($"patterns: {fPatterns}");
                                 var focusResult = fsb.ToString().TrimEnd();
                                 if (focusResult != _lastFocusChainResult)
                                 {
@@ -363,23 +363,23 @@ internal partial class Program
 
                     var winShort = winTitle.Length > 30 ? winTitle[..30] + "…" : winTitle;
                     var sb = new StringBuilder();
-                    sb.AppendLine($"⌨️ **grap**: `{grapPath}`");
-                    sb.AppendLine($"**focus**: `[{focusType}]` \"{focusName}\"");
+                    sb.AppendLine($"⌨️ Keyboard: `{grapPath}`");
+                    sb.AppendLine($"focus: [{focusType}] \"{focusName}\"");
                     if (!string.IsNullOrEmpty(focusValue))
-                        sb.AppendLine($"**value**: \"{(focusValue.Length > 50 ? focusValue[..50] + "…" : focusValue)}\"");
-                    sb.AppendLine($"**win**: _{winShort}_");
+                        sb.AppendLine($"value: \"{(focusValue)}\"");
+                    sb.AppendLine($"win: {winShort}");
 
                     // Parent chain
                     var chain = resp?["chain"] as System.Text.Json.Nodes.JsonArray;
                     if (chain?.Count > 0)
                     {
-                        sb.AppendLine("**chain**:");
+                        sb.AppendLine("chain:");
                         foreach (var p in chain)
-                            sb.AppendLine($"  └ `[{p?["type"]}]` {p?["name"]}");
+                            sb.AppendLine($"  └ [{p?["type"]}] {p?["name"]}");
                     }
 
                     if (!string.IsNullOrEmpty(patterns))
-                        sb.AppendLine($"**patterns**: {patterns}");
+                        sb.AppendLine($"patterns: {patterns}");
 
                     chainResult = sb.ToString().TrimEnd();
                 }

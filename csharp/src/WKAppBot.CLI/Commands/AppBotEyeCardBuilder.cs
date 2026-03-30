@@ -11,11 +11,14 @@ internal partial class Program
     {
         var sb = new StringBuilder();
 
-        // ── Action triplet (always on top — real-time accessibility probe) ──
+        // ── Action triplet (plain text — must NOT be inside code block, or Slack splits the message) ──
         var (a11y, act, fallback) = ReadLatestActionTriplet();
+        bool hasAction = !string.IsNullOrWhiteSpace(a11y) || !string.IsNullOrWhiteSpace(act) || !string.IsNullOrWhiteSpace(fallback);
         if (!string.IsNullOrWhiteSpace(a11y)) sb.AppendLine($"엑빌: {a11y}");
         if (!string.IsNullOrWhiteSpace(act)) sb.AppendLine($"액션: {act}");
         if (!string.IsNullOrWhiteSpace(fallback)) sb.AppendLine($"폴백: {fallback}");
+        // ── Card block: fixed-width (``` opens here, after action triplet plain text) ──
+        sb.AppendLine("```");
 
         // ── Build KRO section text (rendered inline with cards by recency) ──
         // KRO sort time = session file mtime (= when kro last wrote to its session JSONL)
@@ -171,7 +174,8 @@ internal partial class Program
             }
         }
 
-        return sb.ToString().TrimEnd();
+        var result = sb.ToString().TrimEnd();
+        return result.Length > 0 ? result + "\n```" : result;
     }
 
     /// <summary>Map host type to Slack emoji icon for card header.</summary>
