@@ -80,8 +80,6 @@ internal partial class Program
         var launcherPath = Path.Combine(dir, "wkappbot.exe");
         if (!File.Exists(launcherPath)) launcherPath = corePath;
 
-        var fireAt = DateTime.Now.AddMinutes(2).ToString("HH:mm");
-        var fireDate = DateTime.Now.AddMinutes(2).ToString("yyyy/MM/dd");
         // Use wscript.exe + VBS wrapper to suppress console window entirely.
         // VBScript ws.Run "...", 0 = hidden window (more reliable than conhost --headless).
         var vbsPath = Path.Combine(dir, "wkappbot-silent.vbs");
@@ -91,7 +89,11 @@ internal partial class Program
             catch { }
         }
         var tr = File.Exists(vbsPath) ? $"wscript.exe \\\"{vbsPath}\\\"" : $"\\\"{launcherPath}\\\" eye tick --timeout 15";
-        var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"{tr}\" /SC ONCE /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
+        // /SC MINUTE /MO 2: repeating every 2 min — survives even if Eye's 60s refresh fails.
+        // Eye's loop refreshes this every 60s (rolling defer), but if Eye dies the task keeps firing.
+        var fireAt = DateTime.Now.AddMinutes(2).ToString("HH:mm");
+        var fireDate = DateTime.Now.AddMinutes(2).ToString("yyyy/MM/dd");
+        var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"{tr}\" /SC MINUTE /MO 2 /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
         try
         {
             using var spawn = AppBotPipe.Spawn("schtasks.exe", args,
