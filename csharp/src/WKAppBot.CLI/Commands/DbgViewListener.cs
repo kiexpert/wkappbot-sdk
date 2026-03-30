@@ -48,8 +48,10 @@ internal sealed class DbgViewListener : IDisposable
 
             if (!createdBuffer || !createdData)
             {
-                // Another listener exists — warn but continue (user chose to run)
-                Console.Error.WriteLine("[DBG] WARNING: another debug listener detected (DebugView?). Messages may be split.");
+                // Another listener exists (DebugView, logcat --dbg) — messages would be split
+                // between the two listeners, making [CMD] capture unreliable → bail out.
+                Cleanup();
+                return false;
             }
 
             _mmf = MemoryMappedFile.CreateOrOpen("DBWIN_BUFFER", BufferSize, MemoryMappedFileAccess.ReadWrite);
