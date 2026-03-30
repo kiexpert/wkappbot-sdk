@@ -178,10 +178,10 @@ internal partial class Program
                         {
                             bool ready = stablePersonaResp.Contains("READY", StringComparison.OrdinalIgnoreCase);
                             Console.WriteLine($"[ASK] Persona stable ({stablePersonaResp.Length}): {(ready ? "READY" : stablePersonaResp.Substring(0, Math.Min(80, stablePersonaResp.Length)).Replace('\n', ' '))}");
-                            if (effectiveLoopPersona && stablePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
+                            if (loopMode && effectiveLoopPersona && stablePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                                 && ParseAllLoopToolCalls(stablePersonaResp).Count > 0)
                             {
-                                Console.WriteLine($"[ASK] Persona continuation has tool call ({stablePersonaResp.Length} chars) ? skipping question send");
+                                Console.WriteLine($"[ASK] Persona continuation has tool call ({stablePersonaResp.Length} chars) — skipping question send");
                                 personaEarlyToolCall = stablePersonaResp;
                             }
                         }
@@ -220,11 +220,15 @@ internal partial class Program
                     var latePersonaResp = await GetGeminiLastResponseAsync(cdp);
                     if (latePersonaResp.Length > 0)
                         Console.WriteLine($"[ASK] Post-persona resp ({latePersonaResp.Length}): {latePersonaResp.Replace('\n', ' ').Substring(0, Math.Min(80, latePersonaResp.Length))}");
-                    if (latePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
+                    if (loopMode && latePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                         && ParseAllLoopToolCalls(latePersonaResp).Count > 0)
                     {
                         Console.WriteLine("[ASK] Post-persona tool call captured -- skipping question send");
                         return (true, latePersonaResp);
+                    }
+                    else if (!loopMode && latePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]"))
+                    {
+                        Console.WriteLine("[ASK] Non-loop ask: ignoring stale APSP tool call from previous session, proceeding with question");
                     }
                 }
                 // ?�?�?Browser exclusive: question input ??send complete ?�?�?

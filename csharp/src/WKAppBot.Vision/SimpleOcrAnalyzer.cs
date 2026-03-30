@@ -400,7 +400,8 @@ public sealed class SimpleOcrAnalyzer : IDisposable
     {
         var newWidth = original.Width * factor;
         var newHeight = original.Height * factor;
-        var scaled = new Bitmap(newWidth, newHeight, original.PixelFormat);
+        // Always use 32bppArgb — indexed formats (8bpp, 4bpp, 1bpp) can't be used with Graphics
+        var scaled = new Bitmap(newWidth, newHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         scaled.SetResolution(original.HorizontalResolution * factor, original.VerticalResolution * factor);
         using var g = Graphics.FromImage(scaled);
         g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
@@ -415,6 +416,20 @@ public sealed class SimpleOcrAnalyzer : IDisposable
     /// </summary>
     private static async Task<SoftwareBitmap> ConvertToSoftwareBitmap(Bitmap bitmap)
     {
+        // Normalize pixel format — indexed/non-standard formats throw ArgumentException on BMP save
+        Bitmap? owned = null;
+        if (bitmap.PixelFormat is not (System.Drawing.Imaging.PixelFormat.Format32bppArgb
+            or System.Drawing.Imaging.PixelFormat.Format32bppRgb
+            or System.Drawing.Imaging.PixelFormat.Format24bppRgb
+            or System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+        {
+            owned = new Bitmap(bitmap.Width, bitmap.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using var g = Graphics.FromImage(owned);
+            g.DrawImage(bitmap, 0, 0);
+            bitmap = owned;
+        }
+        try
+        {
         // Save bitmap to in-memory stream as BMP
         using var ms = new MemoryStream();
         bitmap.Save(ms, ImageFormat.Bmp);
@@ -436,6 +451,11 @@ public sealed class SimpleOcrAnalyzer : IDisposable
             BitmapAlphaMode.Premultiplied);
 
         return softwareBitmap;
+        }
+        finally
+        {
+            owned?.Dispose();
+        }
     }
 
     public void Dispose()
