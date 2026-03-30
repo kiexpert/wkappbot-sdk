@@ -54,8 +54,15 @@ internal static class EyeCmdPipeServer
     public static void StartServer() => Task.Run(ServerLoop);
 
     /// <summary>
-    /// Stop accepting new pipe connections and wait for all in-progress commands to finish.
-    /// Called during hot-swap after new Eye is confirmed responsive.
+    /// Stop accepting NEW pipe connections immediately (hot-swap retiring).
+    /// Call this as soon as _slackRetiring = true — new Eye takes over new connections instantly.
+    /// In-flight connections continue to be served until StopAcceptingAndWaitForDrain() is called.
+    /// </summary>
+    public static void StopAccepting() => _acceptCts.Cancel();
+
+    /// <summary>
+    /// Wait for all in-progress commands to finish.
+    /// Call StopAccepting() first (or this will do it too).
     /// Logs a warning every 9s; hard-caps at 5 minutes.
     /// </summary>
     public static void StopAcceptingAndWaitForDrain()

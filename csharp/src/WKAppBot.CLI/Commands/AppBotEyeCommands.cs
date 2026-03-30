@@ -322,12 +322,15 @@ internal partial class Program
         // Fix CWD: hot-swap inherits old Eye's CWD (often system32).
         // Correct to callerCwd (from pipe) or exe directory as fallback.
         var cwd = Environment.CurrentDirectory;
+        var exeDir = (Path.GetDirectoryName(Environment.ProcessPath) ?? "").TrimEnd('\\', '/');
+        bool cwdIsExeDir = !string.IsNullOrEmpty(exeDir)
+            && string.Equals(cwd.TrimEnd('\\', '/'), exeDir, StringComparison.OrdinalIgnoreCase);
         if (string.IsNullOrEmpty(cwd) || cwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
-            || cwd.Contains("System32", StringComparison.OrdinalIgnoreCase))
+            || cwd.Contains("System32", StringComparison.OrdinalIgnoreCase)
+            || cwdIsExeDir)
         {
-            var fixedCwd = EyeCmdPipeServer.CallerCwd.Value
-                ?? Path.GetDirectoryName(Environment.ProcessPath)
-                ?? ".";
+            // Don't fall back to exe dir (that's exactly what we're trying to avoid)
+            var fixedCwd = EyeCmdPipeServer.CallerCwd.Value ?? ".";
             try { Environment.CurrentDirectory = fixedCwd; } catch { }
             Console.Error.WriteLine($"[EYE] CWD fixed: {cwd} → {fixedCwd}");
         }
