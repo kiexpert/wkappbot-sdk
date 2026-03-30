@@ -105,20 +105,39 @@ internal partial class Program
         for (int wait = 0; wait < 30 && _eyeStatusTs == null && !ct.IsCancellationRequested; wait++)
             await Task.Delay(1000, ct);
 
-        // Post placeholder replies: mouse first, then focus
+        // Set up reply #2 and #3: reuse if existing 앱봇아이 reply, else create placeholder
         if (_eyeStatusTs != null && !string.IsNullOrEmpty(_eyeBotToken) && !string.IsNullOrEmpty(_eyeChannel))
         {
             try
             {
-                var (ok1, ts1) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "🔍 분석 중...",
-                    threadTs: _eyeStatusTs, username: "앱봇아이");
-                if (ok1 && ts1 != null) _mouseCcaReplyTs = ts1;
+                var replies = await SlackGetThreadRepliesAsync(_eyeBotToken, _eyeChannel, _eyeStatusTs);
+                var children = replies?
+                    .Where(r => r?["ts"]?.GetValue<string>() != _eyeStatusTs)
+                    .ToList();
 
-                var (ok2, ts2) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "⌨️ 분석 중...",
-                    threadTs: _eyeStatusTs, username: "앱봇아이");
-                if (ok2 && ts2 != null) _focusChainReplyTs = ts2;
+                // Reply #2 (mouse CCA)
+                var r2 = children?.Count > 1 ? children[1] : null;
+                if (r2?["username"]?.GetValue<string>() == "앱봇아이")
+                    _mouseCcaReplyTs = r2["ts"]?.GetValue<string>();
+                else
+                {
+                    var (ok1, ts1) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "🔍 분석 중...",
+                        threadTs: _eyeStatusTs, username: "앱봇아이");
+                    if (ok1 && ts1 != null) _mouseCcaReplyTs = ts1;
+                }
 
-                Console.WriteLine("[ANALYSIS] Placeholder replies posted (mouse → focus order)");
+                // Reply #3 (focus chain)
+                var r3 = children?.Count > 2 ? children[2] : null;
+                if (r3?["username"]?.GetValue<string>() == "앱봇아이")
+                    _focusChainReplyTs = r3["ts"]?.GetValue<string>();
+                else
+                {
+                    var (ok2, ts2) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "⌨️ 분석 중...",
+                        threadTs: _eyeStatusTs, username: "앱봇아이");
+                    if (ok2 && ts2 != null) _focusChainReplyTs = ts2;
+                }
+
+                Console.WriteLine($"[ANALYSIS] Replies ready: mouse={_mouseCcaReplyTs != null} focus={_focusChainReplyTs != null}");
             }
             catch { }
         }
@@ -261,6 +280,12 @@ internal partial class Program
                                     _lastFocusChainResult = focusResult;
                                     if (_focusChainReplyTs != null)
                                         await SlackUpdateMessageAsync(_eyeBotToken!, _eyeChannel!, _focusChainReplyTs, focusResult);
+                                    else if (_eyeStatusTs != null)
+                                    {
+                                        var (fok, fts) = await SlackSendViaApi(_eyeBotToken!, _eyeChannel!, focusResult,
+                                            threadTs: _eyeStatusTs, username: "앱봇아이");
+                                        if (fok && fts != null) _focusChainReplyTs = fts;
+                                    }
                                     Console.WriteLine($"[ANALYSIS] focus: {focusResult.Split('\n')[0]}");
                                 }
                             }
@@ -281,6 +306,16 @@ internal partial class Program
     // ── Keyboard Focus Chain analysis (separate Slack thread reply) ──
     static string? _focusChainReplyTs;
     static string _lastFocusChainResult = "";
+
+    /// <summary>
+    /// Restore reply ts values from a recovered Eye status thread (Eye restart reuse).
+    /// Called from AppBotEyeGlobalMode when _eyeStatusTs is reused from previous session.
+    /// </summary>
+    internal static void RestoreHoverReplyTs(string? mouseTs, string? focusTs)
+    {
+        if (mouseTs != null) { _mouseCcaReplyTs = mouseTs; Console.WriteLine($"[EYE] Restored mouse CCA reply ts={mouseTs}"); }
+        if (focusTs != null) { _focusChainReplyTs = focusTs; Console.WriteLine($"[EYE] Restored focus chain reply ts={focusTs}"); }
+    }
 
     /// <summary>
     /// Start keyboard focus chain analysis worker.

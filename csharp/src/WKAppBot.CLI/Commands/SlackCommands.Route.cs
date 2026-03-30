@@ -60,17 +60,26 @@ internal partial class Program
             return 0;
         }
 
+        // --dry-run: trace routing without delivering or sending ack
+        var argList = args.ToList();
+        bool isDryRun = argList.Remove("--dry-run");
+
         // Support --file for single-message route (kept for tests / backward compat)
         string jsonStr;
-        if (args.Length >= 2 && args[0] == "--file")
+        if (argList.Count >= 2 && argList[0] == "--file")
         {
-            var filePath = args[1];
+            var filePath = argList[1];
             if (!File.Exists(filePath)) { Console.Error.WriteLine($"[ROUTE] File not found: {filePath}"); return 1; }
             jsonStr = File.ReadAllText(filePath);
         }
+        else if (argList.Count >= 1)
+        {
+            jsonStr = argList[0];
+        }
         else
         {
-            jsonStr = args[0];
+            Console.Error.WriteLine("Usage: slack route --queue | slack route [--dry-run] --file <path> | slack route [--dry-run] <msgJson>");
+            return 1;
         }
 
         var node = JsonNode.Parse(jsonStr);
@@ -104,10 +113,10 @@ internal partial class Program
         var rp = new StepProfiler("route");
         rp.Init($"ts={ts} user={user} thread={threadTs ?? "none"} cwd={eyeCwd} bot={eyeBotName} promptNames={promptNameMap.Count}");
 
-        if (!File.Exists(SlackConfigPath)) { rp.Line("No Slack config — skip"); return 0; }
-        var cfg = JsonNode.Parse(File.ReadAllText(SlackConfigPath));
+        if (!File.Exists(SlackConfigPath) && !isDryRun) { rp.Line("No Slack config — skip"); return 0; }
+        var cfg = File.Exists(SlackConfigPath) ? JsonNode.Parse(File.ReadAllText(SlackConfigPath)) : null;
         var botToken = cfg?["bot_token"]?.GetValue<string>();
-        if (string.IsNullOrEmpty(botToken)) { rp.Line("No bot_token — skip"); return 0; }
+        if (string.IsNullOrEmpty(botToken) && !isDryRun) { rp.Line("No bot_token — skip"); return 0; }
 
         // Clean @mention tokens
         var cleanText = Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
@@ -153,7 +162,7 @@ internal partial class Program
         if (!string.IsNullOrEmpty(threadTs))
         {
             rp.Line($"step2: GetThreadContext channel={channel} thread={threadTs}");
-            var ctx = GetThreadContext(botToken, channel, threadTs, ts);
+            var ctx = GetThreadContext(botToken ?? "", channel, threadTs, ts);
             if (!string.IsNullOrEmpty(ctx)) threadContext = $"\n{ctx}\n";
             rp.Line($"step2: context len={threadContext.Length}");
         }
@@ -174,7 +183,7 @@ internal partial class Program
         if (isTrackedThread && !string.IsNullOrEmpty(threadTs))
         {
             // ★ Thread reply: find owning Claude via ResolveThreadScopedPrompts
-            targets = ResolveThreadScopedPrompts(promptHelper, botToken, channel, threadTs, eyeBotName ?? BotUsername);
+            targets = ResolveThreadScopedPrompts(promptHelper, botToken ?? "", channel, threadTs, eyeBotName ?? BotUsername);
             rp.Line($"step4: ResolveThreadScoped → {targets.Count} match(es)");
 
             if (targets.Count == 0)
@@ -232,13 +241,20 @@ internal partial class Program
         }
 
         // ── Step 5(deliver): TypeAndSubmit to each target ──
-        rp.Line($"step5: deliver to {targets.Count} target(s)");
+        rp.Line($"step5: deliver to {targets.Count} target(s){(isDryRun ? " [DRY-RUN]" : "")}");
         int sent = 0;
         var results = new List<DeliveryResult>();
         foreach (var pi in targets)
         {
             var dispName = promptNameMap.TryGetValue($"0x{pi.WindowHandle.ToInt64():X}", out var n) ? n : ExtractProjectName(pi);
             rp.Line($"step5: → {dispName} 0x{pi.WindowHandle:X} host={pi.HostType}");
+            if (isDryRun)
+            {
+                Console.WriteLine($"[DRY-RUN] would deliver to: {dispName} (0x{pi.WindowHandle:X} {pi.HostType})");
+                results.Add(new DeliveryResult(dispName, true));
+                sent++;
+                continue;
+            }
             try
             {
                 var promptText = label == null
@@ -259,6 +275,13 @@ internal partial class Program
 
         rp.Line($"Delivered {sent}/{targets.Count}");
 
+        if (isDryRun)
+        {
+            Console.WriteLine($"[DRY-RUN] routing complete: {sent}/{targets.Count} target(s)");
+            rp.Finish("dry-run done");
+            return 0;
+        }
+
         if (sent == 0)
         {
             rp.Line($"All failed — retry #{retryCount + 1}");
@@ -267,7 +290,7 @@ internal partial class Program
         }
 
         // ── Send ack ──
-        SendRouteAck(botToken, channel, replyTs, sent, targets.Count, results);
+        SendRouteAck(botToken!, channel, replyTs, sent, targets.Count, results);
         rp.Finish($"done sent={sent}/{targets.Count}");
         return 0;
     }
