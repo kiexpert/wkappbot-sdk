@@ -55,8 +55,8 @@ partial class Program
         // backward-compat local alias so existing prof("...") calls in Main still work
         Action<string> prof = Prof;
 
-        // TODO: stderr dim — rolled back until MCP stderr relay preserves ANSI + encoding
-        // Console.SetError(new DimStderrWriter(Console.Error));
+        // Dim all Launcher stderr via ANSI codes — MCP relay now writes raw UTF-8 bytes (preserves ANSI + encoding)
+        Console.SetError(new DimStderrWriter(Console.Error));
 
         // stderr AutoFlush: when redirected (piped to file/log), ensure real-time output
         if (Console.IsErrorRedirected && Console.Error is System.IO.StreamWriter errSw)
@@ -418,7 +418,9 @@ partial class Program
 
         // Fast-exit commands (help): watchdog reports exact step if process hangs >3s.
         // _lDiagStep is a static field so RunCore() can update it directly.
-        bool isFastExit = cmd is "help" or "--help" or "-h";
+        // --regression runs test scripts → needs more time, not a fast-exit
+        bool isFastExit = (cmd is "help" or "--help" or "-h")
+            && !forwardArgs.Any(a => a == "--regression");
         if (isFastExit)
         {
             _lDiagStep = "before-RunCore";
@@ -620,6 +622,11 @@ partial class Program
         // Make write ends inheritable (child needs them); read ends stay non-inheritable.
         SetHandleInformation(hStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
         SetHandleInformation(hStderrWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+        // Make Launcher's own stdout/stderr non-inheritable so Core doesn't inherit bash's pipe.
+        // Without this, Core holds bash's pipe write end → bash waits for Core to die (~30s) after Launcher exits.
+        var hLauncherOut = GetStdHandle(-11); var hLauncherErr = GetStdHandle(-12);
+        if (hLauncherOut != IntPtr.Zero && hLauncherOut != (IntPtr)(-1)) SetHandleInformation(hLauncherOut, HANDLE_FLAG_INHERIT, 0);
+        if (hLauncherErr != IntPtr.Zero && hLauncherErr != (IntPtr)(-1)) SetHandleInformation(hLauncherErr, HANDLE_FLAG_INHERIT, 0);
 
         var cmd = new StringBuilder($"\"{core.Replace("\"", "\\\"")}\"");
         foreach (var a in args) cmd.Append(" \"").Append(a.Replace("\"", "\\\"")).Append('"');

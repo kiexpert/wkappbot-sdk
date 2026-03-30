@@ -16,6 +16,65 @@ internal partial class Program
     /// <summary>현재 실행 중인 exe 경로 (설치 위치 무관).</summary>
     static readonly string ExePath = (Environment.ProcessPath ?? "wkappbot").Replace('\\', '/');
 
+    // ── Slack message file queue ──
+    static string SlackQueueDir => Path.Combine(DataDir, "runtime", "slack_queue");
+    static volatile bool _slackDraining; // serializes drain — only one route worker at a time
+
+    /// <summary>
+    /// Enqueue a route JSON to a per-message file.
+    /// WebSocket thread calls this → immediate file write, no blocking.
+    /// </summary>
+    static void EnqueueSlackRoute(string routeJson, string uniqueId)
+    {
+        var safeId = uniqueId.Replace('.', '_').Replace('/', '_').Replace('\\', '_');
+        Directory.CreateDirectory(SlackQueueDir);
+        var path = Path.Combine(SlackQueueDir, $"{safeId}.json");
+        File.WriteAllText(path, routeJson);
+        Console.WriteLine($"[EYE][SLACK][QUEUE] +{safeId}");
+    }
+
+    /// <summary>
+    /// Returns (pending, processing) file counts in the Slack queue dir.
+    /// Used by eye tick for visibility.
+    /// </summary>
+    internal static (int Pending, int Processing) GetSlackQueueStats()
+    {
+        if (!Directory.Exists(SlackQueueDir)) return (0, 0);
+        var pending = Directory.GetFiles(SlackQueueDir, "*.json").Length;
+        var processing = Directory.GetFiles(SlackQueueDir, "*.processing").Length;
+        return (pending, processing);
+    }
+
+    /// <summary>
+    /// Drain queued Slack route files — called every ~1s from the Eye main loop.
+    /// Each file is renamed to .processing (atomic claim) then spawned in a Task.
+    /// File is deleted after route subprocess completes.
+    /// Skipped when _slackRetiring (hot-swap old process) — new Eye handles the queue.
+    /// </summary>
+    internal static void DrainSlackQueue()
+    {
+        if (_slackRetiring) return; // retiring: new Eye will drain
+        if (_slackDraining) return; // already processing — wait for next tick
+        if (!Directory.Exists(SlackQueueDir)) return;
+        if (Directory.GetFiles(SlackQueueDir, "*.json").Length == 0) return;
+        _slackDraining = true;
+        var corePath = Environment.ProcessPath ?? "wkappbot";
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                // Worker handles rename→process→delete loop serially
+                var proc = AppBotPipe.Spawn(corePath, "slack route --queue",
+                    Environment.CurrentDirectory,
+                    env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE");
+                proc?.WaitForExit(60000);
+                proc?.Dispose();
+            }
+            catch (Exception ex) { Console.Error.WriteLine($"[EYE] Queue drain error: {ex.Message}"); }
+            finally { _slackDraining = false; }
+        });
+    }
+
     /// <summary>
     /// Build the "(Slack ... — wkappbot slack reply ...)" suffix appended to every forwarded prompt.
     /// ONE place to change the format — never duplicate this string elsewhere!
@@ -989,28 +1048,21 @@ internal partial class Program
                     text = msg.Text, user = msg.User, ts = msg.Timestamp,
                     threadTs = msg.ThreadTs, channel = msg.Channel,
                     isMention = true,
-                    eyeCwd = Environment.CurrentDirectory,
+                    eyeCwd = _cachedCards?.OrderByDescending(c => c.LastTsUtc)
+                        .FirstOrDefault(c => !string.IsNullOrEmpty(c.Cwd)
+                            && (c.ParentName ?? "").ToLowerInvariant() is not "wkappbot" and not "a11y")?.Cwd ?? "",
                     botUsername = GetSendReplyUsername(),
                     promptNames = mentionPromptNames
                 });
-                _ = Task.Run(() =>
-                {
-                    try
-                    {
-                        var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
-                        File.WriteAllText(tmpFile, routeJson);
-                        var corePath = Environment.ProcessPath ?? "wkappbot";
-                        var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory,
-                            env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE");
-                        proc?.WaitForExit(60000);
-                        proc?.Dispose();
-                        try { File.Delete(tmpFile); } catch { }
-                    }
-                    catch (Exception ex) { Console.Error.WriteLine($"[EYE] Mention route spawn error: {ex.Message}"); }
-                });
+                EnqueueSlackRoute(routeJson, msg.Timestamp);
 
                 int mentionSent = 1; // assumed success (subprocess handles actual delivery)
-                var mentionResults = new List<DeliveryResult> { new DeliveryResult("route", true) };
+                // Build meaningful ShortName from matched session names (mentionPromptNames has hwnd→"클롣[tag]")
+                var mentionShortNames = mentionPromptNames.Values.ToList();
+                var mentionShortName = mentionShortNames.Count == 1 ? mentionShortNames[0]
+                    : mentionShortNames.Count > 1 ? string.Join("+", mentionShortNames.Select(n => n.Split('[').LastOrDefault()?.TrimEnd(']') ?? n))
+                    : botUsername ?? "클롣";
+                var mentionResults = new List<DeliveryResult> { new DeliveryResult(mentionShortName, true) };
                 Console.WriteLine($"[EYE][SLACK] >> Mention broadcast: {mentionSent}/{allMentionPrompts.Count} prompts");
 
                 SendAndTrackAck(msg.Channel, ackThread, mentionSent, allMentionPrompts.Count, mentionResults);
@@ -1223,27 +1275,13 @@ internal partial class Program
             {
                 text = msg.Text, user = msg.User, ts = msg.Timestamp,
                 threadTs = msg.ThreadTs, channel = msg.Channel,
-                eyeCwd = Environment.CurrentDirectory,
+                eyeCwd = _cachedCards?.OrderByDescending(c => c.LastTsUtc)
+                    .FirstOrDefault(c => !string.IsNullOrEmpty(c.Cwd)
+                        && (c.ParentName ?? "").ToLowerInvariant() is not "wkappbot" and not "a11y")?.Cwd ?? "",
                 botUsername = GetSendReplyUsername(),
                 promptNames  // hwnd → display name map
             });
-            // Separate process: UIA write ops (FindAllPrompts + TypeAndSubmit) run outside Eye
-            _ = Task.Run(() =>
-            {
-                try
-                {
-                    // Pass JSON via temp file (avoids shell escaping issues)
-                    var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
-                    File.WriteAllText(tmpFile, routeJson);
-                    var corePath = Environment.ProcessPath ?? "wkappbot";
-                    var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory,
-                        env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE");
-                    proc?.WaitForExit(60000);
-                    proc?.Dispose();
-                    try { File.Delete(tmpFile); } catch { }
-                }
-                catch (Exception ex) { Console.Error.WriteLine($"[EYE] Route spawn error: {ex.Message}"); }
-            });
+            EnqueueSlackRoute(routeJson, msg.Timestamp);
             }); // end Task.Run — WebSocket thread now free for next message
         };
 
@@ -1344,19 +1382,14 @@ internal partial class Program
                         channel = rx.Channel,
                         isReaction = true,
                         reaction = rx.Reaction,
-                        eyeCwd = Environment.CurrentDirectory,
+                        eyeCwd = _cachedCards?.OrderByDescending(c => c.LastTsUtc)
+                        .FirstOrDefault(c => !string.IsNullOrEmpty(c.Cwd)
+                            && (c.ParentName ?? "").ToLowerInvariant() is not "wkappbot" and not "a11y")?.Cwd ?? "",
                         botUsername = GetSendReplyUsername(),
                         promptNames
                     });
 
-                    var tmpFile = Path.Combine(Path.GetTempPath(), $"wkappbot_route_{Guid.NewGuid():N}.json");
-                    File.WriteAllText(tmpFile, routeJson);
-                    var corePath = Environment.ProcessPath ?? "wkappbot";
-                    var proc = AppBotPipe.Spawn(corePath, $"slack route --file \"{tmpFile}\"", Environment.CurrentDirectory,
-                        env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE");
-                    proc?.WaitForExit(60000);
-                    proc?.Dispose();
-                    try { File.Delete(tmpFile); } catch { }
+                    EnqueueSlackRoute(routeJson, $"{rx.ItemTs}_{rx.Reaction}");
                 }
                 catch (Exception ex) { Console.Error.WriteLine($"[EYE] Reaction route error: {ex.Message}"); }
             });

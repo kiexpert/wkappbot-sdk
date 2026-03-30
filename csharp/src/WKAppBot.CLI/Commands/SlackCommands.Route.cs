@@ -23,11 +23,38 @@ internal partial class Program
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: slack route <msgJson> | slack route --file <path>");
+            Console.Error.WriteLine("Usage: slack route --queue | slack route --file <path> | slack route <msgJson>");
             return 1;
         }
 
-        // Support --file for process-separated route (avoids shell escaping)
+        // --queue: drain SlackQueueDir serially (Eye spawns this; no file arg needed)
+        if (args[0] == "--queue")
+        {
+            var queueDir = Path.Combine(DataDir, "runtime", "slack_queue");
+            if (!Directory.Exists(queueDir)) return 0;
+            var files = Directory.GetFiles(queueDir, "*.json");
+            if (files.Length == 0) return 0;
+            Array.Sort(files);
+            int processed = 0;
+            foreach (var file in files)
+            {
+                var procFile = Path.ChangeExtension(file, ".processing");
+                try { File.Move(file, procFile, overwrite: false); }
+                catch { continue; } // already claimed
+                try
+                {
+                    var json = File.ReadAllText(procFile);
+                    SlackRouteCommand([json]);
+                    processed++;
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[ROUTE] Queue error: {ex.Message}"); }
+                finally { try { File.Delete(procFile); } catch { } }
+            }
+            Console.WriteLine($"[ROUTE] Queue drained: {processed}/{files.Length}");
+            return 0;
+        }
+
+        // Support --file for single-message route (kept for tests / backward compat)
         string jsonStr;
         if (args.Length >= 2 && args[0] == "--file")
         {
@@ -253,12 +280,14 @@ internal partial class Program
         string ackText;
         if (total > 0 && sent < total)
             ackText = $":warning: 전달 {sent}/{total} (partial failure)";
+        else if (results?.Count == 1)
+            ackText = $"{results[0].ShortName}에 전달했습니다! {(results[0].Sent ? ":white_check_mark:" : ":x:")}";
         else if (sent > 1)
-            ackText = $"Claude {sent}곳에 전달했습니다!";
+            ackText = $"{sent}곳에 전달했습니다!";
         else
-            ackText = "Claude에 전달했습니다!";
+            ackText = "전달했습니다!";
 
-        if (results != null && results.Count > 0)
+        if (results != null && results.Count > 1)
         {
             var lines = results.Select(r => $"• {r.ShortName} {(r.Sent ? ":white_check_mark:" : ":x:")}");
             ackText += "\n" + string.Join("\n", lines);

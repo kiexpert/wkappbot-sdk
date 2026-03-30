@@ -16,6 +16,10 @@ internal partial class Program
     // Unified pattern: find all -> select (--nth/--all) -> dispatch targets
     static int A11yCommand(string[] args)
     {
+        // --help/--regression interceptor: MCP worker calls A11yCommand directly (bypasses Program.cs)
+        if (args.Any(a => a is "--help" or "-h")) { TryPrintCommandHelp("a11y", args); return 0; }
+        if (args.Any(a => a is "--regression")) { TryRunRegression("a11y", args); return 0; }
+
         // ═══ Focus Hot-Chain (lightweight — Win32 only, no FlaUI/UIA DLL loading) ═══
         try
         {
@@ -778,6 +782,7 @@ internal partial class Program
                 }
 
                 AutomationElement root;
+                PulseStep.Mark("uia-from-handle");
                 try { root = automation.FromHandle(hwnd); }
                 catch (Exception ex)
                 {
@@ -785,6 +790,7 @@ internal partial class Program
                     fail++;
                     continue;
                 }
+                PulseStep.Mark("uia-from-handle-done");
 
                 if (!string.IsNullOrEmpty(uiaPath))
                 {

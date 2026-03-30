@@ -116,6 +116,51 @@ internal partial class Program
             latestAge = (DateTime.UtcNow - ts.ToUniversalTime()).TotalSeconds;
         var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastKeepAwakeUtc).TotalSeconds;
         Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
+
+        var (qPending, qProc) = GetSlackQueueStats();
+        if (qPending > 0 || qProc > 0)
+            Console.WriteLine($"[EYE_QUEUE] pending={qPending} processing={qProc}{(_slackRetiring ? " retiring" : "")}");
+
+        // ── LGDisplayExtensionWnd rogue topmost guard ──
+        try
+        {
+            var lgHwnd = NativeMethods.FindWindowW("HwndWrapper[LGDisplayExtension.exe;;", null);
+            if (lgHwnd != IntPtr.Zero
+                && (NativeMethods.GetWindowLongW(lgHwnd, -20) & 0x8) != 0) // WS_EX_TOPMOST
+            {
+                var fgBuf = new System.Text.StringBuilder(256);
+                NativeMethods.GetWindowTextW(NativeMethods.GetForegroundWindow(), fgBuf, fgBuf.Capacity);
+                Console.WriteLine($"[EYE_TICK][GUARD] LGDisplayExtensionWnd topmost! fg=\"{fgBuf}\"");
+
+                // Step 1: Instant transparency — user sees normal screen immediately
+                var exStyle = NativeMethods.GetWindowLongW(lgHwnd, -20);
+                NativeMethods.SetWindowLongW(lgHwnd, -20, exStyle | NativeMethods.WS_EX_LAYERED);
+                NativeMethods.SetLayeredWindowAttributes(lgHwnd, 0, 0, NativeMethods.LWA_ALPHA);
+                Console.WriteLine("[EYE_TICK][GUARD] → transparent");
+
+                // Step 2: WM_CLOSE
+                NativeMethods.PostMessageW(lgHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
+                Console.WriteLine("[EYE_TICK][GUARD] → WM_CLOSE sent");
+
+                // Step 3: Verify after 500ms — if still alive, kill the process
+                Thread.Sleep(500);
+                if (NativeMethods.IsWindow(lgHwnd))
+                {
+                    Console.WriteLine("[EYE_TICK][GUARD] WM_CLOSE ignored → killing LGDisplayExtension process");
+                    NativeMethods.GetWindowThreadProcessId(lgHwnd, out uint lgPid);
+                    if (lgPid > 0)
+                    {
+                        try { Process.GetProcessById((int)lgPid).Kill(); Console.WriteLine($"[EYE_TICK][GUARD] Kill OK (pid={lgPid})"); }
+                        catch (Exception kex) { Console.WriteLine($"[EYE_TICK][GUARD] Kill failed: {kex.Message}"); }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[EYE_TICK][GUARD] LGDisplayExtensionWnd closed OK");
+                }
+            }
+        }
+        catch { }
     }
 
     static bool ShouldForceFullLoad()

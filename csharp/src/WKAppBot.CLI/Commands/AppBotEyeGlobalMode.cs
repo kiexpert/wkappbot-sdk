@@ -107,6 +107,7 @@ internal partial class Program
     static volatile bool _fswPromptDirty;
     static volatile string? _fswPromptChangedFile; // last changed file name for filtering
     static volatile bool _fswExeDirty; // hot-swap: exe binary changed
+    static volatile bool _slackRetiring; // hot-swap retiring: stop DrainSlackQueue, keep EnqueueSlackRoute
     static volatile bool _fswClaudeJsonlDirty; // reserved (FSW removed — kept to avoid refactor)
     static FileSystemWatcher? _fswTick;
     static FileSystemWatcher? _fswPrompt;
@@ -700,9 +701,14 @@ internal partial class Program
             // ── Claude Desktop status detection (~every 1 sec) ──
             // Per-instance JSONL size watermark inside RunClaudeStatusTick handles dedup.
             if (frameCount % 10 == 0)
+            {
                 cachedClaudeStatusText = RunClaudeStatusTick(
                     ref claudeHwnd, slackBotToken, slackChannel, botUsername,
                     slackClient, statusTsFile, contextWarnedPcts);
+
+                // ── Drain Slack message file queue ──
+                DrainSlackQueue();
+            }
 
             // ── Stale zoom overlay cleanup (every 60s, kill zooms older than 60s) ──
             if ((DateTime.UtcNow - _lastZoomCleanup).TotalSeconds >= 60)
@@ -725,6 +731,49 @@ internal partial class Program
                     }, IntPtr.Zero);
                     if (cleaned > 0)
                         Console.WriteLine($"[EYE] Cleaned {cleaned} stale zoom overlay(s)");
+                }
+                catch { }
+
+                // ── LGDisplayExtensionWnd rogue topmost overlay guard ──
+                // This LG monitor software occasionally pops a full-screen topmost black overlay
+                // without user interaction. Auto-close + Slack alert for forensics.
+                try
+                {
+                    var lgHwnd = NativeMethods.FindWindowW("HwndWrapper[LGDisplayExtension.exe;;", null);
+                    if (lgHwnd != IntPtr.Zero
+                        && (NativeMethods.GetWindowLongW(lgHwnd, -20) & 0x8) != 0) // WS_EX_TOPMOST
+                    {
+                        var fgBuf = new System.Text.StringBuilder(256);
+                        NativeMethods.GetWindowTextW(NativeMethods.GetForegroundWindow(), fgBuf, fgBuf.Capacity);
+                        var fgTitle = fgBuf.ToString();
+                        Console.WriteLine($"[EYE][GUARD] LGDisplayExtensionWnd topmost! fg=\"{fgTitle}\"");
+
+                        // Step 1: instant transparency
+                        var exStyle = NativeMethods.GetWindowLongW(lgHwnd, -20);
+                        NativeMethods.SetWindowLongW(lgHwnd, -20, exStyle | NativeMethods.WS_EX_LAYERED);
+                        NativeMethods.SetLayeredWindowAttributes(lgHwnd, 0, 0, NativeMethods.LWA_ALPHA);
+                        // Step 2: WM_CLOSE
+                        NativeMethods.PostMessageW(lgHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
+                        // Step 3: verify + kill
+                        Thread.Sleep(500);
+                        if (NativeMethods.IsWindow(lgHwnd))
+                        {
+                            NativeMethods.GetWindowThreadProcessId(lgHwnd, out uint lgPid);
+                            if (lgPid > 0) try { Process.GetProcessById((int)lgPid).Kill(); } catch { }
+                            Console.WriteLine($"[EYE][GUARD] WM_CLOSE ignored → killed process");
+                        }
+
+                        if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                        {
+                            var result = NativeMethods.IsWindow(lgHwnd) ? "킬 완료" : "닫기 완료";
+                            var alertMsg = $":warning: *LGDisplayExtension* 검은 장막 감지 → {result}\n포그라운드: `{fgTitle}`";
+                            Task.Run(async () =>
+                            {
+                                try { await SlackSendViaApi(slackBotToken, slackChannel, alertMsg, username: "앱봇아이"); }
+                                catch { }
+                            });
+                        }
+                    }
                 }
                 catch { }
             }
@@ -865,6 +914,7 @@ internal partial class Program
                             File.Move(exePath, oldExePath);    // running exe → .old-YYYYMMDD-HHmm.exe
                             File.Move(newExePath, exePath);     // .new.exe → wkappbot.exe
                             Console.WriteLine($"[EYE:HOT-SWAP] swap OK (.exe→{Path.GetFileName(oldExePath)}, .new→.exe)");
+                            _slackRetiring = true; // stop draining queue — new Eye will take over
                             hotReloadTriggered = true;
                             break;
                         }
@@ -882,6 +932,7 @@ internal partial class Program
                         EyeColor(ConsoleColor.Magenta);
                         Console.WriteLine("[EYE:HOT-SWAP] EXE timestamp changed — binary updated!");
                         EyeResetColor();
+                        _slackRetiring = true;
                         hotReloadTriggered = true;
                         break;
                     }

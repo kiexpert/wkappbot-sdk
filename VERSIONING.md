@@ -34,4 +34,4 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`5.1` — bumped at 2026-03-25 (debate hardening, dry-run, moderator quality gates, Eye memory fix)
+`5.5` — bumped at 2026-03-30 (Slack file queue, LGDisplayExtension guard, --help/--regression interceptors, OutputDebugString stderr mirror)
