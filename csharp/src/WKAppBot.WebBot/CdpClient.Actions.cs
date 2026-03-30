@@ -571,7 +571,7 @@ public sealed partial class CdpClient
         var result = await EvalAsync(
             $"(()=>{{var el=document.querySelector('{escaped}');if(!el)return null;" +
             "var r=el.getBoundingClientRect();" +
-            "return Math.round(r.left)+','+Math.round(r.top)+','+Math.round(r.width)+','+Math.round(r.height)}})()");
+            "return Math.round(r.left)+','+Math.round(r.top)+','+Math.round(r.width)+','+Math.round(r.height)})()");
         return result;
     }
 
