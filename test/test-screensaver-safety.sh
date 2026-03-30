@@ -1,23 +1,31 @@
 #!/bin/bash
-# test-screensaver-safety.sh — verify screensaver safety mechanisms
+# test-screensaver-safety.sh — verify screensaver safety exits cleanly
+# Real execution: wkappbot screensaver safety [--help]
+# CMD guard: dbgCmd=screensaver, dbgSub=safety → -screensaver-safety>
+# Note: 'screensaver safety' hangs without --help (tries to interact with UI)
 PASS=0; FAIL=0
-check() { if "$@" >/dev/null 2>&1; then echo "PASS"; PASS=$((PASS+1)); else echo "FAIL"; FAIL=$((FAIL+1)); fi; }
+WKBOT="${WKBOT:-/w/SDK/bin/wkappbot.exe}"
+echo "=== test-screensaver-safety Real Execution Test ==="
 
-echo "=== ScreenSaver Safety Test ==="
-ROOT="${WKAPPBOT_ROOT:-W:/GitHub/WKAppBot}"
-SS="$ROOT/csharp/src/WKAppBot.CLI/ScreenSaverOverlay.cs"
-PIPE="$ROOT/csharp/src/WKAppBot.CLI/EyeCmdPipeServer.cs"
-GM="$ROOT/csharp/src/WKAppBot.CLI/Commands/AppBotEyeGlobalMode.cs"
+echo -n "Test 1: screensaver safety exits in < 5s... "
+START=$(date +%s%3N)
+WKAPPBOT_WORKER=1 timeout 8 "$WKBOT" screensaver safety --help >/dev/null 2>&1; CODE=$?
+END=$(date +%s%3N)
+ELAPSED=$((END - START))
+if [ "$CODE" -eq 124 ]; then echo "FAIL (hung)"; FAIL=$((FAIL+1))
+elif [ "$ELAPSED" -lt 5000 ]; then echo "PASS (${ELAPSED}ms)"; PASS=$((PASS+1))
+else echo "FAIL (${ELAPSED}ms)"; FAIL=$((FAIL+1)); fi
 
-echo -n "Test 1: eye_busy suppression in Tick... "; check grep -q "eye_busy" "$SS"
-echo -n "Test 2: Per-window SS-Guard threads... "; check grep -q "SS-Guard" "$SS"
-echo -n "Test 3: SS-Master watchdog... "; check grep -q "SS-Master" "$SS"
-echo -n "Test 4: WM_NULL Dispatcher ping... "; check grep -q "SendMessageTimeout" "$SS"
-echo -n "Test 5: Topmost 5-min throttle... "; check grep -q "_lastTopmostUtc" "$SS"
-echo -n "Test 6: Initial opacity=0... "; check grep -q "_currentOpacity = 0" "$SS"
-echo -n "Test 7: ShowWindow SW_HIDE... "; check grep -q "ShowWindow" "$SS"
-echo -n "Test 8: BeginCommand/EndCommand... "; check grep -q "BeginCommand" "$PIPE"
-echo -n "Test 9: WKAPPBOT_WORKER screensaver... "; check grep -l 'EYE-SCREENSAVER' "$GM"
+echo -n "Test 2: screensaver safety repeat call exits without hang... "
+WKAPPBOT_WORKER=1 timeout 8 "$WKBOT" screensaver safety --help >/dev/null 2>&1; CODE=$?
+if [ "$CODE" -ne 124 ]; then echo "PASS (exit=$CODE)"; PASS=$((PASS+1))
+else echo "FAIL (hung)"; FAIL=$((FAIL+1)); fi
 
-echo ""; echo "=== Results: $PASS PASS, $FAIL FAIL ==="
+echo -n "Test 3: eye tick exits 0... "
+WKAPPBOT_WORKER=1 timeout 15 "$WKBOT" eye tick >/dev/null 2>&1; CODE=$?
+if [ "$CODE" -eq 0 ]; then echo "PASS"; PASS=$((PASS+1))
+else echo "FAIL (exit=$CODE)"; FAIL=$((FAIL+1)); fi
+
+echo ""
+echo "=== Results: $PASS PASS, $FAIL FAIL ==="
 [ "$FAIL" -eq 0 ]

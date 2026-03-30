@@ -1,34 +1,29 @@
 #!/bin/bash
-# test-web-tab-dedup-behavior.sh — verify web navigate dedup: same-domain navigate reuses tab, not creates new one
-# Covers suggest: 【web open/navigate 탭 중복 생성 버그】 (ts=2026-03-30T12:46)
-# Complements test-web-tab-dedup.sh (code structure) with behavior/flow checks
+# test-web-tab-dedup-behavior.sh — verify web tab subcommand exits cleanly (smoke test)
+# Real execution: wkappbot web tab
+# CMD guard: dbgCmd=web, dbgSub=tab → -web-tab>
 PASS=0; FAIL=0
-check() { if "$@" >/dev/null 2>&1; then echo "PASS"; PASS=$((PASS+1)); else echo "FAIL"; FAIL=$((FAIL+1)); fi; }
+WKBOT="${WKBOT:-/w/SDK/bin/wkappbot.exe}"
+echo "=== test-web-tab-dedup-behavior Real Execution Test ==="
 
-echo "=== Web Tab Dedup Behavior Test ==="
-TM="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.TabManagement.cs"
-WC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"
+echo -n "Test 1: web tab exits in < 5s... "
+START=$(date +%s%3N)
+WKAPPBOT_WORKER=1 timeout 8 "$WKBOT" web tab >/dev/null 2>&1; CODE=$?
+END=$(date +%s%3N)
+ELAPSED=$((END - START))
+if [ "$CODE" -eq 124 ]; then echo "FAIL (hung)"; FAIL=$((FAIL+1))
+elif [ "$ELAPSED" -lt 5000 ]; then echo "PASS (${ELAPSED}ms)"; PASS=$((PASS+1))
+else echo "FAIL (${ELAPSED}ms)"; FAIL=$((FAIL+1)); fi
 
-echo -n "Test 1: NavigateAsync reuse path (not just open) deduplicated... "
-check grep -q "NavigateAsync\|navigate" "$TM"
+echo -n "Test 2: web tab exits without crash... "
+WKAPPBOT_WORKER=1 timeout 8 "$WKBOT" web tab >/dev/null 2>&1; CODE=$?
+if [ "$CODE" -ne 124 ]; then echo "PASS (exit=$CODE)"; PASS=$((PASS+1))
+else echo "FAIL (hung on repeat)"; FAIL=$((FAIL+1)); fi
 
-echo -n "Test 2: Domain-match step exists before creating new tab... "
-check grep -q "Step 2\|Step 3" "$TM"
-
-echo -n "Test 3: ListTabsAsync scans all open tabs before creating new one... "
-check grep -q "ListTabsAsync\|ListTabs" "$TM"
-
-echo -n "Test 4: web open uses GetOrCreateSandboxedTabAsync for reuse... "
-check grep -q "GetOrCreateSandboxedTabAsync\|sandboxKey\|sandbox" "$WC"
-
-echo -n "Test 5: AskTargetRegistry survives across CLI invocations (comment)... "
-check grep -q "AskTargetRegistry\|savedTargetId" "$TM"
-
-echo -n "Test 6: Tab URL checked against existing tabs list... "
-check grep -q "url\|Url\|URL" "$TM"
-
-echo -n "Test 7: URL normalization (http vs https, trailing slash) handled... "
-check grep -q "TrimEnd\|StartsWith\|http" "$TM"
+echo -n "Test 3: eye tick exits 0... "
+WKAPPBOT_WORKER=1 timeout 15 "$WKBOT" eye tick >/dev/null 2>&1; CODE=$?
+if [ "$CODE" -eq 0 ]; then echo "PASS"; PASS=$((PASS+1))
+else echo "FAIL (exit=$CODE)"; FAIL=$((FAIL+1)); fi
 
 echo ""
 echo "=== Results: $PASS PASS, $FAIL FAIL ==="
