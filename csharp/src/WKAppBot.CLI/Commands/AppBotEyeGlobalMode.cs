@@ -241,6 +241,41 @@ internal partial class Program
         EyeCmdPipeServer.StartServer();
         PulseStep.Mark("pipe-server");
 
+        // ── Early Slack connect (parallel with MCP+WPF startup) ──
+        // Slack ConnectAsync takes 1-3s (WebSocket handshake). Start it NOW so it runs
+        // concurrently with MCP worker spawn + WPF host init + schtasks watchdog.
+        SlackSocketClient? _earlySlackClient = null;
+        string? _earlyAppToken = null, _earlyBotToken = null, _earlyChannel = null;
+        Task? _slackConnectBgTask = null;
+        {
+            var earlyCfg = Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
+            if (File.Exists(earlyCfg))
+            {
+                try
+                {
+                    var earlyJson = JsonNode.Parse(File.ReadAllText(earlyCfg));
+                    _earlyAppToken = earlyJson?["app_token"]?.GetValue<string>();
+                    _earlyBotToken = earlyJson?["bot_token"]?.GetValue<string>();
+                    _earlyChannel  = earlyJson?["channel"]?.GetValue<string>();
+                    if (!string.IsNullOrEmpty(_earlyAppToken) && !string.IsNullOrEmpty(_earlyBotToken))
+                    {
+                        _earlySlackClient = new SlackSocketClient();
+                        var capturedClient = _earlySlackClient;
+                        var capturedApp = _earlyAppToken;
+                        var capturedBot = _earlyBotToken;
+                        _slackConnectBgTask = Task.Run(async () =>
+                        {
+                            try { await capturedClient.ConnectAsync(capturedApp, capturedBot); }
+                            catch (Exception ex) { Console.Error.WriteLine($"[EYE] Slack early-connect failed: {ex.Message}"); }
+                        });
+                        Console.WriteLine("[EYE] Slack: connecting in background (parallel with startup)...");
+                    }
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[EYE] Slack early-config read failed: {ex.Message}"); }
+            }
+        }
+        PulseStep.Mark("slack-connect-started");
+
         // Start MCP worker subprocess — all a11y/UIA operations route through this process
         // Eye stays lean (~80MB), UIA memory (~600MB) stays in the worker
         EyeMcpClient.Start();
@@ -350,8 +385,17 @@ internal partial class Program
 
                 if (!string.IsNullOrEmpty(appToken) && !string.IsNullOrEmpty(slackBotToken))
                 {
-                    slackClient = new SlackSocketClient();
-                    slackClient.ConnectAsync(appToken, slackBotToken).GetAwaiter().GetResult();
+                    if (_earlySlackClient != null && _slackConnectBgTask != null)
+                    {
+                        // Reuse the early-started client — await completion (usually already done)
+                        _slackConnectBgTask.GetAwaiter().GetResult();
+                        slackClient = _earlySlackClient;
+                    }
+                    else
+                    {
+                        slackClient = new SlackSocketClient();
+                        slackClient.ConnectAsync(appToken, slackBotToken).GetAwaiter().GetResult();
+                    }
                     EyeColor(ConsoleColor.Green);
                     PulseStep.Mark("slack-connected");
                     var workspace = json?["workspace"]?.GetValue<string>() ?? "?";

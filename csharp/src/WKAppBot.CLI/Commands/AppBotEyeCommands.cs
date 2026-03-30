@@ -94,21 +94,25 @@ internal partial class Program
         var fireAt = DateTime.Now.AddMinutes(2).ToString("HH:mm");
         var fireDate = DateTime.Now.AddMinutes(2).ToString("yyyy/MM/dd");
         var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"{tr}\" /SC MINUTE /MO 2 /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
-        try
+        // Fire-and-forget — schtasks.exe can take 0.5-3s; don't block Eye startup
+        Console.WriteLine($"[EYE] Watchdog: registering /SC MINUTE /MO 2 (first={fireAt})...");
+        _ = Task.Run(() =>
         {
-            using var spawn = AppBotPipe.Spawn("schtasks.exe", args,
-                cwd: Environment.SystemDirectory, caller: "EYE-SCHED");
-            spawn?.WaitForExit(3000);
-            var ok = spawn != null && spawn.ExitCode == 0;
-            if (ok)
-                Console.WriteLine($"[EYE] Watchdog: eye tick scheduled at {fireAt} (2 min from now)");
-            else
-                Console.WriteLine($"[EYE] Watchdog schtasks exit={spawn?.ExitCode} (non-fatal)");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[EYE] Watchdog error: {ex.Message} (non-fatal)");
-        }
+            try
+            {
+                using var spawn = AppBotPipe.Spawn("schtasks.exe", args,
+                    cwd: Environment.SystemDirectory, caller: "EYE-SCHED");
+                spawn?.WaitForExit(5000);
+                var ok = spawn != null && spawn.ExitCode == 0;
+                Console.WriteLine(ok
+                    ? $"[EYE] Watchdog: ✓ registered (/SC MINUTE /MO 2 → first={fireAt})"
+                    : $"[EYE] Watchdog: schtasks exit={spawn?.ExitCode} (non-fatal)");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EYE] Watchdog error: {ex.Message} (non-fatal)");
+            }
+        });
     }
 
     /// <summary>
