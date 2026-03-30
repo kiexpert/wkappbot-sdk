@@ -832,6 +832,7 @@ internal partial class Program
             {
                 var name = Path.GetFileName(script);
                 Console.Write($"  {name}... ");
+                try { Console.Out.Flush(); } catch { }
                 try
                 {
                     var psi = new System.Diagnostics.ProcessStartInfo
