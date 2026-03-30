@@ -11,6 +11,7 @@ namespace WKAppBot.CLI;
 internal sealed class DimTextWriter : TextWriter
 {
     private readonly TextWriter _inner;
+    private readonly bool _useAnsi; // false when stderr is redirected/piped — no ANSI pollution
     private const string DimOn = "\x1b[2m";   // ANSI dim
     private const string Reset = "\x1b[0m";   // ANSI reset
 
@@ -24,14 +25,18 @@ internal sealed class DimTextWriter : TextWriter
     public DimTextWriter(TextWriter inner)
     {
         _inner = inner;
-        // Enable VT processing on stderr so ANSI codes work on Windows console
-        try
+        _useAnsi = !Console.IsErrorRedirected;
+        if (_useAnsi)
         {
-            var hErr = GetStdHandle(-12); // STD_ERROR_HANDLE
-            if (GetConsoleMode(hErr, out uint mode))
-                SetConsoleMode(hErr, mode | 0x0004); // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            // Enable VT processing on stderr so ANSI codes work on Windows console
+            try
+            {
+                var hErr = GetStdHandle(-12); // STD_ERROR_HANDLE
+                if (GetConsoleMode(hErr, out uint mode))
+                    SetConsoleMode(hErr, mode | 0x0004); // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            }
+            catch { }
         }
-        catch { }
     }
 
     public override Encoding Encoding => _inner.Encoding;
@@ -41,16 +46,16 @@ internal sealed class DimTextWriter : TextWriter
     public override void Write(string? value)
     {
         if (value == null) return;
-        _inner.Write(DimOn);
+        if (_useAnsi) _inner.Write(DimOn);
         _inner.Write(value);
-        _inner.Write(Reset);
+        if (_useAnsi) _inner.Write(Reset);
     }
 
     public override void WriteLine(string? value)
     {
-        _inner.Write(DimOn);
+        if (_useAnsi) _inner.Write(DimOn);
         _inner.WriteLine(value);
-        _inner.Write(Reset);
+        if (_useAnsi) _inner.Write(Reset);
     }
 
     public override void WriteLine() => _inner.WriteLine();
