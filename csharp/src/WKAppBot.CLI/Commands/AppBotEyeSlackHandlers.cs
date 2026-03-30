@@ -198,9 +198,9 @@ internal partial class Program
         }
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[EYE][SLACK] FindMyPrompts: no CWD match for \"{cwdFolder}\" in {allPrompts.Count} prompts, using first");
+        Console.WriteLine($"[EYE][SLACK] FindMyPrompts: no CWD match for \"{cwdFolder}\" in {allPrompts.Count} prompts — returning empty (let caller pick fallback)");
         Console.ResetColor();
-        return new List<ClaudePromptHelper.PromptInfo> { allPrompts[0] };
+        return new List<ClaudePromptHelper.PromptInfo>();
     }
 
     static ClaudePromptHelper.PromptInfo? ResolveWorkspaceScopedPrompt(ClaudePromptHelper promptHelper)
@@ -1046,11 +1046,9 @@ internal partial class Program
                 var mentionPromptNames = new Dictionary<string, string>();
                 foreach (var p in allMentionPrompts)
                 {
-                    var cwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
-                    if (string.IsNullOrEmpty(cwd)) continue;
-                    var tag = AbbreviateCwd(cwd);
-                    if (!string.IsNullOrEmpty(tag))
-                        mentionPromptNames[$"0x{p.WindowHandle.ToInt64():X}"] = $"클롣[{tag}]";
+                    var (dispName, _, _) = GetPromptDisplayInfo(p.WindowHandle);
+                    if (!string.IsNullOrEmpty(dispName))
+                        mentionPromptNames[$"0x{p.WindowHandle.ToInt64():X}"] = dispName;
                 }
                 // Use Eye's own launch CWD (not card cache) — card cache may be dominated by
                 // another Claude instance, causing wrong botUsername and misrouted thread replies.
@@ -1272,15 +1270,13 @@ internal partial class Program
 
             // ── Dispatch to route worker (separate process → memory isolation) ──
             Console.WriteLine($"[EYE][SLACK] → spawn slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
-            // Build per-prompt display name map for routing (hwnd → botUsername)
+            // Build per-prompt display name map for routing (hwnd → display name)
             var promptNames = new Dictionary<string, string>();
             foreach (var p in FindAllPromptsViaMcp())
             {
-                var cwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
-                if (string.IsNullOrEmpty(cwd)) continue;
-                var tag = AbbreviateCwd(cwd);
-                if (!string.IsNullOrEmpty(tag))
-                    promptNames[$"0x{p.WindowHandle.ToInt64():X}"] = $"클롣[{tag}]";
+                var (dispName, _, _) = GetPromptDisplayInfo(p.WindowHandle);
+                if (!string.IsNullOrEmpty(dispName))
+                    promptNames[$"0x{p.WindowHandle.ToInt64():X}"] = dispName;
             }
             var eyeOwnCwd2 = Environment.CurrentDirectory;
             EyeCmdPipeServer.CallerCwd.Value = eyeOwnCwd2; // override any AsyncLocal leak
@@ -1307,7 +1303,9 @@ internal partial class Program
             Console.WriteLine($"[EYE][SLACK] Reaction :{rx.Reaction}: by {rx.User} on {rx.ItemTs}");
 
             // ✅ reaction on suggest message → auto-resolve (willkim approval = no test guard needed)
-            if (rx.Reaction == "white_check_mark" && rx.Channel == SuggestChannel)
+            var rxSuggestCfg = LoadSlackConfig();
+            var rxSuggestChannel = rxSuggestCfg?["channel"]?.GetValue<string>();
+            if (rx.Reaction == "white_check_mark" && rx.Channel == rxSuggestChannel)
             {
                 _ = Task.Run(() =>
                 {
@@ -1332,11 +1330,11 @@ internal partial class Program
                                     Console.WriteLine($"[EYE] ✅ reaction → auto-resolve: {preview}");
 
                                     // Post resolve reply to Slack (no test guard — willkim approved via reaction)
-                                    var botToken = LoadSlackBotToken();
-                                    if (!string.IsNullOrEmpty(botToken))
+                                    var rxBotToken = rxSuggestCfg?["bot_token"]?.GetValue<string>();
+                                    if (!string.IsNullOrEmpty(rxBotToken) && !string.IsNullOrEmpty(rxSuggestChannel))
                                     {
                                         var resolverName = GetSendReplyUsername();
-                                        SlackSendViaApi(botToken, SuggestChannel,
+                                        SlackSendViaApi(rxBotToken, rxSuggestChannel,
                                             $":white_check_mark: *RESOLVED* (✅ approved by willkim)",
                                             threadTs: rx.ItemTs, username: resolverName, replyBroadcast: true)
                                             .GetAwaiter().GetResult();
@@ -1377,11 +1375,9 @@ internal partial class Program
                     var promptNames = new Dictionary<string, string>();
                     foreach (var p in FindAllPromptsViaMcp())
                     {
-                        var cwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
-                        if (string.IsNullOrEmpty(cwd)) continue;
-                        var tag = AbbreviateCwd(cwd);
-                        if (!string.IsNullOrEmpty(tag))
-                            promptNames[$"0x{p.WindowHandle.ToInt64():X}"] = $"클롣[{tag}]";
+                        var (dispName, _, _) = GetPromptDisplayInfo(p.WindowHandle);
+                        if (!string.IsNullOrEmpty(dispName))
+                            promptNames[$"0x{p.WindowHandle.ToInt64():X}"] = dispName;
                     }
 
                     var eyeOwnCwd3 = Environment.CurrentDirectory;

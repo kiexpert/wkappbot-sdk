@@ -80,6 +80,7 @@ internal partial class Program
     // ── Time-based loop timers ──
     static DateTime _lastWatchdogRefresh = DateTime.MinValue;
     static DateTime _lastEyeStatusEdit = DateTime.MinValue;
+    static DateTime _lastEyeRebumpCheck = DateTime.MinValue;
     static DateTime _lastCcaAnalysis = DateTime.MinValue;
     static DateTime _lastZoomCleanup = DateTime.MinValue;
 
@@ -112,6 +113,12 @@ internal partial class Program
     static FileSystemWatcher? _fswTick;
     static FileSystemWatcher? _fswPrompt;
     static FileSystemWatcher? _fswExe;
+
+    // ── WhisperRing watchdog ──
+    static int _whisperRingPid = 0;       // PID of spawned WhisperRing process (0 = not spawned)
+    static int _whisperRingX = 0;
+    static int _whisperRingY = 0;
+    static DateTime _lastWhisperRingCheck = DateTime.MinValue;
     static FileSystemWatcher? _fswExeNew; // hot-swap: .new.exe staged file
     static FileSystemWatcher? _fswMcp;
     static FileSystemWatcher? _fswClaudeJsonl; // Claude Code projects JSONL (~/.claude/projects/**/*.jsonl)
@@ -550,14 +557,15 @@ internal partial class Program
         try
         {
             var wrPath = Environment.ProcessPath ?? "wkappbot";
-            int ringX = Math.Max(0, posX - 190);
-            int ringY = posY;
-            AppBotPipe.Spawn(wrPath, $"whisper-ring {ringX} {ringY}",
+            _whisperRingX = Math.Max(0, posX - 190);
+            _whisperRingY = posY;
+            var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
                 cwd: Environment.CurrentDirectory,
                 env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
                 caller: "EYE-WHISPER");
+            if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
             PulseStep.Mark("whisper-spawned");
-            Console.WriteLine($"[EYE] Whisper Ring spawned as separate process");
+            Console.WriteLine($"[EYE] Whisper Ring spawned pid={_whisperRingPid}");
         }
         catch (Exception ex)
         {
@@ -651,31 +659,46 @@ internal partial class Program
                 try
                 {
                     var summary = _cachedIpcSummary;
-                    var startMsg = $"🟢 Eye started (PID={Environment.ProcessId})";
-                    var (eyeOk, eyeTs) = SlackSendViaApi(slackBotToken, slackChannel, startMsg, username: "앱봇아이").GetAwaiter().GetResult();
-                    if (eyeOk && eyeTs != null)
+                    var startMsg = $":large_green_circle: Eye started (PID={Environment.ProcessId})";
+                    // Proactively reuse existing Eye status message (by username, no emoji check)
+                    var adoptTs = FindLastMessageTsByAuthor(slackBotToken, slackChannel, null, "앱봇아이");
+                    if (adoptTs != null)
                     {
-                        _eyeStatusTs = eyeTs;
-                        // Post card summary as thread reply
-                        if (summary.Length > 0)
+                        // Reuse existing Eye status ts — update in place, no new post
+                        _eyeStatusTs = adoptTs;
+                        Console.Error.WriteLine($"[EYE] Startup reuse ts={adoptTs}");
+                        SlackUpdateMessageAsync(slackBotToken, slackChannel, adoptTs, startMsg).GetAwaiter().GetResult();
+                        // Recover thread replies (1=summary, 2=mouse CCA, 3=focus chain) — await to prevent race
+                        try
                         {
-                            var (replyOk, replyTs) = SlackSendViaApi(slackBotToken, slackChannel, summary, threadTs: eyeTs, username: "앱봇아이").GetAwaiter().GetResult();
-                            if (replyOk && replyTs != null) _eyeSummaryReplyTs = replyTs;
+                            var replies = SlackGetThreadRepliesAsync(slackBotToken, slackChannel, adoptTs).GetAwaiter().GetResult();
+                            if (replies != null)
+                            {
+                                var children = replies
+                                    .Where(r => r?["ts"]?.GetValue<string>() != adoptTs
+                                           && r?["username"]?.GetValue<string>() == "앱봇아이")
+                                    .ToList();
+                                var r1 = children.Count > 0 ? children[0]?["ts"]?.GetValue<string>() : null;
+                                if (r1 != null) { _eyeSummaryReplyTs = r1; Console.WriteLine($"[EYE] Restored summary reply ts={r1}"); }
+                                // r2/r3 (mouse CCA, focus chain) handled by UnifiedMouseFocusLoop on startup
+                            }
                         }
+                        catch { }
                     }
                     else
                     {
-                        // message_limit fallback: find existing 앱봇아이 status message and reuse its ts
-                        var existingTs = FindLastMessageTsByAuthor(slackBotToken, slackChannel, null, "앱봇아이");
-                        if (existingTs != null)
+                        // No existing status found → post new (expected on first launch)
+                        Console.Error.WriteLine("[EYE] Startup: no existing 앱봇아이 msg found → posting new");
+                        var (eyeOk, eyeTs) = SlackSendViaApi(slackBotToken, slackChannel, startMsg, username: "앱봇아이").GetAwaiter().GetResult();
+                        if (eyeOk && eyeTs != null)
                         {
-                            _eyeStatusTs = existingTs;
-                            Console.Error.WriteLine($"[EYE] Reusing existing 앱봇아이 status ts={existingTs}");
-                            // Immediately update to show alive (may have been "stopped" from previous session)
-                            var uptime = DateTime.UtcNow - eyeStartTime;
-                            var memMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
-                            var aliveMsg = $"🟢 Eye alive (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, mem={memMB}MB, frame=0)";
-                            _ = SlackUpdateMessageAsync(slackBotToken, slackChannel, existingTs, aliveMsg);
+                            _eyeStatusTs = eyeTs;
+                            // Post card summary as first thread reply
+                            if (summary.Length > 0)
+                            {
+                                var (replyOk, replyTs) = SlackSendViaApi(slackBotToken, slackChannel, summary, threadTs: eyeTs, username: "앱봇아이").GetAwaiter().GetResult();
+                                if (replyOk && replyTs != null) _eyeSummaryReplyTs = replyTs;
+                            }
                         }
                     }
                 }
@@ -773,6 +796,29 @@ internal partial class Program
                                 catch { }
                             });
                         }
+                    }
+                }
+                catch { }
+            }
+
+            // ── WhisperRing watchdog: respawn if process died (every 60s) ──
+            if (_whisperRingPid > 0 && (DateTime.UtcNow - _lastWhisperRingCheck).TotalSeconds >= 60)
+            {
+                _lastWhisperRingCheck = DateTime.UtcNow;
+                try
+                {
+                    bool alive = false;
+                    try { Process.GetProcessById(_whisperRingPid); alive = true; } catch { }
+                    if (!alive)
+                    {
+                        Console.WriteLine($"[EYE] WhisperRing pid={_whisperRingPid} died — respawning");
+                        var wrPath = Environment.ProcessPath ?? "wkappbot";
+                        var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
+                            cwd: Environment.CurrentDirectory,
+                            env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
+                            caller: "EYE-WHISPER-RESPAWN");
+                        if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
+                        Console.WriteLine($"[EYE] WhisperRing respawned pid={_whisperRingPid}");
                     }
                 }
                 catch { }
@@ -1065,7 +1111,32 @@ internal partial class Program
                         var uptime = DateTime.UtcNow - eyeStartTime;
                         var memMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
                         var mainMsg = $"🟢 Eye alive (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, mem={memMB}MB, frame={frameCount})";
-                        _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeStatusTs, mainMsg);
+
+                        // Rebump: if we're not the latest channel message, post new (throttled 60s API check)
+                        bool rebumped = false;
+                        if ((DateTime.UtcNow - _lastEyeRebumpCheck).TotalSeconds >= 60.0)
+                        {
+                            _lastEyeRebumpCheck = DateTime.UtcNow;
+                            if (!IsChannelLatestByAuthor(slackBotToken!, slackChannel!, "앱봇아이"))
+                            {
+                                var (ok, newTs) = SlackSendViaApi(slackBotToken!, slackChannel!, mainMsg, username: "앱봇아이").GetAwaiter().GetResult();
+                                if (ok && newTs != null)
+                                {
+                                    var oldTs = _eyeStatusTs;
+                                    _eyeStatusTs = newTs;
+                                    _eyeSummaryReplyTs = null;
+                                    _mouseCcaReplyTs = null;
+                                    _focusChainReplyTs = null;
+                                    Console.Error.WriteLine($"[EYE] Rebumped: {oldTs} → {newTs}");
+                                    _ = SlackDeleteMessageAsync(slackBotToken!, slackChannel!, oldTs!, guardThreadStarter: false);
+                                    rebumped = true;
+                                }
+                            }
+                        }
+
+                        if (!rebumped)
+                            _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeStatusTs, mainMsg);
+
                         // Update summary thread reply
                         if (summary.Length > 0 && _eyeSummaryReplyTs != null)
                             _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeSummaryReplyTs, summary);

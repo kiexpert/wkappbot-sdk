@@ -45,6 +45,7 @@ internal partial class Program
             "list" or "ls" => SlackListCommand(args),
             "delete" or "del" => SlackDeleteCommand(args),
             "read" => SlackReadCommand(args),
+            "gc" => SlackGcCommand(args),
             _ => SlackUsage()
         };
     }
@@ -216,6 +217,7 @@ internal partial class Program
         // Parse: text parts + file attachments (shared ParseTextAndFiles)
         var (textParts, filePaths) = ParseTextAndFiles(args, startIndex: 1);
         var message = string.Join("\n", textParts);
+        Console.WriteLine($"[SLACK-DBG] send len={message.Length} isStatus={IsStatusEmoji(message)} firstLine={message.Split('\n')[0][..Math.Min(message.Length, 60)]}");
         // C-style escape decode: \n → newline, \t → tab, \\ → backslash
         message = DecodeCEscapes(message);
         // Bash history expansion escapes ! to \! even in single quotes — undo it
@@ -282,6 +284,7 @@ internal partial class Program
         return sb.ToString();
     }
 
+    /// <summary>
     /// <summary>
     /// Post a channel message with automatic overflow handling.
     /// First paragraph (≤5 lines) goes to the channel; remainder is posted as thread replies.
@@ -504,27 +507,27 @@ internal partial class Program
             var msgs = json?["messages"]?.AsArray();
             if (msgs == null) return null;
 
-            // Reverse scan: find last message with matching username
-            // Guard: skip thread starters (have reply_count) and first 3 thread replies (need stable ts for --msg)
-            int replyIdx = 0; // 0-based index within thread replies (skip element 0 = thread starter)
-            for (int i = msgs.Count - 1; i >= 0; i--)
+            if (string.IsNullOrEmpty(threadTs))
             {
-                var msg = msgs[i];
-                var msgUser = msg?["username"]?.GetValue<string>();
-                if (msgUser != username) continue;
-
-                // Skip thread starter (has replies — editing it breaks thread context)
-                var replyCount = msg?["reply_count"]?.GetValue<int>() ?? 0;
-                if (replyCount > 0) continue;
-
-                // In thread mode: skip first 3 replies (preserve their ts for --msg references)
-                if (!string.IsNullOrEmpty(threadTs))
+                // Channel mode: Slack returns newest-first → first match = newest message
+                for (int i = 0; i < msgs.Count; i++)
                 {
-                    // msgs[0] = thread starter, replies start at index 1
-                    if (i <= 3) continue; // indices 0,1,2,3 = starter + first 3 replies
+                    var msg = msgs[i];
+                    if (msg?["username"]?.GetValue<string>() != username) continue;
+                    // Allow messages with replies (e.g. Eye status ts that has summary replies under it)
+                    return msg?["ts"]?.GetValue<string>();
                 }
-
-                return msg?["ts"]?.GetValue<string>();
+            }
+            else
+            {
+                // Thread mode: reverse scan to find last reply to append to
+                // Skip thread starter (index 0) and first 3 replies (preserve stable ts for --msg refs)
+                for (int i = msgs.Count - 1; i > 3; i--)
+                {
+                    var msg = msgs[i];
+                    if (msg?["username"]?.GetValue<string>() != username) continue;
+                    return msg?["ts"]?.GetValue<string>();
+                }
             }
         }
         catch (Exception ex)
@@ -532,6 +535,21 @@ internal partial class Program
             Console.Error.WriteLine($"[SLACK] FindLastMessage error: {ex.Message}");
         }
         return null;
+    }
+
+    /// <summary>Returns true if the most recent channel message is by the given username.</summary>
+    static bool IsChannelLatestByAuthor(string botToken, string channel, string username)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+            var resp = http.GetStringAsync($"https://slack.com/api/conversations.history?channel={channel}&limit=1").GetAwaiter().GetResult();
+            var json = JsonSerializer.Deserialize<JsonNode>(resp);
+            var msg = json?["messages"]?.AsArray().FirstOrDefault();
+            return msg?["username"]?.GetValue<string>() == username;
+        }
+        catch { return false; }
     }
 
     /// <summary>
@@ -1212,6 +1230,117 @@ internal partial class Program
         return json?["user_id"]?.GetValue<string>();
     }
 
+    /// <summary>
+    /// wkappbot slack gc [--keep N] [--dry-run]
+    /// Delete old Eye status messages from channel, keeping the latest N (default 2).
+    /// Replies are deleted first; thread starters with non-bot replies are skipped.
+    /// </summary>
+    static int SlackGcCommand(string[] args)
+    {
+        var config = LoadSlackConfig();
+        if (config == null) return 1;
+        var botToken = config["bot_token"]?.GetValue<string>();
+        var channel  = config["channel"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
+        { Console.WriteLine("[SLACK:GC] bot_token or channel missing"); return 1; }
+
+        int keep = 2;
+        bool dryRun = args.Contains("--dry-run");
+
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (args[i] == "--keep" && i + 1 < args.Length && int.TryParse(args[i + 1], out var k)) { keep = k; i++; }
+        }
+
+        Console.WriteLine($"[SLACK:GC] keep={keep} per-author dry-run={dryRun}");
+
+        // Fetch recent channel history (up to 100 messages)
+        List<JsonNode> allBotMsgs;
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+            var resp = http.GetStringAsync($"https://slack.com/api/conversations.history?channel={channel}&limit=999")
+                          .GetAwaiter().GetResult();
+            var json = JsonSerializer.Deserialize<JsonNode>(resp);
+            if (json?["ok"]?.GetValue<bool>() != true)
+            { Console.WriteLine($"[SLACK:GC] history error: {json?["error"]}"); return 1; }
+            // Bot messages with custom username (app-posted)
+            allBotMsgs = (json["messages"]?.AsArray() ?? [])
+                .Where(m => m != null && !string.IsNullOrEmpty(m["username"]?.GetValue<string>()))
+                .Select(m => m!)
+                .ToList();
+        }
+        catch (Exception ex) { Console.WriteLine($"[SLACK:GC] fetch error: {ex.Message}"); return 1; }
+
+        // Build keep set: latest `keep` ts per author (Slack returns newest-first)
+        var keepSet = new HashSet<string>();
+        foreach (var grp in allBotMsgs.GroupBy(m => m["username"]!.GetValue<string>()))
+        {
+            var kept = grp.Take(keep).Select(m => m["ts"]?.GetValue<string>()).Where(t => t != null).ToList();
+            foreach (var t in kept) keepSet.Add(t!);
+            Console.WriteLine($"[SLACK:GC] \"{grp.Key}\": {grp.Count()} msgs → keeping {kept.Count}");
+        }
+
+        var toDelete = allBotMsgs.Where(m => !keepSet.Contains(m["ts"]?.GetValue<string>() ?? "")).ToList();
+        Console.WriteLine($"[SLACK:GC] {allBotMsgs.Count} bot msgs total → {toDelete.Count} to delete");
+        if (toDelete.Count == 0) { Console.WriteLine("[SLACK:GC] Nothing to delete."); return 0; }
+        int deleted = 0, skipped = 0;
+
+        foreach (var msg in toDelete)
+        {
+            var ts = msg["ts"]?.GetValue<string>();
+            if (ts == null) continue;
+            var replyCount = msg["reply_count"]?.GetValue<int>() ?? 0;
+            var preview = (msg["text"]?.GetValue<string>() ?? "").Replace("\n", " ");
+            if (preview.Length > 60) preview = preview[..60] + "…";
+
+            if (replyCount > 0)
+            {
+                // Fetch replies and check for non-bot users
+                var replies = SlackGetThreadRepliesAsync(botToken, channel, ts).GetAwaiter().GetResult();
+                var hasUserReply = replies?.Any(r =>
+                    r?["ts"]?.GetValue<string>() != ts &&            // skip thread starter
+                    r?["bot_id"] == null &&                          // not a bot message
+                    r?["subtype"]?.GetValue<string>() != "bot_message") ?? false;
+
+                if (hasUserReply)
+                {
+                    Console.WriteLine($"  SKIP  {ts}  (user replied) {preview}");
+                    skipped++;
+                    continue;
+                }
+
+                // Delete replies (bot-only) first
+                if (replies != null)
+                {
+                    foreach (var r in replies)
+                    {
+                        var rTs = r?["ts"]?.GetValue<string>();
+                        if (rTs == null || rTs == ts) continue; // skip thread starter itself
+                        if (dryRun) { Console.WriteLine($"  DRY   reply {rTs}"); continue; }
+                        var ok = SlackDeleteMessageAsync(botToken, channel, rTs, guardThreadStarter: false, skipLastMsgProtection: true)
+                                    .GetAwaiter().GetResult();
+                        Console.WriteLine($"  {(ok ? "DEL" : "ERR")}   reply {rTs}");
+                        Thread.Sleep(300);
+                    }
+                }
+            }
+
+            // Delete parent
+            if (dryRun) { Console.WriteLine($"  DRY   {ts}  {preview}"); continue; }
+            var delOk = SlackDeleteMessageAsync(botToken, channel, ts, guardThreadStarter: false, skipLastMsgProtection: true)
+                           .GetAwaiter().GetResult();
+            Console.WriteLine($"  {(delOk ? "DEL" : "ERR")}   {ts}  {preview}");
+            if (delOk) deleted++;
+            Thread.Sleep(300);
+        }
+
+        Console.WriteLine($"[SLACK:GC] Done — deleted={deleted} skipped={skipped}");
+        return 0;
+    }
+
     static int SlackUsage()
     {
         Console.WriteLine("Usage: wkappbot slack <command>");
@@ -1225,6 +1354,9 @@ internal partial class Program
         Console.WriteLine("                        --claude: stream Claude Desktop status to Slack");
         Console.WriteLine("                        --webbot: alias for --claude (legacy name)");
         Console.WriteLine("                        --name N: instance name for multi-bot ID (default: cwd folder)");
+        Console.WriteLine("  gc [--keep N] [--dry-run]");
+        Console.WriteLine("                        Delete old Eye status messages, keep latest N (default 2)");
+        Console.WriteLine("                        Replies deleted first; user-replied threads skipped");
         Console.WriteLine("  send \"message\"      Send a message to the configured channel");
         Console.WriteLine("  test                Test Slack connection (auth + send + socket)");
         Console.WriteLine("  status              Check if background listener is running");
