@@ -54,6 +54,7 @@ internal partial class Program
         public required Func<string, bool> ConfirmByOcrContains { get; init; }
         public required Func<IntPtr, IntPtr, byte[]?> CaptureControlPng { get; init; }
         public required Func<IntPtr, IntPtr, byte[]?> CaptureControlFast { get; init; }
+        public Func<IntPtr, IntPtr, (byte[], int, int, int)?>? CaptureControlRawFast { get; init; }
         public required Func<string, string, int, bool> FuzzyDigitMatch { get; init; }
 
         // ── Abort flag (any method can set to stop the chain) ──

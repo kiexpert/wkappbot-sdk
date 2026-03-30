@@ -466,6 +466,67 @@ Examples:
             catch { return null; }
         }
 
+        // Raw BGRA pixel capture — no codec encode/decode. ~10x faster than BMP path.
+        // For live zoom updates: foreground → CopyFromScreen, background → PrintWindow+crop.
+        (byte[] pixels, int w, int h, int stride)? CaptureControlRawFast(IntPtr formHandle, IntPtr controlHandle)
+        {
+            try
+            {
+                NativeMethods.GetWindowRect(controlHandle, out var cr);
+                if (cr.Width <= 0 || cr.Height <= 0) return null;
+
+                // Foreground check: CopyFromScreen is fastest for visible windows
+                var fgHwnd = NativeMethods.GetForegroundWindow();
+                NativeMethods.GetWindowThreadProcessId(formHandle, out uint formPid);
+                NativeMethods.GetWindowThreadProcessId(fgHwnd, out uint fgPid);
+                bool isFg = (formPid == fgPid);
+
+                System.Drawing.Bitmap? bmp = null;
+                try
+                {
+                    if (isFg)
+                    {
+                        bmp = ScreenCapture.CaptureScreenRegion(cr.Left, cr.Top, cr.Width, cr.Height);
+                        if (ScreenCapture.IsBlankBitmap(bmp)) { bmp?.Dispose(); bmp = null; }
+                    }
+
+                    // Background (or screen capture blank) → PrintWindow+crop (Z-order safe)
+                    if (bmp == null)
+                    {
+                        NativeMethods.GetWindowRect(formHandle, out var fr);
+                        int rx = cr.Left - fr.Left, ry = cr.Top - fr.Top;
+                        if (rx >= 0 && ry >= 0)
+                        {
+                            using var formBmp = ScreenCapture.TryPrintWindowOnly(formHandle);
+                            if (formBmp != null)
+                            {
+                                int rw = Math.Min(cr.Width, formBmp.Width - rx);
+                                int rh = Math.Min(cr.Height, formBmp.Height - ry);
+                                if (rw > 0 && rh > 0)
+                                    bmp = ScreenCapture.CropRegion(formBmp, rx, ry, rw, rh);
+                            }
+                        }
+                    }
+
+                    if (bmp == null || bmp.Width <= 0 || bmp.Height <= 0) return null;
+
+                    var lockRect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
+                    var data = bmp.LockBits(lockRect,
+                        System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                        System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                    try
+                    {
+                        var bytes = new byte[data.Stride * data.Height];
+                        System.Runtime.InteropServices.Marshal.Copy(data.Scan0, bytes, 0, bytes.Length);
+                        return (bytes, bmp.Width, bmp.Height, data.Stride);
+                    }
+                    finally { bmp.UnlockBits(data); }
+                }
+                finally { bmp?.Dispose(); }
+            }
+            catch { return null; }
+        }
+
         // Fuzzy digit match for tiny MFC bitmap OCR (130x20 controls)
         // Extracts digits from OCR text, compares to expected via Levenshtein distance
         bool FuzzyDigitMatch(string ocrText, string expected, int maxErrors)
@@ -507,6 +568,7 @@ Examples:
             ConfirmByOcrContains = ConfirmByOcrContains,
             CaptureControlPng = CaptureControlPng,
             CaptureControlFast = CaptureControlFast,
+            CaptureControlRawFast = CaptureControlRawFast,
             FuzzyDigitMatch = FuzzyDigitMatch,
         };
 

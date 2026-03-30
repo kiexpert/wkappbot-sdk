@@ -89,8 +89,13 @@ internal sealed class ClickZoomHelper : IDisposable
             if (isSmall)
             {
                 mode = ZoomMode.Magnifier;
-                zW = ctlRect.Width * 3 + 16;  // exact 3x + border padding
-                zH = ctlRect.Height * 3 + 50; // exact 3x + header + status + padding
+                // Auto-scale: fill up to MaxZoomW×MaxZoomH — tiny controls get higher zoom
+                const int MaxZoomW = 480, MaxZoomH = 240, MaxScale = 8, MinScale = 2;
+                int scaleX = ctlRect.Width > 0 ? MaxZoomW / ctlRect.Width : MaxScale;
+                int scaleY = ctlRect.Height > 0 ? MaxZoomH / ctlRect.Height : MaxScale;
+                int scale = Math.Clamp(Math.Min(scaleX, scaleY), MinScale, MaxScale);
+                zW = ctlRect.Width * scale + 16;  // scaled + border padding
+                zH = ctlRect.Height * scale + 50; // scaled + header + status + padding
                 zX = ctlRect.Left + (ctlRect.Width / 2) - (zW / 2);
                 zY = ctlRect.Top + (ctlRect.Height / 2) - (zH / 2);
             }
@@ -329,8 +334,12 @@ internal sealed class ClickZoomHelper : IDisposable
             if (isSmall)
             {
                 mode = ZoomMode.Magnifier;
-                zW = screenRect.Width * 3 + 16;  // exact 3x + border padding
-                zH = screenRect.Height * 3 + 50; // exact 3x + header + status + padding
+                const int MaxZoomW = 480, MaxZoomH = 240, MaxScale = 8, MinScale = 2;
+                int scaleX = screenRect.Width > 0 ? MaxZoomW / screenRect.Width : MaxScale;
+                int scaleY = screenRect.Height > 0 ? MaxZoomH / screenRect.Height : MaxScale;
+                int scale = Math.Clamp(Math.Min(scaleX, scaleY), MinScale, MaxScale);
+                zW = screenRect.Width * scale + 16;
+                zH = screenRect.Height * scale + 50;
                 zX = screenRect.Left + (screenRect.Width / 2) - (zW / 2);
                 zY = screenRect.Top + (screenRect.Height / 2) - (zH / 2);
             }
