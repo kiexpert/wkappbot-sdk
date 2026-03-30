@@ -11,9 +11,19 @@ namespace WKAppBot.CLI;
 internal sealed class DebugStringWriter : TextWriter
 {
     private readonly TextWriter _inner;
-    private readonly string _prefix = $"wkappbot({Environment.ProcessId})>";
+    private readonly string _prefix;
 
-    public DebugStringWriter(TextWriter inner) => _inner = inner;
+    /// <param name="inner">Underlying writer (original stderr).</param>
+    /// <param name="cmd">CLI command name (e.g. "web"). null = unknown.</param>
+    /// <param name="subcmd">CLI subcommand (e.g. "open"). null = omit.</param>
+    public DebugStringWriter(TextWriter inner, string? cmd = null, string? subcmd = null)
+    {
+        _inner = inner;
+        var pid = Environment.ProcessId;
+        var cmdPart = cmd != null ? $"-{cmd}" : "";
+        var subcmdPart = subcmd != null ? $"-{subcmd}" : "";
+        _prefix = $"wkappbot:{pid}{cmdPart}{subcmdPart}>";
+    }
 
     public override Encoding Encoding => _inner.Encoding;
 
