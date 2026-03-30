@@ -845,7 +845,19 @@ internal partial class Program
                         RedirectStandardError = true,
                     };
                     var proc = System.Diagnostics.Process.Start(psi);
+                    // Stream output live to console (prevents pipe-buffer deadlock + shows progress)
+                    var rOut = Task.Run(() => {
+                        string? line;
+                        while ((line = proc?.StandardOutput.ReadLine()) != null)
+                        { Console.WriteLine($"    {line}"); try { Console.Out.Flush(); } catch { } }
+                    });
+                    var rErr = Task.Run(() => {
+                        string? line;
+                        while ((line = proc?.StandardError.ReadLine()) != null)
+                            Console.Error.WriteLine($"    {line}");
+                    });
                     proc?.WaitForExit(60_000);
+                    rOut.Wait(3_000); rErr.Wait(1_000);
                     var exitCode = proc?.ExitCode ?? 1;
                     if (exitCode == 0)
                     {
