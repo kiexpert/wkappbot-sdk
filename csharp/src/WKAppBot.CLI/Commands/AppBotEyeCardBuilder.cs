@@ -242,6 +242,19 @@ internal partial class Program
         return _cardCacheDir;
     }
 
+    /// <summary>Purge all card cache entries (memory + disk). Called on Eye startup for a clean slate.</summary>
+    static void CardCachePurgeAll()
+    {
+        _cardCache.Clear();
+        try
+        {
+            var dir = GetCardCacheDir();
+            foreach (var f in Directory.GetFiles(dir, "*.json"))
+                try { File.Delete(f); } catch { }
+        }
+        catch { }
+    }
+
     /// <summary>
     /// Get the cached changedUtc for a card, updating if content changed.
     /// Returns DateTime.MinValue if card has never been seen.
