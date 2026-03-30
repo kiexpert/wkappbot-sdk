@@ -599,7 +599,16 @@ internal partial class Program
                     return 1;
                 }
 
-                var cmdCount = capturedDbg.Split('\n').Count(l => l.Contains("[CMD]"));
+                // Derive expected cmd pattern from script filename: test-{cmd}-{subcmd}-*.sh → "{cmd}-{subcmd}"
+                var scriptBaseName = Path.GetFileNameWithoutExtension(evidenceFile); // e.g. test-web-open-real
+                var scriptParts = scriptBaseName.Split('-');
+                var expectedCmdPattern = scriptParts.Length >= 3 ? $"{scriptParts[1]}-{scriptParts[2]}" : null; // e.g. "web-open"
+
+                var dbgLines = capturedDbg.Split('\n');
+                var cmdCount = dbgLines.Count(l => l.Contains("[CMD]"));
+                bool cmdPatternHit = expectedCmdPattern == null
+                    || dbgLines.Any(l => l.Contains($"-{expectedCmdPattern}>"));
+
                 if (!dbgStarted)
                 {
                     Console.WriteLine("  [RESOLVE] CMD guard: dbg listener unavailable (another listener active) — skipped");
@@ -612,9 +621,17 @@ internal partial class Program
                     Console.ResetColor();
                     return 1;
                 }
+                else if (!cmdPatternHit)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"  ❌ CMD execution guard FAILED: expected '{expectedCmdPattern}' command in debug output, not found.");
+                    Console.WriteLine($"     스크립트 파일명 test-{scriptParts[1]}-{scriptParts[2]}-*.sh → 'wkappbot {scriptParts[1]} {scriptParts[2]}' 명령을 실제 실행해야 합니다.");
+                    Console.ResetColor();
+                    return 1;
+                }
                 else
                 {
-                    Console.WriteLine($"  [RESOLVE] CMD execution verified: {cmdCount} wkappbot command(s) captured in real-time debug output");
+                    Console.WriteLine($"  [RESOLVE] CMD execution verified: {cmdCount} command(s) captured, pattern '-{expectedCmdPattern ?? "any"}>' confirmed");
                 }
 
                 Console.ForegroundColor = ConsoleColor.Green;
