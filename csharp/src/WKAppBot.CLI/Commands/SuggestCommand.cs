@@ -569,6 +569,10 @@ internal partial class Program
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                 };
+                // WKAPPBOT_WORKER=1: evidence script's nested wkappbot calls skip Eye pipe
+                // (prevents deadlock if Eye is active, and avoids Eye-pipe timeout if Eye is down)
+                psi.EnvironmentVariables["WKAPPBOT_WORKER"] = "1";
+
                 // ── CMD execution guard: capture OutputDebugString in real-time during script run ──
                 // wkappbot-core mirrors all stderr → OutputDebugStringW([WKBOT/{pid}] ...).
                 // [CMD] lines appear on every command invocation → grep-only scripts produce 0 hits.
