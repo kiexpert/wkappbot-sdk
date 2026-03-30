@@ -844,6 +844,9 @@ internal partial class Program
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                     };
+                    // WKAPPBOT_WORKER=1: prevents nested wkappbot calls from connecting to Eye pipe
+                    // (avoids deadlock when suggest resolve is already running inside Eye)
+                    psi.EnvironmentVariables["WKAPPBOT_WORKER"] = "1";
                     var proc = System.Diagnostics.Process.Start(psi);
                     // Stream output live to console (prevents pipe-buffer deadlock + shows progress)
                     var rOut = Task.Run(() => {
