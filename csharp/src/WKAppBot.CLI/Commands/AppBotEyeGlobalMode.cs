@@ -80,7 +80,7 @@ internal partial class Program
     // ── Time-based loop timers ──
     static DateTime _lastWatchdogRefresh = DateTime.MinValue;
     static DateTime _lastEyeStatusEdit = DateTime.MinValue;
-    static DateTime _lastEyeRebumpCheck = DateTime.MinValue;
+    // _lastEyeRebumpCheck removed — rebump disabled (keep initial message position fixed)
     static DateTime _lastCcaAnalysis = DateTime.MinValue;
     static DateTime _lastZoomCleanup = DateTime.MinValue;
 
@@ -1114,30 +1114,8 @@ internal partial class Program
                         var memMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
                         var mainMsg = $"🟢 Eye alive (PID={Environment.ProcessId}, uptime={uptime.TotalMinutes:F0}m, mem={memMB}MB, frame={frameCount})";
 
-                        // Rebump: if we're not the latest channel message, post new (throttled 60s API check)
-                        bool rebumped = false;
-                        if ((DateTime.UtcNow - _lastEyeRebumpCheck).TotalSeconds >= 60.0)
-                        {
-                            _lastEyeRebumpCheck = DateTime.UtcNow;
-                            if (!IsChannelLatestByAuthor(slackBotToken!, slackChannel!, "앱봇아이"))
-                            {
-                                var (ok, newTs) = SlackSendViaApi(slackBotToken!, slackChannel!, mainMsg, username: "앱봇아이").GetAwaiter().GetResult();
-                                if (ok && newTs != null)
-                                {
-                                    var oldTs = _eyeStatusTs;
-                                    _eyeStatusTs = newTs;
-                                    _eyeSummaryReplyTs = null;
-                                    _mouseCcaReplyTs = null;
-                                    _focusChainReplyTs = null;
-                                    Console.Error.WriteLine($"[EYE] Rebumped: {oldTs} → {newTs}");
-                                    _ = SlackDeleteMessageAsync(slackBotToken!, slackChannel!, oldTs!, guardThreadStarter: false);
-                                    rebumped = true;
-                                }
-                            }
-                        }
-
-                        if (!rebumped)
-                            _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeStatusTs, mainMsg);
+                        // Always update in-place — keep initial message position fixed
+                        _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeStatusTs, mainMsg);
 
                         // Update summary thread reply
                         if (summary.Length > 0 && _eyeSummaryReplyTs != null)
