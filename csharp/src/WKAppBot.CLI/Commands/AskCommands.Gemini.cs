@@ -283,14 +283,14 @@ internal partial class Program
                         Console.WriteLine("[ASK] Gemini still generating pre-send ? waiting without interrupt...");
                         await WaitWhileGeminiStopVisibleNoClickAsync(cdp, maxWaitMs: 30000);
                         // After Gemini finishes, check if it generated a tool call (loop mode)
-                        if (effectiveLoopPersona && personaEarlyToolCall == null)
+                        if (loopMode && effectiveLoopPersona && personaEarlyToolCall == null)
                         {
                             var lateResp = await cdp.GetLastResponseTextAsync() ?? "";
                             Console.WriteLine($"[ASK] Post-wait resp ({lateResp.Length}): {lateResp.Substring(0, Math.Min(80, lateResp.Length)).Replace('\n', ' ')}");
                             if (lateResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                                 && ParseAllLoopToolCalls(lateResp).Count > 0)
                             {
-                                Console.WriteLine("[ASK] Late persona tool call captured ? skipping question send");
+                                Console.WriteLine("[ASK] Late persona tool call captured — skipping question send");
                                 zoom?.ShowPass("tool call");
                                 zoom?.Dispose();
                                 questionLock.Release("late-toolcall");
