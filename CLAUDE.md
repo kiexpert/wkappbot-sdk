@@ -1,4 +1,4 @@
-# WKAppBot v5.4.0 - Windows + Android App Automation Test Framework
+# WKAppBot v5.5.0 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -135,6 +135,22 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
 - **Eye Startup PulseStep**: 6 체크포인트 + 메모리 워터마크 (54→710MB 범인 추적)
 - **PIPE-MEM**: 파이프 명령별 메모리 델타 로깅 (±5MB 이상)
 - **Slack Heartbeat**: 1분마다 IsConnected 체크 → 끊기면 자동 재접속
+- **Slack 파일 기반 큐 (v5.5)**: 수신 메시지 → `runtime/slack_queue/{ts}.json` 저장, 매초 drain worker 스폰
+  - 직렬 처리 (`_slackDraining` flag) — TypeAndSubmit 동시 실행 방지
+  - Hot-swap retiring Eye: `_slackRetiring=true` → drain 중단, enqueue는 유지 (신규 Eye가 처리)
+  - `slack route --queue` 내부 worker 모드: atomic rename claim (.processing), 처리 완료 시 삭제
+  - `eye tick` → `[EYE_QUEUE] pending=N processing=N` 통계 표시
+- **LGDisplayExtension 블랙스크린 가드 (v5.5)**: `HwndWrapper[LGDisplayExtension.exe;;...]` topmost 감지
+  - 즉시 투명화(SetLayeredWindowAttributes alpha=0) → WM_CLOSE → 500ms 후 생존 시 Process.Kill
+  - Eye tick + 60s 루프 양쪽에서 감시, Slack 알림 (foreground 창 컨텍스트 포함)
+- **`--help` 글로벌 인터셉터 (v5.5)**: 어떤 인수 조합이든 `--help`/`-h` 있으면 즉시 설명 출력 후 exit 0
+  - `CommandHelp.cs` 딕셔너리: a11y, slack, suggest, eye, logcat, file, ask, newchat, schedule, agent, help
+  - MCP 라우팅 바이패스 대응: `A11yCommand` 시작 시점에도 인터셉터 추가
+- **`--regression` 글로벌 인터셉터 (v5.5)**: `--help` 출력 후 `experience/tests/{cmd}/{subcmd}/*.sh` 전체 실행
+  - [PASS]/[FAIL] per script, 실패 시 마지막 5줄 출력, 최종 합산
+  - `wkappbot help --regression` = 헬프/리그레션 기능 자가 점검
+- **OutputDebugString stderr 미러 (v5.5)**: `DebugStringWriter`로 모든 stderr → `OutputDebugStringW`
+  - `[WKBOT/{pid}]` 접두사, ANSI 코드 제거 — `logcat --dbg`로 MCP/Eye 자식 프로세스 실시간 감시
 - **suggest resolve guard 6단계**: `--...-willkim-allowed-this-script <test.sh>` 필수
   - 1) 플래그 필수 2) 증거 파일 필수 3) 파일명 `test-{cmd}-{subcmd}-*.sh` 규격
   - 4) 스크립트 내 해당 명령 사용 검증 5) 스크립트 실행 PASS(exit=0) 6) Slack 업로드 + experience/tests/ 복사
@@ -185,6 +201,12 @@ wkappbot eye / eye tick                       # AppBotEye 루프 / one-shot
 wkappbot newchat "prompt" [--file f.txt]      # Claude Desktop 새채팅 (focusless)
 wkappbot ask gpt|gemini|claude "line1" [file.png]  # CDP 웹 AI 질문 (MCP도 동일 명령)
 wkappbot speak / suggest / claude-usage / schedule / readiness ...
+# ── 글로벌 메타 옵션 (모든 명령에서 동작) ────────────────────────────────────
+wkappbot <cmd> [<subcmd>] --help        # 명령 설명 즉시 출력 → exit 0
+wkappbot <cmd> [<subcmd>] --regression  # --help 출력 + experience/tests/{cmd}/{subcmd}/*.sh 전부 실행
+wkappbot help --regression              # --help/--regression 기능 자가 점검
+# 디버깅: 모든 stderr → OutputDebugString([WKBOT/{pid}]) 자동 미러
+#   → 별도 창: wkappbot logcat --dbg   (MCP 서버, Eye 자식 프로세스 실시간 감시)
 wkappbot gc [pattern] [--days N] [--sweep]       # HQ file garbage collection (Recycle Bin)
 wkappbot screen off [--duration N] / screen on   # fullscreen black overlay
 wkappbot file edit <old> <new> <path>... [--replace-all] [--context N] [--tab-size N]

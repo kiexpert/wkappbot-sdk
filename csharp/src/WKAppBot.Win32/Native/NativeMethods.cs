@@ -164,6 +164,9 @@ public static partial class NativeMethods
 
     // Global atom table — used to cache strings in window props (survives Eye restart)
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    public static extern void OutputDebugStringW(string lpOutputString);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     public static extern ushort GlobalAddAtomW(string lpString);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]

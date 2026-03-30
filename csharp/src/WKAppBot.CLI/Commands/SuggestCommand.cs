@@ -630,6 +630,10 @@ internal partial class Program
             Console.WriteLine($"[RESOLVE] Non-executable evidence ({ext}) — skip execution, upload only");
         }
 
+        // Regression test: re-run all previously stored scripts in experience/tests/{cmd}/{subcmd}/
+        // Blocks resolve on failure — fix the regression or update the failing test first.
+        if (RunRegressionTests(evidenceFile) != 0) return 1;
+
         args = args.Where(a => a != ConfirmFlag && a != evidenceFile).ToArray();
 
         var tsPrefix = args[0];
@@ -689,7 +693,8 @@ internal partial class Program
             ["slack_ts"] = slackTs,
             ["review_status"] = "done",
             ["review_note"] = note,
-            ["review_ts"] = DateTime.UtcNow.ToString("o")
+            ["review_ts"] = DateTime.UtcNow.ToString("o"),
+            ["evidence_file"] = Path.GetFileName(evidenceFile)
         };
         var resolvedJson = JsonSerializer.Serialize(resolvedObj);
 
@@ -766,6 +771,122 @@ internal partial class Program
             Console.WriteLine("[RESOLVE] No slack_ts recorded — Slack reply skipped");
         }
 
+        return 0;
+    }
+
+    /// <summary>
+    /// Re-run all previously stored test scripts for the same cmd/subcmd as the evidence file.
+    /// Returns 0 if all pass, 1 if any fail (resolve is blocked until fixed).
+    /// To fix: update the failing test script or fix the regression in code.
+    /// </summary>
+    static int RunRegressionTests(string evidenceFile)
+    {
+        try
+        {
+            var parts = Path.GetFileNameWithoutExtension(evidenceFile).Split('-');
+            var cmd = parts.Length > 1 ? parts[1] : "misc";
+            var subcmd = parts.Length > 2 ? parts[2] : "general";
+            var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+            var testsDir = Path.Combine(hqDir, "experience", "tests", cmd, subcmd);
+            if (!Directory.Exists(testsDir)) return 0;
+
+            var evidenceAbs = Path.GetFullPath(evidenceFile);
+            var scripts = Directory.GetFiles(testsDir, "*.sh")
+                .Where(f => !string.Equals(Path.GetFullPath(f), evidenceAbs, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(f => f)
+                .ToArray();
+            if (scripts.Length == 0) return 0;
+
+            Console.WriteLine($"\n[REGRESSION] Running {scripts.Length} existing test(s) for {cmd}/{subcmd}...");
+            var bashExe = File.Exists(@"C:\Program Files\Git\usr\bin\bash.exe")
+                ? @"C:\Program Files\Git\usr\bin\bash.exe" : "bash";
+
+            int passed = 0, failed = 0;
+            var failures = new List<(string name, string path)>();
+            foreach (var script in scripts)
+            {
+                var name = Path.GetFileName(script);
+                Console.Write($"  {name}... ");
+                try
+                {
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = bashExe,
+                        Arguments = $"\"{script}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                    };
+                    var proc = System.Diagnostics.Process.Start(psi);
+                    proc?.WaitForExit(60_000);
+                    var exitCode = proc?.ExitCode ?? 1;
+                    if (exitCode == 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine("PASS");
+                        Console.ResetColor();
+                        passed++;
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"FAIL (exit={exitCode})");
+                        Console.ResetColor();
+                        failed++;
+                        failures.Add((name, script));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"ERROR ({ex.Message})");
+                    Console.ResetColor();
+                    failed++;
+                    failures.Add((name, script));
+                }
+            }
+
+            if (failed == 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"[REGRESSION] All {passed} regression test(s) passed ✅");
+                Console.ResetColor();
+                return 0;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[REGRESSION] ❌ {failed}/{scripts.Length} regression test(s) FAILED — resolve BLOCKED");
+                Console.ResetColor();
+                Console.WriteLine($"  Fix the regression in code, or edit the failing test if the check is outdated.");
+                Console.WriteLine($"  Edit commands:");
+                foreach (var (name, path) in failures)
+                    Console.WriteLine($"    wkappbot file edit \"old\" \"new\" \"{path.Replace('\\', '/')}\"");
+
+                // Slack alert with edit hints
+                try
+                {
+                    var botToken = LoadSlackBotToken();
+                    var channel = SuggestChannel;
+                    if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
+                    {
+                        var lines = new System.Text.StringBuilder();
+                        lines.AppendLine($":x: *[REGRESSION BLOCKED]* `{cmd}/{subcmd}` — {failed}/{scripts.Length} test(s) failed:");
+                        foreach (var (name, path) in failures)
+                            lines.AppendLine($"• `{name}` — `wkedit \"old\" \"new\" \"{path.Replace('\\', '/')}\"` 로 수정");
+                        lines.Append("_코드 버그 수정 or 구버전 테스트 wkedit 후 re-resolve_");
+                        SlackSendViaApi(botToken, channel, lines.ToString()).GetAwaiter().GetResult();
+                    }
+                }
+                catch { }
+                return 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[REGRESSION] Error running regression tests: {ex.Message}");
+        }
         return 0;
     }
 
