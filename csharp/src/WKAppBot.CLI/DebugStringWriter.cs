@@ -59,7 +59,7 @@ internal sealed class DebugStringWriter : TextWriter
             // Strip ANSI escape codes for cleaner DebugView output
             var clean = System.Text.RegularExpressions.Regex.Replace(msg, @"\x1b\[[0-9;]*m", "").TrimEnd();
             if (!string.IsNullOrEmpty(clean))
-                NativeMethods.OutputDebugStringW($"[WKBOT/{_pid}] {clean}");
+                NativeMethods.OutputDebugStringW($"{_pid}> {clean}");
         }
         catch { }
     }
