@@ -118,12 +118,13 @@ internal partial class Program
                     var cwdTag = AbbreviateCwd(c.Cwd);
                     var ageText = age < 60 ? $"{age}초 전" : age < 3600 ? $"{age / 60}분 전" : $"{age / 3600}시간 전";
 
-                    // Header: [icon CWD] or process info
+                    // Header: "{icon} {prefix}[CWD]" — full display name matches Slack bot username format
                     var hostIcon = HostTypeIcon(c.HostType);
+                    var namePrefix = (c.HostType ?? "").ToLowerInvariant().Contains("codex") ? SlackCodexPrefix : SlackClaudePrefix;
                     var header = string.IsNullOrWhiteSpace(cwdTag)
                         ? (string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : c.ParentTitle)
-                        : cwdTag;
-                    sb.AppendLine(string.IsNullOrEmpty(hostIcon) ? $"[{header}]" : $"{hostIcon} [{header}]");
+                        : $"{namePrefix}[{cwdTag}]";
+                    sb.AppendLine(string.IsNullOrEmpty(hostIcon) ? header : $"{hostIcon} {header}");
                     // Context % per card (CWD → session JSONL size → ctx%)
                     var ctxTag = "";
                     var (cardCtx, jsonlAge, _, jsonlFileSize) = GetContextInfoForCwdEx(c.Cwd);

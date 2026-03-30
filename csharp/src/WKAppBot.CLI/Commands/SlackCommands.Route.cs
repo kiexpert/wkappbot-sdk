@@ -30,27 +30,33 @@ internal partial class Program
         // --queue: drain SlackQueueDir serially (Eye spawns this; no file arg needed)
         if (args[0] == "--queue")
         {
+            var qp = new StepProfiler("route-queue");
             var queueDir = Path.Combine(DataDir, "runtime", "slack_queue");
-            if (!Directory.Exists(queueDir)) return 0;
+            qp.Init($"start queueDir={queueDir}");
+            if (!Directory.Exists(queueDir)) { qp.Step("dir missing — exit", force: true); return 0; }
             var files = Directory.GetFiles(queueDir, "*.json");
+            qp.Step($"found {files.Length} file(s)", force: true);
             if (files.Length == 0) return 0;
             Array.Sort(files);
             int processed = 0;
             foreach (var file in files)
             {
                 var procFile = Path.ChangeExtension(file, ".processing");
+                qp.Step($"claim → {Path.GetFileName(procFile)}", force: true);
                 try { File.Move(file, procFile, overwrite: false); }
-                catch { continue; } // already claimed
+                catch (Exception ex) { qp.Step($"claim failed: {ex.Message}", force: true); continue; }
                 try
                 {
                     var json = File.ReadAllText(procFile);
+                    qp.Step($"routing {Path.GetFileName(file)} ({json.Length}B)", force: true);
                     SlackRouteCommand([json]);
                     processed++;
+                    qp.Step($"done {Path.GetFileName(file)}", force: true);
                 }
-                catch (Exception ex) { Console.Error.WriteLine($"[ROUTE] Queue error: {ex.Message}"); }
-                finally { try { File.Delete(procFile); } catch { } }
+                catch (Exception ex) { qp.Step($"error: {ex.Message}", force: true); }
+                finally { try { File.Delete(procFile); qp.Step($"deleted {Path.GetFileName(procFile)}", force: true); } catch { } }
             }
-            Console.WriteLine($"[ROUTE] Queue drained: {processed}/{files.Length}");
+            qp.Done($"drained {processed}/{files.Length}", force: true);
             return 0;
         }
 
@@ -95,22 +101,22 @@ internal partial class Program
                 if (kv.Value != null) promptNameMap[kv.Key] = kv.Value.GetValue<string>();
         }
 
-        if (!string.IsNullOrEmpty(eyeBotName))
-            Console.WriteLine($"[ROUTE] Eye bot={eyeBotName} cwd={eyeCwd} promptNames={promptNameMap.Count}");
+        var rp = new StepProfiler("route");
+        rp.Init($"ts={ts} user={user} thread={threadTs ?? "none"} cwd={eyeCwd} bot={eyeBotName} promptNames={promptNameMap.Count}");
 
-        if (!File.Exists(SlackConfigPath)) { Console.WriteLine("[ROUTE] No Slack config — skip"); return 0; }
+        if (!File.Exists(SlackConfigPath)) { rp.Step("No Slack config — skip", force: true); return 0; }
         var cfg = JsonNode.Parse(File.ReadAllText(SlackConfigPath));
         var botToken = cfg?["bot_token"]?.GetValue<string>();
-        if (string.IsNullOrEmpty(botToken)) { Console.WriteLine("[ROUTE] No bot_token — skip"); return 0; }
+        if (string.IsNullOrEmpty(botToken)) { rp.Step("No bot_token — skip", force: true); return 0; }
 
         // Clean @mention tokens
         var cleanText = Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
-        if (string.IsNullOrEmpty(cleanText)) return 0;
+        if (string.IsNullOrEmpty(cleanText)) { rp.Step("Empty text after clean — skip", force: true); return 0; }
 
         // Noise filter (skip for reactions — they have no user text)
         if (!isReaction && SlackRouteNoise.Any(n => cleanText.Equals(n, StringComparison.OrdinalIgnoreCase)))
         {
-            Console.WriteLine($"[ROUTE] Noise filter — skip: {cleanText}");
+            rp.Step($"Noise filter — skip: {cleanText}", force: true);
             return 0;
         }
 
@@ -140,59 +146,60 @@ internal partial class Program
         bool isKeyword = !isTrackedThread &&
             SlackRouteKeywords.Any(kw => textLower.Contains(kw, StringComparison.OrdinalIgnoreCase));
 
-        Console.WriteLine($"[ROUTE] from={user} thread={isTrackedThread} kw={isKeyword} text={cleanText[..Math.Min(cleanText.Length, 60)]}");
+        rp.Step($"step1: thread={isTrackedThread} kw={isKeyword} text={cleanText[..Math.Min(cleanText.Length, 60)]}", force: true);
 
         // ── Step 2: Collect thread context (previous messages for Claude) ──
         string threadContext = "";
         if (!string.IsNullOrEmpty(threadTs))
         {
+            rp.Step($"step2: GetThreadContext channel={channel} thread={threadTs}", force: true);
             var ctx = GetThreadContext(botToken, channel, threadTs, ts);
             if (!string.IsNullOrEmpty(ctx)) threadContext = $"\n{ctx}\n";
+            rp.Step($"step2: context len={threadContext.Length}", force: true);
         }
 
         // ── Step 3: Discover all prompt windows ──
-        // AllowFocusSteal = true: user-initiated message delivery may take focus
-        // FindAllPrompts(): scans all open Claude/Codex prompt windows via UIA
-        // ⚠ Removing these lines → no prompts found → all messages lost
+        rp.Step("step3: FindAllPrompts", force: true);
         ClaudePromptHelper.AllowFocusSteal = true;
         using var promptHelper = new ClaudePromptHelper();
         var allPrompts = promptHelper.FindAllPrompts();
+        rp.Step($"step3: found {allPrompts.Count} prompt(s) — {string.Join(", ", allPrompts.Select(p => $"0x{p.WindowHandle:X}({p.HostType})"))}", force: true);
 
         List<ClaudePromptHelper.PromptInfo> targets;
         string replyTs;
         string? label;
 
         // ── Step 4: Select target prompts (CRITICAL BRANCH) ──
+        rp.Step($"step4: isTrackedThread={isTrackedThread} isKeyword={isKeyword} eyeBot=\"{eyeBotName}\"", force: true);
         if (isTrackedThread && !string.IsNullOrEmpty(threadTs))
         {
             // ★ Thread reply: find owning Claude via ResolveThreadScopedPrompts
-            // Matches bot username in thread → prompt CWD tag → exact 1 prompt
-            // eyeBotName: Eye's display name (subprocess doesn't know it, passed via JSON)
-            // ⚠ DO NOT replace this function. Internal matching is complex but correct.
             targets = ResolveThreadScopedPrompts(promptHelper, botToken, channel, threadTs, eyeBotName ?? BotUsername);
+            rp.Step($"step4: ResolveThreadScoped → {targets.Count} match(es)", force: true);
 
             if (targets.Count == 0)
             {
                 // Fallback 1: workspace CWD match (Eye's working directory)
-                // Handles: Eye-alive thread replies, orphaned threads
                 var own = ResolveWorkspaceScopedPrompt(promptHelper);
                 if (own != null)
                 {
                     targets = [own];
-                    Console.WriteLine($"[ROUTE] Thread fallback → workspace prompt: {ExtractProjectName(own)}");
+                    rp.Step($"step4: fallback1 → workspace: {ExtractProjectName(own)} 0x{own.WindowHandle:X}", force: true);
                 }
                 else
                 {
                     // Fallback 2: appbot master (WKAppBot VS Code) — final receiver
-                    // Any unroutable message goes to appbot Claude (Slack master/root)
-                    // ⚠ Removing this fallback → orphaned messages silently lost
                     var appbot = allPrompts.FirstOrDefault(p =>
                         p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
                         p.HostType is "vscode-claudecode");
                     if (appbot != null)
                     {
                         targets = [appbot];
-                        Console.WriteLine($"[ROUTE] Thread fallback → appbot VS Code: 0x{appbot.WindowHandle:X}");
+                        rp.Step($"step4: fallback2 → appbot 0x{appbot.WindowHandle:X}", force: true);
+                    }
+                    else
+                    {
+                        rp.Step($"step4: fallback2 — no appbot! allPrompts={allPrompts.Count}", force: true);
                     }
                 }
             }
@@ -202,8 +209,6 @@ internal partial class Program
         else
         {
             // ★ Non-thread (channel message): broadcast to ALL prompts
-            // "ping" etc → every Claude gets it (original legacy behavior)
-            // ⚠ Changing to workspace-scoped → ping only reaches 1 of N (v4.9 lesson)
             targets = allPrompts;
             replyTs = threadTs ?? ts;
             if (isKeyword)
@@ -215,24 +220,25 @@ internal partial class Program
             {
                 label = null; // catch-all → SlackSendSuffix
             }
+            rp.Step($"step4: broadcast → {targets.Count} prompt(s) label={label ?? "catch-all"}", force: true);
         }
 
         // ── Step 5: 타겟 없음 → 재시도 큐 ──
-        // 프롬프트가 하나도 없는 경우 (Claude 아직 안 뜸 등) → 1분 후 재시도
         if (targets.Count == 0)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[ROUTE] No target prompts found — scheduling retry #{retryCount + 1} in 1 min");
-            Console.ResetColor();
+            rp.Step($"step5: No targets — retry #{retryCount + 1}", force: true);
             RouteRetryQueue.Enqueue(node, retryCount + 1);
             return 0;
         }
 
-        // ── Deliver ──
+        // ── Step 5(deliver): TypeAndSubmit to each target ──
+        rp.Step($"step5: deliver to {targets.Count} target(s)", force: true);
         int sent = 0;
         var results = new List<DeliveryResult>();
         foreach (var pi in targets)
         {
+            var dispName = promptNameMap.TryGetValue($"0x{pi.WindowHandle.ToInt64():X}", out var n) ? n : ExtractProjectName(pi);
+            rp.Step($"step5: → {dispName} 0x{pi.WindowHandle:X} host={pi.HostType}", force: true);
             try
             {
                 var promptText = label == null
@@ -240,33 +246,29 @@ internal partial class Program
                     : $"{cleanText}{threadContext}\n{SlackReplySuffix(user, replyTs, label)}";
 
                 var ok = ProbeAndSubmit(promptHelper, pi, promptText, ts);
-                var dispName = promptNameMap.TryGetValue($"0x{pi.WindowHandle.ToInt64():X}", out var n) ? n : ExtractProjectName(pi);
+                rp.Step($"step5: {dispName} → {(ok ? "OK" : "FAIL")}", force: true);
                 results.Add(new DeliveryResult(dispName, ok));
                 if (ok) sent++;
             }
             catch (Exception ex)
             {
-                var dispName = promptNameMap.TryGetValue($"0x{pi.WindowHandle.ToInt64():X}", out var n) ? n : ExtractProjectName(pi);
+                rp.Step($"step5: {dispName} → ERROR: {ex.Message}", force: true);
                 results.Add(new DeliveryResult(dispName, false));
-                Console.WriteLine($"[ROUTE] Delivery error for {dispName}: {ex.Message}");
             }
         }
 
-        Console.ForegroundColor = sent > 0 ? ConsoleColor.Cyan : ConsoleColor.Yellow;
-        Console.WriteLine($"[ROUTE] Delivered {sent}/{targets.Count}");
-        Console.ResetColor();
+        rp.Step($"Delivered {sent}/{targets.Count}", force: true);
 
         if (sent == 0)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[ROUTE] All deliveries failed — scheduling retry #{retryCount + 1} in 1 min");
-            Console.ResetColor();
+            rp.Step($"All failed — retry #{retryCount + 1}", force: true);
             RouteRetryQueue.Enqueue(node, retryCount + 1);
             return 0;
         }
 
         // ── Send ack ──
         SendRouteAck(botToken, channel, replyTs, sent, targets.Count, results);
+        rp.Done($"done sent={sent}/{targets.Count}", force: true);
         return 0;
     }
 

@@ -64,11 +64,20 @@ internal partial class Program
             try
             {
                 // Worker handles rename→process→delete loop serially
+                // redirectStdOut=true: relay worker output to Eye log for debugging
                 var proc = AppBotPipe.Spawn(corePath, "slack route --queue",
                     Environment.CurrentDirectory,
+                    redirectStdOut: true, redirectStdErr: true,
                     env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE");
-                proc?.WaitForExit(60000);
-                proc?.Dispose();
+                if (proc == null) { Console.Error.WriteLine("[EYE] Queue drain: Spawn returned null"); return; }
+
+                // Relay worker stdout/stderr to Eye's own log (non-blocking reads)
+                var outTask = Task.Run(() => { try { while (proc.StdOut?.ReadLine() is string l) Console.WriteLine($"[ROUTE] {l}"); } catch { } });
+                var errTask = Task.Run(() => { try { while (proc.StdErr?.ReadLine() is string l) Console.Error.WriteLine($"[ROUTE] {l}"); } catch { } });
+                proc.WaitForExit(60000);
+                Task.WhenAll(outTask, errTask).Wait(5000);
+                Console.WriteLine($"[EYE][QUEUE] drain done exit={proc.ExitCode}");
+                proc.Dispose();
             }
             catch (Exception ex) { Console.Error.WriteLine($"[EYE] Queue drain error: {ex.Message}"); }
             finally { _slackDraining = false; }
@@ -1043,14 +1052,16 @@ internal partial class Program
                     if (!string.IsNullOrEmpty(tag))
                         mentionPromptNames[$"0x{p.WindowHandle.ToInt64():X}"] = $"클롣[{tag}]";
                 }
+                // Use Eye's own launch CWD (not card cache) — card cache may be dominated by
+                // another Claude instance, causing wrong botUsername and misrouted thread replies.
+                var eyeOwnCwd = Environment.CurrentDirectory;
+                EyeCmdPipeServer.CallerCwd.Value = eyeOwnCwd; // override any AsyncLocal leak
                 var routeJson = System.Text.Json.JsonSerializer.Serialize(new
                 {
                     text = msg.Text, user = msg.User, ts = msg.Timestamp,
                     threadTs = msg.ThreadTs, channel = msg.Channel,
                     isMention = true,
-                    eyeCwd = _cachedCards?.OrderByDescending(c => c.LastTsUtc)
-                        .FirstOrDefault(c => !string.IsNullOrEmpty(c.Cwd)
-                            && (c.ParentName ?? "").ToLowerInvariant() is not "wkappbot" and not "a11y")?.Cwd ?? "",
+                    eyeCwd = eyeOwnCwd,
                     botUsername = GetSendReplyUsername(),
                     promptNames = mentionPromptNames
                 });
@@ -1271,13 +1282,13 @@ internal partial class Program
                 if (!string.IsNullOrEmpty(tag))
                     promptNames[$"0x{p.WindowHandle.ToInt64():X}"] = $"클롣[{tag}]";
             }
+            var eyeOwnCwd2 = Environment.CurrentDirectory;
+            EyeCmdPipeServer.CallerCwd.Value = eyeOwnCwd2; // override any AsyncLocal leak
             var routeJson = System.Text.Json.JsonSerializer.Serialize(new
             {
                 text = msg.Text, user = msg.User, ts = msg.Timestamp,
                 threadTs = msg.ThreadTs, channel = msg.Channel,
-                eyeCwd = _cachedCards?.OrderByDescending(c => c.LastTsUtc)
-                    .FirstOrDefault(c => !string.IsNullOrEmpty(c.Cwd)
-                        && (c.ParentName ?? "").ToLowerInvariant() is not "wkappbot" and not "a11y")?.Cwd ?? "",
+                eyeCwd = eyeOwnCwd2,
                 botUsername = GetSendReplyUsername(),
                 promptNames  // hwnd → display name map
             });
@@ -1373,6 +1384,8 @@ internal partial class Program
                             promptNames[$"0x{p.WindowHandle.ToInt64():X}"] = $"클롣[{tag}]";
                     }
 
+                    var eyeOwnCwd3 = Environment.CurrentDirectory;
+                    EyeCmdPipeServer.CallerCwd.Value = eyeOwnCwd3; // override any AsyncLocal leak
                     var routeJson = System.Text.Json.JsonSerializer.Serialize(new
                     {
                         text = reactionText,
@@ -1382,9 +1395,7 @@ internal partial class Program
                         channel = rx.Channel,
                         isReaction = true,
                         reaction = rx.Reaction,
-                        eyeCwd = _cachedCards?.OrderByDescending(c => c.LastTsUtc)
-                        .FirstOrDefault(c => !string.IsNullOrEmpty(c.Cwd)
-                            && (c.ParentName ?? "").ToLowerInvariant() is not "wkappbot" and not "a11y")?.Cwd ?? "",
+                        eyeCwd = eyeOwnCwd3,
                         botUsername = GetSendReplyUsername(),
                         promptNames
                     });
