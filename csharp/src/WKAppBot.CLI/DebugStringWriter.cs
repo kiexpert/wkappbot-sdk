@@ -11,7 +11,7 @@ namespace WKAppBot.CLI;
 internal sealed class DebugStringWriter : TextWriter
 {
     private readonly TextWriter _inner;
-    private readonly int _pid = Environment.ProcessId;
+    private readonly string _prefix = $"wkappbot({Environment.ProcessId})>";
 
     public DebugStringWriter(TextWriter inner) => _inner = inner;
 
@@ -59,7 +59,7 @@ internal sealed class DebugStringWriter : TextWriter
             // Strip ANSI escape codes for cleaner DebugView output
             var clean = System.Text.RegularExpressions.Regex.Replace(msg, @"\x1b\[[0-9;]*m", "").TrimEnd();
             if (!string.IsNullOrEmpty(clean))
-                NativeMethods.OutputDebugStringW($"{_pid}> {clean}");
+                NativeMethods.OutputDebugStringW($"{_prefix} {clean}");
         }
         catch { }
     }
