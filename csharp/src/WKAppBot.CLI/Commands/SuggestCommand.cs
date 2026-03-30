@@ -569,6 +569,7 @@ internal partial class Program
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                 };
+                var scriptStartUtc = DateTime.UtcNow;
                 var proc = System.Diagnostics.Process.Start(psi);
                 var stdout = proc?.StandardOutput.ReadToEnd() ?? "";
                 var stderr = proc?.StandardError.ReadToEnd() ?? "";
@@ -585,6 +586,35 @@ internal partial class Program
                     Console.ResetColor();
                     return 1;
                 }
+
+                // ── CMD execution guard: verify wkappbot was actually invoked during the script ──
+                // Grep-only tests (no real command execution) are rejected here.
+                // Scans log files written AFTER scriptStartUtc for [CMD] entries.
+                var logsOldDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq", "logs", "old");
+                var cmdCount = 0;
+                if (Directory.Exists(logsOldDir))
+                {
+                    foreach (var logFile in Directory.GetFiles(logsOldDir, "*.log"))
+                    {
+                        try
+                        {
+                            if (File.GetLastWriteTimeUtc(logFile) < scriptStartUtc) continue;
+                            var logLines = File.ReadAllLines(logFile);
+                            cmdCount += logLines.Count(l => l.Contains("[CMD]"));
+                        }
+                        catch { }
+                    }
+                }
+                if (cmdCount == 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("  ❌ CMD execution guard FAILED: no [CMD] log entries found during script run.");
+                    Console.WriteLine("     테스트 스크립트는 실제 wkappbot 명령을 실행해야 합니다 (grep-only 테스트 불가).");
+                    Console.ResetColor();
+                    return 1;
+                }
+                Console.WriteLine($"  [RESOLVE] CMD execution verified: {cmdCount} wkappbot command(s) ran during script");
+
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine($"  ✅ Evidence script PASSED (exit=0)");
                 Console.WriteLine();
