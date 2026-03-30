@@ -192,6 +192,9 @@ internal partial class Program
             var dbgCmd = args.FirstOrDefault(a => !a.StartsWith('-'));
             var dbgSub = dbgCmd != null ? args.SkipWhile(a => a != dbgCmd).Skip(1).FirstOrDefault(a => !a.StartsWith('-')) : null;
             Console.SetError(new DebugStringWriter(Console.Error, dbgCmd, dbgSub));
+            // [CMD] marker: emitted immediately so DbgViewListener can verify real command execution.
+            // grep-only test scripts produce no wkappbot process → no [CMD] in captured debug output.
+            Console.Error.WriteLine($"[CMD] {string.Join(" ", args)}");
         }
 
         // --args-file <path>: UTF-8 file fallback for Korean args garbled via bash→PowerShell CP949
