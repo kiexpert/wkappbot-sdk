@@ -26,6 +26,7 @@ internal partial class Program
     var readinessReport = ctx.ReadinessReport;
     var CaptureControlPng = ctx.CaptureControlPng;
     var CaptureControlFast = ctx.CaptureControlFast;
+    var CaptureControlRawFast = ctx.CaptureControlRawFast;
     var ConfirmByOcrContains = ctx.ConfirmByOcrContains;
     var FuzzyDigitMatch = ctx.FuzzyDigitMatch;
     var OcrDebugPath = ctx.OcrDebugPath;
@@ -120,6 +121,7 @@ internal partial class Program
     var readinessReport = ctx.ReadinessReport;
     var CaptureControlPng = ctx.CaptureControlPng;
     var CaptureControlFast = ctx.CaptureControlFast;
+    var CaptureControlRawFast = ctx.CaptureControlRawFast;
     var ConfirmByOcrContains = ctx.ConfirmByOcrContains;
     var FuzzyDigitMatch = ctx.FuzzyDigitMatch;
     var OcrDebugPath = ctx.OcrDebugPath;
@@ -236,10 +238,13 @@ internal partial class Program
                         zoomHost.UpdateStatus($"Before → \"{text}\" ({text.Length} chars)");
 
                         // Start periodic live capture (fast refresh) + TOPMOST enforcement
+                        // Raw pixel path: no codec overhead, ~10x faster than BMP/PNG
                         var formH = targetForm.Handle;
                         var ctlH = targetHwnd;
-                        zoomHost.StartLiveCapture(
-                            zoomMode != ZoomMode.HighlightBox ? () => CaptureControlFast(formH, ctlH) : null);
+                        zoomHost.StartLiveCaptureFast(
+                            zoomMode != ZoomMode.HighlightBox && CaptureControlRawFast != null
+                                ? () => CaptureControlRawFast(formH, ctlH)
+                                : (Func<(byte[], int, int, int)?>?)null);
                     }
                     catch (Exception zex)
                     {
@@ -505,6 +510,7 @@ internal partial class Program
     var readinessReport = ctx.ReadinessReport;
     var CaptureControlPng = ctx.CaptureControlPng;
     var CaptureControlFast = ctx.CaptureControlFast;
+    var CaptureControlRawFast = ctx.CaptureControlRawFast;
     var ConfirmByOcrContains = ctx.ConfirmByOcrContains;
     var FuzzyDigitMatch = ctx.FuzzyDigitMatch;
     var OcrDebugPath = ctx.OcrDebugPath;
@@ -589,6 +595,7 @@ internal partial class Program
     var readinessReport = ctx.ReadinessReport;
     var CaptureControlPng = ctx.CaptureControlPng;
     var CaptureControlFast = ctx.CaptureControlFast;
+    var CaptureControlRawFast = ctx.CaptureControlRawFast;
     var ConfirmByOcrContains = ctx.ConfirmByOcrContains;
     var FuzzyDigitMatch = ctx.FuzzyDigitMatch;
     var OcrDebugPath = ctx.OcrDebugPath;
@@ -681,6 +688,7 @@ internal partial class Program
     var readinessReport = ctx.ReadinessReport;
     var CaptureControlPng = ctx.CaptureControlPng;
     var CaptureControlFast = ctx.CaptureControlFast;
+    var CaptureControlRawFast = ctx.CaptureControlRawFast;
     var ConfirmByOcrContains = ctx.ConfirmByOcrContains;
     var FuzzyDigitMatch = ctx.FuzzyDigitMatch;
     var OcrDebugPath = ctx.OcrDebugPath;
