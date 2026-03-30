@@ -20,9 +20,10 @@ internal sealed class DebugStringWriter : TextWriter
     {
         _inner = inner;
         var pid = Environment.ProcessId;
+        var exeName = Path.GetFileNameWithoutExtension(Environment.ProcessPath ?? "") is { Length: > 0 } n ? n : "wkappbot";
         var cmdPart = cmd != null ? $"-{cmd}" : "";
         var subcmdPart = subcmd != null ? $"-{subcmd}" : "";
-        _prefix = $"wkappbot:{pid}{cmdPart}{subcmdPart}>";
+        _prefix = $"{exeName}:{pid}{cmdPart}{subcmdPart}>";
     }
 
     public override Encoding Encoding => _inner.Encoding;
