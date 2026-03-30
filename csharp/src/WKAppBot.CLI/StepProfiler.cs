@@ -45,32 +45,50 @@ internal static class PulseStep
     /// <summary>
     /// Record a checkpoint in the current session.
     /// Prints callstack + elapsed to stderr only when delta ≥ threshold (100ms).
-    /// always=true: bypass threshold AND WKAPPBOT_PROFILE check → always prints to stdout.
     /// </summary>
     public static void Mark(
         string label,
-        bool always = false,
         [CallerMemberName] string caller = "",
         [CallerLineNumber] int line = 0)
     {
         if (!_sessions.TryGetValue(caller, out var prof))
             _sessions[caller] = prof = new StepProfiler(caller);
-        prof.Step(label, skipFrames: 1, callerHint: $"{caller}:{line}", force: always);
+        prof.Step(label, skipFrames: 1, callerHint: $"{caller}:{line}");
     }
 
-    /// <summary>
-    /// End the session: print final step + total elapsed, then remove session.
-    /// always=true: bypass threshold AND WKAPPBOT_PROFILE check → always prints to stdout.
-    /// </summary>
+    /// <summary>Always emit to stderr — bypasses threshold + WKAPPBOT_PROFILE.</summary>
+    public static void Line(
+        string label,
+        [CallerMemberName] string caller = "",
+        [CallerLineNumber] int line = 0)
+    {
+        if (!_sessions.TryGetValue(caller, out var prof))
+            _sessions[caller] = prof = new StepProfiler(caller);
+        prof.Step(label, skipFrames: 1, callerHint: $"{caller}:{line}", force: true);
+    }
+
+    /// <summary>End the session: print final step + total elapsed, then remove session.</summary>
     public static void Done(
         string label = "done",
-        bool always = false,
         [CallerMemberName] string caller = "",
         [CallerLineNumber] int line = 0)
     {
         if (_sessions.TryGetValue(caller, out var prof))
         {
-            prof.Done(label, skipFrames: 1, callerHint: $"{caller}:{line}", force: always);
+            prof.Done(label, skipFrames: 1, callerHint: $"{caller}:{line}");
+            _sessions.Remove(caller);
+        }
+    }
+
+    /// <summary>Always emit Done to stderr — bypasses threshold + WKAPPBOT_PROFILE.</summary>
+    public static void Finish(
+        string label = "done",
+        [CallerMemberName] string caller = "",
+        [CallerLineNumber] int line = 0)
+    {
+        if (_sessions.TryGetValue(caller, out var prof))
+        {
+            prof.Done(label, skipFrames: 1, callerHint: $"{caller}:{line}", force: true);
             _sessions.Remove(caller);
         }
     }
@@ -99,20 +117,39 @@ internal sealed class StepProfiler
     // Default: silent — prevents stderr noise leaking through MCP/Eye/Launcher pipes.
     // force=true: bypass _profEnabled + threshold → always print to stdout (e.g. route logging).
     private static readonly bool _profEnabled = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1";
+    // Nesting depth — AsyncLocal so each async context (Task, thread) has independent depth
+    private static readonly AsyncLocal<int> _nestDepth = new();
+    private int _myDepth = -1;       // depth captured at Init time; -1 = Init never called
+    private bool _finished;          // true once Done/Finish is called
+    private string _initCaller = "";  // callerHint at Init — for mismatch detection
+
     private void Emit(string msg, bool force = false)
     {
         // always=true: stderr (captured by DebugStringWriter → logcat --dbg, also Eye log relay)
         // normal: stderr only when WKAPPBOT_PROFILE=1
-        if (force || _profEnabled) { try { Console.Error.WriteLine(msg); } catch { } }
+        if (force || _profEnabled)
+        {
+            var indent = _myDepth > 0 ? new string(' ', _myDepth * 2) : "";
+            try { Console.Error.WriteLine($"{indent}{msg}"); } catch { }
+        }
     }
 
     /// <summary>Print init line unconditionally (no threshold). Resets last-step timer.</summary>
     public void Init(string label, string callerHint = "")
     {
+        _initCaller = callerHint;
+        _myDepth = _nestDepth.Value;
+        _nestDepth.Value++;
         _lastMs = _sw.ElapsedMilliseconds;
         _initMemMB = GetWsMB();
         _lastMemMB = _initMemMB;
         Emit($"[PULSE:{_name}] ── init \"{label}\" @{_startedAt} mem={_initMemMB}MB ──");
+    }
+
+    ~StepProfiler()
+    {
+        if (_myDepth >= 0 && !_finished)
+            try { Console.Error.WriteLine($"[PULSE:⚠] {_name} leaked — Done/Finish never called (init at {_initCaller})"); } catch { }
     }
 
     public void Step(
@@ -121,13 +158,12 @@ internal sealed class StepProfiler
         [CallerLineNumber] int line = 0)
         => Step(label, skipFrames: 1, callerHint: $"{caller}:{line}");
 
-    /// <summary>force=true: always emit to stderr (bypass threshold + WKAPPBOT_PROFILE).</summary>
-    public void Step(
+    /// <summary>Always emit to stderr — bypasses threshold + WKAPPBOT_PROFILE. Compact single-line, no callchain.</summary>
+    public void Line(
         string label,
-        bool force,
         [CallerMemberName] string caller = "",
         [CallerLineNumber] int line = 0)
-        => Step(label, skipFrames: 1, callerHint: $"{caller}:{line}", force: force);
+        => Step(label, skipFrames: 1, callerHint: $"{caller}:{line}", force: true);
 
     internal void Step(string label, int skipFrames, string callerHint, bool force = false)
     {
@@ -161,21 +197,29 @@ internal sealed class StepProfiler
 
     internal void Done(string label, int skipFrames, string callerHint, bool force = false)
     {
+        // Callstack mismatch: Init and Done called from different methods
+        var initMethod = _initCaller.Split(':')[0];
+        var doneMethod = callerHint.Split(':')[0];
+        if (!string.IsNullOrEmpty(initMethod) && !string.IsNullOrEmpty(doneMethod) && initMethod != doneMethod)
+            try { Console.Error.WriteLine($"[PULSE:⚠] {_name} caller mismatch — Init:{_initCaller} Done:{callerHint}"); } catch { }
+
         Step(label, skipFrames + 1, callerHint, force);
         var totalMs = _sw.ElapsedMilliseconds;
         var finalMem = GetWsMB();
         var totalMemDelta = finalMem - _initMemMB;
         var memStr = totalMemDelta != 0 ? $" mem={finalMem}MB({(totalMemDelta >= 0 ? "+" : "")}{totalMemDelta})" : "";
         Emit($"[PULSE:{_name}] ── total {totalMs}ms{memStr} ──", force);
+
+        _finished = true;
+        _nestDepth.Value--;
     }
 
-    /// <summary>force=true: always emit to stderr (bypass threshold + WKAPPBOT_PROFILE).</summary>
-    public void Done(
-        string label,
-        bool force,
+    /// <summary>Always emit Done to stderr — bypasses threshold + WKAPPBOT_PROFILE.</summary>
+    public void Finish(
+        string label = "done",
         [CallerMemberName] string caller = "",
         [CallerLineNumber] int line = 0)
-        => Done(label, skipFrames: 1, callerHint: $"{caller}:{line}", force: force);
+        => Done(label, skipFrames: 1, callerHint: $"{caller}:{line}", force: true);
 
     /// <summary>
     /// Walk StackTrace, skip StepProfiler/PulseStep frames, return call chain as

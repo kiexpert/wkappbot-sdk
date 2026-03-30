@@ -33,30 +33,30 @@ internal partial class Program
             var qp = new StepProfiler("route-queue");
             var queueDir = Path.Combine(DataDir, "runtime", "slack_queue");
             qp.Init($"start queueDir={queueDir}");
-            if (!Directory.Exists(queueDir)) { qp.Step("dir missing — exit", force: true); return 0; }
+            if (!Directory.Exists(queueDir)) { qp.Line("dir missing — exit"); return 0; }
             var files = Directory.GetFiles(queueDir, "*.json");
-            qp.Step($"found {files.Length} file(s)", force: true);
+            qp.Line($"found {files.Length} file(s)");
             if (files.Length == 0) return 0;
             Array.Sort(files);
             int processed = 0;
             foreach (var file in files)
             {
                 var procFile = Path.ChangeExtension(file, ".processing");
-                qp.Step($"claim → {Path.GetFileName(procFile)}", force: true);
+                qp.Line($"claim → {Path.GetFileName(procFile)}");
                 try { File.Move(file, procFile, overwrite: false); }
-                catch (Exception ex) { qp.Step($"claim failed: {ex.Message}", force: true); continue; }
+                catch (Exception ex) { qp.Line($"claim failed: {ex.Message}"); continue; }
                 try
                 {
                     var json = File.ReadAllText(procFile);
-                    qp.Step($"routing {Path.GetFileName(file)} ({json.Length}B)", force: true);
+                    qp.Line($"routing {Path.GetFileName(file)} ({json.Length}B)");
                     SlackRouteCommand([json]);
                     processed++;
-                    qp.Step($"done {Path.GetFileName(file)}", force: true);
+                    qp.Line($"done {Path.GetFileName(file)}");
                 }
-                catch (Exception ex) { qp.Step($"error: {ex.Message}", force: true); }
-                finally { try { File.Delete(procFile); qp.Step($"deleted {Path.GetFileName(procFile)}", force: true); } catch { } }
+                catch (Exception ex) { qp.Line($"error: {ex.Message}"); }
+                finally { try { File.Delete(procFile); qp.Line($"deleted {Path.GetFileName(procFile)}"); } catch { } }
             }
-            qp.Done($"drained {processed}/{files.Length}", force: true);
+            qp.Finish($"drained {processed}/{files.Length}");
             return 0;
         }
 
@@ -104,19 +104,19 @@ internal partial class Program
         var rp = new StepProfiler("route");
         rp.Init($"ts={ts} user={user} thread={threadTs ?? "none"} cwd={eyeCwd} bot={eyeBotName} promptNames={promptNameMap.Count}");
 
-        if (!File.Exists(SlackConfigPath)) { rp.Step("No Slack config — skip", force: true); return 0; }
+        if (!File.Exists(SlackConfigPath)) { rp.Line("No Slack config — skip"); return 0; }
         var cfg = JsonNode.Parse(File.ReadAllText(SlackConfigPath));
         var botToken = cfg?["bot_token"]?.GetValue<string>();
-        if (string.IsNullOrEmpty(botToken)) { rp.Step("No bot_token — skip", force: true); return 0; }
+        if (string.IsNullOrEmpty(botToken)) { rp.Line("No bot_token — skip"); return 0; }
 
         // Clean @mention tokens
         var cleanText = Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
-        if (string.IsNullOrEmpty(cleanText)) { rp.Step("Empty text after clean — skip", force: true); return 0; }
+        if (string.IsNullOrEmpty(cleanText)) { rp.Line("Empty text after clean — skip"); return 0; }
 
         // Noise filter (skip for reactions — they have no user text)
         if (!isReaction && SlackRouteNoise.Any(n => cleanText.Equals(n, StringComparison.OrdinalIgnoreCase)))
         {
-            rp.Step($"Noise filter — skip: {cleanText}", force: true);
+            rp.Line($"Noise filter — skip: {cleanText}");
             return 0;
         }
 
@@ -146,36 +146,36 @@ internal partial class Program
         bool isKeyword = !isTrackedThread &&
             SlackRouteKeywords.Any(kw => textLower.Contains(kw, StringComparison.OrdinalIgnoreCase));
 
-        rp.Step($"step1: thread={isTrackedThread} kw={isKeyword} text={cleanText[..Math.Min(cleanText.Length, 60)]}", force: true);
+        rp.Line($"step1: thread={isTrackedThread} kw={isKeyword} text={cleanText[..Math.Min(cleanText.Length, 60)]}");
 
         // ── Step 2: Collect thread context (previous messages for Claude) ──
         string threadContext = "";
         if (!string.IsNullOrEmpty(threadTs))
         {
-            rp.Step($"step2: GetThreadContext channel={channel} thread={threadTs}", force: true);
+            rp.Line($"step2: GetThreadContext channel={channel} thread={threadTs}");
             var ctx = GetThreadContext(botToken, channel, threadTs, ts);
             if (!string.IsNullOrEmpty(ctx)) threadContext = $"\n{ctx}\n";
-            rp.Step($"step2: context len={threadContext.Length}", force: true);
+            rp.Line($"step2: context len={threadContext.Length}");
         }
 
         // ── Step 3: Discover all prompt windows ──
-        rp.Step("step3: FindAllPrompts", force: true);
+        rp.Line("step3: FindAllPrompts");
         ClaudePromptHelper.AllowFocusSteal = true;
         using var promptHelper = new ClaudePromptHelper();
         var allPrompts = promptHelper.FindAllPrompts();
-        rp.Step($"step3: found {allPrompts.Count} prompt(s) — {string.Join(", ", allPrompts.Select(p => $"0x{p.WindowHandle:X}({p.HostType})"))}", force: true);
+        rp.Line($"step3: found {allPrompts.Count} prompt(s) — {string.Join(", ", allPrompts.Select(p => $"0x{p.WindowHandle:X}({p.HostType})"))}");
 
         List<ClaudePromptHelper.PromptInfo> targets;
         string replyTs;
         string? label;
 
         // ── Step 4: Select target prompts (CRITICAL BRANCH) ──
-        rp.Step($"step4: isTrackedThread={isTrackedThread} isKeyword={isKeyword} eyeBot=\"{eyeBotName}\"", force: true);
+        rp.Line($"step4: isTrackedThread={isTrackedThread} isKeyword={isKeyword} eyeBot=\"{eyeBotName}\"");
         if (isTrackedThread && !string.IsNullOrEmpty(threadTs))
         {
             // ★ Thread reply: find owning Claude via ResolveThreadScopedPrompts
             targets = ResolveThreadScopedPrompts(promptHelper, botToken, channel, threadTs, eyeBotName ?? BotUsername);
-            rp.Step($"step4: ResolveThreadScoped → {targets.Count} match(es)", force: true);
+            rp.Line($"step4: ResolveThreadScoped → {targets.Count} match(es)");
 
             if (targets.Count == 0)
             {
@@ -184,7 +184,7 @@ internal partial class Program
                 if (own != null)
                 {
                     targets = [own];
-                    rp.Step($"step4: fallback1 → workspace: {ExtractProjectName(own)} 0x{own.WindowHandle:X}", force: true);
+                    rp.Line($"step4: fallback1 → workspace: {ExtractProjectName(own)} 0x{own.WindowHandle:X}");
                 }
                 else
                 {
@@ -195,11 +195,11 @@ internal partial class Program
                     if (appbot != null)
                     {
                         targets = [appbot];
-                        rp.Step($"step4: fallback2 → appbot 0x{appbot.WindowHandle:X}", force: true);
+                        rp.Line($"step4: fallback2 → appbot 0x{appbot.WindowHandle:X}");
                     }
                     else
                     {
-                        rp.Step($"step4: fallback2 — no appbot! allPrompts={allPrompts.Count}", force: true);
+                        rp.Line($"step4: fallback2 — no appbot! allPrompts={allPrompts.Count}");
                     }
                 }
             }
@@ -220,25 +220,25 @@ internal partial class Program
             {
                 label = null; // catch-all → SlackSendSuffix
             }
-            rp.Step($"step4: broadcast → {targets.Count} prompt(s) label={label ?? "catch-all"}", force: true);
+            rp.Line($"step4: broadcast → {targets.Count} prompt(s) label={label ?? "catch-all"}");
         }
 
         // ── Step 5: 타겟 없음 → 재시도 큐 ──
         if (targets.Count == 0)
         {
-            rp.Step($"step5: No targets — retry #{retryCount + 1}", force: true);
+            rp.Line($"step5: No targets — retry #{retryCount + 1}");
             RouteRetryQueue.Enqueue(node, retryCount + 1);
             return 0;
         }
 
         // ── Step 5(deliver): TypeAndSubmit to each target ──
-        rp.Step($"step5: deliver to {targets.Count} target(s)", force: true);
+        rp.Line($"step5: deliver to {targets.Count} target(s)");
         int sent = 0;
         var results = new List<DeliveryResult>();
         foreach (var pi in targets)
         {
             var dispName = promptNameMap.TryGetValue($"0x{pi.WindowHandle.ToInt64():X}", out var n) ? n : ExtractProjectName(pi);
-            rp.Step($"step5: → {dispName} 0x{pi.WindowHandle:X} host={pi.HostType}", force: true);
+            rp.Line($"step5: → {dispName} 0x{pi.WindowHandle:X} host={pi.HostType}");
             try
             {
                 var promptText = label == null
@@ -246,29 +246,29 @@ internal partial class Program
                     : $"{cleanText}{threadContext}\n{SlackReplySuffix(user, replyTs, label)}";
 
                 var ok = ProbeAndSubmit(promptHelper, pi, promptText, ts);
-                rp.Step($"step5: {dispName} → {(ok ? "OK" : "FAIL")}", force: true);
+                rp.Line($"step5: {dispName} → {(ok ? "OK" : "FAIL")}");
                 results.Add(new DeliveryResult(dispName, ok));
                 if (ok) sent++;
             }
             catch (Exception ex)
             {
-                rp.Step($"step5: {dispName} → ERROR: {ex.Message}", force: true);
+                rp.Line($"step5: {dispName} → ERROR: {ex.Message}");
                 results.Add(new DeliveryResult(dispName, false));
             }
         }
 
-        rp.Step($"Delivered {sent}/{targets.Count}", force: true);
+        rp.Line($"Delivered {sent}/{targets.Count}");
 
         if (sent == 0)
         {
-            rp.Step($"All failed — retry #{retryCount + 1}", force: true);
+            rp.Line($"All failed — retry #{retryCount + 1}");
             RouteRetryQueue.Enqueue(node, retryCount + 1);
             return 0;
         }
 
         // ── Send ack ──
         SendRouteAck(botToken, channel, replyTs, sent, targets.Count, results);
-        rp.Done($"done sent={sent}/{targets.Count}", force: true);
+        rp.Finish($"done sent={sent}/{targets.Count}");
         return 0;
     }
 

@@ -459,6 +459,8 @@ internal partial class Program
         Console.WriteLine("[EYE] Starting WK AppBot Eye (GlobalMode)");
         // Clean up orphan sandbox registry entries from previous Eye session (dead HWNDs)
         AskTargetRegistry.PurgeDeadHwnds();
+        // Purge stale card cache from previous Eye session — fresh start, no zombie cards
+        CardCachePurgeAll();
         return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, elevated, replacePid);
     }
 
