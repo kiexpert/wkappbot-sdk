@@ -740,7 +740,7 @@ internal partial class Program
                             // Post card summary as first thread reply
                             if (summary.Length > 0)
                             {
-                                var (replyOk, replyTs) = SlackSendViaApi(slackBotToken, slackChannel, summary, threadTs: eyeTs, username: "앱봇아이").GetAwaiter().GetResult();
+                                var (replyOk, replyTs) = SlackSendViaApi(slackBotToken, slackChannel, "```\n" + summary + "\n```", threadTs: eyeTs, username: "앱봇아이").GetAwaiter().GetResult();
                                 if (replyOk && replyTs != null) _eyeSummaryReplyTs = replyTs;
                             }
                         }
@@ -1163,12 +1163,12 @@ internal partial class Program
 
                         // Update summary thread reply
                         if (summary.Length > 0 && _eyeSummaryReplyTs != null)
-                            _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeSummaryReplyTs, summary);
+                            _ = SlackUpdateMessageAsync(slackBotToken!, slackChannel!, _eyeSummaryReplyTs, "```\n" + summary + "\n```");
                         else if (summary.Length > 0 && _eyeSummaryReplyTs == null && _eyeStatusTs != null)
                         {
                             _ = Task.Run(async () =>
                             {
-                                var (ok, ts) = await SlackSendViaApi(slackBotToken!, slackChannel!, summary, threadTs: _eyeStatusTs, username: "앱봇아이");
+                                var (ok, ts) = await SlackSendViaApi(slackBotToken!, slackChannel!, "```\n" + summary + "\n```", threadTs: _eyeStatusTs, username: "앱봇아이");
                                 if (ok && ts != null) _eyeSummaryReplyTs = ts;
                             });
                         }
