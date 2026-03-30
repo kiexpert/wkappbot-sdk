@@ -66,8 +66,6 @@ Options:
         {
             cdp = new CdpClient();
             cdp.ConnectAsync(port).GetAwaiter().GetResult();
-            cdp.InjectWebBotBar = true;
-
             // Verify it's a WebBot window
             var title = cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "";
             if (!title.Contains("WKWebBot"))

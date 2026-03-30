@@ -50,8 +50,28 @@ internal partial class Program
 
                 if (response != null)
                 {
+                    // Moderator redirect: detect off-topic responses (tool exploration, CLI jargon, etc.)
+                    if (IsOffTopicResponse(response))
+                    {
+                        var originalQ = ctx.OriginalQuestion;
+                        var redirectMsg = string.IsNullOrEmpty(originalQ)
+                            ? "[MODERATOR DM] ⚠️ OFF-TOPIC DETECTED: Your response is about tools/CLI commands, not the debate question. " +
+                              "STOP exploring tools. Answer the original question directly using [CLAIM] + [STANCE] format."
+                            : $"[MODERATOR DM] ⚠️ OFF-TOPIC DETECTED: Your response ignores the question. " +
+                              $"Original question: {originalQ}\n" +
+                              "Answer THIS question directly with [CLAIM] + [STANCE] format. NO tool exploration.";
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"[MOD] {ai}: off-topic response detected → redirecting");
+                        Console.ResetColor();
+                        SlackPostToThread($"⚠️ *[Moderator→{ai}]* 질문 무시 감지! 오리지날 질문으로 리다이렉트", "🦉 Moderator");
+                        if (ctx._cdpClients.ContainsKey(ai)) ctx.InjectToSingle(ai, redirectMsg);
+                        response = hasCdp
+                            ? await InjectAndPollAsync(ctx, ai, redirectMsg, Math.Min(timeoutSec, 60))
+                            : AskAndCapture(ai, redirectMsg, Math.Min(timeoutSec, 60));
+                    }
+
                     // Format enforcement: retry once if required elements missing
-                    var claims = TriadDebateLoop.ParseClaims(response);
+                    var claims = TriadDebateLoop.ParseClaims(response ?? "");
                     bool needsRetry = false;
                     string? retryReason = null;
 
@@ -1358,6 +1378,36 @@ internal partial class Program
         }
         catch (Exception ex) { Console.Error.WriteLine($"[DEBATE:INJECT] {ai} error: {ex.Message}"); }
         return null;
+    }
+
+    // ── Off-topic detection: moderator redirect ──
+
+    /// <summary>
+    /// Detect if an AI response is off-topic (e.g., tool exploration, CLI jargon, wrong language).
+    /// Returns true if the moderator should redirect the debater to the original question.
+    /// </summary>
+    static bool IsOffTopicResponse(string? response)
+    {
+        if (string.IsNullOrWhiteSpace(response) || response.Length < 50) return false;
+
+        // CLI tool exploration patterns: --help, wkappbot commands, DEBATE_JSON
+        var offTopicPatterns = new[]
+        {
+            "DEBATE_JSON", "DEBATE_MODE", "--help", "--debug", "--verbose",
+            "wkappbot inspect", "wkappbot a11y", "wkappbot windows",
+            "[APPBOT_TOOL_CALL", "TOOL_CALL_BEGIN", "Usage: wkappbot",
+            "Available commands:", "Available options:", "Usage: "
+        };
+        var lower = response;
+        int matches = offTopicPatterns.Count(p => lower.Contains(p, StringComparison.OrdinalIgnoreCase));
+        if (matches >= 2) return true; // 2+ CLI patterns = definitely off-topic
+
+        // Single strong CLI pattern = also off-topic
+        if (matches >= 1 && response.Contains("--", StringComparison.Ordinal) &&
+            response.Split("--", StringSplitOptions.None).Length > 3)
+            return true;
+
+        return false;
     }
 
     // ── NLI: AI-as-judge semantic comparison ──

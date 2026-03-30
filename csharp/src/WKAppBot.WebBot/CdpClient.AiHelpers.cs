@@ -392,7 +392,7 @@ public sealed partial class CdpClient
     /// Uses SW_SHOWNOACTIVATE (4) — no focus steal.
     /// Also emulates active tab via CDP for background tab rendering.
     /// </summary>
-    private void EnsureChromeNotIconic()
+    public void EnsureChromeNotIconic()
     {
         var hwnd = GetChromeWindowHandle();
         if (hwnd != IntPtr.Zero && IsIconic(hwnd))

@@ -421,37 +421,43 @@ internal sealed class ClickZoomHelper : IDisposable
     /// <summary>Update status text during action.</summary>
     public void UpdateStatus(string text)
     {
-        if (_host?.IsAlive != true) return;
-        _host.UpdateStatus(text);
+        var host = _host;
+        if (host?.IsAlive != true) return;
+        host.UpdateStatus(text);
     }
 
     /// <summary>Update captured image (e.g., after action to show result).</summary>
     public void UpdateImage()
     {
-        if (_host?.IsAlive != true) return;
+        var host = _host;
+        if (host?.IsAlive != true) return;
         var png = CaptureCurrentPng();
-        if (png != null) _host.UpdateImage(png);
+        if (png != null) host.UpdateImage(png);
     }
 
     /// <summary>Show success result and auto-fade.</summary>
     public void ShowPass(string detail)
     {
-        if (_host?.IsAlive != true) return;
-        _host.ShowResult(true, $"✓ {detail}");
+        // Capture _host locally to avoid race with _zombieTimer (which can set _host=null via Dispose)
+        var host = _host;
+        if (host?.IsAlive != true) return;
+        host.ShowResult(true, $"✓ {detail}");
         var png = CaptureCurrentPng();
-        if (png != null) _host.UpdateImage(png);
-        _host.BeginFadeOut(1500, 400);
+        if (png != null) host.UpdateImage(png);
+        host.BeginFadeOut(1500, 400);
         _host = null;
     }
 
     /// <summary>Show failure result and auto-fade.</summary>
     public void ShowFail(string detail)
     {
-        if (_host?.IsAlive != true) return;
-        _host.ShowResult(false, $"✗ {detail}");
+        // Capture _host locally to avoid race with _zombieTimer (which can set _host=null via Dispose)
+        var host = _host;
+        if (host?.IsAlive != true) return;
+        host.ShowResult(false, $"✗ {detail}");
         var png = CaptureCurrentPng();
-        if (png != null) _host.UpdateImage(png);
-        _host.BeginFadeOut(2000, 500);
+        if (png != null) host.UpdateImage(png);
+        host.BeginFadeOut(2000, 500);
         _host = null;
     }
 

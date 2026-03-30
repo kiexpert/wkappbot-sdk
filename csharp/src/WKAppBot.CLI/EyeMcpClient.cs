@@ -312,8 +312,13 @@ internal static class EyeMcpClient
             _stdin = new StreamWriter(stdinStream, new UTF8Encoding(false)) { AutoFlush = true };
             _stdout = new StreamReader(stdoutStream, Encoding.UTF8);
 
-            // Pump stderr (prefixed)
+            // Pump stderr (prefixed) — write raw UTF-8 bytes to preserve Korean and ANSI codes.
+            // Console.Error.WriteLine() may transcode through CP949 on Windows, garbling UTF-8 output.
             var stderrReader = new StreamReader(stderrStream, Encoding.UTF8);
+            var stderrRawOut = Console.OpenStandardError();
+            var stderrUtf8 = new UTF8Encoding(false);
+            var stderrPrefix = stderrUtf8.GetBytes("[MCP-W] ");
+            var stderrNewline = stderrUtf8.GetBytes(Environment.NewLine);
             _ = Task.Run(async () =>
             {
                 try
@@ -322,7 +327,11 @@ internal static class EyeMcpClient
                     {
                         var line = await stderrReader.ReadLineAsync();
                         if (line == null) break;
-                        Console.Error.WriteLine($"[MCP-W] {line}");
+                        // Write as raw UTF-8 bytes to preserve ANSI escape codes and Korean chars
+                        stderrRawOut.Write(stderrPrefix);
+                        stderrRawOut.Write(stderrUtf8.GetBytes(line));
+                        stderrRawOut.Write(stderrNewline);
+                        stderrRawOut.Flush();
                     }
                 }
                 catch { }

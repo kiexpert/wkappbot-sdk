@@ -155,6 +155,10 @@ partial class Program
             // in .NET 8 AppHost during console init (SetConsoleMode → csrss.exe LPC → never returns).
             // FreeConsole(): Launcher releases its console → child inherits nothing → no LPC deadlock.
             // Stdout/stderr file handles (ConPTY slave) remain valid for WriteFile after FreeConsole().
+            // Make Launcher's stdout/stderr non-inheritable before spawning Core.
+            // If bash's pipe write end is inheritable, Core inherits it → bash waits 30s for Core to die after Launcher exits.
+            try { var h = GetStdHandle(-11); if (h != IntPtr.Zero && h != (IntPtr)(-1)) SetHandleInformation(h, 0x1, 0); } catch { }
+            try { var h = GetStdHandle(-12); if (h != IntPtr.Zero && h != (IntPtr)(-1)) SetHandleInformation(h, 0x1, 0); } catch { }
             FreeConsole();
             proc.Start();
             // Close stdin immediately — Core doesn't read stdin interactively.

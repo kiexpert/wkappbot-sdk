@@ -165,12 +165,10 @@ Options:
         catch { return null; }
     }
 
-    static CdpClient ConnectCdp(int port, bool withBar = true, bool verifyWebBot = false, bool ensureWindow = true, string? navigateUrl = null)
+    static CdpClient ConnectCdp(int port, bool withBar = false, bool verifyWebBot = false, bool ensureWindow = true, string? navigateUrl = null)
     {
         var cdp = new CdpClient();
         cdp.ConnectAsync(port).GetAwaiter().GetResult();
-        if (withBar)
-            cdp.InjectWebBotBar = true;
 
         // Ensure we're connected to this session's tab in the correctly-positioned window.
         // When navigateUrl is provided: use sandbox key "web+{host}+{hwnd:X8}" — guaranteed isolated tab per host+HWND.
@@ -232,7 +230,7 @@ Options:
     }
 
     /// <summary>Connect to CDP and switch to tab matching --tab pattern (if specified).</summary>
-    static CdpClient? ConnectCdpWithTab(string[] args, bool withBar = true)
+    static CdpClient? ConnectCdpWithTab(string[] args, bool withBar = false)
     {
         var port = GetPort(args);
         var tabPattern = GetArgValue(args, "--tab");
@@ -243,7 +241,6 @@ Options:
         // Connect to first available tab, then find the right one
         var cdp = new CdpClient();
         cdp.ConnectAsync(port).GetAwaiter().GetResult();
-        if (withBar) cdp.InjectWebBotBar = true;
 
         var matched = cdp.ConnectToTabAsync(port, tabPattern).GetAwaiter().GetResult();
         if (!matched)
@@ -395,10 +392,7 @@ Options:
         int port = GetPort(args);
         bool headless = args.Contains("--headless");
         bool noLaunch = args.Contains("--no-launch");
-        // ★ App mode is DEFAULT — MUST open as app mode to avoid mixing with user's browser!
-        // Normal Chrome UI (tabs, address bar) risks session contamination and confusion.
-        // Only use --browser flag for debugging purposes.
-        bool appMode = !args.Contains("--browser");
+        bool appMode = false; // always normal browser UI (tabs + address bar)
 
         // Get URL (first non-flag argument)
         string? url = args.FirstOrDefault(a => !a.StartsWith("--") && a != "true" && a != "false");
@@ -412,8 +406,7 @@ Options:
             // In app mode: pass actual URL to --app flag so Chrome opens clean window with it
             //   (navigating away from --app=about:blank re-enables Chrome UI)
             // In normal mode: pass about:blank, navigate later via CDP
-            var launchUrl = appMode && !string.IsNullOrEmpty(url) ? url : "about:blank";
-            var process = ChromeLauncher.LaunchAsync(port, launchUrl, headless, appMode: appMode).GetAwaiter().GetResult();
+            var process = ChromeLauncher.LaunchAsync(port, url, headless).GetAwaiter().GetResult();
             if (process == null)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
@@ -442,13 +435,6 @@ Options:
             if (freshLaunch)
                 Thread.Sleep(appMode ? 2000 : 1000); // App mode needs extra time for initial load
 
-            if (appMode && freshLaunch)
-            {
-                // App mode: Chrome already loaded URL via --app flag, just inject WebBot bar
-                Console.Write($"[WEB] Injecting WebBot bar... ");
-                cdp.InjectBarAsync().GetAwaiter().GetResult();
-            }
-            else
             {
                 Console.Write($"[WEB] Navigating to {url}... ");
                 cdp.NavigateAsync(url).GetAwaiter().GetResult();

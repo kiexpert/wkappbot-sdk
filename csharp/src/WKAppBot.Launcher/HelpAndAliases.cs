@@ -260,25 +260,29 @@ static class FocusGuard
 sealed class DimStderrWriter : System.IO.TextWriter
 {
     private readonly System.IO.TextWriter _inner;
+    private readonly bool _useAnsi;
     public DimStderrWriter(System.IO.TextWriter inner)
     {
         _inner = inner;
-        // Enable VT processing on stderr for ANSI codes on Windows console
-        try
+        if (!Console.IsErrorRedirected)
         {
-            var hErr = GetStdHandle(-12);
-            if (GetConsoleMode(hErr, out uint mode))
-                SetConsoleMode(hErr, mode | 0x0004); // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            // Enable VT processing on stderr for ANSI codes on Windows console
+            try
+            {
+                var hErr = GetStdHandle(-12);
+                if (GetConsoleMode(hErr, out uint mode))
+                    _useAnsi = SetConsoleMode(hErr, mode | 0x0004); // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            }
+            catch { }
         }
-        catch { }
     }
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr GetStdHandle(int n);
     [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool GetConsoleMode(IntPtr h, out uint m);
     [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool SetConsoleMode(IntPtr h, uint m);
     public override System.Text.Encoding Encoding => _inner.Encoding;
     public override void Write(char value) => _inner.Write(value);
-    public override void Write(string? value) { if (value != null) { _inner.Write("\x1b[2m"); _inner.Write(value); _inner.Write("\x1b[0m"); } }
-    public override void WriteLine(string? value) { _inner.Write("\x1b[2m"); _inner.WriteLine(value); _inner.Write("\x1b[0m"); }
+    public override void Write(string? value) { if (value == null) return; if (_useAnsi) { _inner.Write("\x1b[2m"); _inner.Write(value); _inner.Write("\x1b[0m"); } else _inner.Write(value); }
+    public override void WriteLine(string? value) { if (_useAnsi) { _inner.Write("\x1b[2m"); _inner.WriteLine(value); _inner.Write("\x1b[0m"); } else _inner.WriteLine(value); }
     public override void WriteLine() => _inner.WriteLine();
     public override void Flush() => _inner.Flush();
 }

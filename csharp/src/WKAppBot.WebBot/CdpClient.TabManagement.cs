@@ -416,6 +416,26 @@ public sealed partial class CdpClient
             return tid;
         }
 
+        // Step 2b: Exact URL match — reuse existing tab without navigating (prevents tab duplication)
+        if (!string.IsNullOrWhiteSpace(navigateUrl))
+        {
+            foreach (var target in allTargets)
+            {
+                if (target?["type"]?.GetValue<string>() != "page") continue;
+                var tid = target?["id"]?.GetValue<string>();
+                var url = target?["url"]?.GetValue<string>() ?? "";
+                if (tid == null || url.Contains("#wkbot-", StringComparison.Ordinal)) continue;
+                if (string.Equals(url, navigateUrl, StringComparison.OrdinalIgnoreCase) ||
+                    url.StartsWith(navigateUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"[WEB] Reusing exact-URL tab {tid} for {navigateUrl}");
+                    if (tid != TargetId) await SwitchToTargetAsync(tid, port);
+                    if (minimizeAfter) await MinimizeWindowAsync(tid);
+                    return tid;
+                }
+            }
+        }
+
         // Step 3: Claim untagged tab in correctly-positioned window
         foreach (var target in allTargets)
         {
