@@ -187,7 +187,12 @@ internal partial class Program
 
         // Mirror all stderr to OutputDebugString — useful for MCP server debugging (no pipe pollution).
         // Capture with: wkappbot logcat --dbg [pid]
-        Console.SetError(new DebugStringWriter(Console.Error));
+        // Prefix: wkappbot:{pid}-{cmd}-{subcmd}> so each line identifies which command produced it.
+        {
+            var dbgCmd = args.FirstOrDefault(a => !a.StartsWith('-'));
+            var dbgSub = dbgCmd != null ? args.SkipWhile(a => a != dbgCmd).Skip(1).FirstOrDefault(a => !a.StartsWith('-')) : null;
+            Console.SetError(new DebugStringWriter(Console.Error, dbgCmd, dbgSub));
+        }
 
         // --args-file <path>: UTF-8 file fallback for Korean args garbled via bash→PowerShell CP949
         {
