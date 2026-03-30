@@ -291,7 +291,9 @@ internal partial class Program
                     // UIA focused LEAF element — TreeWalker + HasKeyboardFocus (works for background windows)
                     try
                     {
+                        PulseStep.Mark("focus-uia-init");
                         using var uia = new FlaUI.UIA3.UIA3Automation();
+                        PulseStep.Mark("focus-uia-from-handle");
                         FlaUI.Core.AutomationElements.AutomationElement? focusEl = null;
                         // Get UIA root from hwndFocus, then walk to leaf with HasKeyboardFocus
                         try
@@ -753,7 +755,7 @@ internal partial class Program
                     totalCount++;
                     parentPrinted = true;
                 }
-                if (!hasFilter && ownerCandidateMatcher != null && info == null)
+                if (ownerCandidateMatcher != null && info == null)
                 {
                     // ── Owner chain candidate: even 0x0/hidden windows that match pattern ──
                     var owner = NativeMethods.GetWindow(hWnd, 4 /* GW_OWNER */);

@@ -338,6 +338,8 @@ internal partial class Program
     /// <summary>Wait for ChatGPT editor to be ready. Returns the working CSS selector.</summary>
     static async Task<string?> WaitForChatGptEditorA11y(CdpClient cdp)
     {
+        // Restore Chrome if minimized — V8 throttles JS when iconic, causing eval timeouts
+        cdp.EnsureChromeNotIconic();
         Console.Write("[EDITOR-WAIT]");
         var sw = Stopwatch.StartNew();
         for (int attempt = 0; attempt < 20; attempt++)
@@ -361,6 +363,8 @@ internal partial class Program
     /// <summary>Generic a11y-first editor wait with custom selector chain.</summary>
     static async Task<string?> WaitForEditorA11y(CdpClient cdp, params string[] selectors)
     {
+        // Restore Chrome if minimized — V8 throttles JS when iconic, causing eval timeouts
+        cdp.EnsureChromeNotIconic();
         for (int attempt = 0; attempt < 20; attempt++)
         {
             foreach (var sel in selectors)

@@ -33,6 +33,8 @@ internal partial class Program
 
     static async Task<string?> WaitForClaudeEditorA11y(CdpClient cdp)
     {
+        // Restore Chrome if minimized — V8 throttles JS when iconic, causing eval timeouts
+        cdp.EnsureChromeNotIconic();
         for (int attempt = 0; attempt < 20; attempt++)
         {
             foreach (var sel in ClaudeEditorSelectors)

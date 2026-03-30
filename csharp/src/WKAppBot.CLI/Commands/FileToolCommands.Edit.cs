@@ -42,7 +42,7 @@ internal partial class Program
         }
 
         // Search for backups in two formats:
-        // 1. New: .bak/ subfolder — {dir}/.bak/{filename}.{timestamp}
+        // 1. New: .bak/ subfolder — {dir}/.bak/{filename}.bak-{yyyyMMdd-HHmmss.fff}.txt
         // 2. Legacy: sibling files — {original}.bak-{timestamp}.txt
         var restorePairs = new List<(string backup, string original)>();
 
@@ -54,16 +54,17 @@ internal partial class Program
             foreach (var bakFile in Directory.EnumerateFiles(bakDir))
             {
                 var fn = Path.GetFileName(bakFile);
-                // Format: {originalFilename}.{YYYYMMDD-HHmmss.fff}
-                // Find last dot-separated timestamp (20-char: YYYYMMDD-HHmmss.fff)
+                // Format: {originalFilename}.bak-{YYYYMMDD-HHmmss.fff}
                 if (!fn.Contains(atPrefix)) continue;
-                var lastDot = fn.LastIndexOf('.');
-                if (lastDot < 0) continue;
-                var tsCandidate = fn[(lastDot + 1)..];
+                var bakMarker = fn.LastIndexOf(".bak-", StringComparison.Ordinal);
+                if (bakMarker < 0) continue;
+                var tsCandidate = fn[(bakMarker + 5)..]; // after ".bak-", may end in .txt
+                if (tsCandidate.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+                    tsCandidate = tsCandidate[..^4];
                 // Timestamp should be >= 15 chars (YYYYMMDD-HHmmss)
                 if (tsCandidate.Length >= 15 && tsCandidate.Contains(atPrefix))
                 {
-                    var origName = fn[..lastDot];
+                    var origName = fn[..bakMarker];
                     var origPath = Path.Combine(parentDir, origName);
                     restorePairs.Add((bakFile, origPath));
                 }
@@ -123,12 +124,13 @@ internal partial class Program
         {
             try
             {
-                // Save current file before undo (undo-of-undo safety net)
+                // Save current file before undo (undo-of-undo safety net) → .bak/ subfolder
                 if (File.Exists(orig))
                 {
                     var undoTs = DateTime.Now.ToString("yyyyMMdd-HHmmss.fff");
-                    var undoBak = $"{orig}.undo-{undoTs}.txt";
-                    File.Copy(orig, undoBak);
+                    var undoBakDir = Path.Combine(Path.GetDirectoryName(orig)!, ".bak");
+                    var undoBak = Path.Combine(undoBakDir, $"{Path.GetFileName(orig)}.bak-{undoTs}-undo.txt");
+                    try { Directory.CreateDirectory(undoBakDir); File.Copy(orig, undoBak); } catch { }
                     Console.WriteLine($"  [backup] {Path.GetFileName(undoBak)}");
                 }
                 File.Copy(bak, orig, overwrite: true);
@@ -257,7 +259,7 @@ internal partial class Program
                 var bakSubDir = Path.Combine(dir, ".bak");
                 if (Directory.Exists(bakSubDir))
                 {
-                    bakFile = Directory.EnumerateFiles(bakSubDir, $"{baseName}.*")
+                    bakFile = Directory.EnumerateFiles(bakSubDir, $"{baseName}.bak-*.txt")
                         .Where(f => Path.GetFileName(f).Contains(undoTimestamp))
                         .OrderByDescending(f => f)
                         .FirstOrDefault();
@@ -279,12 +281,13 @@ internal partial class Program
                     return 1;
                 }
 
-                // Safety: backup current file before undo (undo-of-undo)
+                // Safety: backup current file before undo (undo-of-undo) → .bak/ subfolder
                 if (File.Exists(path))
                 {
                     var undoTs = DateTime.Now.ToString("yyyyMMdd-HHmmss.fff");
-                    var undoBak = $"{path}.undo-{undoTs}.txt";
-                    File.Copy(path, undoBak);
+                    var undoBakDir = Path.Combine(Path.GetDirectoryName(path)!, ".bak");
+                    var undoBak = Path.Combine(undoBakDir, $"{Path.GetFileName(path)}.bak-{undoTs}-undo.txt");
+                    try { Directory.CreateDirectory(undoBakDir); File.Copy(path, undoBak); } catch { }
                     Console.WriteLine($"[file edit --undo] safety backup → {Path.GetFileName(undoBak)}");
                 }
 
@@ -449,7 +452,7 @@ internal partial class Program
             var ts = origMtime.ToString("yyyyMMdd-HHmmss.fff");
             var fileName = Path.GetFileName(plan.Path);
             var bakDir = Path.Combine(Path.GetDirectoryName(plan.Path)!, ".bak");
-            var bakPath = Path.Combine(bakDir, $"{fileName}.{ts}");
+            var bakPath = Path.Combine(bakDir, $"{fileName}.bak-{ts}.txt");
             try
             {
                 Directory.CreateDirectory(bakDir);
@@ -476,7 +479,7 @@ internal partial class Program
                 var ts = DateTime.Now.ToString("yyyyMMdd-HHmmss");
                 var dryBakDir = Path.Combine(Path.GetDirectoryName(plan.Path)!, ".bak");
                 var dryFileName = Path.GetFileName(plan.Path);
-                var backupPath = Path.Combine(dryBakDir, $"{dryFileName}.{aiName}-{ts}");
+                var backupPath = Path.Combine(dryBakDir, $"{dryFileName}.bak-{ts}-{aiName}.txt");
                 try
                 {
                     Directory.CreateDirectory(dryBakDir);
@@ -603,49 +606,93 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Migrate legacy sibling .bak-*.txt backup files into .bak/ subfolder.
-    /// Called once per file-edit, scoped to the edited file's directory only.
-    /// Format: {original}.bak-YYYYMMDD-HHmmss.fff.txt → .bak/{original}.YYYYMMDD-HHmmss.fff
+    /// Migrate all legacy backup formats into current format (.bak/{original}.bak-{ts}.txt).
+    /// Phase 1: sibling .bak-*.txt files → move into .bak/ subfolder
+    /// Phase 2: .bak/ files without .txt extension (intermediate format) → rename to add .txt
+    /// Called once per file-edit, walks up from sourceDir to git/svn root to catch all dirs.
     /// </summary>
     static void MigrateLegacyBackups(string sourceDir, string bakDir)
     {
-        try
+        // Walk up to project root (git/.svn/.wkappbot marker) — migrate all dirs en route
+        var dirs = new List<string>();
+        var cur = sourceDir;
+        while (!string.IsNullOrEmpty(cur))
         {
-            var legacyFiles = Directory.EnumerateFiles(sourceDir, "*.bak-*.txt", SearchOption.TopDirectoryOnly).ToList();
-            if (legacyFiles.Count == 0) return;
+            dirs.Add(cur);
+            if (Directory.Exists(Path.Combine(cur, ".git")) ||
+                Directory.Exists(Path.Combine(cur, ".svn")) ||
+                Directory.Exists(Path.Combine(cur, ".wkappbot"))) break;
+            var parent = Path.GetDirectoryName(cur);
+            if (parent == cur || parent == null) break;
+            cur = parent;
+        }
 
-            int moved = 0;
-            foreach (var legacy in legacyFiles)
+        int totalMoved = 0;
+        foreach (var dir in dirs)
+        {
+            try
             {
-                var fn = Path.GetFileName(legacy);
-                // Parse: {originalName}.bak-{timestamp}.txt
-                var bakIdx = fn.LastIndexOf(".bak-", StringComparison.Ordinal);
-                if (bakIdx < 0) continue;
-                var origName = fn[..bakIdx];
-                var tsPart = fn[(bakIdx + 5)..]; // after ".bak-"
-                if (tsPart.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
-                    tsPart = tsPart[..^4]; // strip .txt
-                var newPath = Path.Combine(bakDir, $"{origName}.{tsPart}");
-                try
+                // Phase 1: sibling .bak-*.txt → .bak/ subfolder
+                var legacyFiles = Directory.EnumerateFiles(dir, "*.bak-*.txt", SearchOption.TopDirectoryOnly).ToList();
+                var targetBakDir = Path.Combine(dir, ".bak");
+                foreach (var legacy in legacyFiles)
                 {
-                    if (!File.Exists(newPath))
+                    var fn = Path.GetFileName(legacy);
+                    var bakIdx = fn.LastIndexOf(".bak-", StringComparison.Ordinal);
+                    if (bakIdx < 0) continue;
+                    var origName = fn[..bakIdx];
+                    var tsPart = fn[(bakIdx + 5)..];
+                    if (tsPart.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)) tsPart = tsPart[..^4];
+                    var newPath = Path.Combine(targetBakDir, $"{origName}.bak-{tsPart}.txt");
+                    try
                     {
-                        File.Move(legacy, newPath);
-                        moved++;
+                        Directory.CreateDirectory(targetBakDir);
+                        if (!File.Exists(newPath)) { File.Move(legacy, newPath); totalMoved++; }
+                        else { File.Delete(legacy); totalMoved++; }
                     }
-                    else
+                    catch { }
+                }
+
+                // Phase 2: .bak/ files missing .txt extension → rename
+                if (Directory.Exists(targetBakDir))
+                {
+                    foreach (var f in Directory.EnumerateFiles(targetBakDir, "*", SearchOption.TopDirectoryOnly))
                     {
-                        // Already exists in .bak/ — delete legacy duplicate
-                        File.Delete(legacy);
-                        moved++;
+                        var fn = Path.GetFileName(f);
+                        if (fn.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)) continue; // already correct
+                        if (!fn.Contains(".bak-")) continue; // not a backup file
+                        var renamed = f + ".txt";
+                        try { if (!File.Exists(renamed)) { File.Move(f, renamed); totalMoved++; } }
+                        catch { }
                     }
                 }
-                catch { /* skip individual file errors silently */ }
+
+                // Phase 3: sibling .undo-*.txt files (old undo-of-undo format) → .bak/ subfolder
+                // Old: {file}.undo-{ts}.txt  →  New: .bak/{file}.bak-{ts}-undo.txt
+                var undoFiles = Directory.EnumerateFiles(dir, "*.undo-*.txt", SearchOption.TopDirectoryOnly).ToList();
+                foreach (var undoFile in undoFiles)
+                {
+                    var fn = Path.GetFileName(undoFile);
+                    var undoIdx = fn.LastIndexOf(".undo-", StringComparison.Ordinal);
+                    if (undoIdx < 0) continue;
+                    var origName = fn[..undoIdx];
+                    var tsPart = fn[(undoIdx + 6)..]; // after ".undo-"
+                    if (tsPart.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)) tsPart = tsPart[..^4];
+                    var newPath = Path.Combine(targetBakDir, $"{origName}.bak-{tsPart}-undo.txt");
+                    try
+                    {
+                        Directory.CreateDirectory(targetBakDir);
+                        if (!File.Exists(newPath)) { File.Move(undoFile, newPath); totalMoved++; }
+                        else { File.Delete(undoFile); totalMoved++; }
+                    }
+                    catch { }
+                }
             }
-            if (moved > 0)
-                Console.WriteLine($"[file edit] migrated {moved} legacy backup(s) → {bakDir}");
+            catch { }
         }
-        catch { /* directory access error — non-critical */ }
+
+        if (totalMoved > 0)
+            Console.WriteLine($"[file edit] migrated {totalMoved} legacy backup(s) to current format");
     }
 
     static int GetLineIndent(string[] lines, int tabSize, int idx)
@@ -705,7 +752,7 @@ Usage:
       Without --replace-all: fails if old_string not found or matches multiple locations.
       --regex: old_string is a .NET regex; new_string may use $1/$2 capture groups.
       --i-really-want-lossy-encoding: allow '?' substitution for chars not encodable in target charset.
-      --i-really-want-no-backup: skip backup (default: backup ON — saves <file>.bak-HHMMSS.txt before writing).
+      --i-really-want-no-backup: skip backup (default: backup ON — saves .bak/<file>.bak-yyyyMMdd-HHmmss.fff.txt).
       --context N: lines of context around changes (default 1; 0 = header only).
 
   wkappbot file write <path> [--encoding N] (--stdin | --text ""..."" | --file <src>) [--append]

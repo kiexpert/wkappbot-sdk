@@ -940,6 +940,11 @@ internal partial class Program
     static async Task<(bool ok, string? ts, string? error)> SlackUpdateMessageAsync(
         string botToken, string channel, string ts, string text)
     {
+        // Hard cap: Slack chat.update rejects > 40,000 chars; stay well under to avoid msg_too_long
+        const int MaxSlackText = 39000;
+        if (text.Length > MaxSlackText)
+            text = text[..MaxSlackText] + "\n…(truncated)";
+
         using var http = new HttpClient();
         var payload = JsonSerializer.Serialize(new { channel, ts, text });
         var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
@@ -966,7 +971,7 @@ internal partial class Program
     /// Pass false for ack/reply messages that are themselves inside threads (not thread starters).
     /// </summary>
     static async Task<bool> SlackDeleteMessageAsync(string botToken, string channel, string ts,
-        bool guardThreadStarter = true)
+        bool guardThreadStarter = true, bool skipLastMsgProtection = false)
     {
         // ── Orphan detection: reply whose thread starter was deleted → always delete ──
         // Fetch message info to check if it's an orphaned reply
@@ -1026,7 +1031,8 @@ internal partial class Program
         }
 
         // ── Guard: protect last 2 messages per author+profile (message_limit fallback target) ──
-        if (await IsProtectedLastMessageAsync(botToken, channel, ts))
+        // skipLastMsgProtection=true bypasses this for explicit gc/cleanup callers
+        if (!skipLastMsgProtection && await IsProtectedLastMessageAsync(botToken, channel, ts))
         {
             Console.WriteLine($"[SLACK] SKIP delete ts={ts} — protected (last 2 per author)");
             return false;
@@ -1187,7 +1193,7 @@ internal partial class Program
     /// Get the latest message in a channel: (ts, reply_count).
     /// Used to check if our status streaming message is still at the bottom and has no replies.
     /// </summary>
-    static async Task<(string? ts, int replyCount, string? username, string? botId)> GetChannelLatestMessageInfo(string botToken, string channel)
+    static async Task<(string? ts, int replyCount, string? username, string? botId, string? text, string? iconEmoji)> GetChannelLatestMessageInfo(string botToken, string channel)
     {
         using var http = new HttpClient();
         using var req = new HttpRequestMessage(HttpMethod.Get,
@@ -1198,24 +1204,71 @@ internal partial class Program
         var body = await resp.Content.ReadAsStringAsync();
         var json = JsonSerializer.Deserialize<JsonNode>(body);
         var ok = json?["ok"]?.GetValue<bool>() ?? false;
-        if (!ok) return (null, 0, null, null);
+        if (!ok) return (null, 0, null, null, null, null);
 
         var messages = json?["messages"]?.AsArray();
-        if (messages == null || messages.Count == 0) return (null, 0, null, null);
+        if (messages == null || messages.Count == 0) return (null, 0, null, null, null, null);
 
         var msg = messages[0];
         var ts = msg?["ts"]?.GetValue<string>();
         var replyCount = msg?["reply_count"]?.GetValue<int>() ?? 0;
         var username = msg?["username"]?.GetValue<string>();
         var botId = msg?["bot_id"]?.GetValue<string>();
-        return (ts, replyCount, username, botId);
+        var text = msg?["text"]?.GetValue<string>();
+        // icon_emoji: Slack returns message-level icon override under icons.emoji
+        var iconEmoji = msg?["icons"]?["emoji"]?.GetValue<string>()
+                     ?? msg?["icon_emoji"]?.GetValue<string>();
+        return (ts, replyCount, username, botId, text, iconEmoji);
     }
 
     /// Backward-compat wrapper.
     static async Task<string?> GetChannelLatestMessageTs(string botToken, string channel)
     {
-        var (ts, _, _, _) = await GetChannelLatestMessageInfo(botToken, channel);
+        var (ts, _, _, _, _, _) = await GetChannelLatestMessageInfo(botToken, channel);
         return ts;
+    }
+
+    /// <summary>
+    /// Fetch the last N channel messages and find the most recent bot status message.
+    /// Returns (ownTs: found our exact ts, adoptTs: first bot status ts found, botId).
+    /// Used by PostOrUpdateAiStatusAsync to decide whether to edit-in-place or post new.
+    /// </summary>
+    static async Task<(bool ownFound, string? adoptTs, string? adoptBotId, bool isVeryLatest)> FindRecentBotStatus(
+        string botToken, string channel, string? ourTs, int limit = 6)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            using var req = new HttpRequestMessage(HttpMethod.Get,
+                $"https://slack.com/api/conversations.history?channel={channel}&limit={limit}");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+
+            var resp = await http.SendAsync(req);
+            var body = await resp.Content.ReadAsStringAsync();
+            var json = JsonSerializer.Deserialize<JsonNode>(body);
+            if (!(json?["ok"]?.GetValue<bool>() ?? false)) return (false, null, null, false);
+
+            var messages = json?["messages"]?.AsArray();
+            if (messages == null || messages.Count == 0) return (false, null, null, false);
+
+            var latestTs = messages[0]?["ts"]?.GetValue<string>();
+            bool ownFound = ourTs != null && messages.Any(m => m?["ts"]?.GetValue<string>() == ourTs);
+            if (ownFound) return (true, ourTs, null, latestTs == ourTs);
+
+            // Find first bot message with profile icon (icon_emoji set) among last N messages
+            for (int i = 0; i < messages.Count; i++)
+            {
+                var msg = messages[i];
+                var botId     = msg?["bot_id"]?.GetValue<string>();
+                var iconEmoji = msg?["icons"]?["emoji"]?.GetValue<string>()
+                             ?? msg?["icon_emoji"]?.GetValue<string>();
+                var ts = msg?["ts"]?.GetValue<string>();
+                if (botId != null && iconEmoji != null && ts != null)
+                    return (false, ts, botId, i == 0);
+            }
+        }
+        catch { }
+        return (false, null, null, false);
     }
 
     /// <summary>

@@ -46,6 +46,9 @@ internal sealed class TriadSharedContext
     /// <summary>When true, moderator intervenes (STANCE check, format enforcement). Off during R0.</summary>
     public bool ModeratorEnabled { get; set; } = false;
 
+    /// <summary>The original user question — used by moderator redirect when debaters go off-topic.</summary>
+    public string OriginalQuestion => _question;
+
     // ── Live MD minutes: real-time debate transcript (APPEND mode) ──
     private string? _mdPath;
     private readonly object _mdLock = new();

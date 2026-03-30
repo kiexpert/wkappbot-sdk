@@ -505,8 +505,19 @@ internal partial class Program
                                     string? idleHint = state.LastExecutingText;
                                     if (idleHint == null && state.LastSlackStatusText != null)
                                     {
-                                        var idx = state.LastSlackStatusText.IndexOf("Claude: ", StringComparison.Ordinal);
-                                        if (idx >= 0) idleHint = state.LastSlackStatusText[(idx + 8)..];
+                                        // Support both "Claude: text" (non-executing) and "Claude:\n```\ntext\n```" (executing)
+                                        var idxColon = state.LastSlackStatusText.IndexOf("Claude:\n```\n", StringComparison.Ordinal);
+                                        if (idxColon >= 0)
+                                        {
+                                            var start = idxColon + "Claude:\n```\n".Length;
+                                            var end = state.LastSlackStatusText.IndexOf("\n```", start, StringComparison.Ordinal);
+                                            if (end > start) idleHint = state.LastSlackStatusText[start..end];
+                                        }
+                                        else
+                                        {
+                                            var idx = state.LastSlackStatusText.IndexOf("Claude: ", StringComparison.Ordinal);
+                                            if (idx >= 0) idleHint = state.LastSlackStatusText[(idx + 8)..];
+                                        }
                                     }
                                     // Strip rate_limit artifacts from idle hint
                                     if (idleHint != null && (idleHint.Contains("한도") || idleHint.Contains("rate") || idleHint.Contains("리셋") || idleHint.Contains("Rate")))
@@ -548,7 +559,10 @@ internal partial class Program
                                     "rate_limit" => ":warning:",
                                     _ => ":robot_face:"
                                 };
-                                slackText = $"{statusEmoji} {slackLabel}Claude: {claudeStatus.Item2}";
+                                var statusBody = claudeStatus.Item2 ?? "";
+                                slackText = claudeStatus.Item1 == "executing"
+                                    ? $"{statusEmoji} {slackLabel}Claude:\n```\n{statusBody}\n```"
+                                    : $"{statusEmoji} {slackLabel}Claude: {statusBody}";
                             }
 
                             // File-size watermark: only stream if JSONL has grown since last successful post/edit.
@@ -876,19 +890,32 @@ internal partial class Program
 
         // ── Step 1: Is our status message still the latest in the channel? ──────────────────
         // "Latest = ours" → edit in place (streaming).
+        // "Latest = another Eye message" → adopt that ts and edit in place (no new post spam).
         // "Latest = someone else" → delete our old status + post new below.
         bool latestIsOurs = false;
         bool hasReplies = false;
 
-        if (state.SlackStatusTs != null)
+        try
         {
-            try
+            var (ownFound, adoptTs, adoptBotId, isVeryLatest) = await FindRecentBotStatus(slackBotToken, slackChannel, state.SlackStatusTs);
+            Console.WriteLine($"[EYE-DBG] ownFound={ownFound} adoptTs={adoptTs} adoptBotId={adoptBotId} isVeryLatest={isVeryLatest}");
+            if (ownFound)
             {
-                var (latestTs, _, _, _) = await GetChannelLatestMessageInfo(slackBotToken, slackChannel);
-                latestIsOurs = latestTs == state.SlackStatusTs;
+                latestIsOurs = true; // our ts is still in recent messages → edit in place
             }
-            catch { }
+            else if (adoptTs != null)
+            {
+                // Found a bot status message among recent N → adopt it (no new post needed)
+                state.SlackStatusTs = adoptTs;
+                SetWindowStringProp(hwnd, PropSlackTs, adoptTs);
+                latestIsOurs = true;
+                Console.WriteLine($"[EYE] Adopted bot status ts={adoptTs} → edit in place");
+            }
+        }
+        catch { }
 
+        if (state.SlackStatusTs != null && !latestIsOurs)
+        {
             try { hasReplies = await SlackMessageHasRepliesAsync(slackBotToken, slackChannel, state.SlackStatusTs); }
             catch { }
         }
@@ -899,15 +926,21 @@ internal partial class Program
                                 && (statusType == "idle" || state.LastStatusType == "idle");
         if (latestIsOurs && !hasReplies && !isIdleTransition)
         {
-            var (ok, _, editError) = await SlackUpdateMessageAsync(slackBotToken, slackChannel, state.SlackStatusTs!, slackText);
+            // Split: header → main ts, overflow → first summary reply (prevents msg_too_long on main)
+            var (statusHeader, statusOverflow) = SplitMessageForChannel(slackText);
+            var (ok, _, editError) = await SlackUpdateMessageAsync(slackBotToken, slackChannel, state.SlackStatusTs!, statusHeader);
             if (ok)
             {
+                // Update overflow into first summary reply if we have one
+                if (statusOverflow != null && _eyeSummaryReplyTs != null)
+                    await SlackUpdateMessageAsync(slackBotToken, slackChannel, _eyeSummaryReplyTs, statusOverflow);
+
                 state.LastStatusType = statusType;
                 state.LastSlackStatusText = slackText;
-                if (jsonlSize > 0) state.LastPostedJsonlSize = jsonlSize; // advance watermark
+                if (jsonlSize > 0) state.LastPostedJsonlSize = jsonlSize;
                 SetWindowStringProp(hwnd, PropAiOut, slackText);
                 SetWindowStringProp(hwnd, PropStatusType, statusType);
-                Console.WriteLine($"[EYE] Edit [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
+                Console.WriteLine($"[EYE] Edit [{statusType}]: {statusHeader[..Math.Min(statusHeader.Length, 80)]}");
             }
             else
             {

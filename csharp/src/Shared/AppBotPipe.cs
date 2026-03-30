@@ -214,6 +214,12 @@ internal static class AppBotPipe
             CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB, IntPtr.Zero, cwd,
             ref si, out var pi, caller);
 
+        // err=5 (ACCESS_DENIED): job object may not allow breakaway — retry without that flag
+        if (!ok && Marshal.GetLastWin32Error() == 5)
+            ok = CreateProcess(null, cmdLine, IntPtr.Zero, IntPtr.Zero,
+                needPipes, CREATE_NO_WINDOW, IntPtr.Zero, cwd,
+                ref si, out pi, caller + "-no-breakaway");
+
         // Restore parent env (don't pollute caller process)
         if (savedEnv != null)
             foreach (var kv in savedEnv)

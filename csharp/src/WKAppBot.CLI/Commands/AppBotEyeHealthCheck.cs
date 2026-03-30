@@ -266,7 +266,8 @@ internal partial class Program
 
     static List<EyeParentCard> ReadEyeCards(int staleSeconds = 86400)
     {
-        // KEY = normalized CWD (folder-based grouping: same folder = one card, survives PID restart)
+        // KEY = sessionJsonl path when available (one card per conversation, survives PID restart).
+        // Falls back to promptHwnd, then CWD (legacy).
         var cards = new Dictionary<string, EyeParentCard>(StringComparer.OrdinalIgnoreCase);
         var now = DateTime.UtcNow;
 
@@ -280,8 +281,16 @@ internal partial class Program
                 var cwdKey = (s.Cwd ?? "").Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
                 if (string.IsNullOrEmpty(cwdKey)) continue;
 
-                var cardKey = !string.IsNullOrEmpty(s.PromptHwnd) ? s.PromptHwnd : cwdKey;
+                // Use SessionJsonl as primary key — deduplicates multiple PIDs sharing the same conversation.
+                var jsonlKey = !string.IsNullOrEmpty(s.SessionJsonl)
+                    ? s.SessionJsonl.Replace('\\', '/').ToLowerInvariant()
+                    : null;
+                var cardKey = jsonlKey ?? (!string.IsNullOrEmpty(s.PromptHwnd) ? s.PromptHwnd : cwdKey);
                 var hbUtc = DateTime.TryParse(s.Heartbeat, out var hb) ? hb.ToUniversalTime() : now;
+
+                // When multiple sessions point to the same JSONL, keep the most recent heartbeat.
+                if (cards.TryGetValue(cardKey, out var existing) && existing.LastTsUtc >= hbUtc)
+                    continue;
 
                 cards[cardKey] = new EyeParentCard
                 {

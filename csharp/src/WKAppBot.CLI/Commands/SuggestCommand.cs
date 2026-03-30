@@ -5,12 +5,9 @@ using System.Text.Json.Nodes;
 
 namespace WKAppBot.CLI;
 
-// partial class: wkappbot suggest "건의 내용" [file.png] — webhook + file upload to #클봇-전체
+// partial class: wkappbot suggest "건의 내용" [file.png] — slack send to current channel
 internal partial class Program
 {
-    // Hardcoded webhook + channel for #클봇-전체
-    const string SuggestWebhookUrl = "https://hooks.slack.com/services/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";
-    const string SuggestChannel = "C0A21P52EAH";
 
     static int SuggestCommand(string[] args)
     {
@@ -97,59 +94,32 @@ internal partial class Program
 
         string? messageTs = null;
 
-        // Split message: short channel header + optional thread overflow (same as slack send)
-        var (header, overflow) = SplitMessageForChannel(slackMsg);
-
-        var botToken = LoadSlackBotToken();
-        if (!string.IsNullOrEmpty(botToken))
+        // Send via normal slack send channel (LoadSlackConfig — same as 'wkappbot slack send')
+        var config = LoadSlackConfig();
+        var botToken = config?["bot_token"]?.GetValue<string>();
+        var channel  = config?["channel"]?.GetValue<string>();
+        if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
         {
             var senderName = GetSendReplyUsername();
-            var (ok, ts) = SlackSendViaApi(botToken, SuggestChannel, header, username: senderName).GetAwaiter().GetResult();
+            var (ok, ts) = PostWithOverflow(botToken, channel, slackMsg, username: senderName);
             if (ok)
             {
                 messageTs = ts;
-                Console.WriteLine($"[SUGGEST] Slack sent: {header.Split('\n')[0]}{(overflow != null || files.Count > 0 ? " (+thread)" : "")}");
-                // Post overflow as thread reply
-                if (overflow != null)
-                {
-                    foreach (var chunk in ChunkText(overflow, 3900))
-                        SlackSendViaApi(botToken, SuggestChannel, chunk, threadTs: messageTs, username: senderName).GetAwaiter().GetResult();
-                    Console.WriteLine($"[SUGGEST] Thread: {overflow.Split('\n').Length} overflow line(s)");
-                }
-                // Upload files as thread replies
+                Console.WriteLine($"[SUGGEST] Slack sent (+{files.Count} file(s))");
                 foreach (var f in files)
                 {
                     Console.WriteLine($"[SUGGEST] Uploading {Path.GetFileName(f)}...");
-                    SlackUploadFileAsync(botToken, SuggestChannel, f,
+                    SlackUploadFileAsync(botToken, channel, f,
                         title: Path.GetFileName(f), threadTs: messageTs).GetAwaiter().GetResult();
                 }
                 if (files.Count > 0) Console.WriteLine("[SUGGEST] File(s) uploaded OK");
             }
             else
-                Console.Error.WriteLine("[SUGGEST] chat.postMessage failed");
-        }
-        else if (files.Count == 0)
-        {
-            // No bot token, no files — use webhook (fast fallback)
-            try
-            {
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-                var payload = JsonSerializer.Serialize(new { text = slackMsg });
-                var content = new StringContent(payload, Encoding.UTF8, "application/json");
-                var resp = http.PostAsync(SuggestWebhookUrl, content).GetAwaiter().GetResult();
-                if (resp.IsSuccessStatusCode)
-                    Console.WriteLine("[SUGGEST] Slack webhook OK");
-                else
-                    Console.Error.WriteLine($"[SUGGEST] Webhook failed: {resp.StatusCode}");
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[SUGGEST] Webhook error: {ex.Message}");
-            }
+                Console.Error.WriteLine("[SUGGEST] Slack send failed");
         }
         else
         {
-            Console.Error.WriteLine("[SUGGEST] No bot_token found — cannot upload files.");
+            Console.Error.WriteLine("[SUGGEST] No Slack config found — saved locally only (run 'wkappbot slack setup' to configure)");
         }
 
         // Save to HQ suggestions.jsonl
@@ -212,8 +182,10 @@ internal partial class Program
 
         if (unsynced.Count > 0)
         {
-            var botToken = LoadSlackBotToken();
-            if (!string.IsNullOrEmpty(botToken))
+            var syncCfg = LoadSlackConfig();
+            var botToken = syncCfg?["bot_token"]?.GetValue<string>();
+            var syncChannel = syncCfg?["channel"]?.GetValue<string>();
+            if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(syncChannel))
             {
                 // Use HQ file mtime as oldest — only fetch Slack messages since last local update
                 var fileMtime = File.GetLastWriteTimeUtc(jsonlPath);
@@ -226,7 +198,7 @@ internal partial class Program
                         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
                         http.DefaultRequestHeaders.Authorization =
                             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
-                        var url = $"https://slack.com/api/conversations.history?channel={SuggestChannel}&limit=200&oldest={oldestUnix}";
+                        var url = $"https://slack.com/api/conversations.history?channel={syncChannel}&limit=200&oldest={oldestUnix}";
                         var resp = http.GetAsync(url).GetAwaiter().GetResult();
                         var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                         var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(body);
@@ -365,10 +337,12 @@ internal partial class Program
             return 1;
         }
 
-        var botToken = LoadSlackBotToken();
-        if (string.IsNullOrEmpty(botToken))
+        var repostCfg = LoadSlackConfig();
+        var botToken = repostCfg?["bot_token"]?.GetValue<string>();
+        var channel  = repostCfg?["channel"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
         {
-            Console.Error.WriteLine("[REPOST] No bot_token — cannot send to Slack");
+            Console.Error.WriteLine("[REPOST] No Slack config — cannot send to Slack");
             return 1;
         }
 
@@ -406,7 +380,7 @@ internal partial class Program
             var (header, overflow) = SplitMessageForChannel(slackMsg);
             var senderName = GetSendReplyUsername();
 
-            var (ok, newTs) = SlackSendViaApi(botToken, SuggestChannel, header, username: senderName).GetAwaiter().GetResult();
+            var (ok, newTs) = SlackSendViaApi(botToken, channel, header, username: senderName).GetAwaiter().GetResult();
             if (!ok || string.IsNullOrEmpty(newTs))
             {
                 Console.Error.WriteLine($"[REPOST] Slack send failed for {entryTs}");
@@ -417,7 +391,7 @@ internal partial class Program
             if (overflow != null)
             {
                 foreach (var chunk in ChunkText(overflow, 3900))
-                    SlackSendViaApi(botToken, SuggestChannel, chunk, threadTs: newTs, username: senderName).GetAwaiter().GetResult();
+                    SlackSendViaApi(botToken, channel, chunk, threadTs: newTs, username: senderName).GetAwaiter().GetResult();
             }
 
             Console.WriteLine($"[REPOST] Sent → slack_ts={newTs}");
@@ -738,14 +712,16 @@ internal partial class Program
         // Slack reply if slack_ts is available — uses shared SlackSendViaApi (same as 'slack reply')
         if (!string.IsNullOrEmpty(slackTs))
         {
-            var botToken = LoadSlackBotToken();
-            if (!string.IsNullOrEmpty(botToken))
+            var resolveCfg = LoadSlackConfig();
+            var botToken = resolveCfg?["bot_token"]?.GetValue<string>();
+            var channel  = resolveCfg?["channel"]?.GetValue<string>();
+            if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
             {
                 var replyText = $":white_check_mark: *RESOLVED* — {note}\n:page_facing_up: Evidence: `{Path.GetFileName(evidenceFile)}`";
                 var resolverName = GetSendReplyUsername();
 
                 // 1. Text reply with reply_broadcast → visible in channel + thread
-                var (textOk, _) = SlackSendViaApi(botToken, SuggestChannel, replyText,
+                var (textOk, _) = SlackSendViaApi(botToken, channel, replyText,
                     threadTs: slackTs, username: resolverName, replyBroadcast: true).GetAwaiter().GetResult();
                 if (textOk)
                     Console.WriteLine($"[RESOLVE] Slack reply sent to thread {slackTs} (+ channel broadcast)");
@@ -755,7 +731,7 @@ internal partial class Program
                 // 2. Upload evidence file to thread (thread-only, no broadcast)
                 try
                 {
-                    SlackUploadFileAsync(botToken, SuggestChannel, evidenceFile,
+                    SlackUploadFileAsync(botToken, channel, evidenceFile,
                         title: Path.GetFileName(evidenceFile), threadTs: slackTs).GetAwaiter().GetResult();
                     Console.WriteLine($"[RESOLVE] Evidence uploaded to thread");
                 }
@@ -763,7 +739,7 @@ internal partial class Program
             }
             else
             {
-                Console.Error.WriteLine("[RESOLVE] No bot_token — Slack reply skipped");
+                Console.Error.WriteLine("[RESOLVE] No Slack config — Slack reply skipped");
             }
         }
         else
@@ -867,8 +843,9 @@ internal partial class Program
                 // Slack alert with edit hints
                 try
                 {
-                    var botToken = LoadSlackBotToken();
-                    var channel = SuggestChannel;
+                    var regCfg = LoadSlackConfig();
+                    var botToken = regCfg?["bot_token"]?.GetValue<string>();
+                    var channel  = regCfg?["channel"]?.GetValue<string>();
                     if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
                     {
                         var lines = new System.Text.StringBuilder();
@@ -890,16 +867,4 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>Load bot_token from webhook.json.</summary>
-    static string? LoadSlackBotToken()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq", "profiles", "slack_exp", "webhook.json");
-        if (!File.Exists(path)) return null;
-        try
-        {
-            var json = JsonSerializer.Deserialize<JsonNode>(File.ReadAllText(path));
-            return json?["bot_token"]?.GetValue<string>();
-        }
-        catch { return null; }
-    }
 }
