@@ -58,8 +58,16 @@ internal partial class Program
                 // Search key: "[pid]processName.exe" — substring by default
                 var nodeKey = $"[{p.Id}]{procName}.exe";
 
+                // cmdLine is populated lazily: only fetched on name-miss (perf),
+                // then reused for protection checks, argFilter, and display.
+                string cmdLine = "";
+
                 if (!targetMatcher.IsMatch(nodeKey) && !targetMatcher.IsMatch(procName))
-                    continue;
+                {
+                    // Last chance: cmdline search (same as grap windows behavior)
+                    try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
+                    if (!targetMatcher.IsMatch(cmdLine)) continue;
+                }
 
                 if (exeMatcher != null && !exeMatcher.IsMatch(string.IsNullOrEmpty(exePath) ? nodeKey : exePath))
                     continue;
@@ -80,9 +88,9 @@ internal partial class Program
                     continue;
                 }
 
-                // Get command line for display + protection + --arg filter
-                string cmdLine = "";
-                try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
+                // Get command line for display + protection + --arg filter (may already be populated above)
+                if (string.IsNullOrEmpty(cmdLine))
+                    try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
                 var cmdBrief = cmdLine.Length > 80 ? cmdLine[..80] + "..." : cmdLine;
 
                 // --arg=<substring>: filter by cmdline argument
