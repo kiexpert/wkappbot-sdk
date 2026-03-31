@@ -1,4 +1,4 @@
-# WKAppBot v5.5.0 - Windows + Android App Automation Test Framework
+# WKAppBot v5.6.0 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -84,6 +84,21 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
 4. 픽셀해시 캐시 (`aid'hash=description.png`) + Experience DB 레이아웃해시별 저장
 5. CCA 파라미터 자동 튜닝 (Gemini 피드백 → EMA α감쇠, 프로세스/컨트롤/레이아웃별)
 6. 테이블 그리드 자동 감지 (Separator → 행/열 경계 → 셀별 OCR)
+
+### AppBotPipe 완전 통합 + 포커스 보호 (v5.6)
+- **모든 프로세스 생성 AppBotPipe 통과**: `Spawn()` / `StartTracked()` — CreateProcessW 훅 보장
+  - `StartTracked()`: `UseShellExecute=true` (runas 제외) 차단, `CreateNoWindow=true` + `WindowStyle=Hidden` 강제
+  - `Spawn()`: `STARTF_USESHOWWINDOW + SW_HIDE + CREATE_NO_WINDOW` 항상 적용
+- **FocusLaunchTracker**: 포커스 탈취 프로세스 추적 DB (`runtime/focus_launch.json`)
+  - `requiresFocus=false` (기본): 첫 실행 포커스리스 → 600ms 후 포그라운드 변경 감지 → 자동 등록
+  - `requiresFocus=true`: 즉시 승인 팝업 (Win32 MessageBox, MB_TOPMOST | MB_SYSTEMMODAL)
+  - `_selfExe` 면제: wkappbot.exe 자기 자신(whisper-ring/screensaver/MCP) 항상 신뢰
+  - `Wire()`: Program.cs 시작 시 AppBotPipe 콜백 3개 연결
+- **워치독 VBS 강화**: 발동 = Eye 2분+ 사망 비정상 상황
+  - `watchdog.log` 타임스탬프 기록
+  - WMI로 wkappbot-core.exe(`% mcp%` 제외) 전부 종료 후 1s 대기 → eye tick
+  - 핫스왑 진입 즉시 `DisableEyeWatchdogTask()` → 신규 Eye가 재활성화
+- **windows --cmd=\<substring\>**: cmdline 기반 창 필터 (예: `windows chrome --cmd=remote-debugging-port`)
 
 ### Eye MCP Architecture (v4.9)
 - **EyeMcpClient**: Eye→MCP 워커(Core) 파이프 연결, 모든 a11y/UIA를 MCP 서브프로세스로 라우팅
