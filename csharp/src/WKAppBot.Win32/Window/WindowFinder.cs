@@ -108,11 +108,10 @@ public static class WindowFinder
             // Token-AND match: plain multi-word patterns check each token in title+searchKey (order-independent)
             bool matched = PatternMatcher.TokenMatchAny(titlePattern, title, searchKey);
 
-            // URL fallback: for Chrome/Edge without a title match, fetch active/all tab URLs
-            if (!matched && (procName.Equals("chrome", StringComparison.OrdinalIgnoreCase)
-                          || procName.Equals("msedge", StringComparison.OrdinalIgnoreCase)))
+            // URL fallback: any browser exposing URL via UIA a11y tree or CDP
+            if (!matched)
             {
-                var url = GetChromeUrl(hWnd, pid, procName);
+                var url = GetBrowserUrl(hWnd, pid);
                 if (!string.IsNullOrEmpty(url))
                     matched = PatternMatcher.TokenMatchAny(titlePattern, url);
             }
@@ -781,14 +780,17 @@ public static class WindowFinder
         Console.Write("\r" + new string(' ', Math.Max(w - 1, 80)) + "\r");
     }
 
-    // ── Chrome/Edge URL fetch (Tier 1: CDP HTTP, Tier 2: UIA omnibox) ──
-    // Returns all tab URLs (space-joined) for CDP, or active-tab URL for UIA.
-    // Results cached per PID (CDP) / HWND (UIA) with 5s TTL.
-    static string GetChromeUrl(IntPtr hWnd, uint pid, string procName)
+    // ── Browser URL fetch — 4-tier fallback, any browser ──
+    // Tier 1: CDP HTTP /json          — Chromium + --remote-debugging-port (all tabs)
+    // Tier 2: UIA known address bar IDs — omnibox_view (Chrome/Edge/Brave), urlbar-input (Firefox)
+    // Tier 3: UIA ControlType.Edit in ToolBar + URL heuristic — standard UIA, any compliant browser
+    // Tier 4: UIA ControlType.Document → LegacyIAccessible.Value — W3C a11y standard
+    // Results cached per PID (Tier 1) / HWND (Tier 2-4) with 5s TTL.
+    static string GetBrowserUrl(IntPtr hWnd, uint pid)
     {
         var now = DateTime.UtcNow;
 
-        // Tier 1: CDP HTTP — requires --remote-debugging-port in cmdline
+        // Tier 1: CDP HTTP — Chromium only, requires --remote-debugging-port
         if (!_cdpPidUrlCache.TryGetValue(pid, out var cdpEntry) || now - cdpEntry.cachedAt >= _urlCacheTtl)
         {
             string cdpUrls = "";
@@ -810,26 +812,55 @@ public static class WindowFinder
         }
         if (!string.IsNullOrEmpty(cdpEntry.urls)) return cdpEntry.urls;
 
-        // Tier 2: UIA omnibox_view — active tab URL (no CDP needed)
         if (hWnd == IntPtr.Zero) return "";
-        if (!_uiaOmniboxCache.TryGetValue(hWnd, out var uiaEntry) || now - uiaEntry.cachedAt >= _urlCacheTtl)
+        if (_uiaOmniboxCache.TryGetValue(hWnd, out var uiaEntry) && now - uiaEntry.cachedAt < _urlCacheTtl)
+            return uiaEntry.url;
+
+        string url = "";
+        if (!_lazyUiaFailed)
         {
-            string uiaUrl = "";
-            if (!_lazyUiaFailed)
+            try
             {
-                try
+                _lazyUia ??= new UIA3Automation();
+                var root = _lazyUia.FromHandle(hWnd);
+                if (root != null)
                 {
-                    _lazyUia ??= new UIA3Automation();
-                    var root = _lazyUia.FromHandle(hWnd);
-                    var omnibox = root?.FindFirstDescendant(cf => cf.ByAutomationId("omnibox_view"));
-                    uiaUrl = omnibox?.Patterns.Value.PatternOrDefault?.Value.ValueOrDefault ?? "";
+                    // Tier 2: known address bar AutomationIds (Chrome/Edge/Brave = omnibox_view, Firefox = urlbar-input)
+                    var addrBar = root.FindFirstDescendant(cf =>
+                        cf.ByAutomationId("omnibox_view").Or(cf.ByAutomationId("urlbar-input")));
+                    url = addrBar?.Patterns.Value.PatternOrDefault?.Value.ValueOrDefault ?? "";
+
+                    // Tier 3: ControlType.Edit inside a ToolBar whose Value looks like a URL
+                    if (string.IsNullOrEmpty(url))
+                    {
+                        var toolbars = root.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ToolBar));
+                        foreach (var toolbar in toolbars)
+                        {
+                            var edits = toolbar.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Edit));
+                            foreach (var edit in edits)
+                            {
+                                var val = edit.Patterns.Value.PatternOrDefault?.Value.ValueOrDefault ?? "";
+                                if (val.Contains("://") || val.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+                                { url = val; break; }
+                            }
+                            if (!string.IsNullOrEmpty(url)) break;
+                        }
+                    }
+
+                    // Tier 4: ControlType.Document → LegacyIAccessible.Value (W3C a11y standard path)
+                    if (string.IsNullOrEmpty(url))
+                    {
+                        var doc = root.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Document));
+                        var legacyVal = doc?.Patterns.LegacyIAccessible.PatternOrDefault?.Value.ValueOrDefault ?? "";
+                        if (legacyVal.Contains("://")) url = legacyVal;
+                    }
                 }
-                catch { _lazyUiaFailed = true; }
             }
-            _uiaOmniboxCache[hWnd] = (uiaUrl, now);
-            uiaEntry = (uiaUrl, now);
+            catch { _lazyUiaFailed = true; }
         }
-        return uiaEntry.url;
+
+        _uiaOmniboxCache[hWnd] = (url, now);
+        return url;
     }
 }
 
