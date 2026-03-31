@@ -145,13 +145,13 @@ internal partial class Program
                     var txt = cdp.EvalAsync($"document.querySelector('{esc2}')?.textContent?.substring(0,200)||''").GetAwaiter().GetResult();
                     if (!string.IsNullOrWhiteSpace(txt) && txt != "''")
                     {
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo
                         {
                             FileName = "wkappbot",
                             Arguments = $"speak \"{txt.Replace("\"", "'")}\" --bg",
                             UseShellExecute = false,
                             CreateNoWindow = true
-                        });
+                        }, Environment.CurrentDirectory, "A11Y-CDP");
                     }
                 }
                 catch { /* best effort */ }

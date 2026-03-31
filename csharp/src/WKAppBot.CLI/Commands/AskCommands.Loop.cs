@@ -364,6 +364,7 @@ internal partial class Program
                 foreach (var a in argv)
                     p.StartInfo.ArgumentList.Add(a);
                 p.StartInfo.EnvironmentVariables["WKAPPBOT_LOOP_CALLER"] = executedBy;
+                p.StartInfo.WorkingDirectory = Environment.CurrentDirectory;
 
                 sw.Restart();
                 p.Start();

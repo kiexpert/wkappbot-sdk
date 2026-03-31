@@ -101,6 +101,7 @@ internal partial class Program
         foreach (var a in exeArgs) p.StartInfo.ArgumentList.Add(a);
         p.StartInfo.EnvironmentVariables["WKAPPBOT_LOOP_CALLER"] = executedBy;
         p.StartInfo.EnvironmentVariables["WKAPPBOT_RUN_ID"] = runId;
+        p.StartInfo.WorkingDirectory = Environment.CurrentDirectory;
 
         var entry = new RunEntry(runId, string.Join(" ", cmdArgv), p);
         p.OutputDataReceived += (_, e) =>

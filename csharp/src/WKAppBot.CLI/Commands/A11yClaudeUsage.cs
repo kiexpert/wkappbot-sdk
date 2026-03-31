@@ -450,7 +450,7 @@ internal partial class Program
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
-                Process.Start(psi)?.WaitForExit(5000);
+                AppBotPipe.StartTracked(psi, psi.WorkingDirectory.Length > 0 ? psi.WorkingDirectory : Environment.CurrentDirectory, "CLAUDE-USAGE")?.WaitForExit(5000);
                 Console.WriteLine("[USAGE] Slack alert sent");
             }
             catch (Exception ex)

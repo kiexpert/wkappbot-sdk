@@ -117,7 +117,7 @@ internal partial class Program
                     RedirectStandardError = true,
                     UseShellExecute = false,
                 };
-                using var proc = System.Diagnostics.Process.Start(psi)!;
+                using var proc = AppBotPipe.StartTracked(psi, psi.WorkingDirectory.Length > 0 ? psi.WorkingDirectory : Environment.CurrentDirectory, "HELP-BASH")!;
                 var stdout = proc.StandardOutput.ReadToEnd();
                 var stderr = proc.StandardError.ReadToEnd();
                 proc.WaitForExit(60_000);

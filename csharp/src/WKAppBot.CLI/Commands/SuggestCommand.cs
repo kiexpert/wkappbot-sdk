@@ -581,7 +581,7 @@ internal partial class Program
                 dbgListener.MessageReceived += (pid, msg) => { lock (dbgCapture) dbgCapture.AppendLine(msg); };
                 bool dbgStarted = dbgListener.TryStart();
 
-                var proc = System.Diagnostics.Process.Start(psi);
+                var proc = AppBotPipe.StartTracked(psi, psi.WorkingDirectory.Length > 0 ? psi.WorkingDirectory : Environment.CurrentDirectory, "SUGGEST");
                 var stdoutTask = Task.Run(() => proc?.StandardOutput.ReadToEnd() ?? "");
                 var stderrTask = Task.Run(() => proc?.StandardError.ReadToEnd() ?? "");
                 proc?.WaitForExit(120_000);
@@ -851,7 +851,7 @@ internal partial class Program
                     // WKAPPBOT_WORKER=1: prevents nested wkappbot calls from connecting to Eye pipe
                     // (avoids deadlock when suggest resolve is already running inside Eye)
                     psi.EnvironmentVariables["WKAPPBOT_WORKER"] = "1";
-                    var proc = System.Diagnostics.Process.Start(psi);
+                    var proc = AppBotPipe.StartTracked(psi, psi.WorkingDirectory.Length > 0 ? psi.WorkingDirectory : Environment.CurrentDirectory, "SUGGEST");
                     // Stream output live to console (prevents pipe-buffer deadlock + shows progress)
                     var rOut = Task.Run(() => {
                         string? line;

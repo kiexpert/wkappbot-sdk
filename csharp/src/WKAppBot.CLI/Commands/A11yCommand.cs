@@ -1263,13 +1263,13 @@ internal partial class Program
                     {
                         try
                         {
-                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                            AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo
                             {
                                 FileName = "wkappbot",
                                 Arguments = $"speak \"{speakText.Replace("\"", "'")}\" --bg",
                                 UseShellExecute = false,
                                 CreateNoWindow = true
-                            });
+                            }, Environment.CurrentDirectory, "A11Y");
                         }
                         catch { /* best effort */ }
                     }

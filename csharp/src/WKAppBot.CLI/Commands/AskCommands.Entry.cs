@@ -348,7 +348,7 @@ Examples:
         {
             Console.WriteLine($"[TRIAD] Live MD: {ctx.MdPath}");
             // Open in VS Code for real-time preview
-            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "code", Arguments = $"\"{ctx.MdPath}\"", UseShellExecute = true, CreateNoWindow = true }); } catch { }
+            try { AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo { FileName = "code", Arguments = $"\"{ctx.MdPath}\"", UseShellExecute = true, CreateNoWindow = true }, Environment.CurrentDirectory, "ASK-CODE"); } catch { }
         }
 
         var triadCwd = EyeCmdPipeServer.CallerCwd.Value;
