@@ -82,12 +82,18 @@ internal partial class Program
 
         // Use wscript.exe + VBS wrapper to suppress console window entirely.
         // VBScript ws.Run "...", 0 = hidden window (more reliable than conhost --headless).
+        // ws.CurrentDirectory sets CWD before launch — prevents system32 default.
         var vbsPath = Path.Combine(dir, "wkappbot-silent.vbs");
-        if (!File.Exists(vbsPath))
+        string? watchdogCwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : null;
+        if (watchdogCwd == null && File.Exists(EyeCwdFile))
         {
-            try { File.WriteAllText(vbsPath, $"Set ws = CreateObject(\"WScript.Shell\")\nws.Run \"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, False\n"); }
-            catch { }
+            var saved = File.ReadAllText(EyeCwdFile).Trim();
+            if (Directory.Exists(saved)) watchdogCwd = saved;
         }
+        var vbsContent = watchdogCwd != null
+            ? $"Set ws = CreateObject(\"WScript.Shell\")\nws.CurrentDirectory = \"{watchdogCwd}\"\nws.Run \"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, False\n"
+            : $"Set ws = CreateObject(\"WScript.Shell\")\nws.Run \"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, False\n";
+        try { File.WriteAllText(vbsPath, vbsContent); } catch { }
         var tr = File.Exists(vbsPath) ? $"wscript.exe \\\"{vbsPath}\\\"" : $"\\\"{launcherPath}\\\" eye tick --timeout 15";
         // /SC MINUTE /MO 2: repeating every 2 min — survives even if Eye's 60s refresh fails.
         // Eye's loop refreshes this every 60s (rolling defer), but if Eye dies the task keeps firing.
