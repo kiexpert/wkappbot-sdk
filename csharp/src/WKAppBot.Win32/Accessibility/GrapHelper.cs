@@ -347,7 +347,23 @@ public static class GrapHelper
         if (string.IsNullOrEmpty(grap))
             return (Array.Empty<string>(), null);
 
-        var hashIdx = grap.IndexOf('#');
+        // Find '#' that separates window grap from UIA scope.
+        // Skip over JSON5 multi-field block {...} so '#' inside quoted values doesn't split early.
+        var hashIdx = -1;
+        if (grap.StartsWith('{'))
+        {
+            int depth = 0;
+            bool inQuote = false; char quoteChar = '\0';
+            for (int ci = 0; ci < grap.Length; ci++)
+            {
+                var ch = grap[ci];
+                if (inQuote) { if (ch == quoteChar) inQuote = false; continue; }
+                if (ch == '\'' || ch == '"') { inQuote = true; quoteChar = ch; continue; }
+                if (ch == '{') depth++;
+                else if (ch == '}') { if (--depth == 0 && ci + 1 < grap.Length && grap[ci + 1] == '#') { hashIdx = ci + 1; break; } }
+            }
+        }
+        if (hashIdx < 0) hashIdx = grap.IndexOf('#');
         string win32Part = hashIdx >= 0 ? grap[..hashIdx] : grap;
         string? uiaPart = hashIdx >= 0 ? grap[(hashIdx + 1)..] : null;
 
