@@ -890,6 +890,43 @@ public static class WindowFinder
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
+    // JSON5 target pattern builder — usable as grap in any command
+    // ══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Build a JSON5 target pattern string for <paramref name="hWnd"/>.
+    /// Format: {hwnd:0xXXXXXXXX,pid:NNN,title:'...',domain:'...'}
+    /// domain is omitted if the window is not a browser or URL is unavailable.
+    /// The returned string can be used as a grap pattern in any command.
+    /// </summary>
+    public static string BuildTargetJson5(IntPtr hWnd, string? overrideTitle = null)
+    {
+        NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+
+        var title = overrideTitle ?? GetWindowText(hWnd);
+        // Trim " - Chrome / Chromium / Microsoft Edge" suffix
+        title = title.Split(new[] { " - Chrome", " - Chromium", " - Microsoft Edge" },
+                            StringSplitOptions.None)[0].Trim();
+        if (title.Length > 40) title = title[..37] + "...";
+        title = title.Replace("'", "\\'");
+
+        var domain = "";
+        try
+        {
+            var url = GetBrowserUrl(hWnd, pid);
+            if (!string.IsNullOrEmpty(url))
+                domain = new Uri(url.Split(' ')[0]).Host;
+        }
+        catch { }
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"{{hwnd:0x{hWnd.ToInt64():X8},pid:{pid},title:'{title}'");
+        if (!string.IsNullOrEmpty(domain)) sb.Append($",domain:'{domain}'");
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════
     // Multi-field JSON-like grap pattern  {key:value, key:"quoted", key:[or1,or2]}
     // ══════════════════════════════════════════════════════════════════════════════
 

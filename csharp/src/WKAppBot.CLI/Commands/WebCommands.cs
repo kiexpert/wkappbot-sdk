@@ -301,25 +301,11 @@ Options:
                 catch { }
             }
 
-            // Title: trim off " - Chrome" / " - Chromium" / " - Microsoft Edge" suffix
-            var shortTitle = (cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "")
-                .Split(new[] { " - Chrome", " - Chromium", " - Microsoft Edge" }, StringSplitOptions.None)[0].Trim();
-            if (shortTitle.Length > 40) shortTitle = shortTitle[..37] + "...";
-            var domain = "";
-            try { domain = new Uri(url).Host; } catch { }
-
-            // PID from render widget HWND (each tab has its own renderer process)
-            uint rendPid = 0;
-            if (renderHwnd != IntPtr.Zero)
-                NativeMethods.GetWindowThreadProcessId(renderHwnd, out rendPid);
-
-            // JSON5 format — usable as grap pattern in any command
-            var hwndField  = renderHwnd != IntPtr.Zero ? $"hwnd:0x{renderHwnd.ToInt64():X8}," : $"tab:'{targetId[..Math.Min(8, targetId.Length)]}',";
-            var pidField   = rendPid > 0 ? $"pid:{rendPid}," : "";
-            var titleEsc   = shortTitle.Replace("'", "\\'");
-            var targetStr  = $"{{{hwndField}{pidField}title:'{titleEsc}',domain:'{domain}'}}";
+            // Prefer render widget HWND (tab-isolated PID); fall back to chrome root window
+            var targetHwnd = renderHwnd != IntPtr.Zero ? renderHwnd : cdp.ChromeWindowHandle;
+            var cdpTitle   = cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "";
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[WEB] TARGET: {targetStr}");
+            Console.WriteLine($"[WEB] TARGET: {WindowFinder.BuildTargetJson5(targetHwnd, cdpTitle)}");
             Console.ResetColor();
         }
         catch { }

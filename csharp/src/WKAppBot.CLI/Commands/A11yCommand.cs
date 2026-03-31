@@ -526,6 +526,12 @@ internal partial class Program
             Console.WriteLine($"[A11Y] matched: {SearchKey(targets[0])}");
         }
 
+        // ── JSON5 TARGET: usable as grap pattern in any command ──
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        foreach (var t in targets)
+            Console.WriteLine($"[A11Y] TARGET: {WindowFinder.BuildTargetJson5(t.Handle)}");
+        Console.ResetColor();
+
         // ═══ STEP 4.5: Hot focus chain (show on all actions) ═══
         try
         {
