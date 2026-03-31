@@ -958,13 +958,14 @@ public static class WindowFinder
     static string ReadPatternValue(string s, ref int i)
     {
         if (i >= s.Length) return "";
-        if (s[i] == '"')
+        // Quoted value — supports both " and ' as delimiters
+        if (s[i] == '"' || s[i] == '\'')
         {
-            i++; // skip opening "
+            char quote = s[i++];
             int start = i;
-            while (i < s.Length && s[i] != '"') i++;
+            while (i < s.Length && s[i] != quote) i++;
             var val = s[start..i];
-            if (i < s.Length) i++; // skip closing "
+            if (i < s.Length) i++; // skip closing quote
             return val;
         }
         else
