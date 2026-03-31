@@ -94,6 +94,7 @@ internal partial class Program
         // WMI query kills any wkappbot-core.exe whose cmdline contains " eye" (eye / eye tick modes).
         // "On Error Resume Next" protects against WMI failures on locked/exiting processes.
         var cwdLine = watchdogCwd != null ? $"ws.CurrentDirectory = \"{watchdogCwd}\"\n" : "";
+        var bakPath  = corePath + ".bak"; // corePath = Environment.ProcessPath (wkappbot-core.exe)
         var vbsContent =
             "On Error Resume Next\n" +
             $"Set fso = CreateObject(\"Scripting.FileSystemObject\")\n" +
@@ -110,7 +111,23 @@ internal partial class Program
             "WScript.Sleep 1000\n" +
             "Set ws = CreateObject(\"WScript.Shell\")\n" +
             cwdLine +
-            $"ws.Run \"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, False\n";
+            $"Dim ret : ret = ws.Run(\"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, True)\n" +
+            $"Set fso2 = CreateObject(\"Scripting.FileSystemObject\")\n" +
+            $"Set f2 = fso2.OpenTextFile(\"{vbsLog}\", 8, True)\n" +
+            "f2.WriteLine \"[WATCHDOG] \" & Now() & \" eye tick exit=\" & ret\n" +
+            // ── Rollback: if eye tick failed and .bak exists, restore + retry once ──
+            "If ret <> 0 Then\n" +
+            $"  If fso2.FileExists(\"{bakPath}\") Then\n" +
+            $"    f2.WriteLine \"[WATCHDOG] \" & Now() & \" → rollback {Path.GetFileName(bakPath)}\"\n" +
+            $"    fso2.CopyFile \"{bakPath}\", \"{corePath}\", True\n" +
+            "    WScript.Sleep 500\n" +
+            $"    Dim ret2 : ret2 = ws.Run(\"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, True)\n" +
+            "    f2.WriteLine \"[WATCHDOG] \" & Now() & \" rollback eye tick exit=\" & ret2\n" +
+            "  Else\n" +
+            $"    f2.WriteLine \"[WATCHDOG] \" & Now() & \" .bak not found — no rollback\"\n" +
+            "  End If\n" +
+            "End If\n" +
+            "f2.Close\n";
         try { Directory.CreateDirectory(vbsDir); File.WriteAllText(vbsPath, vbsContent); } catch { }
         var tr = File.Exists(vbsPath) ? $"wscript.exe \\\"{vbsPath}\\\"" : $"\\\"{launcherPath}\\\" eye tick --timeout 15";
         // /SC MINUTE /MO 2: repeating every 2 min — survives even if Eye's 60s refresh fails.
