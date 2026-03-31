@@ -217,12 +217,13 @@ internal partial class Program
         // Parse: text parts + file attachments (shared ParseTextAndFiles)
         var (textParts, filePaths) = ParseTextAndFiles(args, startIndex: 1);
         var message = string.Join("\n", textParts);
-        var _firstLine = message.Split('\n')[0];
-        Console.WriteLine($"[SLACK-DBG] send len={message.Length} isStatus={IsStatusEmoji(message)} firstLine={_firstLine[..Math.Min(_firstLine.Length, 60)]}");
         // C-style escape decode: \n → newline, \t → tab, \\ → backslash
         message = DecodeCEscapes(message);
         // Bash history expansion escapes ! to \! even in single quotes — undo it
         message = message.Replace("\\!", "!");
+        var _firstLine = message.Split('\n')[0];
+        Console.WriteLine($"[SLACK-DBG] send len={message.Length} lines={message.Split('\n').Length} isStatus={IsStatusEmoji(message)} firstLine={_firstLine[..Math.Min(_firstLine.Length, 60)]}");
+
 
         var config = LoadSlackConfig();
         if (config == null) return 1;
