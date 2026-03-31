@@ -360,17 +360,18 @@ internal partial class Program
             try { Environment.CurrentDirectory = fixedCwd; } catch { }
             Console.Error.WriteLine($"[EYE] CWD fixed: {cwd} → {fixedCwd}");
         }
-        // Persist current correct CWD for future restarts (watchdog, hot-swap)
+        // one-shot diagnostic tick (must not enter global loop)
+        if (args.Length > 0 && string.Equals(args[0], "tick", StringComparison.OrdinalIgnoreCase))
+            return EyeTickCommand(args.Skip(1).ToArray());
+
+        // Persist CWD only when entering global loop (not tick) — prevents csproj post-publish
+        // eye tick (runs from CLI project dir) from overwriting with a wrong path.
         var currentCwd = Environment.CurrentDirectory;
         if (!currentCwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(currentCwd.TrimEnd('\\', '/'), exeDir, StringComparison.OrdinalIgnoreCase))
         {
             try { Directory.CreateDirectory(Path.GetDirectoryName(EyeCwdFile)!); File.WriteAllText(EyeCwdFile, currentCwd); } catch { }
         }
-
-        // one-shot diagnostic tick (must not enter global loop)
-        if (args.Length > 0 && string.Equals(args[0], "tick", StringComparison.OrdinalIgnoreCase))
-            return EyeTickCommand(args.Skip(1).ToArray());
 
         // Parse arguments (GlobalMode only — no app/web/legacy modes)
         int intervalMs = 100;
