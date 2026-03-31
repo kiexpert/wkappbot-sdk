@@ -103,15 +103,22 @@ internal partial class Program
             "f.Close\n" +
             "Set fso = Nothing\n" +
             "Set ws = CreateObject(\"WScript.Shell\")\n" +
-            $"ws.Run \"\"\"{launcherPath}\"\" a11y kill \"\"-core.exe eye\"\" --allow-ancestors\", 0, True\n" +
-            "WScript.Sleep 1000\n" +
+            // taskkill /IM wkappbot-core.exe: kills all Core instances (Eye, MCP zombies, etc).
+            // Simpler than a11y kill and doesn't hang via IOCP when Eye is already dead.
+            // Whisper-ring/screensaver are separate executables — not affected.
+            // Eye re-spawns MCP/whisper-ring on startup.
+            "ws.Run \"taskkill /F /IM wkappbot-core.exe\", 0, True\n" +
+            "WScript.Sleep 3000\n" +  // 3s: give processes time to fully exit
             cwdLine +
-            $"Dim ret : ret = ws.Run(\"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, True)\n" +
+            // Use wkappbot-core.exe directly (not wkappbot.exe Launcher) to avoid IOCP relay
+            // which returns wrong exit code in VBS context (no ConPTY → safe to call Core directly).
+            $"Dim ret : ret = ws.Run(\"\"\"{corePath}\"\" eye tick --timeout 15\", 0, True)\n" +
             $"Set fso2 = CreateObject(\"Scripting.FileSystemObject\")\n" +
             $"Set f2 = fso2.OpenTextFile(\"{vbsLog}\", 8, True)\n" +
             "f2.WriteLine \"[WATCHDOG] \" & Now() & \" eye tick exit=\" & ret\n" +
-            // ── Rollback: if eye tick failed and .bak exists, restore + retry once ──
-            "If ret <> 0 Then\n" +
+            // ── Rollback: only on crash (ret > 2). exit=2 = Launcher timeout; Eye's finally block
+            // already spawns Eye in that case. exit=0 = success.
+            "If ret > 2 Then\n" +
             $"  If fso2.FileExists(\"{bakPath}\") Then\n" +
             $"    f2.WriteLine \"[WATCHDOG] \" & Now() & \" → rollback {Path.GetFileName(bakPath)}\"\n" +
             $"    fso2.CopyFile \"{bakPath}\", \"{corePath}\", True\n" +
@@ -500,7 +507,26 @@ internal partial class Program
         AskTargetRegistry.PurgeDeadHwnds();
         // Purge stale card cache from previous Eye session — fresh start, no zombie cards
         CardCachePurgeAll();
-        return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, Environment.CurrentDirectory, elevated, replacePid);
+        // Walk up to git/.wkappbot root so watchdog VBS is always at project root,
+        // not wherever the shell happened to be when Eye was spawned (e.g. during publish).
+        var eyeCwd = Environment.CurrentDirectory;
+        try
+        {
+            var d = eyeCwd.Replace('/', '\\');
+            while (!string.IsNullOrEmpty(d))
+            {
+                if (Directory.Exists(Path.Combine(d, ".git"))
+                    || Directory.Exists(Path.Combine(d, ".svn"))
+                    || Directory.Exists(Path.Combine(d, ".wkappbot"))
+                    || File.Exists(Path.Combine(d, ".wkappbot")))
+                { eyeCwd = d; break; }
+                var p = Path.GetDirectoryName(d);
+                if (p == d || p == null) break;
+                d = p;
+            }
+        }
+        catch { }
+        return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, eyeCwd, elevated, replacePid);
     }
 
     // ── P/Invoke declarations (shared across all AppBotEye partial class files) ──
