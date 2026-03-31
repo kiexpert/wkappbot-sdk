@@ -58,6 +58,21 @@ internal static class AppBotPipe
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr h);
 
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    // ── Focus Launch Callbacks ───────────────────────────────
+    // Wired by WKAppBot.CLI at startup. null in Launcher (NativeAOT) — no-op.
+
+    /// <summary>Called before launching a known/declared focus-requiring exe. Returns true = approved.</summary>
+    internal static Func<string, string, bool>? OnFocusApprovalRequired;
+
+    /// <summary>Called after focusless launch to monitor if focus was stolen. (exePath, prevFgHwnd)</summary>
+    internal static Action<string, nint>? OnPostLaunchFocusMonitor;
+
+    /// <summary>Returns true if the exe is registered as a known focus-stealer.</summary>
+    internal static Func<string, bool>? OnIsKnownFocusStealer;
+
     // ── Low-level: guarded CreateProcessW ────────────────────
 
     /// <summary>
@@ -158,8 +173,26 @@ internal static class AppBotPipe
     internal static SpawnResult? Spawn(string exe, string args, string cwd,
         bool redirectStdIn = false, bool redirectStdOut = false, bool redirectStdErr = false,
         System.Collections.Generic.Dictionary<string, string>? env = null,
+        bool requiresFocus = false,
         string caller = "PROC")
     {
+        // ── Focus Launch Guard ───────────────────────────────────
+        var exeName = Path.GetFileName(exe);
+        bool needsApproval = requiresFocus || (OnIsKnownFocusStealer?.Invoke(exeName) == true);
+        if (needsApproval)
+        {
+            if (requiresFocus)
+            {
+                OnPostLaunchFocusMonitor?.Invoke(exe, 0); // register immediately (prevFg=0 = force-register signal)
+            }
+            if (OnFocusApprovalRequired?.Invoke(exeName, caller) == false)
+            {
+                try { Console.Error.WriteLine($"[{caller}] Spawn BLOCKED — focus approval denied for {exeName}"); } catch { }
+                return null;
+            }
+        }
+        nint prevFg = needsApproval ? 0 : GetForegroundWindow();
+
         // Save + set env vars (inherited via CreateProcess), restore after
         System.Collections.Generic.Dictionary<string, string?>? savedEnv = null;
         if (env != null && env.Count > 0)
@@ -238,6 +271,8 @@ internal static class AppBotPipe
             return null;
         }
         CloseHandle(pi.hThread);
+        if (!needsApproval && prevFg != 0)
+            OnPostLaunchFocusMonitor?.Invoke(exe, prevFg);
         return new SpawnResult(
             (int)pi.dwProcessId, pi.hProcess,
             hStdInWrite, hStdOutRead, hStdErrRead);
@@ -250,7 +285,9 @@ internal static class AppBotPipe
     /// All other cases should use Spawn() which routes through CreateProcessW guard.
     /// </summary>
     internal static System.Diagnostics.Process? StartTracked(
-        System.Diagnostics.ProcessStartInfo psi, string cwd, string caller = "PROC")
+        System.Diagnostics.ProcessStartInfo psi, string cwd,
+        string caller = "PROC",
+        bool requiresFocus = false)
     {
         if (string.IsNullOrEmpty(cwd))
         {
@@ -258,6 +295,21 @@ internal static class AppBotPipe
             return null;
         }
         psi.WorkingDirectory = cwd;
+
+        // ── Focus Launch Guard ───────────────────────────────────
+        var exeName = Path.GetFileName(psi.FileName);
+        bool needsApproval = requiresFocus || (OnIsKnownFocusStealer?.Invoke(exeName) == true);
+        if (needsApproval)
+        {
+            if (requiresFocus)
+                OnPostLaunchFocusMonitor?.Invoke(psi.FileName, 0); // register immediately
+            if (OnFocusApprovalRequired?.Invoke(exeName, caller) == false)
+            {
+                try { Console.Error.WriteLine($"[{caller}] StartTracked BLOCKED — focus approval denied for {exeName}"); } catch { }
+                return null;
+            }
+        }
+        nint prevFg = needsApproval ? 0 : GetForegroundWindow();
 
         // ── FOCUSLESS GUARD ──────────────────────────────────────
         // UseShellExecute=true is only allowed for Verb="runas" (UAC elevation — OS-mandated).
@@ -286,7 +338,10 @@ internal static class AppBotPipe
         }
 
         try { Console.Error.WriteLine($"[{caller}] StartTracked cwd=\"{cwd}\" exe={psi.FileName} shell={psi.UseShellExecute} verb={psi.Verb} nowin={psi.CreateNoWindow}"); } catch { }
-        return System.Diagnostics.Process.Start(psi);
+        var proc = System.Diagnostics.Process.Start(psi);
+        if (!needsApproval && prevFg != 0)
+            OnPostLaunchFocusMonitor?.Invoke(psi.FileName, prevFg);
+        return proc;
     }
 
     // ── SpawnMcp: DETACHED_PROCESS + stdin/stdout/stderr pipes ──

@@ -28,6 +28,7 @@ internal partial class Program
             {
                 AppBotPipe.Spawn(ClaudeExePath, ClaudeA11yFlag,
                     EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory,
+                    requiresFocus: true,
                     caller: "CLAUDE-USAGE");
             }
             catch (Exception ex)
