@@ -915,13 +915,25 @@ public static class WindowFinder
             while (i < inner.Length && (char.IsWhiteSpace(inner[i]) || inner[i] == ',')) i++;
             if (i >= inner.Length) break;
 
-            // Read key (up to ':')
-            int keyStart = i;
-            while (i < inner.Length && inner[i] != ':' && inner[i] != '}') i++;
-            if (i >= inner.Length || inner[i] == '}') return null; // malformed
-            var key = inner[keyStart..i].Trim();
+            // Read key — supports quoted keys ("hwnd", 'hwnd') and bare keys (hwnd)
+            string key;
+            if (inner[i] == '"' || inner[i] == '\'')
+            {
+                key = ReadPatternValue(inner, ref i);   // reuse quoted-value reader
+                // skip whitespace then ':'
+                while (i < inner.Length && char.IsWhiteSpace(inner[i])) i++;
+                if (i >= inner.Length || inner[i] != ':') return null;
+                i++; // skip ':'
+            }
+            else
+            {
+                int keyStart = i;
+                while (i < inner.Length && inner[i] != ':' && inner[i] != '}') i++;
+                if (i >= inner.Length || inner[i] == '}') return null; // malformed
+                key = inner[keyStart..i].Trim();
+                i++; // skip ':'
+            }
             if (string.IsNullOrEmpty(key)) return null;
-            i++; // skip ':'
 
             // Skip whitespace
             while (i < inner.Length && char.IsWhiteSpace(inner[i])) i++;
@@ -997,11 +1009,7 @@ public static class WindowFinder
 
         uint pidFilter = 0;
         if (fields.TryGetValue("pid", out var pidVals))
-        {
-            var ps = pidVals[0].TrimStart('0', 'x', 'X');
-            if (!uint.TryParse(ps, System.Globalization.NumberStyles.HexNumber, null, out pidFilter))
-                uint.TryParse(pidVals[0], out pidFilter);
-        }
+            pidFilter = (uint)ParseNumericField(pidVals[0]);
 
         var titleMatchers  = fields.TryGetValue("title",  out var tv) ? tv.Select(PatternMatcher.Create).ToList() : null;
         var clsMatchers    = fields.TryGetValue("cls",    out var cv) ? cv.Select(PatternMatcher.Create).ToList() : null;
@@ -1041,11 +1049,21 @@ public static class WindowFinder
         return results;
     }
 
-    static IntPtr ParseHwndField(string s)
+    // Parse hwnd or pid value: auto-detects decimal vs hex.
+    // Rules: "0x..." prefix → hex; contains a-f chars → hex; digits-only → decimal.
+    static IntPtr ParseHwndField(string s) => new IntPtr((long)ParseNumericField(s));
+
+    static ulong ParseNumericField(string s)
     {
-        var hex = s.TrimStart().TrimStart('0', 'x', 'X');
-        if (IntPtr.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var h)) return h;
-        return IntPtr.Zero;
+        s = s.Trim();
+        if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            ulong.TryParse(s[2..], System.Globalization.NumberStyles.HexNumber, null, out var v);
+            return v;
+        }
+        // No 0x prefix → always decimal
+        ulong.TryParse(s, out var dv);
+        return dv;
     }
 
     static bool MatchesMultiField(
