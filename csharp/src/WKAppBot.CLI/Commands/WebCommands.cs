@@ -301,9 +301,16 @@ Options:
                 catch { }
             }
 
+            // hwnd:XXXXXXXX = self-documenting target (clearly a window handle, works in all commands)
             var hwndStr = renderHwnd != IntPtr.Zero ? $"hwnd:{renderHwnd.ToInt64():X8}" : $"tab:{targetId[..Math.Min(8, targetId.Length)]}";
+            // Title: trim off " - Chrome" / " - Chromium" suffix for brevity
+            var shortTitle = (cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "")
+                .Split(new[] { " - Chrome", " - Chromium", " - Microsoft Edge" }, StringSplitOptions.None)[0].Trim();
+            if (shortTitle.Length > 40) shortTitle = shortTitle[..37] + "...";
+            var domain = "";
+            try { domain = new Uri(url).Host; } catch { }
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[WEB] TARGET: {hwndStr}  ← 이 문자열로 이 탭에 다시 붙을 수 있음");
+            Console.WriteLine($"[WEB] TARGET: {hwndStr}  \"{shortTitle}\"  {domain}");
             Console.ResetColor();
         }
         catch { }
