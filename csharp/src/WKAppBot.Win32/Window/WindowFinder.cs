@@ -59,15 +59,21 @@ public static class WindowFinder
         {
             return cached.hwnds.Select(WindowInfo.FromHwnd).ToList();
         }
-        // ★ hwnd: prefix — direct handle lookup (no enumeration needed)
-        if (titlePattern.StartsWith("hwnd:", StringComparison.OrdinalIgnoreCase))
+        // ★ Direct HWND lookup — no enumeration, works for any HWND (root or child)
+        // Supported formats (all equivalent):
+        //   [001A2B3C]   ← windows/inspect output format (canonical)
+        //   hwnd:001A2B3C
+        //   hwnd:0x001A2B3C
+        string? hwndHex = null;
+        if (titlePattern.Length == 10 && titlePattern[0] == '[' && titlePattern[9] == ']')
+            hwndHex = titlePattern[1..9];  // [001A2B3C]
+        else if (titlePattern.StartsWith("hwnd:", StringComparison.OrdinalIgnoreCase))
+            hwndHex = titlePattern[5..].Trim().TrimStart('0', 'x', 'X');
+        if (hwndHex != null)
         {
-            var hexStr = titlePattern.Substring(5).Trim().TrimStart('0', 'x', 'X');
-            if (IntPtr.TryParse(hexStr, System.Globalization.NumberStyles.HexNumber, null, out var hwndVal)
+            if (IntPtr.TryParse(hwndHex, System.Globalization.NumberStyles.HexNumber, null, out var hwndVal)
                 && hwndVal != IntPtr.Zero && NativeMethods.IsWindow(hwndVal))
-            {
                 return new List<WindowInfo> { WindowInfo.FromHwnd(hwndVal) };
-            }
             return new List<WindowInfo>();
         }
 
