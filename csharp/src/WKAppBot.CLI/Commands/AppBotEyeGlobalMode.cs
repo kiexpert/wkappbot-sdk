@@ -299,6 +299,20 @@ internal partial class Program
         PulseStep.Mark("watchdog");
         EnsureEyeWatchdogTask();
         RouteRetryQueue.ScheduleRetryTask();
+        CheckPreviousCrash();
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            try
+            {
+                var crashedDir = Path.Combine(GetEyeLogDir(), "_crashed");
+                Directory.CreateDirectory(crashedDir);
+                File.WriteAllText(
+                    Path.Combine(crashedDir, $"crash-{DateTime.Now:yyyyMMdd-HHmmss}.pid={Environment.ProcessId}.txt"),
+                    e.ExceptionObject?.ToString() ?? "unknown");
+            }
+            catch { }
+        };
+
 
         // ★ Default: pure focusless mode — Eye will not steal foreground focus
         // AllowFocusSteal is temporarily enabled for handoff nudges only
@@ -1326,6 +1340,7 @@ internal partial class Program
         // ── Graceful shutdown ──
         cts.Cancel();
 
+        WriteEyeCleanExit();
         Console.WriteLine("[EYE:HOT-SWAP] Old Eye shutting down");
         return 0;
     }
