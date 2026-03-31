@@ -588,6 +588,7 @@ Options:
 
         Console.WriteLine($"[WEB] Title: {title}");
         Console.WriteLine($"[WEB] URL:   {pageUrl}");
+        Console.WriteLine($"[WEB] TabID: {tabId}");
         PrintWebTarget(cdp, port);
 
         // Verify this is our WebBot window (CDP port-based connection is already sufficient;
@@ -647,6 +648,7 @@ Options:
         Console.ResetColor();
         Console.WriteLine($"[WEB] Title: {title}");
         Console.WriteLine($"[WEB] URL:   {pageUrl}");
+        Console.WriteLine($"[WEB] TabID: {tabId}");
         PrintWebTarget(cdp, port);
 
         // Show past knowhow for this domain
