@@ -598,8 +598,8 @@ public static class GrapHelper
                 {
                     var name = child.Properties.Name.ValueOrDefault ?? "";
                     var aid = child.Properties.AutomationId.ValueOrDefault ?? "";
-                    bool nameMatch = !string.IsNullOrEmpty(name) && matcher.IsMatch(name);
-                    bool aidMatch = !nameMatch && !string.IsNullOrEmpty(aid) && matcher.IsMatch(aid);
+                    bool nameMatch = !string.IsNullOrEmpty(name) && matcher.MatchAny(name, aid);
+                    bool aidMatch = !nameMatch && !string.IsNullOrEmpty(aid) && matcher.MatchAny(aid, name);
                     if (nameMatch || aidMatch)
                     {
                         var matched = nameMatch ? name : aid;
@@ -784,8 +784,8 @@ public static class GrapHelper
                     // Match against Name first, then AutomationId as fallback
                     var name = child.Properties.Name.ValueOrDefault ?? "";
                     var aid = child.Properties.AutomationId.ValueOrDefault ?? "";
-                    bool nameMatch = !string.IsNullOrEmpty(name) && matcher.IsMatch(name);
-                    bool aidMatch = !nameMatch && !string.IsNullOrEmpty(aid) && matcher.IsMatch(aid);
+                    bool nameMatch = !string.IsNullOrEmpty(name) && matcher.MatchAny(name, aid);
+                    bool aidMatch = !nameMatch && !string.IsNullOrEmpty(aid) && matcher.MatchAny(aid, name);
 
                     if (nameMatch || aidMatch)
                     {
