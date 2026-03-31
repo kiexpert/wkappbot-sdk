@@ -26,13 +26,9 @@ internal partial class Program
             if (verbose) Console.WriteLine("[USAGE] Claude Desktop not running — launching with a11y flag...");
             try
             {
-                // [FOCUS-GUARD] GuardedStart: Claude Desktop 실행 — 포커스 강탈 감지
-                WKAppBot.Win32.Input.ProcessLaunchGuard.GuardedStart(new ProcessStartInfo
-                {
-                    FileName = ClaudeExePath,
-                    Arguments = ClaudeA11yFlag,
-                    UseShellExecute = true
-                }, "ClaudeUsage");
+                AppBotPipe.Spawn(ClaudeExePath, ClaudeA11yFlag,
+                    EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory,
+                    caller: "CLAUDE-USAGE");
             }
             catch (Exception ex)
             {

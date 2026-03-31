@@ -260,15 +260,32 @@ internal static class AppBotPipe
         psi.WorkingDirectory = cwd;
 
         // ── FOCUSLESS GUARD ──────────────────────────────────────
-        // UseShellExecute=false processes must not create a visible window (focus steal).
-        // UseShellExecute=true (browser/runas/shell open) is intentional UI — not blocked.
-        if (!psi.UseShellExecute && !psi.CreateNoWindow)
+        // UseShellExecute=true is only allowed for Verb="runas" (UAC elevation — OS-mandated).
+        // All other cases must use UseShellExecute=false to stay within our CreateProcessW guard.
+        if (psi.UseShellExecute && string.IsNullOrEmpty(psi.Verb))
         {
-            try { Console.Error.WriteLine($"[{caller}:WARN] StartTracked — enforcing CreateNoWindow=true (was false) exe={psi.FileName}"); } catch { }
-            psi.CreateNoWindow = true;
+            try { Console.Error.WriteLine($"[{caller}:BUG] StartTracked — UseShellExecute=true without Verb BLOCKED (focusless violation). Use Spawn() or set UseShellExecute=false. exe={psi.FileName}"); } catch { }
+            return null;
         }
 
-        try { Console.Error.WriteLine($"[{caller}] StartTracked cwd=\"{cwd}\" exe={psi.FileName} shell={psi.UseShellExecute} nowin={psi.CreateNoWindow}"); } catch { }
+        // ── FOCUSLESS RE-ADJUSTMENT ──────────────────────────────
+        // Ignore any caller-supplied focus-requesting options — always enforce focusless.
+        // WindowStyle=Normal/Maximized → Hidden; CreateNoWindow → true
+        if (!psi.UseShellExecute)
+        {
+            if (!psi.CreateNoWindow)
+            {
+                try { Console.Error.WriteLine($"[{caller}:WARN] StartTracked — enforcing CreateNoWindow=true (was false) exe={psi.FileName}"); } catch { }
+                psi.CreateNoWindow = true;
+            }
+            if (psi.WindowStyle != System.Diagnostics.ProcessWindowStyle.Hidden)
+            {
+                try { Console.Error.WriteLine($"[{caller}:WARN] StartTracked — enforcing WindowStyle=Hidden (was {psi.WindowStyle}) exe={psi.FileName}"); } catch { }
+                psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+            }
+        }
+
+        try { Console.Error.WriteLine($"[{caller}] StartTracked cwd=\"{cwd}\" exe={psi.FileName} shell={psi.UseShellExecute} verb={psi.Verb} nowin={psi.CreateNoWindow}"); } catch { }
         return System.Diagnostics.Process.Start(psi);
     }
 
