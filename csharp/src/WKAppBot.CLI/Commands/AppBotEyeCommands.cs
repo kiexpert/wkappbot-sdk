@@ -321,7 +321,7 @@ internal partial class Program
                 // Without this, another caller sees "alive mutex free" during Eye's
                 // init window and spawns a duplicate. CreateProcess hooks / AV scans
                 // can widen this gap to several seconds.
-                for (int wait = 0; wait < 2000; wait += 200)
+                for (int wait = 0; wait < 1000; wait += 200)
                 {
                     System.Threading.Thread.Sleep(200);
                     try
