@@ -44,7 +44,7 @@ internal static class EyeCmdPipeServer
     /// <summary>Active command count — screensaver checks eye_busy file to suppress during automation.</summary>
     static int _activeCommandCount;
     static readonly string EyeBusyFile = Path.Combine(
-        Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot.hq", "runtime", "eye_busy");
+        Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".", "wkappbot.hq", "runtime", "eye_busy");
     internal static void BeginCommand() { if (Interlocked.Increment(ref _activeCommandCount) == 1) try { File.WriteAllText(EyeBusyFile, DateTime.UtcNow.ToString("O")); } catch { } }
     internal static void EndCommand() { if (Interlocked.Decrement(ref _activeCommandCount) <= 0) try { File.Delete(EyeBusyFile); } catch { } }
 
