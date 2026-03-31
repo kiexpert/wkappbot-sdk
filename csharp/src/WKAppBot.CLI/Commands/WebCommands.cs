@@ -226,9 +226,169 @@ Options:
         return cdp;
     }
 
+    // ── Web Target: renderer HWND-based tab identity ─────────────────────────
+    // Each Chrome tab has its own Chrome_RenderWidgetHostHWND (child window, renderer process).
+    // This HWND is the most reliable per-tab identifier:
+    //   - hwnd:XXXXXXXX works in windows/a11y/inspect via WindowFinder direct lookup
+    //   - web commands accept hwnd:XXXXXXXX to reconnect to the exact tab
+    //
+    // Cache: runtime/web_hwnd_targets.json  { "XXXXXXXX": { port, targetId, url } }
+    // Written on web open/navigate, read on web commands with hwnd: target.
+
+    static readonly string _webHwndCacheFile =
+        Path.Combine(DataDir, "runtime", "web_hwnd_targets.json");
+
+    /// <summary>Find Chrome_RenderWidgetHostHWND for the current CDP tab.</summary>
+    static IntPtr GetRenderWidgetHwnd(CdpClient cdp)
+    {
+        var chromeHwnd = cdp.GetChromeWindowHandle();
+        if (chromeHwnd == IntPtr.Zero) return IntPtr.Zero;
+        IntPtr renderHwnd = IntPtr.Zero;
+        NativeMethods.EnumChildWindows(chromeHwnd, (hwnd, _) =>
+        {
+            var sb = new System.Text.StringBuilder(128);
+            NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
+            if (sb.ToString() != "Chrome_RenderWidgetHostHWND") return true;
+            // Match renderer PID to this tab's targetId via CDP process list
+            // Best effort: use the first visible render widget (active tab)
+            NativeMethods.GetWindowRect(hwnd, out var r);
+            if (r.Right - r.Left > 10 && r.Bottom - r.Top > 10)
+            {
+                renderHwnd = hwnd;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return renderHwnd != IntPtr.Zero ? renderHwnd : chromeHwnd;
+    }
+
+    /// <summary>
+    /// Save renderHwnd → (port, targetId, url) to cache and print the TARGET line.
+    /// Output: [WEB] TARGET: hwnd:XXXXXXXX  ← this string re-attaches to this exact tab
+    /// </summary>
+    static void PrintWebTarget(CdpClient cdp, int port)
+    {
+        try
+        {
+            var renderHwnd = GetRenderWidgetHwnd(cdp);
+            var targetId   = cdp.TargetId ?? "";
+            var url        = cdp.GetUrlAsync().GetAwaiter().GetResult() ?? "";
+
+            // Persist mapping so future commands can reconnect by HWND
+            if (renderHwnd != IntPtr.Zero)
+            {
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(_webHwndCacheFile)!);
+                    var cache = new System.Text.Json.Nodes.JsonObject();
+                    if (File.Exists(_webHwndCacheFile))
+                        try { cache = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(_webHwndCacheFile))?.AsObject() ?? new(); } catch { }
+                    var key = renderHwnd.ToInt64().ToString("X8");
+                    cache[key] = new System.Text.Json.Nodes.JsonObject
+                    {
+                        ["port"]     = port,
+                        ["targetId"] = targetId,
+                        ["url"]      = url,
+                        ["ts"]       = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                    };
+                    // Prune stale entries (HWND no longer valid)
+                    foreach (var k in cache.Select(kv => kv.Key).ToList())
+                        if (k != key && !IntPtr.TryParse(k, System.Globalization.NumberStyles.HexNumber, null, out var h)
+                                     || (IntPtr.TryParse(k, System.Globalization.NumberStyles.HexNumber, null, out var hh) && !NativeMethods.IsWindow(hh)))
+                            cache.Remove(k);
+                    File.WriteAllText(_webHwndCacheFile, cache.ToJsonString());
+                }
+                catch { }
+            }
+
+            var hwndStr = renderHwnd != IntPtr.Zero ? $"hwnd:{renderHwnd.ToInt64():X8}" : $"tab:{targetId[..Math.Min(8, targetId.Length)]}";
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"[WEB] TARGET: {hwndStr}  ← 이 문자열로 이 탭에 다시 붙을 수 있음");
+            Console.ResetColor();
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Connect to CDP tab by renderer HWND (from hwnd:XXXXXXXX target string).
+    /// Looks up runtime cache → reconnects to exact tab by targetId.
+    /// Falls back to URL-based tab search if cache miss.
+    /// </summary>
+    static CdpClient? ConnectCdpByHwnd(IntPtr renderHwnd)
+    {
+        var key = renderHwnd.ToInt64().ToString("X8");
+
+        // 1. Try cache lookup
+        if (File.Exists(_webHwndCacheFile))
+        {
+            try
+            {
+                var cache = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(_webHwndCacheFile))?.AsObject();
+                if (cache != null && cache[key] is { } entry)
+                {
+                    var port     = entry["port"]?.GetValue<int>() ?? 9222;
+                    var targetId = entry["targetId"]?.GetValue<string>() ?? "";
+                    var cdp = new CdpClient();
+                    cdp.ConnectAsync(port).GetAwaiter().GetResult();
+                    if (!string.IsNullOrEmpty(targetId))
+                    {
+                        var ok = cdp.ConnectToTabAsync(port, targetId).GetAwaiter().GetResult();
+                        if (ok) return cdp;
+                    }
+                    return cdp; // cache hit but targetId stale — still connected to port
+                }
+            }
+            catch { }
+        }
+
+        // 2. Cache miss — walk up to find Chrome browser HWND → CDP port
+        try
+        {
+            var parent = renderHwnd;
+            for (int i = 0; i < 10; i++)
+            {
+                var p = NativeMethods.GetAncestor(parent, 2 /*GA_ROOT*/);
+                if (p == parent || p == IntPtr.Zero) break;
+                parent = p;
+            }
+            NativeMethods.GetWindowThreadProcessId(parent, out uint browserPid);
+            var cmdLine = WKAppBot.Win32.Native.NativeMethods.GetProcessCommandLine((int)browserPid) ?? "";
+            var m = System.Text.RegularExpressions.Regex.Match(cmdLine, @"--remote-debugging-port=(\d+)");
+            if (m.Success && int.TryParse(m.Groups[1].Value, out int port))
+            {
+                // Find which tab's renderer HWND matches ours via URL from GetBrowserUrl
+                var cdp = new CdpClient();
+                cdp.ConnectAsync(port).GetAwaiter().GetResult();
+                // Try to match by URL (UIA omnibox of target HWND)
+                NativeMethods.GetWindowThreadProcessId(renderHwnd, out uint rendPid);
+                var url = WKAppBot.Win32.Window.WindowFinder.GetBrowserUrl(renderHwnd, rendPid);
+                if (!string.IsNullOrEmpty(url))
+                {
+                    var ok = cdp.ConnectToTabAsync(port, url).GetAwaiter().GetResult();
+                    if (!ok) Console.Error.WriteLine($"[WEB] WARN: tab URL match failed for hwnd:{key}, using default tab");
+                }
+                return cdp;
+            }
+        }
+        catch { }
+
+        Console.Error.WriteLine($"[WEB] ERROR: Cannot reconnect to hwnd:{key} — no cache entry and no CDP port found");
+        return null;
+    }
+
     /// <summary>Connect to CDP and switch to tab matching --tab pattern (if specified).</summary>
     static CdpClient? ConnectCdpWithTab(string[] args, bool withBar = false)
     {
+        // hwnd:XXXXXXXX target — reconnect to exact tab by renderer HWND
+        var hwndTarget = args.FirstOrDefault(a => a.StartsWith("hwnd:", StringComparison.OrdinalIgnoreCase)
+                                                && !a.StartsWith("--"));
+        if (hwndTarget != null)
+        {
+            var hexStr = hwndTarget[5..].TrimStart('0', 'x', 'X');
+            if (IntPtr.TryParse(hexStr, System.Globalization.NumberStyles.HexNumber, null, out var renderHwnd))
+                return ConnectCdpByHwnd(renderHwnd);
+        }
+
         var port = GetPort(args);
         var tabPattern = GetArgValue(args, "--tab");
 
@@ -451,62 +611,7 @@ Options:
 
         Console.WriteLine($"[WEB] Title: {title}");
         Console.WriteLine($"[WEB] URL:   {pageUrl}");
-        Console.WriteLine($"[WEB] HWND:  0x{chromeHwnd:X}");
-        Console.WriteLine($"[WEB] TabID: {tabId}");
-
-        // Print VERIFIED working commands for agents (tested pattern: title grap + URL tab hint)
-        // Pattern: "*{first words of title}*chrome*#url-path" → CDP tab portal
-        var titlePrefix = (title ?? "").Split(" - ")[0].Trim();
-        if (titlePrefix.Length > 30) titlePrefix = titlePrefix[..30];
-        var urlPath = "";
-        try { var uri = new Uri(pageUrl ?? ""); urlPath = uri.Host + uri.AbsolutePath.TrimEnd('/'); } catch { }
-
-        // Build candidate grap patterns and verify each finds exactly 1 window
-        // Shortest unique match wins — agents should copy-paste without editing
-        var candidates = new List<string>();
-        if (chromeHwnd != IntPtr.Zero) candidates.Add($"*hwnd={chromeHwnd.ToInt64():X8}*#{urlPath}");
-        candidates.Add($"*WKWebBot*#{urlPath}"); // WebBot-only pattern (shortest)
-        if (!string.IsNullOrEmpty(titlePrefix)) candidates.Add($"*{titlePrefix}*chrome*#{urlPath}");
-        if (!string.IsNullOrEmpty(urlPath)) candidates.Add($"*chrome*#{urlPath}");
-        // Shorter title variants
-        var words = (title ?? "").Split(new[] { ' ', '-', '|' }, StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length >= 2) candidates.Add($"*{words[0]}*{words[1]}*chrome*#{urlPath}");
-
-        // Verify: find the shortest pattern that matches exactly 1 window
-        string? bestPattern = null;
-        foreach (var cand in candidates)
-        {
-            try
-            {
-                var grap = cand.Split('#')[0]; // window grap only (before #)
-                var matches = WKAppBot.Win32.Window.WindowFinder.FindByTitle(grap);
-                if (matches.Count == 1)
-                {
-                    bestPattern = cand;
-                    break; // first single-match wins
-                }
-            }
-            catch { }
-        }
-        if (bestPattern == null)
-        {
-            // No single-match found — dump all candidates for agent debugging
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("[WEB] WARNING: No unique window match found. Candidates tried:");
-            foreach (var cand in candidates)
-            {
-                var grap = cand.Split('#')[0];
-                int count = 0;
-                try { count = WKAppBot.Win32.Window.WindowFinder.FindByTitle(grap).Count; } catch { }
-                Console.WriteLine($"[WEB]   {cand}  → {count} match(es)");
-            }
-            Console.ResetColor();
-            bestPattern = candidates.FirstOrDefault() ?? $"*chrome*#{urlPath}";
-        }
-
-        Console.WriteLine($"[WEB] ── Agent Target (verified single-match) ──");
-        Console.WriteLine($"[WEB] eval:  a11y read \"{bestPattern}\" --eval-js \"document.title\"");
-        Console.WriteLine($"[WEB] read:  web read \"{pageUrl}\" --max-chars 3000");
+        PrintWebTarget(cdp, port);
 
         // Verify this is our WebBot window (CDP port-based connection is already sufficient;
         // title check can fail due to async bar injection timing — warn only, don't abort).
@@ -565,8 +670,7 @@ Options:
         Console.ResetColor();
         Console.WriteLine($"[WEB] Title: {title}");
         Console.WriteLine($"[WEB] URL:   {pageUrl}");
-        Console.WriteLine($"[WEB] HWND:  0x{chromeHwnd:X}");
-        Console.WriteLine($"[WEB] TabID: {tabId}");
+        PrintWebTarget(cdp, port);
 
         // Show past knowhow for this domain
         ShowDomainKnowhow(url);
