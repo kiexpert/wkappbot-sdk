@@ -786,7 +786,7 @@ public static class WindowFinder
     // Tier 3: UIA ControlType.Edit in ToolBar + URL heuristic — standard UIA, any compliant browser
     // Tier 4: UIA ControlType.Document → LegacyIAccessible.Value — W3C a11y standard
     // Results cached per PID (Tier 1) / HWND (Tier 2-4) with 5s TTL.
-    static string GetBrowserUrl(IntPtr hWnd, uint pid)
+    public static string GetBrowserUrl(IntPtr hWnd, uint pid)
     {
         var now = DateTime.UtcNow;
 

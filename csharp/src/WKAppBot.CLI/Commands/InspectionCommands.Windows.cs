@@ -58,74 +58,6 @@ internal partial class Program
             return cmd;
         }
 
-        // Lazy UIA automation for Chrome/Edge URL lookup (no CDP debug port)
-        FlaUI.UIA3.UIA3Automation? lazyUia = null;
-        bool lazyUiaFailed = false;
-        FlaUI.UIA3.UIA3Automation? TryGetUia()
-        {
-            if (lazyUiaFailed) return null;
-            try { return lazyUia ??= new FlaUI.UIA3.UIA3Automation(); }
-            catch { lazyUiaFailed = true; return null; }
-        }
-
-        // CDP tab URL cache: Chrome/Edge PID → space-joined tab URLs (CDP, all tabs)
-        var cdpPidCache = new Dictionary<uint, string>();
-        // UIA omnibox URL cache: Chrome/Edge HWND → active tab URL
-        var uiaHwndCache = new Dictionary<IntPtr, string>();
-
-        // Get web URLs for a Chrome/Edge window — by any means:
-        //   Tier 1: CDP HTTP (--remote-debugging-port → all tab URLs)
-        //   Tier 2: UIA omnibox_view (active tab URL for regular Chrome/Edge)
-        string GetCdpUrls(IntPtr hWnd, uint pid, string processName)
-        {
-            bool isChrome = processName.Equals("chrome", StringComparison.OrdinalIgnoreCase);
-            bool isEdge   = processName.Equals("msedge", StringComparison.OrdinalIgnoreCase);
-            if (!isChrome && !isEdge) return "";
-
-            // Tier 1: CDP HTTP (all tab URLs for processes with --remote-debugging-port)
-            if (!cdpPidCache.TryGetValue(pid, out var cdpUrls))
-            {
-                cdpUrls = "";
-                try
-                {
-                    var cmdLine = GetCommandLine(pid);
-                    var m = Regex.Match(cmdLine, @"--remote-debugging-port=(\d+)");
-                    if (m.Success && int.TryParse(m.Groups[1].Value, out int cdpPort))
-                    {
-                        using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(300) };
-                        var json = http.GetStringAsync($"http://localhost:{cdpPort}/json").GetAwaiter().GetResult();
-                        var urlMatches = Regex.Matches(json, "\"url\":\\s*\"([^\"]+)\"");
-                        cdpUrls = string.Join(" ", urlMatches.Select(u => u.Groups[1].Value));
-                    }
-                }
-                catch { }
-                cdpPidCache[pid] = cdpUrls;
-            }
-            if (!string.IsNullOrEmpty(cdpUrls)) return cdpUrls;
-
-            // Tier 2: UIA omnibox_view (active tab URL — works for regular Chrome/Edge without CDP)
-            if (hWnd == IntPtr.Zero) return "";
-            if (uiaHwndCache.TryGetValue(hWnd, out var uiaUrl)) return uiaUrl;
-            uiaUrl = "";
-            try
-            {
-                var uia = TryGetUia();
-                if (uia != null)
-                {
-                    var root = uia.FromHandle(hWnd);
-                    if (root != null)
-                    {
-                        var omnibox = root.FindFirstDescendant(cf => cf.ByAutomationId("omnibox_view"));
-                        if (omnibox != null)
-                            uiaUrl = omnibox.Patterns.Value.PatternOrDefault?.Value.ValueOrDefault ?? "";
-                    }
-                }
-            }
-            catch { }
-            uiaHwndCache[hWnd] = uiaUrl;
-            return uiaUrl;
-        }
-
         // Pre-create matcher ONCE for all filter checks (avoid per-window regex compile)
         var ownerCandidateMatcher = filterTitle != null ? PatternMatcher.Create(filterTitle) : null;
 
@@ -166,7 +98,7 @@ internal partial class Program
                 {
                     // Last chance: cmdline + web URL — token-AND for plain multi-word patterns
                     if (!CmdLineOrUrlMatch(GetCommandLine(fpid)) &&
-                        !CmdLineOrUrlMatch(GetCdpUrls(hWnd, fpid, fpn))) return null;
+                        !CmdLineOrUrlMatch(WindowFinder.GetBrowserUrl(hWnd, fpid))) return null;
                 }
             }
 
@@ -183,7 +115,7 @@ internal partial class Program
                 var searchKey = WindowFinder.BuildSearchKey(hWnd, className, title, processName, w, h, focus);
                 if (!ownerCandidateMatcher.IsMatch(title) && !ownerCandidateMatcher.IsMatch(searchKey)
                     && !CmdLineOrUrlMatch(GetCommandLine(pid))
-                    && !CmdLineOrUrlMatch(GetCdpUrls(hWnd, pid, processName))) return null;
+                    && !CmdLineOrUrlMatch(WindowFinder.GetBrowserUrl(hWnd, pid))) return null;
             }
             if (filterProcess != null)
             {
@@ -1027,7 +959,6 @@ internal partial class Program
         string limitNote = limit > 0 ? $", --limit {limit}" : "";
         string hint = uiaSearch ? "(--deep: thorough search)" : "(--uia: accessibility search, --deep: child windows)";
         Console.WriteLine($"Total: {totalCount}{uiaNote} {hint}{limitNote}");
-        lazyUia?.Dispose();
         return 0;
     }
 }
