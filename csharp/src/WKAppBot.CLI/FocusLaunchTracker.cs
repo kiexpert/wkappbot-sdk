@@ -5,14 +5,8 @@ using System.Text.Json.Nodes;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Tracks processes that require focus approval before launch.
-///
-/// Registration paths:
-///   1. Caller passes requiresFocus=true → immediately registered in DB
-///   2. Post-launch monitoring detects foreground change → registered for next time
-///
-/// On next launch of a registered exe: Win32 MessageBox approval popup is shown.
-/// User deny → process not launched.
+/// Tracks processes that steal focus after launch (logging + DB only).
+/// No approval popup — focus stealing is logged but never blocked.
 /// </summary>
 internal static class FocusLaunchTracker
 {
@@ -28,7 +22,7 @@ internal static class FocusLaunchTracker
     /// <summary>Wire AppBotPipe callbacks. Call once at startup.</summary>
     internal static void Wire()
     {
-        AppBotPipe.OnFocusApprovalRequired = RequestApproval;
+        // OnFocusApprovalRequired intentionally NOT wired — no confirmation dialog.
         AppBotPipe.OnPostLaunchFocusMonitor = HandlePostLaunch;
         AppBotPipe.OnIsKnownFocusStealer = IsRegistered;
     }
@@ -55,17 +49,6 @@ internal static class FocusLaunchTracker
             Save();
         }
         Console.Error.WriteLine($"[FOCUS-TRACK] Registered focus-stealer: {name}");
-    }
-
-    internal static bool RequestApproval(string exeName, string caller)
-    {
-        var name = Normalize(exeName);
-        var msg = $"{name} 이(가) 포커스를 요구합니다.\n승인하시겠습니까?\n\n[{caller}]";
-        var result = MessageBox(IntPtr.Zero, msg, "포커스 승인",
-            MB_YESNO | MB_ICONWARNING | MB_TOPMOST | MB_SYSTEMMODAL | MB_SETFOREGROUND);
-        var approved = result == IDYES;
-        Console.Error.WriteLine($"[FOCUS-TRACK] {name} approval: {(approved ? "YES" : "NO")}");
-        return approved;
     }
 
     /// <summary>
@@ -121,13 +104,6 @@ internal static class FocusLaunchTracker
         }
         catch { }
     }
-
-    const uint MB_YESNO = 0x4, MB_ICONWARNING = 0x30, MB_TOPMOST = 0x40000,
-               MB_SYSTEMMODAL = 0x1000, MB_SETFOREGROUND = 0x10000;
-    const int IDYES = 6;
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
 
     [DllImport("user32.dll")]
     static extern nint GetForegroundWindow();
