@@ -118,29 +118,60 @@ internal partial class Program
         try { Directory.CreateDirectory(vbsDir); File.WriteAllText(vbsPath, vbsContent); } catch { }
         var tr = File.Exists(vbsPath) ? $"wscript.exe //B \\\"{vbsPath}\\\"" : $"\\\"{corePath}\\\" eye tick --timeout 15";
         // /SC ONCE: one-shot task. Eye calls this every 60s → always defers 2min from now.
-        // /Create /F on ONCE task properly updates the fire time (unlike MINUTE repeating tasks).
-        // If Eye dies, last registered one-shot fires ≤2min later → respawn via eye tick.
+        // Strategy: try /Change /ST (edit existing) + /ENABLE, fall back to /Create /F (new task).
+        // This avoids duplicate ONCE tasks accumulating in Task Scheduler.
         var fireAt = DateTime.Now.AddMinutes(2).ToString("HH:mm");
         var fireDate = DateTime.Now.ToString("yyyy/MM/dd");
-        var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"{tr}\" /SC ONCE /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
         Console.WriteLine($"[EYE] Watchdog: /SC ONCE deferred to {fireAt}...");
         _ = Task.Run(() =>
         {
             try
             {
-                using var spawn = AppBotPipe.Spawn("schtasks.exe", args,
-                    cwd: Environment.SystemDirectory, caller: "EYE-SCHED");
-                spawn?.WaitForExit(5000);
-                var ok = spawn?.HasExited == true && spawn.ExitCode == 0;
-                Console.WriteLine(ok
-                    ? $"[EYE] Watchdog: ✓ deferred to {fireAt}"
-                    : $"[EYE] Watchdog: schtasks exit={spawn?.ExitCode} (non-fatal)");
+                var schtasks = Path.Combine(Environment.SystemDirectory, "schtasks.exe");
+                // Try editing existing task (avoids duplicate task accumulation)
+                int changed = RunSchtasksQuiet(schtasks, $"/Change /TN \"{EyeWatchdogTaskName}\" /ST {fireAt} /SD {fireDate}");
+                if (changed == 0)
+                {
+                    // Re-enable in case the previous ONCE task auto-disabled after firing
+                    RunSchtasksQuiet(schtasks, $"/Change /TN \"{EyeWatchdogTaskName}\" /ENABLE");
+                    Console.WriteLine($"[EYE] Watchdog: ✓ edited to {fireAt}");
+                }
+                else
+                {
+                    // Task doesn't exist yet — create it
+                    var createArgs = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"{tr}\" /SC ONCE /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
+                    int created = RunSchtasksQuiet(schtasks, createArgs);
+                    Console.WriteLine(created == 0
+                        ? $"[EYE] Watchdog: ✓ created to {fireAt}"
+                        : $"[EYE] Watchdog: schtasks exit={created} (non-fatal)");
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[EYE] Watchdog error: {ex.Message} (non-fatal)");
             }
         });
+    }
+
+    /// Run schtasks.exe quietly (no window, no output). Returns exit code, or -1 on failure.
+    private static int RunSchtasksQuiet(string schtasksExe, string args)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = schtasksExe,
+                Arguments = args,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            using var p = System.Diagnostics.Process.Start(psi);
+            p?.WaitForExit(5000);
+            return p?.ExitCode ?? -1;
+        }
+        catch { return -1; }
     }
 
     /// <summary>
@@ -241,11 +272,9 @@ internal partial class Program
         {
             try
             {
-                using var p = AppBotPipe.Spawn("schtasks.exe",
-                    $"/Change /TN \"{EyeWatchdogTaskName}\" /DISABLE",
-                    cwd: Environment.SystemDirectory, caller: "EYE-SCHED-DIS");
-                p?.WaitForExit(3000);
-                Console.WriteLine($"[EYE] Watchdog: disabled (hot-swap, exit={p?.ExitCode})");
+                var schtasks = Path.Combine(Environment.SystemDirectory, "schtasks.exe");
+                int exit = RunSchtasksQuiet(schtasks, $"/Change /TN \"{EyeWatchdogTaskName}\" /DISABLE");
+                Console.WriteLine($"[EYE] Watchdog: disabled (hot-swap, exit={exit})");
             }
             catch (Exception ex) { Console.WriteLine($"[EYE] Watchdog disable error: {ex.Message}"); }
         });
