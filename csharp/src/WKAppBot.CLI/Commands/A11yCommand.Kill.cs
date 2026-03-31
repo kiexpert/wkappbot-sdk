@@ -15,7 +15,7 @@ internal partial class Program
     //   "**/wkappbot-core"         → wkappbot-core with any ancestor (any depth)
     //   "wkappbot-core#regex:lucy" → '#' splits name#exePathFilter
     // If process has a window → WM_CLOSE first then Kill; else → Kill directly.
-    static int A11yKillByPattern(string grap, bool allowAncestors, bool dryRun = false)
+    static int A11yKillByPattern(string grap, bool allowAncestors, bool dryRun = false, string? argFilter = null)
     {
         // Global dry-run mode overrides local flag
         if (_dryRunMode.Value) dryRun = true;
@@ -80,10 +80,14 @@ internal partial class Program
                     continue;
                 }
 
-                // Get command line for display + protection
+                // Get command line for display + protection + --arg filter
                 string cmdLine = "";
                 try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
                 var cmdBrief = cmdLine.Length > 80 ? cmdLine[..80] + "..." : cmdLine;
+
+                // --arg=<substring>: filter by cmdline argument
+                if (argFilter != null && !cmdLine.Contains(argFilter, StringComparison.OrdinalIgnoreCase))
+                    continue;
 
                 // Protect Eye child processes: WhisperRing, ScreenSaver, analyze-hack
                 if (!string.IsNullOrEmpty(cmdLine) && (

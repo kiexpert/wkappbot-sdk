@@ -17,12 +17,12 @@ internal partial class Program
         string? filterTitle = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : GetArgValue(args, "--filter");
         string? filterProcess = GetArgValue(args, "--process");
         string? filterClass = GetArgValue(args, "--class");
-        string? filterCmd = GetArgValue(args, "--cmd"); // filter by cmdline substring (e.g. --cmd=remote-debugging-port)
+        string? filterCmd = GetArgValue(args, "--cmd") ?? GetArgValue(args, "--arg"); // filter by cmdline substring; --arg is alias
         bool showAll = args.Contains("--all"); // include zero-size/invisible (also bypasses wkappbot self-filter)
         bool deep = args.Contains("--deep");   // include child windows (EnumChildWindows)
         bool uiaDeep = args.Contains("--uia-deep"); // deep UIA search (find --deep)
         bool uiaSearch = uiaDeep || args.Contains("--uia"); // also search UIA elements
-        bool showCmd = args.Contains("--cmd") || filterCmd != null; // show process path + command line args
+        bool showCmd = args.Contains("--cmd") || args.Contains("--arg") || filterCmd != null; // show process path + command line args
         int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 0; // 0=unlimited
         bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null;
 
@@ -58,6 +58,74 @@ internal partial class Program
             return cmd;
         }
 
+        // Lazy UIA automation for Chrome/Edge URL lookup (no CDP debug port)
+        FlaUI.UIA3.UIA3Automation? lazyUia = null;
+        bool lazyUiaFailed = false;
+        FlaUI.UIA3.UIA3Automation? TryGetUia()
+        {
+            if (lazyUiaFailed) return null;
+            try { return lazyUia ??= new FlaUI.UIA3.UIA3Automation(); }
+            catch { lazyUiaFailed = true; return null; }
+        }
+
+        // CDP tab URL cache: Chrome/Edge PID → space-joined tab URLs (CDP, all tabs)
+        var cdpPidCache = new Dictionary<uint, string>();
+        // UIA omnibox URL cache: Chrome/Edge HWND → active tab URL
+        var uiaHwndCache = new Dictionary<IntPtr, string>();
+
+        // Get web URLs for a Chrome/Edge window — by any means:
+        //   Tier 1: CDP HTTP (--remote-debugging-port → all tab URLs)
+        //   Tier 2: UIA omnibox_view (active tab URL for regular Chrome/Edge)
+        string GetCdpUrls(IntPtr hWnd, uint pid, string processName)
+        {
+            bool isChrome = processName.Equals("chrome", StringComparison.OrdinalIgnoreCase);
+            bool isEdge   = processName.Equals("msedge", StringComparison.OrdinalIgnoreCase);
+            if (!isChrome && !isEdge) return "";
+
+            // Tier 1: CDP HTTP (all tab URLs for processes with --remote-debugging-port)
+            if (!cdpPidCache.TryGetValue(pid, out var cdpUrls))
+            {
+                cdpUrls = "";
+                try
+                {
+                    var cmdLine = GetCommandLine(pid);
+                    var m = Regex.Match(cmdLine, @"--remote-debugging-port=(\d+)");
+                    if (m.Success && int.TryParse(m.Groups[1].Value, out int cdpPort))
+                    {
+                        using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(300) };
+                        var json = http.GetStringAsync($"http://localhost:{cdpPort}/json").GetAwaiter().GetResult();
+                        var urlMatches = Regex.Matches(json, "\"url\":\\s*\"([^\"]+)\"");
+                        cdpUrls = string.Join(" ", urlMatches.Select(u => u.Groups[1].Value));
+                    }
+                }
+                catch { }
+                cdpPidCache[pid] = cdpUrls;
+            }
+            if (!string.IsNullOrEmpty(cdpUrls)) return cdpUrls;
+
+            // Tier 2: UIA omnibox_view (active tab URL — works for regular Chrome/Edge without CDP)
+            if (hWnd == IntPtr.Zero) return "";
+            if (uiaHwndCache.TryGetValue(hWnd, out var uiaUrl)) return uiaUrl;
+            uiaUrl = "";
+            try
+            {
+                var uia = TryGetUia();
+                if (uia != null)
+                {
+                    var root = uia.FromHandle(hWnd);
+                    if (root != null)
+                    {
+                        var omnibox = root.FindFirstDescendant(cf => cf.ByAutomationId("omnibox_view"));
+                        if (omnibox != null)
+                            uiaUrl = omnibox.Patterns.Value.PatternOrDefault?.Value.ValueOrDefault ?? "";
+                    }
+                }
+            }
+            catch { }
+            uiaHwndCache[hWnd] = uiaUrl;
+            return uiaUrl;
+        }
+
         // Pre-create matcher ONCE for all filter checks (avoid per-window regex compile)
         var ownerCandidateMatcher = filterTitle != null ? PatternMatcher.Create(filterTitle) : null;
 
@@ -87,10 +155,15 @@ internal partial class Program
                 && !ownerCandidateMatcher.IsMatch(title)
                 && !ownerCandidateMatcher.IsMatch(className))
             {
-                // Last chance: check process name (needed for "*wsl*" matching "wslhost")
+                // Check process name (needed for "*wsl*" matching "wslhost")
                 NativeMethods.GetWindowThreadProcessId(hWnd, out uint fpid);
                 var fpn = GetProcessName(fpid);
-                if (!ownerCandidateMatcher.IsMatch(fpn)) return null;
+                if (!ownerCandidateMatcher.IsMatch(fpn))
+                {
+                    // Last chance: cmdline + web URL (Chrome/Edge active tab via CDP or UIA)
+                    if (!ownerCandidateMatcher.IsMatch(GetCommandLine(fpid)) &&
+                        !ownerCandidateMatcher.IsMatch(GetCdpUrls(hWnd, fpid, fpn))) return null;
+                }
             }
 
             NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
@@ -100,10 +173,13 @@ internal partial class Program
             if (!showAll && processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
 
             // Apply filters — full search key check for remaining candidates
+            // Search scope: title + full searchKey + cmdline (all cached per PID)
             if (ownerCandidateMatcher != null)
             {
                 var searchKey = WindowFinder.BuildSearchKey(hWnd, className, title, processName, w, h, focus);
-                if (!ownerCandidateMatcher.IsMatch(title) && !ownerCandidateMatcher.IsMatch(searchKey)) return null;
+                if (!ownerCandidateMatcher.IsMatch(title) && !ownerCandidateMatcher.IsMatch(searchKey)
+                    && !ownerCandidateMatcher.IsMatch(GetCommandLine(pid))
+                    && !ownerCandidateMatcher.IsMatch(GetCdpUrls(hWnd, pid, processName))) return null;
             }
             if (filterProcess != null)
             {
@@ -947,6 +1023,7 @@ internal partial class Program
         string limitNote = limit > 0 ? $", --limit {limit}" : "";
         string hint = uiaSearch ? "(--deep: thorough search)" : "(--uia: accessibility search, --deep: child windows)";
         Console.WriteLine($"Total: {totalCount}{uiaNote} {hint}{limitNote}");
+        lazyUia?.Dispose();
         return 0;
     }
 }
