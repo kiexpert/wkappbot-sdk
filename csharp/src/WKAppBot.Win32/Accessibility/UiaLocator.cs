@@ -1270,19 +1270,12 @@ public sealed partial class UiaLocator : IDisposable
         }
         catch { rectStr = "(?)"; }
 
-        // Check if this element matches the filter
+        // Check if this element matches the filter — token-AND for plain multi-word patterns
         bool isMatch;
         if (matcher != null)
-        {
-            isMatch = matcher.IsMatch(name) || matcher.IsMatch(aid) || matcher.IsMatch(ctStr);
-        }
+            isMatch = matcher.MatchAny(name, aid, ctStr);
         else
-        {
-            // Plain substring search (case-insensitive)
-            isMatch = name.Contains(filterText, StringComparison.OrdinalIgnoreCase)
-                || aid.Contains(filterText, StringComparison.OrdinalIgnoreCase)
-                || ctStr.Contains(filterText, StringComparison.OrdinalIgnoreCase);
-        }
+            isMatch = PatternMatcher.TokenMatchAny(filterText, name, aid, ctStr);
 
         var rectParsed = new System.Drawing.Rectangle();
         try { var r = element.BoundingRectangle; rectParsed = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
@@ -1634,18 +1627,11 @@ public sealed partial class UiaLocator : IDisposable
                     }
                     else
                     {
-                        bool nameMatch, aidMatch;
-                        if (matcher != null)
-                        {
-                            nameMatch = !string.IsNullOrEmpty(name) && matcher.IsMatch(name);
-                            aidMatch = !string.IsNullOrEmpty(aid) && matcher.IsMatch(aid);
-                        }
-                        else
-                        {
-                            nameMatch = !string.IsNullOrEmpty(name) && name.Contains(keyword, StringComparison.OrdinalIgnoreCase);
-                            aidMatch = !string.IsNullOrEmpty(aid) && aid.Contains(keyword, StringComparison.OrdinalIgnoreCase);
-                        }
-                        if (nameMatch || aidMatch)
+                        // token-AND for plain multi-word keywords — name+aid pool, order-independent
+                        bool isElemMatch = matcher != null
+                            ? matcher.MatchAny(name, aid)
+                            : PatternMatcher.TokenMatchAny(keyword, name, aid);
+                        if (isElemMatch)
                             results.Add(new UiaQuickMatch(ct, name, aid, currentPath));
                     }
                 }
@@ -1855,6 +1841,24 @@ public sealed class PatternMatcher
             return texts.Any(t => m.IsMatch(t));
         }
         var tokens = pattern.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var combined = string.Join(" ", texts);
+        return tokens.All(t => combined.Contains(t, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Instance-level token-AND match across multiple texts.
+    /// For plain multi-word literals: each token must appear in the combined text pool.
+    /// For glob/regex: any one of the texts must match.
+    /// </summary>
+    public bool MatchAny(params string[] texts)
+    {
+        if (_regex != null)
+            return texts.Any(t => _regex.IsMatch(t));
+        // Single-word literal — standard Contains on any text
+        if (!_literal!.Contains(' '))
+            return texts.Any(t => t.Contains(_literal, StringComparison.OrdinalIgnoreCase));
+        // Multi-word literal — token-AND across combined pool
+        var tokens = _literal.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var combined = string.Join(" ", texts);
         return tokens.All(t => combined.Contains(t, StringComparison.OrdinalIgnoreCase));
     }
