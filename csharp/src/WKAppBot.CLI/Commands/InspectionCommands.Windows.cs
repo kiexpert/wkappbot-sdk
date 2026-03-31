@@ -637,6 +637,25 @@ internal partial class Program
         }
         var _printedChildPids = new HashSet<uint>();
 
+        // ── JSON5 fast path: {field:value,...} patterns → delegate to WindowFinder which handles JSON5 natively ──
+        // ownerCandidateMatcher is a literal matcher that would filter out all results (no window title = "{...}")
+        if (filterTitle != null && filterTitle.StartsWith('{') && filterTitle.EndsWith('}')
+            && filterCmd == null && !deep && !uiaSearch)
+        {
+            var json5Results = WindowFinder.FindByTitle(filterTitle);
+            foreach (var wi in json5Results)
+            {
+                var raw = GetRawWindowInfo(wi.Handle);
+                if (raw == null) continue;
+                var v = raw.Value;
+                PrintWindow(wi.Handle, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, wi.Handle == fgWnd);
+                totalCount++;
+            }
+            Console.WriteLine();
+            Console.WriteLine($"Total: {totalCount} (--uia: accessibility search, --deep: child windows)");
+            return 0;
+        }
+
         PulseStep.Mark("enum-windows-start");
         NativeMethods.EnumWindows((hWnd, _) =>
         {
