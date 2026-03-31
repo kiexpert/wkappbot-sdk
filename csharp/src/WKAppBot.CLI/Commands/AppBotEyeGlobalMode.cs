@@ -625,6 +625,7 @@ internal partial class Program
             var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
                 cwd: callerCwd,
                 env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
+                showNoActivate: true,
                 caller: "EYE-WHISPER");
             if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
             PulseStep.Mark("whisper-spawned");
@@ -642,6 +643,7 @@ internal partial class Program
             AppBotPipe.Spawn(ssPath, "screensaver",
                 cwd: callerCwd,
                 env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
+                showNoActivate: true,
                 caller: "EYE-SCREENSAVER");
             PulseStep.Mark("screensaver-spawned");
             Console.WriteLine("[EYE] ScreenSaver spawned as separate process");
@@ -879,6 +881,7 @@ internal partial class Program
                         var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
                             cwd: callerCwd,
                             env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
+                            showNoActivate: true,
                             caller: "EYE-WHISPER-RESPAWN");
                         if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
                         Console.WriteLine($"[EYE] WhisperRing respawned pid={_whisperRingPid}");

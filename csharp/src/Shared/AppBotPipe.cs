@@ -177,6 +177,7 @@ internal static class AppBotPipe
         bool redirectStdIn = false, bool redirectStdOut = false, bool redirectStdErr = false,
         System.Collections.Generic.Dictionary<string, string>? env = null,
         bool requiresFocus = false,
+        bool showNoActivate = false,
         string caller = "PROC")
     {
         // ── Focus Launch Guard ───────────────────────────────────
@@ -209,12 +210,13 @@ internal static class AppBotPipe
         }
 
         var cmdLine = $"\"{exe}\" {args}\0".ToCharArray();
-        // Focusless: STARTF_USESHOWWINDOW + SW_HIDE — never steal focus, never show window
+        // showNoActivate=true → SW_SHOWNOACTIVATE(4): visible but no focus steal (WPF overlays)
+        // showNoActivate=false → SW_HIDE(0): invisible background process
         var si = new STARTUPINFOW
         {
             cb = Marshal.SizeOf<STARTUPINFOW>(),
             dwFlags = STARTF_USESHOWWINDOW,
-            wShowWindow = 0, // SW_HIDE
+            wShowWindow = showNoActivate ? (ushort)4 : (ushort)0, // 4=SW_SHOWNOACTIVATE, 0=SW_HIDE
         };
 
         IntPtr hStdInRead = IntPtr.Zero, hStdInWrite = IntPtr.Zero;
