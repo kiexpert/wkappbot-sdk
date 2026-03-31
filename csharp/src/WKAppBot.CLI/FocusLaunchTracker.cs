@@ -21,6 +21,10 @@ internal static class FocusLaunchTracker
     private static readonly object _lock = new();
     private static HashSet<string>? _stealers;
 
+    // Self-exe name — self-spawns (whisper-ring, screensaver, mcp worker, etc.) are always trusted.
+    private static readonly string _selfExe =
+        Path.GetFileName(Environment.ProcessPath ?? "wkappbot.exe").ToLowerInvariant();
+
     /// <summary>Wire AppBotPipe callbacks. Call once at startup.</summary>
     internal static void Wire()
     {
@@ -32,6 +36,7 @@ internal static class FocusLaunchTracker
     internal static bool IsRegistered(string exeName)
     {
         var name = Normalize(exeName);
+        if (name == _selfExe) return false; // self-spawn always trusted
         lock (_lock)
         {
             _stealers ??= Load();
@@ -42,6 +47,7 @@ internal static class FocusLaunchTracker
     internal static void Register(string exeName)
     {
         var name = Normalize(exeName);
+        if (name == _selfExe) return; // never register self
         lock (_lock)
         {
             _stealers ??= Load();
