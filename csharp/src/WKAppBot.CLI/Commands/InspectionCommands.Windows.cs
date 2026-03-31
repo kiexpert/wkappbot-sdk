@@ -17,11 +17,12 @@ internal partial class Program
         string? filterTitle = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : GetArgValue(args, "--filter");
         string? filterProcess = GetArgValue(args, "--process");
         string? filterClass = GetArgValue(args, "--class");
+        string? filterCmd = GetArgValue(args, "--cmd"); // filter by cmdline substring (e.g. --cmd=remote-debugging-port)
         bool showAll = args.Contains("--all"); // include zero-size/invisible (also bypasses wkappbot self-filter)
         bool deep = args.Contains("--deep");   // include child windows (EnumChildWindows)
         bool uiaDeep = args.Contains("--uia-deep"); // deep UIA search (find --deep)
         bool uiaSearch = uiaDeep || args.Contains("--uia"); // also search UIA elements
-        bool showCmd = args.Contains("--cmd"); // show process path + command line args
+        bool showCmd = args.Contains("--cmd") || filterCmd != null; // show process path + command line args
         int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 0; // 0=unlimited
         bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null;
 
@@ -117,6 +118,11 @@ internal partial class Program
                     ? PatternMatcher.Create(filterClass).IsMatch(className)
                     : className.Contains(filterClass, StringComparison.OrdinalIgnoreCase);
                 if (!match) return null;
+            }
+            if (filterCmd != null)
+            {
+                var cmdLine = GetCommandLine(pid);
+                if (!cmdLine.Contains(filterCmd, StringComparison.OrdinalIgnoreCase)) return null;
             }
 
             return (title, className, processName, pid, w, h, visible);
