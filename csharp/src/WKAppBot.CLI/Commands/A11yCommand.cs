@@ -421,7 +421,8 @@ internal partial class Program
         if (action == "kill")
         {
             bool dryRun = args.Any(a => a == "--dry-run");
-            return A11yKillByPattern(grap, allowAncestors, dryRun);
+            string? argFilter = GetArgValue(args, "--arg"); // cmdline substring filter
+            return A11yKillByPattern(grap, allowAncestors, dryRun, argFilter);
         }
 
         var elementActions = new HashSet<string> {
