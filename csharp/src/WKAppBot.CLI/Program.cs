@@ -573,7 +573,10 @@ internal partial class Program
             // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
             // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
             var isMcpCommand = command == "mcp";
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" or "dashboard" or "find-prompts" or "claude-detect" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || isMcpCommand || _fastExitAfterCommand;
+            // kill/close subcommands may target Eye itself — don't auto-launch Eye before they run.
+            var subCmd = restArgs.Length > 0 ? restArgs[0].ToLowerInvariant() : "";
+            bool isKillOrClose = command == "a11y" && subCmd is "kill" or "close";
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" or "dashboard" or "find-prompts" or "claude-detect" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || isMcpCommand || isKillOrClose || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
