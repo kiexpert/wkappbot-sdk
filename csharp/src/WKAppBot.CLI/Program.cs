@@ -180,6 +180,9 @@ internal partial class Program
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
 
+        // Focus-steal tracking: wire callbacks into AppBotPipe before any Spawn/StartTracked calls.
+        FocusLaunchTracker.Wire();
+
         // Worker processes spawned by Eye (screensaver, whisper-ring, find-prompts, analyze-hack, slack-route)
         // inherit WKAPPBOT_WORKER=1 env → suppress ticks, TeeWriter, crash handler, LaunchEye (same as RunningInEye).
         if (Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1")
