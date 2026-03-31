@@ -554,7 +554,7 @@ partial class Program
     /// <summary>Thin delegate to AppBotPipe.CreateProcess — null CWD guard + trace.</summary>
     static bool CreateProcessW(string? app, char[] cmd, IntPtr pa, IntPtr ta,
         bool inh, uint flags, IntPtr env, string? cwd, ref STARTUPINFOW si, out PROCESS_INFORMATION pi)
-        => AppBotPipe.CreateProcess(app, cmd, pa, ta, inh, flags, env, cwd, ref si, out pi, "LAUNCHER");
+        => AppBotPipe.CreateProcess(app, cmd, pa, ta, inh, flags, env, cwd, ref si, out pi, out _, "LAUNCHER");
 
     const uint DETACHED_PROCESS          = AppBotPipe.DETACHED_PROCESS;
     const uint CREATE_BREAKAWAY_FROM_JOB = AppBotPipe.CREATE_BREAKAWAY_FROM_JOB;

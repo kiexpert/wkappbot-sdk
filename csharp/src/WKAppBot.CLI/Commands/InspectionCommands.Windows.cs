@@ -242,6 +242,16 @@ internal partial class Program
             Console.Write($" {trimProc,-16} {sizeStr,9}");
             if (isForeground) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" *"); Console.ResetColor(); }
             if (flagStr.Length > 0) { Console.ForegroundColor = ConsoleColor.DarkCyan; Console.Write(flagStr); Console.ResetColor(); }
+            // CDP port tag: show [CDP=XXXX] when process has --remote-debugging-port in cmdline
+            // Only check Chromium-based processes or when cmdLine already cached via --cmd
+            if (process.Contains("chrome", StringComparison.OrdinalIgnoreCase)
+                || process.Contains("msedge", StringComparison.OrdinalIgnoreCase)
+                || process.Contains("electron", StringComparison.OrdinalIgnoreCase)
+                || cmdLineCache.ContainsKey(pid))
+            {
+                var m = Regex.Match(GetCommandLine(pid), @"--remote-debugging-port=(\d+)");
+                if (m.Success) { Console.ForegroundColor = ConsoleColor.Cyan; Console.Write($" [CDP={m.Groups[1].Value}]"); Console.ResetColor(); }
+            }
             if (ownerHwnd != IntPtr.Zero)
             {
                 Console.ForegroundColor = ConsoleColor.DarkGray;
