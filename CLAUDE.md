@@ -1,4 +1,4 @@
-# WKAppBot v5.6.0 - Windows + Android App Automation Test Framework
+# WKAppBot v5.7.0 - Windows + Android App Automation Test Framework
 
 ## 동료 클롣을 위한 운영 규칙 (필독!)
 
@@ -99,6 +99,16 @@ UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
   - WMI로 wkappbot-core.exe(`% mcp%` 제외) 전부 종료 후 1s 대기 → eye tick
   - 핫스왑 진입 즉시 `DisableEyeWatchdogTask()` → 신규 Eye가 재활성화
 - **windows --cmd=\<substring\>**: cmdline 기반 창 필터 (예: `windows chrome --cmd=remote-debugging-port`)
+
+### AppBotPipe hot-swap 버그 수정 + 워치독 안정화 (v5.7)
+- **`CreateProcess` out int lastError 수정**: `RawCreateProcessW` 실패 후 `Console.Error.WriteLine`이 Win32 last error를 리셋하던 레이스 수정
+  - 기존: `Spawn`이 `Marshal.GetLastWin32Error() == 5` 체크 시 항상 0 읽음 → breakaway-less 재시도 없음 → EYE-HOTSWAP err=5 크래시
+  - 수정: `CreateProcess`에 `out int lastError` 추가, `RawCreateProcessW` 직후 즉시 저장 → `Spawn`이 `cpErr == 5`로 직접 비교
+- **`EnsureEyeWatchdogTask` 안정화**: `AppBotPipe.Spawn("schtasks.exe")` → `Process.Start` 직접 사용 (Job object 제한 우회)
+  - `/Change /ST + /ENABLE` 전략 (기존 태스크 편집), 없으면 `/Create /F` 폴백
+  - 실패 시만 `watchdog.log`에 stderr/stdout 기록
+- **web open/navigate [WEB] TabID 출력 (v5.7)**: `[WEB] TabID:` / `[WEB] Title:` / `[WEB] URL:` 표준 출력 추가
+  - Aborting 제거 → warn-only (foreign Chrome 허용)
 
 ### Eye MCP Architecture (v4.9)
 - **EyeMcpClient**: Eye→MCP 워커(Core) 파이프 연결, 모든 a11y/UIA를 MCP 서브프로세스로 라우팅

@@ -34,4 +34,10 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`5.6` — bumped at 2026-03-31 (AppBotPipe 완전 통합 + FocusLaunchTracker, 워치독 VBS 강화, 핫스왑 워치독 비활성화, windows --cmd 필터)
+`5.7` — bumped at 2026-04-01 (AppBotPipe hot-swap lastError 레이스 수정, EnsureEyeWatchdogTask Process.Start 안정화, web open [WEB] TabID/Title/URL 출력)
+
+## Previous versions
+
+| Version | Bumped | Summary |
+|---------|--------|---------|
+| `5.6` | 2026-03-31 | AppBotPipe 완전 통합 + FocusLaunchTracker, 워치독 VBS 강화, 핫스왑 워치독 비활성화, windows --cmd 필터 |
