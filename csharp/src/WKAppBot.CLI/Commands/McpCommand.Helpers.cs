@@ -255,7 +255,7 @@ internal partial class Program
             "ocr" => RunCliCaptureWithCode("ocr", rest, emitProgress),
             "prompt-probe" => RunCliCaptureWithCode("prompt-probe", rest, emitProgress),
             "claude-detect" => RunCliCaptureWithCode("claude-detect", rest, emitProgress),
-            "find-prompts" => ("[ERROR] find-prompts must use dedicated worker, not MCP pipe", 1),
+            "find-prompts" => RunCliCaptureWithCode("find-prompts", rest, emitProgress),
             // All other commands: spawn external process (safest, no in-proc side-effects)
             _ => RunCliCaptureWithCodeExternal(cmd, rest, emitProgress)
         };
