@@ -105,7 +105,7 @@ Subcommands:
             RedirectStandardError = true,
         };
 
-        var process = Process.Start(psi);
+        var process = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "KIWOOM");
         if (process == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;

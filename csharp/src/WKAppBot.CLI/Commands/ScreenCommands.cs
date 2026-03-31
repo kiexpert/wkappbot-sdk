@@ -170,14 +170,7 @@ internal partial class Program
             if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe))
                 return;
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = exe,
-                Arguments = "eye --size 380x280",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            Process.Start(psi);
+            AppBotPipe.Spawn(exe, "eye --size 380x280", Environment.CurrentDirectory, caller: "SCREEN");
         }
         catch { }
     }

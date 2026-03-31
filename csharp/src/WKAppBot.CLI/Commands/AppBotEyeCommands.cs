@@ -84,12 +84,9 @@ internal partial class Program
         // VBScript ws.Run "...", 0 = hidden window (more reliable than conhost --headless).
         // ws.CurrentDirectory sets CWD before launch — prevents system32 default.
         // VBS lives under {watchdogCwd}/.wkappbot/ — visible in project, per-workspace.
+        // Only update VBS when running in full Eye loop (EyeCallerCwd is set).
+        // During eye tick, skip VBS rewrite — existing VBS on disk already has correct CWD.
         string? watchdogCwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : null;
-        if (watchdogCwd == null && File.Exists(EyeCwdFile))
-        {
-            var saved = File.ReadAllText(EyeCwdFile).Trim();
-            if (Directory.Exists(saved)) watchdogCwd = saved;
-        }
         var vbsDir = watchdogCwd != null ? Path.Combine(watchdogCwd, ".wkappbot") : dir;
         var vbsPath = Path.Combine(vbsDir, "wkappbot-silent.vbs");
         var vbsContent = watchdogCwd != null
@@ -267,24 +264,13 @@ internal partial class Program
             // Previously used UseShellExecute=true, but ShellExecuteEx fails silently
             // in DETACHED_PROCESS context (no shell/console to work with).
             // CWD chain: user's project dir → Core → Eye → screensaver/whisper-ring/MCP
-            // Eye needs AllocConsole() — cannot use AppBotPipe.Spawn (CREATE_NO_WINDOW blocks it).
-            // Use Process.Start with explicit WorkingDirectory instead.
             var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
             var eyeArgs = "eye" + (extraArgs.Length > 0 ? " " + extraArgs : "");
             EyeLog($"Spawning: {corePath} {eyeArgs} cwd={callerCwd}");
-            var psi = new ProcessStartInfo
-            {
-                FileName        = corePath,
-                Arguments       = eyeArgs,
-                UseShellExecute = false,
-                CreateNoWindow  = true,
-                WorkingDirectory = callerCwd,
-                WindowStyle     = ProcessWindowStyle.Hidden,
-            };
-            var proc2 = Process.Start(psi);
+            using var proc2 = AppBotPipe.Spawn(corePath, eyeArgs, callerCwd, caller: "EYE-LAUNCH");
             if (proc2 != null)
             {
-                Console.WriteLine($"[EYE] Launched (PID={proc2.Id})");
+                Console.WriteLine($"[EYE] Launched (PID={proc2.Pid})");
                 PulseStep.Mark("process-started");
 
                 // Policy broadcast when Eye first spawns (agent reads stdout)
@@ -331,47 +317,11 @@ internal partial class Program
         }
     }
 
-    // Persistent CWD file — survives process restarts (e.g. watchdog, hot-swap)
-    static string EyeCwdFile => Path.Combine(DataDir, "runtime", "eye_cwd.txt");
-
     static int AppBotEyeCommand(string[] args)
     {
-        // Fix CWD: task scheduler / hot-swap often starts with C:\Windows\system32.
-        // Priority: CallerCwd pipe value → WKAPPBOT_EYE_CWD env var → saved eye_cwd.txt
-        var cwd = Environment.CurrentDirectory;
-        var exeDir = (Path.GetDirectoryName(Environment.ProcessPath) ?? "").TrimEnd('\\', '/');
-        bool cwdIsExeDir = !string.IsNullOrEmpty(exeDir)
-            && string.Equals(cwd.TrimEnd('\\', '/'), exeDir, StringComparison.OrdinalIgnoreCase);
-        if (string.IsNullOrEmpty(cwd) || cwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
-            || cwd.Contains("System32", StringComparison.OrdinalIgnoreCase)
-            || cwdIsExeDir)
-        {
-            var savedCwd = File.Exists(EyeCwdFile) ? File.ReadAllText(EyeCwdFile).Trim() : null;
-            var envCwd   = Environment.GetEnvironmentVariable("WKAPPBOT_EYE_CWD");
-            // Skip env var if it is also system32/exeDir (bad CWD propagated from broken Eye)
-            bool envCwdGood = !string.IsNullOrEmpty(envCwd)
-                && !envCwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(envCwd.TrimEnd('\\', '/'), exeDir, StringComparison.OrdinalIgnoreCase)
-                && Directory.Exists(envCwd);
-            var fixedCwd = EyeCmdPipeServer.CallerCwd.Value
-                ?? (envCwdGood ? envCwd : null)
-                ?? (Directory.Exists(savedCwd) ? savedCwd : null)
-                ?? ".";
-            try { Environment.CurrentDirectory = fixedCwd; } catch { }
-            Console.Error.WriteLine($"[EYE] CWD fixed: {cwd} → {fixedCwd}");
-        }
         // one-shot diagnostic tick (must not enter global loop)
         if (args.Length > 0 && string.Equals(args[0], "tick", StringComparison.OrdinalIgnoreCase))
             return EyeTickCommand(args.Skip(1).ToArray());
-
-        // Persist CWD only when entering global loop (not tick) — prevents csproj post-publish
-        // eye tick (runs from CLI project dir) from overwriting with a wrong path.
-        var currentCwd = Environment.CurrentDirectory;
-        if (!currentCwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(currentCwd.TrimEnd('\\', '/'), exeDir, StringComparison.OrdinalIgnoreCase))
-        {
-            try { Directory.CreateDirectory(Path.GetDirectoryName(EyeCwdFile)!); File.WriteAllText(EyeCwdFile, currentCwd); } catch { }
-        }
 
         // Parse arguments (GlobalMode only — no app/web/legacy modes)
         int intervalMs = 100;
