@@ -258,7 +258,17 @@ internal static class AppBotPipe
             return null;
         }
         psi.WorkingDirectory = cwd;
-        try { Console.Error.WriteLine($"[{caller}] StartTracked cwd=\"{cwd}\" exe={psi.FileName}"); } catch { }
+
+        // ── FOCUSLESS GUARD ──────────────────────────────────────
+        // UseShellExecute=false processes must not create a visible window (focus steal).
+        // UseShellExecute=true (browser/runas/shell open) is intentional UI — not blocked.
+        if (!psi.UseShellExecute && !psi.CreateNoWindow)
+        {
+            try { Console.Error.WriteLine($"[{caller}:WARN] StartTracked — enforcing CreateNoWindow=true (was false) exe={psi.FileName}"); } catch { }
+            psi.CreateNoWindow = true;
+        }
+
+        try { Console.Error.WriteLine($"[{caller}] StartTracked cwd=\"{cwd}\" exe={psi.FileName} shell={psi.UseShellExecute} nowin={psi.CreateNoWindow}"); } catch { }
         return System.Diagnostics.Process.Start(psi);
     }
 
