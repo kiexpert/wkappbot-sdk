@@ -103,7 +103,7 @@ internal partial class Program
             "f.Close\n" +
             "Set fso = Nothing\n" +
             "Set ws = CreateObject(\"WScript.Shell\")\n" +
-            $"ws.Run \"\"\"{launcherPath}\"\" a11y kill \\\"-core.exe eye\\\" --allow-ancestors\", 0, True\n" +
+            $"ws.Run \"\"\"{launcherPath}\"\" a11y kill \"\"-core.exe eye\"\" --allow-ancestors\", 0, True\n" +
             "WScript.Sleep 1000\n" +
             cwdLine +
             $"Dim ret : ret = ws.Run(\"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, True)\n" +
@@ -124,7 +124,7 @@ internal partial class Program
             "End If\n" +
             "f2.Close\n";
         try { Directory.CreateDirectory(vbsDir); File.WriteAllText(vbsPath, vbsContent); } catch { }
-        var tr = File.Exists(vbsPath) ? $"wscript.exe \\\"{vbsPath}\\\"" : $"\\\"{launcherPath}\\\" eye tick --timeout 15";
+        var tr = File.Exists(vbsPath) ? $"wscript.exe //B \\\"{vbsPath}\\\"" : $"\\\"{launcherPath}\\\" eye tick --timeout 15";
         // /SC MINUTE /MO 2: repeating every 2 min — survives even if Eye's 60s refresh fails.
         // Eye's loop refreshes this every 60s (rolling defer), but if Eye dies the task keeps firing.
         var fireAt = DateTime.Now.AddMinutes(2).ToString("HH:mm");
