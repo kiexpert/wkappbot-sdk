@@ -59,6 +59,26 @@ public static class WindowFinder
         {
             return cached.hwnds.Select(WindowInfo.FromHwnd).ToList();
         }
+        // ── Multi-field JSON-like pattern: {hwnd:0xAABB,pid:1234,title:"...",domain:"..."} ──
+        // All specified fields must match (AND logic). Supported fields:
+        //   hwnd    hex HWND (with or without 0x) — direct lookup if sole field
+        //   pid     decimal or hex process ID
+        //   title   window title substring (PatternMatcher: glob/regex supported)
+        //   cls     window class name substring
+        //   proc    process name substring
+        //   domain  browser domain (via GetBrowserUrl) substring
+        //   url     browser full URL substring
+        if (titlePattern.StartsWith('{') && titlePattern.EndsWith('}'))
+        {
+            var mfFields = ParseMultiFieldPattern(titlePattern);
+            if (mfFields != null)
+            {
+                var mfResults = FindByMultiField(mfFields);
+                _grapCache[titlePattern] = (mfResults.Select(r => r.Handle).ToList(), DateTime.UtcNow);
+                return mfResults;
+            }
+        }
+
         // ★ Direct HWND lookup — no enumeration, works for any HWND (root or child)
         // Supported formats (all equivalent):
         //   [001A2B3C]   ← windows/inspect output format (canonical)
@@ -867,6 +887,217 @@ public static class WindowFinder
 
         _uiaOmniboxCache[hWnd] = (url, now);
         return url;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════
+    // Multi-field JSON-like grap pattern  {key:value, key:"quoted", key:[or1,or2]}
+    // ══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Parse {key:value,...} multi-field pattern into field→value(s) dictionary.
+    /// Values may be:
+    ///   unquoted   →  single token (no spaces / commas)
+    ///   "quoted"   →  single value (may contain spaces)
+    ///   [a,b,"c"]  →  OR list of values
+    /// Returns null if the input doesn't look like a valid multi-field pattern.
+    /// </summary>
+    static Dictionary<string, List<string>>? ParseMultiFieldPattern(string pattern)
+    {
+        var inner = pattern[1..^1].Trim();
+        if (string.IsNullOrEmpty(inner)) return null;
+
+        var fields = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        int i = 0;
+
+        while (i < inner.Length)
+        {
+            // Skip whitespace and commas between pairs
+            while (i < inner.Length && (char.IsWhiteSpace(inner[i]) || inner[i] == ',')) i++;
+            if (i >= inner.Length) break;
+
+            // Read key (up to ':')
+            int keyStart = i;
+            while (i < inner.Length && inner[i] != ':' && inner[i] != '}') i++;
+            if (i >= inner.Length || inner[i] == '}') return null; // malformed
+            var key = inner[keyStart..i].Trim();
+            if (string.IsNullOrEmpty(key)) return null;
+            i++; // skip ':'
+
+            // Skip whitespace
+            while (i < inner.Length && char.IsWhiteSpace(inner[i])) i++;
+            if (i >= inner.Length) return null;
+
+            // Read value(s)
+            var values = new List<string>();
+
+            if (inner[i] == '[')
+            {
+                // OR array: [val1, "val 2", val3]
+                i++; // skip '['
+                while (i < inner.Length && inner[i] != ']')
+                {
+                    while (i < inner.Length && (char.IsWhiteSpace(inner[i]) || inner[i] == ',')) i++;
+                    if (i >= inner.Length || inner[i] == ']') break;
+                    values.Add(ReadPatternValue(inner, ref i));
+                }
+                if (i < inner.Length && inner[i] == ']') i++; // skip ']'
+            }
+            else
+            {
+                // Single value (quoted or unquoted)
+                values.Add(ReadPatternValue(inner, ref i));
+            }
+
+            if (values.Count > 0) fields[key] = values;
+        }
+
+        return fields.Count > 0 ? fields : null;
+    }
+
+    /// <summary>Read one value token (quoted or unquoted) from a pattern string at position i.</summary>
+    static string ReadPatternValue(string s, ref int i)
+    {
+        if (i >= s.Length) return "";
+        if (s[i] == '"')
+        {
+            i++; // skip opening "
+            int start = i;
+            while (i < s.Length && s[i] != '"') i++;
+            var val = s[start..i];
+            if (i < s.Length) i++; // skip closing "
+            return val;
+        }
+        else
+        {
+            int start = i;
+            while (i < s.Length && s[i] != ',' && s[i] != ']' && s[i] != '}') i++;
+            return s[start..i].Trim();
+        }
+    }
+
+    /// <summary>
+    /// Find windows matching all fields in a parsed multi-field pattern (AND between fields, OR within each field's value list).
+    /// </summary>
+    static List<WindowInfo> FindByMultiField(Dictionary<string, List<string>> fields)
+    {
+        // ── hwnd-only: direct lookup ──
+        if (fields.Count == 1 && fields.TryGetValue("hwnd", out var hwndOnlyVals))
+        {
+            var h = ParseHwndField(hwndOnlyVals[0]);
+            if (h != IntPtr.Zero && NativeMethods.IsWindow(h))
+                return [WindowInfo.FromHwnd(h)];
+            return [];
+        }
+
+        // ── Parse static filters ──
+        IntPtr hwndFilter = IntPtr.Zero;
+        if (fields.TryGetValue("hwnd", out var hwndVals))
+            hwndFilter = ParseHwndField(hwndVals[0]);
+
+        uint pidFilter = 0;
+        if (fields.TryGetValue("pid", out var pidVals))
+        {
+            var ps = pidVals[0].TrimStart('0', 'x', 'X');
+            if (!uint.TryParse(ps, System.Globalization.NumberStyles.HexNumber, null, out pidFilter))
+                uint.TryParse(pidVals[0], out pidFilter);
+        }
+
+        var titleMatchers  = fields.TryGetValue("title",  out var tv) ? tv.Select(PatternMatcher.Create).ToList() : null;
+        var clsMatchers    = fields.TryGetValue("cls",    out var cv) ? cv.Select(PatternMatcher.Create).ToList() : null;
+        var procMatchers   = fields.TryGetValue("proc",   out var pv) ? pv.Select(PatternMatcher.Create).ToList() : null;
+        var domainPatterns = fields.TryGetValue("domain", out var dv) ? dv : null;
+        var urlPatterns    = fields.TryGetValue("url",    out var uv) ? uv : null;
+        bool needsUrl      = domainPatterns != null || urlPatterns != null;
+
+        var results = new List<WindowInfo>();
+        var procNameCache = new Dictionary<uint, string>();
+        var focus = FocusSnapshot.CaptureNow();
+
+        // ── If hwnd specified: check only that single window ──
+        if (hwndFilter != IntPtr.Zero)
+        {
+            if (NativeMethods.IsWindow(hwndFilter) && MatchesMultiField(
+                    hwndFilter, pidFilter, titleMatchers, clsMatchers, procMatchers,
+                    domainPatterns, urlPatterns, procNameCache))
+                results.Add(WindowInfo.FromHwnd(hwndFilter));
+            return results;
+        }
+
+        // ── Enumerate all visible windows ──
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            if (MatchesMultiField(hWnd, pidFilter, titleMatchers, clsMatchers, procMatchers,
+                    domainPatterns, urlPatterns, procNameCache))
+                results.Add(WindowInfo.FromHwnd(hWnd));
+            return true;
+        }, IntPtr.Zero);
+
+        // Sort: focus priority
+        if (results.Count > 1)
+            results.Sort((a, b) => focus.GetPriority(b.Handle).CompareTo(focus.GetPriority(a.Handle)));
+
+        return results;
+    }
+
+    static IntPtr ParseHwndField(string s)
+    {
+        var hex = s.TrimStart().TrimStart('0', 'x', 'X');
+        if (IntPtr.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var h)) return h;
+        return IntPtr.Zero;
+    }
+
+    static bool MatchesMultiField(
+        IntPtr hWnd, uint pidFilter,
+        List<PatternMatcher>? titleMatchers, List<PatternMatcher>? clsMatchers, List<PatternMatcher>? procMatchers,
+        List<string>? domainPatterns, List<string>? urlPatterns,
+        Dictionary<uint, string> procNameCache)
+    {
+        NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+
+        // pid
+        if (pidFilter != 0 && pid != pidFilter) return false;
+
+        // title (OR within list)
+        if (titleMatchers != null)
+        {
+            var title = GetWindowText(hWnd);
+            if (!titleMatchers.Any(m => m.IsMatch(title))) return false;
+        }
+
+        // cls (OR within list)
+        if (clsMatchers != null)
+        {
+            var cls = GetClassName(hWnd);
+            if (!clsMatchers.Any(m => m.IsMatch(cls))) return false;
+        }
+
+        // proc (OR within list)
+        if (procMatchers != null)
+        {
+            if (!procNameCache.TryGetValue(pid, out var proc))
+            {
+                try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { proc = ""; }
+                procNameCache[pid] = proc;
+            }
+            if (!procMatchers.Any(m => m.IsMatch(proc))) return false;
+        }
+
+        // domain / url (lazy fetch)
+        if (domainPatterns != null || urlPatterns != null)
+        {
+            var url = GetBrowserUrl(hWnd, pid);
+            if (domainPatterns != null)
+            {
+                string domain = "";
+                try { domain = string.IsNullOrEmpty(url) ? "" : new Uri(url.Split(' ')[0]).Host; } catch { }
+                if (!domainPatterns.Any(d => domain.Contains(d, StringComparison.OrdinalIgnoreCase))) return false;
+            }
+            if (urlPatterns != null && !urlPatterns.Any(u => (url ?? "").Contains(u, StringComparison.OrdinalIgnoreCase)))
+                return false;
+        }
+
+        return true;
     }
 }
 
