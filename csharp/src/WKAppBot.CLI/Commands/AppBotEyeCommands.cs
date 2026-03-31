@@ -66,7 +66,7 @@ internal partial class Program
     // ── Eye Watchdog Task (Task Scheduler) ──────────────────────────────
     // Eye 시작마다 자동 재등록 → 클롣이 까먹어도 자가 치유.
     // 10분마다 `eye tick --timeout 15` 실행 → Eye 죽으면 재spawn + retry queue flush.
-    private const string EyeWatchdogTaskName = "WKAppBot Eye Watchdog";
+    internal const string EyeWatchdogTaskName = "WKAppBot Eye Watchdog";
 
     /// <summary>
     /// Schedule eye tick 2 minutes from now via schtasks.exe (no PowerShell = no focus steal).
@@ -176,6 +176,27 @@ internal partial class Program
     private static System.Threading.Mutex? _eyeAliveMutex;
     // Spawn mutex: prevents concurrent spawn attempts
     private const string EyeSpawnMutexName = "Global\\WKAppBotEyeSpawn";
+
+    /// <summary>
+    /// Disable (not delete) the watchdog task. Called on hot-swap entry.
+    /// New Eye will re-enable it via EnsureEyeWatchdogTask().
+    /// Fire-and-forget (non-blocking).
+    /// </summary>
+    internal static void DisableEyeWatchdogTask()
+    {
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                using var p = AppBotPipe.Spawn("schtasks.exe",
+                    $"/Change /TN \"{EyeWatchdogTaskName}\" /DISABLE",
+                    cwd: Environment.SystemDirectory, caller: "EYE-SCHED-DIS");
+                p?.WaitForExit(3000);
+                Console.WriteLine($"[EYE] Watchdog: disabled (hot-swap, exit={p?.ExitCode})");
+            }
+            catch (Exception ex) { Console.WriteLine($"[EYE] Watchdog disable error: {ex.Message}"); }
+        });
+    }
 
     /// <summary>
     /// Eye auto-launch — called from Program.Main for every CLI command.
