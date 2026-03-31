@@ -397,11 +397,22 @@ internal sealed class WhisperExperienceDb : IDisposable
             _sttWriter?.Dispose();
 
             _currentDate = date;
+            // Allow hot-swap / overlap between old and new WhisperRing processes.
+            // Default StreamWriter(path, append:true) takes an exclusive write lock,
+            // which can crash the new process before the UI window is shown.
             _tokenWriter = new StreamWriter(
-                Path.Combine(_basePath, $"tokens_{date}.jsonl"), append: true)
+                new FileStream(
+                    Path.Combine(_basePath, $"tokens_{date}.jsonl"),
+                    FileMode.Append,
+                    FileAccess.Write,
+                    FileShare.ReadWrite))
             { AutoFlush = false };
             _sttWriter = new StreamWriter(
-                Path.Combine(_basePath, $"stt_{date}.jsonl"), append: true)
+                new FileStream(
+                    Path.Combine(_basePath, $"stt_{date}.jsonl"),
+                    FileMode.Append,
+                    FileAccess.Write,
+                    FileShare.ReadWrite))
             { AutoFlush = false };
         }
     }
