@@ -89,9 +89,28 @@ internal partial class Program
         string? watchdogCwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : null;
         var vbsDir = watchdogCwd != null ? Path.Combine(watchdogCwd, ".wkappbot") : dir;
         var vbsPath = Path.Combine(vbsDir, "wkappbot-silent.vbs");
-        var vbsContent = watchdogCwd != null
-            ? $"Set ws = CreateObject(\"WScript.Shell\")\nws.CurrentDirectory = \"{watchdogCwd}\"\nws.Run \"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, False\n"
-            : $"Set ws = CreateObject(\"WScript.Shell\")\nws.Run \"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, False\n";
+        var vbsLog = Path.Combine(vbsDir, "watchdog.log");
+        // Watchdog fires = Eye has been dead ≥2 min (abnormal). Log + kill zombie Eye + respawn.
+        // WMI query kills any wkappbot-core.exe whose cmdline contains " eye" (eye / eye tick modes).
+        // "On Error Resume Next" protects against WMI failures on locked/exiting processes.
+        var cwdLine = watchdogCwd != null ? $"ws.CurrentDirectory = \"{watchdogCwd}\"\n" : "";
+        var vbsContent =
+            "On Error Resume Next\n" +
+            $"Set fso = CreateObject(\"Scripting.FileSystemObject\")\n" +
+            $"Set f = fso.OpenTextFile(\"{vbsLog}\", 8, True)\n" +
+            "f.WriteLine \"[WATCHDOG] \" & Now() & \" Eye dead — killing zombie + respawn\"\n" +
+            "f.Close\n" +
+            "Set fso = Nothing\n" +
+            "Set oWMI = GetObject(\"winmgmts:\")\n" +
+            "Set oProcs = oWMI.ExecQuery(\"SELECT ProcessId FROM Win32_Process WHERE Name='wkappbot-core.exe' AND CommandLine LIKE '% eye%'\")\n" +
+            "For Each oProc In oProcs\n" +
+            "  oProc.Terminate()\n" +
+            "Next\n" +
+            "On Error GoTo 0\n" +
+            "WScript.Sleep 1000\n" +
+            "Set ws = CreateObject(\"WScript.Shell\")\n" +
+            cwdLine +
+            $"ws.Run \"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, False\n";
         try { Directory.CreateDirectory(vbsDir); File.WriteAllText(vbsPath, vbsContent); } catch { }
         var tr = File.Exists(vbsPath) ? $"wscript.exe \\\"{vbsPath}\\\"" : $"\\\"{launcherPath}\\\" eye tick --timeout 15";
         // /SC MINUTE /MO 2: repeating every 2 min — survives even if Eye's 60s refresh fails.
