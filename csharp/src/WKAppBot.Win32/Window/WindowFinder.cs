@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
+using FlaUI.UIA3;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Native;
 
@@ -16,6 +18,15 @@ public static class WindowFinder
     // Lazy cache: only caches what was searched. hwnd validity checked on hit.
     static readonly Dictionary<string, (List<IntPtr> hwnds, DateTime cachedAt)> _grapCache = new();
     static readonly TimeSpan _grapCacheTtl = TimeSpan.FromSeconds(5);
+
+    // ── Chrome URL caches (shared across FindByTitle calls) ──
+    // PID → CDP tab URLs string (all tabs joined by space), 5s TTL
+    static readonly Dictionary<uint, (string urls, DateTime cachedAt)> _cdpPidUrlCache = new();
+    // HWND → UIA omnibox URL (active tab), 5s TTL
+    static readonly Dictionary<IntPtr, (string url, DateTime cachedAt)> _uiaOmniboxCache = new();
+    static readonly TimeSpan _urlCacheTtl = TimeSpan.FromSeconds(5);
+    static UIA3Automation? _lazyUia;
+    static bool _lazyUiaFailed;
 
     /// <summary>Invalidate cache entries containing this hwnd (call after a11y action).</summary>
     public static void InvalidateCache(IntPtr hwnd)
@@ -95,7 +106,18 @@ public static class WindowFinder
             var searchKey = BuildSearchKey(hWnd, cls, title, procName, w, h, focus);
 
             // Token-AND match: plain multi-word patterns check each token in title+searchKey (order-independent)
-            if (PatternMatcher.TokenMatchAny(titlePattern, title, searchKey))
+            bool matched = PatternMatcher.TokenMatchAny(titlePattern, title, searchKey);
+
+            // URL fallback: for Chrome/Edge without a title match, fetch active/all tab URLs
+            if (!matched && (procName.Equals("chrome", StringComparison.OrdinalIgnoreCase)
+                          || procName.Equals("msedge", StringComparison.OrdinalIgnoreCase)))
+            {
+                var url = GetChromeUrl(hWnd, pid, procName);
+                if (!string.IsNullOrEmpty(url))
+                    matched = PatternMatcher.TokenMatchAny(titlePattern, url);
+            }
+
+            if (matched)
             {
                 var info = WindowInfo.FromHwnd(hWnd);
                 // Coverage = pattern literal length / matched text length (higher = more specific match)
@@ -757,6 +779,57 @@ public static class WindowFinder
         int w;
         try { w = Console.WindowWidth; } catch { w = 120; }
         Console.Write("\r" + new string(' ', Math.Max(w - 1, 80)) + "\r");
+    }
+
+    // ── Chrome/Edge URL fetch (Tier 1: CDP HTTP, Tier 2: UIA omnibox) ──
+    // Returns all tab URLs (space-joined) for CDP, or active-tab URL for UIA.
+    // Results cached per PID (CDP) / HWND (UIA) with 5s TTL.
+    static string GetChromeUrl(IntPtr hWnd, uint pid, string procName)
+    {
+        var now = DateTime.UtcNow;
+
+        // Tier 1: CDP HTTP — requires --remote-debugging-port in cmdline
+        if (!_cdpPidUrlCache.TryGetValue(pid, out var cdpEntry) || now - cdpEntry.cachedAt >= _urlCacheTtl)
+        {
+            string cdpUrls = "";
+            try
+            {
+                var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+                var m = Regex.Match(cmdLine, @"--remote-debugging-port=(\d+)");
+                if (m.Success && int.TryParse(m.Groups[1].Value, out int port))
+                {
+                    using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(300) };
+                    var json = http.GetStringAsync($"http://localhost:{port}/json").GetAwaiter().GetResult();
+                    var urlMatches = Regex.Matches(json, "\"url\":\\s*\"([^\"]+)\"");
+                    cdpUrls = string.Join(" ", urlMatches.Select(u => u.Groups[1].Value));
+                }
+            }
+            catch { }
+            _cdpPidUrlCache[pid] = (cdpUrls, now);
+            cdpEntry = (cdpUrls, now);
+        }
+        if (!string.IsNullOrEmpty(cdpEntry.urls)) return cdpEntry.urls;
+
+        // Tier 2: UIA omnibox_view — active tab URL (no CDP needed)
+        if (hWnd == IntPtr.Zero) return "";
+        if (!_uiaOmniboxCache.TryGetValue(hWnd, out var uiaEntry) || now - uiaEntry.cachedAt >= _urlCacheTtl)
+        {
+            string uiaUrl = "";
+            if (!_lazyUiaFailed)
+            {
+                try
+                {
+                    _lazyUia ??= new UIA3Automation();
+                    var root = _lazyUia.FromHandle(hWnd);
+                    var omnibox = root?.FindFirstDescendant(cf => cf.ByAutomationId("omnibox_view"));
+                    uiaUrl = omnibox?.Patterns.Value.PatternOrDefault?.Value.ValueOrDefault ?? "";
+                }
+                catch { _lazyUiaFailed = true; }
+            }
+            _uiaOmniboxCache[hWnd] = (uiaUrl, now);
+            uiaEntry = (uiaUrl, now);
+        }
+        return uiaEntry.url;
     }
 }
 
