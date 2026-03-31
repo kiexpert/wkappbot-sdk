@@ -40,4 +40,4 @@ Features committed before the bump will show under the old minor version.
 
 | Version | Bumped | Summary |
 |---------|--------|---------|
-| `5.6` | 2026-03-31 | AppBotPipe 완전 통합 + FocusLaunchTracker, 워치독 VBS 강화, 핫스왑 워치독 비활성화, windows --cmd 필터 |
+| `5.6` | 2026-03-31 | AppBotPipe 완전 통합 + FocusLaunchTracker, 워치독 VBS 강화, 핫스왑 워치독 비활성화, windows --cmd 필터, JSON5 멀티필드 grap 패턴 (`{hwnd,pid,title,cls,proc,domain,url}` AND 검색) |
