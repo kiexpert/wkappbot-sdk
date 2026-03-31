@@ -129,6 +129,18 @@ internal partial class Program
         // Pre-create matcher ONCE for all filter checks (avoid per-window regex compile)
         var ownerCandidateMatcher = filterTitle != null ? PatternMatcher.Create(filterTitle) : null;
 
+        // Token-AND cmdline/URL match for plain multi-word patterns (order-independent).
+        // "eye tick", "tick eye" → both match "wkappbot eye tick --timeout 15".
+        // Glob/regex patterns use standard PatternMatcher (order-sensitive).
+        bool CmdLineOrUrlMatch(string text)
+        {
+            if (ownerCandidateMatcher == null || filterTitle == null) return false;
+            if (PatternMatcher.IsPattern(filterTitle) || !filterTitle.Contains(' '))
+                return ownerCandidateMatcher.IsMatch(text);
+            var tokens = filterTitle.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return tokens.All(t => text.Contains(t, StringComparison.OrdinalIgnoreCase));
+        }
+
         // Get window info, apply filters. Returns null if filtered out or noise.
         (string title, string className, string process, uint pid, int w, int h, bool visible)?
             GetWindowInfo(IntPtr hWnd)
@@ -160,9 +172,9 @@ internal partial class Program
                 var fpn = GetProcessName(fpid);
                 if (!ownerCandidateMatcher.IsMatch(fpn))
                 {
-                    // Last chance: cmdline + web URL (Chrome/Edge active tab via CDP or UIA)
-                    if (!ownerCandidateMatcher.IsMatch(GetCommandLine(fpid)) &&
-                        !ownerCandidateMatcher.IsMatch(GetCdpUrls(hWnd, fpid, fpn))) return null;
+                    // Last chance: cmdline + web URL — token-AND for plain multi-word patterns
+                    if (!CmdLineOrUrlMatch(GetCommandLine(fpid)) &&
+                        !CmdLineOrUrlMatch(GetCdpUrls(hWnd, fpid, fpn))) return null;
                 }
             }
 
@@ -178,8 +190,8 @@ internal partial class Program
             {
                 var searchKey = WindowFinder.BuildSearchKey(hWnd, className, title, processName, w, h, focus);
                 if (!ownerCandidateMatcher.IsMatch(title) && !ownerCandidateMatcher.IsMatch(searchKey)
-                    && !ownerCandidateMatcher.IsMatch(GetCommandLine(pid))
-                    && !ownerCandidateMatcher.IsMatch(GetCdpUrls(hWnd, pid, processName))) return null;
+                    && !CmdLineOrUrlMatch(GetCommandLine(pid))
+                    && !CmdLineOrUrlMatch(GetCdpUrls(hWnd, pid, processName))) return null;
             }
             if (filterProcess != null)
             {
