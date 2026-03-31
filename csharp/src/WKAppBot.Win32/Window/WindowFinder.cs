@@ -94,8 +94,8 @@ public static class WindowFinder
             // ★ Standard search key with focus flags
             var searchKey = BuildSearchKey(hWnd, cls, title, procName, w, h, focus);
 
-            // Substring match: try title first, then full searchKey — track coverage
-            if (matcher.IsMatch(title) || matcher.IsMatch(searchKey))
+            // Token-AND match: plain multi-word patterns check each token in title+searchKey (order-independent)
+            if (PatternMatcher.TokenMatchAny(titlePattern, title, searchKey))
             {
                 var info = WindowInfo.FromHwnd(hWnd);
                 // Coverage = pattern literal length / matched text length (higher = more specific match)
@@ -392,7 +392,7 @@ public static class WindowFinder
         {
             foreach (var mc in GetChildrenZOrder(hMdiClient))
             {
-                if (matcher.IsMatch(mc.Title) || matcher.IsMatch(SearchKey(mc)))
+                if (PatternMatcher.TokenMatchAny(pattern, mc.Title, SearchKey(mc)))
                     return mc;
             }
         }
@@ -400,7 +400,7 @@ public static class WindowFinder
         // Direct children fallback
         foreach (var ch in topChildren)
         {
-            if (matcher.IsMatch(ch.Title) || matcher.IsMatch(SearchKey(ch)))
+            if (PatternMatcher.TokenMatchAny(pattern, ch.Title, SearchKey(ch)))
                 return ch;
         }
 

@@ -1841,6 +1841,24 @@ public sealed class PatternMatcher
         return value.Contains(_literal!, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Token-AND match across one or more texts (order-independent).
+    /// Plain multi-word patterns: each token must appear in ANY of the provided texts.
+    ///   "eye tick" matches {"AppBotEye", "[wkappbot] ... eye tick ..."}  — tokens spread across fields.
+    /// Glob/regex patterns: standard IsMatch against any of the texts.
+    /// </summary>
+    public static bool TokenMatchAny(string pattern, params string[] texts)
+    {
+        if (IsPattern(pattern) || !pattern.Contains(' '))
+        {
+            var m = Create(pattern);
+            return texts.Any(t => m.IsMatch(t));
+        }
+        var tokens = pattern.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var combined = string.Join(" ", texts);
+        return tokens.All(t => combined.Contains(t, StringComparison.OrdinalIgnoreCase));
+    }
+
     public override string ToString() =>
         _regex != null ? $"pattern({_regex})" : $"literal({_literal})";
 }
