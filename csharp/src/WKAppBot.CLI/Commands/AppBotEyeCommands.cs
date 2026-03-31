@@ -154,9 +154,17 @@ internal partial class Program
     }
 
     /// Run schtasks.exe quietly (no window). Returns exit code, or -1 on failure.
-    /// Logs stderr output on failure for debugging.
+    /// Logs to watchdog.log (file-based, bypasses Console routing) for diagnostics.
     private static int RunSchtasksQuiet(string schtasksExe, string args)
     {
+        var logPath = System.IO.Path.Combine(
+            EyeCallerCwd.Length > 0 ? System.IO.Path.Combine(EyeCallerCwd, ".wkappbot") : System.IO.Path.GetDirectoryName(schtasksExe) ?? "",
+            "watchdog.log");
+        void FileLog(string msg)
+        {
+            try { System.IO.File.AppendAllText(logPath, $"[SCHTASKS] {DateTime.Now:HH:mm:ss} {msg}\n"); } catch { }
+            Console.Error.WriteLine($"[EYE] Watchdog schtasks: {msg}");
+        }
         try
         {
             var psi = new System.Diagnostics.ProcessStartInfo
@@ -169,21 +177,22 @@ internal partial class Program
                 RedirectStandardError = true,
             };
             using var p = System.Diagnostics.Process.Start(psi);
-            var stdoutTask = System.Threading.Tasks.Task.Run(() => p?.StandardOutput.ReadToEnd() ?? "");
-            var stderrTask = System.Threading.Tasks.Task.Run(() => p?.StandardError.ReadToEnd() ?? "");
-            p?.WaitForExit(5000);
+            if (p == null) { FileLog($"Process.Start returned null for: {args[..Math.Min(40,args.Length)]}"); return -1; }
+            var stdoutTask = System.Threading.Tasks.Task.Run(() => p.StandardOutput.ReadToEnd());
+            var stderrTask = System.Threading.Tasks.Task.Run(() => p.StandardError.ReadToEnd());
+            p.WaitForExit(5000);
             var stdout = stdoutTask.GetAwaiter().GetResult();
             var stderr = stderrTask.GetAwaiter().GetResult();
-            var exit = p?.ExitCode ?? -1;
+            var exit = p.ExitCode;
+            FileLog($"exit={exit} args={args[..Math.Min(40,args.Length)]}");
             if (exit != 0)
             {
                 var msg = (stderr + stdout).Trim();
-                if (!string.IsNullOrEmpty(msg))
-                    Console.WriteLine($"[EYE] Watchdog schtasks({exit}): {msg}");
+                if (!string.IsNullOrEmpty(msg)) FileLog($"output: {msg[..Math.Min(200,msg.Length)]}");
             }
             return exit;
         }
-        catch (Exception ex) { Console.WriteLine($"[EYE] Watchdog schtasks error: {ex.Message}"); return -1; }
+        catch (Exception ex) { FileLog($"exception: {ex.Message}"); return -1; }
     }
 
     /// <summary>

@@ -81,8 +81,9 @@ internal static class AppBotPipe
     internal static bool CreateProcess(string? app, char[] cmd, IntPtr pa, IntPtr ta,
         bool inh, uint flags, IntPtr env, string? cwd,
         ref STARTUPINFOW si, out PROCESS_INFORMATION pi,
-        string caller = "PROC")
+        out int lastError, string caller = "PROC")
     {
+        lastError = 0;
         var cmdStr = new string(cmd).TrimEnd('\0');
 
         // ── FOCUSLESS GUARD ─────────────────────────────────────
@@ -103,10 +104,12 @@ internal static class AppBotPipe
         }
         try { Console.Error.WriteLine($"[{caller}] CreateProcessW cwd=\"{cwd}\" cmd={Trunc(cmdStr, 80)} flags=0x{flags:X}"); } catch { }
         var ok = RawCreateProcessW(app, cmd, pa, ta, inh, flags, env, cwd, ref si, out pi);
+        // Save error BEFORE any Console/IO calls that would reset Win32 last error
+        lastError = ok ? 0 : Marshal.GetLastWin32Error();
         try
         {
             if (ok) Console.Error.WriteLine($"[{caller}] CreateProcessW → pid={pi.dwProcessId}");
-            else    Console.Error.WriteLine($"[{caller}] CreateProcessW FAILED err={Marshal.GetLastWin32Error()}");
+            else    Console.Error.WriteLine($"[{caller}] CreateProcessW FAILED err={lastError}");
         }
         catch { }
         return ok;
@@ -245,13 +248,13 @@ internal static class AppBotPipe
         bool ok = CreateProcess(null, cmdLine, IntPtr.Zero, IntPtr.Zero,
             needPipes, // bInheritHandles only when pipes are used
             CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB, IntPtr.Zero, cwd,
-            ref si, out var pi, caller);
+            ref si, out var pi, out var cpErr, caller);
 
         // err=5 (ACCESS_DENIED): job object may not allow breakaway — retry without that flag
-        if (!ok && Marshal.GetLastWin32Error() == 5)
+        if (!ok && cpErr == 5)
             ok = CreateProcess(null, cmdLine, IntPtr.Zero, IntPtr.Zero,
                 needPipes, CREATE_NO_WINDOW, IntPtr.Zero, cwd,
-                ref si, out pi, caller + "-no-breakaway");
+                ref si, out pi, out _, caller + "-no-breakaway");
 
         // Restore parent env (don't pollute caller process)
         if (savedEnv != null)
@@ -369,7 +372,7 @@ internal static class AppBotPipe
 
         var cmdLine = ($"\"{exe}\" mcp" + '\0').ToCharArray();
         bool ok = CreateProcess(null, cmdLine, IntPtr.Zero, IntPtr.Zero, true,
-            DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT, envBlock, cwd, ref si, out var pi, "MCP-SPAWN");
+            DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT, envBlock, cwd, ref si, out var pi, out _, "MCP-SPAWN");
 
         // Close child-side handles in parent regardless of outcome
         CloseHandle(hStdinRead); CloseHandle(hStdoutWrite); CloseHandle(hStderrWrite);

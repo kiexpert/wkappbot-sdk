@@ -106,6 +106,7 @@ internal partial class Program
             {
                 messageTs = ts;
                 Console.WriteLine($"[SUGGEST] Slack sent (+{files.Count} file(s))");
+                Console.WriteLine($"[SUGGEST] ID: {messageTs}  (resolve: suggest resolve {messageTs} \"note\")");
                 foreach (var f in files)
                 {
                     Console.WriteLine($"[SUGGEST] Uploading {Path.GetFileName(f)}...");
