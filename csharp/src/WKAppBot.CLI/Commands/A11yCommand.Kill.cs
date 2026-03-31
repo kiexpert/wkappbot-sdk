@@ -100,6 +100,21 @@ internal partial class Program
                     continue;
                 }
 
+                // Protect WebBot Chrome/Edge: processes with --remote-debugging-port are active CDP sessions.
+                // Skip automatically unless user explicitly targeted them with --arg=remote-debugging-port=N.
+                if (argFilter == null && !string.IsNullOrEmpty(cmdLine) &&
+                    (procName.Equals("chrome", StringComparison.OrdinalIgnoreCase) ||
+                     procName.Equals("msedge", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(cmdLine, @"--remote-debugging-port=(\d+)");
+                    if (m.Success)
+                    {
+                        skipped.Add($"[{p.Id}]{procName} (webbot-cdp:port={m.Groups[1].Value})");
+                        Console.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (WebBot CDP port={m.Groups[1].Value}). Use --arg=remote-debugging-port={m.Groups[1].Value} to force.");
+                        continue;
+                    }
+                }
+
                 if (dryRun)
                 {
                     Console.WriteLine($"[KILL:DRY] [{p.Id}]{procName} — {cmdBrief}");

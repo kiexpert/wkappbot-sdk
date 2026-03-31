@@ -555,11 +555,18 @@ Options:
         cdp.NavigateAsync(url).GetAwaiter().GetResult();
 
         var title = cdp.GetTitleAsync().GetAwaiter().GetResult();
+        var pageUrl = cdp.GetUrlAsync().GetAwaiter().GetResult();
+        var chromeHwnd = cdp.GetChromeWindowHandle();
+        cdp.ChromeWindowHandle = (nint)chromeHwnd;
+        var tabId = cdp.TargetId ?? "";
         cdp.UpdateStatusAsync($"Navigate: {url}", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("OK");
         Console.ResetColor();
         Console.WriteLine($"[WEB] Title: {title}");
+        Console.WriteLine($"[WEB] URL:   {pageUrl}");
+        Console.WriteLine($"[WEB] HWND:  0x{chromeHwnd:X}");
+        Console.WriteLine($"[WEB] TabID: {tabId}");
 
         // Show past knowhow for this domain
         ShowDomainKnowhow(url);
