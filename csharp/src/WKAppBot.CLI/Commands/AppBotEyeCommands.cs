@@ -69,9 +69,10 @@ internal partial class Program
     internal const string EyeWatchdogTaskName = "WKAppBot Eye Watchdog";
 
     /// <summary>
-    /// Schedule eye tick 2 minutes from now via schtasks.exe (no PowerShell = no focus steal).
-    /// Eye loop calls this every minute — keeps pushing 2 min forward while alive.
-    /// If Eye dies, last scheduled time fires 2 min later → tick checks + respawns Eye.
+    /// Register watchdog task 2 minutes from now. Delete+Create ensures the timer is always reset
+    /// (schtasks /Create /F alone doesn't reset an existing repeating task's next fire time).
+    /// Eye loop calls this every 60s — keeps pushing 2 min forward while alive.
+    /// If Eye dies, last registration fires 2 min later → tick checks + respawns Eye.
     /// </summary>
     internal static void EnsureEyeWatchdogTask()
     {
@@ -80,21 +81,13 @@ internal partial class Program
         var launcherPath = Path.Combine(dir, "wkappbot.exe");
         if (!File.Exists(launcherPath)) launcherPath = corePath;
 
-        // Use wscript.exe + VBS wrapper to suppress console window entirely.
-        // VBScript ws.Run "...", 0 = hidden window (more reliable than conhost --headless).
-        // ws.CurrentDirectory sets CWD before launch — prevents system32 default.
-        // VBS lives under {watchdogCwd}/.wkappbot/ — visible in project, per-workspace.
-        // Only update VBS when running in full Eye loop (EyeCallerCwd is set).
-        // During eye tick, skip VBS rewrite — existing VBS on disk already has correct CWD.
         string? watchdogCwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : null;
         var vbsDir = watchdogCwd != null ? Path.Combine(watchdogCwd, ".wkappbot") : dir;
         var vbsPath = Path.Combine(vbsDir, "wkappbot-silent.vbs");
         var vbsLog = Path.Combine(vbsDir, "watchdog.log");
-        // Watchdog fires = Eye has been dead ≥2 min (abnormal). Log + kill zombie Eye + respawn.
-        // WMI query kills any wkappbot-core.exe whose cmdline contains " eye" (eye / eye tick modes).
-        // "On Error Resume Next" protects against WMI failures on locked/exiting processes.
+
         var cwdLine = watchdogCwd != null ? $"ws.CurrentDirectory = \"{watchdogCwd}\"\n" : "";
-        var bakPath  = corePath + ".bak"; // corePath = Environment.ProcessPath (wkappbot-core.exe)
+        var bakPath  = corePath + ".bak";
         var vbsContent =
             "On Error Resume Next\n" +
             $"Set fso = CreateObject(\"Scripting.FileSystemObject\")\n" +
@@ -103,27 +96,19 @@ internal partial class Program
             "f.Close\n" +
             "Set fso = Nothing\n" +
             "Set ws = CreateObject(\"WScript.Shell\")\n" +
-            // taskkill /IM wkappbot-core.exe: kills all Core instances (Eye, MCP zombies, etc).
-            // Simpler than a11y kill and doesn't hang via IOCP when Eye is already dead.
-            // Whisper-ring/screensaver are separate executables — not affected.
-            // Eye re-spawns MCP/whisper-ring on startup.
             "ws.Run \"taskkill /F /IM wkappbot-core.exe\", 0, True\n" +
-            "WScript.Sleep 3000\n" +  // 3s: give processes time to fully exit
+            "WScript.Sleep 3000\n" +
             cwdLine +
-            // Use wkappbot-core.exe directly (not wkappbot.exe Launcher) to avoid IOCP relay
-            // which returns wrong exit code in VBS context (no ConPTY → safe to call Core directly).
             $"Dim ret : ret = ws.Run(\"\"\"{corePath}\"\" eye tick --timeout 15\", 0, True)\n" +
             $"Set fso2 = CreateObject(\"Scripting.FileSystemObject\")\n" +
             $"Set f2 = fso2.OpenTextFile(\"{vbsLog}\", 8, True)\n" +
             "f2.WriteLine \"[WATCHDOG] \" & Now() & \" eye tick exit=\" & ret\n" +
-            // ── Rollback: only on crash (ret > 2). exit=2 = Launcher timeout; Eye's finally block
-            // already spawns Eye in that case. exit=0 = success.
             "If ret > 2 Then\n" +
             $"  If fso2.FileExists(\"{bakPath}\") Then\n" +
             $"    f2.WriteLine \"[WATCHDOG] \" & Now() & \" → rollback {Path.GetFileName(bakPath)}\"\n" +
             $"    fso2.CopyFile \"{bakPath}\", \"{corePath}\", True\n" +
             "    WScript.Sleep 500\n" +
-            $"    Dim ret2 : ret2 = ws.Run(\"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, True)\n" +
+            $"    Dim ret2 : ret2 = ws.Run(\"\"\"{corePath}\"\" eye tick --timeout 15\", 0, True)\n" +
             "    f2.WriteLine \"[WATCHDOG] \" & Now() & \" rollback eye tick exit=\" & ret2\n" +
             "  Else\n" +
             $"    f2.WriteLine \"[WATCHDOG] \" & Now() & \" .bak not found — no rollback\"\n" +
@@ -131,14 +116,14 @@ internal partial class Program
             "End If\n" +
             "f2.Close\n";
         try { Directory.CreateDirectory(vbsDir); File.WriteAllText(vbsPath, vbsContent); } catch { }
-        var tr = File.Exists(vbsPath) ? $"wscript.exe //B \\\"{vbsPath}\\\"" : $"\\\"{launcherPath}\\\" eye tick --timeout 15";
-        // /SC MINUTE /MO 2: repeating every 2 min — survives even if Eye's 60s refresh fails.
-        // Eye's loop refreshes this every 60s (rolling defer), but if Eye dies the task keeps firing.
+        var tr = File.Exists(vbsPath) ? $"wscript.exe //B \\\"{vbsPath}\\\"" : $"\\\"{corePath}\\\" eye tick --timeout 15";
+        // /SC ONCE: one-shot task. Eye calls this every 60s → always defers 2min from now.
+        // /Create /F on ONCE task properly updates the fire time (unlike MINUTE repeating tasks).
+        // If Eye dies, last registered one-shot fires ≤2min later → respawn via eye tick.
         var fireAt = DateTime.Now.AddMinutes(2).ToString("HH:mm");
-        var fireDate = DateTime.Now.AddMinutes(2).ToString("yyyy/MM/dd");
-        var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"{tr}\" /SC MINUTE /MO 2 /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
-        // Fire-and-forget — schtasks.exe can take 0.5-3s; don't block Eye startup
-        Console.WriteLine($"[EYE] Watchdog: registering /SC MINUTE /MO 2 (first={fireAt})...");
+        var fireDate = DateTime.Now.ToString("yyyy/MM/dd");
+        var args = $"/Create /TN \"{EyeWatchdogTaskName}\" /TR \"{tr}\" /SC ONCE /ST {fireAt} /SD {fireDate} /F /RL LIMITED";
+        Console.WriteLine($"[EYE] Watchdog: /SC ONCE deferred to {fireAt}...");
         _ = Task.Run(() =>
         {
             try
@@ -146,9 +131,9 @@ internal partial class Program
                 using var spawn = AppBotPipe.Spawn("schtasks.exe", args,
                     cwd: Environment.SystemDirectory, caller: "EYE-SCHED");
                 spawn?.WaitForExit(5000);
-                var ok = spawn != null && spawn.ExitCode == 0;
+                var ok = spawn?.HasExited == true && spawn.ExitCode == 0;
                 Console.WriteLine(ok
-                    ? $"[EYE] Watchdog: ✓ registered (/SC MINUTE /MO 2 → first={fireAt})"
+                    ? $"[EYE] Watchdog: ✓ deferred to {fireAt}"
                     : $"[EYE] Watchdog: schtasks exit={spawn?.ExitCode} (non-fatal)");
             }
             catch (Exception ex)
@@ -173,6 +158,55 @@ internal partial class Program
             return true; // returning true blocks default action (kill process)
         };
         SetConsoleCtrlHandler(_eyeCtrlHandler, true);
+    }
+
+    // ── Crash detection helpers ──────────────────────────────────────────
+
+    static string GetEyeVbsDir()
+    {
+        var dir = Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? "";
+        return EyeCallerCwd.Length > 0 ? Path.Combine(EyeCallerCwd, ".wkappbot") : dir;
+    }
+
+    static string GetEyeLogDir()
+    {
+        var dir = Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? "";
+        return Path.Combine(dir, "wkappbot.hq", "logs");
+    }
+
+    /// <summary>
+    /// Called at Eye startup: if no clean-exit marker from previous session, move that log to logs/_crashed/.
+    /// Covers both exception crashes and hard kills (taskkill/watchdog).
+    /// </summary>
+    internal static void CheckPreviousCrash()
+    {
+        try
+        {
+            var cleanExitFile = Path.Combine(GetEyeVbsDir(), "eye-clean-exit");
+            if (File.Exists(cleanExitFile)) { File.Delete(cleanExitFile); return; }
+            var logDir = GetEyeLogDir();
+            var myLog = $"eye.pid={Environment.ProcessId}.log";
+            var prevLogs = Directory.Exists(logDir)
+                ? Directory.GetFiles(logDir, "eye.pid=*.log")
+                    .Where(f => !Path.GetFileName(f).Equals(myLog, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(File.GetLastWriteTimeUtc)
+                    .ToArray()
+                : Array.Empty<string>();
+            if (prevLogs.Length == 0) return;
+            var crashedDir = Path.Combine(logDir, "_crashed");
+            Directory.CreateDirectory(crashedDir);
+            var latest = prevLogs[0];
+            var dest = Path.Combine(crashedDir, Path.GetFileName(latest));
+            File.Move(latest, dest, overwrite: true);
+            Console.WriteLine($"[EYE] Previous session was not clean — moved {Path.GetFileName(latest)} → _crashed/");
+        }
+        catch { }
+    }
+
+    /// <summary>Write clean-exit marker so next Eye startup skips _crashed/ move.</summary>
+    internal static void WriteEyeCleanExit()
+    {
+        try { File.WriteAllText(Path.Combine(GetEyeVbsDir(), "eye-clean-exit"), "1"); } catch { }
     }
 
     // ── Eye auto-launch (called from Program.cs for every command) ──
