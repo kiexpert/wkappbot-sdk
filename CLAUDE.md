@@ -1,334 +1,148 @@
 # WKAppBot v5.7.0 - Windows + Android App Automation Test Framework
 
-## 동료 클롣을 위한 운영 규칙 (필독!)
+## 클롣 운영 규칙 (필독!)
 
-### 응답 언어
-- **유저에게 말할 때는 항상 한국어** (코드/영어 문서 작성 시는 영어 OK)
-- 인수인계(Handoff) 섹션 등 내부 문서는 영어로 작성 (토큰 절약)
+### 언어/소통
+- **유저: 항상 한국어** / 내부 문서·AI 파일: 영어 (토큰 절약)
+- **질문 시**: `wkappbot slack send "질문"` + 프롬프트 동시 발송 (슬랙 단독 발송 금지)
+- **슬랙 수신**: 반드시 슬랙 쓰레드로 답장 (`--msg TS` 있으면 reply, 없으면 send)
 
-### 질문/소통
-- **유저에게 질문할 때**: 반드시 **Slack과 Claude Code 여기에 동시에** 전달할 것
-  - `wkappbot slack send "질문 내용"` + 여기(프롬프트)에도 출력
-- **작업 중 상황 공유**: 슬랙에도 현황을 알려줘야 유저가 모바일에서도 확인 가능
-
-### 앱봇의 눈 (AppBotEye)
-- **항상 떠있어야 함**: 모든 CLI 명령 실행 시 AppBotEye 자동 spawn
-- `eye`, `slack`, `help`, `validate`, `win-move` 제외하고 자동 실행
-- AppBotEye = Slack 데몬 통합 → 별도 `slack listen` 불필요
-- **크로 카드 터치 금지!**: 크로(OpenClaw)는 별도 서비스 → BuildKroStatus3 등 크로 카드 로직 수정 금지
-- **클롣 카드만 개선 가능**: 클롣(wkappbot CLI)의 카드 표시/포맷은 자유롭게 개선 OK
-- **CWD 약식 표시**: `W:\GitHub\WKAppBot` → `WG-WKAppBot`
-
-### EyeTick & 슬랙 연동
-- **`wkappbot eye tick`**: one-shot — 모든 활성 클롣/크로 상태 즉시 조회 (`ctx=N%` 포함)
-- **`wkappbot eye`**: 글로벌 루프 — FSW 하이브리드, Slack 메시지 자동 전달+ack
-- Eye 재시작 시 이전 idle 상태 메시지 자동 삭제 (Slack 스팸 방지)
-- **슬랙 메시지를 받았으면 반드시 해당 쓰레드에 슬랙으로 응답할 것!**
-- "전달했습니다" ack → `slack reply` 시 자동 삭제
-- 노이즈 필터: `NO_REPLY`, `send ㄱㄱ`, `ㄱㄱ`
-- **인수인계**: `wkappbot newchat "프롬프트"` 명령으로 새채팅 열고 프롬프트 전달
-
-### 슬랙 답장 규칙 (MUST!)
-- **슬랙에서 온 메시지엔 반드시 슬랙 쓰레드로 답장!** 여기(프롬프트)에만 답하면 안 됨
-- 전달된 메시지 끝에 `--msg XXXXXXXXXX` 가 있으면 그 메시지에 답장:
-  ```
-  wkappbot slack reply "답변 내용" --msg 1772339328.052469
-  ```
-- 쓰레드 없는 채널 메시지에 답장: `wkappbot slack send "답변 내용"`
+### AppBotEye
+- **항상 떠있어야 함**: 일반 CLI 명령 실행 시 자동 spawn (`eye`/`slack`/`help`/`validate`/`win-move` 제외)
+- **Eye = Slack 데몬 통합** → 별도 `slack listen` 불필요
+- **eye tick**: one-shot 상태 조회 (ctx=N% 포함) / **eye**: FSW 하이브리드 루프
+- **인수인계**: `wkappbot newchat "프롬프트"` — 새 채팅에 컨텍스트 요약 전달
+- **크로 카드 금지!**: OpenClaw(크로)는 별도 서비스 — 수정 금지. 클롣 카드만 개선 OK
+- **CWD 약식**: `W:\GitHub\WKAppBot` → `WG-WKAppBot` / 노이즈 필터: `NO_REPLY`, `ㄱㄱ`
 
 ### 빌드 & 배포
-- 코드 변경 후 **반드시** `dotnet publish` + AppBotEye 재시작까지 완료할 것
-- Eye 종료 → publish → Eye 재시작:
-  ```bash
-  wkappbot a11y kill wkappbot 2>/dev/null; "W:/SDK/dotnet/dotnet" publish 'W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj' -c Release --verbosity quiet
-  ```
-  a11y kill은 프로세스명 기반 — 창 제목에 WKAppBot 있는 VS Code 등은 매칭 안 됨 (안전)
+```bash
+"W:/SDK/dotnet/dotnet" publish 'W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj' -c Release --verbosity minimal
+```
+- **Hot-Swap**: publish만 하면 Eye 자동 감지+교체. **Eye kill 절대 금지!**
+- `.cs` 수정 후 별도 지시 없이 자동 publish
 
 ### 마이너 버전 bump
-→ **[VERSIONING.md](../VERSIONING.md) 참조** — 반드시 3개 파일 함께 커밋할 것
+→ [VERSIONING.md](../VERSIONING.md) 참조 — 3개 파일 함께 커밋
 
-### Source File Size Policy
-- **Recommend ~400 lines per WKAppBot source file** — split by logical unit when it grows beyond
-- **NEVER split/refactor customer code!** This policy applies to our code (WKAppBot) only
+### Source File Size
+~400줄/파일 권장. **WKAppBot 코드에만 적용** (고객 코드 리팩터 금지!)
 
-### 금지 사항
-- Eye는 간접 런칭만! (일반 명령 실행 시 Core가 자동 spawn — eye tick에서 직접 spawn 금지)
-- 클롣에게 전달을 차단하는 옵션 절대 만들지 말 것
-- 앱봇의 눈을 안 띄우는 옵션 만들지 말 것
-- 유저에게 여기(프롬프트)에서만 질문하지 말 것 (반드시 슬랙 동시 발송)
-
-### HTS 자동화 핵심
-- MFC 컨트롤은 UIA 패턴이 거의 없음 → Win32 메시지 폴백 필수
-- SmartClickButton 3티어: BM_CLICK → WM_LBUTTON → SendInput
-- 영웅문은 owner-drawn → GetWindowText 빈 문자열 → OCR 폴백
+### 금지사항
+- Eye 직접 spawn / 클롣 전달 차단 옵션 / Eye 안 띄우는 옵션 — 전부 금지
+- 유저에게 프롬프트에서만 질문 금지 (슬랙 동시 발송 필수)
 
 ---
 
 ## Overview
-Windows a11y 기반 앱 UI 자동화 프레임워크. UIA→Win32→SendInput 3티어 자동 폴백, 포커스리스 제어, 돋보기 피드백.
-
-### Busybox-Style Shortcut
-- `a11y.exe` = symlink to `wkappbot.exe` → exe 이름으로 명령 자동 감지
-- Known commands: a11y, inspect, ocr, logcat, capture, scan, windows, snapshot, readiness, ask
+Windows a11y 기반 앱 UI 자동화. UIA→Win32→SendInput 3티어 폴백, 포커스리스 제어.
+`a11y.exe` = busybox symlink → `wkappbot.exe`
 
 ## Architecture
 
-### 핵심 전략: 5티어 요소 탐색
+### 5티어 요소 탐색
 UIA → Vision Cache → Simple OCR → Vision API(Claude) → 좌표 기반
 
-### Self-Healing Dynamic A11Y (DYN-A11Y)
-UIA 정보 없는 owner-drawn MFC 컨트롤 자동 분석:
-1. CCA 세그멘테이션 (Sauvola threshold + union-find + Container/Text/Icon/Separator 분류)
-2. OCR gap 분석 + [?] 마커 → 3중 교차검증 (정방향/역방향/셔플 합성 이미지)
-3. Gemini Vision으로 컨트롤 타입/상태/액션 추론 → `dyn_r{row}c{col}_{w}x{h}` 동적 ID
-4. 픽셀해시 캐시 (`aid'hash=description.png`) + Experience DB 레이아웃해시별 저장
-5. CCA 파라미터 자동 튜닝 (Gemini 피드백 → EMA α감쇠, 프로세스/컨트롤/레이아웃별)
-6. 테이블 그리드 자동 감지 (Separator → 행/열 경계 → 셀별 OCR)
+### AppBotPipe (v5.7)
+모든 프로세스 생성은 `Spawn()` / `StartTracked()` 경유 — CreateProcessW 훅 보장
+- `Spawn(showNoActivate:true)`: WPF 오버레이용 (WhisperRing/ScreenSaver) — 포커스 없이 창 표시
+- `Spawn(default)`: `SW_HIDE` — 백그라운드 프로세스
+- **FocusLaunchTracker**: 포커스 탈취 프로세스 추적 (`runtime/focus_launch.json`)
+- **워치독 VBS**: Eye 2분+ 사망 시 발동 → wkappbot-core 전부 종료 → eye tick 재시작
 
-### AppBotPipe 완전 통합 + 포커스 보호 (v5.6)
-- **모든 프로세스 생성 AppBotPipe 통과**: `Spawn()` / `StartTracked()` — CreateProcessW 훅 보장
-  - `StartTracked()`: `UseShellExecute=true` (runas 제외) 차단, `CreateNoWindow=true` + `WindowStyle=Hidden` 강제
-  - `Spawn()`: `STARTF_USESHOWWINDOW + SW_HIDE + CREATE_NO_WINDOW` 항상 적용
-- **FocusLaunchTracker**: 포커스 탈취 프로세스 추적 DB (`runtime/focus_launch.json`)
-  - `requiresFocus=false` (기본): 첫 실행 포커스리스 → 600ms 후 포그라운드 변경 감지 → 자동 등록
-  - `requiresFocus=true`: 즉시 승인 팝업 (Win32 MessageBox, MB_TOPMOST | MB_SYSTEMMODAL)
-  - `_selfExe` 면제: wkappbot.exe 자기 자신(whisper-ring/screensaver/MCP) 항상 신뢰
-  - `Wire()`: Program.cs 시작 시 AppBotPipe 콜백 3개 연결
-- **워치독 VBS 강화**: 발동 = Eye 2분+ 사망 비정상 상황
-  - `watchdog.log` 타임스탬프 기록
-  - WMI로 wkappbot-core.exe(`% mcp%` 제외) 전부 종료 후 1s 대기 → eye tick
-  - 핫스왑 진입 즉시 `DisableEyeWatchdogTask()` → 신규 Eye가 재활성화
-- **windows --cmd=\<substring\>**: cmdline 기반 창 필터 (예: `windows chrome --cmd=remote-debugging-port`)
+### Eye MCP Architecture (v4.9+)
+Eye ↔ MCP 워커(Core) JSON-RPC over pipe. a11y/UIA를 별도 프로세스로 격리.
+- `ShouldRouteToMcp()`: a11y/inspect/windows/ask → MCP, slack/eye/schedule → in-process
+- `DETACHED_PROCESS` 플래그로 ConPTY LPC 교착 방지. 자동 재시작 max 5/5min
+- Slack 파일 기반 큐 (`runtime/slack_queue/`), drain worker 직렬 처리
 
-### AppBotPipe hot-swap 버그 수정 + 워치독 안정화 (v5.7)
-- **`CreateProcess` out int lastError 수정**: `RawCreateProcessW` 실패 후 `Console.Error.WriteLine`이 Win32 last error를 리셋하던 레이스 수정
-  - 기존: `Spawn`이 `Marshal.GetLastWin32Error() == 5` 체크 시 항상 0 읽음 → breakaway-less 재시도 없음 → EYE-HOTSWAP err=5 크래시
-  - 수정: `CreateProcess`에 `out int lastError` 추가, `RawCreateProcessW` 직후 즉시 저장 → `Spawn`이 `cpErr == 5`로 직접 비교
-- **`EnsureEyeWatchdogTask` 안정화**: `AppBotPipe.Spawn("schtasks.exe")` → `Process.Start` 직접 사용 (Job object 제한 우회)
-  - `/Change /ST + /ENABLE` 전략 (기존 태스크 편집), 없으면 `/Create /F` 폴백
-  - 실패 시만 `watchdog.log`에 stderr/stdout 기록
-- **web open/navigate [WEB] TabID 출력 (v5.7)**: `[WEB] TabID:` / `[WEB] Title:` / `[WEB] URL:` 표준 출력 추가
-  - Aborting 제거 → warn-only (foreign Chrome 허용)
+### Self-Healing DYN-A11Y
+UIA 없는 MFC owner-drawn → CCA 세그멘테이션 → OCR 3중 교차검증 → Gemini Vision 추론
+→ `dyn_r{row}c{col}` 동적 ID + Experience DB 캐시 + CCA 파라미터 자동 튜닝
 
-### Eye MCP Architecture (v4.9)
-- **EyeMcpClient**: Eye→MCP 워커(Core) 파이프 연결, 모든 a11y/UIA를 MCP 서브프로세스로 라우팅
-  - `CreateProcessW` + `DETACHED_PROCESS` 플래그로 ConPTY LPC 교착 방지
-  - JSON-RPC 2.0 over stdin/stdout 파이프 (MCP 프로토콜 동일)
-  - 자동 재시작 (max 5/5min), 60s 기본 타임아웃
-  - static `ClaudePromptHelper` 캐시 — MCP 워커에서 UIA 데이터 유지
-- **Eye a11y 분리**: Eye 프로세스에 FlaUI/UIA 미로드 → 메모리 절감
-  - `ShouldRouteToMcp()`: a11y/inspect/windows/ask/prompt → MCP, slack/eye/schedule → in-process
-  - `a11y kill`은 MCP 제외 (자기 자신 kill 방지)
-- **내부 명령**: `find-prompts` (JSON 프롬프트 목록), `claude-detect <hwnd>` (상태 감지 JSON)
-- **ReadOnlyMode → --read-only CLI 인수**: Eye에서 제거, 필요 시 명시적 전달
-- **WKAPPBOT_CALLER_NAME env**: MCP 워커 프로세스 레벨 기본 대화명
-- **JSON-RPC _meta**: 호출별 `callerCwd`/`callerHwnd` 전달 (argv 오염 없음)
-- **file-edit/file-read/file-grep/file-glob**: 하이픈 별칭 지원
-- **wkedit.exe**: busybox symlink → `file edit` 자동 라우팅
-- **--old-file/--new-file**: file edit 한국어 인수 파일 전달 (bash 인코딩 우회)
-- **file grep 출력**: edit 스타일 통일 (`→` 마커, `│` 구분, `...` elision)
-- **Slack Socket Mode ack**: envelope_id dedup + 2회 재시도 + 이벤트 핸들러 비동기 디스패치
-- **Slack message_changed unwrap**: URL unfurl 이벤트에서 inner message 추출
-- **Slack route subprocess**: Eye→서브프로세스 eyeCwd/botUsername/promptNames JSON 전달
-- **grap --json**: 구조적 JSON/JSONL 검색 (key+value regex AND 매칭)
-- **GetCommandLineA() encoding recovery**: bash 한국어 인수 깨짐 복구 (Launcher)
-- **AllocConsole BANNED**: 컴파일 에러 + 런타임 크래시 (콘솔 창 생성 금지)
-- **CDP fallback training**: 1-in-9 랜덤 실패 주입 + 자동 서제스트
-- **[BUG-AUTO]**: 포커스 탈취 감지 → callstack + 로그 자동 서제스트 (Eye pipe)
-- **ADB OCR fallback**: 요소 미발견 시 screenshot→OCR→dump 하이브리드
-- **ScreenSaver per-monitor**: 모니터별 독립 윈도우 + X-ray 토글
-- **Whisper 3-tier**: normal → fresh-session → new-tab 폴백 + Slack 알림
-
-### Eye Live Analysis (v4.8)
-- **Mouse CCA Worker**: 1초마다 마우스 위치 → UIA 부모 → CCA 세그멘테이션 → Visual MD 변환 → Slack 쓰레드 갱신
-- **Keyboard Focus Chain**: 1초마다 포커스 노드 → 부모 체인 → 루트 윈도우 핫체인 표시
-- **RenderVisualMarkdown**: UIA 트리 → 텍스트 전용 MD (x좌표 들여쓰기, 고정폭 테이블, 아이콘 필터)
-- **CcaUiaFusedMatcher**: Grid Hash + 가중점수(IoU+contain+center+size+rowCol) + Greedy 매칭 (삼두 AI 자문 반영)
-- **Eye 시작글 1줄 + 카드 댓글**: 메인 = Eye alive, 카드 상세 = 쓰레드 댓글 (변경 감지 기반)
-- **웹 3티어 폴백**: CDP scroll/expand/collapse/right-click/double-click dispatcher
-- **CJK Input.insertText**: 한국어/일본어/중국어 자동 감지 → CDP Input.insertText
-- **Gemini 저작권 경고 자동 dismiss**: mat-dialog/role=dialog 감지 → 확인 버튼 자동 클릭
-- **grap search cache**: 5초 TTL + hwnd 유효성 검증
-- **Slack \n 디코딩**: C-style escape (\\n→줄바꿈) slack send/reply 적용
-- **Auto A11y Hack**: InputReadiness Probe 성공 → 자동 CCA+FusedMatcher+Experience DB 저장
-- **Parallel CCA on Find**: a11y 액션 FindUiaScope 시 병렬 CCA → UIA 실패 시 DB 즉시 폴백
-- **Experience DB 사이클**: Mouse CCA(자동) + Probe(입력) + Find(액션) → fused_match.jsonl 축적 → 조회 폴백
-- **Zoom Cleanup**: 60초마다 1분+ InputZoom/InputHighlight 윈도우 자동 WM_CLOSE
-- **Eye 콘솔 UTF-8**: SetConsoleOutputCP(65001) + Console.OutputEncoding (스케줄러 포함)
-- **Process Separation**: ScreenSaver + WhisperRing → 별도 프로세스 (WPF 메모리 격리, 부모 PID 감시)
-- **analyze-hack**: CCA+UIA 분석 서버 프로세스 (one-shot + server mode, stdin/stdout JSON)
-- **Eye Startup PulseStep**: 6 체크포인트 + 메모리 워터마크 (54→710MB 범인 추적)
-- **PIPE-MEM**: 파이프 명령별 메모리 델타 로깅 (±5MB 이상)
-- **Slack Heartbeat**: 1분마다 IsConnected 체크 → 끊기면 자동 재접속
-- **Slack 파일 기반 큐 (v5.5)**: 수신 메시지 → `runtime/slack_queue/{ts}.json` 저장, 매초 drain worker 스폰
-  - 직렬 처리 (`_slackDraining` flag) — TypeAndSubmit 동시 실행 방지
-  - Hot-swap retiring Eye: `_slackRetiring=true` → drain 중단, enqueue는 유지 (신규 Eye가 처리)
-  - `slack route --queue` 내부 worker 모드: atomic rename claim (.processing), 처리 완료 시 삭제
-  - `eye tick` → `[EYE_QUEUE] pending=N processing=N` 통계 표시
-- **LGDisplayExtension 블랙스크린 가드 (v5.5)**: `HwndWrapper[LGDisplayExtension.exe;;...]` topmost 감지
-  - 즉시 투명화(SetLayeredWindowAttributes alpha=0) → WM_CLOSE → 500ms 후 생존 시 Process.Kill
-  - Eye tick + 60s 루프 양쪽에서 감시, Slack 알림 (foreground 창 컨텍스트 포함)
-- **`--help` 글로벌 인터셉터 (v5.5)**: 어떤 인수 조합이든 `--help`/`-h` 있으면 즉시 설명 출력 후 exit 0
-  - `CommandHelp.cs` 딕셔너리: a11y, slack, suggest, eye, logcat, file, ask, newchat, schedule, agent, help
-  - MCP 라우팅 바이패스 대응: `A11yCommand` 시작 시점에도 인터셉터 추가
-- **`--regression` 글로벌 인터셉터 (v5.5)**: `--help` 출력 후 `experience/tests/{cmd}/{subcmd}/*.sh` 전체 실행
-  - [PASS]/[FAIL] per script, 실패 시 마지막 5줄 출력, 최종 합산
-  - `wkappbot help --regression` = 헬프/리그레션 기능 자가 점검
-- **OutputDebugString stderr 미러 (v5.5)**: `DebugStringWriter`로 모든 stderr → `OutputDebugStringW`
-  - `[WKBOT/{pid}]` 접두사, ANSI 코드 제거 — `logcat --dbg`로 MCP/Eye 자식 프로세스 실시간 감시
-- **suggest resolve guard 6단계**: `--...-willkim-allowed-this-script <test.sh>` 필수
-  - 1) 플래그 필수 2) 증거 파일 필수 3) 파일명 `test-{cmd}-{subcmd}-*.sh` 규격
-  - 4) 스크립트 내 해당 명령 사용 검증 5) 스크립트 실행 PASS(exit=0) 6) Slack 업로드 + experience/tests/ 복사
-- **a11y wait --condition/--not**: 텍스트 조건 매칭 + 요소 사라짐 대기 (Windows UIA + ADB)
-- **claude-usage JSONL**: Session 라인에 JSONL 파일 크기 + context% 표시
-- **Eye ReadOnly Mode**: Eye 내 UIA 쓰기 금지 (ReadOnlyMode 전역 플래그)
-- **slack route 프로세스 분리**: route → 별도 프로세스 spawn (temp file JSON), Eye 메모리 0 증가
-- **CWD git root 보정**: AbbreviateCwd가 .git/.svn/.wkappbot 마커까지 walk up
-- **좀비 프로세스 정리**: Eye shutdown 시 FocuslessWarning 등 WPF 윈도우 WM_CLOSE
-- **FindAllPrompts 2s 캐시**: 연속 호출 <1ms, 풀스캔은 캐시 미스 시에만
-- **Slack ack/event 디버그 로깅**: ACK 실패, self/bot skip, subtype skip 상세 로그
-
-### Sunset Screensaver
-10초 idle → 해질녘 색상 전환 (7-stop gradient) → 별/달/토성/파도 애니메이션
-바탕화면 벽지 배경 + 99% 불투명. WS_EX_TRANSPARENT 클릭 투과. GPU 전용 부하 0.
-**별도 프로세스**: `wkappbot screensaver` (자체 idle 감지, 부모 PID 감시 → Eye 종료 시 자동 종료)
+### Sunset Screensaver + WhisperRing
+별도 프로세스 (WPF 메모리 격리, 부모 PID 감시 → Eye 종료 시 자동 종료)
 
 ### 프로젝트 구조
 ```
 csharp/src/
-├── WKAppBot.CLI/           # CLI 진입점 + Commands/
-├── WKAppBot.Core/          # ScenarioRunner, ActionExecutor, DialogHandlerManager
-├── WKAppBot.Win32/         # NativeMethods, WindowFinder, UiaLocator, Input/*
-├── WKAppBot.Vision/        # ChartAnalyzer, SimpleOcrAnalyzer, VisionCache
-├── WKAppBot.WebBot/        # CdpClient, ChromeLauncher, SlackSocketClient
-├── WKAppBot.Android/       # AdbClient, AndroidA11yTree, AdbGrapRouter
-handlers/                   # 방해꾼 다이얼로그 핸들러 YAML
-scenarios/                  # YAML 테스트 시나리오
+├── WKAppBot.CLI/     # CLI 진입점 + Commands/
+├── WKAppBot.Core/    # ScenarioRunner, ActionExecutor
+├── WKAppBot.Win32/   # NativeMethods, WindowFinder, UiaLocator, Input/*
+├── WKAppBot.Vision/  # ChartAnalyzer, SimpleOcrAnalyzer, VisionCache
+├── WKAppBot.WebBot/  # CdpClient, ChromeLauncher, SlackSocketClient
+├── WKAppBot.Android/ # AdbClient, AndroidA11yTree
+handlers/ scenarios/
 ```
 
-## Build & Run
-```bash
-# Publish (single-file EXE → W:/SDK/bin/)
-"W:/SDK/dotnet/dotnet" publish 'W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj' -c Release --verbosity quiet
-wkappbot run 'W:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml' -v
-```
+---
 
 ## CLI 명령어
-> **`<grap>`** = **gr**ab **a**ccessibility **p**attern — 와일드카드/정규식/경로glob/#UIA스코프 지원
+> **`<grap>`** = glob/regex/OR(`;`)/`#UIA스코프`/`{JSON5}` 멀티필드 AND
+
 ```
-wkappbot inspect <grap>[#<uia-scope>] [--depth N] [--win32] [--filter <pattern>]
-wkappbot windows [grap] [--deep] [--process <name>] [--all]
-wkappbot scan / capture / ocr / snapshot / watch / focus / zoom-demo ...
-wkappbot slack send "msg" [file.png]          # 텍스트+파일 전송
-wkappbot slack reply "msg" [file.png] --msg TS # 쓰레드 답장
-wkappbot slack upload <file> [--msg TS]
-wkappbot eye / eye tick                       # AppBotEye 루프 / one-shot
-wkappbot newchat "prompt" [--file f.txt]      # Claude Desktop 새채팅 (focusless)
-wkappbot ask gpt|gemini|claude "line1" [file.png]  # CDP 웹 AI 질문 (MCP도 동일 명령)
-wkappbot speak / suggest / claude-usage / schedule / readiness ...
-# ── 글로벌 메타 옵션 (모든 명령에서 동작) ────────────────────────────────────
-wkappbot <cmd> [<subcmd>] --help        # 명령 설명 즉시 출력 → exit 0
-wkappbot <cmd> [<subcmd>] --regression  # --help 출력 + experience/tests/{cmd}/{subcmd}/*.sh 전부 실행
-wkappbot help --regression              # --help/--regression 기능 자가 점검
-# 디버깅: 모든 stderr → OutputDebugString([WKBOT/{pid}]) 자동 미러
-#   → 별도 창: wkappbot logcat --dbg   (MCP 서버, Eye 자식 프로세스 실시간 감시)
-wkappbot gc [pattern] [--days N] [--sweep]       # HQ file garbage collection (Recycle Bin)
-wkappbot screen off [--duration N] / screen on   # fullscreen black overlay
-wkappbot file edit <old> <new> <path>... [--replace-all] [--context N] [--tab-size N]
-  # indent-based block context (auto-expands to enclosing block)
-  # C-style escapes: \n \t \r \\ supported
-  # same old+new = search-only mode (no backup, no write)
-  # 4-stage UTF-8/CP949 encoding detection + verification
-wkappbot logcat [regex] [file1.log] [file2.log ...] [--hq] [--past Ns/Nm/Nh] [-f] [--timeout N] [-r]
-  # grep-style: first arg = content regex (';' = OR), remaining = file globs (default: *.log)
-  # path-segment ';' OR: "logs/가;나;다/*.log" → 3 sibling dirs expanded automatically
-  # ';' OR also works in file glob/grep: file glob "src/a;b/*.cs", file grep --path "W:/A;B"
-  # --past only      → grep-style: scan and exit
-  # --past + -f      → scan then live follow
-  # --past + --timeout N → scan then live, auto-exit after N
-  # no --past        → live only (real-time FSW)
-  # --hq: include wkappbot.hq/logs (finished logs live here)
-  # Ctrl+C / broken pipe / --timeout → clean exit
-  # --json: structural JSON matching (key+value regex)
-  #   grap '{"role":"user"}' *.jsonl --hq --past 1h --json
-  #   grap '{"role":"user","content":"screensaver"}' *.jsonl --json  (AND logic)
-  #   grap "keyword" *.jsonl --json  (simple keyword in JSON lines)
-wkappbot file edit <old> <new> <path>... [--replace-all] [--context N] [--tab-size N]
-  # --old-file/--new-file: read old/new from files (bash Korean encoding workaround)
-  # file-edit/file-read/file-grep/file-glob: hyphenated aliases supported
-  # wkedit.exe: busybox symlink → "file edit" auto-routing
-wkappbot mcp                                  # MCP stdio 서버 (도구 1개: wkappbot)
-wkappbot a11y <action> <grap>[#uia-scope] [options]  # ★ 표준 통합 명령
-  # Discovery: inspect, find, windows, screenshot, ocr
-  # Window (7): close, minimize, maximize, restore, focus, move, resize
-  # Element (13): find, read, highlight, invoke, click, toggle, expand, collapse,
-  #               select, scroll, type [--hotkey] [text...], set-value(--text), set-range(--value)
-  # type --hotkey: focusless label/menu dispatch (Experience DB → live scan → UIA AccessKey → CDP)
-  #   메뉴경로: "파일/저장" (slash syntax), grap 패턴: "*저장*", 커버리지최고 자동선택
-  #   실패 시 중단 (순수 타이핑 폴백 없음)
-  # Async (2): wait(--timeout --interval), eval(--text "js") [DEPRECATED → use --eval-js]
-  # Utility (3): clipboard, clipboard-read, clipboard-write
-  # --all, --nth N, --depth N, --force, --force-close-ancestors, --timeout N, --speak, --eval-js "js"
-  # --eval-js: pre-hook (click/type) or primary output (read/find)
-  #   read: loading wait + streaming stabilization (null=done signal)
-  #   JS runtime injection: defA11yRead/Click/Focus/Editor/Hidden/Ready
-  #   Chrome without #scope → tab list display
-  # Web auto-fallback: Chrome/Electron → CSS selector 자동감지 → CDP 엔진
-  # CdpClient.AiHelpers: InsertContentEditable, ClearEditor, SendPrompt, IsStreaming, ClickStop
-  # CdpTabManager: CreateScoped (hwnd-isolated) / CreateShared (pattern-match)
-  # adb:// scheme: Android ADB USB 디바이스 제어 (30 actions)
-wkappbot a11y kill <pattern>[/<ancestor>] [--allow-ancestors]  # 프로세스 킬
+wkappbot a11y <action> <grap>[#scope] [options]   # ★ 표준 통합 (24 actions)
+  inspect / find / windows / screenshot / ocr     # Discovery
+  close / minimize / maximize / restore / focus / move / resize
+  click / invoke / toggle / expand / collapse / select / scroll
+  type [--hotkey] / set-value / set-range / read
+  wait [--condition/--not] / clipboard[-read/-write]
+  --eval-js "js"  --all  --nth N  --force  --timeout N  --speak
+wkappbot a11y kill <pattern>[/<ancestor>]
+wkappbot windows [grap] [--deep] [--process <name>] [--cmd <substr>]
+wkappbot slack send "msg" [file.png]  /  reply "msg" --msg TS
+wkappbot eye / eye tick
+wkappbot newchat "prompt" [--file f.txt]
+wkappbot ask gpt|gemini|claude|triad "question" [file.png]
+wkappbot logcat [regex] [file.log ...] [--past Nh] [-f] [--timeout N] [--json]
+wkappbot file read/grep/glob/edit <args>
+wkappbot gc [pattern] [--days N] [--sweep]
+wkappbot claude-usage                             # JSONL size + ctx%
+wkappbot mcp                                     # MCP stdio server
+wkappbot <cmd> --help / --regression
 ```
 
-## grap 패턴 매칭
+## grap 패턴
+| 구문 | 예시 |
+|------|------|
+| 와일드카드 | `"*Button*"` |
+| OR | `"*메모장*;*계산기*"` |
+| #UIA스코프 | `"영웅문#실시간계좌"` |
+| 탭포털 | `"Chrome#ChatGPT#모델"` |
+| JSON5 | `{title:'Claude',domain:'claude.ai'}` |
+| hwnd | `"*hwnd=001A0F2C*"` |
+| adb | `"adb://Fold5/*heromts*#해외잔고"` |
 
-**Search key**: `[ClassName] Title (processName hwnd=XXXXXXXX WxH)`
-
-| 구문 | 예시 | 동작 |
-|------|------|------|
-| 와일드카드 | `"*Button*"` | glob 스타일 |
-| 정규식 | `"regex:btn_\\d+"` | 정규식 |
-| OR 패턴 | `"*메모장*;*계산기*"` | `;` 구분 |
-| **#UIA 스코프** | `"영웅문#실시간계좌"` | `#` 뒤 = UIA Name/AutomationId |
-| **탭 포털** | `"Chrome#ChatGPT#모델"` | TabItem → 자동 탭 전환 → RootWebArea |
-| **adb://** | `"adb://Fold5/*heromts*#해외잔고"` | Android ADB 제어 |
-| hwnd 직접 | `"*hwnd=001A0F2C*"` | 핸들 직접 매칭 |
-| **JSON5** | `{hwnd:0x1A2B,pid:1234,title:'Claude',domain:'claude.ai'}` | 멀티필드 AND 검색 |
-
-**JSON5 멀티필드 패턴** — `{...}` 로 시작하면 자동 인식, 모든 grap 명령에서 사용 가능
-- 필드: `hwnd`(hex=0x접두사, 아니면 10진), `pid`, `title`, `cls`, `proc`(프로세스명+cmdline), `domain`, `url`
-- 키/값 따옴표 선택: `{title:'Claude'}` = `{"title":"Claude"}` = `{title:Claude}`
-- OR 조건: `{title:['Claude','ChatGPT']}` (배열)
-- AND 조건: 필드 사이는 전부 AND
-- `hwnd` 단독이면 EnumWindows 없이 직접 조회
+---
 
 ## Key Design Decisions
 
 ### Focusless-First
-UIA Invoke/Value/Toggle/Select/Scroll/RangeValue = Focusless
-PostMessage WM_CHAR / MSAA put_accValue = Focusless
-SendInput/Hotkey = EnsureFocus 필요
+UIA Invoke/Value/Toggle/Select = Focusless. SendInput/Hotkey = EnsureFocus 필요.
+WPF 오버레이는 `Spawn(showNoActivate:true)` → SW_SHOWNOACTIVATE(4), 포커스 탈취 없음.
 
-### 포커스 양보 승인 (UserInputWaitOverlay)
-- "input" 액션은 항상 yield 로직 진입
-- 타겟 전경+idle(30초) → 자동승인 / 비전경/활동 → 팝업(30초 카운트다운)
+### PromptDeliveryContext
+프롬프트 주입 전: ① 타겟 포그라운드? ② 최근 30s 입력?
+→ `Focusless` / `FocusSteal` / `Skip` / `Abort` 자동 결정
 
-### PromptDeliveryContext — 유저 방해 예방 상황실
-- **목적**: 프롬프트 주입 전, 유저가 그 창을 쓰고 있는지 미리 파악 → 작업 방해 예방
-- **범위**: 거창한 "전체 상황실" 아님. 딱 두 가지만 체크:
-  1. 타겟 창이 포그라운드? (유저가 거기 보고 있나)
-  2. 최근 30초 이내 키/마우스 입력? (유저가 타이핑 중인가)
-- **전략 결정**: `ctx.Decide()` → `Focusless` / `FocusSteal` / `Skip` / `Abort`
-  - 비포커스 창 → `Focusless` (조용히 주입, 포커스 안 빼앗음)
-  - 포커스+idle → `FocusSteal` (유저 자리 비웠으니 포커스 빼앗기 OK)
-  - 포커스+타이핑 중 → `Skip` (재무장 후 다음 idle 사이클 재시도)
-- **`AllowFocusSteal` static**: 레거시 fallback — 신규 코드는 `PromptDeliveryContext` 사용 권장
-- 참고: `PromptDeliveryContext.cs` (WKAppBot.Win32/Window/)
+### HTS 자동화
+MFC 컨트롤: UIA 패턴 거의 없음 → Win32 메시지 폴백 필수. 영웅문 owner-drawn → OCR 폴백.
 
 ### 태그 규칙
 `[WATCH]` `[RUN]` `[FOCUS]` `[VERIFY]` `[BLOCK]` `[GUARD]` `[ZOOM]` `[SLACK]` `[EXP]` `[KNOWHOW]`
 
-## YAML Scenario Format (요약)
+---
+
+## Session Management (Claude Code Tips)
+- `wkappbot claude-usage` → JSONL 크기 + ctx% 표시
+- **ctx% = JSONL ÷ ~40MB** — 80%에서 인수인계 준비, 90%에서 즉시 handoff
+- **목표**: 세션당 ~10MB 이하. 15MB+ 부터 품질 저하 시작
+- **Handoff**: `wkappbot newchat "프롬프트"` — 새 채팅에 작업 요약 전달
+- **MEMORY.md**: 200줄 상한. 초과 시 세부내용 `memory/` topic 파일로 분리
+
+---
+
+## YAML Scenario (요약)
 ```yaml
 scenario: { name: "Test" }
 app: { launch: "calc.exe", wait_for_window: { title_contains: "계산기" } }
@@ -337,16 +151,13 @@ steps:
   - { name: "Verify", target: { automation_id: "CalculatorResults" }, action: assert,
       params: { type: text_contains, expected: "42" } }
 ```
-지원 액션: click, double_click, right_click, type_text, press_key, hotkey, wait, assert, scroll, screenshot, toggle, expand, collapse, select, set_range, window_close/minimize/maximize
+지원 액션: click/double_click/right_click/type_text/press_key/hotkey/wait/assert/scroll/screenshot/toggle/expand/collapse/select/set_range/window_close/minimize/maximize
 
 ## 배포 구조
 ```
-W:/SDK/bin/wkappbot.exe          # single-file EXE
-W:/SDK/bin/a11y.exe / wka11y.exe # symlink → wkappbot.exe
-W:/SDK/bin/wkappbot.hq/          # handlers, profiles, runtime, logs
+W:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 ```
 
 ## 참고
-- **MEMORY.md**: 빌드 명령, 완료 Phase 상세, 아키텍처 결정
-- **memory/**: chart-analyzer, hts-controls, condition_search, a11y-actions 등
-- Windows 전용 (.NET 8.0 `net8.0-windows10.0.22621.0`), 한국어 UI 지원
+- **MEMORY.md** / **memory/**: 빌드 명령, 아키텍처 결정, gotchas 상세
+- .NET 8.0 `net8.0-windows10.0.22621.0`, 한국어 UI 지원
