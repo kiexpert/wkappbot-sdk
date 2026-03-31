@@ -64,9 +64,10 @@ internal partial class Program
 
                 if (!targetMatcher.IsMatch(nodeKey) && !targetMatcher.IsMatch(procName))
                 {
-                    // Last chance: cmdline search (same as grap windows behavior)
+                    // Last chance: cmdline search — token-AND for plain multi-word patterns (order-independent)
+                    // e.g. "tick eye" matches "wkappbot eye tick --timeout 15" regardless of token order
                     try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
-                    if (!targetMatcher.IsMatch(cmdLine)) continue;
+                    if (!KillCmdLineMatch(cmdLine, targetPattern)) continue;
                 }
 
                 if (exeMatcher != null && !exeMatcher.IsMatch(string.IsNullOrEmpty(exePath) ? nodeKey : exePath))
@@ -218,6 +219,17 @@ internal partial class Program
         }
         // Reverse patterns so innermost = first to match
         return KillMatchChainRec(ancestorPatterns.Reverse().ToArray(), 0, ancestors, 0);
+    }
+
+    // Cmdline match for kill: plain multi-word patterns use token-AND (order-independent).
+    // "eye tick" and "tick eye" both match "wkappbot-core.exe eye tick --timeout 15".
+    // Glob/regex patterns fall through to standard PatternMatcher (order-sensitive).
+    static bool KillCmdLineMatch(string cmdLine, string pattern)
+    {
+        if (PatternMatcher.IsPattern(pattern) || !pattern.Contains(' '))
+            return PatternMatcher.Create(pattern).IsMatch(cmdLine);
+        var tokens = pattern.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return tokens.All(t => cmdLine.Contains(t, StringComparison.OrdinalIgnoreCase));
     }
 
     static bool KillMatchChainRec(string[] patterns, int pi, List<string> ancestors, int ai)
