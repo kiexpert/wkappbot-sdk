@@ -102,7 +102,7 @@ internal partial class Program
             "f.Close\n" +
             "Set fso = Nothing\n" +
             "Set oWMI = GetObject(\"winmgmts:\")\n" +
-            "Set oProcs = oWMI.ExecQuery(\"SELECT ProcessId FROM Win32_Process WHERE Name='wkappbot-core.exe'\")\n" +
+            "Set oProcs = oWMI.ExecQuery(\"SELECT ProcessId FROM Win32_Process WHERE Name='wkappbot-core.exe' AND CommandLine NOT LIKE '% mcp%'\")\n" +
             "For Each oProc In oProcs\n" +
             "  oProc.Terminate()\n" +
             "Next\n" +
