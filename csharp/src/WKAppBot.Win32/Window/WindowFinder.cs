@@ -1074,6 +1074,7 @@ public static class WindowFinder
         }
 
         // proc (OR within list)
+        // proc: match against process name OR full command line (token-AND for multi-word patterns)
         if (procMatchers != null)
         {
             if (!procNameCache.TryGetValue(pid, out var proc))
@@ -1081,7 +1082,9 @@ public static class WindowFinder
                 try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { proc = ""; }
                 procNameCache[pid] = proc;
             }
-            if (!procMatchers.Any(m => m.IsMatch(proc))) return false;
+            string cmdLine = "";
+            try { cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? ""; } catch { }
+            if (!procMatchers.Any(m => m.MatchAny(proc, cmdLine))) return false;
         }
 
         // domain / url (lazy fetch)
