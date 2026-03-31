@@ -213,17 +213,14 @@ Options:
             }
         }
 
-        // Verify we're connected to a WebBot-managed Chrome, not user's normal browser
+        // Verify we're connected to a WebBot-managed Chrome.
+        // CDP port-based connection is the primary guard; title check is advisory only
+        // (bar injection may still be pending when this runs).
         if (verifyWebBot)
         {
             var title = cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "";
             if (!title.Contains("WKWebBot"))
-            {
-                cdp.Dispose();
-                throw new InvalidOperationException(
-                    "Connected to Chrome but it's not a WebBot window (no 'WKWebBot' in title). " +
-                    "Run 'wkappbot web open <url>' first to launch a WebBot-managed Chrome.");
-            }
+                Console.Error.WriteLine("[WEB] WARN: WKWebBot bar not yet in title (run 'web open <url>' first if not done)");
         }
 
         return cdp;
@@ -511,14 +508,13 @@ Options:
         Console.WriteLine($"[WEB] eval:  a11y read \"{bestPattern}\" --eval-js \"document.title\"");
         Console.WriteLine($"[WEB] read:  web read \"{pageUrl}\" --max-chars 3000");
 
-        // Verify this is our WebBot window, not user's normal Chrome
+        // Verify this is our WebBot window (CDP port-based connection is already sufficient;
+        // title check can fail due to async bar injection timing — warn only, don't abort).
         if (title == null || !title.Contains("WKWebBot"))
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("[WEB] ERROR: WebBot bar not found in title — not a WebBot window!");
-            Console.WriteLine("[WEB] This may be user's normal Chrome. Aborting.");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("[WEB] WARN: WKWebBot bar not yet in title (injection may still be pending) — continuing.");
             Console.ResetColor();
-            return 1;
         }
 
         // Minimize Chrome window (unless --no-minimize)
