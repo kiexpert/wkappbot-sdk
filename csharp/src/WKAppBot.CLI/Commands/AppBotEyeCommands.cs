@@ -102,14 +102,9 @@ internal partial class Program
             "f.WriteLine \"[WATCHDOG] \" & Now() & \" Eye dead — killing zombie + respawn\"\n" +
             "f.Close\n" +
             "Set fso = Nothing\n" +
-            "Set oWMI = GetObject(\"winmgmts:\")\n" +
-            "Set oProcs = oWMI.ExecQuery(\"SELECT ProcessId FROM Win32_Process WHERE Name='wkappbot-core.exe' AND CommandLine NOT LIKE '% mcp%'\")\n" +
-            "For Each oProc In oProcs\n" +
-            "  oProc.Terminate()\n" +
-            "Next\n" +
-            "On Error GoTo 0\n" +
-            "WScript.Sleep 1000\n" +
             "Set ws = CreateObject(\"WScript.Shell\")\n" +
+            $"ws.Run \"\"\"{launcherPath}\"\" a11y kill \\\"-core.exe eye\\\" --allow-ancestors\", 0, True\n" +
+            "WScript.Sleep 1000\n" +
             cwdLine +
             $"Dim ret : ret = ws.Run(\"\"\"{launcherPath}\"\" eye tick --timeout 15\", 0, True)\n" +
             $"Set fso2 = CreateObject(\"Scripting.FileSystemObject\")\n" +
