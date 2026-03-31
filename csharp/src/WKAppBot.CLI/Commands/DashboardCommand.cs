@@ -79,7 +79,7 @@ internal partial class Program
 
         if (openBrowser)
         {
-            try { AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo(localUrl) { UseShellExecute = true }, Environment.CurrentDirectory, "DASHBOARD"); }
+            try { AppBotPipe.Spawn("cmd.exe", $"/c start \"\" \"{localUrl}\"", Environment.CurrentDirectory, caller: "DASHBOARD"); }
             catch { }
         }
 
