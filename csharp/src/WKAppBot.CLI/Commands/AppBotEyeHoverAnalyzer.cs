@@ -84,7 +84,8 @@ internal partial class Program
         try
         {
             var corePath = Environment.ProcessPath ?? "wkappbot";
-            _hackServerProcess = AppBotPipe.Spawn(corePath, "analyze-hack --server", Environment.CurrentDirectory,
+            _hackServerProcess = AppBotPipe.Spawn(corePath, "analyze-hack --server",
+                EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory,
                 redirectStdIn: true, redirectStdOut: true,
                 env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE-HACK");
             if (_hackServerProcess != null)

@@ -66,7 +66,7 @@ internal partial class Program
                 // Worker handles rename→process→delete loop serially
                 // redirectStdOut=true: relay worker output to Eye log for debugging
                 var proc = AppBotPipe.Spawn(corePath, "slack route --queue",
-                    Environment.CurrentDirectory,
+                    EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory,
                     redirectStdOut: true, redirectStdErr: true,
                     env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "EYE");
                 if (proc == null) { Console.Error.WriteLine("[EYE] Queue drain: Spawn returned null"); return; }
@@ -815,7 +815,8 @@ internal partial class Program
         Func<IntPtr>? getClaudeHwnd = null, Func<string?>? getPlanApprovalTs = null,
         Func<string?>? getPermissionApprovalTs = null,
         string? startupTs = null, string? botUsername = null,
-        Func<string?>? getStatusStreamingTs = null, Action? resetStatusStreaming = null)
+        Func<string?>? getStatusStreamingTs = null, Action? resetStatusStreaming = null,
+        string? callerCwd = null)
     {
         // Re-detect Claude Desktop window on every event call (handles Electron restart)
         IntPtr GetClaudeHwnd() => getClaudeHwnd?.Invoke() ?? IntPtr.Zero;
@@ -900,7 +901,7 @@ internal partial class Program
 
         // Local helper: send ack "전달했습니다" and track it for later deletion
         // Deleted when slack reply is sent (not auto-deleted — stays visible until response)
-        const string AckUsername = "앱봇아이";
+        var AckUsername = BuildSlackBotUsername("앱봇아이"); // e.g. "앱봇아이[WG-WKAppBot]"
         void SendAndTrackAck(string ch, string threadKey, int promptCount = 1, int totalAttempted = 0,
             List<DeliveryResult>? results = null)
         {
@@ -1153,7 +1154,7 @@ internal partial class Program
         slack.OnSelfMessage += (msg) =>
         {
             if (string.IsNullOrEmpty(msg.ThreadTs)) return;
-            // Skip ack messages (posted by "클롣아이") — never trigger self-deletion
+            // Skip ack messages (posted by Eye as "앱봇아이[tag]") — never trigger self-deletion
             if (msg.Username == AckUsername) return;
             // Only delete ack if the replying session matches THIS Eye's botUsername
             // (prevents other sessions' replies from deleting our ack too early)
@@ -1422,7 +1423,7 @@ internal partial class Program
                     ScheduleNotifySlack(slackBotToken, slackChannel,
                         $":rocket: 스케줄 커맨드 실행: `{item.Command}`");
                 using var proc = AppBotPipe.Spawn("cmd.exe", $"/c {item.Command}",
-                    cwd: item.Cwd ?? Environment.CurrentDirectory,
+                    cwd: item.Cwd ?? (EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory),
                     redirectStdOut: true, redirectStdErr: true, caller: "EYE")!;
                 var stdout = proc.StdOut!.ReadToEnd();
                 var stderr = proc.StdErr!.ReadToEnd();

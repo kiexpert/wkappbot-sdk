@@ -145,8 +145,12 @@ internal partial class Program
     static string _cachedIpcPromptPreview = "";
     static DateTime _cachedIpcUpdatedAt = DateTime.MinValue;
 
-    static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs, bool elevated = false, int replacePid = 0)
+    /// <summary>Eye's working directory — set once at startup, used for all child process spawns.</summary>
+    internal static string EyeCallerCwd { get; private set; } = "";
+
+    static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs, string callerCwd, bool elevated = false, int replacePid = 0)
     {
+        EyeCallerCwd = callerCwd; // store for DrainSlackQueueIfNeeded and HoverAnalyzer
         if (posX < 0 || posY < 0)
         {
             var (x, y) = GetRightmostMonitorAnchor(width, height);
@@ -475,7 +479,8 @@ internal partial class Program
                     SetupSlackEventHandlers(slackClient, slackBotToken!, slackChannel,
                         GetCurrentClaudeHwnd, GetAnyPlanApprovalTs,
                         GetAnyPermissionTs, startupTs, botUsername,
-                        GetAnyInstanceSlackStatusTs, () => ResetAllInstancesSlackStatus(statusTsFile));
+                        GetAnyInstanceSlackStatusTs, () => ResetAllInstancesSlackStatus(statusTsFile),
+                        callerCwd);
 
                     // Block Kit button handler (plan approve/reject, permission buttons)
                     slackClient.OnBlockAction += (action) =>
@@ -604,7 +609,7 @@ internal partial class Program
             _whisperRingX = Math.Max(0, posX - 190);
             _whisperRingY = posY;
             var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
-                cwd: Environment.CurrentDirectory,
+                cwd: callerCwd,
                 env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
                 caller: "EYE-WHISPER");
             if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
@@ -621,7 +626,7 @@ internal partial class Program
         {
             var ssPath = Environment.ProcessPath ?? "wkappbot";
             AppBotPipe.Spawn(ssPath, "screensaver",
-                cwd: Environment.CurrentDirectory,
+                cwd: callerCwd,
                 env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
                 caller: "EYE-SCREENSAVER");
             PulseStep.Mark("screensaver-spawned");
@@ -858,7 +863,7 @@ internal partial class Program
                         Console.WriteLine($"[EYE] WhisperRing pid={_whisperRingPid} died — respawning");
                         var wrPath = Environment.ProcessPath ?? "wkappbot";
                         var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
-                            cwd: Environment.CurrentDirectory,
+                            cwd: callerCwd,
                             env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
                             caller: "EYE-WHISPER-RESPAWN");
                         if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
@@ -1273,8 +1278,10 @@ internal partial class Program
                 Console.WriteLine($"[EYE:HOT-SWAP] Launching new Eye: {Path.GetFileName(exePath)} {argsStr}");
                 EyeResetColor();
 
-                var newProc = AppBotPipe.Spawn(exePath, argsStr, Environment.CurrentDirectory,
-                    redirectStdIn: true, redirectStdOut: true, redirectStdErr: true, caller: "EYE-HOTSWAP");
+                var newProc = AppBotPipe.Spawn(exePath, argsStr, callerCwd,
+                    redirectStdIn: true, redirectStdOut: true, redirectStdErr: true,
+                    env: new() { ["WKAPPBOT_EYE_CWD"] = callerCwd },
+                    caller: "EYE-HOTSWAP");
                 if (newProc != null)
                 {
                     // Close pipe ends immediately — new Eye writes to its own AllocConsole (hidden).
