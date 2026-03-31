@@ -232,11 +232,8 @@ Options:
     //   - hwnd:XXXXXXXX works in windows/a11y/inspect via WindowFinder direct lookup
     //   - web commands accept hwnd:XXXXXXXX to reconnect to the exact tab
     //
-    // Cache: runtime/web_hwnd_targets.json  { "XXXXXXXX": { port, targetId, url } }
-    // Written on web open/navigate, read on web commands with hwnd: target.
-
-    static readonly string _webHwndCacheFile =
-        Path.Combine(DataDir, "runtime", "web_hwnd_targets.json");
+    // In-memory cache: HWND(hex) → (port, targetId, url)
+    static readonly Dictionary<string, (int port, string targetId, string url)> _webHwndCache = new();
 
     /// <summary>Find Chrome_RenderWidgetHostHWND for the current CDP tab.</summary>
     static IntPtr GetRenderWidgetHwnd(CdpClient cdp)
@@ -274,31 +271,15 @@ Options:
             var targetId   = cdp.TargetId ?? "";
             var url        = cdp.GetUrlAsync().GetAwaiter().GetResult() ?? "";
 
-            // Persist mapping so future commands can reconnect by HWND
+            // Cache mapping in memory so future commands can reconnect by HWND
             if (renderHwnd != IntPtr.Zero)
             {
-                try
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(_webHwndCacheFile)!);
-                    var cache = new System.Text.Json.Nodes.JsonObject();
-                    if (File.Exists(_webHwndCacheFile))
-                        try { cache = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(_webHwndCacheFile))?.AsObject() ?? new(); } catch { }
-                    var key = renderHwnd.ToInt64().ToString("X8");
-                    cache[key] = new System.Text.Json.Nodes.JsonObject
-                    {
-                        ["port"]     = port,
-                        ["targetId"] = targetId,
-                        ["url"]      = url,
-                        ["ts"]       = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-                    };
-                    // Prune stale entries (HWND no longer valid)
-                    foreach (var k in cache.Select(kv => kv.Key).ToList())
-                        if (k != key && !IntPtr.TryParse(k, System.Globalization.NumberStyles.HexNumber, null, out var h)
-                                     || (IntPtr.TryParse(k, System.Globalization.NumberStyles.HexNumber, null, out var hh) && !NativeMethods.IsWindow(hh)))
-                            cache.Remove(k);
-                    File.WriteAllText(_webHwndCacheFile, cache.ToJsonString());
-                }
-                catch { }
+                var key = renderHwnd.ToInt64().ToString("X8");
+                _webHwndCache[key] = (port, targetId, url);
+                // Prune stale entries (HWND no longer valid)
+                foreach (var k in _webHwndCache.Keys.ToList())
+                    if (k != key && IntPtr.TryParse(k, System.Globalization.NumberStyles.HexNumber, null, out var hh) && !NativeMethods.IsWindow(hh))
+                        _webHwndCache.Remove(k);
             }
 
             // Prefer render widget HWND (tab-isolated PID); fall back to chrome root window
@@ -320,25 +301,19 @@ Options:
     {
         var key = renderHwnd.ToInt64().ToString("X8");
 
-        // 1. Try cache lookup
-        if (File.Exists(_webHwndCacheFile))
+        // 1. Try in-memory cache lookup
+        if (_webHwndCache.TryGetValue(key, out var cached))
         {
             try
             {
-                var cache = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(_webHwndCacheFile))?.AsObject();
-                if (cache != null && cache[key] is { } entry)
+                var cdp = new CdpClient();
+                cdp.ConnectAsync(cached.port).GetAwaiter().GetResult();
+                if (!string.IsNullOrEmpty(cached.targetId))
                 {
-                    var port     = entry["port"]?.GetValue<int>() ?? 9222;
-                    var targetId = entry["targetId"]?.GetValue<string>() ?? "";
-                    var cdp = new CdpClient();
-                    cdp.ConnectAsync(port).GetAwaiter().GetResult();
-                    if (!string.IsNullOrEmpty(targetId))
-                    {
-                        var ok = cdp.ConnectToTabAsync(port, targetId).GetAwaiter().GetResult();
-                        if (ok) return cdp;
-                    }
-                    return cdp; // cache hit but targetId stale — still connected to port
+                    var ok = cdp.ConnectToTabAsync(cached.port, cached.targetId).GetAwaiter().GetResult();
+                    if (ok) return cdp;
                 }
+                return cdp; // cache hit but targetId stale — still connected to port
             }
             catch { }
         }
