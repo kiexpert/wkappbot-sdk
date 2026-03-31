@@ -88,7 +88,8 @@ internal static class AppBotPipe
 
         // ── FOCUSLESS GUARD ─────────────────────────────────────
         // wShowWindow > 0 without SW_HIDE = potential focus steal
-        if ((si.dwFlags & STARTF_USESHOWWINDOW) != 0 && si.wShowWindow > 0)
+        // Exception: SW_SHOWNOACTIVATE(4) is safe — shows window without stealing focus
+        if ((si.dwFlags & STARTF_USESHOWWINDOW) != 0 && si.wShowWindow > 0 && si.wShowWindow != 4)
         {
             try { Console.Error.WriteLine($"[{caller}:BUG] CreateProcessW BLOCKED — wShowWindow={si.wShowWindow} violates focusless! cmd={Trunc(cmdStr, 60)}"); } catch { }
             pi = default;
