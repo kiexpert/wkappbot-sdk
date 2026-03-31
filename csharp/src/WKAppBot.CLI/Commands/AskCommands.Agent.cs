@@ -45,7 +45,7 @@ internal partial class Program
                 var gitRoot = Path.GetDirectoryName(patch) ?? Directory.GetCurrentDirectory();
                 var psi2 = new System.Diagnostics.ProcessStartInfo("git", $"apply \"{patch}\"")
                     { UseShellExecute = false, WorkingDirectory = gitRoot };
-                using var p2 = System.Diagnostics.Process.Start(psi2)!;
+                using var p2 = AppBotPipe.StartTracked(psi2, psi2.WorkingDirectory.Length > 0 ? psi2.WorkingDirectory : Environment.CurrentDirectory, "ASK-GIT")!;
                 p2.WaitForExit();
                 Console.WriteLine(p2.ExitCode == 0 ? "[AGENT] Patch applied." : $"[AGENT] git apply failed (exit {p2.ExitCode})");
             }

@@ -173,8 +173,8 @@ internal partial class Program
         var schtasksArgs = $"/create /tn \"{taskName}\" /tr \"{tr}\" /sc {sc} /sd {date} /st {time} /f";
         try
         {
-            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
-                "schtasks.exe", schtasksArgs) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })!;
+            using var p = AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo(
+                "schtasks.exe", schtasksArgs) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true }, Environment.CurrentDirectory, "SCHEDULE")!;
             p.WaitForExit(5000);
             Console.WriteLine($"[SCHEDULE] schtasks registered: {taskName} at {executeAt:HH:mm}");
         }
@@ -186,8 +186,8 @@ internal partial class Program
     {
         try
         {
-            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
-                "schtasks.exe", $"/delete /tn \"WKAppBot_{id}\" /f") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })!;
+            using var p = AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo(
+                "schtasks.exe", $"/delete /tn \"WKAppBot_{id}\" /f") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true }, Environment.CurrentDirectory, "SCHEDULE")!;
             p.WaitForExit(3000);
         }
         catch { /* schtask may not exist — ignore */ }

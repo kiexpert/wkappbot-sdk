@@ -131,7 +131,7 @@ internal partial class Program
             File.WriteAllText(mdPath, sb.ToString(), Encoding.UTF8);
             Console.WriteLine($"[ASK:MD] {mdPath}");
             // Open in VS Code for immediate review
-            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "code", Arguments = $"\"{mdPath}\"", UseShellExecute = true, CreateNoWindow = true }); } catch { }
+            try { AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo { FileName = "code", Arguments = $"\"{mdPath}\"", UseShellExecute = true, CreateNoWindow = true }, Environment.CurrentDirectory, "ASK-MD"); } catch { }
             return mdPath;
         }
         catch (Exception ex)

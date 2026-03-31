@@ -107,7 +107,7 @@ Examples:
                     Verb = "runas",  // triggers UAC
                     WindowStyle = ProcessWindowStyle.Hidden,
                 };
-                var proc = Process.Start(psi);
+                var proc = AppBotPipe.StartTracked(psi, psi.WorkingDirectory.Length > 0 ? psi.WorkingDirectory : Environment.CurrentDirectory, "AUTOMATION");
                 proc?.WaitForExit();
 
                 // Show the elevated process's output

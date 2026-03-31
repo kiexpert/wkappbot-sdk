@@ -100,7 +100,7 @@ internal partial class Program
 
         try
         {
-            using var proc = Process.Start(psi);
+            using var proc = AppBotPipe.StartTracked(psi, psi.WorkingDirectory.Length > 0 ? psi.WorkingDirectory : Environment.CurrentDirectory, "MCP-RUN");
             if (proc == null) return ("Error: failed to start child process", 1);
 
             pushedPid = proc.Id; // PushLine이 메트릭 샘플링에 사용

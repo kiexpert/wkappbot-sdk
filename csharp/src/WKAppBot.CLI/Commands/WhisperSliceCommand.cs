@@ -145,7 +145,7 @@ internal partial class Program
                 RedirectStandardOutput = true,
                 RedirectStandardError  = true,
             };
-            using var proc = Process.Start(psi);
+            using var proc = AppBotPipe.StartTracked(psi, psi.WorkingDirectory.Length > 0 ? psi.WorkingDirectory : Environment.CurrentDirectory, "WHISPER-FFMPEG");
             if (proc == null) return -1;
             proc.StandardOutput.ReadToEnd(); // drain
             proc.StandardError.ReadToEnd();  // drain

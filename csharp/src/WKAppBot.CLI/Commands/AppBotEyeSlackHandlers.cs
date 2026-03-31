@@ -143,7 +143,7 @@ internal partial class Program
         Console.WriteLine($"[EYE][SLACK] 앱봇 창 없음 — VS Code 스폰: {appbotDir}");
         Console.ResetColor();
 
-        try { System.Diagnostics.Process.Start("code.exe", $"\"{appbotDir}\""); }
+        try { AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo("code.exe", $"\"{appbotDir}\"") { UseShellExecute = false, CreateNoWindow = true }, appbotDir, "EYE-CODE"); }
         catch (Exception ex) { Console.WriteLine($"[EYE][SLACK] VS Code 스폰 실패: {ex.Message}"); return; }
 
         if (string.IsNullOrWhiteSpace(pendingMessage)) return;

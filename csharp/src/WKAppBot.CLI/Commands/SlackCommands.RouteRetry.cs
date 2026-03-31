@@ -219,7 +219,7 @@ Register-ScheduledTask -TaskName '{WatchdogTaskName}' -Action $action -Trigger $
                 RedirectStandardOutput = false,
                 RedirectStandardError  = false,
             };
-            var proc = Process.Start(psi);
+            var proc = AppBotPipe.StartTracked(psi, psi.WorkingDirectory.Length > 0 ? psi.WorkingDirectory : Environment.CurrentDirectory, "ROUTE-RETRY");
             proc?.WaitForExit(5000);
             exitCode = proc?.ExitCode ?? -1;
         }
