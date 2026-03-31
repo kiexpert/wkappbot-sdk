@@ -153,7 +153,8 @@ internal partial class Program
         });
     }
 
-    /// Run schtasks.exe quietly (no window, no output). Returns exit code, or -1 on failure.
+    /// Run schtasks.exe quietly (no window). Returns exit code, or -1 on failure.
+    /// Logs stderr output on failure for debugging.
     private static int RunSchtasksQuiet(string schtasksExe, string args)
     {
         try
@@ -168,10 +169,21 @@ internal partial class Program
                 RedirectStandardError = true,
             };
             using var p = System.Diagnostics.Process.Start(psi);
+            var stdoutTask = System.Threading.Tasks.Task.Run(() => p?.StandardOutput.ReadToEnd() ?? "");
+            var stderrTask = System.Threading.Tasks.Task.Run(() => p?.StandardError.ReadToEnd() ?? "");
             p?.WaitForExit(5000);
-            return p?.ExitCode ?? -1;
+            var stdout = stdoutTask.GetAwaiter().GetResult();
+            var stderr = stderrTask.GetAwaiter().GetResult();
+            var exit = p?.ExitCode ?? -1;
+            if (exit != 0)
+            {
+                var msg = (stderr + stdout).Trim();
+                if (!string.IsNullOrEmpty(msg))
+                    Console.WriteLine($"[EYE] Watchdog schtasks({exit}): {msg}");
+            }
+            return exit;
         }
-        catch { return -1; }
+        catch (Exception ex) { Console.WriteLine($"[EYE] Watchdog schtasks error: {ex.Message}"); return -1; }
     }
 
     /// <summary>
