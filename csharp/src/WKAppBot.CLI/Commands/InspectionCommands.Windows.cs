@@ -275,6 +275,15 @@ internal partial class Program
             }
             // Full UIA focus path — DISABLED for speed. Use GetFocusPath (Win32) above.
             // To re-enable: if (!isChild && (isForeground || hasFilter)) PrintFocusAndPopup(hWnd);
+
+            // [GRAP] TARGET: print JSON5 pattern when filter is active (reusable in any a11y command)
+            if (hasFilter && !isChild)
+            {
+                var target = WindowFinder.BuildTargetJson5(hWnd);
+                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                Console.WriteLine($"  [GRAP] TARGET: {target}");
+                Console.ResetColor();
+            }
         }
 
         void PrintFocusAndPopup(IntPtr hWnd)
