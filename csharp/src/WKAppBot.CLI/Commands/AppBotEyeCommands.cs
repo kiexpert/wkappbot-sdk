@@ -323,10 +323,13 @@ internal partial class Program
         }
     }
 
+    // Persistent CWD file — survives process restarts (e.g. watchdog, hot-swap)
+    static string EyeCwdFile => Path.Combine(DataDir, "runtime", "eye_cwd.txt");
+
     static int AppBotEyeCommand(string[] args)
     {
-        // Fix CWD: hot-swap inherits old Eye's CWD (often system32).
-        // Correct to callerCwd (from pipe) or exe directory as fallback.
+        // Fix CWD: task scheduler / hot-swap often starts with C:\Windows\system32.
+        // Priority: CallerCwd pipe value → WKAPPBOT_EYE_CWD env var → saved eye_cwd.txt
         var cwd = Environment.CurrentDirectory;
         var exeDir = (Path.GetDirectoryName(Environment.ProcessPath) ?? "").TrimEnd('\\', '/');
         bool cwdIsExeDir = !string.IsNullOrEmpty(exeDir)
@@ -335,10 +338,26 @@ internal partial class Program
             || cwd.Contains("System32", StringComparison.OrdinalIgnoreCase)
             || cwdIsExeDir)
         {
-            // Don't fall back to exe dir (that's exactly what we're trying to avoid)
-            var fixedCwd = EyeCmdPipeServer.CallerCwd.Value ?? ".";
+            var savedCwd = File.Exists(EyeCwdFile) ? File.ReadAllText(EyeCwdFile).Trim() : null;
+            var envCwd   = Environment.GetEnvironmentVariable("WKAPPBOT_EYE_CWD");
+            // Skip env var if it is also system32/exeDir (bad CWD propagated from broken Eye)
+            bool envCwdGood = !string.IsNullOrEmpty(envCwd)
+                && !envCwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(envCwd.TrimEnd('\\', '/'), exeDir, StringComparison.OrdinalIgnoreCase)
+                && Directory.Exists(envCwd);
+            var fixedCwd = EyeCmdPipeServer.CallerCwd.Value
+                ?? (envCwdGood ? envCwd : null)
+                ?? (Directory.Exists(savedCwd) ? savedCwd : null)
+                ?? ".";
             try { Environment.CurrentDirectory = fixedCwd; } catch { }
             Console.Error.WriteLine($"[EYE] CWD fixed: {cwd} → {fixedCwd}");
+        }
+        // Persist current correct CWD for future restarts (watchdog, hot-swap)
+        var currentCwd = Environment.CurrentDirectory;
+        if (!currentCwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(currentCwd.TrimEnd('\\', '/'), exeDir, StringComparison.OrdinalIgnoreCase))
+        {
+            try { Directory.CreateDirectory(Path.GetDirectoryName(EyeCwdFile)!); File.WriteAllText(EyeCwdFile, currentCwd); } catch { }
         }
 
         // one-shot diagnostic tick (must not enter global loop)
@@ -470,7 +489,7 @@ internal partial class Program
         AskTargetRegistry.PurgeDeadHwnds();
         // Purge stale card cache from previous Eye session — fresh start, no zombie cards
         CardCachePurgeAll();
-        return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, elevated, replacePid);
+        return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, Environment.CurrentDirectory, elevated, replacePid);
     }
 
     // ── P/Invoke declarations (shared across all AppBotEye partial class files) ──

@@ -12,7 +12,7 @@ internal partial class Program
 {
     static readonly string[] SlackRouteKeywords = ["클롣", "클롯", "클봇", "claude", "appbot", "wkappbot"];
     static readonly string[] SlackRouteNoise = ["NO_REPLY", "ㄱㄱ", "send ㄱㄱ"];
-    const string RouteAckUsername = "앱봇아이";
+    const string RouteAckPrefix = "앱봇아이"; // combined with folder tag at runtime: "앱봇아이[WG-WKAppBot]"
 
     /// <summary>
     /// wkappbot slack route <msgJson>
@@ -318,8 +318,9 @@ internal partial class Program
             ackText += "\n" + string.Join("\n", lines);
         }
 
+        var routeAckUsername = BuildSlackBotUsername(RouteAckPrefix); // "앱봇아이[WG-WKAppBot]"
         var (ackOk, ackTs) = Task.Run(async () =>
-            await SlackSendViaApi(botToken, channel, ackText, threadKey, username: RouteAckUsername))
+            await SlackSendViaApi(botToken, channel, ackText, threadKey, username: routeAckUsername))
             .GetAwaiter().GetResult();
 
         if (ackOk && !string.IsNullOrEmpty(ackTs))
