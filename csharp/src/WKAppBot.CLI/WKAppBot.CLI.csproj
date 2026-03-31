@@ -59,7 +59,9 @@
     <Message Importance="high" Text="[BUILD] WKAppBot v$(Version)" />
     <!-- Step 1: Copy handlers -->
     <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="W:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
-    <!-- Step 2: Try direct copy first. If locked (Eye running), stage as .new.exe for hot-swap -->
+    <!-- Step 2a: Backup current binary as .bak (rollback if new binary crashes Eye) -->
+    <Exec Command="if exist &quot;W:\SDK\bin\wkappbot-core.exe&quot; copy /Y &quot;W:\SDK\bin\wkappbot-core.exe&quot; &quot;W:\SDK\bin\wkappbot-core.exe.bak&quot;" IgnoreExitCode="true" />
+    <!-- Step 2b: Try direct copy first. If locked (Eye running), stage as .new.exe for hot-swap -->
     <!-- Eye FSW watches wkappbot-core.exe/.new.exe (uses Environment.ProcessPath dynamically) -->
     <Exec Command="copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;W:\SDK\bin\wkappbot-core.exe&quot; &amp;&amp; (echo [Deploy] wkappbot-core.exe updated &amp; &quot;W:\SDK\bin\wkappbot-core.exe&quot; eye tick --timeout 15 &gt;nul 2&gt;&amp;1) || (copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;W:\SDK\bin\wkappbot-core.new.exe&quot; &amp;&amp; echo [Deploy] wkappbot-core.new.exe staged for hot-swap)" IgnoreExitCode="true" />
   </Target>
