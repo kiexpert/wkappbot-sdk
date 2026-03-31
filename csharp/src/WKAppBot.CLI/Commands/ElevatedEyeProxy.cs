@@ -190,7 +190,7 @@ static class ElevatedEyeServer
                 CreateNoWindow = true,
             };
 
-            using var proc = Process.Start(psi);
+            using var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "EYE-PROXY");
             if (proc == null)
                 return new EyeProxyResponse { Id = req.Id, ExitCode = -1, Error = "Failed to start process" };
 
@@ -436,16 +436,10 @@ static class ElevationHelper
         {
             try
             {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? "", "wkappbot.exe"),
-                    Arguments = "speak 관리자 권한이 필요합니다",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                };
-                Process.Start(psi);
+                AppBotPipe.Spawn(
+                    Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? "", "wkappbot.exe"),
+                    "speak 관리자 권한이 필요합니다",
+                    Environment.CurrentDirectory, caller: "ELEVATED-SPEAK");
             }
             catch { }
         });
@@ -470,7 +464,7 @@ static class ElevationHelper
             Console.WriteLine("[ELEVATION] Requesting admin rights for Eye proxy...");
             Console.ResetColor();
 
-            var proc = Process.Start(psi);
+            var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "EYE-ELEVATED");
             if (proc == null) return false;
 
             // Wait briefly for pipe to become available

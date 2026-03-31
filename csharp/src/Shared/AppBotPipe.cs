@@ -243,5 +243,67 @@ internal static class AppBotPipe
             hStdInWrite, hStdOutRead, hStdErrRead);
     }
 
+    // ── StartTracked: Process.Start with CWD enforcement ───────
+    /// <summary>
+    /// Process.Start with mandatory CWD — prevents system32 default.
+    /// Use for cases that need .NET Process (async StreamReader, UseShellExecute=true/runas, CreateNoWindow=false).
+    /// All other cases should use Spawn() which routes through CreateProcessW guard.
+    /// </summary>
+    internal static System.Diagnostics.Process? StartTracked(
+        System.Diagnostics.ProcessStartInfo psi, string cwd, string caller = "PROC")
+    {
+        if (string.IsNullOrEmpty(cwd))
+        {
+            try { Console.Error.WriteLine($"[{caller}:BUG] StartTracked BLOCKED — null CWD! exe={psi.FileName}"); } catch { }
+            return null;
+        }
+        psi.WorkingDirectory = cwd;
+        try { Console.Error.WriteLine($"[{caller}] StartTracked cwd=\"{cwd}\" exe={psi.FileName}"); } catch { }
+        return System.Diagnostics.Process.Start(psi);
+    }
+
+    // ── SpawnMcp: DETACHED_PROCESS + stdin/stdout/stderr pipes ──
+    /// <summary>
+    /// Spawn MCP subprocess with DETACHED_PROCESS flag and full pipe I/O.
+    /// cwd is required — prevents system32 default.
+    /// envBlock: pre-built Unicode env block (IntPtr.Zero = inherit parent env).
+    /// </summary>
+    internal static bool SpawnMcp(string exe, string cwd, IntPtr envBlock,
+        out int pid, out System.IO.Stream? stdinStream,
+        out System.IO.Stream? stdoutStream, out System.IO.Stream? stderrStream)
+    {
+        pid = 0; stdinStream = stdoutStream = stderrStream = null;
+
+        // Pipes: child-side handles inherit, parent-side do not
+        CreatePipe(out var hStdinRead,  out var hStdinWrite,  IntPtr.Zero, 0);
+        SetHandleInformation(hStdinRead,   HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+        CreatePipe(out var hStdoutRead, out var hStdoutWrite, IntPtr.Zero, 0);
+        SetHandleInformation(hStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+        CreatePipe(out var hStderrRead, out var hStderrWrite, IntPtr.Zero, 0);
+        SetHandleInformation(hStderrWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+
+        var si = new STARTUPINFOW { cb = Marshal.SizeOf<STARTUPINFOW>(), dwFlags = STARTF_USESTDHANDLES,
+            hStdInput = hStdinRead, hStdOutput = hStdoutWrite, hStdError = hStderrWrite };
+
+        var cmdLine = ($"\"{exe}\" mcp" + '\0').ToCharArray();
+        bool ok = CreateProcess(null, cmdLine, IntPtr.Zero, IntPtr.Zero, true,
+            DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT, envBlock, cwd, ref si, out var pi, "MCP-SPAWN");
+
+        // Close child-side handles in parent regardless of outcome
+        CloseHandle(hStdinRead); CloseHandle(hStdoutWrite); CloseHandle(hStderrWrite);
+
+        if (!ok) { CloseHandle(hStdinWrite); CloseHandle(hStdoutRead); CloseHandle(hStderrRead); return false; }
+
+        pid = (int)pi.dwProcessId;
+        CloseHandle(pi.hThread);
+        stdinStream  = new System.IO.FileStream(
+            new Microsoft.Win32.SafeHandles.SafeFileHandle(hStdinWrite,  true), System.IO.FileAccess.Write);
+        stdoutStream = new System.IO.FileStream(
+            new Microsoft.Win32.SafeHandles.SafeFileHandle(hStdoutRead,  true), System.IO.FileAccess.Read);
+        stderrStream = new System.IO.FileStream(
+            new Microsoft.Win32.SafeHandles.SafeFileHandle(hStderrRead,  true), System.IO.FileAccess.Read);
+        return true;
+    }
+
     private static string Trunc(string s, int max) => s.Length > max ? s[..(max - 3)] + "..." : s;
 }

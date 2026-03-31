@@ -704,7 +704,7 @@ internal partial class Program
                 };
                 // Pass through environment variables
                 psi.Environment["DOTNET_ROOT"] = Environment.GetEnvironmentVariable("DOTNET_ROOT") ?? "";
-                Process.Start(psi);
+                AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "SLACK-RESTART");
                 Console.WriteLine("[SLACK] Hot-reload: new process launched");
             }
             catch (Exception ex)
@@ -762,7 +762,7 @@ internal partial class Program
         if (!string.IsNullOrEmpty(oauthToken))
             psi.Environment["CLAUDE_CODE_OAUTH_TOKEN"] = oauthToken;
 
-        var process = Process.Start(psi);
+        var process = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "SLACK-BG");
         if (process == null)
         {
             Console.WriteLine("[SLACK] Failed to start background listener");

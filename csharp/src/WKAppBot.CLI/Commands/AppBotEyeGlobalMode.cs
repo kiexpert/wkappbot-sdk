@@ -1280,7 +1280,6 @@ internal partial class Program
 
                 var newProc = AppBotPipe.Spawn(exePath, argsStr, callerCwd,
                     redirectStdIn: true, redirectStdOut: true, redirectStdErr: true,
-                    env: new() { ["WKAPPBOT_EYE_CWD"] = callerCwd },
                     caller: "EYE-HOTSWAP");
                 if (newProc != null)
                 {

@@ -248,67 +248,19 @@ internal static class EyeMcpClient
 
         try
         {
-            // Create pipes with inheritable handles for the MCP-side
-            var sa = new SECURITY_ATTRIBUTES { nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>(), bInheritHandle = true };
-
-            CreatePipe(out var hStdinRead, out var hStdinWrite, ref sa, 0);
-            CreatePipe(out var hStdoutRead, out var hStdoutWrite, ref sa, 0);
-            CreatePipe(out var hStderrRead, out var hStderrWrite, ref sa, 0);
-
-            // Eye-side handles must NOT be inherited (prevent handle leak)
-            SetHandleInformation(hStdinWrite, HANDLE_FLAG_INHERIT, 0);
-            SetHandleInformation(hStdoutRead, HANDLE_FLAG_INHERIT, 0);
-            SetHandleInformation(hStderrRead, HANDLE_FLAG_INHERIT, 0);
-
-            // Build environment block (Unicode, remove PTY vars)
             var envBlock = BuildDetachedEnvBlock();
-
-            var si = new STARTUPINFOW();
-            si.cb = Marshal.SizeOf<STARTUPINFOW>();
-            si.dwFlags = STARTF_USESTDHANDLES;
-            si.hStdInput = hStdinRead;
-            si.hStdOutput = hStdoutWrite;
-            si.hStdError = hStderrWrite;
-
-            var cmdLine = ($"\"{exe}\" mcp" + '\0').ToCharArray();
-            var cwd = Environment.CurrentDirectory;
-            bool ok = AppBotPipe.CreateProcess(
-                null, cmdLine,
-                IntPtr.Zero, IntPtr.Zero,
-                true, // bInheritHandles
-                DETACHED_PROCESS | CREATE_UNICODE_ENVIRONMENT, // no CREATE_BREAKAWAY_FROM_JOB (ACCESS_DENIED in some job contexts)
-                envBlock, cwd,
-                ref si, out var pi, "EYE-MCP");
-
-            // Free environment block
+            var cwd = Program.EyeCallerCwd.Length > 0 ? Program.EyeCallerCwd : Environment.CurrentDirectory;
+            bool ok = AppBotPipe.SpawnMcp(exe, cwd, envBlock,
+                out int mcpPid, out var stdinStream, out var stdoutStream, out var stderrStream);
             if (envBlock != IntPtr.Zero) Marshal.FreeHGlobal(envBlock);
-
-            // Close MCP-side pipe handles (we keep Eye-side only)
-            CloseHandle(hStdinRead);
-            CloseHandle(hStdoutWrite);
-            CloseHandle(hStderrWrite);
 
             if (!ok)
             {
-                var err = Marshal.GetLastWin32Error();
-                Console.Error.WriteLine($"[EYE-MCP] CreateProcessW failed: win32err={err} exe={exe} si.cb={si.cb} sizeof={Marshal.SizeOf<STARTUPINFOW>()}");
-                CloseHandle(hStdinWrite);
-                CloseHandle(hStdoutRead);
-                CloseHandle(hStderrRead);
+                Console.Error.WriteLine($"[EYE-MCP] SpawnMcp failed: exe={exe} cwd={cwd}");
                 return;
             }
 
-            CloseHandle(pi.hThread);
-
-            // Wrap Win32 handles as .NET streams
-            var stdinStream = new FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle(hStdinWrite, true),
-                FileAccess.Write);
-            var stdoutStream = new FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle(hStdoutRead, true),
-                FileAccess.Read);
-            var stderrStream = new FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle(hStderrRead, true),
-                FileAccess.Read);
-
-            _process = Process.GetProcessById((int)pi.dwProcessId);
+            _process = Process.GetProcessById(mcpPid);
             _stdin = new StreamWriter(stdinStream, new UTF8Encoding(false)) { AutoFlush = true };
             _stdout = new StreamReader(stdoutStream, Encoding.UTF8);
 
@@ -366,10 +318,7 @@ internal static class EyeMcpClient
             _readerTask = Task.Run(() => ReaderLoop(_readerCts.Token));
 
             _restartCount++;
-            Console.Error.WriteLine($"[EYE-MCP] Started PID={(int)pi.dwProcessId} (DETACHED_PROCESS, restart #{_restartCount})");
-
-            // Close process handle (Process object tracks it)
-            CloseHandle(pi.hProcess);
+            Console.Error.WriteLine($"[EYE-MCP] Started PID={mcpPid} (DETACHED_PROCESS, restart #{_restartCount})");
         }
         catch (Exception ex)
         {

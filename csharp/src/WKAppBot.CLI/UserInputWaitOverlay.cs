@@ -382,13 +382,7 @@ internal sealed class UserInputWaitWindow : Window
     {
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "wkappbot",
-                Arguments = "speak \"포커스 양보가 필요합니다\" --bg",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
+            AppBotPipe.Spawn("wkappbot", "speak \"포커스 양보가 필요합니다\" --bg", Environment.CurrentDirectory, caller: "OVERLAY");
         }
         catch { /* best effort — fallback to silent */ }
     }

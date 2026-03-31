@@ -59,13 +59,7 @@ internal partial class Program
             var sizeArg = sizePx > 0 ? $" --size {sizePx}" : "";
             var mouseArg = atMouse ? " --mouse" : "";
             var targetArg = targetGrap != null ? $" --target \"{targetGrap}\"" : "";
-            var psi = new ProcessStartInfo(exe, $"speak {textArgs}{sizeArg}{mouseArg}{targetArg}")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden,
-            };
-            Process.Start(psi);
+            AppBotPipe.Spawn(exe, $"speak {textArgs}{sizeArg}{mouseArg}{targetArg}", Environment.CurrentDirectory, caller: "SPEAK");
             return 0;
         }
 

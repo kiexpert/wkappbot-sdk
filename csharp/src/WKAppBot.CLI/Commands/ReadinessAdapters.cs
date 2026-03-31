@@ -221,7 +221,7 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
             Console.WriteLine($"  [ELEVATION] Fallback: relaunching as admin: {Path.GetFileName(exePath)} {args}");
             Console.ResetColor();
 
-            var proc = Process.Start(psi);
+            var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "READINESS");
             if (proc != null)
             {
                 proc.WaitForExit();

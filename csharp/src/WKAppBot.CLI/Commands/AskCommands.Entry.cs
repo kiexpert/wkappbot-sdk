@@ -471,7 +471,7 @@ Examples:
             psi.ArgumentList.Add(promptMsg);
             psi.ArgumentList.Add("--after");
             psi.ArgumentList.Add("5s");
-            System.Diagnostics.Process.Start(psi);
+            AppBotPipe.StartTracked(psi, callerCwd, "TRIAD-PROMPT");
             Console.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) → {cwdTag}");
         }
         catch (Exception ex) { LogWarning("TRIAD", "Reminder schedule error", ex); }
