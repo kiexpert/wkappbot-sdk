@@ -221,16 +221,9 @@ internal partial class Program
         return KillMatchChainRec(ancestorPatterns.Reverse().ToArray(), 0, ancestors, 0);
     }
 
-    // Cmdline match for kill: plain multi-word patterns use token-AND (order-independent).
-    // "eye tick" and "tick eye" both match "wkappbot-core.exe eye tick --timeout 15".
-    // Glob/regex patterns fall through to standard PatternMatcher (order-sensitive).
-    static bool KillCmdLineMatch(string cmdLine, string pattern)
-    {
-        if (PatternMatcher.IsPattern(pattern) || !pattern.Contains(' '))
-            return PatternMatcher.Create(pattern).IsMatch(cmdLine);
-        var tokens = pattern.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return tokens.All(t => cmdLine.Contains(t, StringComparison.OrdinalIgnoreCase));
-    }
+    // Cmdline match for kill — delegates to shared PatternMatcher.TokenMatchAny
+    static bool KillCmdLineMatch(string cmdLine, string pattern) =>
+        PatternMatcher.TokenMatchAny(pattern, cmdLine);
 
     static bool KillMatchChainRec(string[] patterns, int pi, List<string> ancestors, int ai)
     {

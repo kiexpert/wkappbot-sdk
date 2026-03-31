@@ -129,17 +129,9 @@ internal partial class Program
         // Pre-create matcher ONCE for all filter checks (avoid per-window regex compile)
         var ownerCandidateMatcher = filterTitle != null ? PatternMatcher.Create(filterTitle) : null;
 
-        // Token-AND cmdline/URL match for plain multi-word patterns (order-independent).
-        // "eye tick", "tick eye" → both match "wkappbot eye tick --timeout 15".
-        // Glob/regex patterns use standard PatternMatcher (order-sensitive).
-        bool CmdLineOrUrlMatch(string text)
-        {
-            if (ownerCandidateMatcher == null || filterTitle == null) return false;
-            if (PatternMatcher.IsPattern(filterTitle) || !filterTitle.Contains(' '))
-                return ownerCandidateMatcher.IsMatch(text);
-            var tokens = filterTitle.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            return tokens.All(t => text.Contains(t, StringComparison.OrdinalIgnoreCase));
-        }
+        // Token-AND cmdline/URL match — delegates to shared PatternMatcher.TokenMatchAny
+        bool CmdLineOrUrlMatch(string text) =>
+            filterTitle != null && PatternMatcher.TokenMatchAny(filterTitle, text);
 
         // Get window info, apply filters. Returns null if filtered out or noise.
         (string title, string className, string process, uint pid, int w, int h, bool visible)?
