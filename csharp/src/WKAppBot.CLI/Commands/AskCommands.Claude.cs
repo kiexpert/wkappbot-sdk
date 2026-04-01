@@ -395,6 +395,7 @@ internal partial class Program
                     if (detectResult == "STREAMING" || detectResult == "DONE")
                     {
                         responseStarted = true;
+                        askSession.MarkRunning();
                         Console.WriteLine($"[ASK] Response detected: {detectResult}");
                         chatLock.Release("first-byte");
                         break;
@@ -405,6 +406,7 @@ internal partial class Program
                 }
                 if (!responseStarted)
                 {
+                    askSession.MarkTimedOut();
                     Console.WriteLine("[ASK] No response detected");
                     return (false, (string?)null);
                 }
@@ -477,6 +479,7 @@ internal partial class Program
                         {
                             if (liveHeaderPrinted) Console.WriteLine();
                             Console.WriteLine($"[ASK] Flush idle 1s ??early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                            askSession.MarkDone(text);
                             return (true, text);
                         }
 
@@ -484,6 +487,7 @@ internal partial class Program
                         {
                             if (liveHeaderPrinted) Console.WriteLine();
                             Console.WriteLine($"[ASK] Response complete ({len} chars, {sw.Elapsed.TotalSeconds:F0}s)");
+                            askSession.MarkDone(text);
                             return (true, text);
                         }
                     }
@@ -504,6 +508,7 @@ internal partial class Program
                     """) ?? "";
                 if (liveHeaderPrinted) Console.WriteLine();
                 Console.WriteLine($"[ASK] Timeout ({timeoutSec}s) ??partial response ({finalText.Length} chars)");
+                askSession.MarkTimedOut(finalText);
                 return (finalText.Length > 0, finalText.Length > 0 ? finalText : null);
             }
             catch (Exception ex)

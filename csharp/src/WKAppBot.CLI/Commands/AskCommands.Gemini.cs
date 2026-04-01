@@ -413,6 +413,7 @@ internal partial class Program
                 // Use pre-send count as baseline (preResponseCount already measured before send loop)
                 // If we measured post-send, Gemini may have already added the new response �� skipped!
                 bool responseAlreadyStarted = sendResult.StartsWith("RESPONSE_", StringComparison.OrdinalIgnoreCase);
+                if (responseAlreadyStarted) askSession.MarkRunning();
                 int baseResponseCount = int.TryParse(preResponseCount, out var brc) ? brc : 0;
                 Console.WriteLine($"[POLL-WAIT] start (base={baseResponseCount}, timeout={timeoutSec}s)...");
 
@@ -482,6 +483,7 @@ internal partial class Program
                             liveHeaderPrinted = true;
                         }
                         Console.Write(text.Substring(lastFlushedLen));
+                        if (lastFlushedLen == 0) askSession.MarkRunning();
                         Console.Out.Flush();
                         lastFlushedLen = text.Length;
                         lastFlushTime = DateTime.UtcNow;
@@ -521,6 +523,7 @@ internal partial class Program
                         geminiSavedImages.AddRange(gemEarlyImages);
                         if (liveHeaderPrinted) Console.WriteLine();
                         Console.WriteLine($"[ASK] Flush idle 1s -- early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                        askSession.MarkDone(StripGeminiUiPrefix(text));
                         return (true, text!);
                     }
 
@@ -552,6 +555,7 @@ internal partial class Program
                                     return (true, preStop);
                                 }
                                 Console.WriteLine("[ASK] Gemini stopped response notice detected; retrying once...");
+                                askSession.MarkRetrying("STOP_NOTICE");
                                 var retryResult = await RetryGeminiAfterStopAsync(cdp, editorSel, question);
                                 if (retryResult.ok && !string.IsNullOrWhiteSpace(retryResult.text))
                                 {
@@ -566,6 +570,7 @@ internal partial class Program
                             Console.WriteLine($"[ASK] Response received ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
                             if (geminiSavedImages.Count > 0)
                                 Console.WriteLine($"[ASK] Downloaded {geminiSavedImages.Count} generated image(s)");
+                            askSession.MarkDone(StripGeminiUiPrefix(text));
                             return (true, StripGeminiUiPrefix(text));
                         }
                     }
@@ -595,9 +600,11 @@ internal partial class Program
                         return (false, lastText);
                     }
                     Console.WriteLine($"[ASK] Timeout ??partial response ({lastText.Length} chars)");
+                    askSession.MarkTimedOut(StripGeminiUiPrefix(lastText));
                     return (true, StripGeminiUiPrefix(lastText));
                 }
                 Console.WriteLine("[ASK] Timeout ??no response, retrying once...");
+                askSession.MarkRetrying("TIMEOUT");
 
                 // Retry: same page, re-insert and send (no reload, keeps session)
                 await Task.Delay(1000);
@@ -623,6 +630,7 @@ internal partial class Program
                             return (false, text);
                         }
                         Console.WriteLine($"[ASK] Retry: response ({text.Length} chars)");
+                        askSession.MarkDone(StripGeminiUiPrefix(text));
                         return (true, StripGeminiUiPrefix(text));
                     }
                     retryText = text;
@@ -635,9 +643,11 @@ internal partial class Program
                         return (false, retryText);
                     }
                     Console.WriteLine($"[ASK] Retry: partial ({retryText.Length} chars)");
+                    askSession.MarkTimedOut(retryText);
                     return (true, retryText);
                 }
                 Console.WriteLine("[ASK] Retry: also failed");
+                askSession.MarkTimedOut();
                 return (false, (string?)null);
             }
             catch (Exception ex)
