@@ -16,7 +16,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ?€?€ Claude.ai ?€?€
+    // ?ï¿½?ï¿½ Claude.ai ?ï¿½?ï¿½
 
     // Claude.ai uses ProseMirror editor ??innerHTML/execCommand fail, must use ClipboardEvent paste
     static readonly string[] ClaudeEditorSelectors =
@@ -160,7 +160,7 @@ internal partial class Program
         {
             try
             {
-                // ?€?€ Phase 1: Navigate ?€?€
+                // ?ï¿½?ï¿½ Phase 1: Navigate ?ï¿½?ï¿½
                 PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
@@ -178,7 +178,7 @@ internal partial class Program
                 // NOTE: BringToFront removed ??steals OS focus. CDP works on background tabs.
                 await Task.Delay(1000);
 
-                // ?€?€ Phase 2: Find editor ?€?€
+                // ?ï¿½?ï¿½ Phase 2: Find editor ?ï¿½?ï¿½
                 var editorSel = await WaitForClaudeEditorA11y(cdp);
                 if (editorSel == null)
                     return (false, (string?)null);
@@ -187,7 +187,7 @@ internal partial class Program
                 Console.WriteLine($"[ASK] Editor found: {editorSel}");
                 askSession.BindStreamingContext(editorSel);
 
-                // ?€?€ Phase 3: Check existing turns ?€?€
+                // ?ï¿½?ï¿½ Phase 3: Check existing turns ?ï¿½?ï¿½
                 int existingTurns = await CountClaudeTurns(cdp);
                 if (existingTurns > 0)
                     Console.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
@@ -205,7 +205,7 @@ internal partial class Program
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
                     var personaTextClaude = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (!_suppressLoopPersona.Value && Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
-                        SlackPostToThread($"?“‹ *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextClaude.Length > 800 ? personaTextClaude[..800] + "..." : personaTextClaude)}\n```", "System");
+                        SlackPostToThread($"?ï¿½ï¿½ *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextClaude.Length > 800 ? personaTextClaude[..800] + "..." : personaTextClaude)}\n```", "System");
                     var (personaOk, personaResp) = await ClaudeSendAndWaitAsync(
                         cdp,
                         personaTextClaude,
@@ -245,11 +245,11 @@ internal partial class Program
                         question = BuildHostHandshake() + question;
                 }
 
-                // ?€?€ Phase 4: Insert text + send ?€?€
+                // ?ï¿½?ï¿½ Phase 4: Insert text + send ?ï¿½?ï¿½
                 using var chatLock = ChromeTabLock.Acquire("Claude");
                 if (chatLock == null) return (false, (string?)null);
 
-                // ?€?€ CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ?€?€
+                // ?ï¿½?ï¿½ CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ?ï¿½?ï¿½
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Claude");
 
                 if (attachFiles?.Count > 0)
@@ -269,7 +269,7 @@ internal partial class Program
                     return (false, (string?)null);
                 }
 
-                // ?€?€ Send ?€?€
+                // ?ï¿½?ï¿½ Send ?ï¿½?ï¿½
                 // Wait for any active response to finish (stop button = Claude is generating/tool-running).
                 // Clicking the send button during tool execution would interrupt it ??Enter key is safer
                 // because Claude queues it in the editor without firing until generation completes.
@@ -345,7 +345,7 @@ internal partial class Program
                     return (true, BuildNoWaitQueuedMessage("Claude"));
                 }
 
-                // ?€?€ Phase 5: Wait for response ?€?€
+                // ?ï¿½?ï¿½ Phase 5: Wait for response ?ï¿½?ï¿½
                 var sw = Stopwatch.StartNew();
                 bool responseStarted = false;
                 while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
@@ -368,7 +368,7 @@ internal partial class Program
                                 var banners = document.querySelectorAll('[class*="limit"],[class*="usage"],[class*="quota"]');
                                 t = Array.from(banners).map(b => b.innerText).join('\n').substring(0, 800);
                             }
-                            var keys = ['usage limit', 'rate limit', 'too many requests', '?”ì²­???ˆë¬´ ë§?, '?¬ìš©???œë„'];
+                            var keys = ['usage limit', 'rate limit', 'too many requests', 'request limit', 'usage cap'];
                             var tl = t.toLowerCase();
                             for (var i = 0; i < keys.length; i++) {
                                 if (tl.includes(keys[i])) {
@@ -417,7 +417,7 @@ internal partial class Program
                     return (false, (string?)null);
                 }
 
-                // ?€?€ Phase 6: Poll for completion ?€?€
+                // ?ï¿½?ï¿½ Phase 6: Poll for completion ?ï¿½?ï¿½
                 int lastFlushedLen = 0;
                 bool liveHeaderPrinted = false;
                 var lastFlushTime = DateTime.UtcNow;
@@ -460,7 +460,7 @@ internal partial class Program
                             if (!liveHeaderPrinted)
                             {
                                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                                Console.WriteLine("?€?€ Claude streaming ?€?€");
+                                Console.WriteLine("?ï¿½?ï¿½ Claude streaming ?ï¿½?ï¿½");
                                 Console.ResetColor();
                                 liveHeaderPrinted = true;
                             }
@@ -552,12 +552,12 @@ internal partial class Program
         if (isLimit)
         {
             EnsureSlackThread("Claude", question);
-            SlackPostToThread("??_Claude ë©”ì‹œì§€ ?œë„ ì´ˆê³¼_ ??claude.ai ?¬ìš©???•ì¸ ?„ìš”", SlackAiName("claude", "Claude"));
+            SlackPostToThread("??_Claude ë©”ì‹œì§€ ?ï¿½ë„ ì´ˆê³¼_ ??claude.ai ?ï¿½ìš©???ï¿½ì¸ ?ï¿½ìš”", SlackAiName("claude", "Claude"));
         }
         else if (!ok)
         {
             EnsureSlackThread("Claude", question);
-            SlackPostToThread("??_Claude ?‘ë‹µ ?¤íŒ¨_", SlackAiName("claude", "Claude"));
+            SlackPostToThread("??_Claude ?ï¿½ë‹µ ?ï¿½íŒ¨_", SlackAiName("claude", "Claude"));
         }
 
         if (answer != null)
