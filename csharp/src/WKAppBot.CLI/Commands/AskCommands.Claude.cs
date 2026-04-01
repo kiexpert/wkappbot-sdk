@@ -376,6 +376,7 @@ internal partial class Program
                     if (!string.IsNullOrWhiteSpace(limitText))
                     {
                         Console.WriteLine("[ASK] Claude limit detected");
+                        askSession.MarkFailed("LIMIT", FormatClaudeLimitResponse(limitText));
                         return (false, FormatClaudeLimitResponse(limitText));
                     }
 

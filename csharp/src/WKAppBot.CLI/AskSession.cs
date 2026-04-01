@@ -288,6 +288,17 @@ internal sealed class AskSession : IDisposable
         EmitQuestionState(state);
     }
 
+    public void MarkFailed(string? reason = null, string? detailText = null)
+    {
+        if (!TryGetCurrentQuestion(out var state))
+            return;
+        state.Status = string.IsNullOrWhiteSpace(reason) ? "FAILED" : $"FAILED:{reason}";
+        if (!string.IsNullOrEmpty(detailText))
+            state.LastFullText = detailText;
+        state.LastUpdateUtc = DateTime.UtcNow;
+        EmitQuestionState(state);
+    }
+
     public void TrackChunkEvent(CdpClient.PromptStreamEvent evt)
     {
         var key = BuildQuestionKey(evt.PageKey, evt.QuestionId, evt.RunId);
