@@ -133,6 +133,21 @@ internal sealed class CdpPromptPump : IDisposable
         return ok;
     }
 
+    public static async Task<bool> DropPendingForPageAsync(string? pageKey, WKAppBot.WebBot.CdpClient cdp, string editorSelector, bool clearEditor = true)
+    {
+        if (!string.IsNullOrWhiteSpace(pageKey) && _pages.TryGetValue(pageKey, out var state))
+        {
+            lock (state.SyncRoot)
+            {
+                state.Locked = false;
+                state.QueuedChunks.Clear();
+            }
+        }
+
+        var result = await cdp.CancelPromptPumpAsync(editorSelector, clearEditor);
+        return result.StartsWith("CANCELLED", StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         // No background resources. The page-scoped singleton pump lives inside the target page.

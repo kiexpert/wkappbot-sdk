@@ -365,6 +365,37 @@ public sealed partial class CdpClient
             "})()") ?? "NO_PUMP";
     }
 
+    public async Task<string> CancelPromptPumpAsync(string selector, bool clearEditor = true)
+    {
+        var esc = Esc(selector);
+        var jsClear = JsonSerializer.Serialize(clearEditor);
+        return await EvalAsync(
+            "(()=>{" +
+            "var sel='" + esc + "';" +
+            "var clearEditor=" + jsClear + ";" +
+            "var root=(window.__wkAskPump||(window.__wkAskPump={}));" +
+            "if(!root.states)root.states={};" +
+            "var st=root.states[sel]||(root.states[sel]={gen:0,timer:0,lastResult:'',locked:false});" +
+            "if(st.timer)try{clearTimeout(st.timer);}catch(_e){}" +
+            "st.timer=0;st.gen=(st.gen||0)+1;st.locked=false;st.lastResult='CANCELLED';st.responseStatus='CANCELLED';" +
+            "var el=document.querySelector(sel);" +
+            "if(clearEditor&&el){" +
+                "try{" +
+                    "if(el.tagName==='TEXTAREA'||el.tagName==='INPUT'){" +
+                        "el.value='';" +
+                        "el.dispatchEvent(new Event('input',{bubbles:true}));" +
+                        "el.dispatchEvent(new Event('change',{bubbles:true}));" +
+                    "}else{" +
+                        "el.textContent='';" +
+                        "el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'deleteContentBackward',data:null}));" +
+                        "el.dispatchEvent(new Event('change',{bubbles:true}));" +
+                    "}" +
+                "}catch(_e){}" +
+            "}" +
+            "return clearEditor?'CANCELLED:CLEARED':'CANCELLED';" +
+            "})()") ?? "NO_PUMP";
+    }
+
     /// <summary>Clear a contenteditable editor (selectAll + delete).</summary>
     public async Task ClearEditorAsync(string selector)
     {
