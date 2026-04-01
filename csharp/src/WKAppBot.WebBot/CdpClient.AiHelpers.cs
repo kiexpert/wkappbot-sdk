@@ -112,7 +112,7 @@ public sealed partial class CdpClient
         };
     }
 
-    // ?ê‚ïê Editor Operations ?ê‚ïê
+    // ?ÔøΩ‚ïê Editor Operations ?ÔøΩ‚ïê
 
     /// <summary>
     /// Insert text into a contenteditable element (3-tier: innerHTML ??execCommand ??Input.insertText).
@@ -298,7 +298,7 @@ public sealed partial class CdpClient
                 "if(!responseCount){var turns=qsa('[data-testid*=\"conversation-turn\"]');var articles=qsa('article');responseCount=turns.length?Math.floor(turns.length/2):(articles.length||0);}" +
                 "text=lastText(msgs);" +
                 "if(!text){var arts=qsa('article');text=lastText(arts);}" +
-                $"stopVisible=!!(document.querySelector(''button[data-testid=\"stop-button\"]'')||document.querySelector(''button[aria-label=\"Stop streaming\"]'')||document.querySelector(''button[aria-label=\"{AskLocaleKeys.KoStopStreaming}\"]''));" +
+                $"stopVisible=!!(document.querySelector(\"button[data-testid='stop-button']\")||document.querySelector(\"button[aria-label='Stop streaming']\")||document.querySelector(\"button[aria-label='{AskLocaleKeys.KoStopStreaming}']\"));" +
                 "streaming=stopVisible;" +
             "} else if(provider==='claude'){" +
                 "var streamMsgs=qsa('[data-is-streaming]');" +
@@ -307,13 +307,13 @@ public sealed partial class CdpClient
                 "text=streamMsgs.length?lastText(streamMsgs):lastText(asstMsgs);" +
                 "var last=streamMsgs.length?streamMsgs[streamMsgs.length-1]:null;" +
                 "streaming=!!(last&&last.getAttribute('data-is-streaming')==='true');" +
-                $"stopVisible=streaming||!!document.querySelector(''button[aria-label*=\"Stop\"],button[aria-label*=\"{AskLocaleKeys.KoStop}\"]'');" +
+                $"stopVisible=streaming||!!(document.querySelector(\"button[aria-label*='Stop']\")||document.querySelector(\"button[aria-label*='{AskLocaleKeys.KoStop}']\"));" +
             "} else if(provider==='gemini'){" +
                 "var models=qsa('model-response');" +
                 "var arts=qsa('[role=\"article\"]');" +
                 "responseCount=models.length||arts.length||0;" +
                 "text=models.length?lastText(models):lastText(arts);" +
-                $"var stopBtn=document.querySelector(''button[aria-label*=\"Stop\"]'')||document.querySelector(''button[aria-label*=\"{AskLocaleKeys.KoStop}\"]'');" +
+                $"var stopBtn=document.querySelector(\"button[aria-label*='Stop']\")||document.querySelector(\"button[aria-label*='{AskLocaleKeys.KoStop}']\");" +
                 "var stopIcon=document.querySelector('mat-icon[fonticon=\"stop_circle\"]');" +
                 "stopVisible=!!stopBtn||!!stopIcon;" +
                 "streaming=stopVisible;" +
@@ -406,7 +406,7 @@ public sealed partial class CdpClient
             "document.execCommand('selectAll');document.execCommand('delete')})()");
     }
 
-    // ?ê‚ïê Send Button ?ê‚ïê
+    // ?ÔøΩ‚ïê Send Button ?ÔøΩ‚ïê
 
     /// <summary>
     /// Send message via Enter key (modern AI chats use Enter=send, button=stop).
@@ -458,7 +458,7 @@ public sealed partial class CdpClient
             """) ?? "NOT_FOUND";
     }
 
-    // ?ê‚ïê Streaming Detection ?ê‚ïê
+    // ?ÔøΩ‚ïê Streaming Detection ?ÔøΩ‚ïê
 
     /// <summary>
     /// Check if AI is currently streaming a response.
@@ -511,7 +511,7 @@ public sealed partial class CdpClient
             """);
     }
 
-    // ?ê‚ïê Common Ask Flow ?ê‚ïê
+    // ?ÔøΩ‚ïê Common Ask Flow ?ÔøΩ‚ïê
 
     /// <summary>
     /// Wait for AI response to complete (streaming done).
@@ -604,7 +604,7 @@ public sealed partial class CdpClient
                     const txt = (btn.textContent || '').trim().toLowerCase();
                     if (txt.includes('ok') || txt.includes('got it') || txt.includes('i understand')
                         || txt.includes('confirm') || txt.includes('agree') || txt.includes('continue')
-                        || txt.includes('?ïÏù∏') || txt.includes('?ôÏùò') || txt.includes('Í≥ÑÏÜç')
+                        || txt.includes('?ÔøΩÏù∏') || txt.includes('?ÔøΩÏùò') || txt.includes('Í≥ÑÏÜç')
                         || btn.classList.contains('primary') || btn.classList.contains('mat-primary')) {
                         btn.click(); return 'DISMISSED:' + txt;
                     }
@@ -615,7 +615,7 @@ public sealed partial class CdpClient
             """) ?? "NONE";
     }
 
-    // ?ê‚ïê File Attachment ?ê‚ïê
+    // ?ÔøΩ‚ïê File Attachment ?ÔøΩ‚ïê
 
     /// <summary>
     /// Synthetic paste of an image file via clipboard DataTransfer event.
@@ -640,7 +640,7 @@ public sealed partial class CdpClient
         return await EvalAsync("""
             (() => {
                 var bt = (document.body?.innerText || '');
-                if (/?¥Î?\s*??s*?åÏùº(???\s*?ÖÎ°ú??.test(bt) || /already\s*uploaded/i.test(bt)) return 'DUPLICATE';
+                if (/?ÔøΩÔøΩ?\s*??s*?ÔøΩÏùº(???\s*?ÔøΩÎ°ú??.test(bt) || /already\s*uploaded/i.test(bt)) return 'DUPLICATE';
                 var sels = ['[data-testid="file-thumbnail"]','[data-testid*="attachment"]',
                     '[class*="attachment"]','[class*="file-upload"]','[class*="uploaded-file"]',
                     'img[src*="blob:"]','[class*="file-chip"]','[class*="upload-chip"]',
@@ -747,7 +747,7 @@ public sealed partial class CdpClient
         return string.IsNullOrEmpty(lastText) ? (false, "") : (true, lastText.Trim());
     }
 
-    // ?Ä?Ä Internal ?Ä?Ä
+    // ?ÔøΩ?ÔøΩ Internal ?ÔøΩ?ÔøΩ
     /// <summary>
     /// Ensure Chrome window is not minimized before DOM-dependent operations.
     /// ProseMirror, contenteditable, and some React components need rendering.
