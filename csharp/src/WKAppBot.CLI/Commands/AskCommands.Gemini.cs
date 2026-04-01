@@ -563,6 +563,7 @@ internal partial class Program
                                     return (true, retryResult.text);
                                 }
                                 Console.WriteLine("[ASK] Retry did not recover from Gemini stop notice; fast-fail");
+                                askSession.MarkFailed("STOP_NOTICE", retryResult.text ?? text);
                                 return (false, retryResult.text ?? text);
                             }
                             if (hasToolCall && IsGeminiStoppedNotice(text))
@@ -597,6 +598,7 @@ internal partial class Program
                     if (IsGeminiStoppedNotice(lastText))
                     {
                         Console.WriteLine("[ASK] Timeout with Gemini stop notice; fast-fail");
+                        askSession.MarkFailed("STOP_NOTICE", lastText);
                         return (false, lastText);
                     }
                     Console.WriteLine($"[ASK] Timeout ??partial response ({lastText.Length} chars)");
@@ -627,6 +629,7 @@ internal partial class Program
                         if (IsGeminiStoppedNotice(text))
                         {
                             Console.WriteLine("[ASK] Retry: stop notice detected; fast-fail");
+                            askSession.MarkFailed("STOP_NOTICE", text);
                             return (false, text);
                         }
                         Console.WriteLine($"[ASK] Retry: response ({text.Length} chars)");
@@ -640,6 +643,7 @@ internal partial class Program
                     if (IsGeminiStoppedNotice(retryText))
                     {
                         Console.WriteLine("[ASK] Retry: partial stop notice; fast-fail");
+                        askSession.MarkFailed("STOP_NOTICE", retryText);
                         return (false, retryText);
                     }
                     Console.WriteLine($"[ASK] Retry: partial ({retryText.Length} chars)");
@@ -647,7 +651,7 @@ internal partial class Program
                     return (true, retryText);
                 }
                 Console.WriteLine("[ASK] Retry: also failed");
-                askSession.MarkTimedOut();
+                askSession.MarkFailed("RETRY_EXHAUSTED");
                 return (false, (string?)null);
             }
             catch (Exception ex)
