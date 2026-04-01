@@ -11,12 +11,15 @@ internal partial class Program
 {
     static async Task<(bool ok, string? text)> ClaudeSendAndWaitAsync(CdpClient cdp, string message, int timeoutSec)
     {
-        using var askSession = new AskSession(AiProvider.Claude, cdp); // provider-aware utilities
+        using var askSession = new AskSession(AiProvider.Claude, cdp);
+        askSession.SetIdentity(
+            runId: Environment.GetEnvironmentVariable("WKAPPBOT_RUN_ID"),
+            providerTag: "claude-loop");
         // Guard: verify tab is still on claude.ai (web search subprocess might have navigated away)
         var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("claude.ai", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"[ASK:LOOP] Claude tab drifted to {currentUrl} — navigating back to claude.ai");
+            Console.WriteLine($"[ASK:LOOP] Claude tab drifted to {currentUrl} ??navigating back to claude.ai");
             await cdp.NavigateAsync("https://claude.ai/new");
             await Task.Delay(3000);
         }
@@ -24,6 +27,7 @@ internal partial class Program
         var editorSel = await WaitForClaudeEditorA11y(cdp);
         if (editorSel == null)
             return (false, null);
+        askSession.BindStreamingContext(editorSel);
 
         int baseCount = await cdp.QueryCountAsync("[data-is-streaming]");
 
@@ -73,7 +77,7 @@ internal partial class Program
                         var banners = document.querySelectorAll('[class*="limit"],[class*="usage"],[class*="quota"]');
                         t = Array.from(banners).map(b => b.innerText).join('\n').substring(0, 800);
                     }
-                    var keys = ['usage limit', 'rate limit', 'too many requests', '요청이 너무 많', '사용량 한도'];
+                    var keys = ['usage limit', 'rate limit', 'too many requests', '?�청???�무 �?, '?�용???�도'];
                     var tl = t.toLowerCase();
                     for (var i = 0; i < keys.length; i++) {
                         if (tl.includes(keys[i])) return t.substring(0, 800);
@@ -125,12 +129,15 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> GeminiSendAndWaitAsync(CdpClient cdp, string message, int timeoutSec)
     {
-        using var askSession = new AskSession(AiProvider.Gemini, cdp); // provider-aware utilities
+        using var askSession = new AskSession(AiProvider.Gemini, cdp);
+        askSession.SetIdentity(
+            runId: Environment.GetEnvironmentVariable("WKAPPBOT_RUN_ID"),
+            providerTag: "gemini-loop");
         // Guard: verify tab is still on gemini.google.com
         var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("gemini.google.com", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"[ASK:LOOP] Gemini tab drifted to {currentUrl} — navigating back");
+            Console.WriteLine($"[ASK:LOOP] Gemini tab drifted to {currentUrl} ??navigating back");
             await cdp.NavigateAsync("https://gemini.google.com/app");
             await Task.Delay(3000);
         }
@@ -144,6 +151,7 @@ internal partial class Program
             ".input-area [contenteditable]");
         if (editorSel == null)
             return (false, null);
+        askSession.BindStreamingContext(editorSel);
 
         using var loopLock = ChromeTabLock.Acquire("Gemini/loop");
         if (loopLock == null)
@@ -238,3 +246,5 @@ internal partial class Program
         return (!string.IsNullOrWhiteSpace(last), last);
     }
 }
+
+

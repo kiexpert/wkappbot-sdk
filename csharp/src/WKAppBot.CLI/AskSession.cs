@@ -3,8 +3,8 @@ using WKAppBot.WebBot;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Declarative AI provider configuration — selectors, host, quirks.
-/// No JS here — just data that drives the common AskSession flow.
+/// Declarative AI provider configuration: selectors, host, and quirks.
+/// No JS here, only data that drives the common AskSession flow.
 /// </summary>
 internal record AiProvider(
     string Name,                // "gemini", "claude", "gpt"
@@ -79,8 +79,8 @@ internal record AiProvider(
 }
 
 /// <summary>
-/// Shared AI ask session — orchestrates the common flow across all providers.
-/// Eliminates per-provider reimplementation of connect → type → send → poll.
+/// Shared AI ask session for the common provider flow.
+/// Eliminates per-provider reimplementation of connect -> type -> send -> poll.
 ///
 /// Usage:
 ///   using var session = new AskSession(AiProvider.Gemini);
@@ -93,10 +93,52 @@ internal record AiProvider(
 /// </summary>
 internal sealed class AskSession : IDisposable
 {
+    public sealed class AskQuestionState
+    {
+        public string Key { get; init; } = "";
+        public string Provider { get; init; } = "";
+        public string? ProviderTag { get; init; }
+        public string? GameId { get; init; }
+        public string? QuestionId { get; init; }
+        public string? RunId { get; init; }
+        public string? PageKey { get; init; }
+        public string? EditorSelector { get; init; }
+        public string Status { get; set; } = "CREATED";
+        public DateTime CreatedUtc { get; init; } = DateTime.UtcNow;
+        public DateTime LastUpdateUtc { get; set; } = DateTime.UtcNow;
+        public DateTime? LastChunkUtc { get; set; }
+        public int ChunkCount { get; set; }
+        public long LastChunkSeq { get; set; }
+        public bool IsFinal { get; set; }
+        public string? LastSendResult { get; set; }
+        public string? SendMethod { get; set; }
+        public string? SendKeyChord { get; set; }
+        public int? SendAttempt { get; set; }
+        public DateTime? QueuedAtUtc { get; set; }
+        public string LastDeltaText { get; set; } = "";
+        public string LastFullText { get; set; } = "";
+    }
+
+    public sealed class AskIdentity
+    {
+        public string? GameId { get; init; }
+        public string? QuestionId { get; init; }
+        public string? RunId { get; init; }
+        public string? ProviderTag { get; init; }
+    }
+
     public AiProvider Provider { get; }
     public CdpTabSession? Tab { get; private set; }
     public CdpClient? Cdp => _legacyCdp ?? Tab?.Cdp;
     public int Port { get; private set; } = 9222;
+    public AskIdentity Identity { get; private set; } = new();
+    public Action<AskQuestionState>? OnQuestionStateChanged { get; set; }
+    public IReadOnlyDictionary<string, AskQuestionState> Questions => _questions;
+
+    readonly Dictionary<string, AskQuestionState> _questions = new(StringComparer.OrdinalIgnoreCase);
+    string? _currentQuestionKey;
+    Action<CdpClient.PromptStreamEvent>? _priorStreamingChunkHandler;
+    bool _streamBridgeAttached;
 
     public AskSession(AiProvider provider, int port = 9222)
     {
@@ -109,20 +151,233 @@ internal sealed class AskSession : IDisposable
     {
         Provider = provider;
         _legacyCdp = existingCdp;
+        AttachStreamingBridge();
     }
     private CdpClient? _legacyCdp;
 
-    // ══ Step 1: Connect ══
+    public void SetIdentity(string? gameId = null, string? questionId = null, string? runId = null, string? providerTag = null)
+    {
+        Identity = new AskIdentity
+        {
+            GameId = gameId,
+            QuestionId = questionId,
+            RunId = runId,
+            ProviderTag = providerTag ?? Provider.Name,
+        };
+    }
+
+    public void BindStreamingContext(string editorSelector, string? pageKey = null)
+    {
+        var resolvedPageKey = pageKey ?? $"{Identity.ProviderTag ?? Provider.Name}:{editorSelector}";
+        RegisterQuestion(editorSelector, resolvedPageKey);
+        Cdp?.SetStreamingChunkContext(
+            provider: Identity.ProviderTag ?? Provider.Name,
+            gameId: Identity.GameId,
+            questionId: Identity.QuestionId,
+            runId: Identity.RunId,
+            editorSelector: editorSelector,
+            pageKey: resolvedPageKey);
+    }
+
+    public void AttachStreamingBridge()
+    {
+        if (_streamBridgeAttached || Cdp == null)
+            return;
+
+        _priorStreamingChunkHandler = Cdp.OnStreamingChunkEvent;
+        Cdp.OnStreamingChunkEvent = evt =>
+        {
+            _priorStreamingChunkHandler?.Invoke(evt);
+            TrackChunkEvent(evt);
+        };
+        _streamBridgeAttached = true;
+    }
+
+    public AskQuestionState RegisterQuestion(string editorSelector, string? pageKey = null)
+    {
+        var normalizedPageKey = pageKey ?? $"{Identity.ProviderTag ?? Provider.Name}:{editorSelector}";
+        var key = BuildQuestionKey(normalizedPageKey);
+        if (!_questions.TryGetValue(key, out var state))
+        {
+            state = new AskQuestionState
+            {
+                Key = key,
+                Provider = Provider.Name,
+                ProviderTag = Identity.ProviderTag ?? Provider.Name,
+                GameId = Identity.GameId,
+                QuestionId = Identity.QuestionId,
+                RunId = Identity.RunId,
+                PageKey = normalizedPageKey,
+                EditorSelector = editorSelector,
+            };
+            _questions[key] = state;
+        }
+        else
+        {
+            state.LastUpdateUtc = DateTime.UtcNow;
+            state.Status = "BOUND";
+        }
+
+        _currentQuestionKey = key;
+        EmitQuestionState(state);
+        return state;
+    }
+
+    public void MarkQueued(string? sendResult = null)
+    {
+        if (!TryGetCurrentQuestion(out var state))
+            return;
+        state.Status = "QUEUED";
+        state.LastSendResult = sendResult ?? state.LastSendResult;
+        var parsed = ParseDispatchResult(sendResult);
+        state.SendMethod = parsed.method ?? state.SendMethod;
+        state.SendKeyChord = parsed.keyChord ?? state.SendKeyChord;
+        state.SendAttempt = parsed.attempt ?? state.SendAttempt;
+        state.QueuedAtUtc = DateTime.UtcNow;
+        state.LastUpdateUtc = DateTime.UtcNow;
+        EmitQuestionState(state);
+    }
+
+    public void MarkRunning()
+    {
+        if (!TryGetCurrentQuestion(out var state))
+            return;
+        state.Status = "RUNNING";
+        state.LastUpdateUtc = DateTime.UtcNow;
+        EmitQuestionState(state);
+    }
+
+    public void MarkDone(string? finalText = null)
+    {
+        if (!TryGetCurrentQuestion(out var state))
+            return;
+        state.Status = "DONE";
+        state.IsFinal = true;
+        if (!string.IsNullOrEmpty(finalText))
+            state.LastFullText = finalText;
+        state.LastUpdateUtc = DateTime.UtcNow;
+        EmitQuestionState(state);
+    }
+
+    public void TrackChunkEvent(CdpClient.PromptStreamEvent evt)
+    {
+        var key = BuildQuestionKey(evt.PageKey, evt.QuestionId, evt.RunId);
+        if (!_questions.TryGetValue(key, out var state))
+        {
+            state = new AskQuestionState
+            {
+                Key = key,
+                Provider = Provider.Name,
+                ProviderTag = evt.Provider,
+                GameId = evt.GameId,
+                QuestionId = evt.QuestionId,
+                RunId = evt.RunId,
+                PageKey = evt.PageKey,
+                EditorSelector = evt.EditorSelector,
+            };
+            _questions[key] = state;
+        }
+
+        _currentQuestionKey = key;
+        state.Status = evt.IsFinal ? "DONE" : "RUNNING";
+        state.LastUpdateUtc = DateTime.UtcNow;
+        state.LastChunkUtc = DateTime.UtcNow;
+        state.ChunkCount++;
+        state.LastChunkSeq = evt.ChunkSeq;
+        state.IsFinal = evt.IsFinal;
+        state.LastDeltaText = evt.DeltaText ?? evt.ChunkText ?? "";
+        state.LastFullText = evt.FullTextSoFar ?? state.LastFullText;
+        EmitQuestionState(state);
+    }
+
+    string BuildQuestionKey(string? pageKey = null, string? questionId = null, string? runId = null)
+    {
+        var q = questionId ?? Identity.QuestionId ?? "q0";
+        var r = runId ?? Identity.RunId ?? "run0";
+        var p = pageKey ?? _currentQuestionKey ?? $"{Identity.ProviderTag ?? Provider.Name}:page";
+        return $"{Identity.ProviderTag ?? Provider.Name}|{q}|{r}|{p}";
+    }
+
+    bool TryGetCurrentQuestion(out AskQuestionState state)
+    {
+        if (_currentQuestionKey != null && _questions.TryGetValue(_currentQuestionKey, out state!))
+            return true;
+
+        if (_questions.Count > 0)
+        {
+            state = _questions.Values.Last();
+            _currentQuestionKey = state.Key;
+            return true;
+        }
+
+        state = null!;
+        return false;
+    }
+
+    void EmitQuestionState(AskQuestionState state)
+    {
+        OnQuestionStateChanged?.Invoke(state);
+    }
+
+    static (string? method, string? keyChord, int? attempt) ParseDispatchResult(string? sendResult)
+    {
+        if (string.IsNullOrWhiteSpace(sendResult))
+            return (null, null, null);
+
+        string? method = null;
+        string? keyChord = null;
+        int? attempt = null;
+        var value = sendResult.Trim();
+
+        if (value.StartsWith("JS_CLICK", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("BTN_CLICK", StringComparison.OrdinalIgnoreCase))
+            method = "button-click";
+        else if (value.StartsWith("UIA_INVOKE", StringComparison.OrdinalIgnoreCase))
+            method = "uia-invoke";
+        else if (value.StartsWith("FORM_SUBMIT", StringComparison.OrdinalIgnoreCase) ||
+                 value.StartsWith("REQUEST_SUBMIT", StringComparison.OrdinalIgnoreCase))
+            method = "form-submit";
+        else if (value.StartsWith("CDP_ENTER", StringComparison.OrdinalIgnoreCase) ||
+                 value.StartsWith("KEY_ENTER", StringComparison.OrdinalIgnoreCase))
+        {
+            method = "key-dispatch";
+            keyChord = "Enter";
+        }
+        else if (value.StartsWith("SENT(", StringComparison.OrdinalIgnoreCase) ||
+                 value.StartsWith("RESPONSE_STARTED(", StringComparison.OrdinalIgnoreCase) ||
+                 value.StartsWith("RESPONSE_IN_PROGRESS(", StringComparison.OrdinalIgnoreCase))
+        {
+            method = "provider-default";
+        }
+        else if (value.StartsWith("FORCED(", StringComparison.OrdinalIgnoreCase))
+            method = "forced-retry";
+
+        var attemptMarker = "attempt=";
+        var idx = value.IndexOf(attemptMarker, StringComparison.OrdinalIgnoreCase);
+        if (idx >= 0)
+        {
+            idx += attemptMarker.Length;
+            var end = idx;
+            while (end < value.Length && char.IsDigit(value[end]))
+                end++;
+            if (end > idx && int.TryParse(value[idx..end], out var parsedAttempt))
+                attempt = parsedAttempt;
+        }
+
+        return (method, keyChord, attempt);
+    }
+
+    // Step 1: Connect
 
     public bool Connect(IntPtr? promptHwnd = null)
     {
         Tab = CdpTabManager.CreateScoped("ask", Provider.Name, Provider.Host, Port, promptHwnd);
         if (Tab == null) { Console.Error.WriteLine($"[ASK] Failed to create tab session for {Provider.Name}"); return false; }
-        Console.WriteLine($"[ASK] Session: {Provider.Name} → {Provider.Host} (tab={Tab.IsScoped})");
+        Console.WriteLine($"[ASK] Session: {Provider.Name} ??{Provider.Host} (tab={Tab.IsScoped})");
         return true;
     }
 
-    // ══ Step 2: Navigate ══
+    // Step 2: Navigate
 
     public async Task<bool> NavigateAsync(bool newSession = false)
     {
@@ -138,7 +393,7 @@ internal sealed class AskSession : IDisposable
         return true;
     }
 
-    // ══ Step 3: Find Editor ══
+    // Step 3: Find Editor
 
     public async Task<string?> FindEditorAsync(int timeoutSec = 15)
     {
@@ -146,7 +401,7 @@ internal sealed class AskSession : IDisposable
         return await Cdp.WaitForEditorAsync(Provider.EditorSelectors, timeoutSec);
     }
 
-    // ══ Step 4: Type ══
+    // Step 4: Type
 
     public async Task<bool> TypeAsync(string editorSelector, string text)
     {
@@ -155,15 +410,18 @@ internal sealed class AskSession : IDisposable
         return await Cdp.InsertContentEditableAsync(editorSelector, text);
     }
 
-    // ══ Step 5: Send ══
+    // Step 5: Send
 
     public async Task<string> SendAsync(string editorSelector)
     {
         if (Cdp == null) return "NO_CDP";
-        return await Cdp.SendPromptAsync(editorSelector);
+        RegisterQuestion(editorSelector);
+        var result = await Cdp.SendPromptAsync(editorSelector);
+        MarkQueued(result);
+        return result;
     }
 
-    // ══ Step 6: Wait for Response ══
+    // Step 6: Wait for Response
 
     public async Task<(bool ok, string text)> WaitForResponseAsync(int timeoutSec = 30)
     {
@@ -172,7 +430,7 @@ internal sealed class AskSession : IDisposable
         return await Cdp.PollStreamingResponseAsync(Provider.Name, baseCount, timeoutSec);
     }
 
-    // ══ Convenience: Full Ask (Type + Send + Wait) ══
+    // Convenience: Full Ask (Type + Send + Wait)
 
     public async Task<(bool ok, string text)> AskAsync(string editorSelector, string question, int timeoutSec = 30)
     {
@@ -199,18 +457,18 @@ internal sealed class AskSession : IDisposable
         return (ok, text);
     }
 
-    // ══ Provider Hooks (set by caller for provider-specific behavior) ══
+    // Provider hooks set by the caller for provider-specific behavior.
 
-    /// <summary>Called before typing question — e.g. persona injection.</summary>
+    /// <summary>Called before typing question ??e.g. persona injection.</summary>
     public Func<AskSession, string, Task>? OnBeforeType { get; set; }
 
-    /// <summary>Called after send — e.g. send verification.</summary>
+    /// <summary>Called after send ??e.g. send verification.</summary>
     public Func<AskSession, Task>? OnAfterSend { get; set; }
 
-    /// <summary>Called when streaming completes — e.g. response post-processing.</summary>
+    /// <summary>Called when streaming completes ??e.g. response post-processing.</summary>
     public Func<AskSession, string, Task<string>>? OnResponseDone { get; set; }
 
-    // ══ Provider-Aware Utilities ══
+    // Provider-aware utilities.
 
     public async Task<bool> IsStreamingAsync()
         => Cdp != null && await Cdp.QueryExistsAsync(Provider.StreamingIndicator);
@@ -228,7 +486,7 @@ internal sealed class AskSession : IDisposable
     public async Task<bool> IsStopVisibleAsync()
     {
         if (Cdp == null) return false;
-        // Check visibility (not just DOM existence) — hidden/disabled buttons should not block
+        // Check visibility (not just DOM existence) ??hidden/disabled buttons should not block
         var js = string.Join(",", Provider.StopSelectors.Select(s => "'" + s.Replace("'", "\\'") + "'"));
         var result = await Cdp.EvalAsync(
             "(()=>{var sels=[" + js + "];" +
@@ -262,3 +520,4 @@ internal sealed class AskSession : IDisposable
 
     public void Dispose() => Tab?.Dispose();
 }
+
