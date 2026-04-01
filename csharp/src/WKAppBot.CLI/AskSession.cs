@@ -259,6 +259,35 @@ internal sealed class AskSession : IDisposable
         EmitQuestionState(state);
     }
 
+    public void MarkTimedOut(string? partialText = null)
+    {
+        if (!TryGetCurrentQuestion(out var state))
+            return;
+        state.Status = "TIMED_OUT";
+        if (!string.IsNullOrEmpty(partialText))
+            state.LastFullText = partialText;
+        state.LastUpdateUtc = DateTime.UtcNow;
+        EmitQuestionState(state);
+    }
+
+    public void MarkRetrying(string? reason = null)
+    {
+        if (!TryGetCurrentQuestion(out var state))
+            return;
+        state.Status = string.IsNullOrWhiteSpace(reason) ? "RETRYING" : $"RETRYING:{reason}";
+        state.LastUpdateUtc = DateTime.UtcNow;
+        EmitQuestionState(state);
+    }
+
+    public void MarkCancelled(string? reason = null)
+    {
+        if (!TryGetCurrentQuestion(out var state))
+            return;
+        state.Status = string.IsNullOrWhiteSpace(reason) ? "CANCELLED" : $"CANCELLED:{reason}";
+        state.LastUpdateUtc = DateTime.UtcNow;
+        EmitQuestionState(state);
+    }
+
     public void TrackChunkEvent(CdpClient.PromptStreamEvent evt)
     {
         var key = BuildQuestionKey(evt.PageKey, evt.QuestionId, evt.RunId);

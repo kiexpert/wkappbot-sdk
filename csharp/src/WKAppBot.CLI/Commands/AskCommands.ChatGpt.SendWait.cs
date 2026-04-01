@@ -237,6 +237,7 @@ internal partial class Program
             if (detectResult.StartsWith("TURN_") || detectResult == "STREAMING" || detectResult == "THINKING")
             {
                 responseStarted = true;
+                askSession?.MarkRunning();
                 Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
                 Console.WriteLine($"[ASK] Response detected: {detectResult}");
                 chatLock.Release("first-byte");
@@ -250,6 +251,7 @@ internal partial class Program
         }
         if (!responseStarted)
         {
+            askSession?.MarkTimedOut();
             Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
             Console.WriteLine("[ASK] No response detected");
             return (false, null);
@@ -505,9 +507,11 @@ internal partial class Program
             // ★★ Final answer ready: focusless restore to show answer to user ★★
             ShowChromeAnswer(cdp);
 
+            askSession?.MarkDone(finalText);
             return (true, finalText);
         }
         Console.WriteLine("[ASK] Timeout -- no response");
+        askSession?.MarkTimedOut();
         return (false, null);
     }
 }
