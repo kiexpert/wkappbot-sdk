@@ -49,8 +49,8 @@ internal partial class Program
         {
             try
             {
-                // ?ï¿½?ï¿½?Phase 1: Navigate (iconified OK ??CDP works without rendering) ?ï¿½?ï¿½?
-                // â”€â”€ P1: Navigate â”€â”€
+                // ?ï¿?ï¿?Phase 1: Navigate (iconified OK ??CDP works without rendering) ?ï¿?ï¿?
+                // ?€?€ P1: Navigate ?€?€
                 PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
@@ -78,7 +78,7 @@ internal partial class Program
                     await Task.Delay(500);
                 }
 
-                // â”€â”€ P2: Find editor via AskSession (uses AiProvider.Gemini selectors) â”€â”€
+                // ?€?€ P2: Find editor via AskSession (uses AiProvider.Gemini selectors) ?€?€
                 PulseStep.Mark("find-editor");
                 var editorSel = await askSession.FindEditorAsync(15);
                 if (editorSel == null)
@@ -95,7 +95,7 @@ internal partial class Program
                     return (false, (string?)null);
                 }
 
-                // ?ï¿½?ï¿½?Persona injection on fresh Gemini conversation ?ï¿½?ï¿½?
+                // ¦¡¦¡ Persona injection on fresh Gemini conversation ¦¡¦¡
                 // If persona continuation already contains a tool call, skip question send entirely
                 string? personaEarlyToolCall = null;
                 var geminiTurnCount = (await cdp.GetResponseCountAsync()).ToString();
@@ -106,7 +106,7 @@ internal partial class Program
                     Console.WriteLine("[ASK] Loop marker found; MCP guidance will be included for fresh session persona.");
                 if (geminiTurnCount == "0" || (effectiveLoopPersona && !hasLoopPersonaState))
                 {
-                    // ?ï¿½?ï¿½?Browser exclusive: persona input ??send complete ?ï¿½?ï¿½?
+                    // ¦¡¦¡ Browser exclusive: persona input ¡æ send complete ¦¡¦¡
                     using var personaLock = ChromeTabLock.Acquire("Gemini/persona");
                     if (personaLock == null) return (false, (string?)null);
 
@@ -116,7 +116,7 @@ internal partial class Program
                     await cdp.ClearEditorAsync(editorSel);
                     var personaText = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (!_suppressLoopPersona.Value && Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
-                        SlackPostToThread($"ðŸ“‹ *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "..." : personaText)}\n```", "System");
+                        SlackPostToThread($"?“‹ *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "..." : personaText)}\n```", "System");
                     await cdp.InsertContentEditableAsync(editorSel, personaText);
                     await Task.Delay(300);
 
@@ -181,7 +181,7 @@ internal partial class Program
                             if (loopMode && effectiveLoopPersona && stablePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                                 && ParseAllLoopToolCalls(stablePersonaResp).Count > 0)
                             {
-                                Console.WriteLine($"[ASK] Persona continuation has tool call ({stablePersonaResp.Length} chars) â€” skipping question send");
+                                Console.WriteLine($"[ASK] Persona continuation has tool call ({stablePersonaResp.Length} chars) ??skipping question send");
                                 personaEarlyToolCall = stablePersonaResp;
                             }
                         }
@@ -231,7 +231,7 @@ internal partial class Program
                         Console.WriteLine("[ASK] Non-loop ask: ignoring stale APSP tool call from previous session, proceeding with question");
                     }
                 }
-                // ?ï¿½?ï¿½?Browser exclusive: question input ??send complete ?ï¿½?ï¿½?
+                // ¦¡¦¡ Browser exclusive: question input ¡æ send complete ¦¡¦¡
                 // Prepend host handshake proof for loop sessions so Gemini trusts the host is live
                 if (effectiveLoopPersona)
                     question = BuildHostHandshake() + question;
@@ -240,14 +240,14 @@ internal partial class Program
                 using var questionLock = ChromeTabLock.Acquire("Gemini");
                 if (questionLock == null) return (false, (string?)null);
 
-                // ?ï¿½?ï¿½?CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ?ï¿½?ï¿½?
+                // ¦¡¦¡ CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ¦¡¦¡
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Gemini");
 
-                // ?ï¿½?ï¿½?File attachments (before text) ?ï¿½?ï¿½?
+                // ¦¡¦¡ File attachments (before text) ¦¡¦¡
                 // Pass prevFgGemini so native file dialog tier can restore original user focus after close
                 if (attachFiles?.Count > 0)
                 {
-                    await AttachFilesViaCdp(cdp, attachFiles, editorSel, prevFgGemini);
+                    await AttachFilesViaCdp(cdp, attachFiles, editorSel, prevFgGemini, AskAttachmentPump, "gemini");
                     PulseStep.Mark("files-attached");
                 }
 
@@ -268,7 +268,7 @@ internal partial class Program
                     }
 
                 }
-                // ?ï¿½?ï¿½?Focus theft detection: restore if Chrome stole focus ?ï¿½?ï¿½?
+                // ¦¡¦¡ Focus theft detection: restore if Chrome stole focus ¦¡¦¡
                 GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
 
                 // Send: a11y-first (CDP real click on button) ??focusless Enter fallback
@@ -290,7 +290,7 @@ internal partial class Program
                             if (lateResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                                 && ParseAllLoopToolCalls(lateResp).Count > 0)
                             {
-                                Console.WriteLine("[ASK] Late persona tool call captured â€” skipping question send");
+                                Console.WriteLine("[ASK] Late persona tool call captured ??skipping question send");
                                 zoom?.ShowPass("tool call");
                                 zoom?.Dispose();
                                 questionLock.Release("late-toolcall");
@@ -306,7 +306,7 @@ internal partial class Program
 
                 for (int sendAttempt = 0; sendAttempt < 5; sendAttempt++)
                 {
-                    // Fast-fail if Gemini is still generating â€” do NOT click stop (poisons response)
+                    // Fast-fail if Gemini is still generating ??do NOT click stop (poisons response)
                     var stopAtSend = await cdp.GetStopButtonDetailAsync();
                     if (stopAtSend != "NONE")
                     {
@@ -360,7 +360,7 @@ internal partial class Program
                         await Task.Delay(200);
                     }
 
-                    // JS click() â€” works even when Chrome is minimized (no viewport needed)
+                    // JS click() ??works even when Chrome is minimized (no viewport needed)
                     var sendBtnExists = await cdp.QueryExistsAsync("button[aria-label=\"Send message\"], button[aria-label*=\"Send\"], button.send-button");
                     if (sendBtnExists)
                         await cdp.JsClickAsync("button[aria-label=\"Send message\"], button[aria-label*=\"Send\"], button.send-button");
@@ -410,7 +410,7 @@ internal partial class Program
                 int baseResponseCount = int.TryParse(preResponseCount, out var brc) ? brc : 0;
                 Console.WriteLine($"[POLL-WAIT] start (base={baseResponseCount}, timeout={timeoutSec}s)...");
 
-                // â”€â”€ P5 A/B: run new PollStreamingResponseAsync alongside legacy poll â”€â”€
+                // ?€?€ P5 A/B: run new PollStreamingResponseAsync alongside legacy poll ?€?€
                 var abPollTask = Task.Run(async () =>
                 {
                     try { return await cdp.PollStreamingResponseAsync("gemini", baseResponseCount, timeoutSec); }
@@ -570,10 +570,10 @@ internal partial class Program
                     }
                 }
 
-                // Done â€” hand off tab to peer if still waiting
+                // Done ??hand off tab to peer if still waiting
                 await HandoffTabToPeer("gemini");
 
-                // â”€â”€ P5 A/B comparison: log difference between legacy and new poll â”€â”€
+                // ¦¡¦¡ P5 A/B comparison: log difference between legacy and new poll ¦¡¦¡
                 if (abPollTask.IsCompleted)
                 {
                     var (abOk, abText) = await abPollTask;
@@ -648,7 +648,7 @@ internal partial class Program
         {
             EnsureSlackThread("Gemini", question);
             var forSlack = answer; // already stripped of "Geminiï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½" prefix by StripGeminiUiPrefix at source
-            // Strip stop notice suffix (e.g. "ï¿½ï¿½ï¿½ï¿½ï¿½?ï¿½ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½Ï´ï¿½") before posting to Slack
+            // Strip stop notice suffix (e.g. "ï¿½ï¿½ï¿½ï¿½ï¿?ï¿½ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½Ï´ï¿½") before posting to Slack
             foreach (var kw in GeminiStopNoticeKeywords)
             {
                 var ki = forSlack.IndexOf(kw, StringComparison.OrdinalIgnoreCase);
@@ -699,7 +699,7 @@ internal partial class Program
         // Write ask result to .wkappbot/ask/ MD file
         if (ok && !string.IsNullOrEmpty(answer) && triadCtx == null)
             WriteAskMd("gemini", question, answer);
-        // Preserve Chrome's original state â€” don't force minimize
+        // Preserve Chrome's original state ??don't force minimize
         cdp.Dispose();
         return ok ? 0 : 1;
     }

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -12,7 +12,7 @@ namespace WKAppBot.CLI;
 /// Dual-storage: in-memory (fast) + JSONL files (crash-safe).
 /// Files layout: {DataDir}/triad/{sessionId}/{ai}.jsonl
 ///   Each line: {"ts":"...","ai":"Gemini","msg":"..."}
-/// On recovery, BuildRecoveryContext merges in-memory + file logs — survives process restart.
+/// On recovery, BuildRecoveryContext merges in-memory + file logs ??survives process restart.
 /// </summary>
 internal sealed class TriadSharedContext
 {
@@ -27,7 +27,7 @@ internal sealed class TriadSharedContext
     private readonly ConcurrentDictionary<string, object> _fileLocks =
         new(StringComparer.OrdinalIgnoreCase);
 
-    // ── Real-time cross-prompting: streaming chunks shared between AIs ──
+    // ?? Real-time cross-prompting: streaming chunks shared between AIs ??
     // When AI-A produces a chunk, other AIs get it as context.
     private readonly ConcurrentDictionary<string, string> _latestChunks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, int> _chunkVersions = new(StringComparer.OrdinalIgnoreCase);
@@ -35,6 +35,7 @@ internal sealed class TriadSharedContext
     // Per-AI cross-prompt injection queue: chunks from peers waiting to be injected
     private readonly ConcurrentDictionary<string, ConcurrentQueue<(string fromAi, string text)>> _crossPromptQueues =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly CdpPromptPump _crossPromptPump = new("triad-cross");
 
     // Per-AI CdpClient reference for direct injection
     internal readonly ConcurrentDictionary<string, WKAppBot.WebBot.CdpClient> _cdpClients =
@@ -46,10 +47,10 @@ internal sealed class TriadSharedContext
     /// <summary>When true, moderator intervenes (STANCE check, format enforcement). Off during R0.</summary>
     public bool ModeratorEnabled { get; set; } = false;
 
-    /// <summary>The original user question — used by moderator redirect when debaters go off-topic.</summary>
+    /// <summary>The original user question ??used by moderator redirect when debaters go off-topic.</summary>
     public string OriginalQuestion => _question;
 
-    // ── Live MD minutes: real-time debate transcript (APPEND mode) ──
+    // ?? Live MD minutes: real-time debate transcript (APPEND mode) ??
     private string? _mdPath;
     private readonly object _mdLock = new();
     private bool _mdHeaderWritten;
@@ -59,7 +60,7 @@ internal sealed class TriadSharedContext
     public void InitLiveMinutes(string question, string? mdPath = null)
     {
         _mdQuestion = question;
-        // Default path: triad session dir / 삼두 정반합 회의록 - {short question}.md
+        // Default path: triad session dir / ?쇰몢 ?뺣컲???뚯쓽濡?- {short question}.md
         if (mdPath == null)
         {
             var shortQ = question.Length > 40 ? question[..40].Trim() + "..." : question;
@@ -117,12 +118,12 @@ internal sealed class TriadSharedContext
     {
         if (string.IsNullOrWhiteSpace(newText)) return;
         var emojiMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            { ["gpt"] = "🤖", ["gemini"] = "💎", ["claude"] = "🧠" };
-        var emoji = emojiMap.GetValueOrDefault(ai, "🔮");
+            { ["gpt"] = "?쨼", ["gemini"] = "?뭿", ["claude"] = "?쭬" };
+        var emoji = emojiMap.GetValueOrDefault(ai, "?뵰");
         AppendMd($"\n### {emoji} {ai.ToUpperInvariant()} ({DateTime.Now:HH:mm})\n\n{newText.Trim()}\n");
     }
 
-    // ── EEP: Evidence Escalation Protocol — track claims per AI per round ──
+    // ?? EEP: Evidence Escalation Protocol ??track claims per AI per round ??
     internal readonly ConcurrentDictionary<string, List<string>> _priorClaims = new(StringComparer.OrdinalIgnoreCase);
     internal readonly ConcurrentDictionary<string, int> _restatementCount = new(StringComparer.OrdinalIgnoreCase);
 
@@ -148,7 +149,7 @@ internal sealed class TriadSharedContext
     public int IncrementRestatement(string ai)
         => _restatementCount.AddOrUpdate(ai, 1, (_, v) => v + 1);
 
-    // ── Tool Discovery Sharing (큐 기반 — 경합 방지) ──
+    // ?? Tool Discovery Sharing (??湲곕컲 ??寃쏀빀 諛⑹?) ??
     private readonly ConcurrentDictionary<string, ConcurrentQueue<string>> _toolDiscoveryQueues =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -192,8 +193,8 @@ internal sealed class TriadSharedContext
         {
             try
             {
-                await cdp.InsertContentEditableAsync(editorSel, message);
-                Console.WriteLine($"[MOD:DM] → {targetAi}: {message[..Math.Min(60, message.Length)]}");
+                await cdp.AppendContentEditableAsync(editorSel, message, "\n\n");
+                Console.WriteLine($"[MOD:DM] ??{targetAi}: {message[..Math.Min(60, message.Length)]}");
             }
             catch { }
         });
@@ -211,7 +212,7 @@ internal sealed class TriadSharedContext
         if (mdDelta.Length > 30)
             AppendMdAiResponse(ai, mdDelta);
 
-        // First meaningful chunk → assign emoji (speed-based: first responder = 🦊)
+        // First meaningful chunk ??assign emoji (speed-based: first responder = ?쫲)
         if (prev.Length == 0 && chunk.Length > 20)
             Program.AssignEmojiOnFinish(ai);
 
@@ -222,11 +223,11 @@ internal sealed class TriadSharedContext
             if (stance != null)
             {
                 // Post STANCE to Slack
-                Program.SlackPostToThread($"📊 *[{Program.AiDisplayName(ai)} STANCE]* {stance} (sum={stance.Sum})", Program.AiDisplayName(ai));
+                Program.SlackPostToThread($"?뱤 *[{Program.AiDisplayName(ai)} STANCE]* {stance} (sum={stance.Sum})", Program.AiDisplayName(ai));
             }
             if (stance == null)
             {
-                // Moderator: queue STANCE demand — will be sent AFTER response completes
+                // Moderator: queue STANCE demand ??will be sent AFTER response completes
                 _ = Task.Run(async () =>
                 {
                     try
@@ -255,12 +256,12 @@ internal sealed class TriadSharedContext
                                 }
                                 await Task.Delay(1000); // settle
 
-                                var demand = "[MODERATOR DM] Your response was REJECTED — missing mandatory [STANCE]. Reply with ONLY this format:\n[STANCE N=? R=? C=? E=? D=?] (sum must equal 9)\nExample: [STANCE N=2 R=3 C=1 E=2 D=1]\nThen restate your key claim in one sentence.";
-                                await selfCdp.InsertContentEditableAsync(editorSel, demand);
+                                var demand = "[MODERATOR DM] Your response was REJECTED ??missing mandatory [STANCE]. Reply with ONLY this format:\n[STANCE N=? R=? C=? E=? D=?] (sum must equal 9)\nExample: [STANCE N=2 R=3 C=1 E=2 D=1]\nThen restate your key claim in one sentence.";
+                                await selfCdp.AppendContentEditableAsync(editorSel, demand, "\n\n");
                                 await Task.Delay(500);
                                 await selfCdp.SendPromptAsync(editorSel); // auto-send!
-                                Console.WriteLine($"[MOD] {ai}: STANCE missing → reject + re-request SENT");
-                                Program.SlackPostToThread($"⚠️ *[MOD→{ai}]* STANCE missing! Response rejected, re-requested.", "🦉 Moderator");
+                                Console.WriteLine($"[MOD] {ai}: STANCE missing ??reject + re-request SENT");
+                                Program.SlackPostToThread($"[MOD {ai}] STANCE missing. Response rejected and re-requested.", "Moderator");
                             }
                         }
                     }
@@ -278,7 +279,7 @@ internal sealed class TriadSharedContext
 
         // Post chunk to Slack immediately
         var slackSnippet = newText.Length > 200 ? newText[..200] + "..." : newText;
-        Program.SlackPostToThread($"💬 *[{Program.AiDisplayName(ai)}]*: {slackSnippet}", Program.AiDisplayName(ai));
+        Program.SlackPostToThread($"?뮠 *[{Program.AiDisplayName(ai)}]*: {slackSnippet}", Program.AiDisplayName(ai));
 
         // Inject cross-prompt into other AIs' editors immediately (editor is free during streaming)
         var snippet = newText.Length > 300 ? newText[..300] + "..." : newText;
@@ -306,13 +307,13 @@ internal sealed class TriadSharedContext
                     if (editorSel == null) return;
 
                     var crossText = $"[{ai} says]: {snippet}\nYour brief reaction? (ENGLISH ONLY)";
-                    await peerCdp.InsertContentEditableAsync(editorSel, crossText);
-                    Console.WriteLine($"[CROSS] {ai}→{peerAi}: pre-typed ({snippet.Length} chars)");
+                    var queued = await _crossPromptPump.AppendAndQueueAsync(peerAi, peerCdp, editorSel, crossText, "\n\n");
+                    Console.WriteLine($"[CROSS] {ai}->{peerAi}: {(queued ? "armed" : "append-failed")} ({snippet.Length} chars)");
 
                     // Post delivery result to Slack
-                    Program.SlackPostToThread($"🔀 *[{Program.AiDisplayName(ai)}→{peerAi} ✅]*", Program.AiDisplayName(ai));
+                    Program.SlackPostToThread($"[CROSS {Program.AiDisplayName(ai)}->{peerAi}] {(queued ? "armed" : "append failed")}", Program.AiDisplayName(ai));
                 }
-                catch { /* editor may not be ready — non-fatal */ }
+                catch { /* editor may not be ready ??non-fatal */ }
             });
         }
     }
@@ -374,7 +375,7 @@ internal sealed class TriadSharedContext
     /// </summary>
     public void LogStep(string ai, string summary)
     {
-        var snippet = summary.Length > 600 ? summary[..600] + "…" : summary;
+        var snippet = summary.Length > 600 ? summary[..600] + "..." : summary;
 
         // In-memory
         var steps = _stepLogs.GetOrAdd(ai, _ => new List<string>());
@@ -404,7 +405,7 @@ internal sealed class TriadSharedContext
 
     /// <summary>
     /// Build a recovery context string for the failing AI.
-    /// Merges in-memory logs + file logs (file wins if in-memory is empty — e.g. after restart).
+    /// Merges in-memory logs + file logs (file wins if in-memory is empty ??e.g. after restart).
     /// </summary>
     public string BuildRecoveryContext(string failedAi)
     {
@@ -425,12 +426,12 @@ internal sealed class TriadSharedContext
             anyContext = true;
             sb.AppendLine($"[{ai}] ({entries.Count} entries):");
             foreach (var s in entries.TakeLast(4))
-                sb.AppendLine($"  • {s}");
+                sb.AppendLine($"  ??{s}");
             sb.AppendLine();
         }
 
         if (!anyContext)
-            sb.AppendLine("(No context collected yet from other AIs — starting fresh.)");
+            sb.AppendLine("(No context collected yet from other AIs ??starting fresh.)");
 
         sb.AppendLine($"You ({failedAi}) encountered a failure. Resume the original task using the above context.");
         sb.AppendLine("=== END RECOVERY CONTEXT ===");
@@ -499,7 +500,7 @@ internal partial class Program
                 triadMode: true, modelHint, noWait, targetTagOverride: null,
                 linePrefix: null, triadCtx: ctx),
             "claude" => AskClaude(question, true, timeoutSec, newTab: false,
-                newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
+                attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
                 triadMode: true, modelHint, noWait, targetTagOverride: null,
                 linePrefix: null, triadCtx: ctx),
             _ => 1
@@ -508,10 +509,10 @@ internal partial class Program
         if (result != 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[TRIAD:{ai}] ⚠ Failed — attempting recovery with shared context");
+            Console.WriteLine($"[TRIAD:{ai}] ??Failed ??attempting recovery with shared context");
             Console.ResetColor();
 
-            SlackPostToThread($"🔄 *[복구]* `{AiDisplayName(ai)}` 실패 감지 — 컨텍스트 재주입 후 재시작 중...", AiDisplayName(ai));
+            SlackPostToThread($"?봽 *[蹂듦뎄]* `{AiDisplayName(ai)}` ?ㅽ뙣 媛먯? ??而⑦뀓?ㅽ듃 ?ъ＜?????ъ떆??以?..", AiDisplayName(ai));
 
             var recoveryCtx = ctx.BuildRecoveryContext(ai);
             var recoveryQuestion = recoveryCtx + "\n\nResume task:\n" + question;
@@ -530,7 +531,7 @@ internal partial class Program
                     triadMode: true, modelHint, noWait, targetTagOverride: null,
                     linePrefix: null, triadCtx: ctx),
                 "claude" => AskClaude(recoveryQuestion, true, timeoutSec, newTab: false,
-                    newSession: true, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
+                    attachFiles, newSession: true, loopMode, loopMaxSteps, loopRetry, loopMaxParallel,
                     triadMode: true, modelHint, noWait, targetTagOverride: null,
                     linePrefix: null, triadCtx: ctx),
                 _ => 1
@@ -538,8 +539,8 @@ internal partial class Program
 
             {
                 var status = result == 0
-                    ? $"✅ *[복구 성공]* `{AiDisplayName(ai)}` 응답 완료"
-                    : $"❌ *[복구 실패]* `{AiDisplayName(ai)}` — 두 번째 시도도 실패";
+                    ? $"??*[蹂듦뎄 ?깃났]* `{AiDisplayName(ai)}` ?묐떟 ?꾨즺"
+                    : $"??*[蹂듦뎄 ?ㅽ뙣]* `{AiDisplayName(ai)}` ????踰덉㎏ ?쒕룄???ㅽ뙣";
                 SlackPostToThread(status, AiDisplayName(ai));
             }
         }

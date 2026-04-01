@@ -56,6 +56,119 @@ public sealed partial class CdpClient
         return len > 0;
     }
 
+    /// <summary>
+    /// Append text to an editor without wiping prior content.
+    /// Supports textarea/input as well as contenteditable editors.
+    /// </summary>
+    public async Task<bool> AppendContentEditableAsync(string selector, string text, string separator = "\n")
+    {
+        var jsText = JsonSerializer.Serialize(text);
+        var jsSep = JsonSerializer.Serialize(separator);
+        var esc = Esc(selector);
+
+        var result = await EvalAsync(
+            "(()=>{var el=document.querySelector('" + esc + "');if(!el)return 'NOT_FOUND';" +
+            "var t=" + jsText + ";var sep=" + jsSep + ";" +
+            "var isInput=(el.tagName==='TEXTAREA'||el.tagName==='INPUT');" +
+            "var cur=isInput?(el.value||''):((el.innerText||el.textContent||''));" +
+            "var suffix=(cur&&cur.length>0)?(sep+t):t;" +
+            "if(isInput){" +
+                "el.value=(el.value||'')+suffix;" +
+                "el.dispatchEvent(new Event('input',{bubbles:true}));" +
+                "el.dispatchEvent(new Event('change',{bubbles:true}));" +
+                "return el.value.length>0?'OK':'EMPTY';" +
+            "}" +
+            "var p=el.querySelector('p:last-child');" +
+            "if(p){p.textContent=(p.textContent||'')+suffix;}" +
+            "else if(el.isContentEditable||el.getAttribute('contenteditable')==='true'){el.textContent=(el.textContent||'')+suffix;}" +
+            "else return 'UNSUPPORTED';" +
+            "el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:suffix}));" +
+            "el.dispatchEvent(new Event('change',{bubbles:true}));" +
+            "return (el.innerText||el.textContent||'').length>0?'OK':'EMPTY';})()");
+        if (result == "OK") return true;
+
+        // Fallback: read existing text then rewrite as combined content.
+        var existing = await GetEditorContentAsync(selector);
+        var combined = string.IsNullOrWhiteSpace(existing) ? text : existing + separator + text;
+        return await InsertContentEditableAsync(selector, combined);
+    }
+
+    /// <summary>
+    /// Arm a page-local singleton prompt pump.
+    /// The page keeps one timer per editor selector and tries to send after idleMs of silence.
+    /// </summary>
+    public async Task<bool> ArmPromptPumpAsync(string selector, int idleMs = 1000)
+    {
+        var esc = Esc(selector);
+        var jsIdleMs = JsonSerializer.Serialize(idleMs);
+        var result = await EvalAsync(
+            "(()=>{" +
+            "var sel='" + esc + "';" +
+            "var idleMs=" + jsIdleMs + ";" +
+            "var root=(window.__wkAskPump||(window.__wkAskPump={}));" +
+            "if(!root.states)root.states={};" +
+            "if(!root.trySend)root.trySend=function(selector){" +
+                "var st=root.states[selector];if(st&&st.locked)return 'LOCKED';" +
+                "var el=document.querySelector(selector);if(!el)return 'NO_EDITOR';" +
+                "var txt=((el.value||el.innerText||el.textContent||'')).trim();if(!txt)return 'EMPTY';" +
+                "try{el.focus();}catch(_e){}" +
+                "var form=el.closest('form');if(form&&typeof form.requestSubmit==='function'){" +
+                    "try{form.requestSubmit();return 'FORM_SUBMIT';}catch(_e){}" +
+                "}" +
+                "var send=document.querySelector(\"button[data-testid='send-button'],button[aria-label*='Send'],button[aria-label*='send'],button[aria-label*='보내기'],button.send-button,button[type='submit']\");" +
+                "if(send&&!send.disabled&&send.getAttribute('aria-disabled')!=='true'){" +
+                    "try{send.click();return 'BTN_CLICK';}catch(_e){}" +
+                "}" +
+                "try{" +
+                    "var kd=new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true});" +
+                    "var ku=new KeyboardEvent('keyup',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true});" +
+                    "el.dispatchEvent(kd);el.dispatchEvent(ku);return 'KEY_ENTER';" +
+                "}catch(_e){}" +
+                "return 'NO_SEND_PATH';" +
+            "};" +
+            "var st=root.states[sel]||(root.states[sel]={gen:0,timer:0,lastResult:'',locked:false});" +
+            "st.gen=(st.gen||0)+1;" +
+            "if(st.timer)try{clearTimeout(st.timer);}catch(_e){}" +
+            "var myGen=st.gen;" +
+            "st.timer=setTimeout(function(){" +
+                "var cur=root.states[sel];if(!cur||cur.gen!==myGen)return;" +
+                "if(cur.locked)return;" +
+                "cur.lastResult=root.trySend(sel);" +
+            "}, idleMs);" +
+            "return 'ARMED';" +
+            "})()");
+        return result == "ARMED";
+    }
+
+    public async Task<bool> SetPromptPumpLockAsync(string selector, bool locked)
+    {
+        var esc = Esc(selector);
+        var jsLocked = JsonSerializer.Serialize(locked);
+        var result = await EvalAsync(
+            "(()=>{" +
+            "var sel='" + esc + "';" +
+            "var locked=" + jsLocked + ";" +
+            "var root=(window.__wkAskPump||(window.__wkAskPump={}));" +
+            "if(!root.states)root.states={};" +
+            "var st=root.states[sel]||(root.states[sel]={gen:0,timer:0,lastResult:'',locked:false});" +
+            "st.locked=locked;" +
+            "if(locked&&st.timer)try{clearTimeout(st.timer);}catch(_e){}" +
+            "return 'OK';" +
+            "})()");
+        return result == "OK";
+    }
+
+    public async Task<string> FlushPromptPumpNowAsync(string selector)
+    {
+        var esc = Esc(selector);
+        return await EvalAsync(
+            "(()=>{" +
+            "var sel='" + esc + "';" +
+            "var root=window.__wkAskPump;if(!root||!root.trySend)return 'NO_PUMP';" +
+            "return root.trySend(sel);" +
+            "})()") ?? "NO_PUMP";
+    }
+
     /// <summary>Clear a contenteditable editor (selectAll + delete).</summary>
     public async Task ClearEditorAsync(string selector)
     {

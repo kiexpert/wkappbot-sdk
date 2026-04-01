@@ -60,7 +60,7 @@ internal partial class Program
 
         // ★★ File attachments (before text) ★★
         if (attachFiles?.Count > 0)
-            await AttachFilesViaCdp(cdp, attachFiles, editorSel);
+            await AttachFilesViaCdp(cdp, attachFiles, editorSel, promptPump: AskAttachmentPump, pumpScope: "gpt");
 
         // Tier 1: focusless insert (a11y-first)
         await ClearContentEditable(cdp, editorSel);
