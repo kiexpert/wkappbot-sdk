@@ -639,6 +639,13 @@ public static partial class NativeMethods
     [DllImport("kernel32.dll")]
     public static extern bool CloseHandle(IntPtr hObject);
 
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool QueryFullProcessImageNameW(
+        IntPtr hProcess,
+        uint dwFlags,
+        StringBuilder lpExeName,
+        ref uint lpdwSize);
+
     private const uint TOKEN_QUERY = 0x0008;
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
     private const int TokenElevation = 20;
@@ -676,6 +683,32 @@ public static partial class NativeMethods
         using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
         var principal = new System.Security.Principal.WindowsPrincipal(identity);
         return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+    }
+
+    /// <summary>
+    /// Fast best-effort process name via QueryFullProcessImageNameW.
+    /// Returns executable file name without extension, or null on failure.
+    /// Avoids slower Process.GetProcessById(...).ProcessName paths that may be hooked/stalled.
+    /// </summary>
+    public static string? TryGetProcessNameFast(uint processId)
+    {
+        var hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+        if (hProcess == IntPtr.Zero) return null;
+        try
+        {
+            uint size = 1024;
+            var sb = new StringBuilder((int)size);
+            if (!QueryFullProcessImageNameW(hProcess, 0, sb, ref size))
+                return null;
+
+            var path = sb.ToString();
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            var file = Path.GetFileName(path);
+            if (string.IsNullOrWhiteSpace(file)) return null;
+            return Path.GetFileNameWithoutExtension(file);
+        }
+        catch { return null; }
+        finally { CloseHandle(hProcess); }
     }
 
     // ── UIPI integrity level ───────────────────────────────────

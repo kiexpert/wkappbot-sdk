@@ -50,7 +50,7 @@ public static class WindowFinder
     ///             "영웅문" → finds [_NKHeroMainClass] 영웅문4
     ///             "hwnd:0054188E" → direct handle lookup
     /// </summary>
-    public static List<WindowInfo> FindByTitle(string titlePattern)
+    public static List<WindowInfo> FindByTitle(string titlePattern, bool stopOnFirstMatch = false)
     {
         // ── Cache check: return cached if all hwnds still alive and within TTL ──
         if (_grapCache.TryGetValue(titlePattern, out var cached)
@@ -73,7 +73,7 @@ public static class WindowFinder
             var mfFields = ParseMultiFieldPattern(titlePattern);
             if (mfFields != null)
             {
-                var mfResults = FindByMultiField(mfFields);
+                var mfResults = FindByMultiField(mfFields, stopOnFirstMatch);
                 _grapCache[titlePattern] = (mfResults.Select(r => r.Handle).ToList(), DateTime.UtcNow);
                 return mfResults;
             }
@@ -118,8 +118,7 @@ public static class WindowFinder
             NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
             if (!procNameCache.TryGetValue(pid, out var procName))
             {
-                try { procName = Process.GetProcessById((int)pid).ProcessName; }
-                catch { procName = $"pid={pid}"; }
+                procName = NativeMethods.TryGetProcessNameFast(pid) ?? $"pid={pid}";
                 procNameCache[pid] = procName;
             }
 
@@ -149,6 +148,7 @@ public static class WindowFinder
                 var patLen = titlePattern.Replace("*", "").Replace("?", "").Length;
                 info.Coverage = patLen > 0 && title.Length > 0 ? (double)patLen / title.Length : 0;
                 results.Add(info);
+                if (stopOnFirstMatch) return false;
             }
 
             return true;
@@ -807,6 +807,7 @@ public static class WindowFinder
     }
 
     // ── Browser URL fetch — 4-tier fallback, any browser ──
+    // Tier 0: Fast give-up for non-browser windows
     // Tier 1: CDP HTTP /json          — Chromium + --remote-debugging-port (all tabs)
     // Tier 2: UIA known address bar IDs — omnibox_view (Chrome/Edge/Brave), urlbar-input (Firefox)
     // Tier 3: UIA ControlType.Edit in ToolBar + URL heuristic — standard UIA, any compliant browser
@@ -816,17 +817,38 @@ public static class WindowFinder
     {
         var now = DateTime.UtcNow;
 
+        if (hWnd != IntPtr.Zero && _uiaOmniboxCache.TryGetValue(hWnd, out var uiaEntry) && now - uiaEntry.cachedAt < _urlCacheTtl)
+            return uiaEntry.url;
+
+        var cls = hWnd != IntPtr.Zero ? GetClassName(hWnd) : "";
+        var proc = GetProcessNameCached(pid);
+        bool browserLike = IsLikelyBrowserWindow(hWnd, cls, proc);
+
+        if (!browserLike)
+        {
+            if (hWnd != IntPtr.Zero)
+                _uiaOmniboxCache[hWnd] = ("", now);
+            return "";
+        }
+
         // Tier 1: CDP HTTP — Chromium only, requires --remote-debugging-port
         if (!_cdpPidUrlCache.TryGetValue(pid, out var cdpEntry) || now - cdpEntry.cachedAt >= _urlCacheTtl)
         {
             string cdpUrls = "";
             try
             {
-                var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
-                var m = Regex.Match(cmdLine, @"--remote-debugging-port=(\d+)");
-                if (m.Success && int.TryParse(m.Groups[1].Value, out int port))
+                int port = NativeMethods.GetPropW(hWnd, "wkappbot.cdp").ToInt32();
+                if (port <= 0 && IsChromiumProcess(proc))
                 {
-                    using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(300) };
+                    var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+                    var m = Regex.Match(cmdLine, @"--remote-debugging-port=(\d+)");
+                    if (m.Success)
+                        int.TryParse(m.Groups[1].Value, out port);
+                }
+
+                if (port > 0)
+                {
+                    using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(200) };
                     var json = http.GetStringAsync($"http://localhost:{port}/json").GetAwaiter().GetResult();
                     var urlMatches = Regex.Matches(json, "\"url\":\\s*\"([^\"]+)\"");
                     cdpUrls = string.Join(" ", urlMatches.Select(u => u.Groups[1].Value));
@@ -836,11 +858,14 @@ public static class WindowFinder
             _cdpPidUrlCache[pid] = (cdpUrls, now);
             cdpEntry = (cdpUrls, now);
         }
-        if (!string.IsNullOrEmpty(cdpEntry.urls)) return cdpEntry.urls;
+        if (!string.IsNullOrEmpty(cdpEntry.urls))
+        {
+            if (hWnd != IntPtr.Zero)
+                _uiaOmniboxCache[hWnd] = (cdpEntry.urls, now);
+            return cdpEntry.urls;
+        }
 
         if (hWnd == IntPtr.Zero) return "";
-        if (_uiaOmniboxCache.TryGetValue(hWnd, out var uiaEntry) && now - uiaEntry.cachedAt < _urlCacheTtl)
-            return uiaEntry.url;
 
         string url = "";
         if (!_lazyUiaFailed)
@@ -889,19 +914,65 @@ public static class WindowFinder
         return url;
     }
 
+    static bool IsLikelyBrowserWindow(IntPtr hWnd, string cls, string proc)
+    {
+        if (hWnd != IntPtr.Zero)
+        {
+            if (NativeMethods.GetPropW(hWnd, "wkappbot.webbot") != IntPtr.Zero) return true;
+            if (NativeMethods.GetPropW(hWnd, "wkappbot.cdp") != IntPtr.Zero) return true;
+        }
+
+        if (string.IsNullOrEmpty(cls) && string.IsNullOrEmpty(proc)) return false;
+        if (cls.Equals("Chrome_WidgetWin_1", StringComparison.OrdinalIgnoreCase)) return true;
+        if (cls.Equals("Chrome_WidgetWin_0", StringComparison.OrdinalIgnoreCase)) return true;
+        if (cls.Equals("MozillaWindowClass", StringComparison.OrdinalIgnoreCase)) return true;
+        if (cls.Equals("ApplicationFrameWindow", StringComparison.OrdinalIgnoreCase) && proc.Contains("msedge", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    static bool IsChromiumProcess(string proc)
+    {
+        if (string.IsNullOrEmpty(proc)) return false;
+        return proc.Contains("chrome", StringComparison.OrdinalIgnoreCase)
+            || proc.Contains("msedge", StringComparison.OrdinalIgnoreCase)
+            || proc.Contains("brave", StringComparison.OrdinalIgnoreCase)
+            || proc.Contains("vivaldi", StringComparison.OrdinalIgnoreCase)
+            || proc.Contains("opera", StringComparison.OrdinalIgnoreCase);
+    }
+
+    static string GetProcessNameCached(uint pid)
+    {
+        if (pid == 0) return "";
+        return NativeMethods.TryGetProcessNameFast(pid) ?? "";
+    }
+
+    static string GetPrimaryUrlToken(string urls)
+    {
+        if (string.IsNullOrWhiteSpace(urls)) return "";
+        foreach (var token in urls.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            if (token.Contains("://", StringComparison.OrdinalIgnoreCase) || token.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+                return token;
+        return urls;
+    }
+
     // ══════════════════════════════════════════════════════════════════════════════
     // JSON5 target pattern builder — usable as grap in any command
     // ══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Build a JSON5 target pattern string for <paramref name="hWnd"/>.
-    /// Format: {hwnd:0xXXXXXXXX,pid:NNN,title:'...',domain:'...'}
-    /// domain is omitted if the window is not a browser or URL is unavailable.
+    /// Format: {hwnd:0xXXXXXXXX,pid:NNN,title:'...',cls:'...',proc:'...',cid:NNN,domain:'...',url:'...'}
+    /// domain/url are omitted if the window is not a browser or URL is unavailable.
     /// The returned string can be used as a grap pattern in any command.
     /// </summary>
     public static string BuildTargetJson5(IntPtr hWnd, string? overrideTitle = null)
     {
         NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+        var cls = GetClassName(hWnd);
+        var proc = "";
+        int cid = 0;
+        proc = NativeMethods.TryGetProcessNameFast(pid) ?? "";
+        try { cid = NativeMethods.GetDlgCtrlID(hWnd); } catch { }
 
         var title = overrideTitle ?? GetWindowText(hWnd);
         // Trim " - Chrome / Chromium / Microsoft Edge" suffix
@@ -909,32 +980,40 @@ public static class WindowFinder
                             StringSplitOptions.None)[0].Trim();
         if (title.Length > 40) title = title[..37] + "...";
         title = title.Replace("'", "\\'");
+        cls = (cls ?? "").Replace("'", "\\'");
+        proc = (proc ?? "").Replace("'", "\\'");
 
         var domain = "";
+        var url = "";
         try
         {
-            var url = GetBrowserUrl(hWnd, pid);
+            url = GetPrimaryUrlToken(GetBrowserUrl(hWnd, pid));
             if (!string.IsNullOrEmpty(url))
-                domain = new Uri(url.Split(' ')[0]).Host;
+                domain = new Uri(url).Host;
         }
         catch { }
 
         var sb = new System.Text.StringBuilder();
         sb.Append($"{{hwnd:0x{hWnd.ToInt64():X8},pid:{pid},title:'{title}'");
+        if (!string.IsNullOrEmpty(cls)) sb.Append($",cls:'{cls}'");
+        if (!string.IsNullOrEmpty(proc)) sb.Append($",proc:'{proc}'");
+        if (cid != 0) sb.Append($",cid:{cid}");
         if (!string.IsNullOrEmpty(domain)) sb.Append($",domain:'{domain}'");
+        if (!string.IsNullOrEmpty(url)) sb.Append($",url:'{url.Replace("'", "\\'")}'");
         sb.Append('}');
         return sb.ToString();
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    // Multi-field JSON-like grap pattern  {key:value, key:"quoted", key:[or1,or2]}
+    // Multi-field JSON-like grap pattern  {key:value, key:"quoted", key:/regex/, key:[or1,or2]}
     // ══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Parse {key:value,...} multi-field pattern into field→value(s) dictionary.
     /// Values may be:
     ///   unquoted   →  single token (no spaces / commas)
-    ///   "quoted"   →  single value (may contain spaces)
+    ///   "quoted"   →  substring match value (may contain spaces)
+    ///   /regex/    →  regex match value (inside {} only)
     ///   [a,b,"c"]  →  OR list of values
     /// Returns null if the input doesn't look like a valid multi-field pattern.
     /// </summary>
@@ -1007,6 +1086,19 @@ public static class WindowFinder
     static string ReadPatternValue(string s, ref int i)
     {
         if (i >= s.Length) return "";
+        if (s[i] == '/')
+        {
+            int start = i++;
+            bool escaped = false;
+            while (i < s.Length)
+            {
+                var ch = s[i++];
+                if (escaped) { escaped = false; continue; }
+                if (ch == '\\') { escaped = true; continue; }
+                if (ch == '/') return s[start..i];
+            }
+            return s[start..i];
+        }
         // Quoted value — supports both " and ' as delimiters
         if (s[i] == '"' || s[i] == '\'')
         {
@@ -1025,10 +1117,18 @@ public static class WindowFinder
         }
     }
 
+    static string NormalizeFieldPattern(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return value;
+        if (value.Length >= 2 && value[0] == '/' && value[^1] == '/')
+            return "regex:" + value[1..^1];
+        return value;
+    }
+
     /// <summary>
     /// Find windows matching all fields in a parsed multi-field pattern (AND between fields, OR within each field's value list).
     /// </summary>
-    static List<WindowInfo> FindByMultiField(Dictionary<string, List<string>> fields)
+    static List<WindowInfo> FindByMultiField(Dictionary<string, List<string>> fields, bool stopOnFirstMatch = false)
     {
         // ── hwnd-only: direct lookup ──
         if (fields.Count == 1 && fields.TryGetValue("hwnd", out var hwndOnlyVals))
@@ -1048,12 +1148,15 @@ public static class WindowFinder
         if (fields.TryGetValue("pid", out var pidVals))
             pidFilter = (uint)ParseNumericField(pidVals[0]);
 
-        var titleMatchers  = fields.TryGetValue("title",  out var tv) ? tv.Select(PatternMatcher.Create).ToList() : null;
-        var clsMatchers    = fields.TryGetValue("cls",    out var cv) ? cv.Select(PatternMatcher.Create).ToList() : null;
-        var procMatchers   = fields.TryGetValue("proc",   out var pv) ? pv.Select(PatternMatcher.Create).ToList() : null;
-        var domainPatterns = fields.TryGetValue("domain", out var dv) ? dv : null;
-        var urlPatterns    = fields.TryGetValue("url",    out var uv) ? uv : null;
-        bool needsUrl      = domainPatterns != null || urlPatterns != null;
+        int? cidFilter = null;
+        if (fields.TryGetValue("cid", out var cidVals))
+            cidFilter = (int)ParseNumericField(cidVals[0]);
+
+        var titleMatchers  = fields.TryGetValue("title",  out var tv) ? tv.Select(v => PatternMatcher.Create(NormalizeFieldPattern(v))).ToList() : null;
+        var clsMatchers    = fields.TryGetValue("cls",    out var cv) ? cv.Select(v => PatternMatcher.Create(NormalizeFieldPattern(v))).ToList() : null;
+        var procMatchers   = fields.TryGetValue("proc",   out var pv) ? pv.Select(v => PatternMatcher.Create(NormalizeFieldPattern(v))).ToList() : null;
+        var domainMatchers = fields.TryGetValue("domain", out var dv) ? dv.Select(v => PatternMatcher.Create(NormalizeFieldPattern(v))).ToList() : null;
+        var urlMatchers    = fields.TryGetValue("url",    out var uv) ? uv.Select(v => PatternMatcher.Create(NormalizeFieldPattern(v))).ToList() : null;
 
         var results = new List<WindowInfo>();
         var procNameCache = new Dictionary<uint, string>();
@@ -1063,8 +1166,8 @@ public static class WindowFinder
         if (hwndFilter != IntPtr.Zero)
         {
             if (NativeMethods.IsWindow(hwndFilter) && MatchesMultiField(
-                    hwndFilter, pidFilter, titleMatchers, clsMatchers, procMatchers,
-                    domainPatterns, urlPatterns, procNameCache))
+                    hwndFilter, pidFilter, cidFilter, titleMatchers, clsMatchers, procMatchers,
+                    domainMatchers, urlMatchers, procNameCache))
                 results.Add(WindowInfo.FromHwnd(hwndFilter));
             return results;
         }
@@ -1073,9 +1176,12 @@ public static class WindowFinder
         NativeMethods.EnumWindows((hWnd, _) =>
         {
             if (!NativeMethods.IsWindowVisible(hWnd)) return true;
-            if (MatchesMultiField(hWnd, pidFilter, titleMatchers, clsMatchers, procMatchers,
-                    domainPatterns, urlPatterns, procNameCache))
+            if (MatchesMultiField(hWnd, pidFilter, cidFilter, titleMatchers, clsMatchers, procMatchers,
+                    domainMatchers, urlMatchers, procNameCache))
+            {
                 results.Add(WindowInfo.FromHwnd(hWnd));
+                if (stopOnFirstMatch) return false;
+            }
             return true;
         }, IntPtr.Zero);
 
@@ -1104,15 +1210,23 @@ public static class WindowFinder
     }
 
     static bool MatchesMultiField(
-        IntPtr hWnd, uint pidFilter,
+        IntPtr hWnd, uint pidFilter, int? cidFilter,
         List<PatternMatcher>? titleMatchers, List<PatternMatcher>? clsMatchers, List<PatternMatcher>? procMatchers,
-        List<string>? domainPatterns, List<string>? urlPatterns,
+        List<PatternMatcher>? domainMatchers, List<PatternMatcher>? urlMatchers,
         Dictionary<uint, string> procNameCache)
     {
         NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
 
         // pid
         if (pidFilter != 0 && pid != pidFilter) return false;
+
+        // cid
+        if (cidFilter.HasValue)
+        {
+            int cid = 0;
+            try { cid = NativeMethods.GetDlgCtrlID(hWnd); } catch { }
+            if (cid != cidFilter.Value) return false;
+        }
 
         // title (OR within list)
         if (titleMatchers != null)
@@ -1143,16 +1257,16 @@ public static class WindowFinder
         }
 
         // domain / url (lazy fetch)
-        if (domainPatterns != null || urlPatterns != null)
+        if (domainMatchers != null || urlMatchers != null)
         {
             var url = GetBrowserUrl(hWnd, pid);
-            if (domainPatterns != null)
+            if (domainMatchers != null)
             {
                 string domain = "";
                 try { domain = string.IsNullOrEmpty(url) ? "" : new Uri(url.Split(' ')[0]).Host; } catch { }
-                if (!domainPatterns.Any(d => domain.Contains(d, StringComparison.OrdinalIgnoreCase))) return false;
+                if (!domainMatchers.Any(m => m.IsMatch(domain))) return false;
             }
-            if (urlPatterns != null && !urlPatterns.Any(u => (url ?? "").Contains(u, StringComparison.OrdinalIgnoreCase)))
+            if (urlMatchers != null && !urlMatchers.Any(m => m.IsMatch(url ?? "")))
                 return false;
         }
 

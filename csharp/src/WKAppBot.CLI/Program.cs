@@ -360,15 +360,18 @@ internal partial class Program
         // CreateDirectory + RotateOldLogs: skip for grap/grep fast-exit path — they call
         // TerminateProcess after logcat, and any file I/O on W:/ (SMB network drive) leaves
         // pending kernel I/O that blocks TerminateProcess for ~27s (SMB cancel timeout).
+        _diagStep = "logdir-create";
         if (!_fastExitAfterCommand)
         {
             Directory.CreateDirectory(logDir);
+            _diagStep = "rotateoldlogs-queue";
             ThreadPool.QueueUserWorkItem(_ => { try { RotateOldLogs(logDir, staleHours: 24); } catch { } });
             prof("RotateOldLogs queued (background)");
         }
 
         // Include command name in log filename for easy identification via ls
         // e.g. "wkappbot.exe.out-20260221_211427.eye.pid=36944.txt"
+        _diagStep = "logfile-name";
         var (cmdTag, oldSubDir) = ComputeCmdTagAndSubDir(args);
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.log");
         // Track current command log path for auto-heal diagnostics (non-Eye mode only; Eye sets it in RunInEye)
@@ -376,6 +379,7 @@ internal partial class Program
 
         // Pipe mode: stdout is redirected (pipe/file) — suppress diagnostic output for ALL commands.
         // Must be captured before TeeWriter replaces Console.Out.
+        _diagStep = "pipe-mode-check";
         IsPipeMode = Console.IsOutputRedirected;
 
         // --read-only: global flag for UIA read-only mode (strip from args before dispatch)
@@ -399,11 +403,14 @@ internal partial class Program
         // Grep-mode: echo diagnostics to stderr so stdout contains only match lines (grep-compat).
         // Skip TeeWriter for grap/grep fast-exit: writing log file on W:/ (SMB) leaves kernel-level
         // pending I/O that blocks TerminateProcess (STILL_ACTIVE) for ~27s (SMB cancel timeout).
+        _diagStep = "tee-open";
         TeeTextWriter? tee = (RunningInEye || _fastExitAfterCommand) ? null : new TeeTextWriter(GrepModeActive ? Console.Error : Console.Out, logFile, oldSubDir: oldSubDir);
         // Wrap tee in ThreadRoutingWriter so EyeCmdPipeServer.Route() can redirect per-command output.
         // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
+        _diagStep = "tee-install";
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
         // Print log path early — so if the caller times out, they know where to tail the live log.
+        _diagStep = "launch-log";
         if (tee != null && !GrepModeActive)
             Console.Error.WriteLine($"[LOG] {logFile}");
         // LAUNCH identity: callerCwd + callerHwnd → logged by TeeWriter for post-mortem analysis
@@ -417,6 +424,7 @@ internal partial class Program
         // Core redirects Console.Out to that file. FastExit signals WKAPPBOT_RELAY_EVENT (EventWaitHandle)
         // after flushing — Launcher reads the file while Core is still alive (no 27s AV/SMB delay),
         // then signals WKAPPBOT_RELAY_READ_EVENT so Core can proceed to TerminateProcess.
+        _diagStep = "relay-setup";
         RelayFilePath = _fastExitAfterCommand ? Environment.GetEnvironmentVariable("WKAPPBOT_RELAY_FILE") : null;
         if (RelayFilePath != null)
         {
@@ -429,7 +437,9 @@ internal partial class Program
             }
             catch { RelayFilePath = null; /* fallback to normal stdout */ }
         }
+        _diagStep = "stdout-sync";
         if (_fastExitAfterCommand) SetupSyncStdout();
+        _diagStep = "dispatch-ready";
         prof("TeeWriter ready");
 
         // ── Crash handler: dump stack trace to log, DON'T move to old/ (crash evidence) ──
@@ -549,7 +559,8 @@ internal partial class Program
             // Skip for grap/grep alias — EmitEyeTick calls FindLogicalHost which may leave pending
             // I/O (UIA/WMI) that prevents TerminateProcess from completing for ~28s.
             // Skip tick for fast-exit aliases (grap/grep) and Eye pipe commands.
-            _skipTick = _fastExitAfterCommand || RunningInEye;
+            bool isFileCommand = command == "file" || command.StartsWith("file-", StringComparison.Ordinal);
+            _skipTick = _fastExitAfterCommand || RunningInEye || isFileCommand;
             if (!_skipTick)
             {
                 try { EmitEyeTick(command, cmdTag, "start"); } catch { }
@@ -576,7 +587,7 @@ internal partial class Program
             // kill/close subcommands may target Eye itself — don't auto-launch Eye before they run.
             var subCmd = restArgs.Length > 0 ? restArgs[0].ToLowerInvariant() : "";
             bool isKillOrClose = command == "a11y" && subCmd is "kill" or "close";
-            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" or "dashboard" or "find-prompts" or "claude-detect" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || isMcpCommand || isKillOrClose || _fastExitAfterCommand;
+            var isExcluded = command is "help" or "--help" or "-h" or "prompt-test" or "tick" or "uia-test" or "newchat" or "file" or "analyze-hack" or "screensaver" or "whisper-ring" or "dashboard" or "find-prompts" or "claude-detect" or "suggest" || command.StartsWith("file-", StringComparison.Ordinal) || isEyeCommand || isMcpCommand || isKillOrClose || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
@@ -767,14 +778,20 @@ internal partial class Program
             catch { }
             // Write exit-file FIRST — before tee.Dispose() which may block on SMB I/O.
             // Launcher polls this file every 50ms and exits immediately when found.
+            _diagStep = "exitfile-write";
             if (!_fastExitAfterCommand)
                 WriteExitFile(exitCode);
 
+            _diagStep = "tee-restore";
             if (tee != null) Console.SetOut(tee.OriginalConsole);
+            _diagStep = "tee-dispose";
             tee?.Dispose(); // normal-exit atexit-style move to logs/old
+            _diagStep = "logsaved-write";
             if (tee != null) Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
+            _diagStep = "timer-dispose";
             timeoutTimer?.Dispose();
             // grap/grep path still uses FastExit (relay file + TerminateProcess).
+            _diagStep = "finally-done";
             if (_fastExitAfterCommand)
                 FastExit(exitCode);
         }
