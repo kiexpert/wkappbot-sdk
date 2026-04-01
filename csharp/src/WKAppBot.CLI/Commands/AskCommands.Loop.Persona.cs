@@ -224,7 +224,7 @@ internal partial class Program
         sb.Append("ASYNC RUN: argv=[\"run\",\"start\",...] starts a background process — server returns run_id immediately. ");
         sb.Append("STDIN INJECT: {\"id\":\"tc_N\",\"run_id\":\"r_xxx\",\"stdin\":\"text\\r\\n\"} — pipes stdin to a running process (NO argv field). ");
         sb.Append("Useful stdin values: \\u0003=Ctrl+C \\n=Enter \\r=CR \\u001a=Ctrl+Z. ");
-        sb.Append("RUN COMMANDS: run await <id> [sec] / run cancel <id> / run tail <id> / run status <id> / run list. ");
+        sb.Append("RUN COMMANDS: run await <id> [sec] / run cancel <id> / run qcancel <id> [questionId] [reason] / run qstatus <id> [questionId] / run qlist <id> / run tail <id> / run status <id> / run list. ");
         sb.Append("EXTERNAL SHELL: run start launches cmd.exe, bash, python, powershell, node, git, curl — stdin/stdout/stderr all piped. ");
         sb.Append("Blocked: eye, mcp, ask (non-gemini provider). ");
         sb.Append("APSP argv maps DIRECTLY to wkappbot CLI — argv[0] is the wkappbot command name, NO tool-name prefix. ");

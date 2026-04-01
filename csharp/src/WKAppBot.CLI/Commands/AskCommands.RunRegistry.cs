@@ -156,6 +156,38 @@ internal partial class Program
         return RunStdin(runId, payload.ToJsonString() + Environment.NewLine);
     }
 
+    static (int exitCode, string stdout, string stderr) RunQuestionStatus(string runId, string? questionId = null)
+    {
+        var payload = new JsonObject
+        {
+            ["type"] = "ask-control",
+            ["action"] = "status",
+            ["run_id"] = runId
+        };
+        if (!string.IsNullOrWhiteSpace(questionId))
+            payload["question_id"] = questionId;
+        var inject = RunStdin(runId, payload.ToJsonString() + Environment.NewLine);
+        if (inject.exitCode != 0)
+            return inject;
+        Thread.Sleep(250);
+        return RunTail(runId);
+    }
+
+    static (int exitCode, string stdout, string stderr) RunQuestionList(string runId)
+    {
+        var payload = new JsonObject
+        {
+            ["type"] = "ask-control",
+            ["action"] = "list",
+            ["run_id"] = runId
+        };
+        var inject = RunStdin(runId, payload.ToJsonString() + Environment.NewLine);
+        if (inject.exitCode != 0)
+            return inject;
+        Thread.Sleep(250);
+        return RunTail(runId);
+    }
+
     // Block until process exits or timeout
     static async Task<(int exitCode, string stdout, string stderr)> RunAwaitAsync(string runId, int timeoutSec)
     {
