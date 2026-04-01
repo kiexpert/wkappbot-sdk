@@ -11,6 +11,131 @@ namespace WKAppBot.WebBot;
 
 public sealed partial class CdpClient
 {
+    static string GetTabGrowthDumpPath()
+    {
+        var baseDir = Path.GetDirectoryName(Environment.ProcessPath ?? AppContext.BaseDirectory) ?? AppContext.BaseDirectory;
+        var logDir = Path.Combine(baseDir, "wkappbot.hq", "logs");
+        Directory.CreateDirectory(logDir);
+        return Path.Combine(logDir, "cdp-tab-growth.jsonl");
+    }
+
+    static JsonArray CloneTargets(JsonArray? targets)
+    {
+        var arr = new JsonArray();
+        if (targets == null) return arr;
+        foreach (var t in targets)
+        {
+            if (t is JsonObject obj)
+                arr.Add(JsonNode.Parse(obj.ToJsonString()));
+        }
+        return arr;
+    }
+
+    public async Task DumpTabGrowthAsync(
+        int port,
+        string reason,
+        JsonArray? beforeTargets = null,
+        string? key = null,
+        string? expectedHost = null,
+        string? createdTargetId = null)
+    {
+        try
+        {
+            JsonArray afterTargets;
+            try
+            {
+                var afterJson = await _http.GetStringAsync($"http://localhost:{port}/json");
+                afterTargets = JsonSerializer.Deserialize<JsonArray>(afterJson) ?? [];
+            }
+            catch
+            {
+                afterTargets = [];
+            }
+
+            static int CountPages(JsonArray arr)
+            {
+                int count = 0;
+                foreach (var t in arr)
+                {
+                    if (string.Equals(t?["type"]?.GetValue<string>(), "page", StringComparison.OrdinalIgnoreCase))
+                        count++;
+                }
+                return count;
+            }
+
+            static JsonArray Summarize(JsonArray arr)
+            {
+                var result = new JsonArray();
+                foreach (var t in arr)
+                {
+                    if (!string.Equals(t?["type"]?.GetValue<string>(), "page", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    result.Add(new JsonObject
+                    {
+                        ["id"] = t?["id"]?.GetValue<string>() ?? "",
+                        ["title"] = t?["title"]?.GetValue<string>() ?? "",
+                        ["url"] = t?["url"]?.GetValue<string>() ?? ""
+                    });
+                }
+                return result;
+            }
+
+            var before = CloneTargets(beforeTargets);
+            var payload = new JsonObject
+            {
+                ["ts"] = DateTimeOffset.Now.ToString("O"),
+                ["reason"] = reason,
+                ["port"] = port,
+                ["key"] = key ?? "",
+                ["expectedHost"] = expectedHost ?? "",
+                ["createdTargetId"] = createdTargetId ?? "",
+                ["currentTargetId"] = TargetId ?? "",
+                ["beforeCount"] = CountPages(before),
+                ["afterCount"] = CountPages(afterTargets),
+                ["before"] = Summarize(before),
+                ["after"] = Summarize(afterTargets),
+            };
+
+            await File.AppendAllTextAsync(GetTabGrowthDumpPath(), payload.ToJsonString() + Environment.NewLine, Encoding.UTF8);
+            Console.WriteLine($"[TAB:GROWTH] {reason} before={payload["beforeCount"]} after={payload["afterCount"]} key={key ?? "-"}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[TAB:GROWTH] dump failed: {ex.Message}");
+        }
+    }
+
+    public static bool KeepPollutedTabsForDebug()
+    {
+        static bool IsTrue(string? v) =>
+            string.Equals(v, "1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(v, "true", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(v, "yes", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(v, "on", StringComparison.OrdinalIgnoreCase);
+
+        return IsTrue(Environment.GetEnvironmentVariable("DEBUG_KEEP_POLLUTED_TABS")) ||
+               IsTrue(Environment.GetEnvironmentVariable("WKAPPBOT_KEEP_POLLUTED_TABS"));
+    }
+
+    public async Task TryCloseTabByIdAsync(int port, string? targetId, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(targetId)) return;
+        if (KeepPollutedTabsForDebug())
+        {
+            Console.WriteLine($"[TAB:GROWTH] keeping polluted tab for debug: {targetId} ({reason})");
+            return;
+        }
+
+        try
+        {
+            await _http.GetAsync($"http://localhost:{port}/json/close/{targetId}");
+            Console.WriteLine($"[TAB:GROWTH] closed polluted tab: {targetId} ({reason})");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[TAB:GROWTH] close failed for {targetId}: {ex.Message}");
+        }
+    }
     // ── Static: CDP port detection from process ─────────────────
 
     /// <summary>
@@ -510,8 +635,11 @@ public sealed partial class CdpClient
                     MinimizeChrome();
                     await Task.Delay(100);
                     Console.WriteLine($"[ASK] Reusing window at ({existingWb.Value.left},{existingWb.Value.top}) for new tab");
+                    var beforeTargets = CloneTargets(allTargets);
                     var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
                     newTargetId = result?["targetId"]?.GetValue<string>();
+                    if (!string.IsNullOrWhiteSpace(newTargetId))
+                        await DumpTabGrowthAsync(port, "ensure-correct-window-reuse-create", beforeTargets, targetName, navigateUrl, newTargetId);
                     break;
                 }
             }
@@ -528,8 +656,11 @@ public sealed partial class CdpClient
             {
                 try
                 {
+                    var beforeTargets = CloneTargets(allTargets);
                     var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
                     newTargetId = result?["targetId"]?.GetValue<string>();
+                    if (!string.IsNullOrWhiteSpace(newTargetId))
+                        await DumpTabGrowthAsync(port, "ensure-correct-window-fallback-create", beforeTargets, targetName, navigateUrl, newTargetId);
                 }
                 catch { }
                 if (newTargetId == null) return TargetId;
