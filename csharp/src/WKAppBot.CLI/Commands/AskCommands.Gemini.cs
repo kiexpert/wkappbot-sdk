@@ -31,10 +31,11 @@ internal partial class Program
         if (triadCtx != null)
         {
             triadCtx.RegisterCdp("gemini", cdp);
-            cdp.OnStreamingChunk = chunk => triadCtx.UpdateChunk("gemini", chunk);
+            cdp.OnStreamingChunkEvent = triadCtx.UpdateChunk;
             cdp.OperationContext = "gemini:EXPLORER"; // debate role
         }
         using var askSession = new AskSession(AiProvider.Gemini, cdp); // gradual migration wrapper
+        BindAskIdentity(askSession, question, "gemini");
 
         // No tab activation ? CDP works on background tabs via targetId. Truly focusless.
         var prevFgGemini = NativeMethods.GetForegroundWindow();
@@ -94,6 +95,9 @@ internal partial class Program
                     Console.WriteLine("[ASK] Editor not found");
                     return (false, (string?)null);
                 }
+
+                triadCtx?.BindStreamContext("gemini", cdp, editorSel, Environment.GetEnvironmentVariable("WKAPPBOT_RUN_ID"));
+                askSession.BindStreamingContext(editorSel);
 
                 // 式式 Persona injection on fresh Gemini conversation 式式
                 // If persona continuation already contains a tool call, skip question send entirely
@@ -398,6 +402,8 @@ internal partial class Program
                 LogRestoreFocus(prevFg, "after-send-Gemini", cdp);
 
                 Console.WriteLine($"[SEND-DONE] send={sendResult}");
+                await cdp.MarkPromptDispatchAsync(editorSel, "gemini", sendResult);
+                askSession.MarkQueued(sendResult);
                 questionLock.Release("sent");
                 PulseStep.Mark("question-sent");
                 if (noWait)
@@ -704,4 +710,5 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 }
+
 

@@ -20,7 +20,7 @@ internal partial class Program
     /// A11y-first: finds editor via ARIA selector chain, inserts text via CDP Input.insertText.
     /// </summary>
     static async Task<(bool ok, string? text)> ChatGptSendAndWait(
-        CdpClient cdp, string message, int timeoutSec, List<string>? attachFiles = null, bool returnAfterSend = false)
+        CdpClient cdp, string message, int timeoutSec, List<string>? attachFiles = null, bool returnAfterSend = false, AskSession? askSession = null)
     {
         // ★★ Phase 0: URL check + turn count (iconified OK) ★★
         var currentUrl = await cdp.GetUrlAsync() ?? "";
@@ -189,6 +189,7 @@ internal partial class Program
         // Check editor after send — should be empty if sent successfully
         var afterSend = (await cdp.GetTextLengthAsync(editorSel)).ToString();
         Console.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={prevTurns})");
+        await cdp.MarkPromptDispatchAsync(editorSel, "chatgpt", sendResult);
         if (returnAfterSend)
         {
             chatLock.Release("queued-no-wait");
@@ -216,18 +217,16 @@ internal partial class Program
 
             // Multi-signal detection: turn count OR stop button OR thinking marker
             // TODO: migrate to AskSession when provider-specific response detection is unified
-            var detectResult = await cdp.EvalAsync(
-                "(() => {" +
-                "var turns = document.querySelectorAll('[data-message-author-role=\"assistant\"]').length;" +
-                "if (turns === 0) turns = Math.floor((document.querySelectorAll('[data-testid*=\"conversation-turn\"]').length || document.querySelectorAll('article').length) / 2);" +
-                $"if (turns > {prevTurns}) return 'TURN_' + turns;" +
-                "var stop = document.querySelector('button[data-testid=\"stop-button\"]')" +
-                "|| document.querySelector('button[aria-label=\"Stop streaming\"]')" +
-                "|| document.querySelector('button[aria-label=\"\\uc2a4\\ud2b8\\ub9ac\\ubc0d \\uc911\\uc9c0\"]');" +
-                "if (stop) return 'STREAMING';" +
-                "if (document.querySelector('.result-thinking')) return 'THINKING';" +
-                "return 'WAITING_' + turns;" +
-                "})()") ?? "WAITING_0";
+            var probe = await cdp.ProbePromptResponseStateAsync(editorSel, "chatgpt", prevTurns);
+            var detectResult = probe.Status switch
+            {
+                "RUNNING" => probe.ResponseCount > prevTurns ? $"TURN_{probe.ResponseCount}" : "STREAMING",
+                "DONE" => $"TURN_{probe.ResponseCount}",
+                "QUEUED" => $"QUEUED_{probe.ResponseCount}",
+                "LOCKED" => "LOCKED",
+                "NO_EDITOR" => "NO_EDITOR",
+                _ => $"WAITING_{probe.ResponseCount}"
+            };
 
             // Show meaningful state instead of plain dots
             var waitTag = detectResult.StartsWith("TURN_") ? "TURN" :

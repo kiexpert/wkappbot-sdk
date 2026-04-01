@@ -37,6 +37,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     public bool IsConnected => _ws?.State == WebSocketState.Open;
     public string? WebSocketUrl { get; private set; }
     public string? TargetId { get; private set; }
+    private long _streamChunkSeq;
 
     /// <summary>Reconnect to the same tab using saved WebSocketUrl (tab still open, WS dropped).</summary>
     public async Task ReconnectAsync(int timeoutMs = 5000)
