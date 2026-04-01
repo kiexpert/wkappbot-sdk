@@ -298,7 +298,7 @@ public sealed partial class CdpClient
                 "if(!responseCount){var turns=qsa('[data-testid*=\"conversation-turn\"]');var articles=qsa('article');responseCount=turns.length?Math.floor(turns.length/2):(articles.length||0);}" +
                 "text=lastText(msgs);" +
                 "if(!text){var arts=qsa('article');text=lastText(arts);}" +
-                $"stopVisible=!!(document.querySelector(\"button[data-testid='stop-button']\")||document.querySelector(\"button[aria-label='Stop streaming']\")||document.querySelector(\"button[aria-label='{AskLocaleKeys.KoStopStreaming}']\"));" +
+                "stopVisible=!!(document.querySelector(\"button[data-testid='stop-button']\")||document.querySelector(\"button[aria-label='Stop streaming']\"));" +
                 "streaming=stopVisible;" +
             "} else if(provider==='claude'){" +
                 "var streamMsgs=qsa('[data-is-streaming]');" +
@@ -307,13 +307,13 @@ public sealed partial class CdpClient
                 "text=streamMsgs.length?lastText(streamMsgs):lastText(asstMsgs);" +
                 "var last=streamMsgs.length?streamMsgs[streamMsgs.length-1]:null;" +
                 "streaming=!!(last&&last.getAttribute('data-is-streaming')==='true');" +
-                $"stopVisible=streaming||!!(document.querySelector(\"button[aria-label*='Stop']\")||document.querySelector(\"button[aria-label*='{AskLocaleKeys.KoStop}']\"));" +
+                "stopVisible=streaming||!!document.querySelector(\"button[aria-label*='Stop']\");" +
             "} else if(provider==='gemini'){" +
                 "var models=qsa('model-response');" +
                 "var arts=qsa('[role=\"article\"]');" +
                 "responseCount=models.length||arts.length||0;" +
                 "text=models.length?lastText(models):lastText(arts);" +
-                $"var stopBtn=document.querySelector(\"button[aria-label*='Stop']\")||document.querySelector(\"button[aria-label*='{AskLocaleKeys.KoStop}']\");" +
+                "var stopBtn=document.querySelector(\"button[aria-label*='Stop']\");" +
                 "var stopIcon=document.querySelector('mat-icon[fonticon=\"stop_circle\"]');" +
                 "stopVisible=!!stopBtn||!!stopIcon;" +
                 "streaming=stopVisible;" +
