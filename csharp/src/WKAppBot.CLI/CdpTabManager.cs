@@ -1,3 +1,5 @@
+using System.Net.Http;
+using System.Text.Json;
 using WKAppBot.WebBot;
 
 namespace WKAppBot.CLI;
@@ -147,6 +149,7 @@ internal static class CdpTabManager
             cdp.ConnectAsync(detectedPort).GetAwaiter().GetResult();
 
             // Delegate to existing sandbox logic
+            string? driftedTargetId = null;
             var entry = AskTargetRegistry.GetEntry(key);
             if (entry != null)
             {
@@ -170,6 +173,7 @@ internal static class CdpTabManager
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine($"[TAB] ✗ Drift: {key} (expected {expectedHost}, got {tab.Url[..Math.Min(60, tab.Url.Length)]})");
                         Console.ResetColor();
+                        driftedTargetId = entry.TargetId;
                         AskTargetRegistry.RemoveEntry(key);
                     }
                 }
@@ -185,14 +189,19 @@ internal static class CdpTabManager
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine($"[TAB] Creating fresh tab: {key} → {expectedHost}");
             Console.ResetColor();
+            var beforeTargets = JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonArray>(
+                new HttpClient().GetStringAsync($"http://localhost:{detectedPort}/json").GetAwaiter().GetResult());
             var result = cdp.SendAsync("Target.createTarget",
                 new System.Text.Json.Nodes.JsonObject { ["url"] = $"https://{expectedHost}" })
                 .GetAwaiter().GetResult();
             var newId = result?["targetId"]?.GetValue<string>();
             if (newId != null)
             {
+                cdp.DumpTabGrowthAsync(detectedPort, "cdp-tab-manager-create", beforeTargets, key, expectedHost, newId).GetAwaiter().GetResult();
                 cdp.SwitchToTargetAsync(newId, detectedPort).GetAwaiter().GetResult();
                 AskTargetRegistry.SetEntry(key, newId, expectedHost);
+                if (!string.IsNullOrWhiteSpace(driftedTargetId))
+                    cdp.TryCloseTabByIdAsync(detectedPort, driftedTargetId, "cdp-tab-manager-drift").GetAwaiter().GetResult();
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine($"[TAB] ✓ Fresh: {newId[..Math.Min(8, newId.Length)]}");
                 Console.ResetColor();

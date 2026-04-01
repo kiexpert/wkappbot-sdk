@@ -154,8 +154,10 @@ internal partial class Program
                         var newId = result?["targetId"]?.GetValue<string>();
                         if (newId != null)
                         {
+                            await cdp.DumpTabGrowthAsync(port, "sandbox-mismatch-create", null, key, expectedHost, newId);
                             await cdp.SwitchToTargetAsync(newId, port);
                             AskTargetRegistry.SetEntry(key, newId, expectedHost);
+                            await cdp.TryCloseTabByIdAsync(port, entry.TargetId, "sandbox-mismatch");
                             Console.ForegroundColor = ConsoleColor.Green;
                             Console.WriteLine($"[SANDBOX] ✓ New tab after mismatch: {newId[..Math.Min(8,newId.Length)]}");
                             Console.ResetColor();
@@ -190,6 +192,7 @@ internal partial class Program
             var newId = result?["targetId"]?.GetValue<string>();
             if (newId != null)
             {
+                await cdp.DumpTabGrowthAsync(port, "sandbox-miss-create", null, key, expectedHost, newId);
                 await cdp.SwitchToTargetAsync(newId, port);
                 AskTargetRegistry.SetEntry(key, newId, expectedHost);
                 Console.ForegroundColor = ConsoleColor.Green;
