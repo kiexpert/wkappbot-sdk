@@ -571,8 +571,28 @@ internal sealed class AskSession : IDisposable
 
     public async Task<bool> CancelCurrentQuestionAsync(string reason = "USER_STOP")
     {
-        if (!TryGetCurrentQuestion(out _))
+        if (!TryGetCurrentQuestion(out var state))
             return false;
+
+        var isPreSend =
+            state.QueuedAtUtc == null &&
+            !state.Status.StartsWith("RUNNING", StringComparison.OrdinalIgnoreCase) &&
+            !state.Status.StartsWith("DONE", StringComparison.OrdinalIgnoreCase) &&
+            !state.Status.StartsWith("FAILED", StringComparison.OrdinalIgnoreCase) &&
+            !state.Status.StartsWith("TIMED_OUT", StringComparison.OrdinalIgnoreCase) &&
+            !state.Status.StartsWith("CANCELLED", StringComparison.OrdinalIgnoreCase);
+
+        if (isPreSend && Cdp != null && !string.IsNullOrWhiteSpace(state.EditorSelector))
+        {
+            var cleared = await CdpPromptPump.DropPendingForPageAsync(state.PageKey, Cdp, state.EditorSelector, clearEditor: true);
+            if (cleared)
+            {
+                state.LastSendResult = "PRE_SEND_DROP";
+                MarkCancelled("PRE_SEND");
+            }
+            return cleared;
+        }
+
         var clicked = await ClickStopAsync();
         if (clicked)
             MarkCancelled(reason);

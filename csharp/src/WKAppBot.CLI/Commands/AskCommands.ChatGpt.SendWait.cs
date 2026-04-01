@@ -204,6 +204,11 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
         {
             await Task.Delay(1000);
+            if (askSession != null && await TryHandleAskControlAsync(askSession))
+            {
+                chatLock.Release("cancelled");
+                return (false, "CANCELLED");
+            }
 
             // URL change detection (new conversation resets turn count)
             var newUrl = await cdp.GetUrlAsync() ?? "";
@@ -271,6 +276,8 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < timeoutSec)
         {
             await Task.Delay(1500);
+            if (askSession != null && await TryHandleAskControlAsync(askSession))
+                return (false, "CANCELLED");
 
             // Combined check: state + streaming text length + delta text for live flush
             // TODO: migrate to AskSession when provider-specific polling is unified

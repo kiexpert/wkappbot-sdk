@@ -351,6 +351,11 @@ internal partial class Program
                 while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
                 {
                     await Task.Delay(1000);
+                    if (await TryHandleAskControlAsync(askSession))
+                    {
+                        chatLock.Release("cancelled");
+                        return (false, "CANCELLED");
+                    }
 
                     // TODO: migrate to AskSession when provider-specific limit detection is unified
                     var limitText = await cdp.EvalAsync("""
@@ -420,6 +425,8 @@ internal partial class Program
                 while (sw.Elapsed.TotalSeconds < timeoutSec)
                 {
                     await Task.Delay(1500);
+                    if (await TryHandleAskControlAsync(askSession))
+                        return (false, "CANCELLED");
 
                     // Get streaming state + latest response text
                     // TODO: migrate to AskSession when provider-specific polling is unified

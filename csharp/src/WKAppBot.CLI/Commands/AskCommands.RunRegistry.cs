@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json.Nodes;
 
 namespace WKAppBot.CLI;
 
@@ -138,6 +139,21 @@ internal partial class Program
             return (0, $"stdin → {runId} ({stdin.Length} chars: {preview})", "");
         }
         catch (Exception ex) { return (1, "", $"stdin inject failed: {ex.Message}"); }
+    }
+
+    static (int exitCode, string stdout, string stderr) RunQuestionCancel(string runId, string? questionId, string? reason = null)
+    {
+        var payload = new JsonObject
+        {
+            ["type"] = "ask-control",
+            ["action"] = "cancel",
+            ["run_id"] = runId
+        };
+        if (!string.IsNullOrWhiteSpace(questionId))
+            payload["question_id"] = questionId;
+        if (!string.IsNullOrWhiteSpace(reason))
+            payload["reason"] = reason;
+        return RunStdin(runId, payload.ToJsonString() + Environment.NewLine);
     }
 
     // Block until process exits or timeout

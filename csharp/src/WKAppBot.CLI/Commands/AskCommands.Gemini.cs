@@ -444,6 +444,8 @@ internal partial class Program
                 while (sw.Elapsed.TotalSeconds < timeoutSec)
                 {
                     await Task.Delay(1000);
+                    if (await TryHandleAskControlAsync(askSession))
+                        return (false, "CANCELLED");
                     // A11y-first: model-response ??[role='article'] ??generic text
                     // Only read NEW responses (skip persona exchange)
                     var text = responseAlreadyStarted
@@ -622,6 +624,8 @@ internal partial class Program
                 while (retrySw.Elapsed.TotalSeconds < 30)
                 {
                     await Task.Delay(1000);
+                    if (await TryHandleAskControlAsync(askSession))
+                        return (false, "CANCELLED");
                     var text = await cdp.GetLastResponseTextAsync() ?? "";
                     if (string.IsNullOrEmpty(text)) continue;
                     if (text == retryText)

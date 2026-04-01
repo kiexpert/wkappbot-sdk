@@ -67,6 +67,8 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < Math.Max(20, timeoutSec))
         {
             await Task.Delay(1500);
+            if (await TryHandleAskControlAsync(askSession))
+                return (false, "CANCELLED");
             // TODO: migrate to AskSession when provider-specific limit detection is unified
             var limitText = await cdp.EvalAsync("""
                 (() => {
@@ -216,6 +218,8 @@ internal partial class Program
         while (sw.Elapsed.TotalSeconds < Math.Max(20, timeoutSec))
         {
             await Task.Delay(2000);
+            if (await TryHandleAskControlAsync(askSession))
+                return (false, "CANCELLED");
             var text = await cdp.GetLastResponseTextAsync(baseCount, blankDetect: true) ?? "";
             if (text == "\x01BLANK")
             {
