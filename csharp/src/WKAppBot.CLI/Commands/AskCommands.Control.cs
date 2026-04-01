@@ -80,7 +80,9 @@ internal partial class Program
                 return false;
 
             var effectiveAction = action ?? (string.Equals(op, "cancel_question", StringComparison.OrdinalIgnoreCase) ? "cancel" : null);
-            if (!string.Equals(effectiveAction, "cancel", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(effectiveAction, "cancel", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(effectiveAction, "status", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(effectiveAction, "list", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             var targetRunId = root.TryGetProperty("run_id", out var runEl) ? runEl.GetString() : null;
@@ -90,7 +92,7 @@ internal partial class Program
 
             cmd = new AskControlCommand
             {
-                Action = "cancel",
+                Action = effectiveAction ?? "cancel",
                 RunId = targetRunId ?? currentRunId,
                 QuestionId = root.TryGetProperty("question_id", out var qidEl) ? qidEl.GetString() : null,
                 PageKey = root.TryGetProperty("page_key", out var pageEl) ? pageEl.GetString() : null,
@@ -111,28 +113,37 @@ internal partial class Program
         var cancelled = false;
         while (_askControlQueue.TryDequeue(out var cmd))
         {
-            if (!string.Equals(cmd.Action, "cancel", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            bool ok;
-            if (string.IsNullOrWhiteSpace(cmd.QuestionId) && string.IsNullOrWhiteSpace(cmd.PageKey))
+            if (string.Equals(cmd.Action, "cancel", StringComparison.OrdinalIgnoreCase))
             {
-                ok = await askSession.CancelCurrentQuestionAsync(cmd.Reason ?? "USER_STOP");
+                bool ok;
+                if (string.IsNullOrWhiteSpace(cmd.QuestionId) && string.IsNullOrWhiteSpace(cmd.PageKey))
+                {
+                    ok = await askSession.CancelCurrentQuestionAsync(cmd.Reason ?? "USER_STOP");
+                }
+                else
+                {
+                    ok = await askSession.CancelQuestionAsync(
+                        pageKey: cmd.PageKey,
+                        questionId: cmd.QuestionId,
+                        runId: cmd.RunId,
+                        reason: cmd.Reason ?? "USER_STOP");
+                }
+
+                Console.WriteLine(ok
+                    ? $"[ASK:CTRL] cancel applied q={cmd.QuestionId ?? "*"}"
+                    : $"[ASK:CTRL] cancel miss q={cmd.QuestionId ?? "*"}");
+
+                cancelled |= ok;
             }
-            else
+            else if (string.Equals(cmd.Action, "status", StringComparison.OrdinalIgnoreCase))
             {
-                ok = await askSession.CancelQuestionAsync(
-                    pageKey: cmd.PageKey,
-                    questionId: cmd.QuestionId,
-                    runId: cmd.RunId,
-                    reason: cmd.Reason ?? "USER_STOP");
+                var key = askSession.ResolveQuestionKey(cmd.PageKey, cmd.QuestionId, cmd.RunId);
+                Console.WriteLine($"[ASK:QSTATUS] {askSession.SnapshotQuestion(key).ToJsonString()}");
             }
-
-            Console.WriteLine(ok
-                ? $"[ASK:CTRL] cancel applied q={cmd.QuestionId ?? "*"}"
-                : $"[ASK:CTRL] cancel miss q={cmd.QuestionId ?? "*"}");
-
-            cancelled |= ok;
+            else if (string.Equals(cmd.Action, "list", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"[ASK:QLIST] {askSession.SnapshotQuestions().ToJsonString()}");
+            }
         }
 
         return cancelled;

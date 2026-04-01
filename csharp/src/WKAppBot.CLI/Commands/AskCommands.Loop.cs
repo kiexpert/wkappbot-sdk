@@ -327,12 +327,15 @@ internal partial class Program
                 "qcancel" => RunQuestionCancel(runId,
                     argv.Length > 3 ? argv[3] : null,
                     argv.Length > 4 ? argv[4] : null),
+                "qstatus" => RunQuestionStatus(runId,
+                    argv.Length > 3 ? argv[3] : null),
+                "qlist" => RunQuestionList(runId),
                 "status" => RunStatus(runId),
                 "tail" => RunTail(runId),
                 "list" => RunList(),
                 "await" => await RunAwaitAsync(runId,
                     argv.Length > 3 && int.TryParse(argv[3], out var t) ? t : timeoutSec),
-                _ => (2, "", $"run: unknown subcommand '{sub}' — valid: start/cancel/qcancel/status/tail/list/await")
+                _ => (2, "", $"run: unknown subcommand '{sub}' - valid: start/cancel/qcancel/qstatus/qlist/status/tail/list/await")
             };
             return new ExecResult(r.Item1, r.Item2, r.Item3, sw.ElapsedMilliseconds);
         }

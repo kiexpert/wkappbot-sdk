@@ -1,4 +1,5 @@
 using WKAppBot.WebBot;
+using System.Text.Json.Nodes;
 
 namespace WKAppBot.CLI;
 
@@ -318,6 +319,25 @@ internal sealed class AskSession : IDisposable
         return true;
     }
 
+    public JsonObject SnapshotQuestion(string key)
+    {
+        if (!_questions.TryGetValue(key, out var state))
+            return new JsonObject
+            {
+                ["key"] = key,
+                ["status"] = "NOT_FOUND"
+            };
+        return SnapshotQuestion(state);
+    }
+
+    public JsonArray SnapshotQuestions()
+    {
+        var arr = new JsonArray();
+        foreach (var state in _questions.Values.OrderBy(q => q.CreatedUtc))
+            arr.Add(SnapshotQuestion(state));
+        return arr;
+    }
+
     public string ResolveQuestionKey(
         string? pageKey = null,
         string? questionId = null,
@@ -383,6 +403,33 @@ internal sealed class AskSession : IDisposable
     {
         OnQuestionStateChanged?.Invoke(state);
     }
+
+    static JsonObject SnapshotQuestion(AskQuestionState state)
+        => new()
+        {
+            ["key"] = state.Key,
+            ["provider"] = state.Provider,
+            ["providerTag"] = state.ProviderTag ?? "",
+            ["gameId"] = state.GameId ?? "",
+            ["questionId"] = state.QuestionId ?? "",
+            ["runId"] = state.RunId ?? "",
+            ["pageKey"] = state.PageKey ?? "",
+            ["editorSelector"] = state.EditorSelector ?? "",
+            ["status"] = state.Status,
+            ["createdUtc"] = state.CreatedUtc.ToString("O"),
+            ["lastUpdateUtc"] = state.LastUpdateUtc.ToString("O"),
+            ["lastChunkUtc"] = state.LastChunkUtc?.ToString("O") ?? "",
+            ["chunkCount"] = state.ChunkCount,
+            ["lastChunkSeq"] = state.LastChunkSeq,
+            ["isFinal"] = state.IsFinal,
+            ["lastSendResult"] = state.LastSendResult ?? "",
+            ["sendMethod"] = state.SendMethod ?? "",
+            ["sendKeyChord"] = state.SendKeyChord ?? "",
+            ["sendAttempt"] = state.SendAttempt ?? 0,
+            ["queuedAtUtc"] = state.QueuedAtUtc?.ToString("O") ?? "",
+            ["lastDeltaText"] = state.LastDeltaText,
+            ["lastFullText"] = state.LastFullText,
+        };
 
     static (string? method, string? keyChord, int? attempt) ParseDispatchResult(string? sendResult)
     {
