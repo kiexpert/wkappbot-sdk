@@ -128,7 +128,7 @@ internal partial class Program
         return c > 0 ? 1 : 0;
     }
 
-    static int AskClaude(string question, bool slackReport = true, int timeoutSec = 30, bool newTab = false, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
+    static int AskClaude(string question, bool slackReport = true, int timeoutSec = 30, bool newTab = false, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
         Console.WriteLine($"[ASK] Claude: {question}");
@@ -248,6 +248,9 @@ internal partial class Program
 
                 // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Claude");
+
+                if (attachFiles?.Count > 0)
+                    await AttachFilesViaCdp(cdp, attachFiles, editorSel, promptPump: AskAttachmentPump, pumpScope: "claude");
 
                 await ClearContentEditable(cdp, editorSel);
                 PulseStep.Mark("question-send");

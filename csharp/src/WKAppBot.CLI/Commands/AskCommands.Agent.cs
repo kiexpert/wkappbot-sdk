@@ -167,7 +167,7 @@ internal partial class Program
             {
                 Task.Run(() => AskGemini(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gemini-agent-{tabSuffix}", linePrefix: "[gemini] ", triadCtx: triadCtx)),
                 Task.Run(() => AskChatGpt(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"gpt-agent-{tabSuffix}",    linePrefix: "[gpt] ", triadCtx: triadCtx)),
-                Task.Run(() => AskClaude(question, true, timeoutSec, newTab: false, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"claude-agent-{tabSuffix}", linePrefix: "[claude] ", triadCtx: triadCtx)),
+                Task.Run(() => AskClaude(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode: true, modelHint, noWait: false, $"claude-agent-{tabSuffix}", linePrefix: "[claude] ", triadCtx: triadCtx)),
             };
             Task.WaitAll(tasks);
             var results = tasks.Select(t => t.Result).ToArray();
@@ -188,7 +188,7 @@ internal partial class Program
         {
             "gemini"            => AskGemini(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[gemini] "),
             "gpt" or "chatgpt"  => AskChatGpt(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[gpt] "),
-            "claude"            => AskClaude(question, true, timeoutSec, newTab: false, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[claude] "),
+            "claude"            => AskClaude(question, true, timeoutSec, newTab: false, attachFiles, newSession, loopMode: true, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait: false, targetTag, linePrefix: $"[claude] "),
             _                   => Error($"Unknown AI: {ai}")
         };
     }

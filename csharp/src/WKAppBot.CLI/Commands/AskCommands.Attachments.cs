@@ -16,6 +16,8 @@ namespace WKAppBot.CLI;
 // partial class: wkappbot ask <ai> "question" ??one-command AI Q&A via WebBot
 internal partial class Program
 {
+    static readonly CdpPromptPump AskAttachmentPump = new("ask-attach");
+
     // ???? Image Paste ????
 
     /// <summary>
@@ -212,27 +214,47 @@ internal partial class Program
         { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp" };
 
     /// <summary>Attach multiple files: images via clipboard paste, other files via hidden file input.</summary>
-    static async Task AttachFilesViaCdp(CdpClient cdp, List<string> files, string editorSelector, IntPtr originalUserFg = default)
+    static async Task AttachFilesViaCdp(CdpClient cdp, List<string> files, string editorSelector, IntPtr originalUserFg = default, CdpPromptPump? promptPump = null, string? pumpScope = null)
     {
-        foreach (var filePath in files)
+        var beganLock = false;
+        if (promptPump != null && !string.IsNullOrWhiteSpace(pumpScope))
         {
-            var ext = Path.GetExtension(filePath);
-            if (ImageExtensions.Contains(ext))
+            beganLock = await promptPump.BeginAttachmentLockAsync(pumpScope!, cdp, editorSelector);
+        }
+
+        try
+        {
+            foreach (var filePath in files)
             {
-                // Image: clipboard paste (Tier 1 synthetic ??Tier 2 Win32 clipboard + Ctrl+V)
-                var imgOk = await PasteImageViaCdp(cdp, filePath, editorSelector);
-                if (imgOk) await WaitForImageUpload(cdp);
-                else Console.WriteLine($"[ASK] Image paste failed: {Path.GetFileName(filePath)}");
+                var ext = Path.GetExtension(filePath);
+                if (ImageExtensions.Contains(ext))
+                {
+                    // Image: clipboard paste (Tier 1 synthetic ??Tier 2 Win32 clipboard + Ctrl+V)
+                    var imgOk = await PasteImageViaCdp(cdp, filePath, editorSelector);
+                    if (imgOk) await WaitForImageUpload(cdp);
+                    else Console.WriteLine($"[ASK] Image paste failed: {Path.GetFileName(filePath)}");
+                }
+                else
+                {
+                    // Non-image file: use hidden file input element
+                    var fileOk = await AttachFileViaFileInput(cdp, filePath, originalUserFg);
+                    if (fileOk) await WaitForImageUpload(cdp); // reuse upload wait
+                    else Console.WriteLine($"[ASK] File attach failed: {Path.GetFileName(filePath)}");
+                }
+                await Task.Delay(500); // settle between attachments
+                await DismissDialogIfPresent(cdp); // catch late-appearing dialogs
             }
-            else
-            {
-                // Non-image file: use hidden file input element
-                var fileOk = await AttachFileViaFileInput(cdp, filePath, originalUserFg);
-                if (fileOk) await WaitForImageUpload(cdp); // reuse upload wait
-                else Console.WriteLine($"[ASK] File attach failed: {Path.GetFileName(filePath)}");
-            }
-            await Task.Delay(500); // settle between attachments
-            await DismissDialogIfPresent(cdp); // catch late-appearing dialogs
+        }
+        catch
+        {
+            if (beganLock && promptPump != null && !string.IsNullOrWhiteSpace(pumpScope))
+                await promptPump.AbortAttachmentLockAsync(pumpScope!, cdp, editorSelector, keepQueued: true);
+            throw;
+        }
+
+        if (beganLock && promptPump != null && !string.IsNullOrWhiteSpace(pumpScope))
+        {
+            await promptPump.CompleteAttachmentLockAsync(pumpScope!, cdp, editorSelector, immediateFlush: true);
         }
     }
 }
