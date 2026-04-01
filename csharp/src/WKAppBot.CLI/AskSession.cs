@@ -299,6 +299,31 @@ internal sealed class AskSession : IDisposable
         EmitQuestionState(state);
     }
 
+    public bool TryGetQuestion(string key, out AskQuestionState? state)
+    {
+        if (_questions.TryGetValue(key, out var found))
+        {
+            state = found;
+            return true;
+        }
+        state = null;
+        return false;
+    }
+
+    public bool SelectQuestion(string key)
+    {
+        if (!_questions.ContainsKey(key))
+            return false;
+        _currentQuestionKey = key;
+        return true;
+    }
+
+    public string ResolveQuestionKey(
+        string? pageKey = null,
+        string? questionId = null,
+        string? runId = null)
+        => BuildQuestionKey(pageKey, questionId, runId);
+
     public void TrackChunkEvent(CdpClient.PromptStreamEvent evt)
     {
         var key = BuildQuestionKey(evt.PageKey, evt.QuestionId, evt.RunId);
@@ -542,6 +567,41 @@ internal sealed class AskSession : IDisposable
         foreach (var sel in Provider.StopSelectors)
             if (await Cdp.QueryExistsAsync(sel)) { await Cdp.JsClickAsync(sel); return true; }
         return false;
+    }
+
+    public async Task<bool> CancelCurrentQuestionAsync(string reason = "USER_STOP")
+    {
+        if (!TryGetCurrentQuestion(out _))
+            return false;
+        var clicked = await ClickStopAsync();
+        if (clicked)
+            MarkCancelled(reason);
+        return clicked;
+    }
+
+    public async Task<bool> CancelQuestionAsync(string key, string reason = "USER_STOP")
+    {
+        var previous = _currentQuestionKey;
+        if (!SelectQuestion(key))
+            return false;
+        try
+        {
+            return await CancelCurrentQuestionAsync(reason);
+        }
+        finally
+        {
+            _currentQuestionKey = previous;
+        }
+    }
+
+    public async Task<bool> CancelQuestionAsync(
+        string? pageKey,
+        string? questionId,
+        string? runId,
+        string reason = "USER_STOP")
+    {
+        var key = ResolveQuestionKey(pageKey, questionId, runId);
+        return await CancelQuestionAsync(key, reason);
     }
 
     public async Task<bool> ClickSendAsync()
