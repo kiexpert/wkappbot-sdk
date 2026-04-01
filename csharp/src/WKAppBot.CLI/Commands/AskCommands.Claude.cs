@@ -358,26 +358,21 @@ internal partial class Program
                     }
 
                     // TODO: migrate to AskSession when provider-specific limit detection is unified
-                    var limitText = await cdp.EvalAsync("""
-                        (() => {
-                            // Only check the LAST AI message to avoid false positives from prior conversation
-                            var msgs = document.querySelectorAll('[data-is-streaming]');
-                            var t = msgs.length > 0 ? (msgs[msgs.length - 1].innerText || '') : '';
-                            // Fallback: check for standalone limit UI banners (not inside chat turns)
-                            if (!t) {
-                                var banners = document.querySelectorAll('[class*="limit"],[class*="usage"],[class*="quota"]');
-                                t = Array.from(banners).map(b => b.innerText).join('\n').substring(0, 800);
-                            }
-                            var keys = ['usage limit', 'rate limit', 'too many requests', 'request limit', 'usage cap'];
-                            var tl = t.toLowerCase();
-                            for (var i = 0; i < keys.length; i++) {
-                                if (tl.includes(keys[i])) {
-                                    return t.substring(0, 800);
-                                }
-                            }
-                            return '';
-                        })()
-                        """) ?? "";
+                    var limitText = await cdp.EvalAsync(
+                        "(()=>{" +
+                        "var msgs=document.querySelectorAll('[data-is-streaming]');" +
+                        "var t=msgs.length>0?((msgs[msgs.length-1].innerText||'')) : '';" +
+                        "if(!t){" +
+                            "var banners=document.querySelectorAll('[class*=\"limit\"],[class*=\"usage\"],[class*=\"quota\"]');" +
+                            "t=Array.from(banners).map(b=>b.innerText).join('\\n').substring(0,800);" +
+                        "}" +
+                        "var keys=['usage limit','rate limit','too many requests','request limit','usage cap'];" +
+                        "var tl=t.toLowerCase();" +
+                        "for(var i=0;i<keys.length;i++){" +
+                            "if(tl.includes(keys[i])) return t.substring(0,800);" +
+                        "}" +
+                        "return '';" +
+                        "})()") ?? "";
                     if (!string.IsNullOrWhiteSpace(limitText))
                     {
                         Console.WriteLine("[ASK] Claude limit detected");
