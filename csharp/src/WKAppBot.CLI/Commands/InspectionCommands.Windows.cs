@@ -13,6 +13,7 @@ internal partial class Program
 {
     static int WindowsCommand(string[] args)
     {
+        PulseStep.Init("windows-cmd");
         // First positional arg = title filter (like inspect <title>)
         string? filterTitle = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : GetArgValue(args, "--filter");
         string? filterProcess = GetArgValue(args, "--process");
@@ -25,19 +26,49 @@ internal partial class Program
         bool showCmd = args.Contains("--cmd") || args.Contains("--arg") || filterCmd != null; // show process path + command line args
         int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 0; // 0=unlimited
         bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null;
+        bool allowCmdLineUrlFallback =
+            filterCmd != null ||
+            (filterTitle != null
+             && !PatternMatcher.IsPattern(filterTitle)
+             && filterTitle.Any(char.IsWhiteSpace));
 
         // Snapshot focus state once (standard API)
         var focus = WindowFinder.FocusSnapshot.CaptureNow();
+        PulseStep.Mark("focus-captured");
 
         // Process cache to avoid repeated Process.GetProcessById
         var processCache = new Dictionary<uint, string>();
         string GetProcessName(uint pid)
         {
             if (processCache.TryGetValue(pid, out var cached)) return cached;
-            string name = "";
-            try { name = Process.GetProcessById((int)pid).ProcessName; } catch { }
+            string name = NativeMethods.TryGetProcessNameFast(pid) ?? $"pid={pid}";
             processCache[pid] = name;
             return name;
+        }
+
+        var processPerfCache = new Dictionary<uint, (double? cpuPct, long wsMb, long pmMb)>();
+        (double? cpuPct, long wsMb, long pmMb) GetProcessPerf(uint pid)
+        {
+            if (processPerfCache.TryGetValue(pid, out var cached)) return cached;
+
+            double? cpuPct = null;
+            long wsMb = 0;
+            long pmMb = 0;
+            try
+            {
+                using var proc = Process.GetProcessById((int)pid);
+                wsMb = proc.WorkingSet64 / (1024 * 1024);
+                pmMb = proc.PrivateMemorySize64 / (1024 * 1024);
+                var elapsedSec = (DateTime.Now - proc.StartTime).TotalSeconds;
+                var cpuSec = proc.TotalProcessorTime.TotalSeconds;
+                if (elapsedSec > 0.5)
+                    cpuPct = Math.Round(cpuSec / (elapsedSec * Environment.ProcessorCount) * 100, 1);
+            }
+            catch { }
+
+            var perf = (cpuPct, wsMb, pmMb);
+            processPerfCache[pid] = perf;
+            return perf;
         }
 
         // Command line cache (WMI, lazy — only used when --cmd)
@@ -69,8 +100,16 @@ internal partial class Program
         (string title, string className, string process, uint pid, int w, int h, bool visible)?
             GetWindowInfo(IntPtr hWnd)
         {
+            static void MarkSlow(string label, IntPtr hwnd, long ms)
+            {
+                if (ms >= 200)
+                    PulseStep.Line($"{label} hwnd=0x{hwnd:X} {ms}ms");
+            }
+
+            var slowSw = System.Diagnostics.Stopwatch.StartNew();
             // Use timeout-safe version to avoid blocking on hung windows (50ms timeout)
             string title = NativeMethods.GetWindowTextSafe(hWnd, 50);
+            MarkSlow("get-window-text", hWnd, slowSw.ElapsedMilliseconds);
 
             var classBuf = new StringBuilder(256);
             NativeMethods.GetClassNameW(hWnd, classBuf, classBuf.Capacity);
@@ -94,16 +133,23 @@ internal partial class Program
                 // Check process name (needed for "*wsl*" matching "wslhost")
                 NativeMethods.GetWindowThreadProcessId(hWnd, out uint fpid);
                 var fpn = GetProcessName(fpid);
+                MarkSlow("get-process-name-prefilter", hWnd, slowSw.ElapsedMilliseconds);
                 if (!ownerCandidateMatcher.IsMatch(fpn))
                 {
                     // Last chance: cmdline + web URL — token-AND for plain multi-word patterns
-                    if (!CmdLineOrUrlMatch(GetCommandLine(fpid)) &&
-                        !CmdLineOrUrlMatch(WindowFinder.GetBrowserUrl(hWnd, fpid))) return null;
+                    if (!allowCmdLineUrlFallback) return null;
+                    var cmdLine = GetCommandLine(fpid);
+                    MarkSlow("get-commandline-prefilter", hWnd, slowSw.ElapsedMilliseconds);
+                    var browserUrl = WindowFinder.GetBrowserUrl(hWnd, fpid);
+                    MarkSlow("get-browser-url-prefilter", hWnd, slowSw.ElapsedMilliseconds);
+                    if (!CmdLineOrUrlMatch(cmdLine) &&
+                        !CmdLineOrUrlMatch(browserUrl)) return null;
                 }
             }
 
             NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
             string processName = GetProcessName(pid);
+            MarkSlow("get-process-name", hWnd, slowSw.ElapsedMilliseconds);
 
             // Skip wkappbot windows
             if (!showAll && processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
@@ -113,9 +159,21 @@ internal partial class Program
             if (ownerCandidateMatcher != null)
             {
                 var searchKey = WindowFinder.BuildSearchKey(hWnd, className, title, processName, w, h, focus);
-                if (!ownerCandidateMatcher.IsMatch(title) && !ownerCandidateMatcher.IsMatch(searchKey)
-                    && !CmdLineOrUrlMatch(GetCommandLine(pid))
-                    && !CmdLineOrUrlMatch(WindowFinder.GetBrowserUrl(hWnd, pid))) return null;
+                MarkSlow("build-search-key", hWnd, slowSw.ElapsedMilliseconds);
+                if (!allowCmdLineUrlFallback)
+                {
+                    if (!ownerCandidateMatcher.IsMatch(title) && !ownerCandidateMatcher.IsMatch(searchKey)) return null;
+                }
+                else
+                {
+                    var cmdLine = GetCommandLine(pid);
+                    MarkSlow("get-commandline", hWnd, slowSw.ElapsedMilliseconds);
+                    var browserUrl = WindowFinder.GetBrowserUrl(hWnd, pid);
+                    MarkSlow("get-browser-url", hWnd, slowSw.ElapsedMilliseconds);
+                    if (!ownerCandidateMatcher.IsMatch(title) && !ownerCandidateMatcher.IsMatch(searchKey)
+                        && !CmdLineOrUrlMatch(cmdLine)
+                        && !CmdLineOrUrlMatch(browserUrl)) return null;
+                }
             }
             if (filterProcess != null)
             {
@@ -134,9 +192,11 @@ internal partial class Program
             if (filterCmd != null)
             {
                 var cmdLine = GetCommandLine(pid);
+                MarkSlow("get-commandline-filtercmd", hWnd, slowSw.ElapsedMilliseconds);
                 if (!cmdLine.Contains(filterCmd, StringComparison.OrdinalIgnoreCase)) return null;
             }
 
+            MarkSlow("get-window-info-total", hWnd, slowSw.ElapsedMilliseconds);
             return (title, className, processName, pid, w, h, visible);
         }
 
@@ -221,6 +281,10 @@ internal partial class Program
             var procPid = $"{process}:{pid}";
             var trimProc = procPid.Length > 16 ? procPid[..16] : procPid;
             var sizeStr = $"{w}x{h}";
+            var perf = GetProcessPerf(pid);
+            var cpuLifeStr = perf.cpuPct.HasValue ? $"{perf.cpuPct.Value,5:F1}%" : "    -";
+            var wsStr = perf.wsMb > 0 ? $"{perf.wsMb,5}M" : "    -";
+            var pmStr = perf.pmMb > 0 ? $"{perf.pmMb,5}M" : "    -";
             // Flags: single-char compact (H=hidden L=layered T=tool M=min X=max D=disabled ↑=topmost)
             var flagChars = new StringBuilder();
             if (!visible) flagChars.Append('H');
@@ -239,7 +303,7 @@ internal partial class Program
             Console.ForegroundColor = isForeground ? ConsoleColor.Green : ConsoleColor.Yellow;
             Console.Write(padTitle);
             Console.ResetColor();
-            Console.Write($" {trimProc,-16} {sizeStr,9}");
+            Console.Write($" {trimProc,-16} {cpuLifeStr,6} {wsStr,6} {pmStr,6} {sizeStr,9}");
             if (isForeground) { Console.ForegroundColor = ConsoleColor.Green; Console.Write(" *"); Console.ResetColor(); }
             if (flagStr.Length > 0) { Console.ForegroundColor = ConsoleColor.DarkCyan; Console.Write(flagStr); Console.ResetColor(); }
             // CDP port tag: show [CDP=XXXX] when process has --remote-debugging-port in cmdline
@@ -514,7 +578,7 @@ internal partial class Program
         Console.WriteLine($"── {mode} ──");
         Console.ForegroundColor = ConsoleColor.DarkGray;
         //            "  [XXXXXXXX] {,-45}                                        {,-12}     {,9}  flags"
-        Console.WriteLine($"  {"[hwnd____]",-11}{"title",-45} {"process:pid",-16} {"WxH",9}  flags");
+        Console.WriteLine($"  {"[hwnd____]",-11}{"title",-45} {"process:pid",-16} {"cpu",6} {"ws",6} {"pm",6} {"WxH",9}  flags");
         Console.ResetColor();
 
         // Helper: get raw window info WITHOUT title filter (for --uia mode)
@@ -661,7 +725,9 @@ internal partial class Program
         if (filterTitle != null && filterTitle.StartsWith('{') && filterTitle.EndsWith('}')
             && filterCmd == null && !deep && !uiaSearch)
         {
+            PulseStep.Mark("json5-find-start");
             var json5Results = WindowFinder.FindByTitle(filterTitle);
+            PulseStep.Mark("json5-find-done");
             foreach (var wi in json5Results)
             {
                 var raw = GetRawWindowInfo(wi.Handle);
@@ -672,6 +738,7 @@ internal partial class Program
             }
             Console.WriteLine();
             Console.WriteLine($"Total: {totalCount} (--uia: accessibility search, --deep: child windows)");
+            PulseStep.Done("json5-return");
             return 0;
         }
 
@@ -859,7 +926,7 @@ internal partial class Program
 
             return !(limit > 0 && totalCount >= limit);
         }, IntPtr.Zero);
-        PulseStep.Done("enum-windows-done");
+        PulseStep.Mark("enum-windows-done");
 
         // ── Parent process fallback: find host windows for hidden child processes ──
         // If filter matched only hidden/tiny windows (wslhost → WindowsTerminal, chrome renderer → Chrome),
@@ -869,6 +936,7 @@ internal partial class Program
         // O(1) per matched window × max 3 hops — no re-enumeration needed.
         if (filterTitle != null && visibleResultCount == 0 && matchedHiddenHwnds.Count > 0)
         {
+            PulseStep.Mark("host-fallback-start");
             var hostHwnds = new HashSet<IntPtr>();
             var progressSw = System.Diagnostics.Stopwatch.StartNew();
             long lastCommitMs = 0;
@@ -989,14 +1057,17 @@ internal partial class Program
                     totalCount++;
                 }
             }
+            PulseStep.Mark("host-fallback-done");
         }
 
         // 2nd pass: group by pid — root window + children inline
+        PulseStep.Mark("summary-write");
         Console.WriteLine();
         string uiaNote = uiaSearch ? $", UIA matched in {uiaMatchWindows} window(s)" : "";
         string limitNote = limit > 0 ? $", --limit {limit}" : "";
         string hint = uiaSearch ? "(--deep: thorough search)" : "(--uia: accessibility search, --deep: child windows)";
         Console.WriteLine($"Total: {totalCount}{uiaNote} {hint}{limitNote}");
+        PulseStep.Done("windows-return");
         return 0;
     }
 }

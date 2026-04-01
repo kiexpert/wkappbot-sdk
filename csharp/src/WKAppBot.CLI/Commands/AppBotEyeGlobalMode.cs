@@ -123,6 +123,17 @@ internal partial class Program
     static FileSystemWatcher? _fswMcp;
     static FileSystemWatcher? _fswClaudeJsonl; // Claude Code projects JSONL (~/.claude/projects/**/*.jsonl)
     static readonly HashSet<string> _mcpTabsOpened = new(StringComparer.OrdinalIgnoreCase);
+    static readonly HashSet<string> _knownLgOverlayProcesses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "LGDisplayExtension",
+        "LGHotkeyExtension",
+        "LGSmartAssistantExtension",
+        "LGSmartAssistant",
+        "LGLivelyWallpaper",
+        "LG PC Care",
+    };
+    static DateTime _lastLgOverlayGuardUtc = DateTime.MinValue;
+    static nint _lastLgOverlayHwnd;
 
     // ── Memory tracking ──
     static long _prevWorkingSetMB;
@@ -138,6 +149,168 @@ internal partial class Program
     static List<ClaudePromptHelper.PromptInfo>? _cachedAllPrompts;
     /// <summary>Cached appbot master prompt — always-on relay target (WKAppBot VS Code).</summary>
     internal static ClaudePromptHelper.PromptInfo? CachedAppbotMasterPrompt;
+
+    static bool TryGuardLgOverlay(string logPrefix, string? slackBotToken = null, string? slackChannel = null)
+    {
+        try
+        {
+            if (_lastLgOverlayGuardUtc != DateTime.MinValue &&
+                (DateTime.UtcNow - _lastLgOverlayGuardUtc).TotalSeconds < 5)
+                return false;
+
+            var lgHwnd = FindLgOverlayWindow();
+            if (lgHwnd == IntPtr.Zero) return false;
+
+            _lastLgOverlayGuardUtc = DateTime.UtcNow;
+            _lastLgOverlayHwnd = lgHwnd;
+
+            var fgBuf = new StringBuilder(256);
+            NativeMethods.GetWindowTextW(NativeMethods.GetForegroundWindow(), fgBuf, fgBuf.Capacity);
+            var fgTitle = fgBuf.ToString();
+
+            NativeMethods.GetWindowThreadProcessId(lgHwnd, out uint lgPid);
+            string procName = "";
+            try { procName = lgPid > 0 ? Process.GetProcessById((int)lgPid).ProcessName : ""; } catch { }
+
+            Console.WriteLine($"{logPrefix} LG overlay topmost! pid={lgPid} proc={procName} fg=\"{fgTitle}\"");
+
+            ApplyLgOverlayNeutralize(lgHwnd, logPrefix);
+
+            NativeMethods.PostMessageW(lgHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
+            Console.WriteLine($"{logPrefix} -> WM_CLOSE sent");
+
+            Thread.Sleep(500);
+            string result;
+            if (NativeMethods.IsWindow(lgHwnd))
+            {
+                Console.WriteLine($"{logPrefix} WM_CLOSE ignored -> applying shrink fallback");
+                ApplyLgOverlayFallbackLayout(lgHwnd, logPrefix);
+                Thread.Sleep(250);
+                result = "shrunk";
+
+                if (NativeMethods.IsWindow(lgHwnd))
+                {
+                    result = "kill";
+                    Console.WriteLine($"{logPrefix} shrink fallback insufficient -> killing process");
+                }
+
+                if (lgPid > 0)
+                {
+                    try
+                    {
+                        if (result == "kill")
+                        {
+                            Process.GetProcessById((int)lgPid).Kill();
+                            Console.WriteLine($"{logPrefix} Kill OK (pid={lgPid})");
+                        }
+                    }
+                    catch (Exception kex)
+                    {
+                        result = $"kill-failed: {kex.Message}";
+                        Console.WriteLine($"{logPrefix} Kill failed: {kex.Message}");
+                    }
+                }
+            }
+            else
+            {
+                result = "closed";
+                Console.WriteLine($"{logPrefix} overlay closed OK");
+            }
+
+            if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+            {
+                var alertMsg = $":warning: *{(string.IsNullOrEmpty(procName) ? "LG overlay" : procName)}* screen-cover detected -> {result}\n포그라운드: `{fgTitle}`";
+                Task.Run(async () =>
+                {
+                    try { await SlackSendViaApi(slackBotToken, slackChannel, alertMsg, username: "앱봇아이"); }
+                    catch { }
+                });
+            }
+
+            return true;
+        }
+        catch { return false; }
+    }
+
+    static IntPtr FindLgOverlayWindow()
+    {
+        IntPtr best = IntPtr.Zero;
+        long bestArea = 0;
+        var virtualScreen = SystemInformation.VirtualScreen;
+
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            try
+            {
+                if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+
+                int exStyle = NativeMethods.GetWindowLongW(hWnd, -20);
+                if ((exStyle & 0x8) == 0) return true; // WS_EX_TOPMOST
+
+                NativeMethods.GetWindowRect(hWnd, out var rc);
+                int w = Math.Max(0, rc.Right - rc.Left);
+                int h = Math.Max(0, rc.Bottom - rc.Top);
+                if (w < 600 || h < 300) return true; // ignore tiny LG helper popups
+
+                long area = (long)w * h;
+                long minCoverArea = (long)virtualScreen.Width * virtualScreen.Height / 3;
+                if (area < minCoverArea) return true; // only large screen-cover candidates
+
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                if (pid == 0) return true;
+
+                string procName;
+                try { procName = Process.GetProcessById((int)pid).ProcessName; }
+                catch { return true; }
+                if (!_knownLgOverlayProcesses.Contains(procName)) return true;
+
+                if (area > bestArea)
+                {
+                    bestArea = area;
+                    best = hWnd;
+                }
+            }
+            catch { }
+            return true;
+        }, IntPtr.Zero);
+
+        return best;
+    }
+
+    static void ApplyLgOverlayNeutralize(IntPtr hWnd, string logPrefix)
+    {
+        var exStyle = NativeMethods.GetWindowLongW(hWnd, -20);
+        var neutralExStyle = exStyle | NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT;
+        NativeMethods.SetWindowLongW(hWnd, -20, neutralExStyle);
+        NativeMethods.SetLayeredWindowAttributes(hWnd, 0, 0, NativeMethods.LWA_ALPHA);
+        Console.WriteLine($"{logPrefix} -> transparent + click-through");
+    }
+
+    static void ApplyLgOverlayFallbackLayout(IntPtr hWnd, string logPrefix)
+    {
+        try
+        {
+            NativeMethods.ShowWindow(hWnd, NativeMethods.SW_SHOWMINNOACTIVE);
+            Console.WriteLine($"{logPrefix} -> minimize(no-activate)");
+            if (!NativeMethods.IsIconic(hWnd))
+            {
+                NativeMethods.ShowWindow(hWnd, 6); // SW_MINIMIZE
+                Console.WriteLine($"{logPrefix} -> force iconic minimize");
+            }
+        }
+        catch { }
+
+        try
+        {
+            NativeMethods.SetWindowPos(
+                hWnd,
+                new IntPtr(-2), // HWND_NOTOPMOST
+                -32000, -32000, 1, 1,
+                0x0010); // SWP_NOACTIVATE
+            Console.WriteLine($"{logPrefix} -> offscreen shrink");
+        }
+        catch { }
+    }
     static DateTime _lastFindAllPromptsAt = DateTime.MinValue;
 
     // ── Eye IPC cache: updated each tick so eye tick IPC queries get instant response ──
@@ -151,6 +324,17 @@ internal partial class Program
     static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs, string callerCwd, bool elevated = false, int replacePid = 0)
     {
         EyeCallerCwd = callerCwd; // store for DrainSlackQueueIfNeeded and HoverAnalyzer
+        var eyeDiagFile = Path.Combine(GetEyeLogDir(), $"eye.diag.pid={Environment.ProcessId}.log");
+        void EyeDiag(string step)
+        {
+            try
+            {
+                Directory.CreateDirectory(GetEyeLogDir());
+                File.AppendAllText(eyeDiagFile, $"{DateTime.Now:HH:mm:ss.fff} {step}{Environment.NewLine}");
+            }
+            catch { }
+        }
+        EyeDiag("global-enter");
         if (posX < 0 || posY < 0)
         {
             var (x, y) = GetRightmostMonitorAnchor(width, height);
@@ -244,6 +428,7 @@ internal partial class Program
         PulseStep.Init("eye-startup");
         EyeCmdPipeServer.StartServer();
         PulseStep.Mark("pipe-server");
+        EyeDiag("pipe-server");
 
         // ── Early Slack connect (parallel with MCP+WPF startup) ──
         // Slack ConnectAsync takes 1-3s (WebSocket handshake). Start it NOW so it runs
@@ -284,22 +469,35 @@ internal partial class Program
         // Eye stays lean (~80MB), UIA memory (~600MB) stays in the worker
         EyeMcpClient.Start();
         PulseStep.Mark("mcp-client");
+        EyeDiag("mcp-client");
 
         using var host = new AppBotEyeHost();
+        EyeDiag("host-start-call");
         host.Start(width, height, posX, posY, ownerHwnd: IntPtr.Zero);
+        EyeDiag("host-start-return");
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
+        EyeDiag("host-update-info");
         host.UpdateAccessibilityText(string.Empty);
+        EyeDiag("host-update-empty");
 
         PulseStep.Mark("host-started");
+        EyeDiag("host-started");
         Console.WriteLine("[EYE] Global monitor active — press Ctrl+C to stop");
 
         // ── Windows Task Scheduler: dual watchdog structure ──
         // 1. Permanent 10-min watchdog (Eye always comes back even if killed)
         // 2. Precise one-shot retry task synced to actual queue (if items exist)
         PulseStep.Mark("watchdog");
-        EnsureEyeWatchdogTask();
+        EyeDiag("watchdog-start");
+        _ = Task.Run(() =>
+        {
+            try { EnsureEyeWatchdogTask(); }
+            finally { EyeDiag("watchdog-done"); }
+        });
         RouteRetryQueue.ScheduleRetryTask();
+        EyeDiag("route-retry-done");
         CheckPreviousCrash();
+        EyeDiag("crash-check-done");
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             try
@@ -317,6 +515,7 @@ internal partial class Program
         // ★ Default: pure focusless mode — Eye will not steal foreground focus
         // AllowFocusSteal is temporarily enabled for handoff nudges only
         ClaudePromptHelper.AllowFocusSteal = false;
+        EyeDiag("focusless-set");
         Console.WriteLine("[EYE] Focusless mode (AllowFocusSteal=OFF by default)");
 
         var cts = new CancellationTokenSource();
@@ -324,14 +523,17 @@ internal partial class Program
 
         // ── Eye pipe server (always: admin UIA proxy + eye tick IPC) ──
         _ = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
+        EyeDiag("eye-pipe-started");
         Console.WriteLine($"[EYE] Eye pipe server started (elevated={elevated})");
 
         PulseStep.Mark("eye-pipe-server");
         // ── Auto a11y hack on InputReadiness probe success ──
         SetupAutoHackOnProbe();
+        EyeDiag("autohack-hooked");
         // ── Mouse CCA: 1s interval → UIA element + CCA + Visual MD → Slack thread reply ──
         PulseStep.Mark("workers-init");
         StartMouseCcaWorker(cts.Token);
+        EyeDiag("mouse-worker-started");
         // ── Keyboard Focus Chain: 1s interval → focused element + parent chain → Slack thread reply ──
         // FocusChain now handled inside unified MouseCcaWorker (same server process)
 
@@ -342,6 +544,7 @@ internal partial class Program
         // Stored in a field so the getter closure below always returns the current value.
         // Re-fetched automatically when stale (Electron restart / window recreation).
         IntPtr claudeHwnd = FindClaudeDesktopWindow();
+        EyeDiag($"claude-hwnd=0x{claudeHwnd:X}");
         if (claudeHwnd != IntPtr.Zero)
         {
             EyeColor(ConsoleColor.Cyan);
@@ -665,9 +868,13 @@ internal partial class Program
         int duplicateCheckFrame = 0;
 
         PulseStep.Done("ready");
+        EyeDiag("loop-ready");
         int frameCount = 0;
+        Console.WriteLine("[EYE_LOOP] entering main loop");
         while (host.IsAlive && !cts.IsCancellationRequested)
         {
+            if (frameCount < 3) EyeDiag($"frame-{frameCount}-start");
+            if (frameCount < 3) Console.WriteLine($"[EYE_LOOP] frame={frameCount} start");
             // ScreenSaver now runs as separate process — no Tick() needed in Eye
 
             // ── Duplicate Eye check (every 100 frames ≈ 10s) ──
@@ -704,8 +911,12 @@ internal partial class Program
             // ── Core tick: read ticks + sessions ──
             var forceFull = ShouldForceFullLoad();
             var (tickDirty, promptDirty) = CheckGlobalDirtyFlags(forceFull);
+            if (frameCount < 3) EyeDiag($"frame-{frameCount}-before-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
+            if (frameCount < 3) Console.WriteLine($"[EYE_LOOP] frame={frameCount} before-global-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
             if (!TryRunOneGlobalTick(host, timeoutMs: 3000, forceFull, tickDirty, promptDirty))
             {
+                if (frameCount < 3) EyeDiag($"frame-{frameCount}-tick-timeout");
+                Console.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-timeout");
                 if (frameCount < 3)
                 {
                     Console.WriteLine($"[EYE] tick timeout (>3s) on frame {frameCount} — startup grace, continuing");
@@ -716,6 +927,11 @@ internal partial class Program
                     hotReloadTriggered = true; // trigger self-restart via hot-swap path
                     break;
                 }
+            }
+            else if (frameCount < 3)
+            {
+                EyeDiag($"frame-{frameCount}-tick-ok");
+                Console.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-ok");
             }
 
             // ── First frame: announce Eye startup to Slack with card summary ──
@@ -822,48 +1038,10 @@ internal partial class Program
                 }
                 catch { }
 
-                // ── LGDisplayExtensionWnd rogue topmost overlay guard ──
-                // This LG monitor software occasionally pops a full-screen topmost black overlay
-                // without user interaction. Auto-close + Slack alert for forensics.
-                try
-                {
-                    var lgHwnd = NativeMethods.FindWindowW("HwndWrapper[LGDisplayExtension.exe;;", null);
-                    if (lgHwnd != IntPtr.Zero
-                        && (NativeMethods.GetWindowLongW(lgHwnd, -20) & 0x8) != 0) // WS_EX_TOPMOST
-                    {
-                        var fgBuf = new System.Text.StringBuilder(256);
-                        NativeMethods.GetWindowTextW(NativeMethods.GetForegroundWindow(), fgBuf, fgBuf.Capacity);
-                        var fgTitle = fgBuf.ToString();
-                        Console.WriteLine($"[EYE][GUARD] LGDisplayExtensionWnd topmost! fg=\"{fgTitle}\"");
-
-                        // Step 1: instant transparency
-                        var exStyle = NativeMethods.GetWindowLongW(lgHwnd, -20);
-                        NativeMethods.SetWindowLongW(lgHwnd, -20, exStyle | NativeMethods.WS_EX_LAYERED);
-                        NativeMethods.SetLayeredWindowAttributes(lgHwnd, 0, 0, NativeMethods.LWA_ALPHA);
-                        // Step 2: WM_CLOSE
-                        NativeMethods.PostMessageW(lgHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
-                        // Step 3: verify + kill
-                        Thread.Sleep(500);
-                        if (NativeMethods.IsWindow(lgHwnd))
-                        {
-                            NativeMethods.GetWindowThreadProcessId(lgHwnd, out uint lgPid);
-                            if (lgPid > 0) try { Process.GetProcessById((int)lgPid).Kill(); } catch { }
-                            Console.WriteLine($"[EYE][GUARD] WM_CLOSE ignored → killed process");
-                        }
-
-                        if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
-                        {
-                            var result = NativeMethods.IsWindow(lgHwnd) ? "킬 완료" : "닫기 완료";
-                            var alertMsg = $":warning: *LGDisplayExtension* 검은 장막 감지 → {result}\n포그라운드: `{fgTitle}`";
-                            Task.Run(async () =>
-                            {
-                                try { await SlackSendViaApi(slackBotToken, slackChannel, alertMsg, username: "앱봇아이"); }
-                                catch { }
-                            });
-                        }
-                    }
-                }
-                catch { }
+                // ── LG rogue topmost overlay guard ──
+                // LG Smart Assistant family occasionally pops a large topmost screen-cover window.
+                // Handle by process+window heuristic instead of a single fixed class name.
+                TryGuardLgOverlay("[EYE][GUARD]", slackBotToken, slackChannel);
             }
 
             // ── WhisperRing watchdog: respawn if process died (every 60s) ──
