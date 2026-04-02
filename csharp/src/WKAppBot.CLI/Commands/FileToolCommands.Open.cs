@@ -8,6 +8,22 @@ internal partial class Program
 {
     sealed record VsCodeWindowCandidate(IntPtr Hwnd, string Title, string? WorkspaceCwd);
 
+    static int EditorAliasCommand(string toolName, string[] args)
+    {
+        if (args.Length == 0 || args[0] is "--help" or "-h" or "help")
+        {
+            Console.WriteLine($"{toolName} open <path>[:line[:col]]");
+            Console.WriteLine("Alias of: file open");
+            return 0;
+        }
+
+        return args[0].ToLowerInvariant() switch
+        {
+            "open" => FileCommand(new[] { "open" }.Concat(args[1..]).ToArray()),
+            _ => Error($"Unknown {toolName} subcommand: {args[0]}")
+        };
+    }
+
     static int FileOpenCommand(string[] args)
     {
         string? spec = null;
