@@ -491,7 +491,11 @@ internal partial class Program
         EyeDiag("watchdog-start");
         _ = Task.Run(() =>
         {
-            try { EnsureEyeWatchdogTask(); }
+            try
+            {
+                EnsureEyeWatchdogTask();
+                EnsureEyeGuardianForWindow(host.GetWindowHandle());
+            }
             finally { EyeDiag("watchdog-done"); }
         });
         RouteRetryQueue.ScheduleRetryTask();
@@ -1206,7 +1210,6 @@ internal partial class Program
                             Console.WriteLine($"[EYE:HOT-SWAP] swap OK (.exe→{Path.GetFileName(oldExePath)}, .new→.exe)");
                             _slackRetiring = true; // stop draining queue — new Eye will take over
                             EyeCmdPipeServer.StopAccepting(); // stop accepting new pipe connections immediately
-                            DisableEyeWatchdogTask(); // new Eye will re-enable it
                             hotReloadTriggered = true;
                             break;
                         }
@@ -1226,7 +1229,6 @@ internal partial class Program
                         EyeResetColor();
                         _slackRetiring = true;
                         EyeCmdPipeServer.StopAccepting(); // stop accepting new pipe connections immediately
-                        DisableEyeWatchdogTask(); // new Eye will re-enable it
                         hotReloadTriggered = true;
                         break;
                     }

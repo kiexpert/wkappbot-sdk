@@ -25,6 +25,16 @@ internal partial class Program
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SendMessageTimeout(
+        IntPtr hWnd,
+        uint Msg,
+        IntPtr wParam,
+        IntPtr lParam,
+        uint fuFlags,
+        uint uTimeout,
+        out IntPtr lpdwResult);
+
     // AllocConsole BANNED ??肄섏넄 李??덈? ?앹꽦 湲덉?. ?몄텧 ??利됱떆 ?먮윭 + 醫낅즺.
     /// <summary>DO NOT USE. Throws + exits if called. Use log files instead.</summary>
     [Obsolete("AllocConsole BANNED ??use log files. Calling this will crash.", true)]
@@ -67,10 +77,7 @@ internal partial class Program
     // ?? Eye Watchdog Task (Task Scheduler) ??????????????????????????????
     // Eye ?쒖옉留덈떎 ?먮룞 ?щ벑濡????대。??源뚮㉨?대룄 ?먭? 移섏쑀.
     // 10遺꾨쭏??`eye tick --timeout 15` ?ㅽ뻾 ??Eye 二쎌쑝硫??촶pawn + retry queue flush.
-    internal const string EyeWatchdogTaskName = "WKAppBot Eye Watchdog";
-    internal const string EyeWatchdogStartupTaskName = "WKAppBot Eye Startup Recovery";
     internal const string EyeWatchdogStartupRunKeyName = "WKAppBot Eye Startup Recovery";
-    internal const string EyeGuardianMutexName = "Global\\WKAppBotEyeGuardian";
 
     /// <summary>
     /// Register watchdog task 2 minutes from now. Delete+Create ensures the timer is always reset
@@ -89,7 +96,7 @@ internal partial class Program
         var vbsDir = watchdogCwd != null ? Path.Combine(watchdogCwd, ".wkappbot") : dir;
         var vbsPath = Path.Combine(vbsDir, "wkappbot-silent.vbs");
         var vbsLog = Path.Combine(vbsDir, "watchdog.log");
-        var guardianArgs = "eye guardian --respawn-delay 120 --poll-ms 5000";
+        var guardianArgs = "eye guardian --respawn-delay 10 --poll-ms 10000 --tick-timeout-ms 5000";
 
         var cwdLine = watchdogCwd != null ? $"ws.CurrentDirectory = \"{watchdogCwd}\"\n" : "";
         var vbsContent =
@@ -112,6 +119,66 @@ internal partial class Program
         return;
     }
 
+    internal static bool TryLaunchEyeGuardianBootstrap(string vbsPath, string corePath, string guardianArgs, out string reason)
+    {
+        try
+        {
+            if (File.Exists(vbsPath))
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "wscript.exe",
+                    Arguments = $"//B \"{vbsPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetDirectoryName(vbsPath) ?? Path.GetDirectoryName(corePath) ?? Environment.CurrentDirectory,
+                };
+                using var proc = Process.Start(psi);
+                reason = proc != null ? "vbs" : "vbs-start-null";
+                return proc != null;
+            }
+
+            var fallbackPsi = new ProcessStartInfo
+            {
+                FileName = corePath,
+                Arguments = guardianArgs,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetDirectoryName(corePath) ?? Environment.CurrentDirectory,
+            };
+            using var fallbackProc = Process.Start(fallbackPsi);
+            reason = fallbackProc != null ? "core-fallback" : "core-start-null";
+            return fallbackProc != null;
+        }
+        catch (Exception ex)
+        {
+            reason = ex.GetType().Name + ": " + ex.Message;
+            return false;
+        }
+    }
+
+    internal static void EnsureEyeGuardianForWindow(IntPtr hwnd)
+    {
+        try
+        {
+            if (hwnd == IntPtr.Zero) return;
+            var corePath = Environment.ProcessPath ?? "";
+            if (string.IsNullOrWhiteSpace(corePath)) return;
+            var dir = Path.GetDirectoryName(corePath) ?? "";
+            string? watchdogCwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : null;
+            var vbsDir = watchdogCwd != null ? Path.Combine(watchdogCwd, ".wkappbot") : dir;
+            var vbsPath = Path.Combine(vbsDir, "wkappbot-silent.vbs");
+            var guardianArgs = $"eye guardian --respawn-delay 10 --poll-ms 10000 --tick-timeout-ms 5000 --eye-hwnd 0x{hwnd.ToInt64():X}";
+            bool launched = TryLaunchEyeGuardianBootstrap(vbsPath, corePath, guardianArgs, out var launchReason);
+            Console.WriteLine(launched
+                ? $"[EYE] Guardian bootstrap launched ({launchReason}, hwnd=0x{hwnd.ToInt64():X})"
+                : $"[EYE] Guardian bootstrap launch skipped ({launchReason}, hwnd=0x{hwnd.ToInt64():X})");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EYE] Guardian bootstrap error: {ex.Message}");
+        }
+    }
 
     private static bool EnsureEyeStartupRunKey(string command, out string reason)
     {
@@ -149,117 +216,6 @@ internal partial class Program
         }
     }
 
-
-    /// Run schtasks.exe quietly (no window). Returns exit code, or -1 on failure.
-    /// Logs to watchdog.log (file-based, bypasses Console routing) for diagnostics.
-    private static int RunSchtasksQuiet(string schtasksExe, string args)
-    {
-        var logPath = System.IO.Path.Combine(
-            EyeCallerCwd.Length > 0 ? System.IO.Path.Combine(EyeCallerCwd, ".wkappbot") : System.IO.Path.GetDirectoryName(schtasksExe) ?? "",
-            "watchdog.log");
-        void FileLog(string msg)
-        {
-            try { System.IO.File.AppendAllText(logPath, $"[SCHTASKS] {DateTime.Now:HH:mm:ss} {msg}\n"); } catch { }
-            Console.Error.WriteLine($"[EYE] Watchdog schtasks: {msg}");
-        }
-        try
-        {
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = schtasksExe,
-                Arguments = args,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            };
-            using var p = System.Diagnostics.Process.Start(psi);
-            if (p == null) { FileLog($"Process.Start returned null for: {args[..Math.Min(40,args.Length)]}"); return -1; }
-            var stdoutTask = System.Threading.Tasks.Task.Run(() => p.StandardOutput.ReadToEnd());
-            var stderrTask = System.Threading.Tasks.Task.Run(() => p.StandardError.ReadToEnd());
-            p.WaitForExit(5000);
-            var stdout = stdoutTask.GetAwaiter().GetResult();
-            var stderr = stderrTask.GetAwaiter().GetResult();
-            var exit = p.ExitCode;
-            FileLog($"exit={exit} args={args[..Math.Min(40,args.Length)]}");
-            if (exit != 0)
-            {
-                var msg = (stderr + stdout).Trim();
-                if (!string.IsNullOrEmpty(msg)) FileLog($"output: {msg[..Math.Min(200,msg.Length)]}");
-            }
-            return exit;
-        }
-        catch (Exception ex) { FileLog($"exception: {ex.Message}"); return -1; }
-    }
-
-    private static (int exit, string stdout, string stderr) RunSchtasksCapture(string schtasksExe, string args)
-    {
-        try
-        {
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = schtasksExe,
-                Arguments = args,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            };
-            using var p = System.Diagnostics.Process.Start(psi);
-            if (p == null) return (-1, "", "Process.Start returned null");
-            var stdout = p.StandardOutput.ReadToEnd();
-            var stderr = p.StandardError.ReadToEnd();
-            p.WaitForExit(5000);
-            return (p.ExitCode, stdout, stderr);
-        }
-        catch (Exception ex)
-        {
-            return (-1, "", ex.Message);
-        }
-    }
-
-    private static bool IsTaskEnabled(string schtasksExe, string taskName, out string reason)
-    {
-        var (exit, stdout, stderr) = RunSchtasksCapture(schtasksExe, $"/Query /TN \"{taskName}\" /XML");
-        if (exit != 0)
-        {
-            reason = $"query-exit={exit}";
-            return false;
-        }
-        var xml = stdout + stderr;
-        if (xml.Contains("<Enabled>false</Enabled>", StringComparison.OrdinalIgnoreCase))
-        {
-            reason = "enabled=false";
-            return false;
-        }
-        reason = "enabled";
-        return true;
-    }
-
-    private static bool IsTaskArmed(string schtasksExe, string taskName, string expectedBoundary, out string reason)
-    {
-        var (exit, stdout, stderr) = RunSchtasksCapture(schtasksExe, $"/Query /TN \"{taskName}\" /XML");
-        if (exit != 0)
-        {
-            reason = $"query-exit={exit}";
-            return false;
-        }
-
-        var xml = stdout + stderr;
-        if (xml.Contains("<Enabled>false</Enabled>", StringComparison.OrdinalIgnoreCase))
-        {
-            reason = "enabled=false";
-            return false;
-        }
-        if (!xml.Contains(expectedBoundary, StringComparison.OrdinalIgnoreCase))
-        {
-            reason = $"boundary-mismatch(expected={expectedBoundary})";
-            return false;
-        }
-
-        reason = "armed";
-        return true;
-    }
 
     /// <summary>
     /// Install a Ctrl handler that blocks console-close events.
@@ -347,19 +303,30 @@ internal partial class Program
     private static System.Threading.Mutex? _eyeAliveMutex;
     static int EyeGuardianCommand(string[] args)
     {
-        int pollMs = 5000;
-        int respawnDelaySec = 120;
+        int pollMs = 10000;
+        int respawnDelaySec = 10;
         int launchTimeoutMs = 15000;
+        int tickTimeoutMs = 5000;
+        IntPtr eyeHwnd = IntPtr.Zero;
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--poll-ms" && i + 1 < args.Length) int.TryParse(args[i + 1], out pollMs);
             else if (args[i] == "--respawn-delay" && i + 1 < args.Length) int.TryParse(args[i + 1], out respawnDelaySec);
             else if (args[i] == "--launch-timeout-ms" && i + 1 < args.Length) int.TryParse(args[i + 1], out launchTimeoutMs);
+            else if (args[i] == "--tick-timeout-ms" && i + 1 < args.Length) int.TryParse(args[i + 1], out tickTimeoutMs);
+            else if (args[i] == "--eye-hwnd" && i + 1 < args.Length)
+            {
+                var raw = args[i + 1];
+                if (raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) raw = raw[2..];
+                if (long.TryParse(raw, System.Globalization.NumberStyles.HexNumber, null, out var value))
+                    eyeHwnd = new IntPtr(value);
+            }
         }
 
         if (pollMs < 500) pollMs = 500;
         if (respawnDelaySec < 5) respawnDelaySec = 5;
         if (launchTimeoutMs < 3000) launchTimeoutMs = 3000;
+        if (tickTimeoutMs < 100) tickTimeoutMs = 100;
 
         TryHideConsoleWindow();
         var guardianLogPath = Path.Combine(GetEyeLogDir(), "eye-guardian.log");
@@ -373,7 +340,7 @@ internal partial class Program
             catch { }
             try { Console.Error.WriteLine(message); } catch { }
         }
-        using var guardianMutex = new System.Threading.Mutex(true, EyeGuardianMutexName, out bool createdNew);
+        using var guardianMutex = new System.Threading.Mutex(true, "Global\\WKAppBotEyeGuardian", out bool createdNew);
         if (!createdNew)
         {
             GuardianLog("[EYE_GUARDIAN] already running");
@@ -394,6 +361,67 @@ internal partial class Program
             catch { return false; }
         }
 
+        bool IsEyeHealthy()
+        {
+            var pingOk = PingEyeWindow();
+            try
+            {
+                var tick = EyeIpcClient.QueryTickAsync(timeoutMs: tickTimeoutMs).GetAwaiter().GetResult();
+                return tick != null || pingOk || IsEyeLogFresh();
+            }
+            catch
+            {
+                return pingOk || IsEyeLogFresh();
+            }
+        }
+
+        bool IsEyeLogFresh()
+        {
+            try
+            {
+                var logDir = GetEyeLogDir();
+                if (!Directory.Exists(logDir)) return false;
+                var latest = Directory.EnumerateFiles(logDir, "eye.pid=*.log", SearchOption.TopDirectoryOnly)
+                    .Select(path =>
+                    {
+                        try { return new FileInfo(path); }
+                        catch { return null; }
+                    })
+                    .Where(fi => fi != null)
+                    .OrderByDescending(fi => fi!.LastWriteTimeUtc)
+                    .FirstOrDefault();
+                if (latest == null) return false;
+                var freshWindowMs = Math.Max(15000, pollMs * 2);
+                return (DateTime.UtcNow - latest.LastWriteTimeUtc).TotalMilliseconds <= freshWindowMs;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        bool PingEyeWindow()
+        {
+            try
+            {
+                if (eyeHwnd == IntPtr.Zero) return false;
+                if (!WKAppBot.Win32.Native.NativeMethods.IsWindow(eyeHwnd)) return false;
+                _ = SendMessageTimeout(
+                    eyeHwnd,
+                    0x0000,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    0x0002,
+                    (uint)Math.Max(100, tickTimeoutMs),
+                    out _);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         void KillAllCore()
         {
             try
@@ -408,17 +436,45 @@ internal partial class Program
             catch { }
         }
 
-        GuardianLog($"[EYE_GUARDIAN] started pollMs={pollMs} respawnDelaySec={respawnDelaySec} launchTimeoutMs={launchTimeoutMs}");
+        GuardianLog($"[EYE_GUARDIAN] started pollMs={pollMs} respawnDelaySec={respawnDelaySec} launchTimeoutMs={launchTimeoutMs} tickTimeoutMs={tickTimeoutMs} eyeHwnd=0x{eyeHwnd.ToInt64():X}");
         DateTime? deadSinceUtc = null;
+        int consecutiveHealthFailures = 0;
         while (true)
         {
-            if (IsEyeAlive())
+            var alive = IsEyeAlive();
+            if (alive)
             {
-                deadSinceUtc = null;
+                if (IsEyeHealthy())
+                {
+                    GuardianLog("[EYE_GUARDIAN] tick ok");
+                    deadSinceUtc = null;
+                    consecutiveHealthFailures = 0;
+                    Thread.Sleep(pollMs);
+                    continue;
+                }
+
+                consecutiveHealthFailures++;
+                GuardianLog($"[EYE_GUARDIAN] tick failed/timeout streak={consecutiveHealthFailures}");
+                if (consecutiveHealthFailures < 2)
+                {
+                    Thread.Sleep(pollMs);
+                    continue;
+                }
+
+                GuardianLog("[EYE_GUARDIAN] tick failed twice -> eye tick (kill skipped)");
+                try
+                {
+                    Environment.CurrentDirectory = EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory;
+                }
+                catch { }
+                try { EyeTickCommand(new[] { "--timeout", "15" }); } catch { }
+                deadSinceUtc = DateTime.UtcNow;
+                consecutiveHealthFailures = 0;
                 Thread.Sleep(pollMs);
                 continue;
             }
 
+            consecutiveHealthFailures = 0;
             deadSinceUtc ??= DateTime.UtcNow;
             if ((DateTime.UtcNow - deadSinceUtc.Value).TotalSeconds < respawnDelaySec)
             {
@@ -433,25 +489,29 @@ internal partial class Program
             {
                 if (IsEyeAlive())
                 {
-                    GuardianLog("[EYE_GUARDIAN] eye restored");
-                    deadSinceUtc = null;
-                    break;
+                    GuardianLog("[EYE_GUARDIAN] eye restored — exiting guardian (new Eye will spawn its own)");
+                    return 0;
                 }
                 Thread.Sleep(250);
             }
 
             if (deadSinceUtc != null)
             {
-                GuardianLog("[EYE_GUARDIAN] launch timeout -> kill all core + eye tick");
-                KillAllCore();
-                Thread.Sleep(1000);
+                GuardianLog("[EYE_GUARDIAN] launch timeout -> eye tick fallback");
                 try
                 {
                     Environment.CurrentDirectory = EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory;
                 }
                 catch { }
                 try { EyeTickCommand(new[] { "--timeout", "15" }); } catch { }
-                deadSinceUtc = DateTime.UtcNow;
+                // If still not alive after tick fallback, exit so a fresh guardian can be started
+                if (!IsEyeAlive())
+                {
+                    GuardianLog("[EYE_GUARDIAN] eye unrecoverable — guardian exiting");
+                    return 1;
+                }
+                GuardianLog("[EYE_GUARDIAN] eye restored via tick — exiting guardian (new Eye will spawn its own)");
+                return 0;
             }
 
             Thread.Sleep(pollMs);
@@ -459,26 +519,6 @@ internal partial class Program
     }
     // Spawn mutex: prevents concurrent spawn attempts
     private const string EyeSpawnMutexName = "Global\\WKAppBotEyeSpawn";
-
-    /// <summary>
-    /// Disable (not delete) the watchdog task. Called on hot-swap entry.
-    /// New Eye will re-enable it via EnsureEyeWatchdogTask().
-    /// Fire-and-forget (non-blocking).
-    /// </summary>
-    internal static void DisableEyeWatchdogTask()
-    {
-        _ = Task.Run(() =>
-        {
-            try
-            {
-                var schtasks = Path.Combine(Environment.SystemDirectory, "schtasks.exe");
-                int exit = RunSchtasksQuiet(schtasks, $"/Change /TN \"{EyeWatchdogTaskName}\" /DISABLE");
-                int exit2 = RunSchtasksQuiet(schtasks, $"/Change /TN \"{EyeWatchdogStartupTaskName}\" /DISABLE");
-                Console.WriteLine($"[EYE] Watchdog: disabled (hot-swap, exit={exit}/{exit2})");
-            }
-            catch (Exception ex) { Console.WriteLine($"[EYE] Watchdog disable error: {ex.Message}"); }
-        });
-    }
 
     /// <summary>
     /// Eye auto-launch ??called from Program.Main for every CLI command.
