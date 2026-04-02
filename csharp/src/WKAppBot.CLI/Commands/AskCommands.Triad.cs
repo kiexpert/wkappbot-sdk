@@ -1,7 +1,8 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using WKAppBot.WebBot;
 
 namespace WKAppBot.CLI;
 
@@ -18,6 +19,8 @@ internal sealed class TriadSharedContext
 {
     private readonly string _question;
     private readonly string? _sessionDir;  // null = in-memory only (non-triad use)
+    private readonly string _gameId;
+    private readonly string _questionId;
 
     // Per-AI step log: initial answer + each loop step report
     private readonly ConcurrentDictionary<string, List<string>> _stepLogs =
@@ -31,6 +34,7 @@ internal sealed class TriadSharedContext
     // When AI-A produces a chunk, other AIs get it as context.
     private readonly ConcurrentDictionary<string, string> _latestChunks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, int> _chunkVersions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, CdpClient.PromptStreamEvent> _latestChunkEvents = new(StringComparer.OrdinalIgnoreCase);
 
     // Per-AI cross-prompt injection queue: chunks from peers waiting to be injected
     private readonly ConcurrentDictionary<string, ConcurrentQueue<(string fromAi, string text)>> _crossPromptQueues =
@@ -43,6 +47,20 @@ internal sealed class TriadSharedContext
 
     /// <summary>Register a CdpClient for an AI (needed for cross-prompt injection).</summary>
     public void RegisterCdp(string ai, WKAppBot.WebBot.CdpClient cdp) => _cdpClients[ai] = cdp;
+
+    public string GameId => _gameId;
+    public string QuestionId => _questionId;
+
+    public void BindStreamContext(string ai, WKAppBot.WebBot.CdpClient cdp, string editorSelector, string? runId = null)
+    {
+        cdp.SetStreamingChunkContext(
+            provider: ai,
+            gameId: _gameId,
+            questionId: _questionId,
+            runId: runId,
+            editorSelector: editorSelector,
+            pageKey: CdpPromptPump.BuildPageKey($"triad-{ai}", cdp, editorSelector));
+    }
 
     /// <summary>When true, moderator intervenes (STANCE check, format enforcement). Off during R0.</summary>
     public bool ModeratorEnabled { get; set; } = false;
@@ -117,10 +135,14 @@ internal sealed class TriadSharedContext
     public void AppendMdAiResponse(string ai, string newText)
     {
         if (string.IsNullOrWhiteSpace(newText)) return;
-        var emojiMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            { ["gpt"] = "?쨼", ["gemini"] = "?뭿", ["claude"] = "?쭬" };
-        var emoji = emojiMap.GetValueOrDefault(ai, "?뵰");
-        AppendMd($"\n### {emoji} {ai.ToUpperInvariant()} ({DateTime.Now:HH:mm})\n\n{newText.Trim()}\n");
+        var label = ai.ToLowerInvariant() switch
+        {
+            "gpt" => "GPT",
+            "gemini" => "Gemini",
+            "claude" => "Claude",
+            _ => ai,
+        };
+        AppendMd($"\n### {label} ({DateTime.Now:HH:mm})\n\n{newText.Trim()}\n");
     }
 
     // ?? EEP: Evidence Escalation Protocol ??track claims per AI per round ??
@@ -201,6 +223,13 @@ internal sealed class TriadSharedContext
     }
 
     /// <summary>Update latest response chunk + broadcast to Slack + queue for other AIs.</summary>
+    public void UpdateChunk(CdpClient.PromptStreamEvent evt)
+    {
+        var ai = string.IsNullOrWhiteSpace(evt.Provider) ? "unknown" : evt.Provider;
+        _latestChunkEvents[ai] = evt;
+        UpdateChunk(ai, evt.FullTextSoFar);
+    }
+
     public void UpdateChunk(string ai, string chunk)
     {
         var prev = _latestChunks.GetValueOrDefault(ai, "");
@@ -223,7 +252,7 @@ internal sealed class TriadSharedContext
             if (stance != null)
             {
                 // Post STANCE to Slack
-                Program.SlackPostToThread($"?뱤 *[{Program.AiDisplayName(ai)} STANCE]* {stance} (sum={stance.Sum})", Program.AiDisplayName(ai));
+                Program.SlackPostToThread($"\U0001F9ED *[{Program.AiDisplayName(ai)} STANCE]* {stance} (sum={stance.Sum})", Program.AiDisplayName(ai));
             }
             if (stance == null)
             {
@@ -279,7 +308,7 @@ internal sealed class TriadSharedContext
 
         // Post chunk to Slack immediately
         var slackSnippet = newText.Length > 200 ? newText[..200] + "..." : newText;
-        Program.SlackPostToThread($"?뮠 *[{Program.AiDisplayName(ai)}]*: {slackSnippet}", Program.AiDisplayName(ai));
+        Program.SlackPostToThread($"\U0001F4AC *[{Program.AiDisplayName(ai)}]*: {slackSnippet}", Program.AiDisplayName(ai));
 
         // Inject cross-prompt into other AIs' editors immediately (editor is free during streaming)
         var snippet = newText.Length > 300 ? newText[..300] + "..." : newText;
@@ -354,6 +383,8 @@ internal sealed class TriadSharedContext
     {
         _question = question;
         _sessionDir = sessionDir;
+        _gameId = ExtractBracketTag(question, "G") ?? DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        _questionId = ExtractBracketTag(question, "Q") ?? "q1";
 
         if (sessionDir != null)
         {
@@ -364,8 +395,20 @@ internal sealed class TriadSharedContext
             {
                 question,
                 started = DateTime.UtcNow.ToString("o"),
-            }));
+            }), Encoding.UTF8);
         }
+    }
+
+    static string? ExtractBracketTag(string text, string tag)
+    {
+        var prefix = $"[{tag}:";
+        var start = text.IndexOf(prefix, StringComparison.Ordinal);
+        if (start < 0) return null;
+        start += prefix.Length;
+        var end = text.IndexOf(']', start);
+        if (end <= start) return null;
+        var value = text[start..end].Trim();
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
     /// <summary>
@@ -396,7 +439,7 @@ internal sealed class TriadSharedContext
                         ai,
                         msg = snippet
                     });
-                    File.AppendAllText(path, line + "\n");
+                    File.AppendAllText(path, line + "\n", Encoding.UTF8);
                 }
                 catch { /* never crash AI pipeline over log write failure */ }
             }
@@ -539,8 +582,8 @@ internal partial class Program
 
             {
                 var status = result == 0
-                    ? $"??*[蹂듦뎄 ?깃났]* `{AiDisplayName(ai)}` ?묐떟 ?꾨즺"
-                    : $"??*[蹂듦뎄 ?ㅽ뙣]* `{AiDisplayName(ai)}` ????踰덉㎏ ?쒕룄???ㅽ뙣";
+                    ? $"✅ *[복구 성공]* `{AiDisplayName(ai)}` 응답 완료"
+                    : $"❌ *[복구 실패]* `{AiDisplayName(ai)}` — 두 번째 시도도 실패";
                 SlackPostToThread(status, AiDisplayName(ai));
             }
         }
