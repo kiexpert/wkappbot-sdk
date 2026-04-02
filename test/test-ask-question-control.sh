@@ -22,9 +22,13 @@ check_contains() {
 }
 
 check_contains "csharp/src/WKAppBot.CLI/Commands/AskCommands.Control.cs" "TryParseAskControlCommand" "control parser added"
+check_contains "csharp/src/WKAppBot.CLI/Commands/AskCommands.Control.cs" "WKAPPBOT_ASK_CONTROL_PIPE" "ask control pipe env consumed"
 check_contains "csharp/src/WKAppBot.CLI/Commands/AskCommands.Loop.cs" "\"qcancel\" => RunQuestionCancel" "run qcancel exposed"
 check_contains "csharp/src/WKAppBot.CLI/AskSession.cs" "DropPendingForPageAsync" "pre-send cancel drops pending prompt"
 check_contains "csharp/src/WKAppBot.WebBot/CdpClient.AiHelpers.cs" "CancelPromptPumpAsync" "page-local prompt cancel helper added"
+check_contains "csharp/src/WKAppBot.CLI/Commands/AskCommands.RunRegistry.cs" "GenerateAskControlPipeName" "ask control pipe name generated"
+check_contains "csharp/src/WKAppBot.CLI/Commands/AskCommands.RunRegistry.cs" "TrySendAskControlPipe" "ask control named pipe client added"
+check_contains "csharp/src/WKAppBot.CLI/Commands/AskCommands.RunRegistry.cs" "RunAskControl(runId, payload)" "question control routes through pipe-aware helper"
 
 WIN_ROOT="$ROOT_DIR"
 if command -v wslpath >/dev/null 2>&1; then
