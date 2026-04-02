@@ -340,7 +340,8 @@ internal partial class Program
                 NativeMethods.GetCursorPos(out var pt);
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 var nodeKey = hwnd != IntPtr.Zero ? $"{hwnd:X8}:{pt.X},{pt.Y}" : "";
-                bool doMouse = hwnd != IntPtr.Zero && (firstRun || nodeKey != _lastHackNodeKey);
+                var idleMs = NativeMethods.GetUserIdleMs();
+                bool doMouse = hwnd != IntPtr.Zero && idleMs >= 1000 && (firstRun || nodeKey != _lastHackNodeKey);
                 if (doMouse)
                     _lastHackNodeKey = nodeKey;
                 firstRun = false;
