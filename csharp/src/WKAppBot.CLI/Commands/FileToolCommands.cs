@@ -21,6 +21,7 @@ internal partial class Program
         if (args.Length == 0) return FileToolUsage();
         return args[0].ToLowerInvariant() switch
         {
+            "open"                   => FileOpenCommand(args[1..]),
             "read"                   => FileReadCommand(args[1..]),
             "read-pdf"               => FileReadPdfCommand(args[1..]),
             "write"                  => FileWriteCommand(args[1..]),
@@ -141,4 +142,34 @@ internal partial class Program
     }
 
     // ── file read ──────────────────────────────────────────────────────────
+
+    static bool TryCreateFileBackup(string path, string tag, out string? bakPath, out string? errMsg)
+    {
+        bakPath = null;
+        errMsg = null;
+        try
+        {
+            if (!File.Exists(path)) return true; // new file: nothing to back up
+
+            var origMtime = File.GetLastWriteTime(path);
+            var ts = origMtime.ToString("yyyyMMdd-HHmmss.fff");
+            var fileName = Path.GetFileName(path);
+            var bakDir = Path.Combine(Path.GetDirectoryName(path)!, ".bak");
+            bakPath = Path.Combine(bakDir, $"{fileName}.bak-{ts}.txt");
+
+            Directory.CreateDirectory(bakDir);
+            File.Copy(path, bakPath, overwrite: true);
+            File.SetCreationTime(bakPath, File.GetCreationTime(path));
+            File.SetLastWriteTime(bakPath, File.GetLastWriteTime(path));
+            Console.WriteLine($"[{tag}] backup -> {bakPath}");
+
+            MigrateLegacyBackups(Path.GetDirectoryName(path)!, bakDir);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            errMsg = $"[{tag}] backup failed ({ex.Message}) - file NOT written. Use --i-really-want-no-backup to skip backup.";
+            return false;
+        }
+    }
 }

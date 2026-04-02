@@ -633,6 +633,7 @@ internal partial class Program
                 "file" => FileCommand(restArgs),
                 // file-* hyphenated aliases: "file-edit old new f.cs" → FileCommand(["edit","old","new","f.cs"])
                 "file-edit" => FileCommand(new[] { "edit" }.Concat(restArgs).ToArray()),
+                "file-open" => FileCommand(new[] { "open" }.Concat(restArgs).ToArray()),
                 "file-read" => FileCommand(new[] { "read" }.Concat(restArgs).ToArray()),
                 "file-grep" => FileCommand(new[] { "grep" }.Concat(restArgs).ToArray()),
                 "file-glob" => FileCommand(new[] { "glob" }.Concat(restArgs).ToArray()),
