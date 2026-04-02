@@ -354,6 +354,18 @@ internal partial class Program
               Check encoding before editing! Corruption = unrecoverable.
             """,
 
+        ["code"] = """
+            code open <path>[:line[:col]]
+            Convenience alias for: file open
+            Uses the same workspace-aware smart open logic.
+            """,
+
+        ["vscode"] = """
+            vscode open <path>[:line[:col]]
+            Convenience alias for: file open
+            Uses the same workspace-aware smart open logic.
+            """,
+
         ["ask"] = """
             ask gpt|gemini|claude "<question>" [file.png] [--slack] [--new-tab]
             Ask AI via CDP (Chrome DevTools Protocol, focusless).

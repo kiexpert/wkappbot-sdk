@@ -631,6 +631,8 @@ internal partial class Program
                 "slack" => SlackCommand(restArgs),
                 "web" => WebCommand(restArgs),
                 "file" => FileCommand(restArgs),
+                "code" => EditorAliasCommand("code", restArgs),
+                "vscode" => EditorAliasCommand("vscode", restArgs),
                 // file-* hyphenated aliases: "file-edit old new f.cs" → FileCommand(["edit","old","new","f.cs"])
                 "file-edit" => FileCommand(new[] { "edit" }.Concat(restArgs).ToArray()),
                 "file-open" => FileCommand(new[] { "open" }.Concat(restArgs).ToArray()),
