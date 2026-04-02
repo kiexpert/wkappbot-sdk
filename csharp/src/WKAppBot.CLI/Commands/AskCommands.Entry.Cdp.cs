@@ -117,6 +117,20 @@ internal partial class Program
     /// </summary>
     static async Task<string?> GetOrCreateSandboxedTabAsync(CdpClient cdp, int port, string key, string expectedHost)
     {
+        static async Task<System.Text.Json.Nodes.JsonArray?> TryGetTargetsBeforeCreateAsync(int probePort)
+        {
+            try
+            {
+                using var http = new HttpClient();
+                var json = await http.GetStringAsync($"http://localhost:{probePort}/json");
+                return JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonArray>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         var entry = AskTargetRegistry.GetEntry(key);
         if (entry != null)
         {
@@ -149,12 +163,13 @@ internal partial class Program
                     // Leave polluted tab alive (debugging) — create a new clean tab
                     try
                     {
+                        var beforeTargets = await TryGetTargetsBeforeCreateAsync(port);
                         var result = await cdp.SendAsync("Target.createTarget",
                             new System.Text.Json.Nodes.JsonObject { ["url"] = $"https://{expectedHost}" });
                         var newId = result?["targetId"]?.GetValue<string>();
                         if (newId != null)
                         {
-                            await cdp.DumpTabGrowthAsync(port, "sandbox-mismatch-create", null, key, expectedHost, newId);
+                            await cdp.DumpTabGrowthAsync(port, "sandbox-mismatch-create", beforeTargets, key, expectedHost, newId);
                             await cdp.SwitchToTargetAsync(newId, port);
                             AskTargetRegistry.SetEntry(key, newId, expectedHost);
                             await cdp.TryCloseTabByIdAsync(port, entry.TargetId, "sandbox-mismatch");
@@ -187,12 +202,13 @@ internal partial class Program
         Console.ResetColor();
         try
         {
+            var beforeTargets = await TryGetTargetsBeforeCreateAsync(port);
             var result = await cdp.SendAsync("Target.createTarget",
                 new System.Text.Json.Nodes.JsonObject { ["url"] = $"https://{expectedHost}" });
             var newId = result?["targetId"]?.GetValue<string>();
             if (newId != null)
             {
-                await cdp.DumpTabGrowthAsync(port, "sandbox-miss-create", null, key, expectedHost, newId);
+                await cdp.DumpTabGrowthAsync(port, "sandbox-miss-create", beforeTargets, key, expectedHost, newId);
                 await cdp.SwitchToTargetAsync(newId, port);
                 AskTargetRegistry.SetEntry(key, newId, expectedHost);
                 Console.ForegroundColor = ConsoleColor.Green;
