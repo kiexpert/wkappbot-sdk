@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO.Pipes;
 using System.Text;
 using System.Text.Json.Nodes;
 
@@ -7,11 +8,12 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    sealed class RunEntry(string id, string cmd, Process process)
+    sealed class RunEntry(string id, string cmd, Process process, string? askControlPipeName = null)
     {
         public string Id { get; } = id;
         public string Cmd { get; } = cmd;
         public Process Process { get; } = process;
+        public string? AskControlPipeName { get; } = askControlPipeName;
         public StringBuilder Buffer { get; } = new();
         public DateTime StartTime { get; } = DateTime.UtcNow;
         public Stopwatch Elapsed { get; } = Stopwatch.StartNew();
@@ -43,6 +45,9 @@ internal partial class Program
     static string GenerateRunId() =>
         $"r_{DateTime.Now:HHmmss}_{Interlocked.Increment(ref _runSeq):D3}";
 
+    static string GenerateAskControlPipeName(string runId) =>
+        $"wkappbot-ask-ctrl-{runId}".Replace(":", "_");
+
     // Well-known external interpreters/shells (no .exe suffix needed)
     static readonly HashSet<string> KnownExternalTools = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -71,6 +76,7 @@ internal partial class Program
         if (root is "eye" or "mcp") return (2, "", $"run start: blocked: {root}");
 
         var runId = GenerateRunId();
+        var askControlPipeName = root == "ask" ? GenerateAskControlPipeName(runId) : null;
 
         // External exe (cmd.exe, python.exe, etc.) → run directly
         // WKAppBot command (a11y, inspect, etc.) → run via wkappbot-core.exe
@@ -102,9 +108,11 @@ internal partial class Program
         foreach (var a in exeArgs) p.StartInfo.ArgumentList.Add(a);
         p.StartInfo.EnvironmentVariables["WKAPPBOT_LOOP_CALLER"] = executedBy;
         p.StartInfo.EnvironmentVariables["WKAPPBOT_RUN_ID"] = runId;
+        if (!string.IsNullOrWhiteSpace(askControlPipeName))
+            p.StartInfo.EnvironmentVariables["WKAPPBOT_ASK_CONTROL_PIPE"] = askControlPipeName;
         p.StartInfo.WorkingDirectory = Environment.CurrentDirectory;
 
-        var entry = new RunEntry(runId, string.Join(" ", cmdArgv), p);
+        var entry = new RunEntry(runId, string.Join(" ", cmdArgv), p, askControlPipeName);
         p.OutputDataReceived += (_, e) =>
         {
             if (e.Data != null) lock (entry.Buffer) entry.Buffer.AppendLine(e.Data);
@@ -120,7 +128,31 @@ internal partial class Program
         _runRegistry[runId] = entry;
 
         Console.WriteLine($"[RUN] start run_id={runId}  pid={p.Id}  cmd={entry.Cmd}");
-        return (0, $"run_id: {runId}\nstatus: running\npid: {p.Id}\ncmd: {entry.Cmd}", "");
+        var pipeLine = string.IsNullOrWhiteSpace(askControlPipeName) ? "" : $"\nask_control_pipe: {askControlPipeName}";
+        return (0, $"run_id: {runId}\nstatus: running\npid: {p.Id}\ncmd: {entry.Cmd}{pipeLine}", "");
+    }
+
+    static bool TrySendAskControlPipe(RunEntry entry, string payload, out string error)
+    {
+        error = "";
+        if (string.IsNullOrWhiteSpace(entry.AskControlPipeName))
+            return false;
+
+        try
+        {
+            using var client = new NamedPipeClientStream(".", entry.AskControlPipeName, PipeDirection.Out);
+            client.Connect(500);
+            using var writer = new StreamWriter(client, new UTF8Encoding(false)) { AutoFlush = true };
+            writer.Write(payload);
+            var preview = payload.Replace("\r", "\\r").Replace("\n", "\\n");
+            Console.WriteLine($"[RUN] ask-ctrl -> {entry.Id}  data={preview}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
     }
 
     // Inject stdin into a running process
@@ -141,6 +173,23 @@ internal partial class Program
         catch (Exception ex) { return (1, "", $"stdin inject failed: {ex.Message}"); }
     }
 
+    static (int exitCode, string stdout, string stderr) RunAskControl(string runId, JsonObject payload)
+    {
+        if (!_runRegistry.TryGetValue(runId, out var entry))
+            return (1, "", $"run_id not found: {runId}");
+
+        var text = payload.ToJsonString() + Environment.NewLine;
+        if (TrySendAskControlPipe(entry, text, out var pipeError))
+        {
+            return (0, $"ask-control -> {runId} ({payload["action"]})", "");
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.AskControlPipeName) && !string.IsNullOrWhiteSpace(pipeError))
+            Console.WriteLine($"[RUN] ask-ctrl fallback -> stdin ({pipeError})");
+
+        return RunStdin(runId, text);
+    }
+
     static (int exitCode, string stdout, string stderr) RunQuestionCancel(string runId, string? questionId, string? reason = null)
     {
         var payload = new JsonObject
@@ -153,7 +202,7 @@ internal partial class Program
             payload["question_id"] = questionId;
         if (!string.IsNullOrWhiteSpace(reason))
             payload["reason"] = reason;
-        return RunStdin(runId, payload.ToJsonString() + Environment.NewLine);
+        return RunAskControl(runId, payload);
     }
 
     static (int exitCode, string stdout, string stderr) RunQuestionStatus(string runId, string? questionId = null)
@@ -166,7 +215,7 @@ internal partial class Program
         };
         if (!string.IsNullOrWhiteSpace(questionId))
             payload["question_id"] = questionId;
-        var inject = RunStdin(runId, payload.ToJsonString() + Environment.NewLine);
+        var inject = RunAskControl(runId, payload);
         if (inject.exitCode != 0)
             return inject;
         Thread.Sleep(250);
@@ -181,7 +230,7 @@ internal partial class Program
             ["action"] = "list",
             ["run_id"] = runId
         };
-        var inject = RunStdin(runId, payload.ToJsonString() + Environment.NewLine);
+        var inject = RunAskControl(runId, payload);
         if (inject.exitCode != 0)
             return inject;
         Thread.Sleep(250);
