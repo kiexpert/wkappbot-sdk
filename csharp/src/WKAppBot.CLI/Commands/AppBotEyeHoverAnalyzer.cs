@@ -341,9 +341,7 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 var nodeKey = hwnd != IntPtr.Zero ? $"{hwnd:X8}:{pt.X},{pt.Y}" : "";
                 var idleMs = NativeMethods.GetUserIdleMs();
-                bool doMouse = hwnd != IntPtr.Zero && idleMs >= 1000 && (firstRun || nodeKey != _lastHackNodeKey);
-                if (doMouse)
-                    _lastHackNodeKey = nodeKey;
+                bool doMouse = hwnd != IntPtr.Zero && idleMs >= 1000 && !firstRun;
                 firstRun = false;
 
                 // Ensure server is running
