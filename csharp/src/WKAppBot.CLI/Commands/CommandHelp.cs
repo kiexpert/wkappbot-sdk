@@ -192,6 +192,10 @@ internal partial class Program
                      clipboard  clipboard-read  clipboard-write  wait  eval
 
             Grap patterns:
+              AI target language for windows and accessibility nodes.
+              Humans browse windows; AIs point with grap.
+              Interactive actions stop at the first exact match.
+              Full lookup stays array-shaped for ranking and review.
               "*App*"              glob wildcard
               "regex:btn_\\d+"     regex
               "*App*;*Calc*"       OR (semicolon)
@@ -200,7 +204,7 @@ internal partial class Program
               "adb://device#elem"  Android ADB
 
             Key options:
-              --nth N / N~ / ~N / 2~4   which match (default: first)
+              --nth N / N~ / ~N / 2~4 / 1,3~   which match (default: first)
               --all                      apply to all matches
               --depth N                  UIA tree depth
               --force                    skip safety guards
@@ -325,17 +329,25 @@ internal partial class Program
             File operations with 4-stage encoding detection (UTF-8/CP949).
 
             Subcommands:
+              open <path>[:line[:col]]
+                  Smart open in responsible VS Code window, then goto line/column.
               read <path> [--offset N] [--limit N] [--encoding 949|utf-16]
                   Read with line numbers. .pdf → auto-routes to read-pdf.
+                  Aliases: --path/--file, --start/--end/--count, --no-line-numbers.
+              write <path> [--encoding N] (--stdin | --text "..." | --file <src>) [--append]
+                  Auto backup ON. Aliases: --path, --content, --source-file, --dry-run.
               edit <old> <new> <path> [--replace-all] [--context N] [--tab-size N]
                   Indent-based block context. C-style escapes (\\n \\t \\r \\\\).
                   Same old+new = search-only (no write). --old-file/--new-file for Korean args.
+                  Option aliases also work: --old-string/--text/--path/--dry-run.
               grep <regex> [--path <dir>] [--type <ext>] [-i] [-C N] [--max N]
                   Regex search. ';' OR in --path: "W:/A;B" expands.
+                  Aliases: --pattern/--query, --root, --file.
               glob <pattern> [--path <dir>]
                   ** glob. ⚠ ALWAYS use **/ prefix: "**/*.cs" not "*.cs".
+                  Alias: --pattern.
 
-            Aliases: file-read, file-edit, file-grep, file-glob (hyphenated)
+            Aliases: file-open, file-read, file-edit, file-grep, file-glob (hyphenated)
             wkedit.exe → busybox symlink → file edit auto-routing
 
             ⚠ CP949 source files: some WKAppBot sources have Korean in CP949.
