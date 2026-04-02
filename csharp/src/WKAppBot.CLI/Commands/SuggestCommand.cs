@@ -11,6 +11,8 @@ internal partial class Program
 
     static int SuggestCommand(string[] args)
     {
+        Environment.SetEnvironmentVariable("WKAPPBOT_SUGGEST_BYPASS", "1");
+
         if (args.Length > 0 && args[0] is "resolve")
             return SuggestResolveCommand(args[1..]);
         if (args.Length > 0 && args[0] is "list" or "ls")
@@ -100,7 +102,7 @@ internal partial class Program
         var channel  = config?["channel"]?.GetValue<string>();
         if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
         {
-            var senderName = GetSendReplyUsername();
+            var senderName = GetSuggestBypassUsername();
             var (ok, ts) = PostWithOverflow(botToken, channel, slackMsg, username: senderName);
             if (ok)
             {
@@ -379,7 +381,7 @@ internal partial class Program
                 msgLines.Add(part);
             var slackMsg = string.Join("\n", msgLines);
             var (header, overflow) = SplitMessageForChannel(slackMsg);
-            var senderName = GetSendReplyUsername();
+            var senderName = GetSuggestBypassUsername();
 
             var (ok, newTs) = SlackSendViaApi(botToken, channel, header, username: senderName).GetAwaiter().GetResult();
             if (!ok || string.IsNullOrEmpty(newTs))
@@ -449,6 +451,7 @@ internal partial class Program
             Console.WriteLine("  The evidence file is uploaded to Slack as proof of testing.");
             Console.WriteLine();
             Console.WriteLine($"  wkappbot suggest resolve <ts> \"note\" {ConfirmFlag} test_result.sh");
+            Console.WriteLine($"  Allowed evidence scripts: .sh, .ps1, .cmd");
             Console.ResetColor();
             return 1;
         }
@@ -462,14 +465,28 @@ internal partial class Program
         }
 
         // Validate filename convention: test-{cmd}-{subcmd}-{desc}.{ext}
+        var evidenceExt = Path.GetExtension(evidenceFile).ToLowerInvariant();
+        var allowedEvidenceExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".sh", ".ps1", ".cmd", ".bat"
+        };
+        if (!allowedEvidenceExts.Contains(evidenceExt))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  ❌ Unsupported evidence extension: {evidenceExt}");
+            Console.WriteLine($"     Allowed: .sh, .ps1, .cmd");
+            Console.ResetColor();
+            return 1;
+        }
+
         var evidenceName = Path.GetFileNameWithoutExtension(evidenceFile);
         var evidenceParts = evidenceName.Split('-');
         if (evidenceParts.Length < 3 || !evidenceParts[0].Equals("test", StringComparison.OrdinalIgnoreCase))
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  ❌ Evidence filename must follow: test-{{cmd}}-{{subcmd}}-{{description}}.sh");
+            Console.WriteLine($"  ❌ Evidence filename must follow: test-{{cmd}}-{{subcmd}}-{{description}}.<sh|ps1|cmd>");
             Console.WriteLine($"     Got: {Path.GetFileName(evidenceFile)}");
-            Console.WriteLine($"     Example: test-a11y-wait-condition.sh, test-file-edit-korean.sh");
+            Console.WriteLine($"     Example: test-a11y-wait-condition.sh, test-file-edit-korean.ps1, test-file-open-routing.cmd");
             Console.ResetColor();
             return 1;
         }
@@ -539,7 +556,7 @@ internal partial class Program
         catch { }
 
         // Run evidence script — must pass (exit 0) to allow resolve
-        var ext = Path.GetExtension(evidenceFile).ToLowerInvariant();
+        var ext = evidenceExt;
         var shell = ext switch
         {
             ".sh"  => "bash", // resolved below with full path
@@ -604,7 +621,7 @@ internal partial class Program
                     return 1;
                 }
 
-                // Derive expected cmd pattern from script filename: test-{cmd}-{subcmd}-*.sh → "{cmd}-{subcmd}"
+                // Derive expected cmd pattern from script filename: test-{cmd}-{subcmd}-* → "{cmd}-{subcmd}"
                 var scriptBaseName = Path.GetFileNameWithoutExtension(evidenceFile); // e.g. test-web-open-real
                 var scriptParts = scriptBaseName.Split('-');
                 var expectedCmdPattern = scriptParts.Length >= 3 ? $"{scriptParts[1]}-{scriptParts[2]}" : null; // e.g. "web-open"
@@ -630,7 +647,7 @@ internal partial class Program
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine($"  ❌ CMD execution guard FAILED: expected '{expectedCmdPattern}' command in debug output, not found.");
-                    Console.WriteLine($"     스크립트 파일명 test-{scriptParts[1]}-{scriptParts[2]}-*.sh → 'wkappbot {scriptParts[1]} {scriptParts[2]}' 명령을 실제 실행해야 합니다.");
+                    Console.WriteLine($"     스크립트 파일명 test-{scriptParts[1]}-{scriptParts[2]}-* → 'wkappbot {scriptParts[1]} {scriptParts[2]}' 명령을 실제 실행해야 합니다.");
                     Console.ResetColor();
                     return 1;
                 }
@@ -733,7 +750,7 @@ internal partial class Program
         Console.WriteLine($"[RESOLVE] Moved to history: {note}");
 
         // Copy evidence to experience DB: experience/tests/{cmd}/{subcmd}/{filename}
-        // Filename convention: test-{cmd}-{subcmd}-{desc}.sh → folder: tests/{cmd}/{subcmd}/
+        // Filename convention: test-{cmd}-{subcmd}-{desc}.{ext} → folder: tests/{cmd}/{subcmd}/
         try
         {
             var parts = Path.GetFileNameWithoutExtension(evidenceFile).Split('-');
@@ -763,6 +780,17 @@ internal partial class Program
         }
         catch (Exception ex) { Console.Error.WriteLine($"[RESOLVE] Evidence copy failed: {ex.Message}"); }
 
+        try
+        {
+            var recoveryZip = CreateResolveRecoveryZip(hqDir, tsPrefix, evidenceFile);
+            if (!string.IsNullOrWhiteSpace(recoveryZip))
+                Console.WriteLine($"[RESOLVE] Recovery ZIP: {recoveryZip}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[RESOLVE] Recovery ZIP failed: {ex.Message}");
+        }
+
         // Slack reply if slack_ts is available — uses shared SlackSendViaApi (same as 'slack reply')
         if (!string.IsNullOrEmpty(slackTs))
         {
@@ -772,7 +800,7 @@ internal partial class Program
             if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
             {
                 var replyText = $":white_check_mark: *RESOLVED* — {note}\n:page_facing_up: Evidence: `{Path.GetFileName(evidenceFile)}`";
-                var resolverName = GetSendReplyUsername();
+                var resolverName = GetSuggestBypassUsername();
 
                 // 1. Text reply with reply_broadcast → visible in channel + thread
                 var (textOk, _) = SlackSendViaApi(botToken, channel, replyText,
@@ -804,6 +832,58 @@ internal partial class Program
         return 0;
     }
 
+    static string? CreateResolveRecoveryZip(string hqDir, string tsPrefix, string evidenceFile)
+    {
+        try
+        {
+            var binDir = AppContext.BaseDirectory;
+            var coreExe = Path.Combine(binDir, "wkappbot-core.exe");
+            var launcherExe = Path.Combine(binDir, "wkappbot.exe");
+            if (!File.Exists(coreExe) && !File.Exists(launcherExe))
+                return null;
+
+            var recoveryDir = Path.Combine(hqDir, "recovery");
+            Directory.CreateDirectory(recoveryDir);
+
+            var version = System.Diagnostics.FileVersionInfo
+                .GetVersionInfo(coreExe).ProductVersion
+                ?? System.Diagnostics.FileVersionInfo.GetVersionInfo(coreExe).FileVersion
+                ?? "unknown";
+            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var safeTs = tsPrefix.Replace(":", "").Replace("/", "_").Replace("\\", "_");
+            var zipPath = Path.Combine(recoveryDir, $"wkappbot-recovery-v{version}-{stamp}-{safeTs}.zip");
+
+            using var archive = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create);
+            AddRecoveryEntry(archive, coreExe, "bin/wkappbot-core.exe");
+            AddRecoveryEntry(archive, launcherExe, "bin/wkappbot.exe");
+            AddRecoveryEntry(archive, evidenceFile, $"evidence/{Path.GetFileName(evidenceFile)}");
+
+            var manifest = new StringBuilder();
+            manifest.AppendLine($"version={version}");
+            manifest.AppendLine($"resolved_at={DateTime.UtcNow:O}");
+            manifest.AppendLine($"resolve_ts_prefix={tsPrefix}");
+            manifest.AppendLine($"core={Path.GetFileName(coreExe)}");
+            manifest.AppendLine($"launcher={Path.GetFileName(launcherExe)}");
+            manifest.AppendLine($"evidence={Path.GetFileName(evidenceFile)}");
+
+            var entry = archive.CreateEntry("manifest.txt");
+            using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
+            writer.Write(manifest.ToString());
+            return zipPath;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    static void AddRecoveryEntry(System.IO.Compression.ZipArchive archive, string path, string entryName)
+    {
+        if (!File.Exists(path)) return;
+        System.IO.Compression.ZipFileExtensions.CreateEntryFromFile(
+            archive, path, entryName, System.IO.Compression.CompressionLevel.Optimal);
+    }
+
     /// <summary>
     /// Re-run all previously stored test scripts for the same cmd/subcmd as the evidence file.
     /// Returns 0 if all pass, 1 if any fail (resolve is blocked until fixed).
@@ -821,16 +901,18 @@ internal partial class Program
             if (!Directory.Exists(testsDir)) return 0;
 
             var evidenceAbs = Path.GetFullPath(evidenceFile);
-            var scripts = Directory.GetFiles(testsDir, "*.sh")
+            var scripts = Directory.GetFiles(testsDir)
+                .Where(f =>
+                {
+                    var ext = Path.GetExtension(f).ToLowerInvariant();
+                    return ext is ".sh" or ".ps1" or ".cmd" or ".bat";
+                })
                 .Where(f => !string.Equals(Path.GetFullPath(f), evidenceAbs, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(f => f)
                 .ToArray();
             if (scripts.Length == 0) return 0;
 
             Console.WriteLine($"\n[REGRESSION] Running {scripts.Length} existing test(s) for {cmd}/{subcmd}...");
-            var bashExe = File.Exists(@"C:\Program Files\Git\usr\bin\bash.exe")
-                ? @"C:\Program Files\Git\usr\bin\bash.exe" : "bash";
-
             int passed = 0, failed = 0;
             var failures = new List<(string name, string path)>();
             foreach (var script in scripts)
@@ -840,10 +922,31 @@ internal partial class Program
                 try { Console.Out.Flush(); } catch { }
                 try
                 {
+                    var ext = Path.GetExtension(script).ToLowerInvariant();
+                    var runner = ext switch
+                    {
+                        ".sh" => File.Exists(@"C:\Program Files\Git\usr\bin\bash.exe")
+                            ? @"C:\Program Files\Git\usr\bin\bash.exe"
+                            : "bash",
+                        ".ps1" => "powershell.exe",
+                        ".cmd" or ".bat" => "cmd.exe",
+                        _ => null
+                    };
+                    if (runner == null)
+                        throw new InvalidOperationException($"Unsupported regression script: {script}");
+
+                    var runnerArgs = ext switch
+                    {
+                        ".sh" => $"\"{script}\"",
+                        ".ps1" => $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\"",
+                        ".cmd" or ".bat" => $"/c \"{script}\"",
+                        _ => throw new InvalidOperationException()
+                    };
+
                     var psi = new System.Diagnostics.ProcessStartInfo
                     {
-                        FileName = bashExe,
-                        Arguments = $"\"{script}\"",
+                        FileName = runner,
+                        Arguments = runnerArgs,
                         UseShellExecute = false,
                         CreateNoWindow = true,
                         RedirectStandardOutput = true,
@@ -918,12 +1021,13 @@ internal partial class Program
                     var channel  = regCfg?["channel"]?.GetValue<string>();
                     if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
                     {
+                        var senderName = GetSuggestBypassUsername();
                         var lines = new System.Text.StringBuilder();
                         lines.AppendLine($":x: *[REGRESSION BLOCKED]* `{cmd}/{subcmd}` — {failed}/{scripts.Length} test(s) failed:");
                         foreach (var (name, path) in failures)
                             lines.AppendLine($"• `{name}` — `wkedit \"old\" \"new\" \"{path.Replace('\\', '/')}\"` 로 수정");
                         lines.Append("_코드 버그 수정 or 구버전 테스트 wkedit 후 re-resolve_");
-                        SlackSendViaApi(botToken, channel, lines.ToString()).GetAwaiter().GetResult();
+                        SlackSendViaApi(botToken, channel, lines.ToString(), username: senderName).GetAwaiter().GetResult();
                     }
                 }
                 catch { }
