@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.IO.Pipes;
 using System.Text.Json;
 
 namespace WKAppBot.CLI;
@@ -17,12 +18,14 @@ internal partial class Program
     static readonly ConcurrentQueue<AskControlCommand> _askControlQueue = new();
     static readonly object _askControlPumpGate = new();
     static Task? _askControlPumpTask;
+    static string? _askControlPipeName;
 
     static void EnsureAskControlPumpStarted()
     {
         var runId = Environment.GetEnvironmentVariable("WKAPPBOT_RUN_ID");
         if (string.IsNullOrWhiteSpace(runId))
             return;
+        _askControlPipeName ??= Environment.GetEnvironmentVariable("WKAPPBOT_ASK_CONTROL_PIPE");
 
         lock (_askControlPumpGate)
         {
@@ -33,6 +36,12 @@ internal partial class Program
             {
                 try
                 {
+                    if (!string.IsNullOrWhiteSpace(_askControlPipeName))
+                    {
+                        RunAskControlPipeLoop(runId, _askControlPipeName);
+                        return;
+                    }
+
                     while (true)
                     {
                         string? line;
@@ -42,11 +51,7 @@ internal partial class Program
                         if (line == null)
                             break;
 
-                        if (!TryParseAskControlCommand(line, runId, out var cmd) || cmd == null)
-                            continue;
-
-                        _askControlQueue.Enqueue(cmd);
-                        Console.WriteLine($"[ASK:CTRL] queued action={cmd.Action} q={cmd.QuestionId ?? "*"} reason={cmd.Reason ?? "USER_STOP"}");
+                        EnqueueAskControlLine(line, runId);
                     }
                 }
                 catch (Exception ex)
@@ -55,6 +60,42 @@ internal partial class Program
                 }
             });
         }
+    }
+
+    static void RunAskControlPipeLoop(string runId, string pipeName)
+    {
+        while (true)
+        {
+            try
+            {
+                using var server = new NamedPipeServerStream(
+                    pipeName,
+                    PipeDirection.In,
+                    1,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
+                server.WaitForConnection();
+
+                using var reader = new StreamReader(server);
+                string? line;
+                while ((line = reader.ReadLine()) != null)
+                    EnqueueAskControlLine(line, runId);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ASK:CTRL] pipe stopped: {ex.Message}");
+                Thread.Sleep(250);
+            }
+        }
+    }
+
+    static void EnqueueAskControlLine(string line, string runId)
+    {
+        if (!TryParseAskControlCommand(line, runId, out var cmd) || cmd == null)
+            return;
+
+        _askControlQueue.Enqueue(cmd);
+        Console.WriteLine($"[ASK:CTRL] queued action={cmd.Action} q={cmd.QuestionId ?? "*"} reason={cmd.Reason ?? "USER_STOP"}");
     }
 
     static bool TryParseAskControlCommand(string line, string currentRunId, out AskControlCommand? cmd)
