@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using WKAppBot.Win32.Native;
+using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
@@ -57,6 +58,15 @@ internal partial class Program
 
         if (target != null)
         {
+            var probe = CreateInputReadiness();
+            var probeResult = probe.Probe(new InputReadinessRequest
+            {
+                TargetHwnd = target.Hwnd,
+                IntendedAction = "file-open",
+            });
+            if (probeResult.ActiveBlocker != null)
+                return Error($"Blocked by active window: {probeResult.ActiveBlocker.Title}");
+
             NativeMethods.SmartSetForegroundWindow(target.Hwnd);
             Thread.Sleep(150);
             Console.WriteLine($"[FILE] open target -> hwnd=0x{target.Hwnd:X} cwd={target.WorkspaceCwd ?? "?"}");

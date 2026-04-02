@@ -1,7 +1,16 @@
 #!/bin/bash
 # Evidence: file open chooses the responsible VS Code workspace window when one is already open.
 
-WKAPPBOT=${WKAPPBOT:-/w/SDK/bin/wkappbot-core.exe}
+if [ -z "${WKAPPBOT:-}" ]; then
+  if [ -x /w/SDK/bin/wkappbot-core.exe ]; then
+    WKAPPBOT=/w/SDK/bin/wkappbot-core.exe
+  elif [ -x /mnt/w/SDK/bin/wkappbot-core.exe ]; then
+    WKAPPBOT=/mnt/w/SDK/bin/wkappbot-core.exe
+  else
+    echo "FAIL: could not locate wkappbot-core.exe in /w or /mnt/w"
+    exit 1
+  fi
+fi
 TARGET="csharp/src/WKAppBot.CLI/Commands/FileToolCommands.Open.cs:1"
 
 OUT=$("$WKAPPBOT" file open "$TARGET" 2>&1)
