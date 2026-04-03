@@ -174,6 +174,7 @@ internal partial class Program
         // CWD 폴더명으로 윈도우 타이틀 매칭 — 여러 개 가능 (VS Code + Codex 동시에 같은 폴더 열어둔 경우)
         var myPrompts = allPrompts
             .Where(p => p.WindowTitle.Contains(cwdFolder, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(p => ClaudePromptHelper.IsCodexHostType(p.HostType))
             .ToList();
 
         if (myPrompts.Count > 0)
@@ -384,7 +385,7 @@ internal partial class Program
     /// </summary>
     static string GetPromptSearchableTitle(ClaudePromptHelper.PromptInfo p)
     {
-        if (p.HostType == "vscode-claudecode")
+        if (ClaudePromptHelper.IsVsCodeHostType(p.HostType))
         {
             var vscIdx = p.WindowTitle.IndexOf(" - Visual Studio Code", StringComparison.OrdinalIgnoreCase);
             if (vscIdx > 0)
@@ -400,9 +401,9 @@ internal partial class Program
     static bool MatchesHostTarget(ClaudePromptHelper.PromptInfo prompt, string hostTarget)
     {
         if (hostTarget == "codex")
-            return string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
+            return ClaudePromptHelper.IsCodexHostType(prompt.HostType);
         if (hostTarget == "claude")
-            return !string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
+            return !ClaudePromptHelper.IsCodexHostType(prompt.HostType);
         return true;
     }
 
@@ -702,8 +703,8 @@ internal partial class Program
             Console.WriteLine($"  [SLACK→PROMPT] 덮어쓰기 승인 — 기존 내용 저장 후 전달");
         }
 
-        var isCodexPrompt = string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
-        var isVsCodePrompt = string.Equals(prompt.HostType, "vscode-claudecode", StringComparison.OrdinalIgnoreCase);
+        var isCodexPrompt = ClaudePromptHelper.IsCodexHostType(prompt.HostType);
+        var isVsCodePrompt = ClaudePromptHelper.IsVsCodeHostType(prompt.HostType);
         if (isCodexPrompt || isVsCodePrompt)
         {
             if (isCodexPrompt)

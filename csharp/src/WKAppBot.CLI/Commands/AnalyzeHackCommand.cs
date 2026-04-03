@@ -33,32 +33,26 @@ internal partial class Program
         if (!int.TryParse(args[1], out int px) || !int.TryParse(args[2], out int py))
         { Console.Error.WriteLine("Invalid x/y"); return 1; }
 
-        // Optional w/h — default to window rect or 600x400 crop
+        hwnd = ResolveFrontmostWindowForPoint(hwnd, px, py);
+        if (hwnd == IntPtr.Zero)
+        {
+            Console.Error.WriteLine("No frontmost window at point");
+            return 1;
+        }
+
         NativeMethods.GetWindowRect(hwnd, out var wr);
         int cx = wr.Left, cy = wr.Top;
         int cw = wr.Right - wr.Left, ch = wr.Bottom - wr.Top;
 
-        if (args.Length >= 5 && int.TryParse(args[3], out int aw) && int.TryParse(args[4], out int ah))
-        { cw = aw; ch = ah; }
-        else if (cw > 800 || ch > 600)
-        {
-            cx = px - 300; cy = py - 200;
-            if (cx < wr.Left) cx = wr.Left;
-            if (cy < wr.Top) cy = wr.Top;
-            cw = Math.Min(600, wr.Right - cx);
-            ch = Math.Min(400, wr.Bottom - cy);
-        }
-        if (cw < 10 || ch < 10) { Console.Error.WriteLine("Area too small"); return 1; }
-
         var result = new JsonObject();
 
-        // UIA element at point
+        // UIA element at cursor → parent = "family" scope for capture
         string elName = "", elType = "?", elAid = "";
         FlaUI.Core.AutomationElements.AutomationElement? parentEl = null;
         try
         {
             using var uia = new UiaLocator();
-            var (element, info) = uia.GetElementAndInfoAtPoint(px, py);
+            var (element, info) = uia.GetElementAndInfoContainingRectInWindow(px, py, 1, 1, hwnd);
             elName = info?.Name ?? "";
             elType = info?.ControlType ?? "?";
             elAid = info?.AutomationId ?? "";
@@ -67,6 +61,48 @@ internal partial class Program
                 try { parentEl = element.Parent; } catch { }
                 parentEl ??= element;
             }
+
+            // Use parent's BoundingRect as capture area (family-scoped analysis)
+            // If parent is too small (< 50px either axis, likely single child), walk up
+            if (parentEl != null)
+            {
+                try
+                {
+                    var scanScope = parentEl;
+                    for (int up = 0; up < 3; up++)
+                    {
+                        var pb = scanScope.Properties.BoundingRectangle.ValueOrDefault;
+                        if (pb.Width >= 50 && pb.Height >= 30)
+                        {
+                            cx = pb.X; cy = pb.Y; cw = pb.Width; ch = pb.Height;
+                            if (cx < wr.Left) { cw -= (wr.Left - cx); cx = wr.Left; }
+                            if (cy < wr.Top) { ch -= (wr.Top - cy); cy = wr.Top; }
+                            if (cx + cw > wr.Right) cw = wr.Right - cx;
+                            if (cy + ch > wr.Bottom) ch = wr.Bottom - cy;
+                            break;
+                        }
+                        // Too small — go up one level
+                        try { scanScope = scanScope.Parent; } catch { break; }
+                        if (scanScope == null) break;
+                    }
+                }
+                catch { /* fallback to window rect */ }
+            }
+
+            // Override with explicit w/h if provided
+            if (args.Length >= 5 && int.TryParse(args[3], out int aw) && int.TryParse(args[4], out int ah))
+            { cx = wr.Left; cy = wr.Top; cw = aw; ch = ah; }
+
+            // Fallback: if still too large (no UIA parent found), crop around cursor
+            if (cw > 800 || ch > 600)
+            {
+                cx = px - 300; cy = py - 200;
+                if (cx < wr.Left) cx = wr.Left;
+                if (cy < wr.Top) cy = wr.Top;
+                cw = Math.Min(600, wr.Right - cx);
+                ch = Math.Min(400, wr.Bottom - cy);
+            }
+        if (cw < 10 || ch < 10) { Console.Error.WriteLine("Area too small"); return 1; }
 
             // Visual MD render (parent scope)
             string visualMd = "";
@@ -184,6 +220,14 @@ internal partial class Program
 
             result["elName"] = elName;
             result["elType"] = elType;
+            if (info != null)
+            {
+                result["elBounds"] = $"{info.BoundsX},{info.BoundsY} {info.BoundsW}x{info.BoundsH}";
+                if (!string.IsNullOrEmpty(info.Value))
+                    result["elValue"] = info.Value;
+                if (info.Patterns?.Count > 0)
+                    result["elPatterns"] = string.Join(", ", info.Patterns);
+            }
             result["dynId"] = dynId;
             result["grapPath"] = !string.IsNullOrEmpty(grapScope) ? $"{grapWin}#{grapScope}" : grapWin;
             result["winTitle"] = winTitle;
@@ -197,6 +241,50 @@ internal partial class Program
         // Output JSON to stdout
         Console.Write(result.ToJsonString());
         return 0;
+    }
+
+    static IntPtr ResolveFrontmostWindowForPoint(IntPtr fallbackHwnd, int px, int py)
+    {
+        try
+        {
+            var pt = new POINT { X = px, Y = py };
+            var topLeaf = NativeMethods.WindowFromPoint(pt);
+            var candidate = topLeaf != IntPtr.Zero ? topLeaf : fallbackHwnd;
+            if (candidate == IntPtr.Zero) return IntPtr.Zero;
+
+            var cls = new StringBuilder(128);
+            try { NativeMethods.GetClassNameW(candidate, cls, cls.Capacity); } catch { }
+            candidate = NativeMethods.FindRealWindowFromPoint(pt, candidate, cls.ToString());
+
+            var root = NativeMethods.GetAncestor(candidate, NativeMethods.GA_ROOT);
+            if (root != IntPtr.Zero) candidate = root;
+
+            IntPtr zTop = IntPtr.Zero;
+            NativeMethods.EnumWindows((hWnd, _) =>
+            {
+                if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+                NativeMethods.GetWindowRect(hWnd, out var r);
+                if (px >= r.Left && px < r.Right && py >= r.Top && py < r.Bottom)
+                {
+                    zTop = hWnd;
+                    return false;
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            if (zTop != IntPtr.Zero)
+            {
+                var zRoot = NativeMethods.GetAncestor(zTop, NativeMethods.GA_ROOT);
+                if (zRoot != IntPtr.Zero) zTop = zRoot;
+                candidate = zTop;
+            }
+
+            return candidate;
+        }
+        catch
+        {
+            return fallbackHwnd;
+        }
     }
 
     /// <summary>
@@ -285,6 +373,7 @@ internal partial class Program
             using var uia = new UiaLocator();
             var focused = uia.GetFocusedElementInfo();
             if (focused == null) { result["error"] = "no focus"; return result; }
+            var inspectText = uia.GetFocusedInspectText();
 
             result["name"] = focused.Name;
             result["type"] = focused.ControlType;
@@ -292,9 +381,20 @@ internal partial class Program
             result["value"] = focused.Value;
             result["winTitle"] = focused.WindowTitle;
             result["pid"] = focused.ProcessId;
+            result["bounds"] = $"{focused.Bounds.X},{focused.Bounds.Y} {focused.Bounds.Width}x{focused.Bounds.Height}";
+            if (!string.IsNullOrWhiteSpace(inspectText))
+                result["inspectText"] = inspectText;
 
             if (focused.Patterns?.Count > 0)
                 result["patterns"] = string.Join(", ", focused.Patterns);
+
+            if (focused.SelectionRects.Count > 0)
+            {
+                var sels = new JsonArray();
+                foreach (var r in focused.SelectionRects)
+                    sels.Add($"{r.X},{r.Y} {r.Width}x{r.Height}");
+                result["selectionRects"] = sels;
+            }
 
             var chain = new JsonArray();
             if (focused.ParentChain != null)

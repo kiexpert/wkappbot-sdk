@@ -15,6 +15,9 @@ public sealed partial class ClaudePromptHelper
     /// </summary>
     public PromptInfo? FindPrompt(string? callerCwd = null)
     {
+        var cursorPrompt = TryFindPromptAtCursor(callerCwd);
+        if (cursorPrompt != null) return cursorPrompt;
+
         // Strategy 1: Walk up process tree from current wkappbot.exe
         var ancestors = GetAncestorProcesses();
         foreach (var (pid, name) in ancestors)
@@ -25,20 +28,23 @@ public sealed partial class ClaudePromptHelper
             {
                 // Claude Desktop (Electron app)
                 var result = FindClaudeDesktopPrompt(pid);
-                if (result != null) return result;
+                var usable = RequireUsablePrompt(result);
+                if (usable != null) return usable;
             }
             else if (name.Equals("code", StringComparison.OrdinalIgnoreCase) ||
                      name.Equals("code - insiders", StringComparison.OrdinalIgnoreCase))
             {
                 // VS Code with Claude Code extension
                 var result = FindVSCodePrompt(pid, callerCwd);
-                if (result != null) return result;
+                var usable = RequireUsablePrompt(result);
+                if (usable != null) return usable;
             }
             else if (name.Equals("codex", StringComparison.OrdinalIgnoreCase))
             {
                 // Codex desktop app (marker based prompt detection).
                 var result = FindCodexDesktopPromptByMarker(pid);
-                if (result != null) return result;
+                var usable = RequireUsablePrompt(result);
+                if (usable != null) return usable;
             }
         }
 
@@ -50,7 +56,8 @@ public sealed partial class ClaudePromptHelper
         {
             Console.WriteLine($"  [PROMPT]   claude PID={proc.Id}");
             var result = FindClaudeDesktopPrompt(proc.Id);
-            if (result != null) return result;
+            var usable = RequireUsablePrompt(result);
+            if (usable != null) return usable;
         }
 
         // Prefer Codex before VS Code when both are open.
@@ -60,7 +67,8 @@ public sealed partial class ClaudePromptHelper
         foreach (var proc in codexProcs)
         {
             var result = FindCodexDesktopPromptByMarker(proc.Id);
-            if (result != null) return result;
+            var usable = RequireUsablePrompt(result);
+            if (usable != null) return usable;
         }
 
         // Strategy 3: Enumerate all VS Code windows — pool ALL windows first, then sort by callerCwd.
@@ -92,7 +100,19 @@ public sealed partial class ClaudePromptHelper
             foreach (var hWnd in allCodeWindows)
             {
                 var result = TryFindTurnFormInVSCodeWindow(hWnd);
-                if (result != null) return result;
+                var usable = RequireUsablePrompt(result);
+                if (usable != null) return usable;
+                var title = WindowFinder.GetWindowText(hWnd);
+                var codexResult = TryFindFocusedVsCodeCodexPrompt(hWnd);
+                var codexUsable = RequireUsablePrompt(codexResult);
+                if (codexUsable != null) return codexUsable;
+                if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)) continue;
+                if (IsLikelyVsCodeCodexWindowTitle(title)) continue;
+                if (ShouldSkipVsCodePromptFallbackWindow(title)) continue;
+                NativeMethods.GetWindowRect(hWnd, out var wr);
+                var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
+                var fallback = RequireUsablePrompt(new PromptInfo(hWnd, title, "Code", rect, ClassifyVsCodeHostType(title)));
+                if (fallback != null) return fallback;
             }
         }
 
@@ -159,6 +179,60 @@ public sealed partial class ClaudePromptHelper
     /// </summary>
     private static DateTime _lastFullScan = DateTime.MinValue;
     private static List<PromptInfo> _cachedPromptResults = new();
+
+    private PromptInfo? TryFindPromptAtCursor(string? callerCwd = null)
+    {
+        try
+        {
+            if (!NativeMethods.GetCursorPos(out var pt)) return null;
+            var leaf = NativeMethods.WindowFromPoint(pt);
+            if (leaf == IntPtr.Zero) return null;
+
+            var rootHwnd = NativeMethods.GetAncestor(leaf, NativeMethods.GA_ROOT);
+            if (rootHwnd == IntPtr.Zero) rootHwnd = leaf;
+            if (!NativeMethods.IsWindow(rootHwnd) || !NativeMethods.IsWindowVisible(rootHwnd)) return null;
+
+            var title = WindowFinder.GetWindowText(rootHwnd);
+            var cls = WindowFinder.GetClassName(rootHwnd);
+            NativeMethods.GetWindowThreadProcessId(rootHwnd, out uint pidRaw);
+            string procName = "";
+            try { procName = Process.GetProcessById((int)pidRaw).ProcessName; } catch { }
+
+            Console.WriteLine($"  [PROMPT] Cursor-hint: leaf=0x{leaf:X} root=0x{rootHwnd:X} cls={cls} proc={procName} title=\"{title}\"");
+
+            if (procName.Equals("claude", StringComparison.OrdinalIgnoreCase))
+                return FindClaudeDesktopPrompt((int)pidRaw);
+
+            if (procName.Equals("codex", StringComparison.OrdinalIgnoreCase))
+                return FindCodexDesktopPromptByMarker((int)pidRaw);
+
+            if (!procName.Equals("Code", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            var pi = TryFindTurnFormInVSCodeWindow(rootHwnd);
+            if (pi != null) return pi;
+
+            var codexPi = TryFindFocusedVsCodeCodexPrompt(rootHwnd);
+            if (codexPi != null) return codexPi;
+
+            if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
+                return null;
+            if (IsLikelyVsCodeCodexWindowTitle(title))
+                return null;
+            if (ShouldSkipVsCodePromptFallbackWindow(title))
+                return null;
+
+            NativeMethods.GetWindowRect(rootHwnd, out var wr);
+            var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
+            Console.WriteLine($"  [PROMPT] Cursor-hint matched VS Code host ({ClassifyVsCodeHostType(title)})");
+            return new PromptInfo(rootHwnd, title, "Code", rect, ClassifyVsCodeHostType(title));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] Cursor-hint failed: {ex.Message}");
+            return null;
+        }
+    }
 
     public List<PromptInfo> FindAllPrompts(bool includeHidden = false)
     {
@@ -240,18 +314,31 @@ public sealed partial class ClaudePromptHelper
                 var pi = FindTurnFormInWindow(hWnd, title, procName);
                 if (pi != null) { results.Add(pi); seen.Add(hWnd); continue; }
 
+                var codexPi = TryFindFocusedVsCodeCodexPrompt(hWnd);
+                if (codexPi != null) { results.Add(codexPi); _turnFormCache[hWnd] = codexPi; seen.Add(hWnd); continue; }
+
+                if (IsLikelyVsCodeCodexWindowTitle(title))
+                    continue;
+
+                if (ShouldSkipVsCodePromptFallbackWindow(title))
+                    continue;
+
                 // Native Claude Code extension (no turn-form)
                 // Each VS Code window gets its own entry — SmartSetForegroundWindow(hwnd) targets
                 // the specific window, and foreground verification in TypeAndSubmit prevents
                 // wrong-window delivery. No per-process dedup needed.
                 NativeMethods.GetWindowRect(hWnd, out var wr);
                 var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
-                var vsCodeEntry = new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode");
+                var vsCodeEntry = new PromptInfo(hWnd, title, "Code", rect, ClassifyVsCodeHostType(title));
                 results.Add(vsCodeEntry);
                 _turnFormCache[hWnd] = vsCodeEntry; // expose to GetAllCachedPrompts() for status streaming
                 seen.Add(hWnd);
             }
         }
+
+        results = results
+            .Select(DecoratePromptInfo)
+            .ToList();
 
         var scanMs = (DateTime.UtcNow - _lastFullScan).TotalMilliseconds;
         _lastFullScan = DateTime.UtcNow;
@@ -260,7 +347,8 @@ public sealed partial class ClaudePromptHelper
         foreach (var r in results)
         {
             var shortTitle = r.WindowTitle.Length > 60 ? r.WindowTitle[..57] + "..." : r.WindowTitle;
-            Console.WriteLine($"    [{r.HostType}] 0x{r.WindowHandle:X} \"{shortTitle}\"");
+            var state = r.Usable ? "usable" : r.Visible ? "blocked" : "hidden";
+            Console.WriteLine($"    [{r.HostType}] 0x{r.WindowHandle:X} [{state}] \"{shortTitle}\"");
         }
         return results;
     }
@@ -300,14 +388,22 @@ public sealed partial class ClaudePromptHelper
             Console.WriteLine($"  [PROMPT-CWD] VS Code title match: \"{title}\"");
             // Try turn-form first; fallback to vscode-claudecode (native extension has no turn-form)
             var pi = FindTurnFormInWindow(hWnd, title, procName);
-            if (pi != null) return pi;
+            var usable = RequireUsablePrompt(pi);
+            if (usable != null) return usable;
+            var codexPi = TryFindFocusedVsCodeCodexPrompt(hWnd);
+            var codexUsable = RequireUsablePrompt(codexPi);
+            if (codexUsable != null) return codexUsable;
             // Native Claude Code extension: no turn-form, use window directly
             if (title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
             {
+                if (IsLikelyVsCodeCodexWindowTitle(title)) continue;
+                if (ShouldSkipVsCodePromptFallbackWindow(title)) continue;
                 NativeMethods.GetWindowRect(hWnd, out var wr);
                 var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
-                Console.WriteLine($"  [PROMPT-CWD] VS Code native Claude Code extension found");
-                return new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode");
+                var hostType = ClassifyVsCodeHostType(title);
+                Console.WriteLine($"  [PROMPT-CWD] VS Code native prompt host found ({hostType})");
+                var fallback = RequireUsablePrompt(new PromptInfo(hWnd, title, "Code", rect, hostType));
+                if (fallback != null) return fallback;
             }
         }
 
@@ -342,7 +438,8 @@ public sealed partial class ClaudePromptHelper
                 }
                 if (!cwdFound) continue;
                 var pi = FindTurnFormInWindow(hWnd, title, procName);
-                if (pi != null) return pi;
+                var usablePi = RequireUsablePrompt(pi);
+                if (usablePi != null) return usablePi;
             }
             catch (Exception ex)
             {
@@ -365,7 +462,9 @@ public sealed partial class ClaudePromptHelper
         if (_turnFormCache.TryGetValue(hWnd, out var cached))
         {
             if (!NativeMethods.IsWindow(hWnd)) { _turnFormCache.Remove(hWnd); } // stale → fall through to rescan
-            else return cached.WindowTitle == title ? cached : cached with { WindowTitle = title };
+            else return cached.WindowTitle == title
+                ? RequireUsablePrompt(cached)
+                : RequireUsablePrompt(cached with { WindowTitle = title });
         }
 
         // Negative cache hit: skip scan for TTL window (avoids re-scanning non-AI windows repeatedly).
@@ -441,7 +540,7 @@ public sealed partial class ClaudePromptHelper
                 new Rectangle(rect.X, rect.Y, rect.Width, rect.Height), hostType);
             _turnFormCache[hWnd] = result; // cache for all future ticks
             Console.WriteLine($"  [PROMPT-CWD] turn-form found+cached in \"{title}\" ({hostType}) hwnd=0x{hWnd:X}");
-            return result;
+            return RequireUsablePrompt(result);
         }
         catch { return null; }
     }

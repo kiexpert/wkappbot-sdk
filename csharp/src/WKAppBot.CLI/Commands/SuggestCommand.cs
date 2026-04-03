@@ -19,6 +19,8 @@ internal partial class Program
             return SuggestListCommand(args[1..]);
         if (args.Length > 0 && args[0] is "repost")
             return SuggestRepostCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "merge")
+            return SuggestMergeCommand(args[1..]);
 
         if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
         {
@@ -35,6 +37,7 @@ internal partial class Program
             Console.WriteLine();
             Console.WriteLine("Subcommands:");
             Console.WriteLine("  list / ls              Show pending suggestions");
+            Console.WriteLine("  merge <ts> \"text\"     Append text to existing suggestion + Slack thread reply");
             Console.WriteLine("  resolve <ts> \"note\"   Mark resolved + Slack thread reply");
             Console.WriteLine("  repost [ts]            Re-post to Slack entries missing slack_ts, write ID back");
             Console.WriteLine();
@@ -414,6 +417,90 @@ internal partial class Program
         return 0;
     }
 
+    /// <summary>suggest merge &lt;ts_prefix&gt; "text" — append text to existing suggestion + Slack thread reply.</summary>
+    static int SuggestMergeCommand(string[] args)
+    {
+        if (args.Length < 2 || args[0] is "-h" or "--help")
+        {
+            Console.WriteLine("Usage: wkappbot suggest merge <ts> \"additional text\"");
+            Console.WriteLine("  ts  : ISO timestamp prefix or Slack ts of existing suggestion");
+            Console.WriteLine("  text: additional context to append (English preferred)");
+            return 0;
+        }
+
+        var tsPrefix = args[0];
+        var appendText = string.Join(" ", args[1..]);
+
+        var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+        var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
+        if (!File.Exists(jsonlPath))
+        {
+            Console.Error.WriteLine("[MERGE] suggestions.jsonl not found");
+            return 1;
+        }
+
+        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        int matchIdx = -1;
+        JsonNode? matchEntry = null;
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            try
+            {
+                var node = JsonSerializer.Deserialize<JsonNode>(lines[i]);
+                var entryTs = node?["ts"]?.GetValue<string>() ?? "";
+                var entrySlackTs = node?["slack_ts"]?.GetValue<string>() ?? "";
+                if (entryTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase) ||
+                    entrySlackTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchIdx = i;
+                    matchEntry = node;
+                    break;
+                }
+            }
+            catch { }
+        }
+
+        if (matchIdx < 0 || matchEntry == null)
+        {
+            Console.Error.WriteLine($"[MERGE] No suggestion found with ts prefix: {tsPrefix}");
+            return 1;
+        }
+
+        var existingText = matchEntry["text"]?.GetValue<string>() ?? "";
+        var from = matchEntry["from"]?.GetValue<string>() ?? "unknown";
+        var preview = existingText.Split('\n')[0];
+        if (preview.Length > 80) preview = preview[..80] + "…";
+        Console.WriteLine($"[MERGE] Found: [{from}] {preview}");
+
+        // Append text to JSONL entry
+        var mergedText = existingText + "\n\n---\n[MERGE " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm") + "] " + appendText;
+        matchEntry["text"] = mergedText;
+        lines[matchIdx] = JsonSerializer.Serialize(matchEntry);
+        File.WriteAllLines(jsonlPath, lines);
+        Console.WriteLine($"[MERGE] Text appended to local entry");
+
+        // Slack thread reply if slack_ts exists
+        var slackTs = matchEntry["slack_ts"]?.GetValue<string>();
+        if (!string.IsNullOrEmpty(slackTs))
+        {
+            var config = LoadSlackConfig();
+            var botToken = config?["bot_token"]?.GetValue<string>();
+            var channel  = config?["channel"]?.GetValue<string>();
+            if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
+            {
+                var cwdTag = AbbreviateCwd(Environment.CurrentDirectory);
+                var senderName = GetSuggestBypassUsername();
+                var slackMsg = $":heavy_plus_sign: *[Merge]* from `{cwdTag}`\n{appendText}";
+                var (ok, _) = SlackSendViaApi(botToken, channel, slackMsg,
+                    threadTs: slackTs, username: senderName).GetAwaiter().GetResult();
+                Console.WriteLine(ok ? "[MERGE] Slack thread reply sent" : "[MERGE] Slack reply failed");
+            }
+        }
+
+        return 0;
+    }
+
     /// <summary>suggest resolve &lt;ts_prefix&gt; "note" — mark done in JSONL + Slack reply.</summary>
     static int SuggestResolveCommand(string[] args)
     {
@@ -510,14 +597,17 @@ internal partial class Program
             }
         }
 
-        // Verify script content: must contain the command from filename (test-{cmd}-{subcmd}-*)
+        // Verify script content: only enforce command-name coupling when filename tokens
+        // actually look like a real wkappbot command/subcommand pair.
         try
         {
             var cmd2 = evidenceParts.Length > 1 ? evidenceParts[1] : "";
             var subcmd2 = evidenceParts.Length > 2 ? evidenceParts[2] : "";
             var scriptContent = File.ReadAllText(evidenceFile);
             var expectedCmd = $"{cmd2} {subcmd2}".Trim(); // e.g. "a11y wait", "file edit"
-            if (!string.IsNullOrEmpty(expectedCmd) && !scriptContent.Contains(expectedCmd, StringComparison.OrdinalIgnoreCase))
+            if (ShouldEnforceEvidenceCommandCoupling(cmd2, subcmd2)
+                && !string.IsNullOrEmpty(expectedCmd)
+                && !scriptContent.Contains(expectedCmd, StringComparison.OrdinalIgnoreCase))
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"  ❌ Script doesn't contain \"{expectedCmd}\" — filename says test-{cmd2}-{subcmd2} but command not used!");
@@ -624,7 +714,9 @@ internal partial class Program
                 // Derive expected cmd pattern from script filename: test-{cmd}-{subcmd}-* → "{cmd}-{subcmd}"
                 var scriptBaseName = Path.GetFileNameWithoutExtension(evidenceFile); // e.g. test-web-open-real
                 var scriptParts = scriptBaseName.Split('-');
-                var expectedCmdPattern = scriptParts.Length >= 3 ? $"{scriptParts[1]}-{scriptParts[2]}" : null; // e.g. "web-open"
+                var expectedCmdPattern = scriptParts.Length >= 3 && ShouldEnforceEvidenceCommandCoupling(scriptParts[1], scriptParts[2])
+                    ? $"{scriptParts[1]}-{scriptParts[2]}"
+                    : null; // e.g. "web-open"
 
                 var dbgLines = capturedDbg.Split('\n');
                 var cmdCount = dbgLines.Count(l => l.Contains("[CMD]"));
@@ -704,7 +796,9 @@ internal partial class Program
             {
                 var node = JsonSerializer.Deserialize<JsonNode>(lines[i]);
                 var entryTs = node?["ts"]?.GetValue<string>() ?? "";
-                if (entryTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase))
+                var entrySlackTs = node?["slack_ts"]?.GetValue<string>() ?? "";
+                if (entryTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase) ||
+                    entrySlackTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase))
                 {
                     matchIdx = i;
                     matchEntry = node;
@@ -830,6 +924,27 @@ internal partial class Program
         }
 
         return 0;
+    }
+
+    static bool ShouldEnforceEvidenceCommandCoupling(string cmd, string subcmd)
+    {
+        if (string.IsNullOrWhiteSpace(cmd) || string.IsNullOrWhiteSpace(subcmd))
+            return false;
+
+        static bool IsAsciiWord(string s) =>
+            s.All(ch => char.IsLetter(ch) || ch == '_');
+
+        if (!IsAsciiWord(cmd) || !IsAsciiWord(subcmd))
+            return false;
+
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "a11y", "ask", "file", "web", "slack", "suggest", "prompt", "windows",
+            "input", "focus", "screen", "eye", "whisper", "grap", "logcat", "mcp",
+            "newchat", "zoom", "timeout", "debate", "launcher", "findprompts"
+        };
+
+        return known.Contains(cmd);
     }
 
     static string? CreateResolveRecoveryZip(string hqDir, string tsPrefix, string evidenceFile)

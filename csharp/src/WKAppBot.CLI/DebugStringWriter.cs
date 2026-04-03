@@ -39,8 +39,6 @@ internal sealed class DebugStringWriter : TextWriter
 
     public override void WriteLine(string? value)
     {
-        // Flush stdout first so pending output appears before this stderr line (clear ordering)
-        try { Console.Out.Flush(); } catch { }
         _inner.WriteLine(value);
         EmitDbg(value ?? "");
     }
@@ -53,8 +51,6 @@ internal sealed class DebugStringWriter : TextWriter
     public override void Flush()
     {
         _inner.Flush();
-        // When stderr is flushed, also flush stdout for synchronized output
-        try { Console.Out.Flush(); } catch { }
     }
 
     protected override void Dispose(bool disposing)

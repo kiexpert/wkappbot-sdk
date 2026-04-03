@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
 using FlaUI.UIA3;
+using WKAppBot.Win32.Native;
 
 namespace WKAppBot.Win32.Window;
 
@@ -30,6 +31,7 @@ public sealed partial class ClaudePromptHelper : IDisposable
     private readonly UIA3Automation _automation;
     private const string HostClaudeDesktop = "claude-desktop";
     private const string HostVsCodeClaudeCode = "vscode-claudecode";
+    private const string HostVsCodeCodex = "vscode-codex";
     private const string HostCodexDesktop = "codex-desktop";
 
     /// <summary>
@@ -72,8 +74,33 @@ public sealed partial class ClaudePromptHelper : IDisposable
         string WindowTitle,
         string ProcessName,
         Rectangle PromptRect,
-        string HostType // "claude-desktop" | "vscode" | "unknown"
+        string HostType, // "claude-desktop" | "vscode" | "unknown"
+        bool Visible = true,
+        bool Usable = true,
+        string? OccludedBy = null
     );
+
+    public static bool IsCodexHostType(string? hostType) =>
+        !string.IsNullOrWhiteSpace(hostType) &&
+        hostType.Contains("codex", StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsVsCodeHostType(string? hostType) =>
+        string.Equals(hostType, HostVsCodeClaudeCode, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(hostType, HostVsCodeCodex, StringComparison.OrdinalIgnoreCase);
+
+    public static bool ShouldSkipVsCodePromptFallbackWindow(string? title) =>
+        !string.IsNullOrWhiteSpace(title) &&
+        title.Contains("Codex Diff", StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsLikelyVsCodeCodexWindowTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return false;
+        if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)) return false;
+        return title.Contains("Codex", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static string ClassifyVsCodeHostType(string? title) =>
+        IsLikelyVsCodeCodexWindowTitle(title) ? HostVsCodeCodex : HostVsCodeClaudeCode;
 
     public record SubmitState(
         bool TurnFormFound,
@@ -85,5 +112,78 @@ public sealed partial class ClaudePromptHelper : IDisposable
     public void Dispose()
     {
         _automation.Dispose();
+    }
+
+    static PromptInfo DecoratePromptInfo(PromptInfo pi)
+    {
+        try
+        {
+            var windowVisible = NativeMethods.IsWindowVisible(pi.WindowHandle);
+            if (!NativeMethods.GetWindowRect(pi.WindowHandle, out var wr))
+                return pi with { Visible = windowVisible, Usable = false, OccludedBy = "window-rect-missing" };
+
+            var windowRect = Rectangle.FromLTRB(wr.Left, wr.Top, wr.Right, wr.Bottom);
+            var promptRect = pi.PromptRect;
+            var hasArea = promptRect.Width > 4 && promptRect.Height > 4;
+            var insideWindow = hasArea && windowRect.IntersectsWith(promptRect);
+            var promptVisible = windowVisible && hasArea && insideWindow;
+
+            string? occludedBy = null;
+            if (promptVisible)
+            {
+                if (NativeMethods.TryGetCurrentCursorRect(out var cursorRect))
+                {
+                    var fullyContainsCursor = promptRect.Contains(cursorRect);
+                    if (!fullyContainsCursor)
+                    {
+                        occludedBy = $"cursor-rect 0x{cursorRect.X:X},{cursorRect.Y:X},{cursorRect.Width}x{cursorRect.Height}";
+                    }
+                    else
+                    {
+                        var cx = cursorRect.Left + (cursorRect.Width / 2);
+                        var cy = cursorRect.Top + (cursorRect.Height / 2);
+                        var pt = new POINT { X = cx, Y = cy };
+                        var leaf = NativeMethods.WindowFromPoint(pt);
+                        if (leaf != IntPtr.Zero)
+                        {
+                            var top = NativeMethods.GetAncestor(leaf, NativeMethods.GA_ROOT);
+                            if (top == IntPtr.Zero) top = leaf;
+                            if (top != IntPtr.Zero && top != pi.WindowHandle)
+                            {
+                                var cls = WindowFinder.GetClassName(top);
+                                var title = WindowFinder.GetWindowText(top);
+                                occludedBy = $"0x{top:X} {cls} \"{TrimForLog(title, 80)}\"";
+                            }
+                        }
+                    }
+                }
+            }
+
+            var usable = promptVisible && string.IsNullOrEmpty(occludedBy);
+            return pi with
+            {
+                Visible = promptVisible,
+                Usable = usable,
+                OccludedBy = occludedBy
+            };
+        }
+        catch
+        {
+            return pi with { Visible = false, Usable = false, OccludedBy = "decorate-error" };
+        }
+    }
+
+    internal static PromptInfo? RequireUsablePrompt(PromptInfo? pi)
+    {
+        if (pi == null) return null;
+        var decorated = DecoratePromptInfo(pi);
+        return decorated.Usable ? decorated : null;
+    }
+
+    static string TrimForLog(string? text, int max)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        var s = text.Replace("\r", " ").Replace("\n", " ");
+        return s.Length > max ? s[..max] + "..." : s;
     }
 }

@@ -11,7 +11,7 @@ internal partial class Program
 {
     static async Task<(bool ok, string? text)> RunChatGptLoopAsync(
         CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7,
-        Action<string, string?>? onReport = null, TriadSharedContext? triadCtx = null)
+        Action<string, string?>? onReport = null, TriadSharedContext? triadCtx = null, List<string>? toolLogOut = null)
     {
         var answer = initialAnswer;
         var steps = Math.Max(1, maxSteps);
@@ -19,6 +19,7 @@ internal partial class Program
 
         for (int step = 1; step <= steps; step++)
         {
+            if (AgentStopFlagExists()) { Console.WriteLine("[AGENT] 🛑 --terminate 신호 → 루프 종료"); return (true, answer + "\n[AGENT] Terminated."); }
             var toolCalls = ParseAllLoopToolCalls(answer);
             if (toolCalls.Count == 0) return (true, answer);
 
@@ -53,7 +54,7 @@ internal partial class Program
             var startTsMapGpt = idToStartTs?.Where(kv => !string.IsNullOrEmpty(kv.Value))
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
             var (flushOk, flushAnswer) = await RunParallelWithFlushAsync(
-                execTasks, "gpt", msg => ChatGptSendAndWait(cdp, msg, timeoutSec), answer, idToCmd, onReport, step, startTsMapGpt);
+                execTasks, "gpt", msg => ChatGptSendAndWait(cdp, msg, timeoutSec), answer, idToCmd, onReport, step, startTsMapGpt, triadCtx, toolLogOut);
             if (!flushOk) return (true, answer);
             answer = flushAnswer;
         }
@@ -63,7 +64,7 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> RunGeminiLoopAsync(
         CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7,
-        Action<string, string?>? onReport = null, TriadSharedContext? triadCtx = null)
+        Action<string, string?>? onReport = null, TriadSharedContext? triadCtx = null, List<string>? toolLogOut = null)
     {
         var answer = initialAnswer;
         var steps = Math.Max(1, maxSteps);
@@ -71,6 +72,7 @@ internal partial class Program
 
         for (int step = 1; step <= steps; step++)
         {
+            if (AgentStopFlagExists()) { Console.WriteLine("[AGENT] 🛑 --terminate 신호 → 루프 종료"); return (true, answer + "\n[AGENT] Terminated."); }
             var toolCalls = ParseAllLoopToolCalls(answer);
             if (toolCalls.Count == 0)
                 return (true, answer);
@@ -105,9 +107,12 @@ internal partial class Program
             var startTsMapGemini = idToStartTsGemini?.Where(kv => !string.IsNullOrEmpty(kv.Value))
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
             var (flushOk, flushAnswer) = await RunParallelWithFlushAsync(
-                execTasks, "gemini", msg => GeminiSendAndWaitAsync(cdp, msg, timeoutSec), answer, idToCmd, onReport, step, startTsMapGemini);
+                execTasks, "gemini", msg => GeminiSendAndWaitAsync(cdp, msg, timeoutSec), answer, idToCmd, onReport, step, startTsMapGemini, triadCtx, toolLogOut);
             if (!flushOk) return (true, answer);
             answer = flushAnswer;
+
+            // Inject Gemini response into Claude session JSONL if requested
+            TryInjectGeminiResponseToSession(step, answer);
         }
 
         return (true, answer + "\n[ASK:LOOP] Max steps reached.");
@@ -115,7 +120,7 @@ internal partial class Program
 
     static async Task<(bool ok, string? text)> RunClaudeLoopAsync(
         CdpClient cdp, string initialAnswer, int timeoutSec, int maxSteps, int retry, int maxParallel = 7,
-        Action<string, string?>? onReport = null, TriadSharedContext? triadCtx = null)
+        Action<string, string?>? onReport = null, TriadSharedContext? triadCtx = null, List<string>? toolLogOut = null)
     {
         var answer = initialAnswer;
         var steps = Math.Max(1, maxSteps);
@@ -123,6 +128,7 @@ internal partial class Program
 
         for (int step = 1; step <= steps; step++)
         {
+            if (AgentStopFlagExists()) { Console.WriteLine("[AGENT] 🛑 --terminate 신호 → 루프 종료"); return (true, answer + "\n[AGENT] Terminated."); }
             var toolCalls = ParseAllLoopToolCalls(answer);
             if (toolCalls.Count == 0) return (true, answer);
 
@@ -156,7 +162,7 @@ internal partial class Program
             var startTsMapClaude = idToStartTsClaude?.Where(kv => !string.IsNullOrEmpty(kv.Value))
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
             var (flushOk, flushAnswer) = await RunParallelWithFlushAsync(
-                execTasks, "claude", msg => ClaudeSendAndWaitAsync(cdp, msg, timeoutSec), answer, idToCmd, onReport, step, startTsMapClaude);
+                execTasks, "claude", msg => ClaudeSendAndWaitAsync(cdp, msg, timeoutSec), answer, idToCmd, onReport, step, startTsMapClaude, triadCtx, toolLogOut);
             if (!flushOk) return (true, answer);
             answer = flushAnswer;
         }
@@ -177,7 +183,8 @@ internal partial class Program
         Action<string, string?>? onReport = null,
         int step = 0,
         IReadOnlyDictionary<string, string>? idToStartTs = null,
-        TriadSharedContext? triadCtx = null)
+        TriadSharedContext? triadCtx = null,
+        List<string>? toolLogOut = null)
     {
         var pending = execTasks.ToList();
         // Map task → id so we can show status=running for incomplete tasks
@@ -195,17 +202,31 @@ internal partial class Program
             collected.Add(r);
 
             // Cross-share tool call + result via discovery queue (경합 방지)
-            if (triadCtx != null)
             {
                 var cmdStr = idToCmd?.GetValueOrDefault(r.id, r.id) ?? r.id;
                 var outputSnippet = r.result.Output.Length > 500 ? r.result.Output[..500] + "..." : r.result.Output;
                 var toolMsg = $"{cmdStr} → exit={r.result.ExitCode}\n{outputSnippet}";
-                // Queue for idle-time injection to peers (no race condition)
-                triadCtx.PushDiscovery(provider, toolMsg);
-                // Also log to chunk stream (for context recovery)
-                triadCtx.UpdateChunk(provider, $"[TOOL] {toolMsg}");
-                Console.WriteLine($"[CROSS:TOOL] {provider} → queued for peers: {cmdStr} (exit={r.result.ExitCode}, {r.result.Output.Length}ch)");
-                SlackPostToThread($"🔧 *[{provider} tool→peers]* `{cmdStr}` exit={r.result.ExitCode}, {r.result.Output.Length}ch", "🦉 Moderator");
+                if (triadCtx != null)
+                {
+                    triadCtx.PushDiscovery(provider, toolMsg);
+                    triadCtx.UpdateChunk(provider, $"[TOOL] {toolMsg}");
+                    Console.WriteLine($"[CROSS:TOOL] {provider} → queued for peers: {cmdStr} (exit={r.result.ExitCode}, {r.result.Output.Length}ch)");
+                    SlackPostToThread($"🔧 *[{provider} tool→peers]* `{cmdStr}` exit={r.result.ExitCode}, {r.result.Output.Length}ch", "🦉 Moderator");
+                }
+                // Log tool results to MD: edit = full output, others = one line
+                if (toolLogOut != null)
+                {
+                    var status = r.result.ExitCode == 0 ? "ok" : $"exit={r.result.ExitCode}";
+                    if (cmdStr.Contains("edit", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var snippet = r.result.Output.Length > 300 ? r.result.Output[..300] + "..." : r.result.Output;
+                        toolLogOut.Add($"`{cmdStr}` → {status}\n```\n{snippet}\n```");
+                    }
+                    else
+                    {
+                        toolLogOut.Add($"`{cmdStr}` → {status}");
+                    }
+                }
             }
 
             // Echo tool output to console with "{id}> " prefix + metrics
@@ -341,4 +362,6 @@ internal partial class Program
 
         return (true, answer);
     }
+
+    // TryInjectGeminiResponseToSession → AppBotEyeClaudeFallback.cs
 }

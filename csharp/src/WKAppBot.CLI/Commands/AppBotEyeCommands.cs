@@ -340,10 +340,13 @@ internal partial class Program
             catch { }
             try { Console.Error.WriteLine(message); } catch { }
         }
-        using var guardianMutex = new System.Threading.Mutex(true, "Global\\WKAppBotEyeGuardian", out bool createdNew);
-        if (!createdNew)
+        using var guardianMutex = new System.Threading.Mutex(false, "Global\\WKAppBotEyeGuardian");
+        bool gmAcquired = false;
+        try { gmAcquired = guardianMutex.WaitOne(3000); }
+        catch (System.Threading.AbandonedMutexException) { gmAcquired = true; }
+        if (!gmAcquired)
         {
-            GuardianLog("[EYE_GUARDIAN] already running");
+            GuardianLog("[EYE_GUARDIAN] already running (mutex not acquired in 3s)");
             return 0;
         }
 
@@ -439,6 +442,8 @@ internal partial class Program
         GuardianLog($"[EYE_GUARDIAN] started pollMs={pollMs} respawnDelaySec={respawnDelaySec} launchTimeoutMs={launchTimeoutMs} tickTimeoutMs={tickTimeoutMs} eyeHwnd=0x{eyeHwnd.ToInt64():X}");
         DateTime? deadSinceUtc = null;
         int consecutiveHealthFailures = 0;
+        int consecutiveHealthSuccesses = 0;
+        const int ExitThreshold = 7;
         while (true)
         {
             var alive = IsEyeAlive();
@@ -446,14 +451,51 @@ internal partial class Program
             {
                 if (IsEyeHealthy())
                 {
-                    GuardianLog("[EYE_GUARDIAN] tick ok");
+                    consecutiveHealthSuccesses++;
+                    GuardianLog($"[EYE_GUARDIAN] tick ok streak={consecutiveHealthSuccesses}/{ExitThreshold}");
                     deadSinceUtc = null;
                     consecutiveHealthFailures = 0;
-                    Thread.Sleep(pollMs);
+                    if (consecutiveHealthSuccesses >= ExitThreshold)
+                    {
+                        GuardianLog($"[EYE_GUARDIAN] {ExitThreshold} consecutive healthy ticks — spawning successor guardian");
+
+                        // Release mutex so successor can acquire it
+                        try { guardianMutex.ReleaseMutex(); } catch { }
+
+                        // Spawn successor with same parameters
+                        var corePath2 = Environment.ProcessPath ?? "wkappbot";
+                        var succArgs = $"eye guardian --respawn-delay {respawnDelaySec} --poll-ms {pollMs}" +
+                                       $" --tick-timeout-ms {tickTimeoutMs} --launch-timeout-ms {launchTimeoutMs}" +
+                                       (eyeHwnd != IntPtr.Zero ? $" --eye-hwnd 0x{eyeHwnd.ToInt64():X}" : "");
+                        AppBotPipe.Spawn(corePath2, succArgs,
+                            EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory,
+                            caller: "EYE-GUARDIAN-SUCCESSOR");
+
+                        // Wait up to 5s for successor to acquire guardian mutex
+                        bool successorConfirmed = false;
+                        for (int si = 0; si < 20; si++)
+                        {
+                            Thread.Sleep(250);
+                            try
+                            {
+                                using var probe = new System.Threading.Mutex(false, "Global\\WKAppBotEyeGuardian");
+                                if (!probe.WaitOne(0)) { successorConfirmed = true; break; }
+                                probe.ReleaseMutex();
+                            }
+                            catch { }
+                        }
+
+                        GuardianLog(successorConfirmed
+                            ? "[EYE_GUARDIAN] successor confirmed — exiting"
+                            : "[EYE_GUARDIAN] successor not confirmed in 5s — exiting anyway");
+                        return 0;
+                    }
+                    Thread.Sleep(1000); // 1s interval for exit threshold check
                     continue;
                 }
 
                 consecutiveHealthFailures++;
+                consecutiveHealthSuccesses = 0;
                 GuardianLog($"[EYE_GUARDIAN] tick failed/timeout streak={consecutiveHealthFailures}");
                 if (consecutiveHealthFailures < 2)
                 {
@@ -489,8 +531,9 @@ internal partial class Program
             {
                 if (IsEyeAlive())
                 {
-                    GuardianLog("[EYE_GUARDIAN] eye restored — exiting guardian (new Eye will spawn its own)");
-                    return 0;
+                    GuardianLog("[EYE_GUARDIAN] eye restored — will exit after healthy streak");
+                    consecutiveHealthSuccesses = 0;
+                    break;
                 }
                 Thread.Sleep(250);
             }

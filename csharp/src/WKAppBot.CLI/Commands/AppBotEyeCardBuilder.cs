@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows.Forms;
+using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
@@ -59,22 +60,24 @@ internal partial class Program
             kroBlock = kroSb.ToString().TrimEnd();
         }
 
-        // ── Apply CardCache to 클롣 cards — timestamp reflects content change, not tick time ──
-        // If tag/status hasn't changed, the card keeps its old timestamp (won't jump to top)
+        // ── Apply CardCache to 클롣 cards — sort by MAX(content change, tick activity) ──
+        // CardCache tracks when card text (tag|status) actually changed.
+        // HealthCheck sets LastTsUtc from eye_ticks.jsonl (real JSONL activity).
+        // Using max of both ensures active sessions stay on top even when card text is unchanged.
         foreach (var c in cards)
         {
             var clotContent = $"{c.LastTag}|{c.LastStatus}";
             var cwdAbbrev = AbbreviateCwd(c.Cwd);
             var clotKey = !string.IsNullOrEmpty(cwdAbbrev) ? $"clot_{cwdAbbrev}" : $"clot_pid{c.ParentPid}";
+            var tickTs = c.LastTsUtc; // preserve tick activity time before cache overwrites it
             var cachedTs = CardCacheGetTimestamp(clotKey, clotContent);
             if (cachedTs == DateTime.MinValue)
             {
-                // First encounter — seed with tick timestamp (new card should appear at correct position)
                 cachedTs = c.LastTsUtc;
                 _cardCache[clotKey] = (clotContent, cachedTs);
                 CardCacheSave(clotKey, clotContent, cachedTs);
             }
-            c.LastTsUtc = cachedTs;
+            c.LastTsUtc = cachedTs > tickTs ? cachedTs : tickTs;
         }
 
         // ── Sort ALL cards (including KRO) by recency — newest on top ──
@@ -120,14 +123,13 @@ internal partial class Program
 
                     // Header: "{icon} {prefix}[CWD]" — full display name matches Slack bot username format
                     var hostIcon = HostTypeIcon(c.HostType);
-                    var namePrefix = (c.HostType ?? "").ToLowerInvariant().Contains("codex") ? SlackCodexPrefix : SlackClaudePrefix;
                     var header = string.IsNullOrWhiteSpace(cwdTag)
                         ? (string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : c.ParentTitle)
-                        : $"{namePrefix}[{cwdTag}]";
+                        : FormatSlackDisplayName(c.HostType, cwdTag);
                     sb.AppendLine(string.IsNullOrEmpty(hostIcon) ? header : $"{hostIcon} {header}");
                     // Context % per card (CWD → session JSONL size → ctx%)
                     var ctxTag = "";
-                    var (cardCtx, jsonlAge, _, jsonlFileSize) = GetContextInfoForCwdEx(c.Cwd);
+                    var (cardCtx, jsonlAge, _, jsonlFileSize) = GetContextInfoForCwdEx(c.Cwd, c.HostType);
                     if (cardCtx >= 0)
                     {
                         var sizeMB = jsonlFileSize / (1024.0 * 1024.0);
@@ -151,7 +153,7 @@ internal partial class Program
                         sb.AppendLine($"상태: {c.LastStatus} ({ageText}){ctxTag}");
                     }
                     // 클롣 프롬프트 + 생각: CWD별 Claude Code 세션에서 최신 user/assistant 텍스트
-                    var clotThought = ReadClotThoughtForCwd(c.Cwd);
+                    var clotThought = ReadClotThoughtForCwd(c.Cwd, c.HostType);
                     if (!string.IsNullOrWhiteSpace(clotThought))
                     {
                         // May contain "💬 user\n🤖 assistant" — split into separate lines
@@ -178,8 +180,11 @@ internal partial class Program
     static string HostTypeIcon(string? hostType) => (hostType ?? "").ToLowerInvariant() switch
     {
         "vscode" => ":vs:",
+        "vscode-claudecode" => ":vs:",
+        "vscode-codex" => ":openai:",
         "claude-desktop" => ":claude:",
         "codex" => ":openai:",
+        "codex-desktop" => ":openai:",
         "cursor" => ":cursor:",
         "copilot" => ":github:",
         "terminal" => ":terminal:",
@@ -332,8 +337,9 @@ internal partial class Program
             if (screens != null && screens.Length > 0)
             {
                 var rightMost = screens.OrderByDescending(s => s.Bounds.Right).First();
-                var x = rightMost.Bounds.Right - width - 10;
-                var y = rightMost.Bounds.Top + 10;
+                var area = rightMost.WorkingArea;
+                var x = area.Right - width - 10;
+                var y = area.Top + 10;
                 return (x, y);
             }
         }

@@ -190,6 +190,7 @@ internal partial class Program
             Console.WriteLine("  --nth 2~4   Range: 2nd to 4th");
             Console.WriteLine("  --nth 3~    From 3rd to end");
             Console.WriteLine("  --nth ~3    First to 3rd");
+            Console.WriteLine("  --nth 1,3~  Union: #1 plus #3 onward");
             Console.WriteLine("  --all       All matches");
             Console.WriteLine();
             Console.WriteLine("═══ Options ═══════════════════════════════════════════════");
@@ -432,6 +433,12 @@ internal partial class Program
         };
         bool isElementAction = elementActions.Contains(action);
 
+        // Read-only actions (inspect/find/windows/screenshot/ocr/read/highlight/wait) are exempt.
+        bool isInteractiveAction = action is
+            "close" or "invoke" or "click" or "toggle" or "expand" or "collapse" or
+            "select" or "scroll" or "type" or "set-value" or "set-range" or
+            "minimize" or "maximize" or "restore" or "focus" or "move" or "resize";
+
         // ═══ STEP 1: Split grap ═══
         var (win32Segments, uiaPath) = GrapHelper.SplitGrap(grap);
         if (win32Segments.Length == 0)
@@ -442,18 +449,18 @@ internal partial class Program
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var allWindows = new List<WindowInfo>();
         var seen = new HashSet<IntPtr>();
+        bool stopOnFirstWindowMatch = isInteractiveAction && !all && nthRaw == null;
         foreach (var pat in firstSegPatterns)
-            foreach (var w in WindowFinder.FindByTitle(pat))
+        {
+            foreach (var w in WindowFinder.FindByTitle(pat, stopOnFirstWindowMatch))
                 if (seen.Add(w.Handle))
                     allWindows.Add(w);
+            if (stopOnFirstWindowMatch && allWindows.Count > 0)
+                break;
+        }
 
         // ── Ancestor process guard: skip windows owned by own process tree ──
         // Applied to ALL interactive actions (not just close) unless --allow-ancestors is set.
-        // Read-only actions (inspect/find/windows/screenshot/ocr/read/highlight/wait) are exempt.
-        bool isInteractiveAction = action is
-            "close" or "invoke" or "click" or "toggle" or "expand" or "collapse" or
-            "select" or "scroll" or "type" or "set-value" or "set-range" or
-            "minimize" or "maximize" or "restore" or "focus" or "move" or "resize";
         if (isInteractiveAction && !allowAncestors)
         {
             // All interactive actions: window-hierarchy ancestors only
@@ -493,6 +500,13 @@ internal partial class Program
             if (parsed == null)
                 return Error($"--nth {nthRaw}: invalid range or out of bounds ({allWindows.Count} match(es))");
             targets = parsed;
+            if (isInteractiveAction && targets.Count > 1)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[A11Y] WARN: --nth {nthRaw} matched {targets.Count} candidates; acting on highest-priority one only");
+                Console.ResetColor();
+                targets = [targets[0]];
+            }
         }
         else
             targets = new List<WindowInfo> { allWindows[0] };

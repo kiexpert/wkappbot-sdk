@@ -3,6 +3,7 @@ using System.Drawing;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
+using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Native;
 
 namespace WKAppBot.Win32.Window;
@@ -187,12 +188,18 @@ public sealed partial class ClaudePromptHelper
                             title,
                             "Code",
                             new Rectangle(rect.X, rect.Y, rect.Width, rect.Height),
-                            "vscode"
+                            ClassifyVsCodeHostType(title)
                         );
                     }
                 }
             }
             catch { }
+        }
+
+        foreach (var hWnd in windows)
+        {
+            var codexPrompt = TryFindFocusedVsCodeCodexPrompt(hWnd);
+            if (codexPrompt != null) return codexPrompt;
         }
 
         // Fallback: VS Code Claude Code extension (no turn-form, native panel)
@@ -202,14 +209,17 @@ public sealed partial class ClaudePromptHelper
             if (!NativeMethods.IsWindowVisible(hWnd)) continue;
             var title = WindowFinder.GetWindowText(hWnd);
             if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)) continue;
+            if (IsLikelyVsCodeCodexWindowTitle(title)) continue;
+            if (ShouldSkipVsCodePromptFallbackWindow(title)) continue;
 
             // Use full window rect (will use keyboard shortcut to focus input)
             NativeMethods.GetWindowRect(hWnd, out var wr);
             var rect = new Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
+            var hostType = ClassifyVsCodeHostType(title);
 
-            Console.WriteLine($"  [PROMPT] Found VS Code Claude Code (native ext): \"{title}\" at ({rect.X},{rect.Y} {rect.Width}x{rect.Height})");
+            Console.WriteLine($"  [PROMPT] Found VS Code Claude host ({hostType}): \"{title}\" at ({rect.X},{rect.Y} {rect.Width}x{rect.Height})");
 
-            return new PromptInfo(hWnd, title, "Code", rect, "vscode-claudecode");
+            return new PromptInfo(hWnd, title, "Code", rect, hostType);
         }
 
         return null;
@@ -238,6 +248,15 @@ public sealed partial class ClaudePromptHelper
 
                 var root = _automation.FromHandle(hWnd);
                 if (root == null) continue;
+
+                NativeMethods.GetWindowRect(hWnd, out var wr0);
+                var winRect0 = Rectangle.FromLTRB(wr0.Left, wr0.Top, wr0.Right, wr0.Bottom);
+                var messageInputRect = TryResolvePromptRectFromMessageInput(root, winRect0);
+                if (messageInputRect != Rectangle.Empty)
+                {
+                    Console.WriteLine($"  [PROMPT] Found Codex prompt by Message input: ({messageInputRect.X},{messageInputRect.Y} {messageInputRect.Width}x{messageInputRect.Height})");
+                    return new PromptInfo(hWnd, title, "codex", messageInputRect, HostCodexDesktop);
+                }
 
                 // If Codex permission/approval dialog is open, accept it first so
                 // prompt routing does not get stuck on the blocker UI.
@@ -413,6 +432,272 @@ public sealed partial class ClaudePromptHelper
         return false;
     }
 
+    internal PromptInfo? TryFindFocusedVsCodeCodexPrompt(IntPtr hWnd)
+    {
+        if (!NativeMethods.IsWindowVisible(hWnd)) return null;
+        var title = WindowFinder.GetWindowText(hWnd);
+        if (!IsLikelyVsCodeCodexWindowTitle(title)) return null;
+
+        try
+        {
+            var root = _automation.FromHandle(hWnd);
+            if (root == null) return null;
+
+            NativeMethods.GetWindowRect(hWnd, out var wr);
+            var winRect = Rectangle.FromLTRB(wr.Left, wr.Top, wr.Right, wr.Bottom);
+            var messageInputRect = TryResolvePromptRectFromMessageInput(root, winRect);
+            if (messageInputRect != Rectangle.Empty)
+            {
+                if (!ContainsCurrentCursor(messageInputRect))
+                {
+                    Console.WriteLine($"  [PROMPT] Reject VS Code Codex Message input (cursor outside): ({messageInputRect.X},{messageInputRect.Y} {messageInputRect.Width}x{messageInputRect.Height}) \"{title}\"");
+                    return null;
+                }
+                Console.WriteLine($"  [PROMPT] Found VS Code Codex prompt by Message input: ({messageInputRect.X},{messageInputRect.Y} {messageInputRect.Width}x{messageInputRect.Height}) \"{title}\"");
+                return new PromptInfo(hWnd, title, "Code", messageInputRect, HostVsCodeCodex);
+            }
+
+            var focused = GrapHelper.FindFocusedLeaf(_automation, root, hWnd);
+            if (focused == null) return null;
+
+            var promptRect = TryResolveVsCodeCodexPromptRectFromFocus(hWnd, focused);
+            if (promptRect == Rectangle.Empty) return null;
+            if (!ContainsCurrentCursor(promptRect))
+            {
+                Console.WriteLine($"  [PROMPT] Reject VS Code Codex focus rect (cursor outside): ({promptRect.X},{promptRect.Y} {promptRect.Width}x{promptRect.Height}) \"{title}\"");
+                return null;
+            }
+
+            Console.WriteLine($"  [PROMPT] Found VS Code Codex prompt by focus: ({promptRect.X},{promptRect.Y} {promptRect.Width}x{promptRect.Height}) \"{title}\"");
+            return new PromptInfo(hWnd, title, "Code", promptRect, HostVsCodeCodex);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private Rectangle TryResolvePromptRectFromMessageInput(AutomationElement root, Rectangle winRect)
+    {
+        try
+        {
+            var editEl = root.FindFirst(TreeScope.Descendants, new AndCondition(
+                new PropertyCondition(_automation.PropertyLibrary.Element.ControlType, ControlType.Edit),
+                new PropertyCondition(_automation.PropertyLibrary.Element.Name, "Message input")));
+            if (editEl == null) return Rectangle.Empty;
+
+            var br = editEl.BoundingRectangle;
+            var rect = new Rectangle(br.X, br.Y, br.Width, br.Height);
+            if (rect.IsEmpty || rect.Width < 120 || rect.Height < 18)
+                return Rectangle.Empty;
+
+            var padX = Math.Clamp(rect.Width / 12, 16, 64);
+            var padY = Math.Clamp(rect.Height / 3, 8, 28);
+            var expanded = Rectangle.FromLTRB(
+                Math.Max(winRect.Left + 4, rect.Left - padX),
+                Math.Max(winRect.Top + 4, rect.Top - padY),
+                Math.Min(winRect.Right - 4, rect.Right + padX),
+                Math.Min(winRect.Bottom - 4, rect.Bottom + padY));
+
+            return expanded.Width >= 140 && expanded.Height >= 24 ? expanded : rect;
+        }
+        catch
+        {
+            return Rectangle.Empty;
+        }
+    }
+
+    private static bool ContainsCurrentCursor(Rectangle rect)
+    {
+        if (rect.IsEmpty || rect.Width <= 0 || rect.Height <= 0)
+            return false;
+
+        try
+        {
+            if (!NativeMethods.TryGetCurrentCursorRect(out var cursorRect))
+                return false;
+            return rect.Contains(cursorRect);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private Rectangle TryResolveVsCodeCodexPromptRectFromFocus(IntPtr hWnd, AutomationElement focused)
+    {
+        NativeMethods.GetWindowRect(hWnd, out var wr);
+        var winRect = Rectangle.FromLTRB(wr.Left, wr.Top, wr.Right, wr.Bottom);
+        if (winRect.IsEmpty) return Rectangle.Empty;
+
+        try
+        {
+            var root = _automation.FromHandle(hWnd);
+            if (root != null)
+            {
+                var markerRect = TryResolveVsCodeCodexPromptRectFromMarker(root, focused, winRect);
+                if (markerRect != Rectangle.Empty)
+                    return markerRect;
+            }
+        }
+        catch { }
+
+        var walker = _automation.TreeWalkerFactory.GetRawViewWalker();
+        var candidates = new List<(Rectangle Rect, int Score, int Area)>();
+        var cur = focused;
+
+        for (int depth = 0; depth < 10 && cur != null; depth++)
+        {
+            Rectangle rect;
+            try
+            {
+                var br = cur.BoundingRectangle;
+                rect = new Rectangle(br.X, br.Y, br.Width, br.Height);
+            }
+            catch
+            {
+                rect = Rectangle.Empty;
+            }
+
+            if (!rect.IsEmpty &&
+                rect.Width >= 220 &&
+                rect.Height >= 28 &&
+                rect.Height <= 180 &&
+                rect.Left >= winRect.Left &&
+                rect.Top >= winRect.Top &&
+                rect.Right <= winRect.Right + 4 &&
+                rect.Bottom <= winRect.Bottom + 4)
+            {
+                var score = 0;
+                if (rect.Bottom >= winRect.Bottom - Math.Min(320, Math.Max(140, winRect.Height / 3))) score += 8;
+                if (rect.Top >= winRect.Top + winRect.Height / 4) score += 2;
+                if (rect.Width >= Math.Min(360, Math.Max(260, winRect.Width / 4))) score += 4;
+                if (rect.Height is >= 32 and <= 120) score += 4;
+                if (ElementSupportsTextOrValue(cur)) score += 3;
+                if (depth <= 1) score += 2;
+                else if (depth <= 3) score += 1;
+
+                candidates.Add((rect, score, rect.Width * rect.Height));
+            }
+
+            try { cur = walker.GetParent(cur); }
+            catch { break; }
+        }
+
+        var best = candidates
+            .OrderByDescending(c => c.Score)
+            .ThenBy(c => c.Rect.Height)
+            .ThenBy(c => c.Area)
+            .FirstOrDefault();
+
+        if (best.Rect == Rectangle.Empty || best.Score < 10)
+            return Rectangle.Empty;
+
+        var expanded = Rectangle.FromLTRB(
+            Math.Max(winRect.Left + 4, best.Rect.Left - 10),
+            Math.Max(winRect.Top + 4, best.Rect.Top - 6),
+            Math.Min(winRect.Right - 4, best.Rect.Right + 10),
+            Math.Min(winRect.Bottom - 4, best.Rect.Bottom + 6));
+
+        return expanded.Width >= 220 && expanded.Height >= 28 ? expanded : best.Rect;
+    }
+
+    private Rectangle TryResolveVsCodeCodexPromptRectFromMarker(
+        AutomationElement root,
+        AutomationElement focused,
+        Rectangle winRect)
+    {
+        var markers = root.FindAllDescendants()
+            .Where(e =>
+            {
+                try
+                {
+                    var name = (e.Name ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(name) || name.Length > 160) return false;
+                    var lower = name.ToLowerInvariant();
+                    return lower.Contains("ask follow-up") ||
+                           lower.Contains("follow-up changes") ||
+                           lower.Contains("message codex") ||
+                           lower.Contains("what are we coding next") ||
+                           lower.Contains("ask for") ||
+                           lower.Contains("ask");
+                }
+                catch { return false; }
+            })
+            .Select(e =>
+            {
+                try
+                {
+                    var br = e.BoundingRectangle;
+                    var rect = new Rectangle(br.X, br.Y, br.Width, br.Height);
+                    return (el: e, rect);
+                }
+                catch
+                {
+                    return (el: e, rect: Rectangle.Empty);
+                }
+            })
+            .Where(x => !x.rect.IsEmpty && x.rect.Width >= 120 && x.rect.Height >= 16)
+            .ToList();
+
+        if (markers.Count == 0)
+            return Rectangle.Empty;
+
+        Rectangle focusRect;
+        try
+        {
+            var fr = focused.BoundingRectangle;
+            focusRect = new Rectangle(fr.X, fr.Y, fr.Width, fr.Height);
+        }
+        catch
+        {
+            focusRect = Rectangle.Empty;
+        }
+
+        var best = markers
+            .Select(x =>
+            {
+                var score = 0;
+                if (x.rect.Bottom >= winRect.Bottom - Math.Min(320, Math.Max(140, winRect.Height / 3))) score += 10;
+                if (x.rect.Left >= winRect.Left + winRect.Width / 2) score += 4;
+                if (!focusRect.IsEmpty && Math.Abs(x.rect.Top - focusRect.Top) <= 48) score += 8;
+                if (!focusRect.IsEmpty && Math.Abs(x.rect.Bottom - focusRect.Bottom) <= 64) score += 8;
+                if (x.rect.Width >= 180) score += 2;
+                return (x.rect, score);
+            })
+            .OrderByDescending(x => x.score)
+            .ThenByDescending(x => x.rect.Bottom)
+            .FirstOrDefault();
+
+        if (best.rect == Rectangle.Empty || best.score < 10)
+            return Rectangle.Empty;
+
+        var rect = Rectangle.FromLTRB(
+            Math.Max(winRect.Left + 4, best.rect.Left - 14),
+            Math.Max(winRect.Top + 4, best.rect.Top - 12),
+            Math.Min(winRect.Right - 4, Math.Max(best.rect.Right + 120, best.rect.Left + 320)),
+            Math.Min(winRect.Bottom - 4, best.rect.Bottom + 18));
+
+        return rect.Width >= 220 && rect.Height >= 28 ? rect : Rectangle.Empty;
+    }
+
+    private static bool ElementSupportsTextOrValue(AutomationElement el)
+    {
+        try
+        {
+            if (el.Patterns.Text.IsSupported) return true;
+        }
+        catch { }
+
+        try
+        {
+            if (el.Patterns.Value.IsSupported) return true;
+        }
+        catch { }
+
+        return false;
+    }
+
     private static List<IntPtr> GetCodexCandidateWindows(int processId)
     {
         var ordered = new List<IntPtr>();
@@ -478,7 +763,7 @@ public sealed partial class ClaudePromptHelper
             var title = WindowFinder.GetWindowText(hWnd);
             Console.WriteLine($"  [PROMPT] Found VS Code Claude prompt: aid=turn-form at ({rect.X},{rect.Y} {rect.Width}x{rect.Height}) \"{title}\"");
             return new PromptInfo(hWnd, title, "Code",
-                new Rectangle(rect.X, rect.Y, rect.Width, rect.Height), "vscode");
+                new Rectangle(rect.X, rect.Y, rect.Width, rect.Height), ClassifyVsCodeHostType(title));
         }
         catch { return null; }
     }

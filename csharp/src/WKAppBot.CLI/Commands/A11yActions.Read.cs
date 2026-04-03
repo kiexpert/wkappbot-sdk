@@ -111,12 +111,12 @@ internal partial class Program
             try { type = el.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
 
             // BoundingRect
-            var rectStr = "";
+            System.Drawing.Rectangle? rect = null;
             try
             {
                 var r = el.Properties.BoundingRectangle.ValueOrDefault;
                 if (r.Width > 0)
-                    rectStr = $" ({(int)r.X},{(int)r.Y} {(int)r.Width}x{(int)r.Height})";
+                    rect = new System.Drawing.Rectangle((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height);
             }
             catch { }
 
@@ -130,11 +130,8 @@ internal partial class Program
             if (nh != IntPtr.Zero)
                 nhStr = $" hwnd={nh:X8}";
 
-            // Label: prefer name, then aid
-            var label = !string.IsNullOrEmpty(name) ? $"\"{name}\"" : "";
-            var aidStr = !string.IsNullOrEmpty(aid) ? $" aid=\"{aid}\"" : "";
-
-            Console.WriteLine($"[A11Y] {indent}[{type}] {label}{aidStr}{nhStr}{rectStr}{patStr}");
+            var tag = GrapHelper.FormatNodeLabel(type, aid, name, rect: rect, actions: patterns);
+            Console.WriteLine($"[A11Y] {indent}{tag}{nhStr}{patStr}");
 
             // Recurse children
             if (level < maxDepth)
@@ -173,18 +170,21 @@ internal partial class Program
     {
         var lines = new List<string>();
 
-        var name = el.Properties.Name.ValueOrDefault;
-        if (!string.IsNullOrEmpty(name))
-            lines.Add($"Name: {name}");
-
+        var name = el.Properties.Name.ValueOrDefault ?? "";
+        var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
+        string controlType = "?";
+        try { controlType = el.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+        System.Drawing.Rectangle? rect = null;
         try
         {
-            var ct = el.Properties.ControlType.ValueOrDefault;
-            lines.Add($"Type: {ct}");
+            var r = el.Properties.BoundingRectangle.ValueOrDefault;
+            if (r.Width > 0) rect = new System.Drawing.Rectangle((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height);
         }
         catch { }
-
-        var aid = el.Properties.AutomationId.ValueOrDefault;
+        lines.Add($"Tag: {GrapHelper.FormatNodeLabel(controlType, aid, name, rect: rect)}");
+        if (!string.IsNullOrEmpty(name))
+            lines.Add($"Name: {name}");
+        lines.Add($"Type: {controlType}");
         if (!string.IsNullOrEmpty(aid))
             lines.Add($"AutomationId: {aid}");
 
@@ -256,8 +256,7 @@ internal partial class Program
                         var cct = "?";
                         try { cct = child.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                         var caid = child.Properties.AutomationId.ValueOrDefault ?? "";
-                        var label = !string.IsNullOrEmpty(cn) ? $"\"{cn}\"" : (caid != "" ? $"aid={caid}" : "(unnamed)");
-                        lines.Add($"  [{cct}] {label}");
+                        lines.Add($"  {GrapHelper.FormatNodeLabel(cct, caid, cn)}");
                     }
                     catch { }
                 }

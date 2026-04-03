@@ -496,29 +496,13 @@ internal partial class Program
         if (text == null)
             return Error("file-write requires --text \"content\" or --text \"@source.txt\"");
 
-        string content;
-        if (text.StartsWith("@"))
-        {
-            var srcPath = text[1..];
-            if (!File.Exists(srcPath))
-                return Error($"Source file not found: {srcPath}");
-            content = File.ReadAllText(srcPath, System.Text.Encoding.UTF8);
-            Console.WriteLine($"[FILE-WRITE] source: {srcPath} ({content.Length} chars)");
-        }
-        else
-        {
-            content = text;
-        }
-
-        var targetDir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
-            Directory.CreateDirectory(targetDir);
-
-        AgentFileTracker.Track(filePath); // capture original before overwrite
-        var encoded = enc.GetBytes(content);
-        File.WriteAllBytes(filePath, encoded);
-        Console.WriteLine($"[FILE-WRITE] {filePath} ({enc.WebName}, {content.Length} chars → {encoded.Length} bytes) ✓");
-        return 0;
+        var writeArgs = new List<string> { "write", filePath, "--text", text };
+        if (encodingArg != null) { writeArgs.Add("--encoding"); writeArgs.Add(encodingArg); }
+        if (args.Any(a => a.Equals("--append", StringComparison.OrdinalIgnoreCase))) writeArgs.Add("--append");
+        if (args.Any(a => a.Equals("--stdin", StringComparison.OrdinalIgnoreCase))) writeArgs.Add("--stdin");
+        if (args.Any(a => a.Equals("--i-really-want-no-backup", StringComparison.OrdinalIgnoreCase))) writeArgs.Add("--i-really-want-no-backup");
+        if (args.Any(a => a.Equals("--dry-run", StringComparison.OrdinalIgnoreCase))) writeArgs.Add("--dry-run");
+        return FileCommand(writeArgs.ToArray());
     }
 
     /// <summary>Lookup hack cache in experience DB by pixel hash. Returns description or null.</summary>

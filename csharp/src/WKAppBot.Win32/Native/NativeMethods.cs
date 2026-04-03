@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -417,9 +418,66 @@ public static partial class NativeMethods
         public POINT ptScreenPos;
     }
     [DllImport("user32.dll")] public static extern bool GetCursorInfo(ref CURSORINFO pci);
+    [DllImport("user32.dll")] public static extern bool GetIconInfo(IntPtr hIcon, out ICONINFO piconinfo);
+    [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr hIcon);
     [DllImport("user32.dll")] public static extern IntPtr LoadCursorW(IntPtr hInstance, int lpCursorName);
     public const int IDC_IBEAM = 32513;
     public const int IDC_HAND  = 32649;
+    public const int SM_CXCURSOR = 13;
+    public const int SM_CYCURSOR = 14;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct ICONINFO
+    {
+        public bool fIcon;
+        public uint xHotspot;
+        public uint yHotspot;
+        public IntPtr hbmMask;
+        public IntPtr hbmColor;
+    }
+
+    /// <summary>
+    /// Returns the current cursor screen rectangle based on the hotspot and system cursor size.
+    /// This is used for prompt containment checks, not just pointer-point containment.
+    /// </summary>
+    public static bool TryGetCurrentCursorRect(out Rectangle rect)
+    {
+        rect = Rectangle.Empty;
+        try
+        {
+            var ci = new CURSORINFO { cbSize = Marshal.SizeOf<CURSORINFO>() };
+            if (!GetCursorInfo(ref ci) || ci.hCursor == IntPtr.Zero)
+                return false;
+
+            if (!GetIconInfo(ci.hCursor, out var ii))
+                return false;
+
+            try
+            {
+                int width = GetSystemMetrics(SM_CXCURSOR);
+                int height = GetSystemMetrics(SM_CYCURSOR);
+                if (width <= 0 || height <= 0)
+                    return false;
+
+                rect = new Rectangle(
+                    ci.ptScreenPos.X - (int)ii.xHotspot,
+                    ci.ptScreenPos.Y - (int)ii.yHotspot,
+                    width,
+                    height);
+                return true;
+            }
+            finally
+            {
+                if (ii.hbmMask != IntPtr.Zero) DeleteObject(ii.hbmMask);
+                if (ii.hbmColor != IntPtr.Zero) DeleteObject(ii.hbmColor);
+            }
+        }
+        catch
+        {
+            rect = Rectangle.Empty;
+            return false;
+        }
+    }
 
     /// <summary>
     /// Check if current cursor is IBeam (text edit indicator).

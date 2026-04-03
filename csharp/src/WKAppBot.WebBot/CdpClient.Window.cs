@@ -19,7 +19,10 @@ public sealed partial class CdpClient
     {
         var hwnd = FindChromeMainWindow();
         if (hwnd != IntPtr.Zero)
+        {
             ShowWindow(hwnd, SW_SHOWMINNOACTIVE);
+            ScheduleMinimizeDump("minimize-window", hwnd);
+        }
     }
 
     /// <summary>
@@ -41,12 +44,14 @@ public sealed partial class CdpClient
             // It briefly activates, so restore user's foreground immediately after.
             var prevFg = GetForegroundWindow();
             ShowWindow(hwnd, 9); // SW_RESTORE
+            CancelMinimizeDump("restore-window");
             if (prevFg != IntPtr.Zero && prevFg != hwnd)
                 SetForegroundWindow(prevFg);
         }
         else
         {
             ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+            CancelMinimizeDump("restore-window-noactivate");
         }
     }
 

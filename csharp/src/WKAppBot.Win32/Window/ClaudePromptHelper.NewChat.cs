@@ -120,6 +120,12 @@ public sealed partial class ClaudePromptHelper
     {
         try
         {
+            if (currentPrompt != null)
+            {
+                if (string.Equals(currentPrompt.HostType, HostCodexDesktop, StringComparison.OrdinalIgnoreCase))
+                    return OpenCodexDesktopNewChat(currentPrompt);
+            }
+
             // Find Claude Desktop window
             IntPtr claudeHwnd;
             FlaUI.Core.AutomationElements.AutomationElement? claudeRoot = null;
@@ -135,6 +141,8 @@ public sealed partial class ClaudePromptHelper
                     Console.WriteLine("  [PROMPT] OpenNewChat: Claude Desktop window not found");
                     return false;
                 }
+                if (string.Equals(found.HostType, HostCodexDesktop, StringComparison.OrdinalIgnoreCase))
+                    return OpenCodexDesktopNewChat(found);
                 claudeHwnd = found.WindowHandle;
             }
 
@@ -310,6 +318,39 @@ public sealed partial class ClaudePromptHelper
     /// <summary>Backward compat wrapper — returns just the path.</summary>
     private static string? GetLatestJsonlPath()
         => GetLatestJsonlInfo().path;
+
+    private bool OpenCodexDesktopNewChat(PromptInfo prompt)
+    {
+        try
+        {
+            Console.WriteLine("  [PROMPT] OpenNewChat: Codex desktop via Ctrl+N");
+            var prevForeground = NativeMethods.GetForegroundWindow();
+            NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
+            Thread.Sleep(250);
+            KeyboardInput.Hotkey(new[] { "ctrl", "n" });
+            Thread.Sleep(700);
+
+            NativeMethods.GetWindowThreadProcessId(prompt.WindowHandle, out uint pid);
+            var refreshed = pid != 0 ? FindCodexDesktopPromptByMarker((int)pid) : null;
+            var ok = refreshed != null;
+            Console.WriteLine(ok
+                ? "  [PROMPT] OpenNewChat: Codex prompt still discoverable after Ctrl+N"
+                : "  [PROMPT] OpenNewChat: Codex prompt not rediscovered after Ctrl+N");
+
+            if (prevForeground != IntPtr.Zero && prevForeground != prompt.WindowHandle)
+            {
+                Thread.Sleep(150);
+                NativeMethods.SmartSetForegroundWindow(prevForeground);
+            }
+
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  [PROMPT] OpenNewChat Codex error: {ex.Message}");
+            return false;
+        }
+    }
 
     /// <summary>
     /// Complete auto-relay: open new chat and type handoff prompt immediately.

@@ -827,7 +827,7 @@ internal partial class Program
         try
         {
             var wrPath = Environment.ProcessPath ?? "wkappbot";
-            _whisperRingX = Math.Max(0, posX - 190);
+            _whisperRingX = Math.Max(0, posX - 280); // WhisperRing width ~270px + 10px gap
             _whisperRingY = posY;
             var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
                 cwd: callerCwd,
@@ -946,7 +946,7 @@ internal partial class Program
                     var summary = _cachedIpcSummary;
                     var startMsg = $":large_green_circle: Eye started (PID={Environment.ProcessId})";
                     // Proactively reuse existing Eye status message (by username, no emoji check)
-                    var adoptTs = FindLastMessageTsByAuthor(slackBotToken, slackChannel, null, "앱봇아이");
+                    var adoptTs = FindEyeStatusTsForReuse(slackBotToken, slackChannel, "앱봇아이");
                     if (adoptTs != null)
                     {
                         // Reuse existing Eye status ts — update in place, no new post
@@ -1048,17 +1048,34 @@ internal partial class Program
                 TryGuardLgOverlay("[EYE][GUARD]", slackBotToken, slackChannel);
             }
 
-            // ── WhisperRing watchdog: respawn if process died (every 60s) ──
+            // ── WhisperRing watchdog: respawn if died + reposition on monitor change (every 60s) ──
             if (_whisperRingPid > 0 && (DateTime.UtcNow - _lastWhisperRingCheck).TotalSeconds >= 60)
             {
                 _lastWhisperRingCheck = DateTime.UtcNow;
                 try
                 {
+                    // Recalculate position from current monitors (handles monitor add/remove)
+                    var (anchorX, anchorY) = GetRightmostMonitorAnchor(width, height);
+                    int newWrX = Math.Max(0, anchorX - 280);
+                    int newWrY = anchorY;
+
                     bool alive = false;
                     try { Process.GetProcessById(_whisperRingPid); alive = true; } catch { }
-                    if (!alive)
+
+                    bool posChanged = newWrX != _whisperRingX || newWrY != _whisperRingY;
+                    if (!alive || posChanged)
                     {
-                        Console.WriteLine($"[EYE] WhisperRing pid={_whisperRingPid} died — respawning");
+                        if (posChanged && alive)
+                        {
+                            // Kill old WhisperRing at stale position
+                            try { Process.GetProcessById(_whisperRingPid).Kill(); } catch { }
+                            Console.WriteLine($"[EYE] WhisperRing monitor changed ({_whisperRingX},{_whisperRingY})→({newWrX},{newWrY}) — respawning");
+                        }
+                        else
+                            Console.WriteLine($"[EYE] WhisperRing pid={_whisperRingPid} died — respawning");
+
+                        _whisperRingX = newWrX;
+                        _whisperRingY = newWrY;
                         var wrPath = Environment.ProcessPath ?? "wkappbot";
                         var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
                             cwd: callerCwd,
@@ -1066,7 +1083,7 @@ internal partial class Program
                             showNoActivate: true,
                             caller: "EYE-WHISPER-RESPAWN");
                         if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
-                        Console.WriteLine($"[EYE] WhisperRing respawned pid={_whisperRingPid}");
+                        Console.WriteLine($"[EYE] WhisperRing respawned pid={_whisperRingPid} at ({_whisperRingX},{_whisperRingY})");
                     }
                 }
                 catch { }
@@ -1210,6 +1227,7 @@ internal partial class Program
                             Console.WriteLine($"[EYE:HOT-SWAP] swap OK (.exe→{Path.GetFileName(oldExePath)}, .new→.exe)");
                             _slackRetiring = true; // stop draining queue — new Eye will take over
                             EyeCmdPipeServer.StopAccepting(); // stop accepting new pipe connections immediately
+                            EnsureEyeGuardianForWindow(host.GetWindowHandle()); // re-launch guardian for new Eye
                             hotReloadTriggered = true;
                             break;
                         }
@@ -1229,6 +1247,7 @@ internal partial class Program
                         EyeResetColor();
                         _slackRetiring = true;
                         EyeCmdPipeServer.StopAccepting(); // stop accepting new pipe connections immediately
+                        EnsureEyeGuardianForWindow(host.GetWindowHandle()); // re-launch guardian for new Eye
                         hotReloadTriggered = true;
                         break;
                     }

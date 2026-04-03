@@ -32,7 +32,7 @@ internal partial class Program
         "Discovery: inspect (UIA element tree), windows (list all windows), screenshot (capture window), ocr (extract text)\n" +
         "Async: wait (poll until window/element appears, --timeout/--interval), eval (execute JavaScript via CDP, \"js expr\")\n" +
         "Utility: clipboard (show help), clipboard-read (read text), clipboard-write (write text/files — mixed mode with [file:] markers)\n" +
-        "File I/O: file-read (read file as Unicode — supports --encoding 949/utf-8/etc.), file-write (write Unicode content as target encoding — use @file to reference temp content), file-edit (search-replace in file — old_string→text, auto backup, encoding-aware, multi-file glob)\n" +
+        "File I/O: file-read (read file as Unicode — supports --encoding 949/utf-8/etc.), file-write (write Unicode content as target encoding — use @file to reference temp content, auto backup ON), file-edit (search-replace in file — old_string→text, auto backup, encoding-aware, multi-file glob)\n" +
         "AI Agents (삼두협의체): ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini), ask-claude (ask Claude Desktop) — vision-capable, auto image capture from responses\n" +
         "  ⚠ Vision input: use image_path param for clarity (e.g. image_path=\"screenshot.png\"). grap also works (backward-compat).\n" +
         "Messaging: slack (send Slack message — text goes to configured channel)\n" +
@@ -119,14 +119,16 @@ internal partial class Program
         "- Send feature request: action=suggest, text=\"Please add X feature because Y\"\n" +
         "- Suggest with screenshot: action=suggest, text=\"UI bug: button misaligned\", grap=\"screenshot.png\"\n" +
         "- Read CP949 Korean source: action=file-read, grap=\"src/legacy.cpp\", --encoding 949 → outputs Unicode\n" +
-        "- Write CP949 Korean source: action=file-write, grap=\"src/legacy.cpp\", text=\"@/tmp/edit.txt\", --encoding 949 (Claude writes UTF-8 to @file, wkappbot re-encodes)\n" +
+        "- Write CP949 Korean source: action=file-write, path=\"src/legacy.cpp\", text=\"@/tmp/edit.txt\", encoding=949 (writes target encoding, creates .bak first)\n" +
         "- Read UTF-8 file: action=file-read, grap=\"config.json\" (default encoding UTF-8)\n" +
-        "- Write UTF-8 file: action=file-write, grap=\"output.txt\", text=\"line1\\nline2\"\n" +
-        "- Edit file (search-replace): action=file-edit, grap=\"src/foo.cs\", old_string=\"oldValue\", text=\"newValue\"\n" +
+        "- Write UTF-8 file: action=file-write, path=\"output.txt\", text=\"line1\\nline2\"\n" +
+        "- Dry-run write preview: action=file-write, path=\"output.txt\", text=\"draft\", dry_run=true\n" +
+        "- Edit file (search-replace): action=file-edit, path=\"src/foo.cs\", old_string=\"oldValue\", text=\"newValue\"\n" +
         "  → auto backup: src/foo.cs.bak-TIMESTAMP.txt (printed in output so you can restore on mistake)\n" +
         "  → encoding-aware: auto-detects UTF-8/CP949; use encoding=949 to override\n" +
-        "- Replace all occurrences: action=file-edit, grap=\"src/foo.cs\", old_string=\"foo\", text=\"bar\", replace_all=true\n" +
-        "- Regex replace: action=file-edit, grap=\"*.cs\", old_string=\"v(\\\\d+)\\.0\", text=\"v$1.1\", use_regex=true, replace_all=true\n" +
-        "- CP949 file edit: action=file-edit, grap=\"legacy.cpp\", old_string=\"old\", text=\"new\", encoding=949\n" +
-        "- Skip backup: action=file-edit, grap=\"tmp.txt\", old_string=\"x\", text=\"y\", i_really_want_no_backup=true";
+        "- Replace all occurrences: action=file-edit, path=\"src/foo.cs\", old_string=\"foo\", text=\"bar\", replace_all=true\n" +
+        "- Regex replace: action=file-edit, path=\"*.cs\", old_string=\"v(\\\\d+)\\.0\", text=\"v$1.1\", use_regex=true, replace_all=true\n" +
+        "- CP949 file edit: action=file-edit, path=\"legacy.cpp\", old_string=\"old\", text=\"new\", encoding=949\n" +
+        "- Skip backup: action=file-edit, path=\"tmp.txt\", old_string=\"x\", text=\"y\", i_really_want_no_backup=true\n" +
+        "- Tool-friendly aliases: action=file-edit, path=\"src/foo.cs\", old_string=\"before\", new_string=\"after\", dry_run=true";
 }

@@ -1045,7 +1045,19 @@ internal partial class Program
             return _mcpPromptCache;
 
         if (!EyeMcpClient.IsRunning)
+        {
+            using var helper = new ClaudePromptHelper();
+            var direct = helper.FindAllPrompts();
+            _mcpPromptCache = direct;
+            _mcpPromptCacheAt = DateTime.UtcNow;
+            return direct;
+        }
+
+        if (forceRefresh || _mcpPromptCache == null)
+        {
+            FindAllPromptsViaMcpCore();
             return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
+        }
 
         // Fire-and-forget background refresh — never blocks caller
         if (!_findPromptsRunning)

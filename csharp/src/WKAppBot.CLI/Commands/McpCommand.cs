@@ -331,7 +331,7 @@ internal partial class Program
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    // ── initialize ──────────────────────────────────────────────
+    // -- initialize ---------------------------------------------
 
     static JsonNode HandleInitialize(JsonObject? @params)
     {
@@ -350,7 +350,7 @@ internal partial class Program
         };
     }
 
-    // ── tools/list ──────────────────────────────────────────────
+    // -- tools/list ---------------------------------------------
 
     // Shared between MCP tools/list and loop persona — keep in sync
     internal const string McpActionDesc =
@@ -360,18 +360,18 @@ internal partial class Program
         "Query: find, read, highlight\n" +
         "Discovery: inspect (UIA tree), windows (list windows), screenshot (capture), ocr (text extraction)\n" +
         "Async: wait (poll until element appears), eval (execute JavaScript via CDP)\n" +
-        "AI Agents: ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini), ask-claude (ask Claude Desktop) — vision-capable, auto image capture\n" +
-        "File I/O: file-read (read file as Unicode, encoding-aware), file-write (write Unicode→target encoding, @file reference)\n" +
-        "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ), slack (send Slack message), eye (eye tick — status snapshot)\n" +
-        "Diagnostics: prompt-probe (scan all AI prompt windows — Claude Desktop, VS Code Claude Code, Codex — and report certainty, Slack display names, CWD; use all=true to include hidden/minimized windows)\n" +
+        "AI Agents: ask-gpt (ask ChatGPT), ask-gemini (ask Google Gemini), ask-claude (ask Claude Desktop) - vision-capable, auto image capture\n" +
+        "File I/O: file-read (read file as Unicode, encoding-aware), file-write (write Unicode to target encoding with auto backup, @file reference)\n" +
+        "Utility: clipboard-read, clipboard-write, suggest (send feature request to Slack+HQ), slack (send Slack message), eye (eye tick - status snapshot)\n" +
+        "Diagnostics: prompt-probe (scan all AI prompt windows - Claude Desktop, VS Code Claude Code, Codex - and report certainty, Slack display names, CWD; use all=true to include hidden/minimized windows)\n" +
         "Log search: logcat / grap / grep (search+stream wkappbot logs; use wkappbot_cli for full options)\n" +
-        "  ⭐ Token-efficient log access pattern: wkappbot_cli [\"logcat\",\"--hq\",\"--past\",\"30s\",\"*.file.*\",\"keyword\"] → grep-style exit\n" +
-        "  ⭐ grep-compat alias: wkappbot_cli [\"grap\",\"keyword\",\"*.log\",\"--hq\",\"--past\",\"30s\"] (pattern first, files second)\n" +
-        "  file glob: *.file.* / *.eye.* / ** (all) — supports ';' OR. text filters: pure regex, multiple = AND\n" +
-        "Filesystem (read-only): file-read (encoding-aware read), file-write (write with encoding; auto-tracks original for patch restore)\n" +
+        "  Token-efficient log access pattern: wkappbot_cli [\"logcat\",\"--hq\",\"--past\",\"30s\",\"*.file.*\",\"keyword\"] -> grep-style exit\n" +
+        "  grep-compat alias: wkappbot_cli [\"grap\",\"keyword\",\"*.log\",\"--hq\",\"--past\",\"30s\"] (pattern first, files second)\n" +
+        "  file glob: *.file.* / *.eye.* / ** (all) - supports ';' OR. text filters: pure regex, multiple = AND\n" +
+        "Filesystem: file-read (encoding-aware read), file-write (write with encoding; creates .bak backup by default), file-edit (search-replace with backup)\n" +
         "Agent session: agent-checkpoint (snapshot before risky change), agent-dump-patch (write unified patch + restore hints to repo root)\n" +
         "Web: web-fetch (HTTP GET), web-search (Google via CDP), web-read (navigate+extract text)\n" +
-        "⚠ Build/publish: prefer signaling Claude Code (Slack) to build. If Claude Code is offline, you may publish directly — always checkpoint first";
+        "Build/publish: prefer signaling Claude Code (Slack) to build. If Claude Code is offline, you may publish directly - always checkpoint first";
 
     static JsonNode HandleToolsList()
     {
@@ -384,15 +384,18 @@ internal partial class Program
                         ["action"] = Prop("string", McpActionDesc),
                         ["grap"] = Prop("string",
                             "Window#element grap pattern. Required for window/element actions.\n" +
-                            "⚠ For file-read/file-write: grap is the TARGET FILE PATH (e.g. \"src/legacy.cpp\").\n" +
-                            "⚠ For suggest: grap is an optional FILE ATTACHMENT path.\n" +
+                            "For file-read/file-write: grap is the TARGET FILE PATH (e.g. \"src/legacy.cpp\").\n" +
+                            "For suggest: grap is an optional FILE ATTACHMENT path.\n" +
                             "Window examples: \"*Notepad*\", \"*Chrome*#button.submit\", \"*App*#*MenuBar*#*File*\""),
+                        ["path"] = Prop("string",
+                            "Path alias for file-read/file-write/file-edit. Prefer this over grap when targeting files."),
                         ["image_path"] = Prop("string",
                             "Image file path for vision AI actions (ask-gpt, ask-gemini, ask-claude).\n" +
                             "Pass a screenshot or image file to attach it as visual context.\n" +
                             "Example: image_path=\"W:/SDK/bin/wkappbot.hq/output/capture_001.png\"\n" +
                             "Note: 'grap' also works for backward compatibility, but image_path is preferred for clarity."),
                         ["text"] = Prop("string", "Text for type/set-value/file-write/ask-*/slack actions. Use @filename to reference a temp file (e.g. \"@/tmp/edit.txt\")"),
+                        ["new_string"] = Prop("string", "For file-edit: alias of text. Replacement text to write."),
                         ["depth"] = Prop("integer", "Tree depth for inspect/find (default: 3)"),
                         ["process"] = Prop("string", "Filter by process name (for windows action)"),
                         ["all"] = Prop("boolean", "Apply to ALL matching windows, or include hidden windows (for windows action)"),
@@ -400,25 +403,26 @@ internal partial class Program
                         ["interval"] = Prop("integer", "Polling interval in ms for wait action (default: 500)"),
                         ["parallel"] = Prop("boolean", "If true, run tools/call asynchronously so MCP loop stays responsive. Unsafe actions are internally queued with 100ms gate polling."),
                         ["encoding"] = Prop("string", "File encoding for file-read/file-write/file-edit: 949 (CP949/Korean), 932 (Shift-JIS/Japanese), 65001 (UTF-8, default), utf-16. Enables Claude to read/write CP949 Korean source files without encoding corruption."),
+                        ["i_really_want_no_backup"] = Prop("boolean", "For file-write/file-edit: skip creating a .bak-TIMESTAMP.txt backup file. Default: backup is ON."),
+                        ["dry_run"] = Prop("boolean", "For file-write/file-edit: emit backup preview without modifying the original file."),
                         ["old_string"] = Prop("string", "For file-edit: the exact string to search for in the file. Must match exactly once unless replace_all=true."),
                         ["replace_all"] = Prop("boolean", "For file-edit: replace ALL occurrences instead of requiring exactly one match."),
                         ["use_regex"] = Prop("boolean", "For file-edit: treat old_string as a .NET regex pattern. Use $1/$2 capture groups in text (new_string)."),
                         ["i_really_want_lossy_encoding"] = Prop("boolean", "For file-edit: allow '?' substitution when new text contains chars not encodable in the target charset (e.g. emoji in CP949 file)."),
-                        ["i_really_want_no_backup"] = Prop("boolean", "For file-edit: skip creating a .bak-TIMESTAMP.txt backup file. Default: backup is ON."),
                         ["context"] = Prop("integer", "For file-edit: number of context lines to show around each change in output (default: 1).")
                     },
                     ["required"] = new JsonArray { "action" }
                 }),
             McpTool("grap",
-                "Search wkappbot logs — grep-compatible syntax (grap = GRab Accessible Pattern).\n" +
+                "Search wkappbot logs - grep-compatible syntax (grap = GRab Accessible Pattern).\n" +
                 "Pattern comes first, files second — exactly like classic grep/rg.\n" +
                 "Internally rewrites to logcat with translated args.\n\n" +
                 "Examples:\n" +
-                "  {pattern:\"exception\"}                                    → search *.txt in CWD\n" +
-                "  {pattern:\"NullRef\", files:\"*.log\", past:\"1h\"}           → last 1h, exit\n" +
-                "  {pattern:\"error\", files:\"*.log\", past:\"30m\", follow:true}→ scan then stream\n" +
-                "  {pattern:\"error\", hq:true, recursive:true}               → all HQ logs\n" +
-                "  {pattern:\"OCR\", files:\"*.file.*\", timeout:\"30s\"}        → watch 30s\n" +
+                "  {pattern:\"exception\"}                                    -> search *.txt in CWD\n" +
+                "  {pattern:\"NullRef\", files:\"*.log\", past:\"1h\"}           -> last 1h, exit\n" +
+                "  {pattern:\"error\", files:\"*.log\", past:\"30m\", follow:true}-> scan then stream\n" +
+                "  {pattern:\"error\", hq:true, recursive:true}               -> all HQ logs\n" +
+                "  {pattern:\"OCR\", files:\"*.file.*\", timeout:\"30s\"}        -> watch 30s\n" +
                 "  {pattern:\"err\", context:3}                               → 3 lines context\n",
                 new JsonObject {
                     ["type"] = "object",
@@ -440,12 +444,12 @@ internal partial class Program
                     ["required"] = new JsonArray { "pattern" }
                 }),
             McpTool("logcat",
-                "Search+stream wkappbot logs — native logcat syntax (fileFilter first, pattern second).\n" +
+                "Search+stream wkappbot logs - native logcat syntax (fileFilter first, pattern second).\n" +
                 "Prefer grap if you think in grep terms. Use logcat for full fileFilter control.\n\n" +
                 "Examples:\n" +
-                "  {files:\"*.file.*\", pattern:\"OCR-DEEP\", past:\"30s\"}     → one-shot scan, exit\n" +
-                "  {files:\"**\", pattern:\"exception\", past:\"1h\", hq:true}  → all logs last 1h\n" +
-                "  {files:\"*.eye.*\", pattern:\"error\", timeout:\"1m\"}       → watch 1 minute\n",
+                "  {files:\"*.file.*\", pattern:\"OCR-DEEP\", past:\"30s\"}     -> one-shot scan, exit\n" +
+                "  {files:\"**\", pattern:\"exception\", past:\"1h\", hq:true}  -> all logs last 1h\n" +
+                "  {files:\"*.eye.*\", pattern:\"error\", timeout:\"1m\"}       -> watch 1 minute\n",
                 new JsonObject {
                     ["type"] = "object",
                     ["properties"] = new JsonObject {

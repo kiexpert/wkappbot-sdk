@@ -15,14 +15,22 @@ internal partial class Program
         int offset = 0;
         int limit  = 2000;
         int? encoding = null;
+        int? endLine = null;
+        bool showLineNumbers = true;
 
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--offset" && i + 1 < args.Length) int.TryParse(args[++i], out offset);
-            else if (args[i] == "--limit" && i + 1 < args.Length) int.TryParse(args[++i], out limit);
+            if ((args[i] is "--offset" or "--start") && i + 1 < args.Length) int.TryParse(args[++i], out offset);
+            else if ((args[i] is "--limit" or "--count") && i + 1 < args.Length) int.TryParse(args[++i], out limit);
+            else if (args[i] == "--end" && i + 1 < args.Length) { if (int.TryParse(args[++i], out var parsedEnd)) endLine = parsedEnd; }
+            else if (args[i] is "--path" or "--file" && i + 1 < args.Length) path = args[++i];
             else if (args[i] == "--encoding" && i + 1 < args.Length) { if (int.TryParse(args[++i], out int cp)) encoding = cp; }
+            else if (args[i] == "--no-line-numbers") showLineNumbers = false;
             else if (!args[i].StartsWith("--")) path = args[i];
         }
+
+        if (endLine.HasValue)
+            limit = Math.Max(0, endLine.Value - Math.Max(0, offset));
 
         if (string.IsNullOrEmpty(path))
             return Error("Usage: file read <path> [--offset N] [--limit N] [--encoding N]");
@@ -43,7 +51,10 @@ internal partial class Program
 
             Console.WriteLine($"[FILE] {path} ({total} lines, showing {start + 1}-{end})");
             for (int i = start; i < end; i++)
-                Console.WriteLine($"{i + 1,6}\t{lines[i]}");
+            {
+                if (showLineNumbers) Console.WriteLine($"{i + 1,6}\t{lines[i]}");
+                else Console.WriteLine(lines[i]);
+            }
 
             if (end < total)
                 Console.WriteLine($"... ({total - end} more lines — use --offset {end} to continue)");
@@ -66,7 +77,9 @@ internal partial class Program
 
         for (int i = 0; i < args.Length; i++)
         {
-            if      (args[i] == "--path"  && i + 1 < args.Length) searchRoot = args[++i];
+            if      (args[i] is "--pattern" or "--query" && i + 1 < args.Length) pattern = args[++i];
+            else if (args[i] is "--path" or "--root" && i + 1 < args.Length) searchRoot = args[++i];
+            else if (args[i] is "--file" && i + 1 < args.Length) searchRoot = args[++i];
             else if (args[i] == "--type"  && i + 1 < args.Length) typeFilter = args[++i].TrimStart('.');
             else if (args[i] is "-i" or "--ignore-case")           ignoreCase = true;
             else if ((args[i] is "-C" or "--context") && i + 1 < args.Length) int.TryParse(args[++i], out context);

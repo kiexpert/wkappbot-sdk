@@ -285,12 +285,17 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         if (EnableFocusTheftMonitoring && OnFocusTheft != null)
             prevFg = (nint)GetForegroundWindow();
 
+        await MaybeLogFocusRiskBeforeAsync(method, parameters, prevFg);
+
         // Minimize Chrome before Input.* to prevent focus theft (focusless CDP operation)
         // Zoom zombies: handled by zoom cleanup timer (60s) + target IsIconic check
         if (method.StartsWith("Input.", StringComparison.Ordinal) && ChromeWindowHandle != 0)
         {
             if (!IsIconic((IntPtr)ChromeWindowHandle))
+            {
                 ShowWindowNative((IntPtr)ChromeWindowHandle, 6); // SW_MINIMIZE
+                ScheduleMinimizeDump($"input-auto-minimize:{method}", (IntPtr)ChromeWindowHandle);
+            }
         }
 
         var id = Interlocked.Increment(ref _messageId);
@@ -335,6 +340,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
                 if (curPid == chromePid)
                 {
                     // Chrome process stole focus → report + restore user's window
+                    await LogFocusRiskAsync("focus-theft", method, parameters, prevFg, curFg, "chrome-became-foreground");
                     OnFocusTheft(method + (OperationContext != null ? $"[{OperationContext}]" : ""), prevFg, curFg);
                     SetForegroundWindow((IntPtr)prevFg);
                 }

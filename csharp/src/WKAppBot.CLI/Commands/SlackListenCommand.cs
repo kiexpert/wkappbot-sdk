@@ -27,9 +27,9 @@ internal partial class Program
     static bool IsPromptForHost(ClaudePromptHelper.PromptInfo prompt, string host)
     {
         if (host == "codex")
-            return string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
+            return ClaudePromptHelper.IsCodexHostType(prompt.HostType);
         if (host == "claude")
-            return !string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
+            return !ClaudePromptHelper.IsCodexHostType(prompt.HostType);
         return true;
     }
 
@@ -49,13 +49,13 @@ internal partial class Program
 
         var all = helper.FindAllPrompts();
         if (effectiveHost == "codex")
-            return all.FirstOrDefault(p => string.Equals(p.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase));
+            return all.FirstOrDefault(p => ClaudePromptHelper.IsCodexHostType(p.HostType));
         if (effectiveHost == "claude")
-            return all.FirstOrDefault(p => !string.Equals(p.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase));
+            return all.FirstOrDefault(p => !ClaudePromptHelper.IsCodexHostType(p.HostType));
 
         // Safety rule: when Codex app is running, never fallback delivery to Claude.
         // If Codex prompt is not discoverable right now, return null and skip delivery.
-        var codex = all.FirstOrDefault(p => p.HostType == "codex-desktop");
+        var codex = all.FirstOrDefault(p => ClaudePromptHelper.IsCodexHostType(p.HostType));
         if (codex != null) return codex;
         if (codexAlive) return null;
 
@@ -165,7 +165,7 @@ internal partial class Program
                 }
 
                 var codexCandidate = promptHelper.FindAllPrompts()
-                    .FirstOrDefault(p => string.Equals(p.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(p => ClaudePromptHelper.IsCodexHostType(p.HostType));
                 if (codexCandidate != null)
                 {
                     promptMissStreak = 0;

@@ -112,10 +112,21 @@ internal partial class Program
         int loopMaxParallel = 7;
         int timeoutSec = 30;
         string? targetTagOverride = null;
+        string? interceptMsg = null;
+        bool _interceptIsInterrupt = false;
+        int _interceptQid = 0;
         var remaining = new List<string>();
         for (int i = 1; i < args.Length; i++)
         {
-            if (args[i] == "--new-tab")
+            if (args[i] == "--intercept" && i + 1 < args.Length)
+                interceptMsg = args[++i];
+            else if (args[i] == "--interrupt" && i + 1 < args.Length)
+                { interceptMsg = args[++i]; _interceptIsInterrupt = true; }
+            else if (args[i] == "--qid" && i + 1 < args.Length)
+                int.TryParse(args[++i], out _interceptQid);
+            else if (args[i] is "--terminate" or "--stop-agent")
+                return AskTerminate(ai);
+            else if (args[i] == "--new-tab")
                 newTab = true;
             else if (args[i] == "--new-session")
                 newSession = true;
@@ -173,6 +184,13 @@ internal partial class Program
                 remaining.Add(args[++i]);
             else
                 remaining.Add(args[i]);
+        }
+
+        // --intercept / --interrupt: post to existing thread without starting new AI session
+        if (!string.IsNullOrWhiteSpace(interceptMsg))
+        {
+            var msg = _interceptQid > 0 ? $"[Q{_interceptQid}] {interceptMsg}" : interceptMsg;
+            return AskIntercept(ai, msg, interrupt: _interceptIsInterrupt);
         }
 
         var (questionParts, attachFiles) = ParseTextAndFilesWithMarkers(remaining.ToArray());
@@ -248,6 +266,8 @@ Options:
   --retry N       Tool execution retry count per step (default: 1)
   --model 4.1     Model/version hint for remote AI (provider remains ask <ai>)
   --triad         Add triad-planning hints to loop persona
+  --intercept ""msg""  훈수두기: post to existing thread without starting new AI session
+                       triad → last triad thread / gemini|gpt|claude → per-page thread
 
 File attachment:
   Any argument that matches an existing file path is auto-attached.
@@ -306,9 +326,12 @@ Examples:
                 if (ok && ts != null)
                 {
                     _slackSessionThreadTs.Value = ts;
+                    // Persist for --intercept (훈수두기)
+                    try { Directory.CreateDirectory(Path.Combine(DataDir, "runtime")); File.WriteAllText(Path.Combine(DataDir, "runtime", "last_triad_ts.txt"), ts); } catch { }
                     Console.WriteLine($"[TRIAD] Unified Slack thread: {ts}");
                     Console.WriteLine($"[TRIAD] Join: wkappbot slack reply \"your opinion\" --msg {ts}");
                     Console.WriteLine($"[TRIAD:THREAD_TS] {ts}");
+                    Console.WriteLine($"[TRIAD] 훈수두기: wkappbot ask triad --intercept \"훈수내용\"");
                 }
             }
         }

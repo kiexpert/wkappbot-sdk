@@ -249,7 +249,11 @@ internal partial class Program
         sb.Append("(b) if the result suggests follow-up exploration, do it immediately with another TOOL_CALL, ");
         sb.Append("(c) end with a short 'NEXT STEPS' list of 2-3 actionable suggestions. ");
         sb.Append("If a tool_result is empty or minimal, investigate deeper automatically — do not just report empty. ");
-        sb.Append("Prefer chaining tool calls (inspect → click → verify) over asking the user what to do next.");
+        sb.Append("Prefer chaining tool calls (inspect → click → verify) over asking the user what to do next. ");
+        sb.Append("MULTI-QUESTION PROTOCOL: Questions may be prefixed [Qn] (e.g. [Q3]). ");
+        sb.Append("When you receive [Qn] questions, prefix EACH answer with [An] on its own line, e.g.: ");
+        sb.Append("[A1] answer to first question... [A2] answer to second question... ");
+        sb.Append("This enables automated per-question routing. Use [An] even for a single [Qn] question.");
         return sb.ToString();
     }
 
