@@ -284,7 +284,7 @@ internal static class EyeCmdPipeServer
                 var (output, exitCode) = EyeMcpClient.CallAsync(args).GetAwaiter().GetResult();
                 Console.Error.WriteLine($"[MCP-PERF] cmd={cmdLine} mcp={_mcpSw.ElapsedMilliseconds}ms exit={exitCode} len={output?.Length ?? 0}");
                 pipeWriter.Write(output);
-                if (!output.EndsWith('\n')) pipeWriter.WriteLine();
+                if (output != null && !output.EndsWith('\n')) pipeWriter.WriteLine();
                 return exitCode;
             }
             finally { EndCommand(); }

@@ -231,8 +231,8 @@ internal partial class Program
                 Thread.Sleep(10);
                 NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYDOWN, (IntPtr)0x56, (IntPtr)(1u | (sc << 16))); // V down
                 Thread.Sleep(10);
-                NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYUP, (IntPtr)0x56, (IntPtr)(1u | (sc << 16) | (1u << 30) | (1u << 31)));
-                NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYUP, (IntPtr)0x11, (IntPtr)((1u << 30) | (1u << 31)));
+                NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYUP, (IntPtr)0x56, (IntPtr)unchecked((nint)(1u | (sc << 16) | (1u << 30) | (1u << 31))));
+                NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYUP, (IntPtr)0x11, (IntPtr)unchecked((nint)((1u << 30) | (1u << 31))));
                 Thread.Sleep(50);
                 try { if (!string.IsNullOrEmpty(prevClip)) System.Windows.Forms.Clipboard.SetText(prevClip); } catch { }
                 Console.WriteLine($"[A11Y] type — ConPTY clipboard paste ({text.Length} chars, focusless!)");

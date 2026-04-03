@@ -163,6 +163,7 @@ internal partial class Program
     {
         // wt.exe 자동 탭 오픈 비활성화 — 포커스 간섭 없이 필요할 때 수동으로 열어서 사용
         return;
+#pragma warning disable CS0162 // unreachable (intentionally disabled, restore when re-enabling wt auto-tab)
         try
         {
             var fileName = Path.GetFileNameWithoutExtension(logFilePath);
@@ -297,4 +298,5 @@ internal partial class Program
     // _idleSkipCommands + GetClaudeCodeSessionAge + GetLastTickTag + BuildKroStatus3
     // IsMetaTag + CheckAndReportDeadCards + SupplementCardsFromPrompts + ReadEyeCards → AppBotEyeHealthCheck.cs
 
+#pragma warning restore CS0162
 }

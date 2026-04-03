@@ -312,7 +312,7 @@ internal partial class Program
                     LastTag = s.LastTag,
                     LastStatus = s.LastStatus,
                     LastTsUtc = hbUtc,
-                    Cwd = s.Cwd,
+                    Cwd = s.Cwd ?? "",
                 };
             }
         }

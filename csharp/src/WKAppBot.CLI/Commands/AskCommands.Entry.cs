@@ -285,7 +285,9 @@ Examples:
     }
 
     // Sequential question counter for triad sessions (helps AIs reference prior questions)
+#pragma warning disable CS0169
     static int _triadQuestionCount;
+#pragma warning restore CS0169
     // Target consensus count for debate (--debate N): 0 = no target (loop until maxR3Loops)
     internal static int _debateTargetConsensus;
 

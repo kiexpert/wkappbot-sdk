@@ -103,7 +103,6 @@ public sealed class DynamicA11yAnalyzer
             .OrderBy(x => x.rect.Y).ThenBy(x => x.rect.X).ToList();
 
         var result = new List<(int, int, T)>();
-        int currentRow = 0;
         int lastRowBottom = int.MinValue;
 
         var rowGroups = new List<List<(System.Drawing.Rectangle rect, int idx, T region)>>();

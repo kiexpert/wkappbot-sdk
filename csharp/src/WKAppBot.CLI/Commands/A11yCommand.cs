@@ -952,7 +952,6 @@ internal partial class Program
                 // ── OCR gap analysis: detect missing text in element rect ──
                 // Applies to all elements wider than one character (~14px)
                 bool needsOcrScan = elBounds is { Width: > 0, Height: > 0 };
-                bool ocrGapDetected = false;
                 ClickZoomHelper? dynZoom = null; // magnifier for DYN-A11Y analysis
                 if (needsOcrScan)
                 {
@@ -1008,7 +1007,6 @@ internal partial class Program
 
                             if (partial)
                             {
-                                ocrGapDetected = true;
                                 // Interleave words and [?] gaps
                                 var parts = new List<string>();
                                 int cursor = 0;
@@ -1051,7 +1049,6 @@ internal partial class Program
                         else if (string.IsNullOrWhiteSpace(elName) && string.IsNullOrWhiteSpace(elAid))
                         {
                             // No OCR words at all on blind node → definitely needs Vision
-                            ocrGapDetected = true;
                             Console.ForegroundColor = ConsoleColor.DarkCyan;
                             Console.ResetColor();
                             if (gapCollector.Add(capturedBounds, null, elAid, out var cached2))
@@ -1260,7 +1257,7 @@ internal partial class Program
                 // ── 입력위치확보 해제: 상태 diff 출력 (AFTER) + callback 해제 ──
                 Win32.Input.KeyboardInput.OnMidInputAbort = null;
                 if (countN == 1)
-                    PrintNodeAfter(root, _nodeBefore, action, success, swTotal.ElapsedMilliseconds);
+                    PrintNodeAfter(root!, _nodeBefore, action, success, swTotal.ElapsedMilliseconds);
 
                 // Zoom: fire-and-forget ShowPass/Dispose — don't block action result on WPF fade
                 var capturedSuccess = success; var capturedAction = action;
@@ -1278,7 +1275,7 @@ internal partial class Program
                 // --speak: TTS 카라오케 (a11y 공통 옵션)
                 if (speak && success)
                 {
-                    var speakText = root.Properties.Name.ValueOrDefault;
+                    var speakText = root!.Properties.Name.ValueOrDefault;
                     try { if (string.IsNullOrEmpty(speakText)) speakText = root.Patterns.Value.PatternOrDefault?.Value?.ValueOrDefault?.ToString(); } catch { }
                     if (!string.IsNullOrWhiteSpace(speakText))
                     {
@@ -1301,7 +1298,7 @@ internal partial class Program
                 // Auto-heal: click/invoke 전 티어 실패 시 삼두에 해결방법 자동 문의
                 // 조건: CWD=WKAppBot 프로젝트 OR --auto-heal 플래그
                 if (!success && action is "click" or "invoke" && ShouldAutoHeal(args))
-                    FireAutoHeal(action, root, hwnd, title);
+                    FireAutoHeal(action, root!, hwnd, title);
             }
             else
             {

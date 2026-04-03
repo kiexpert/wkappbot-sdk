@@ -71,7 +71,9 @@ internal sealed class TriadSharedContext
     // ?? Live MD minutes: real-time debate transcript (APPEND mode) ??
     private string? _mdPath;
     private readonly object _mdLock = new();
+#pragma warning disable CS0414
     private bool _mdHeaderWritten;
+#pragma warning restore CS0414
     private string _mdQuestion = "";
 
     /// <summary>Initialize live MD output. Call once after construction.</summary>

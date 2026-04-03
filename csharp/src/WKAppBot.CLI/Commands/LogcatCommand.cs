@@ -508,8 +508,10 @@ internal partial class Program
     /// <summary>JSON match function — set by LogcatCommand when --json is active. Thread-static for safety.</summary>
     [ThreadStatic] static Func<string, bool>? _jsonMatchFn;
     /// <summary>Total output line cap — 0 = unlimited. Shared with EmitDeltaLines.</summary>
+#pragma warning disable CS0414
     [ThreadStatic] static int _maxOutputLines;
     [ThreadStatic] static int _outputLineCount;
+#pragma warning restore CS0414
 
     static void EmitDeltaLines(
         string path,

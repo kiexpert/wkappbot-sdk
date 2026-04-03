@@ -250,13 +250,6 @@ internal partial class Program
 
             // ── Compact columnar output ──
             // [hwnd] title(40)  process(12)  WxH  flags
-            // Display width: CJK chars count as 2 columns
-            static int DisplayWidth(string s)
-            {
-                int w = 0;
-                foreach (var c in s) w += (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x2500 && c <= 0x27FF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) || c >= 0x10000 ? 2 : 1;
-                return w;
-            }
             static string TrimToWidth(string s, int maxW)
             {
                 int w = 0;
@@ -360,6 +353,7 @@ internal partial class Program
             }
         }
 
+#pragma warning disable CS8321 // local function declared but never used (reserved for future --focus flag)
         void PrintFocusAndPopup(IntPtr hWnd)
         {
             // 1. Keyboard focus child via GetGUIThreadInfo for this window's thread
@@ -483,6 +477,7 @@ internal partial class Program
                 Console.ResetColor();
             }
         }
+#pragma warning restore CS8321
 
         // ── Hot Focus Line helper ──
         static void PrintHotFocusLine(IntPtr fgWnd, WindowFinder.FocusSnapshot focus, Func<uint, string> getProcessName)
@@ -1013,13 +1008,11 @@ internal partial class Program
                     NativeMethods.GetWindowThreadProcessId(topWnd, out uint topPid);
 
                     // Quick skip: check first child's PID — if same as parent, no cross-process children likely
-                    bool hasCrossProcess = false;
                     bool foundMatch = false;
                     NativeMethods.EnumChildWindows(topWnd, (childWnd, _) =>
                     {
                         NativeMethods.GetWindowThreadProcessId(childWnd, out uint childPid);
                         if (childPid == topPid) return true; // same process → keep scanning
-                        hasCrossProcess = true;
                         // Different process child! Check if it matches the search pattern
                         var cn = GetProcessName(childPid);
                         if (fmatch.IsMatch(cn))

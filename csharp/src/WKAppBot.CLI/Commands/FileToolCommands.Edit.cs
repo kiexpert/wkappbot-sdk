@@ -600,7 +600,6 @@ internal partial class Program
 
             int? prev = null;
             int rangeIdx = 0;
-            int lineShiftAccum = 0;
             foreach (var li in toShow)
             {
                 // Skip empty lines (waste of tokens, annoys AI agents)

@@ -63,7 +63,7 @@ internal static class AppBotPipe
 
     // ── Focus Launch Callbacks ───────────────────────────────
     // Wired by WKAppBot.CLI at startup. null in Launcher (NativeAOT) — no-op.
-
+#pragma warning disable CS0649 // fields wired at runtime by WKAppBot.CLI, always null in NativeAOT Launcher
     /// <summary>Called before launching a known/declared focus-requiring exe. Returns true = approved.</summary>
     internal static Func<string, string, bool>? OnFocusApprovalRequired;
 
@@ -72,6 +72,7 @@ internal static class AppBotPipe
 
     /// <summary>Returns true if the exe is registered as a known focus-stealer.</summary>
     internal static Func<string, bool>? OnIsKnownFocusStealer;
+#pragma warning restore CS0649
 
     // ── Low-level: guarded CreateProcessW ────────────────────
 

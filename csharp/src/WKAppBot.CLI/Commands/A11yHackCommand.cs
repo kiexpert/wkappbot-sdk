@@ -218,7 +218,6 @@ internal partial class Program
         using var ocr = new SimpleOcrAnalyzer();
         var gapCollector = new OcrGapCollector();
         int ocrOk = 0, ocrEmpty = 0;
-        int lastRow = -1;
 
         // Group by row for tree display
         var rowGroups = positions.GroupBy(p => p.row).OrderBy(g => g.Key).ToList();
