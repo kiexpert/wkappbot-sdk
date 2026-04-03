@@ -165,6 +165,7 @@ internal partial class Program
 
         EnsureSlackThread("Claude", question);
 
+        string? capturedEditorSel = null; // captured from inside task for re-education
         var task = Task.Run(async () =>
         {
             try
@@ -195,6 +196,7 @@ internal partial class Program
                 _currentAskCdp.Value = cdp;
                 _currentAskHost.Value = "claude";
                 _currentAskEditorSel.Value = editorSel;
+                capturedEditorSel = editorSel;
                 PulseStep.Mark("editor-found");
                 Console.WriteLine($"[ASK] Editor found: {editorSel}");
                 askSession.BindStreamingContext(editorSel);
@@ -540,6 +542,10 @@ internal partial class Program
         {
             EnsureSlackThread("Claude", question);
             SlackPostToThread(answer.Length > 2000 ? answer[..2000] + "..." : answer, SlackAiName("claude", "Claude"));
+            // Restore re-education context in outer AsyncLocal scope (set inside task, not inherited back)
+            _currentAskCdp.Value = cdp;
+            _currentAskHost.Value = "claude";
+            _currentAskEditorSel.Value = capturedEditorSel;
             SlackPostAnswerBlocks(answer, "Claude");
         }
 
