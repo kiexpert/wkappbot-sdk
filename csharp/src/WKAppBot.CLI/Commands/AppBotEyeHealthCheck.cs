@@ -216,7 +216,17 @@ internal partial class Program
     {
         try
         {
-            var cardCwds = new HashSet<string>(cards.Select(c => c.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/')),
+            static string HostFamily(string? hostType) =>
+                ClaudePromptHelper.IsCodexHostType(hostType) ? "codex"
+                : ClaudePromptHelper.IsVsCodeHostType(hostType) || string.Equals(hostType, "claude-desktop", StringComparison.OrdinalIgnoreCase) ? "claude"
+                : (hostType ?? "").ToLowerInvariant();
+
+            static string BuildCardKey(string cwd, string? hostType) =>
+                $"{cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/')}|{HostFamily(hostType)}";
+
+            var cardKeys = new HashSet<string>(cards
+                    .Where(c => !string.IsNullOrWhiteSpace(c.Cwd))
+                    .Select(c => BuildCardKey(c.Cwd, c.HostType)),
                 StringComparer.OrdinalIgnoreCase);
 
             // 1s cooldown after last scan — FindAllPrompts is fast now (per-hwnd UIA cache in ClaudePromptHelper),
@@ -237,28 +247,29 @@ internal partial class Program
                 // Cache appbot master prompt (WKAppBot VS Code — always-on relay target)
                 CachedAppbotMasterPrompt = allPrompts.FirstOrDefault(p =>
                     p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
-                    p.HostType is "vscode-claudecode");
+                    ClaudePromptHelper.IsVsCodeHostType(p.HostType));
                 if (sw.ElapsedMilliseconds > 50)
                     Console.WriteLine($"[EYE] FindAllPrompts(MCP): {sw.ElapsedMilliseconds}ms ({allPrompts.Count} prompts)");
             }
             foreach (var p in allPrompts)
             {
-                if (p.HostType != "vscode-claudecode" && p.HostType != "Code") continue;
+                if (!ClaudePromptHelper.IsVsCodeHostType(p.HostType) && p.HostType != "Code") continue;
                 var cwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
                 if (string.IsNullOrEmpty(cwd)) continue;
-                var cwdKey = cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
-                if (cardCwds.Contains(cwdKey)) continue;
+                var cardKey = BuildCardKey(cwd, p.HostType);
+                if (cardKeys.Contains(cardKey)) continue;
                 cards.Add(new EyeParentCard
                 {
                     ParentPid = p.WindowHandle.ToInt32(),
                     ParentName = "Code",
                     ParentTitle = p.WindowTitle,
+                    HostType = p.HostType,
                     LastTag = "prompt-discovered",
                     LastStatus = "idle",
                     LastTsUtc = DateTime.UtcNow.AddMinutes(-1),
                     Cwd = cwd,
                 });
-                cardCwds.Add(cwdKey);
+                cardKeys.Add(cardKey);
             }
         }
         catch { }

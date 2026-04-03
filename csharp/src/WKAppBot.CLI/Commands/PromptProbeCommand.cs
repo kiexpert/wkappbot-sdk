@@ -103,9 +103,12 @@ internal partial class Program
             foreach (var p in allPrompts)
             {
                 var st = helper.ProbeSubmitState(p);
+                var cursorState = DescribeCursorContainment(p.PromptRect);
                 Console.WriteLine($"  prompt host={p.HostType} hwnd=0x{p.WindowHandle:X} pid={TryGetPid(p.WindowHandle)}");
                 Console.WriteLine($"    title=\"{TrimForLog(p.WindowTitle, 120)}\"");
                 Console.WriteLine($"    rect=({p.PromptRect.X},{p.PromptRect.Y},{p.PromptRect.Width},{p.PromptRect.Height})");
+                Console.WriteLine($"    state visible={p.Visible} usable={p.Usable} occludedBy=\"{TrimForLog(p.OccludedBy, 120)}\"");
+                Console.WriteLine($"    cursor={cursorState}");
                 Console.WriteLine($"    submit turnForm={st.TurnFormFound} found={st.SubmitFound} enabled={st.SubmitEnabled} name=\"{TrimForLog(st.SubmitName, 80)}\"");
             }
         }
@@ -122,9 +125,13 @@ internal partial class Program
             hostTarget,
             cwdFolder,
             workspaceTags);
+        if (hostTarget != "any")
+            candidates = candidates.Where(c => c.HostMatch).ToList();
 
         Console.WriteLine();
         Console.WriteLine($"[PROMPT-PROBE] === Candidate Windows ({candidates.Count}) ===");
+        if (hostTarget != "any" && candidates.Count == 0)
+            Console.WriteLine($"  no {hostTarget} prompt candidates matched the current live windows");
         using var automation = new UIA3Automation();
         int idx = 0;
         foreach (var c in candidates)
@@ -134,12 +141,14 @@ internal partial class Program
             Console.WriteLine($"    title=\"{TrimForLog(c.Title, 120)}\"");
             Console.WriteLine($"    class={c.ClassName} visible={c.Visible} iconic={c.Iconic}");
             Console.WriteLine($"    rect=({c.Rect.X},{c.Rect.Y},{c.Rect.Width},{c.Rect.Height})");
+            Console.WriteLine($"    cursor={DescribeCursorContainment(c.Rect)}");
             Console.WriteLine($"    reason={c.Reason}");
             Console.WriteLine($"    match host={c.HostMatch} cwd={c.CwdMatch}");
 
             if (promptByHwnd.TryGetValue(c.Hwnd, out var known))
             {
                 Console.WriteLine($"    mapped-prompt host={known.HostType}");
+                Console.WriteLine($"    mapped-prompt state visible={known.Visible} usable={known.Usable} occludedBy=\"{TrimForLog(known.OccludedBy, 120)}\"");
             }
 
             try
@@ -229,7 +238,7 @@ internal partial class Program
 
                 // Match card by PID (VS Code: all windows share one PID — use title CWD)
                 string? probeCwd = null;
-                if (p.HostType == "vscode-claudecode")
+                if (ClaudePromptHelper.IsVsCodeHostType(p.HostType))
                     probeCwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
                 if (string.IsNullOrEmpty(probeCwd))
                 {
@@ -268,7 +277,7 @@ internal partial class Program
                 injectTarget != null
                     ? (p.WindowTitle?.Contains(injectTarget, StringComparison.OrdinalIgnoreCase) == true
                        || p.HostType?.Contains(injectTarget, StringComparison.OrdinalIgnoreCase) == true)
-                    : p.HostType == "codex-desktop"
+                    : ClaudePromptHelper.IsCodexHostType(p.HostType)
             ).ToList();
 
             if (targets.Count == 0)
@@ -346,6 +355,7 @@ internal partial class Program
 
             var submit = helper.ProbeSubmitState(target);
             Console.WriteLine($"    submit.state turnForm={submit.TurnFormFound} found={submit.SubmitFound} enabled={submit.SubmitEnabled} name=\"{TrimForLog(submit.SubmitName, 80)}\"");
+            Console.WriteLine($"    prompt.cursor {DescribeCursorContainment(target.PromptRect)}");
 
             var promptText = ExtractCurrentPromptDraft(root, target.PromptRect);
             Console.WriteLine($"    prompt.current=\"{TrimForLog(promptText, 200)}\"");
@@ -502,6 +512,23 @@ internal partial class Program
         catch { }
 
         return "";
+    }
+
+    static string DescribeCursorContainment(Rectangle rect)
+    {
+        try
+        {
+            if (!NativeMethods.TryGetCurrentCursorRect(out var cursorRect))
+                return "cursor=(unavailable)";
+            var contains = rect.Width > 0 && rect.Height > 0 && rect.Contains(cursorRect);
+            var dx = rect.Width > 0 ? Math.Min(Math.Abs(cursorRect.Left - rect.Left), Math.Abs(cursorRect.Right - rect.Right)) : -1;
+            var dy = rect.Height > 0 ? Math.Min(Math.Abs(cursorRect.Top - rect.Top), Math.Abs(cursorRect.Bottom - rect.Bottom)) : -1;
+            return $"cursorRect=({cursorRect.X},{cursorRect.Y},{cursorRect.Width},{cursorRect.Height}) contains={contains} edgeDist=({dx},{dy})";
+        }
+        catch (Exception ex)
+        {
+            return $"cursor=(error:{TrimForLog(ex.Message, 60)})";
+        }
     }
 
     static bool RunPromptInputRoundTripProbe(
@@ -697,12 +724,12 @@ internal partial class Program
                     : "claude prompt uncertain (no turn-form)");
             }
 
-            if (host == "codex-desktop")
+            if (host == "codex-desktop" || host == "vscode-codex")
             {
                 // Codex: rect height >= 40 required — height=28 is Terminal input line, not the multi-line prompt.
                 var codexRectOk = rectOk && r.Height >= 40 && onScreen;
                 return new InputProbeCertainty(codexRectOk, codexRectOk
-                    ? $"codex rect={r.Width}x{r.Height} confirmed"
+                    ? $"{host} rect={r.Width}x{r.Height} confirmed"
                     : !onScreen ? $"codex off-screen ({r.X},{r.Y})"
                     : r.Height < 40 ? $"codex rect too short ({r.Height}px) — terminal line, not prompt"
                     : $"codex prompt uncertain (rectOk={rectOk})");
@@ -807,15 +834,13 @@ internal partial class Program
         List<EyeParentCard>? _unusedCards)
     {
         var host = (prompt.HostType ?? "").ToLowerInvariant();
-        string prefix = host.Contains("codex") ? SlackCodexPrefix : SlackClaudePrefix;
-
         string? cwd = null;
         string cwdSource;
 
         NativeMethods.GetWindowThreadProcessId(prompt.WindowHandle, out uint pidRaw);
         var pid = (int)pidRaw;
 
-        if (host == "vscode-claudecode")
+        if (ClaudePromptHelper.IsVsCodeHostType(host))
         {
             // VS Code: all windows share one PID, so use window title (reliable per-window)
             cwd = ExtractCwdFromVsCodeTitle(prompt.WindowTitle);
@@ -843,7 +868,7 @@ internal partial class Program
 
         if (string.IsNullOrWhiteSpace(cwd))
         {
-            if (host == "vscode-claudecode")
+            if (ClaudePromptHelper.IsVsCodeHostType(host))
             {
                 // VS Code: window title always has CWD → fallback to process CWD only
                 cwd = Environment.CurrentDirectory;
@@ -852,7 +877,7 @@ internal partial class Program
             else
             {
                 // claude-desktop / codex-desktop: no reliable per-instance CWD → no tag
-                return ($"{prefix}", cwdSource + "+no-cwd-tag");
+                return (FormatSlackDisplayName(prompt.HostType, null), cwdSource + "+no-cwd-tag");
             }
         }
 
@@ -860,7 +885,7 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(cwdTag))
             cwdTag = Path.GetFileName(cwd.TrimEnd('\\', '/')) ?? Environment.MachineName;
 
-        return ($"{prefix}[{cwdTag}]", cwdSource);
+        return (FormatSlackDisplayName(prompt.HostType, cwdTag), cwdSource);
     }
 
     static bool IsSystemOrInstallDirectory(string path)
@@ -931,11 +956,24 @@ internal partial class Program
             var reasons = new List<string>();
             var hostMatch = hostTarget == "any";
             var cwdMatch = false;
+            promptByHwnd.TryGetValue(hWnd, out var mappedPrompt);
 
-            if (promptByHwnd.ContainsKey(hWnd))
+            if (mappedPrompt != null)
             {
                 score += 100;
                 reasons.Add("mapped-by-findallprompts");
+                if (hostTarget == "codex" && ClaudePromptHelper.IsCodexHostType(mappedPrompt.HostType))
+                {
+                    score += 40;
+                    hostMatch = true;
+                    reasons.Add($"mapped-host:{mappedPrompt.HostType}");
+                }
+                else if (hostTarget == "claude" && !ClaudePromptHelper.IsCodexHostType(mappedPrompt.HostType))
+                {
+                    score += 30;
+                    hostMatch = true;
+                    reasons.Add($"mapped-host:{mappedPrompt.HostType}");
+                }
             }
             if (proc.Equals("codex", StringComparison.OrdinalIgnoreCase) ||
                 proc.Equals("claude", StringComparison.OrdinalIgnoreCase) ||
@@ -965,6 +1003,23 @@ internal partial class Program
             }
             if (!string.IsNullOrWhiteSpace(title))
             {
+                if (hostTarget == "codex" &&
+                    (title.Contains("Codex", StringComparison.OrdinalIgnoreCase) ||
+                     title.Contains("Message input", StringComparison.OrdinalIgnoreCase)))
+                {
+                    score += 24;
+                    hostMatch = true;
+                    reasons.Add("title-match:codex");
+                }
+                else if (hostTarget == "claude" &&
+                    (title.Contains("Claude", StringComparison.OrdinalIgnoreCase) ||
+                     title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)))
+                {
+                    score += 16;
+                    hostMatch = true;
+                    reasons.Add("title-match:claude");
+                }
+
                 if (title.Contains("Codex", StringComparison.OrdinalIgnoreCase) ||
                     title.Contains("Claude", StringComparison.OrdinalIgnoreCase) ||
                     title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
@@ -998,6 +1053,9 @@ internal partial class Program
                     reasons.Add($"name-hit:{n}");
                 }
             }
+
+            if (hostTarget != "any" && !hostMatch)
+                return true;
 
             if (score <= 0) return true;
 

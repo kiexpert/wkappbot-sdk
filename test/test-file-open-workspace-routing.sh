@@ -47,12 +47,12 @@ case "$OUT" in
     ;;
 esac
 
-grep -F "OrderByDescending(c => c.WorkspaceCwd!.Length)" "$SRC" >/dev/null || {
+/usr/bin/grep -F "OrderByDescending(c => c.WorkspaceCwd!.Length)" "$SRC" >/dev/null || {
   echo "FAIL: longest workspace prefix selection missing from source"
   exit 1
 }
 
-grep -F "NativeMethods.SmartSetForegroundWindow(target.Hwnd)" "$SRC" >/dev/null || {
+/usr/bin/grep -F "NativeMethods.SmartSetForegroundWindow(target.Hwnd)" "$SRC" >/dev/null || {
   echo "FAIL: focus handoff to matched VS Code window missing from source"
   exit 1
 }

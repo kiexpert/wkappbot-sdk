@@ -172,6 +172,8 @@ internal partial class Program
         ClaudePromptHelper.AllowFocusSteal = true;
         using var promptHelper = new ClaudePromptHelper();
         var allPrompts = promptHelper.FindAllPrompts();
+        var usablePrompts = allPrompts.Where(p => p.Usable).ToList();
+        rp.Line($"step3: usable {usablePrompts.Count} prompt(s) => {string.Join(", ", usablePrompts.Select(p => $"0x{p.WindowHandle:X}({p.HostType})"))}");
         rp.Line($"step3: found {allPrompts.Count} prompt(s) — {string.Join(", ", allPrompts.Select(p => $"0x{p.WindowHandle:X}({p.HostType})"))}");
 
         List<ClaudePromptHelper.PromptInfo> targets;
@@ -198,9 +200,9 @@ internal partial class Program
                 else
                 {
                     // Fallback 2: appbot master (WKAppBot VS Code) — final receiver
-                    var appbot = allPrompts.FirstOrDefault(p =>
+                    var appbot = usablePrompts.FirstOrDefault(p =>
                         p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
-                        p.HostType is "vscode-claudecode");
+                        ClaudePromptHelper.IsVsCodeHostType(p.HostType));
                     if (appbot != null)
                     {
                         targets = [appbot];
@@ -218,7 +220,7 @@ internal partial class Program
         else
         {
             // ★ Non-thread (channel message): broadcast to ALL prompts
-            targets = allPrompts;
+            targets = usablePrompts;
             replyTs = threadTs ?? ts;
             if (isKeyword)
             {
@@ -233,6 +235,13 @@ internal partial class Program
         }
 
         // ── Step 5: 타겟 없음 → 재시도 큐 ──
+        targets = targets
+            .Where(p => p.Usable)
+            .GroupBy(p => p.WindowHandle)
+            .Select(g => g.First())
+            .ToList();
+        rp.Line($"step4: usable-filter ??{targets.Count} prompt(s)");
+
         if (targets.Count == 0)
         {
             rp.Line($"step5: No targets — retry #{retryCount + 1}");

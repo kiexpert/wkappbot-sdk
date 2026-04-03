@@ -38,9 +38,14 @@ Usage:
                     expand  collapse  select  scroll  type  set-value  set-range
       Utility:     clipboard  clipboard-read  clipboard-write (text/files/mixed)
 
-      Target:  --nth 3 | 3~ | ~3 | 2~4    --all    (default: first match)
+      Target:  --nth 3 | 3~ | ~3 | 2~4 | 1,3~    --all    (default: first match)
       Options: --depth N  --force  --value N  --direction  --amount
-      Grap:    ';' OR  #scope  Ex: ""*메모장*#*파일*"" → Notepad's File menu
+      Grap:    AI target language for windows + a11y nodes.
+               Human sees windows; AI points with grap.
+               First exact match stops interactive actions fast.
+               Arrays are for lookups; actions consume the highest-priority target.
+               ';' = OR   # = scope drill-down
+               Ex: ""*메모장*#*파일*"" → Notepad's File menu
 
       a11y find ""*app*"" --depth 5       # MUD: look (Win32 + UIA children)
       a11y highlight ""*app*#*button*""   # visualize target with zoom overlay

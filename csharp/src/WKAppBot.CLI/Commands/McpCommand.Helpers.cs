@@ -158,14 +158,18 @@ internal partial class Program
         var list = new List<string>();
         var action = args["action"]?.GetValue<string>() ?? "inspect";
         list.Add(action);
+        bool isFileAction = action is "file-read" or "file-write" or "file-edit";
         // image_path is the preferred param for ask-* vision actions; grap is backward-compat alias
         var isAskAction = action.StartsWith("ask-", StringComparison.OrdinalIgnoreCase);
         if (isAskAction && args["image_path"] is JsonNode ip)
             list.Add(ip.GetValue<string>());
+        else if (isFileAction && args["path"] is JsonNode fp)
+            list.Add(fp.GetValue<string>());
         else if (args["grap"] is JsonNode g)
             list.Add(g.GetValue<string>());
         // Action-specific params
         if (args["text"] is JsonNode t) { list.Add("--text"); list.Add(t.GetValue<string>()); }
+        else if (args["new_string"] is JsonNode ns) { list.Add("--text"); list.Add(ns.GetValue<string>()); }
         if (args["depth"] is JsonNode d) { list.Add("--depth"); list.Add(d.ToString()); }
         if (args["process"] is JsonNode p) { list.Add("--process"); list.Add(p.GetValue<string>()); }
         if (args["timeout"] is JsonNode to) { list.Add("--timeout"); list.Add(to.ToString()); }
@@ -179,6 +183,7 @@ internal partial class Program
         if (args["i_really_want_lossy_encoding"]?.GetValue<bool>()== true) list.Add("--i-really-want-lossy-encoding");
         if (args["i_really_want_no_backup"]?.GetValue<bool>()           == true) list.Add("--i-really-want-no-backup");
         if (args["context"] is JsonNode ctx) { list.Add("--context"); list.Add(ctx.GetValue<int>().ToString()); }
+        if (args["dry_run"]?.GetValue<bool>() == true) list.Add("--dry-run");
         return list.ToArray();
     }
 

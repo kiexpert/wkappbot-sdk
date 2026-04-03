@@ -16,9 +16,9 @@ public sealed partial class ClaudePromptHelper
     /// </summary>
     public bool InjectTextOnly(PromptInfo prompt, string text)
     {
-        if (prompt.HostType == HostCodexDesktop)
+        if (IsCodexHostType(prompt.HostType))
             return TryPostMessageTextToChromiumRenderer(prompt, text, submit: false);
-        if (prompt.HostType == HostVsCodeClaudeCode)
+        if (IsVsCodeHostType(prompt.HostType))
         {
             // Option 3: TextPattern2 truly focusless
             if (TryVSCodeTextPattern2Insert(prompt, text, submit: false))
@@ -73,9 +73,9 @@ public sealed partial class ClaudePromptHelper
         }
 
         // === VS Code Claude Code (native extension): focus-steal + Escape + paste ===
-        if (prompt.HostType == HostVsCodeClaudeCode)
+        if (IsVsCodeHostType(prompt.HostType))
             return TypeAndSubmitVSCodeClaudeCode(prompt, text, focusStealAllowed);
-        if (prompt.HostType == HostCodexDesktop)
+        if (IsCodexHostType(prompt.HostType))
             return SubmitCodexDesktopPrompt(prompt, text);
 
         // === Strategy 1: Try fully focusless input ===
@@ -659,7 +659,7 @@ public sealed partial class ClaudePromptHelper
             if (root == null) return null;
 
             // VS Code Claude Code path: [Edit] "Message input"
-            if (string.Equals(prompt.HostType, HostVsCodeClaudeCode, StringComparison.OrdinalIgnoreCase)
+            if (IsVsCodeHostType(prompt.HostType)
              || string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase))
             {
                 var editEl = root.FindFirst(FlaUI.Core.Definitions.TreeScope.Descendants, new FlaUI.Core.Conditions.AndCondition(
@@ -737,7 +737,7 @@ public sealed partial class ClaudePromptHelper
             if (root == null) return false;
 
             // VS Code / Codex: try Value.SetValue("") on [Edit] "Message input"
-            if (string.Equals(prompt.HostType, HostVsCodeClaudeCode, StringComparison.OrdinalIgnoreCase)
+            if (IsVsCodeHostType(prompt.HostType)
              || string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase))
             {
                 var editEl = root.FindFirst(FlaUI.Core.Definitions.TreeScope.Descendants, new FlaUI.Core.Conditions.AndCondition(

@@ -12,6 +12,7 @@
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
+using System.Text.Json.Nodes;
 
 namespace WKAppBot.CLI;
 
@@ -21,6 +22,8 @@ internal partial class Program
     // Key: CWD path. Value: (file, preview, fileLen, fileMtime)
     static readonly Dictionary<string, (string file, string? preview, long len, DateTime mtime)>
         _clotThoughtCache = new();
+    static readonly Dictionary<string, string?> _projectFolderPathCache = new(StringComparer.OrdinalIgnoreCase);
+    static readonly Dictionary<string, (string provider, string path)?> _aiSessionFileCache = new(StringComparer.OrdinalIgnoreCase);
 
     // ── VS Code title → CWD ─────────────────────────────────────────────────
 
@@ -88,10 +91,27 @@ internal partial class Program
     static string? ResolveProjectFolderToPath(string folderName)
     {
         var searchRoots = new[] { @"W:\GitHub", @"W:\HTS_Project", @"C:\Users\edenc\projects" };
+        if (_projectFolderPathCache.TryGetValue(folderName, out var cached))
+            return cached;
+
         foreach (var root in searchRoots)
         {
             var candidate = Path.Combine(root, folderName);
-            if (Directory.Exists(candidate)) return candidate;
+            if (Directory.Exists(candidate))
+            {
+                _projectFolderPathCache[folderName] = candidate;
+                return candidate;
+            }
+        }
+
+        foreach (var root in searchRoots)
+        {
+            var recursive = FindProjectFolderUnderRoot(root, folderName);
+            if (!string.IsNullOrEmpty(recursive))
+            {
+                _projectFolderPathCache[folderName] = recursive;
+                return recursive;
+            }
         }
         // Reverse-map from ~/.claude/projects/ dir names
         var cpDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -105,11 +125,63 @@ internal partial class Program
                 if (dirName != null && dirName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
                 {
                     var reversed = dirName.Replace("--", ":\\", StringComparison.Ordinal).Replace('-', '\\');
+                    _projectFolderPathCache[folderName] = reversed;
                     return reversed;
                 }
             }
         }
+        _projectFolderPathCache[folderName] = null;
         return null;
+    }
+
+    static string? FindProjectFolderUnderRoot(string root, string folderName)
+    {
+        try
+        {
+            if (!Directory.Exists(root)) return null;
+
+            var matches = Directory.EnumerateDirectories(root, folderName, SearchOption.AllDirectories)
+                .Where(path => !ShouldIgnoreProjectFolderCandidate(path))
+                .OrderBy(GetProjectFolderCandidateScore)
+                .ThenBy(path => path.Count(ch => ch == '\\' || ch == '/'))
+                .ThenBy(path => path.Length)
+                .ToList();
+
+            return matches.FirstOrDefault();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    static bool ShouldIgnoreProjectFolderCandidate(string path)
+    {
+        var norm = path.Replace('/', '\\');
+        var parts = norm.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in parts)
+        {
+            if (part.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("objd", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("debug", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("release", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("packages", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals(".git", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    static int GetProjectFolderCandidateScore(string path)
+    {
+        var norm = path.Replace('/', '\\');
+        int score = 0;
+        if (norm.Contains(@"\Source\", StringComparison.OrdinalIgnoreCase)) score -= 30;
+        if (norm.Contains(@"\GitHub\", StringComparison.OrdinalIgnoreCase)) score -= 20;
+        if (norm.Contains(@"\projects\", StringComparison.OrdinalIgnoreCase)) score -= 10;
+        return score;
     }
 
     // ── JSONL context usage ──────────────────────────────────────────────────
@@ -125,29 +197,16 @@ internal partial class Program
     /// Extended: also returns JSONL path and file size (for context monitor dedup).
     /// Estimate: 40MB = 100% context. JSONL ÷ 40MB = ctx%.
     /// </summary>
-    static (int pct, TimeSpan? age, string? jsonlPath, long fileSize) GetContextInfoForCwdEx(string? cwd)
+    static (int pct, TimeSpan? age, string? jsonlPath, long fileSize) GetContextInfoForCwdEx(string? cwd, string? preferredHostType = null)
     {
         if (string.IsNullOrWhiteSpace(cwd)) return (-1, null, null, 0);
         try
         {
-            var projName = cwd.Replace(':', '-').Replace('\\', '-').Replace('/', '-').Replace('_', '-');
-            var projDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".claude", "projects", projName);
-            if (!Directory.Exists(projDir)) return (-1, null, null, 0);
-
-            string? latestFile = null;
-            DateTime latestMtime = DateTime.MinValue;
-            foreach (var jsonl in Directory.GetFiles(projDir, "*.jsonl"))
-            {
-                try
-                {
-                    var mtime = File.GetLastWriteTimeUtc(jsonl);
-                    if (mtime > latestMtime) { latestMtime = mtime; latestFile = jsonl; }
-                }
-                catch { }
-            }
-            if (latestFile == null) return (-1, null, null, 0);
+            var session = ResolveAiSessionFileForCwd(cwd, preferredHostType);
+            if (session == null || string.IsNullOrWhiteSpace(session.Value.path) || !File.Exists(session.Value.path))
+                return (-1, null, null, 0);
+            var latestFile = session.Value.path;
+            var latestMtime = File.GetLastWriteTimeUtc(latestFile);
             var size = new FileInfo(latestFile).Length;
             var pct = size > 0 ? (int)(size / (1024.0 * 1024.0) / 40.0 * 100) : -1;
             var age = DateTime.UtcNow - latestMtime;
@@ -164,28 +223,20 @@ internal partial class Program
     /// Reads only last 8–32 KB (tail) — session files grow to 35MB+.
     /// Per-CWD cache: skips re-read when file size/mtime unchanged.
     /// </summary>
-    static string? ReadClotThoughtForCwd(string? cwd)
+    static string? ReadClotThoughtForCwd(string? cwd, string? preferredHostType = null)
     {
         if (string.IsNullOrWhiteSpace(cwd)) return "";
         try
         {
-            var projName = cwd.Replace(':', '-').Replace('\\', '-').Replace('/', '-').Replace('_', '-');
-            var projDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".claude", "projects", projName);
-            if (!Directory.Exists(projDir)) return "";
-
-            string? latestFile = null;
-            DateTime latestMtime = DateTime.MinValue;
-            foreach (var jsonl in Directory.GetFiles(projDir, "*.jsonl"))
-            {
-                var mtime = File.GetLastWriteTimeUtc(jsonl);
-                if (mtime > latestMtime) { latestMtime = mtime; latestFile = jsonl; }
-            }
-            if (latestFile == null) return "";
+            var session = ResolveAiSessionFileForCwd(cwd, preferredHostType);
+            if (session == null || string.IsNullOrWhiteSpace(session.Value.path) || !File.Exists(session.Value.path))
+                return "";
+            var provider = session.Value.provider;
+            var latestFile = session.Value.path;
 
             var fi = new FileInfo(latestFile);
-            if (_clotThoughtCache.TryGetValue(cwd, out var cached) &&
+            var cacheKey = $"{provider}|{cwd}";
+            if (_clotThoughtCache.TryGetValue(cacheKey, out var cached) &&
                 cached.file == latestFile && cached.len == fi.Length && cached.mtime == fi.LastWriteTimeUtc)
                 return cached.preview;
 
@@ -199,8 +250,10 @@ internal partial class Program
                 {
                     var line = lines[i];
                     if (string.IsNullOrWhiteSpace(line)) continue;
-                    if (!line.Contains("\"role\"", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (TryExtractRoleAndText(line, out var role, out var text))
+                    bool parsed = provider == "codex"
+                        ? TryExtractRoleAndTextFromCodex(line, out var role, out var text)
+                        : TryExtractRoleAndText(line, out role, out text);
+                    if (parsed)
                     {
                         text = NormalizePrompt(text);
                         if (string.IsNullOrWhiteSpace(text)) continue;
@@ -221,10 +274,121 @@ internal partial class Program
                     selected = $"💬 {bestUser}";
                 if (!string.IsNullOrWhiteSpace(selected)) break;
             }
-            _clotThoughtCache[cwd] = (latestFile, selected, fi.Length, fi.LastWriteTimeUtc);
+            _clotThoughtCache[cacheKey] = (latestFile, selected, fi.Length, fi.LastWriteTimeUtc);
             return selected;
         }
         catch { return ""; }
+    }
+
+    static (string provider, string path)? ResolveAiSessionFileForCwd(string? cwd, string? preferredHostType = null)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return null;
+
+        var cacheKey = $"{preferredHostType ?? ""}|{cwd.Replace('/', '\\').TrimEnd('\\')}";
+        if (_aiSessionFileCache.TryGetValue(cacheKey, out var cached))
+        {
+            if (cached == null) return null;
+            if (File.Exists(cached.Value.path))
+                return cached.Value;
+        }
+
+        (string provider, string path)? resolved = ClaudePromptHelper.IsCodexHostType(preferredHostType)
+            ? ResolveCodexSessionFileForCwd(cwd) ?? ResolveClaudeSessionFileForCwd(cwd)
+            : ResolveClaudeSessionFileForCwd(cwd) ?? ResolveCodexSessionFileForCwd(cwd);
+
+        _aiSessionFileCache[cacheKey] = resolved;
+        return resolved;
+    }
+
+    static (string provider, string path)? ResolveClaudeSessionFileForCwd(string cwd)
+    {
+        var projName = cwd.Replace(':', '-').Replace('\\', '-').Replace('/', '-').Replace('_', '-');
+        var projDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".claude", "projects", projName);
+        if (!Directory.Exists(projDir)) return null;
+
+        string? latestFile = null;
+        DateTime latestMtime = DateTime.MinValue;
+        foreach (var jsonl in Directory.GetFiles(projDir, "*.jsonl"))
+        {
+            try
+            {
+                var mtime = File.GetLastWriteTimeUtc(jsonl);
+                if (mtime > latestMtime) { latestMtime = mtime; latestFile = jsonl; }
+            }
+            catch { }
+        }
+        return latestFile != null ? ("claude", latestFile) : null;
+    }
+
+    static (string provider, string path)? ResolveCodexSessionFileForCwd(string cwd)
+    {
+        var latestFile = FindCodexSessionJsonl(cwd);
+        return string.IsNullOrWhiteSpace(latestFile) ? null : ("codex", latestFile);
+    }
+
+    static bool TryExtractRoleAndTextFromCodex(string line, out string role, out string text)
+    {
+        role = "";
+        text = "";
+
+        try
+        {
+            var node = JsonNode.Parse(line);
+            if (node == null) return false;
+
+            var type = node["type"]?.GetValue<string>() ?? "";
+            if (string.Equals(type, "response_item", StringComparison.OrdinalIgnoreCase))
+            {
+                var payload = node["payload"];
+                if (!string.Equals(payload?["type"]?.GetValue<string>(), "message", StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                var msgRole = payload?["role"]?.GetValue<string>() ?? "";
+                if (msgRole is not ("assistant" or "user"))
+                    return false;
+
+                var parts = new List<string>();
+                if (payload?["content"] is JsonArray contentArray)
+                {
+                    foreach (var item in contentArray)
+                    {
+                        var part =
+                            item?["text"]?.GetValue<string>() ??
+                            item?["output_text"]?.GetValue<string>() ??
+                            item?["input_text"]?.GetValue<string>();
+                        if (!string.IsNullOrWhiteSpace(part))
+                            parts.Add(part);
+                    }
+                }
+
+                text = string.Join("\n", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+                role = msgRole;
+                return !string.IsNullOrWhiteSpace(text);
+            }
+
+            if (string.Equals(type, "event_msg", StringComparison.OrdinalIgnoreCase))
+            {
+                var payload = node["payload"];
+                var msgType = payload?["type"]?.GetValue<string>() ?? "";
+                if (string.Equals(msgType, "agent_message", StringComparison.OrdinalIgnoreCase))
+                {
+                    role = "assistant";
+                    text = payload?["message"]?.GetValue<string>() ?? "";
+                    return !string.IsNullOrWhiteSpace(text);
+                }
+                if (string.Equals(msgType, "user_message", StringComparison.OrdinalIgnoreCase))
+                {
+                    role = "user";
+                    text = payload?["message"]?.GetValue<string>() ?? "";
+                    return !string.IsNullOrWhiteSpace(text);
+                }
+            }
+        }
+        catch { }
+
+        return false;
     }
 
     // ── Per-prompt display info ──────────────────────────────────────────────
@@ -279,13 +443,16 @@ internal partial class Program
         // 1. PromptInfo from cache
         var pi = FindAllPromptsViaMcp()
             .FirstOrDefault(p => p.WindowHandle == hwnd);
+        if (pi == null)
+            pi = ClaudePromptHelper.GetAllCachedPrompts()
+                .FirstOrDefault(p => p.WindowHandle == hwnd);
 
         // 2. CWD: 호스트 타입별 추출 우선순위
         //   VS Code → 타이틀 우선 (PID 공유 문제, 문제1 참조)
         //   Codex   → UIA app-header-portal-main 버튼 (타이틀은 항상 "Codex")
         //   기타    → PID 카드 fallback
         string? cwd = null;
-        if (pi?.HostType == "vscode-claudecode" && !string.IsNullOrEmpty(pi.WindowTitle))
+        if (ClaudePromptHelper.IsVsCodeHostType(pi?.HostType) && !string.IsNullOrEmpty(pi?.WindowTitle))
             cwd = ExtractCwdFromVsCodeTitle(pi.WindowTitle);
         else if (pi?.HostType == "codex-desktop")
             cwd = ExtractCwdFromCodexWindow(hwnd);
@@ -301,21 +468,12 @@ internal partial class Program
             ? AbbreviateCwd(cwd) : "";
 
         // 4. Display name
-        string displayName;
-        if (pi != null)
-        {
-            var prefix = pi.HostType?.Contains("codex") == true ? SlackCodexPrefix : SlackClaudePrefix;
-            displayName = (pi.HostType == "claude-desktop" || string.IsNullOrEmpty(cwdLabel))
-                ? prefix : $"{prefix}[{cwdLabel}]";
-        }
-        else
-        {
-            displayName = !string.IsNullOrEmpty(cwdLabel)
-                ? $"{SlackClaudePrefix}[{cwdLabel}]" : SlackClaudePrefix;
-        }
+        string displayName = pi != null
+            ? FormatSlackDisplayName(pi.HostType, cwdLabel)
+            : FormatSlackDisplayName(null, cwdLabel);
 
         // 5. Last output line from JSONL
-        var lastLine = GetLastOutputLine(ReadClotThoughtForCwd(cwd));
+        var lastLine = GetLastOutputLine(ReadClotThoughtForCwd(cwd, pi?.HostType));
 
         return (displayName, lastLine, cwdLabel);
     }

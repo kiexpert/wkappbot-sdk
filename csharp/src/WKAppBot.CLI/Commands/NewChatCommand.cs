@@ -1,4 +1,4 @@
-using WKAppBot.Win32.Window;
+﻿using WKAppBot.Win32.Window;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Accessibility;
@@ -7,7 +7,7 @@ using FlaUI.Core.Definitions;
 
 namespace WKAppBot.CLI;
 
-// partial class: newchat command — /clear + prompt injection for VS Code Claude Code
+// partial class: newchat command ??/clear + prompt injection for VS Code Claude Code
 internal partial class Program
 {
     /// <summary>
@@ -17,29 +17,29 @@ internal partial class Program
     /// VS Code Claude Code flow (a11y pipeline):
     ///   1. Find VS Code window (CWD match preferred)
     ///   2. UIA: find [Edit] "Message input" via grap #scope (depth 25)
-    ///   3. Value.SetValue("/clear") → submit via focus + Enter
+    ///   3. Value.SetValue("/clear") ??submit via focus + Enter
     ///   4. Wait 3 seconds for clear to complete
-    ///   5. Value.SetValue(prompt) → submit via focus + Enter
+    ///   5. Value.SetValue(prompt) ??submit via focus + Enter
     ///   6. Restore previous foreground window
     /// </summary>
 
     static int NewChatCommand(string[] args)
     {
-        // ── Mutex guard: prevent concurrent/duplicate newchat runs ──
+        // ?? Mutex guard: prevent concurrent/duplicate newchat runs ??
         var lockFile = Path.Combine(Path.GetTempPath(), "wkappbot_newchat.lock");
         try
         {
             var lockAge = File.Exists(lockFile) ? DateTime.UtcNow - File.GetLastWriteTimeUtc(lockFile) : TimeSpan.MaxValue;
             if (lockAge.TotalSeconds < 30)
             {
-                Console.WriteLine($"[NEWCHAT] SKIPPED — another newchat ran {lockAge.TotalSeconds:F0}s ago (cooldown 30s)");
+                Console.WriteLine($"[NEWCHAT] SKIPPED ??another newchat ran {lockAge.TotalSeconds:F0}s ago (cooldown 30s)");
                 return 0;
             }
             File.WriteAllText(lockFile, $"{DateTime.UtcNow:O} pid={Environment.ProcessId}");
         }
         catch { /* best-effort lock */ }
 
-        // ── Parse args ──
+        // ?? Parse args ??
         string? text = null;
         var filePath = GetArgValue(args, "--file");
 
@@ -66,27 +66,27 @@ internal partial class Program
             return 1;
         }
 
-        // ── Append EmbeddedInitialPrompt + regenerate policy file ──
-        // Handoff prompt goes first (인수인계 우선), policy appended after.
-        // Strip "Startup Confirmation" section — newchat expects handoff response, not "Policy loaded. Ready."
+        // ?? Append EmbeddedInitialPrompt + regenerate policy file ??
+        // Handoff prompt goes first (?몄닔?멸퀎 ?곗꽑), policy appended after.
+        // Strip "Startup Confirmation" section ??newchat expects handoff response, not "Policy loaded. Ready."
         if (!args.Contains("--no-policy"))
         {
             var policy = AgentPolicy.EmbeddedInitialPrompt;
-            const string startupSection = "━━ Startup Confirmation ━━";
+            const string startupSection = "?곣봺 Startup Confirmation ?곣봺";
             var cutIdx = policy.IndexOf(startupSection, StringComparison.Ordinal);
             if (cutIdx >= 0)
                 policy = policy[..cutIdx].TrimEnd();
             policy += """
 
-━━ Session Start (Handoff Mode) ━━
+?곣봺 Session Start (Handoff Mode) ?곣봺
 You are receiving a relay handoff from the previous session.
 
 Begin your response with EXACTLY this line (Korean, no changes):
-"바통을 이어받았습니다. 이전 작업과 운영 규칙을 숙지하고 중단 없이 달려가겠습니다. 🔄"
+"諛뷀넻???댁뼱諛쏆븯?듬땲?? ?댁쟾 ?묒뾽怨??댁쁺 洹쒖튃???숈??섍퀬 以묐떒 ?놁씠 ?щ젮媛寃좎뒿?덈떎. ?봽"
 
 Then immediately:
 1. Read CLAUDE.md + memory/MEMORY.md
-2. Send Slack: wkappbot slack send "바통 인수 완료! 이전 작업 이어갑니다 🔄"
+2. Send Slack: wkappbot slack send "諛뷀넻 ?몄닔 ?꾨즺! ?댁쟾 ?묒뾽 ?댁뼱媛묐땲???봽"
 3. Summarize what you understand is pending (Korean, bullet points)
 4. Continue work without waiting for confirmation
 """;
@@ -98,8 +98,19 @@ Then immediately:
 
         Console.WriteLine($"[NEWCHAT] Prompt: {(text.Length > 80 ? text[..77] + "..." : text)} ({text.Length} chars)");
 
-        // ── Find VS Code window ──
-        var vsHwnd = FindVSCodeWindowForNewChat();
+        using var promptHelper = new ClaudePromptHelper();
+        var currentPrompt = promptHelper.FindPrompt(Environment.CurrentDirectory);
+        if (currentPrompt != null && !ClaudePromptHelper.IsVsCodeHostType(currentPrompt.HostType))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[NEWCHAT] ERROR: host \"{currentPrompt.HostType}\" is not supported");
+            Console.WriteLine("[NEWCHAT] Only VS Code extensions are supported: vscode-claudecode, vscode-codex");
+            Console.ResetColor();
+            return 1;
+        }
+
+        // ?? Find VS Code window ??
+        var vsHwnd = currentPrompt?.WindowHandle ?? FindVSCodeWindowForNewChat();
         if (vsHwnd == IntPtr.Zero)
         {
             Console.ForegroundColor = ConsoleColor.Red;
@@ -108,17 +119,18 @@ Then immediately:
             return 1;
         }
 
-        Console.WriteLine($"[NEWCHAT] Target: VS Code hwnd=0x{vsHwnd:X}");
+        Console.WriteLine(currentPrompt != null
+            ? $"[NEWCHAT] Target: {currentPrompt.HostType} hwnd=0x{vsHwnd:X} \"{currentPrompt.WindowTitle}\""
+            : $"[NEWCHAT] Target: VS Code hwnd=0x{vsHwnd:X}");
 
-        // ── Find [Edit] "Message input" via UIA ──
+        // Search specifically for [Edit] "Message input" ??must filter by ControlType
+        // because chat text may contain "Message input" as substring in Text elements
         using var automation = new UIA3Automation();
         automation.ConnectionTimeout = TimeSpan.FromSeconds(10);
         automation.TransactionTimeout = TimeSpan.FromSeconds(10);
         var root = automation.FromHandle(vsHwnd);
         if (root == null) return Error("[NEWCHAT] UIA root not found");
 
-        // Search specifically for [Edit] "Message input" — must filter by ControlType
-        // because chat text may contain "Message input" as substring in Text elements
         var editEl = GrapHelper.WalkTree(root, maxDepth: 25, el =>
         {
             try
@@ -129,14 +141,14 @@ Then immediately:
             }
             catch { return false; }
         });
-        if (editEl == null) return Error("[NEWCHAT] [Edit] 'Message input' not found — Claude Code panel open?");
+        if (editEl == null) return Error("[NEWCHAT] [Edit] 'Message input' not found ??Claude Code panel open?");
 
         Console.WriteLine($"[NEWCHAT] Found: [Edit] \"{editEl.Name}\" at ({editEl.BoundingRectangle.X},{editEl.BoundingRectangle.Y})");
 
         // Guard: if input field already has real user input, abort to avoid overwriting.
         // Placeholder text detection:
-        //   1. Color: if TextPattern ForegroundColor is NOT white-ish → placeholder (gray) → skip
-        //   2. Length: >30 chars or contains newline → real user input → abort
+        //   1. Color: if TextPattern ForegroundColor is NOT white-ish ??placeholder (gray) ??skip
+        //   2. Length: >30 chars or contains newline ??real user input ??abort
         try
         {
             var existing = editEl.Patterns.Value.IsSupported
@@ -153,7 +165,7 @@ Then immediately:
                     if (!string.IsNullOrEmpty(helpText))
                     {
                         isPlaceholder = string.Equals(existing.Trim(), helpText.Trim(), StringComparison.OrdinalIgnoreCase);
-                        Console.WriteLine($"[NEWCHAT] HelpText: \"{helpText}\" → {(isPlaceholder ? "IS placeholder" : "different from value")}");
+                        Console.WriteLine($"[NEWCHAT] HelpText: \"{helpText}\" ??{(isPlaceholder ? "IS placeholder" : "different from value")}");
                     }
                 }
                 catch { }
@@ -161,13 +173,13 @@ Then immediately:
                 Console.WriteLine($"[NEWCHAT] Input field value: \"{existing.Replace("\n","\\n")}\" ({existing.Length} chars){(isPlaceholder ? " [placeholder]" : "")}");
 
                 // Focusless placeholder probe: type 'a' via WM_CHAR, check if existing text disappears
-                // If it does → was placeholder (not real user input). Then clear 'a'.
+                // If it does ??was placeholder (not real user input). Then clear 'a'.
                 if (!isPlaceholder && existing.Length > 0)
                 {
                     try
                     {
                         // Find Chromium renderer child for WM_CHAR
-                        // Get window handle from UIA element → find Chromium renderer child
+                        // Get window handle from UIA element ??find Chromium renderer child
                         var editHwnd = editEl.Properties.NativeWindowHandle.ValueOrDefault;
                         var parentHwnd = editHwnd != IntPtr.Zero ? editHwnd : root.Properties.NativeWindowHandle.ValueOrDefault;
                         var renderer = NativeMethods.FindWindowExW(parentHwnd, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
@@ -181,13 +193,13 @@ Then immediately:
                                 ? editEl.Patterns.Value.Pattern.Value.Value ?? "" : "";
                             if (!after.Contains(existing[..Math.Min(10, existing.Length)]))
                             {
-                                // Existing text gone → was placeholder!
+                                // Existing text gone ??was placeholder!
                                 isPlaceholder = true;
-                                Console.WriteLine($"[NEWCHAT] Focusless probe: '{existing[..Math.Min(20, existing.Length)]}' disappeared after typing → placeholder ✓");
+                                Console.WriteLine($"[NEWCHAT] Focusless probe: '{existing[..Math.Min(20, existing.Length)]}' disappeared after typing -> placeholder");
                             }
                             else
                             {
-                                Console.WriteLine($"[NEWCHAT] Focusless probe: text persisted → real user input");
+                                Console.WriteLine($"[NEWCHAT] Focusless probe: text persisted ??real user input");
                             }
                             // Clean up: select all + delete (regardless)
                             // Cleanup: backspace to remove the probe space
@@ -201,13 +213,13 @@ Then immediately:
                 if (!isPlaceholder && (existing.Length > 30 || existing.Contains('\n')))
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[NEWCHAT] Input field has pending text ({existing.Length} chars) — aborting to avoid overwriting user input");
+                    Console.WriteLine($"[NEWCHAT] Input field has pending text ({existing.Length} chars) ??aborting to avoid overwriting user input");
                     Console.ResetColor();
-                    return Error("[NEWCHAT] Input not empty — user may be typing");
+                    return Error("[NEWCHAT] Input not empty ??user may be typing");
                 }
             }
         }
-        catch { /* ignore — proceed if value check fails */ }
+        catch { /* ignore ??proceed if value check fails */ }
 
         var prevFg = NativeMethods.GetForegroundWindow();
 
@@ -221,7 +233,7 @@ Then immediately:
             SkipKnowhow = true,
         });
 
-        // ── Step 0.5: Compress context (--compress) ──
+        // ?? Step 0.5: Compress context (--compress) ??
         if (args.Contains("--compress"))
         {
             Console.WriteLine("[NEWCHAT] Compressing context before /clear...");
@@ -231,14 +243,14 @@ Then immediately:
                 "Start with '## Session Summary' and end with '---'.";
             if (SetValueAndSubmit(editEl, vsHwnd, compressPrompt))
             {
-                Console.WriteLine("[NEWCHAT] Compress prompt sent — waiting for response (30s)...");
+                Console.WriteLine("[NEWCHAT] Compress prompt sent ??waiting for response (30s)...");
                 Thread.Sleep(30000); // wait for AI to respond
-                // Summary is now in the conversation history — it will be saved in JSONL
+                // Summary is now in the conversation history ??it will be saved in JSONL
                 // The handoff prompt already references prior session context
-                Console.WriteLine("[NEWCHAT] Compress complete — proceeding to /clear");
+                Console.WriteLine("[NEWCHAT] Compress complete ??proceeding to /clear");
             }
             else
-                Console.Error.WriteLine("[NEWCHAT] Compress prompt failed — proceeding without summary");
+                Console.Error.WriteLine("[NEWCHAT] Compress prompt failed ??proceeding without summary");
 
             // Re-find edit element (DOM may have changed after compress)
             root = automation.FromHandle(vsHwnd);
@@ -254,14 +266,14 @@ Then immediately:
             if (editEl == null) return Error("[NEWCHAT] Edit element lost after compress");
         }
 
-        // ── Step 1: /clear via keyboard (slash command menu needs keystroke input!) ──
+        // ?? Step 1: /clear via keyboard (slash command menu needs keystroke input!) ??
         Console.WriteLine("[NEWCHAT] Using keyboard input for slash command (v2)");
         if (!TypeSlashCommandAndSubmit(editEl, vsHwnd, "/clear"))
             return Error("[NEWCHAT] Failed to send /clear");
-        Console.WriteLine("[NEWCHAT] /clear submitted — waiting 3s for reset...");
+        Console.WriteLine("[NEWCHAT] /clear submitted ??waiting 3s for reset...");
         Thread.Sleep(3000);
 
-        // ── Step 2: Re-find edit (DOM may have changed after /clear) ──
+        // ?? Step 2: Re-find edit (DOM may have changed after /clear) ??
         root = automation.FromHandle(vsHwnd);
         editEl = root != null ? GrapHelper.WalkTree(root, maxDepth: 25, el =>
         {
@@ -274,11 +286,11 @@ Then immediately:
         }) : null;
         if (editEl == null) return Error("[NEWCHAT] Edit element lost after /clear");
 
-        // ── Step 3: Paste prompt + submit ──
+        // ?? Step 3: Paste prompt + submit ??
         if (!SetValueAndSubmit(editEl, vsHwnd, text))
             return Error("[NEWCHAT] Failed to send prompt");
 
-        // ── Step 4: Restore focus ──
+        // ?? Step 4: Restore focus ??
         if (prevFg != IntPtr.Zero && prevFg != vsHwnd)
         {
             Thread.Sleep(500);
@@ -287,7 +299,7 @@ Then immediately:
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("[NEWCHAT] SUCCESS — /clear + prompt submitted!");
+        Console.WriteLine("[NEWCHAT] SUCCESS ??/clear + prompt submitted!");
         Console.ResetColor();
         return 0;
     }
@@ -298,7 +310,7 @@ Then immediately:
     /// </summary>
     static bool TypeSlashCommandAndSubmit(FlaUI.Core.AutomationElements.AutomationElement editEl, IntPtr hwnd, string command)
     {
-        // newchat is an intentional automation command — bypass readiness assertion
+        // newchat is an intentional automation command ??bypass readiness assertion
         WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true;
         try
         {
@@ -342,7 +354,7 @@ Then immediately:
     /// <summary>
     /// Set text via clipboard paste, then submit with Enter key.
     /// UIA Value.SetValue doesn't fire DOM input events in Chromium webview
-    /// — clipboard paste (Ctrl+V) reliably triggers React/Svelte state updates.
+    /// ??clipboard paste (Ctrl+V) reliably triggers React/Svelte state updates.
     /// Option 3 (focusless): TextPattern2.InsertTextAtSelection tried first.
     /// </summary>
     static bool SetValueAndSubmit(FlaUI.Core.AutomationElements.AutomationElement editEl, IntPtr hwnd, string text)
@@ -355,7 +367,7 @@ Then immediately:
             var tp2 = editEl.Patterns.Text2;
             if (tp2.IsSupported)
             {
-                // FlaUI 4.0 IText2Pattern interface omits InsertTextAtSelection — call via reflection
+                // FlaUI 4.0 IText2Pattern interface omits InsertTextAtSelection ??call via reflection
                 var insertMethod = tp2.Pattern.GetType().GetMethod("InsertTextAtSelection",
                     System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                 if (insertMethod == null)
@@ -380,15 +392,15 @@ Then immediately:
                     NativeMethods.PostMessageW(rendHwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, lpDown);
                     Thread.Sleep(20);
                     NativeMethods.PostMessageW(rendHwnd, WM_KEYUP, (IntPtr)VK_RETURN, lpUp);
-                    Console.WriteLine("[NEWCHAT] TP2 + renderer Enter → submitted (focusless!)");
+                    Console.WriteLine("[NEWCHAT] TP2 + renderer Enter ??submitted (focusless!)");
                     return true;
                 }
-                Console.WriteLine("[NEWCHAT] TP2: renderer hwnd not found — fallback to focus-steal");
+                Console.WriteLine("[NEWCHAT] TP2: renderer hwnd not found ??fallback to focus-steal");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[NEWCHAT] TP2: {ex.Message} — fallback to focus-steal");
+            Console.WriteLine($"[NEWCHAT] TP2: {ex.Message} ??fallback to focus-steal");
         }
 
         // === Fallback: focus-steal paste + Enter ===
@@ -427,19 +439,17 @@ Then immediately:
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  VS Code window finder
-    // ═══════════════════════════════════════════════════════════════════
-
+    // ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??    //  VS Code window finder
+    // ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??
     /// <summary>
     /// Find VS Code window for new chat.
-    /// Priority 1: ancestor VS Code process (wkappbot was spawned from its terminal → exact match).
-    /// Priority 2: CWD folder match in title — only if exactly ONE window matches (ambiguous = error).
-    /// Never falls back to "any VS Code" — wrong window is worse than no window.
+    /// Priority 1: ancestor VS Code process (wkappbot was spawned from its terminal ??exact match).
+    /// Priority 2: CWD folder match in title ??only if exactly ONE window matches (ambiguous = error).
+    /// Never falls back to "any VS Code" ??wrong window is worse than no window.
     /// </summary>
     static IntPtr FindVSCodeWindowForNewChat()
     {
-        // ── Collect all VS Code windows (top-level + child renderers) ──
+        // ?? Collect all VS Code windows (top-level + child renderers) ??
         // EnumWindows only returns top-level HWNDs. VS Code sometimes creates Chrome_WidgetWin_1
         // as a SetParent'd child (e.g. "lucy_securepad" panel inside a multi-window frame).
         // We do a 2-pass scan: top-level first, then child scan of each top-level result.
@@ -481,8 +491,8 @@ Then immediately:
 
         if (candidates.Count == 0) return IntPtr.Zero;
 
-        // ── Priority 1: ancestor VS Code PID ──
-        // Walk parent process chain: wkappbot → shell → ... → Code.exe
+        // ?? Priority 1: ancestor VS Code PID ??
+        // Walk parent process chain: wkappbot ??shell ??... ??Code.exe
         var ancestorCodePids = new HashSet<uint>();
         try
         {
@@ -521,13 +531,13 @@ Then immediately:
             }
             if (ancestorMatch.Count > 1)
             {
-                // Multiple windows for same Code process (split editors) — use CWD to disambiguate
-                Console.WriteLine($"[NEWCHAT] {ancestorMatch.Count} ancestor windows — disambiguating by CWD...");
+                // Multiple windows for same Code process (split editors) ??use CWD to disambiguate
+                Console.WriteLine($"[NEWCHAT] {ancestorMatch.Count} ancestor windows ??disambiguating by CWD...");
                 candidates = ancestorMatch; // narrow scope for CWD check below
             }
         }
 
-        // ── Priority 2: CWD folder match — walk up path hierarchy ──
+        // ?? Priority 2: CWD folder match ??walk up path hierarchy ??
         // VS Code title = "{activeFile} - {workspaceRoot} - Visual Studio Code"
         // CWD may be a subdirectory of the workspace root, so try each ancestor folder.
         var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
@@ -544,11 +554,11 @@ Then immediately:
 
                 if (cwdMatches.Count == 0) { searchDir = searchDir.Parent; continue; }
 
-                // Guard: if ancestor PIDs known but match is outside ancestor set → wrong window → fail
+                // Guard: if ancestor PIDs known but match is outside ancestor set ??wrong window ??fail
                 if (cwdMatches.Count == 1 && ancestorCodePids.Count > 0 && !ancestorCodePids.Contains(cwdMatches[0].pid))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[NEWCHAT] ERROR: CWD match \"{folderName}\" → \"{cwdMatches[0].title}\" but PID={cwdMatches[0].pid} is NOT an ancestor — refusing to target wrong window.");
+                    Console.WriteLine($"[NEWCHAT] ERROR: CWD match \"{folderName}\" ??\"{cwdMatches[0].title}\" but PID={cwdMatches[0].pid} is NOT an ancestor ??refusing to target wrong window.");
                     Console.ResetColor();
                     return IntPtr.Zero;
                 }
@@ -561,7 +571,7 @@ Then immediately:
                 if (cwdMatches.Count > 1)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[NEWCHAT] ERROR: {cwdMatches.Count} VS Code windows match \"{folderName}\" — ambiguous, aborting.");
+                    Console.WriteLine($"[NEWCHAT] ERROR: {cwdMatches.Count} VS Code windows match \"{folderName}\" ??ambiguous, aborting.");
                     foreach (var m in cwdMatches) Console.WriteLine($"    hwnd=0x{m.hWnd:X} \"{m.title}\"");
                     Console.ResetColor();
                     return IntPtr.Zero;
@@ -571,7 +581,7 @@ Then immediately:
             }
         }
 
-        // ── No match → error (never guess) ──
+        // ?? No match ??error (never guess) ??
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine($"[NEWCHAT] ERROR: No VS Code window matches CWD \"{cwdFolder}\" (ancestor PID lookup also failed).");
         Console.WriteLine("  Available VS Code windows:");

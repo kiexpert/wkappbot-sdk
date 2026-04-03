@@ -11,7 +11,7 @@ internal partial class Program
     /// Works for both single AI asks and triad sessions.
     /// File: .wkappbot/ask/{ai}-{date}-{time}-{topic-slug}.md
     /// </summary>
-    static string? WriteAskMd(string ai, string question, string answer)
+    static string? WriteAskMd(string ai, string question, string answer, List<string>? toolLog = null)
     {
         try
         {
@@ -116,6 +116,15 @@ internal partial class Program
             cleanAnswer = Regex.Replace(cleanAnswer, @"^(TITLE|FILE_TITLE):.*$", "", RegexOptions.Multiline);
             cleanAnswer = Regex.Replace(cleanAnswer, @"\[(PULSE|CDP|SANDBOX|HANG-DIAG|LOG|ROTATE|APPBOT_TOOL_CALL)[^\]]*\].*?\n?", "");
             cleanAnswer = cleanAnswer.Trim();
+
+            if (toolLog?.Count > 0)
+            {
+                sb.AppendLine("## Tool Calls");
+                sb.AppendLine();
+                for (int i = 0; i < toolLog.Count; i++)
+                    sb.AppendLine($"{i + 1}. {toolLog[i]}");
+                sb.AppendLine();
+            }
 
             if (cleanAnswer.Length > 0)
             {

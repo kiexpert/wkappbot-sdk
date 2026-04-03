@@ -122,11 +122,14 @@ partial class Program
         // stdout handle (needed early for hot-swap FSW closure)
         var hOut = GetStdHandle(-11);
 
-        // ── Hot-swap: FSW watches for .new.exe ──
+        // ── Hot-swap: watch the original core path only; Eye owns .new.exe staging/rename ──
         IntPtr _oldCoreStdinWrite = IntPtr.Zero; // drain pipe for old Core during swap
         IntPtr _oldCoreStdoutRead = IntPtr.Zero;
         var _oldInflight = new Dictionary<string, string>(); // requests still in old Core
         bool _swapInProgress = false;
+        bool _pendingSwapWhileAdmin = false;
+        var _activeCoreStamp = System.IO.File.Exists(core) ? System.IO.File.GetLastWriteTimeUtc(core).Ticks.ToString() : string.Empty;
+        string? _lastFailedSwapStamp = null;
         var _swapDrainEvent = new ManualResetEventSlim(false); // signaled when old Core drain completes
 
         var exePath = core; // path to wkappbot-core.exe
@@ -134,7 +137,7 @@ partial class Program
         var exeName = System.IO.Path.GetFileName(exePath);
         var newExePath = System.IO.Path.Combine(exeDir, System.IO.Path.GetFileNameWithoutExtension(exeName) + ".new.exe");
 
-        // FSW for .new.exe detection (500ms debounce, same as Eye)
+        // FSW for core-path replacement/change detection (500ms debounce, same as Eye)
         System.Threading.Timer? _fswDebounce = null;
         var fsw = new FileSystemWatcher(exeDir)
         {
@@ -155,6 +158,31 @@ partial class Program
             _fswDebounce?.Dispose();
             _fswDebounce = new System.Threading.Timer(_ =>
             {
+                lock (_gate)
+                {
+                    if (_adminMode || _activeStdinWriter != null)
+                    {
+                        _pendingSwapWhileAdmin = true;
+                        Console.Error.WriteLine("[HOT-SWAP] admin endpoint active — deferring normal core swap");
+                        return;
+                    }
+                }
+                var currentSwapStamp = System.IO.File.Exists(core) ? System.IO.File.GetLastWriteTimeUtc(core).Ticks.ToString() : string.Empty;
+                if (currentSwapStamp.Length == 0)
+                {
+                    Console.Error.WriteLine("[HOT-SWAP] core path changed but stamp is unreadable — ignoring");
+                    return;
+                }
+                if (currentSwapStamp == _activeCoreStamp)
+                {
+                    Console.Error.WriteLine($"[HOT-SWAP] same active stamp ({currentSwapStamp}) — ignoring");
+                    return;
+                }
+                if (currentSwapStamp == _lastFailedSwapStamp)
+                {
+                    Console.Error.WriteLine($"[HOT-SWAP] previously failed stamp ({currentSwapStamp}) — waiting for newer core");
+                    return;
+                }
                 if (_swapInProgress) { Console.Error.WriteLine("[HOT-SWAP] Already in progress — ignoring"); return; }
                 _swapInProgress = true;
                 Console.Error.WriteLine($"[HOT-SWAP] core exe changed — starting graceful swap");
@@ -179,11 +207,11 @@ partial class Program
 
                     // 3. Spawn new Core with fresh pipes
                     if (!CreatePipe(out var hNewStdinRead, out var hNewStdinWrite, IntPtr.Zero, 0))
-                    { Console.Error.WriteLine("[HOT-SWAP] CreatePipe(stdin) failed"); _swapInProgress = false; return; }
+                    { Console.Error.WriteLine("[HOT-SWAP] CreatePipe(stdin) failed"); _lastFailedSwapStamp = currentSwapStamp; _swapInProgress = false; return; }
                     SetHandleInformation(hNewStdinRead, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
 
                     if (!CreatePipe(out var hNewStdoutRead, out var hNewStdoutWrite, IntPtr.Zero, 0))
-                    { CloseHandle(hNewStdinRead); CloseHandle(hNewStdinWrite); Console.Error.WriteLine("[HOT-SWAP] CreatePipe(stdout) failed"); _swapInProgress = false; return; }
+                    { CloseHandle(hNewStdinRead); CloseHandle(hNewStdinWrite); Console.Error.WriteLine("[HOT-SWAP] CreatePipe(stdout) failed"); _lastFailedSwapStamp = currentSwapStamp; _swapInProgress = false; return; }
                     SetHandleInformation(hNewStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
 
                     var newSi = new STARTUPINFOW
@@ -202,6 +230,7 @@ partial class Program
                         CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, Environment.CurrentDirectory, ref newSi, out var newPi))
                     {
                         Console.Error.WriteLine($"[HOT-SWAP] CreateProcess failed — restoring old Core");
+                        _lastFailedSwapStamp = currentSwapStamp;
                         lock (_gate) { _activeStdinWrite = _oldCoreStdinWrite; _oldCoreStdinWrite = IntPtr.Zero; foreach (var kv in _oldInflight) _inflight[kv.Key] = kv.Value; _oldInflight.Clear(); }
                         _swapInProgress = false; return;
                     }
@@ -263,11 +292,14 @@ partial class Program
                     { CloseHandle(_oldCoreStdinWrite); _oldCoreStdinWrite = IntPtr.Zero; }
                     Console.Error.WriteLine("[HOT-SWAP] old Core stdin closed — graceful exit");
 
+                    _activeCoreStamp = currentSwapStamp;
+                    _lastFailedSwapStamp = null;
                     _swapInProgress = false;
                     Console.Error.WriteLine("[HOT-SWAP] swap complete!");
                 }
                 catch (Exception ex)
                 {
+                    _lastFailedSwapStamp = currentSwapStamp;
                     Console.Error.WriteLine($"[HOT-SWAP] error: {ex.Message}");
                     _swapInProgress = false;
                 }
@@ -380,7 +412,7 @@ partial class Program
                         // Spawn admin Core on background thread (runas blocks on UAC)
                         new Thread(() => SpawnAdminCore(core, args, _initializeLine, _elevationRequestLine,
                             ref _adminStdinWrite, ref _adminStdoutRead, ref _adminProc, ref _activeStdinWrite,
-                            ref _activeStdinWriter, ref _adminMode, hCoreStdinWrite, hOut, _gate, _outLock, _inflight))
+                            ref _activeStdinWriter, ref _adminMode, ref _pendingSwapWhileAdmin, hCoreStdinWrite, hOut, _gate, _outLock, _inflight))
                         { IsBackground = true, Name = "mcp-admin-spawn" }.Start();
 
                         continue; // suppress elevation error from reaching client
@@ -489,7 +521,7 @@ partial class Program
     static void SpawnAdminCore(string corePath, string[] mcpArgs,
         string? initLine, string? elevationRequestLine,
         ref IntPtr adminStdinWrite, ref IntPtr adminStdoutRead, ref IntPtr adminProc,
-        ref IntPtr activeStdinWrite, ref System.IO.TextWriter? activeStdinWriter, ref bool adminMode,
+        ref IntPtr activeStdinWrite, ref System.IO.TextWriter? activeStdinWriter, ref bool adminMode, ref bool pendingSwapWhileAdmin,
         IntPtr oldCoreStdinWrite, IntPtr hOut, object gate, object outLock,
         Dictionary<string, string> inflight)
     {
@@ -626,6 +658,11 @@ partial class Program
             lock (gate)
             {
                 activeStdinWriter = null; // prevent other threads from writing
+                if (pendingSwapWhileAdmin)
+                {
+                    Console.Error.WriteLine("[LAUNCHER:MCP] deferred core swap is still pending after admin endpoint closed");
+                    pendingSwapWhileAdmin = false;
+                }
             }
             // Dispose after nulling reference — no race
             try { stdinWriter?.Dispose(); } catch { }

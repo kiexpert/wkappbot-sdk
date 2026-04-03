@@ -360,25 +360,54 @@ internal partial class Program
 
     static List<WindowInfo>? ParseNthTargets(List<WindowInfo> windows, string nthRaw)
     {
+        if (windows.Count == 0) return [];
+        if (string.IsNullOrWhiteSpace(nthRaw)) return null;
+
+        var picked = new List<WindowInfo>();
+        var seen = new HashSet<int>();
+
+        foreach (var rawTerm in nthRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var indexes = ParseNthIndexes(rawTerm, windows.Count);
+            if (indexes == null) return null;
+            foreach (var idx in indexes)
+            {
+                if (idx < 1 || idx > windows.Count) return null;
+                if (seen.Add(idx))
+                    picked.Add(windows[idx - 1]);
+            }
+        }
+
+        return picked.Count > 0 ? picked : null;
+    }
+
+    static List<int>? ParseNthIndexes(string nthRaw, int count)
+    {
+        if (string.IsNullOrWhiteSpace(nthRaw)) return null;
+
         if (nthRaw.StartsWith('~'))
         {
             if (!int.TryParse(nthRaw[1..], out var to) || to < 1) return null;
-            return windows.Take(Math.Min(to, windows.Count)).ToList();
+            return Enumerable.Range(1, Math.Min(to, count)).ToList();
         }
         if (nthRaw.EndsWith('~'))
         {
-            if (!int.TryParse(nthRaw[..^1], out var from) || from < 1 || from > windows.Count) return null;
-            return windows.Skip(from - 1).ToList();
+            if (!int.TryParse(nthRaw[..^1], out var from) || from < 1 || from > count) return null;
+            return Enumerable.Range(from, count - from + 1).ToList();
         }
         if (nthRaw.Contains('~'))
         {
             var parts = nthRaw.Split('~');
-            if (parts.Length != 2 || !int.TryParse(parts[0], out var from) || !int.TryParse(parts[1], out var to)
-                || from < 1 || to < from || from > windows.Count) return null;
-            return windows.Skip(from - 1).Take(Math.Min(to, windows.Count) - from + 1).ToList();
+            if (parts.Length != 2
+                || !int.TryParse(parts[0], out var from)
+                || !int.TryParse(parts[1], out var to)
+                || from < 1 || to < from || from > count)
+                return null;
+            return Enumerable.Range(from, Math.Min(to, count) - from + 1).ToList();
         }
-        if (int.TryParse(nthRaw, out var idx) && idx >= 1 && idx <= windows.Count)
-            return new List<WindowInfo> { windows[idx - 1] };
+        if (int.TryParse(nthRaw, out var idx) && idx >= 1 && idx <= count)
+            return [idx];
+
         return null;
     }
 

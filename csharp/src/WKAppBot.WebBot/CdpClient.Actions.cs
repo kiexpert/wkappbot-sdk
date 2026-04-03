@@ -723,6 +723,7 @@ public sealed partial class CdpClient
             {
                 Console.Error.WriteLine($"[CDP] Chrome minimized for tab switch (hwnd={hwnd:X8})");
                 ShowWindowNative(hwnd, 6); // SW_MINIMIZE
+                ScheduleMinimizeDump("bring-to-front-tab-switch", hwnd);
                 didMinimize = true;
                 await Task.Delay(50);
             }
@@ -752,6 +753,7 @@ public sealed partial class CdpClient
         if (hwnd == IntPtr.Zero) return;
         // SW_SHOWNOACTIVATE=4: visible, not minimized, does NOT steal focus
         ShowWindowNative(hwnd, 4);
+        CancelMinimizeDump("restore-no-activate");
         Console.WriteLine("[CDP] Chrome restored (SW_SHOWNOACTIVATE — no focus steal)");
     }
 
@@ -761,6 +763,7 @@ public sealed partial class CdpClient
         if (hwnd == IntPtr.Zero) { Console.WriteLine("[CDP] MinimizeChrome: hwnd=zero (Chrome not found)"); return; }
         // SW_MINIMIZE=6
         ShowWindowNative(hwnd, 6);
+        ScheduleMinimizeDump("explicit-minimize", hwnd);
         var stack = new System.Diagnostics.StackTrace(1, true).ToString();
         var caller = stack.Length > 200 ? stack[..200] : stack;
         Console.Error.WriteLine($"[CDP:MINIMIZE] Chrome minimized (hwnd={hwnd:X8})\n  callstack: {caller.Replace("\n", "\n  ")}");

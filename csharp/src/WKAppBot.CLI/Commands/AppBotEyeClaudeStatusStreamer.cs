@@ -59,6 +59,8 @@ internal partial class Program
         public DateTime? RateLimitResetTime;
         public DateTime? LastRateLimitAlertTime;
         public string? RateLimitAlertMsgTs; // Slack ts for deletion on clear
+        public bool GeminiHandoffFired;    // prevent re-fire for same rate-limit/error period
+        public string? LastServerErrorText; // dedup: don't re-fire for same error text
 
         // ── Plan/permission approval ──
         public bool PlanApprovalSentToSlack;
@@ -149,7 +151,7 @@ internal partial class Program
         try
         {
             var pi = FindAllPromptsViaMcp().FirstOrDefault(p => p.WindowHandle == hwnd);
-            if (pi?.HostType == "vscode-claudecode" && !string.IsNullOrEmpty(pi.WindowTitle))
+            if (ClaudePromptHelper.IsVsCodeHostType(pi?.HostType) && !string.IsNullOrEmpty(pi?.WindowTitle))
             {
                 var titleCwd = ExtractCwdFromVsCodeTitle(pi.WindowTitle);
                 if (!string.IsNullOrEmpty(titleCwd) && !IsSystemOrInstallDirectory(titleCwd))
@@ -220,7 +222,7 @@ internal partial class Program
 
         // ── Collect all AI instances (Desktop + VS Code + Codex) from prompt cache ──
         var allClaudePrompts = FindAllPromptsViaMcp()
-            .Where(p => (p.HostType == "claude-desktop" || p.HostType == "vscode-claudecode" || p.HostType == "codex-desktop") && IsWindow(p.WindowHandle))
+            .Where(p => (p.HostType == "claude-desktop" || ClaudePromptHelper.IsVsCodeHostType(p.HostType) || p.HostType == "codex-desktop") && IsWindow(p.WindowHandle))
             .GroupBy(p => p.WindowHandle).Select(g => g.First()).ToList();
         var claudeInstances = allClaudePrompts.Select(p => p.WindowHandle).ToList();
         var instanceHostTypes = allClaudePrompts.ToDictionary(p => p.WindowHandle, p => p.HostType);
@@ -341,7 +343,7 @@ internal partial class Program
             var state = GetOrCreateInstanceState(hwnd);
             instanceHostTypes.TryGetValue(hwnd, out var hostType);
             // UIA-idle mode: no pixel spinner — use turn-form prompt_ready as idle signal (VS Code + Codex)
-            bool isVsCode = hostType == "vscode-claudecode" || hostType == "codex-desktop";
+            bool isVsCode = ClaudePromptHelper.IsVsCodeHostType(hostType) || hostType == "codex-desktop";
             var label = string.IsNullOrEmpty(state.CwdLabel) ? "" : $"[{state.CwdLabel}] ";
 
             // Cache appbot's own VS Code window hwnd for routing fallback (see ResolveWorkspaceScopedPrompts)
@@ -363,7 +365,7 @@ internal partial class Program
                 {
                     GetWindowThreadProcessId(hwnd, out var vsPid);
                     string? vsCwd = null;
-                    if (hostType == "vscode-claudecode")
+                    if (ClaudePromptHelper.IsVsCodeHostType(hostType))
                     {
                         var pi = FindAllPromptsViaMcp().FirstOrDefault(p => p.WindowHandle == hwnd);
                         if (pi != null) vsCwd = ExtractCwdFromVsCodeTitle(pi.WindowTitle);
@@ -483,7 +485,26 @@ internal partial class Program
                             if (ok && ts != null) state.RateLimitAlertMsgTs = ts;
                         }
                         catch { }
+
+                        // ── Gemini fallback handoff (rate limit) ──
+                        // Server errors handled by CheckClaudeSessionsForErrors in tick
+                        if (!state.GeminiHandoffFired)
+                        {
+                            var cwd = state.FullCwd ?? state.CwdLabel;
+                            var (_, _, jsonlPath2, _) = GetContextInfoForCwdEx(cwd);
+                            if (!string.IsNullOrEmpty(cwd) && !string.IsNullOrEmpty(jsonlPath2))
+                            {
+                                state.GeminiHandoffFired = true;
+                                _geminiHandoffFiredAt[cwd] = DateTime.UtcNow; // sync cooldown with tick
+                                var cwdCap = cwd; var jCap = jsonlPath2;
+                                Task.Run(() => TryLaunchGeminiHandoff(cwdCap, jCap, "rate limit"));
+                            }
+                        }
                     }
+                    // Reset handoff flag when rate limit clears
+                    // (Server error fallback now handled by CheckClaudeSessionsForErrors in tick)
+                    if (!justHitRateLimit && !state.WasRateLimited)
+                        state.GeminiHandoffFired = false;
 
                     // ── Slack status streaming ──
                     if (slackClient != null && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
@@ -983,65 +1004,7 @@ internal partial class Program
             Console.WriteLine($"[EYE] Post [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
 
             // Sweep same-username stale status messages (duplicates from Eye restart/hot-swap)
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    using var http = new System.Net.Http.HttpClient();
-                    http.DefaultRequestHeaders.Authorization =
-                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", slackBotToken);
-                    var resp = await http.GetStringAsync($"https://slack.com/api/conversations.history?channel={slackChannel}&limit=15");
-                    var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(resp);
-                    if (json?["ok"]?.GetValue<bool>() != true) return;
-                    var msgs = json["messages"] as System.Text.Json.Nodes.JsonArray;
-                    if (msgs == null) return;
-                    // Collect status messages per author (newest first — Slack returns newest first)
-                    var statusByAuthor = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-                    var orphanReplies = new List<string>();
-
-                    foreach (var m in msgs)
-                    {
-                        var mTs = m?["ts"]?.GetValue<string>();
-                        var mUser = m?["username"]?.GetValue<string>();
-                        var mText = m?["text"]?.GetValue<string>() ?? "";
-                        if (mTs == null) continue;
-
-                        // Detect orphan replies (thread_ts set but starter deleted)
-                        var threadTs2 = m?["thread_ts"]?.GetValue<string>();
-                        if (threadTs2 != null && threadTs2 != mTs && (mText == "This message was deleted." || m?["subtype"]?.GetValue<string>() == "tombstone"))
-                        { orphanReplies.Add(mTs); continue; }
-
-                        // Collect status messages per author
-                        if (mUser != null && IsStatusEmoji(mText))
-                        {
-                            if (!statusByAuthor.ContainsKey(mUser))
-                                statusByAuthor[mUser] = new List<string>();
-                            statusByAuthor[mUser].Add(mTs);
-                        }
-                    }
-
-                    // Delete: per-author status messages, keep latest 2
-                    foreach (var (author, tsList) in statusByAuthor)
-                    {
-                        if (tsList.Count <= 2) continue; // newest first, keep first 2
-                        for (int si = 2; si < tsList.Count; si++)
-                        {
-                            await SlackDeleteMessageAsync(slackBotToken, slackChannel, tsList[si], guardThreadStarter: true);
-                            Console.WriteLine($"[EYE] Cleaned stale status for '{author}': {tsList[si]}");
-                            await Task.Delay(300);
-                        }
-                    }
-
-                    // Delete orphan replies
-                    foreach (var ots in orphanReplies)
-                    {
-                        await SlackDeleteRawAsync(slackBotToken, slackChannel, ots);
-                        Console.WriteLine($"[EYE] Cleaned orphan reply: {ots}");
-                        await Task.Delay(300);
-                    }
-                }
-                catch { /* best effort */ }
-            });
+            _ = Task.Run(() => SlackCleanStaleStatusAsync(slackBotToken, slackChannel));
 
             // Sweep stale startup messages now that the new post is visible (no gap).
             // Delay 8s so all instances finish their first tick and populate _instanceStates —
@@ -1226,5 +1189,7 @@ internal partial class Program
             Console.Error.WriteLine($"[EYE] Homework delivery failed: {ex.Message}");
         }
     }
+
+    // Gemini fallback logic → AppBotEyeClaudeFallback.cs
 
 }

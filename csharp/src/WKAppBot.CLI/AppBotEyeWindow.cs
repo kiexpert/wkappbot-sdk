@@ -511,7 +511,9 @@ internal sealed class AppBotEyeHost : IDisposable
 
             _dispatcher = Dispatcher.CurrentDispatcher;
             _ready.Set();
+            Console.WriteLine("[EYE_UI] dispatcher-ready");
             _window.Show();
+            Console.WriteLine("[EYE_UI] window-shown");
             Dispatcher.Run(); // message loop -- blocks until InvokeShutdown()
         });
         _uiThread.SetApartmentState(ApartmentState.STA);

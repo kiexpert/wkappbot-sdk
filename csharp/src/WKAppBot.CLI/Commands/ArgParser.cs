@@ -25,6 +25,38 @@ internal partial class Program
     }
 
     /// <summary>
+    /// Join CLI text args with a shell-aware heuristic for chat UX.
+    /// Default mode joins with spaces. Once an arg containing a space appears
+    /// (meaning the shell preserved an intentional group via quotes), switch to
+    /// newline mode for that boundary and all later boundaries.
+    /// Examples:
+    ///   send 오늘 점심 추천         -> "오늘 점심 추천"
+    ///   send "첫째 줄" "둘째 줄"   -> "첫째 줄\n둘째 줄"
+    ///   send 공지 "첫째 항목" "둘째 항목" -> "공지\n첫째 항목\n둘째 항목"
+    /// </summary>
+    static string JoinShellGroupedTextParts(IReadOnlyList<string> textParts)
+    {
+        if (textParts.Count == 0) return "";
+        if (textParts.Count == 1) return textParts[0];
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append(textParts[0]);
+
+        var newlineMode = textParts[0].Contains(' ');
+        for (int i = 1; i < textParts.Count; i++)
+        {
+            var part = textParts[i] ?? "";
+            var partHasSpace = part.Contains(' ');
+            sb.Append(newlineMode || partHasSpace ? '\n' : ' ');
+            sb.Append(part);
+            if (partHasSpace)
+                newlineMode = true;
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// Like ParseTextAndFiles but also detects directories (for clipboard-write CF_HDROP).
     /// Inserts [file:name] markers in text parts at file positions.
     /// </summary>

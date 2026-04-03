@@ -626,6 +626,7 @@ internal partial class Program
                 "scan" => ScanCommand(restArgs),
                 "ask" => AskCommand(restArgs),
                 "agent" => AgentCommand(restArgs),
+                "model" => ModelCommand(restArgs),
                 "logcat" => LogcatCommand(restArgs),
                 "eye" => AppBotEyeCommand(restArgs),
                 "slack" => SlackCommand(restArgs),

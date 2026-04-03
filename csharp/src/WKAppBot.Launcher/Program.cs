@@ -250,9 +250,6 @@ partial class Program
             prof("EnsureBusyboxAliases done");
         }
 
-        var cmd = args[0].ToLowerInvariant();
-        prof($"cmd={cmd}");
-
         // --stderr: show stderr in real-time (default: buffered, shown only on error)
         bool showStderr = args.Any(a => a == "--stderr");
         var stderrBuf = !showStderr ? new System.Collections.Generic.List<(long ms, string msg)>() : null;
@@ -288,6 +285,18 @@ partial class Program
         var forwardArgs = onlyEye || onlyCore
             ? args.Where(a => a != "--only-eye" && a != "--only-core").ToArray()
             : args;
+
+        if (forwardArgs.Length == 0)
+        {
+            prof("no command after launcher-only flags -> PrintUsage + TerminateSelf");
+            PrintUsage();
+            Console.Out.Flush();
+            TerminateSelf(1);
+            return 1; // unreachable
+        }
+
+        var cmd = forwardArgs[0].ToLowerInvariant();
+        prof($"cmd={cmd}");
 
         // mcp: Launcher holds the stdio pipe to Claude Code and manages Core lifecycle
         if (cmd == "mcp")

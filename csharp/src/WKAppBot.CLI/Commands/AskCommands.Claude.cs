@@ -16,13 +16,13 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ?�?� Claude.ai ?�?�
+    // ── Claude.ai ──
 
-    // Claude.ai uses ProseMirror editor ??innerHTML/execCommand fail, must use ClipboardEvent paste
+    // Claude.ai uses ProseMirror editor --innerHTML/execCommand fail, must use ClipboardEvent paste
     static readonly string[] ClaudeEditorSelectors =
     [
-        "div.tiptap.ProseMirror",                          // Claude.ai ProseMirror (no attr filter ??most reliable)
-        "div.tiptap.ProseMirror[contenteditable='true']",  // With attr (single-quote in CSS ??safe in JS double-quoted eval)
+        "div.tiptap.ProseMirror",                          // Claude.ai ProseMirror (no attr filter --most reliable)
+        "div.tiptap.ProseMirror[contenteditable='true']",  // With attr (single-quote in CSS --safe in JS double-quoted eval)
         ".ProseMirror[contenteditable='true']",            // ProseMirror generic
         "[contenteditable='true']",                        // Generic contenteditable
         "[contenteditable]",                               // contenteditable without value check
@@ -33,7 +33,7 @@ internal partial class Program
 
     static async Task<string?> WaitForClaudeEditorA11y(CdpClient cdp)
     {
-        // Restore Chrome if minimized ??V8 throttles JS when iconic, causing eval timeouts
+        // Restore Chrome if minimized --V8 throttles JS when iconic, causing eval timeouts
         cdp.EnsureChromeNotIconic();
         for (int attempt = 0; attempt < 20; attempt++)
         {
@@ -137,6 +137,15 @@ internal partial class Program
 
         PulseStep.Init("ask-claude");
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "claude");
+        _askSandboxKey.Value = targetTag;
+        if (string.IsNullOrEmpty(targetTagOverride)) // skip Qid for agent/triad overrides
+        {
+            var qid = AskTargetRegistry.AssignNextQid(targetTag);
+            _currentQid.Value = qid;
+            question = $"[Q{qid}] {question}\n[REPLY: A{qid}]";
+            Console.WriteLine($"[ASK] Claude Q{qid} 할당됨 (tab={targetTag[..Math.Min(16, targetTag.Length)]})");
+            Console.WriteLine($"[ASK] 훈수두기: wkappbot ask claude --intercept \"내용\" --qid {qid}");
+        }
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
         if (triadCtx != null)
@@ -149,7 +158,7 @@ internal partial class Program
         BindAskIdentity(askSession, question, "claude");
         PulseStep.Mark("cdp-connected");
 
-        // No tab activation ??CDP works on background tabs via targetId. Truly focusless.
+        // No tab activation --CDP works on background tabs via targetId. Truly focusless.
 
         LaunchAppBotEyeIfNeeded(9222);
         cdp.ApplyTargetTagAsync(targetTag).GetAwaiter().GetResult();
@@ -160,13 +169,13 @@ internal partial class Program
         {
             try
             {
-                // ?�?� Phase 1: Navigate ?�?�
+                // ── Phase 1: Navigate ──
                 PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("claude.ai"))
                 {
-                    Console.WriteLine(newSession ? "[ASK] New session ??navigating to fresh Claude..." : "[ASK] Navigating to Claude...");
+                    Console.WriteLine(newSession ? "[ASK] New session --navigating to fresh Claude..." : "[ASK] Navigating to Claude...");
                     await cdp.NavigateAsync("https://claude.ai/new");
                     await Task.Delay(3000);
                 }
@@ -175,19 +184,22 @@ internal partial class Program
                     Console.WriteLine($"[ASK] Reusing Claude session");
                 }
 
-                // NOTE: BringToFront removed ??steals OS focus. CDP works on background tabs.
+                // NOTE: BringToFront removed --steals OS focus. CDP works on background tabs.
                 await Task.Delay(1000);
 
-                // ?�?� Phase 2: Find editor ?�?�
+                // ── Phase 2: Find editor ──
                 var editorSel = await WaitForClaudeEditorA11y(cdp);
                 if (editorSel == null)
                     return (false, (string?)null);
                 triadCtx?.BindStreamContext("claude", cdp, editorSel, Environment.GetEnvironmentVariable("WKAPPBOT_RUN_ID"));
+                _currentAskCdp.Value = cdp;
+                _currentAskHost.Value = "claude";
+                _currentAskEditorSel.Value = editorSel;
                 PulseStep.Mark("editor-found");
                 Console.WriteLine($"[ASK] Editor found: {editorSel}");
                 askSession.BindStreamingContext(editorSel);
 
-                // ?�?� Phase 3: Check existing turns ?�?�
+                // ── Phase 3: Check existing turns ──
                 int existingTurns = await CountClaudeTurns(cdp);
                 if (existingTurns > 0)
                     Console.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
@@ -205,7 +217,7 @@ internal partial class Program
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
                     var personaTextClaude = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (!_suppressLoopPersona.Value && Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
-                        SlackPostToThread($"?�� *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextClaude.Length > 800 ? personaTextClaude[..800] + "..." : personaTextClaude)}\n```", "System");
+                        SlackPostToThread($"\ud83c\udfad *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextClaude.Length > 800 ? personaTextClaude[..800] + "..." : personaTextClaude)}\n```", "System");
                     var (personaOk, personaResp) = await ClaudeSendAndWaitAsync(
                         cdp,
                         personaTextClaude,
@@ -225,12 +237,12 @@ internal partial class Program
                         }
                         if (effectiveLoopPersona)
                             await SetLoopPersonaStateAsync(cdp, "claude");
-                        // Persona continuation may already contain a tool call ??skip question send
+                        // Persona continuation may already contain a tool call --skip question send
                         // Verify there is at least one parseable tool call (not just marker text in explanation)
                         if (effectiveLoopPersona && (personaResp ?? "").Contains("[APPBOT_TOOL_CALL_BEGIN]")
                             && ParseAllLoopToolCalls(personaResp!).Count > 0)
                         {
-                            Console.WriteLine($"[ASK] Persona continuation has tool call ({personaResp!.Length} chars) ??skipping question send");
+                            Console.WriteLine($"[ASK] Persona continuation has tool call ({personaResp!.Length} chars) --skipping question send");
                             return (true, personaResp);
                         }
                     }
@@ -245,11 +257,11 @@ internal partial class Program
                         question = BuildHostHandshake() + question;
                 }
 
-                // ?�?� Phase 4: Insert text + send ?�?�
+                // ── Phase 4: Insert text + send ──
                 using var chatLock = ChromeTabLock.Acquire("Claude");
                 if (chatLock == null) return (false, (string?)null);
 
-                // ?�?� CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ?�?�
+                // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Claude");
 
                 if (attachFiles?.Count > 0)
@@ -269,9 +281,9 @@ internal partial class Program
                     return (false, (string?)null);
                 }
 
-                // ?�?� Send ?�?�
+                // ── Send ──
                 // Wait for any active response to finish (stop button = Claude is generating/tool-running).
-                // Clicking the send button during tool execution would interrupt it ??Enter key is safer
+                // Clicking the send button during tool execution would interrupt it --Enter key is safer
                 // because Claude queues it in the editor without firing until generation completes.
                 if (!await WaitWhileStopButtonVisible(askSession, maxWaitMs: 60000))
                     return (false, (string?)null);
@@ -286,7 +298,7 @@ internal partial class Program
                 int preAssistantCount = await cdp.QueryCountAsync("[data-testid=\"assistant-message\"]");
                 var sendResult = "PENDING";
 
-                // Tier 1: CDP Enter key ??queues safely, does NOT interrupt tool execution
+                // Tier 1: CDP Enter key --queues safely, does NOT interrupt tool execution
                 await cdp.FocusAsync(editorSel);
                 await Task.Delay(100);
                 await cdp.SendAsync("Input.dispatchKeyEvent", new JsonObject
@@ -309,7 +321,7 @@ internal partial class Program
                     if (remaining0 == 0) sendResult = "CDP_ENTER";
                 }
 
-                // Tier 2: JS click on send button (fallback ??only when Enter had no effect)
+                // Tier 2: JS click on send button (fallback --only when Enter had no effect)
                 if (sendResult == "PENDING")
                 {
                     Console.WriteLine("[ASK] Enter key didn't send, trying JS button click...");
@@ -345,7 +357,7 @@ internal partial class Program
                     return (true, BuildNoWaitQueuedMessage("Claude"));
                 }
 
-                // ?�?� Phase 5: Wait for response ?�?�
+                // ── Phase 5: Wait for response ──
                 var sw = Stopwatch.StartNew();
                 bool responseStarted = false;
                 while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
@@ -412,7 +424,7 @@ internal partial class Program
                     return (false, (string?)null);
                 }
 
-                // ?�?� Phase 6: Poll for completion ?�?�
+                // ── Phase 6: Poll for completion ──
                 int lastFlushedLen = 0;
                 bool liveHeaderPrinted = false;
                 var lastFlushTime = DateTime.UtcNow;
@@ -455,7 +467,7 @@ internal partial class Program
                             if (!liveHeaderPrinted)
                             {
                                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                                Console.WriteLine("?�?� Claude streaming ?�?�");
+                                Console.WriteLine("── Claude streaming ──");
                                 Console.ResetColor();
                                 liveHeaderPrinted = true;
                             }
@@ -476,12 +488,12 @@ internal partial class Program
                             Console.Write($" [RUNNING {sw.Elapsed.TotalSeconds:F0}s]"); Console.Out.Flush();
                         }
 
-                        // Early-exit: flush idle 1s ??don't wait for DONE attribute
+                        // Early-exit: flush idle 1s --don't wait for DONE attribute
                         if (lastFlushedLen > 50 && state == "STREAMING"
                             && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 1.0)
                         {
                             if (liveHeaderPrinted) Console.WriteLine();
-                            Console.WriteLine($"[ASK] Flush idle 1s ??early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                            Console.WriteLine($"[ASK] Flush idle 1s --early done ({sw.Elapsed.TotalSeconds:F0}s)");
                             askSession.MarkDone(text);
                             return (true, text);
                         }
@@ -500,7 +512,7 @@ internal partial class Program
                     }
                 }
 
-                // Timeout ??return what we have
+                // Timeout --return what we have
                 // TODO: migrate to AskSession when provider-specific polling is unified
                 var finalText = await cdp.EvalAsync($$"""
                     (() => {
@@ -510,7 +522,7 @@ internal partial class Program
                     })()
                     """) ?? "";
                 if (liveHeaderPrinted) Console.WriteLine();
-                Console.WriteLine($"[ASK] Timeout ({timeoutSec}s) ??partial response ({finalText.Length} chars)");
+                Console.WriteLine($"[ASK] Timeout ({timeoutSec}s) --partial response ({finalText.Length} chars)");
                 askSession.MarkTimedOut(finalText);
                 return (finalText.Length > 0, finalText.Length > 0 ? finalText : null);
             }
@@ -528,31 +540,33 @@ internal partial class Program
         {
             EnsureSlackThread("Claude", question);
             SlackPostToThread(answer.Length > 2000 ? answer[..2000] + "..." : answer, SlackAiName("claude", "Claude"));
+            SlackPostAnswerBlocks(answer, "Claude");
         }
 
         // Log initial answer to shared triad context (for recovery by other AIs if needed)
         if (ok && !string.IsNullOrWhiteSpace(answer))
             triadCtx?.LogStep("Claude", answer);
 
+        var toolLogClaude = new System.Collections.Generic.List<string>();
         Action<string, string?> onStepReport = (msg, uname) =>
         {
             SlackPostToThread(msg, uname ?? SlackAiName("claude", "Claude"));
             triadCtx?.LogStep("Claude", msg);
         };
         if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-            (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport, triadCtx)).GetAwaiter().GetResult();
+            (ok, answer) = Task.Run(() => RunClaudeLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport, triadCtx, toolLogClaude)).GetAwaiter().GetResult();
         bool isLimit = IsClaudeLimitResponse(answer);
         if (isLimit) ok = false;
 
         if (isLimit)
         {
             EnsureSlackThread("Claude", question);
-            SlackPostToThread("??_Claude 메시지 ?�도 초과_ ??claude.ai ?�용???�인 ?�요", SlackAiName("claude", "Claude"));
+            SlackPostToThread("\u26a0\ufe0f _Claude 메시지 한도 초과_ -- claude.ai 사용량 확인 필요", SlackAiName("claude", "Claude"));
         }
         else if (!ok)
         {
             EnsureSlackThread("Claude", question);
-            SlackPostToThread("??_Claude ?�답 ?�패_", SlackAiName("claude", "Claude"));
+            SlackPostToThread("\u26a0\ufe0f _Claude 응답 실패_", SlackAiName("claude", "Claude"));
         }
 
         if (answer != null)
@@ -574,7 +588,7 @@ internal partial class Program
             SendPendingCrossPromptAsync(cdp, "claude", "div.tiptap.ProseMirror").GetAwaiter().GetResult();
         // Write ask result to .wkappbot/ask/ MD file
         if (ok && !string.IsNullOrEmpty(answer) && triadCtx == null)
-            WriteAskMd("claude", question, answer);
+            WriteAskMd("claude", question, answer, toolLogClaude.Count > 0 ? toolLogClaude : null);
         cdp.Dispose();
         return ok ? 0 : 1;
     }

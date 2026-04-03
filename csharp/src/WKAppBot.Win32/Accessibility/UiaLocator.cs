@@ -696,6 +696,64 @@ public sealed partial class UiaLocator : IDisposable
         catch { return (null, null); }
     }
 
+    /// <summary>
+    /// Get the smallest element on the point-hit ancestor chain whose bounds fully contain the target rect.
+    /// This is useful for cursor/focus targeting where a 1x1 or larger rect should be enclosed by the chosen node.
+    /// </summary>
+    public (AutomationElement? element, ElementAtPointInfo? info) GetElementAndInfoContainingRectInWindow(
+        int screenX, int screenY, int targetWidth, int targetHeight, IntPtr hWnd)
+    {
+        try
+        {
+            var root = _automation.FromHandle(hWnd);
+            if (root == null) return (null, null);
+
+            var pt = new System.Drawing.Point(screenX, screenY);
+            var hit = FindDeepestAtPoint(root, pt);
+            if (hit == null) return (null, null);
+
+            var targetRect = new System.Drawing.Rectangle(
+                screenX,
+                screenY,
+                Math.Max(1, targetWidth),
+                Math.Max(1, targetHeight));
+
+            AutomationElement? best = null;
+            var current = hit;
+            int safety = 64;
+            while (current != null && safety-- > 0)
+            {
+                try
+                {
+                    var rect = current.BoundingRectangle;
+                    var rectInt = new System.Drawing.Rectangle(rect.X, rect.Y, rect.Width, rect.Height);
+                    if (!rectInt.IsEmpty && RectContainsRect(rectInt, targetRect))
+                    {
+                        best = current;
+                        break;
+                    }
+                }
+                catch { }
+
+                try { current = current.Parent; }
+                catch { break; }
+            }
+
+            best ??= hit;
+            return (best, BuildElementAtPointInfo(best));
+        }
+        catch
+        {
+            return (null, null);
+        }
+    }
+
+    private static bool RectContainsRect(System.Drawing.Rectangle outer, System.Drawing.Rectangle inner) =>
+        inner.Left >= outer.Left &&
+        inner.Top >= outer.Top &&
+        inner.Right <= outer.Right &&
+        inner.Bottom <= outer.Bottom;
+
     private ElementAtPointInfo BuildElementAtPointInfo(AutomationElement element)
     {
         string name, aid, ctStr;
@@ -1437,10 +1495,15 @@ public sealed partial class UiaLocator : IDisposable
 
                 string indent = new string(' ', i * 2);
                 string arrow = i == 0 ? "⌨ " : "└ ";
-                string displayName = name.Length > 40 ? name[..37] + "..." : name;
-                string aidStr = !string.IsNullOrEmpty(aid) ? $" aid=\"{aid}\"" : "";
+                System.Drawing.Rectangle? rectParsed = null;
+                try
+                {
+                    var rect = el.BoundingRectangle;
+                    rectParsed = new System.Drawing.Rectangle((int)rect.X, (int)rect.Y, (int)rect.Width, (int)rect.Height);
+                }
+                catch { }
 
-                sb.AppendLine($"  {indent}{arrow}[{ctStr}] \"{displayName}\"{aidStr} {rectStr}");
+                sb.AppendLine($"  {indent}{arrow}{GrapHelper.FormatNodeLabel(ctStr, aid, name, rect: rectParsed)}");
 
                 // TextPattern selection/caret for focused element
                 if (i == 0)
@@ -1519,8 +1582,7 @@ public sealed partial class UiaLocator : IDisposable
                         try { sCt = sib.ControlType.ToString(); } catch { sCt = "?"; }
                         string disp = sName.Length > 50 ? sName[..47] + "..." : sName;
                         if (isSelf) disp += "(포커스드)";
-                        string aidPart = !string.IsNullOrEmpty(sAid) ? $" aid=\"{sAid}\"" : "";
-                        sb.AppendLine($"  [{sCt}] \"{disp}\"{aidPart}");
+                        sb.AppendLine($"  {GrapHelper.FormatNodeLabel(sCt, sAid, disp)}");
                     }
                 }
             }

@@ -1,4 +1,4 @@
-# WKAppBot v5.8.0 - Windows + Android App Automation Test Framework
+# WKAppBot v5.9.0 - Windows + Android App Automation Test Framework
 
 ## 클롣 운영 규칙 (필독!)
 

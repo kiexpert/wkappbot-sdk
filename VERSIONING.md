@@ -34,10 +34,12 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`5.7` — bumped at 2026-04-01 (AppBotPipe hot-swap lastError 레이스 수정, EnsureEyeWatchdogTask Process.Start 안정화, web open [WEB] TabID/Title/URL 출력)
+`5.9` — bumped at 2026-04-04 (ask 다중질문 파이프라인: Q# per-tab 할당, per-page Slack thread 재사용, --intercept/--interrupt/--terminate, [An] 포맷 자동 재교육, agent 인터셉트 지원)
 
 ## Previous versions
 
 | Version | Bumped | Summary |
 |---------|--------|---------|
+| `5.8` | 2026-04-01 | file tool compatibility aliases 확장, file-write 백업 정책 통일, LG overlay guard 일반화 |
+| `5.7` | 2026-04-01 | AppBotPipe hot-swap lastError 레이스 수정, EnsureEyeWatchdogTask Process.Start 안정화, web open [WEB] TabID/Title/URL 출력 |
 | `5.6` | 2026-03-31 | AppBotPipe 완전 통합 + FocusLaunchTracker, 워치독 VBS 강화, 핫스왑 워치독 비활성화, windows --cmd 필터, JSON5 멀티필드 grap 패턴 (`{hwnd,pid,title,cls,proc,domain,url}` AND 검색) |

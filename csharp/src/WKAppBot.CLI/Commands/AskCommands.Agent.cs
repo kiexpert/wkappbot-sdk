@@ -73,6 +73,33 @@ internal partial class Program
         if (ai is not ("gemini" or "gpt" or "chatgpt" or "claude" or "triad" or "all"))
             return Error($"Unknown AI: {ai} (use gemini, gpt, claude, or triad)");
 
+        // wkappbot agent <ai> --intercept "msg" [--agent-id name]
+        // 훈수두기: post to running agent's Slack thread without interrupting the loop
+        {
+            string? interceptMsg2 = null;
+            string? interceptAgentId = null;
+            bool interceptIsInterrupt2 = false;
+            int interceptQid2 = 0;
+            for (int i = 1; i < args.Length; i++)
+            {
+                if (args[i] == "--intercept" && i + 1 < args.Length) interceptMsg2 = args[++i];
+                else if (args[i] == "--interrupt" && i + 1 < args.Length) { interceptMsg2 = args[++i]; interceptIsInterrupt2 = true; }
+                else if (args[i] == "--qid" && i + 1 < args.Length) int.TryParse(args[++i], out interceptQid2);
+                else if (args[i] is "--terminate" or "--stop-agent") { var suffix3 = interceptAgentId != null ? interceptAgentId.ToLowerInvariant().Replace(' ', '-') : (GetSessionTag() ?? "default"); return AskTerminate(ai == "chatgpt" ? "gpt" : ai, $"{(ai == "chatgpt" ? "gpt" : ai)}-agent-{suffix3}"); }
+                else if (args[i] == "--agent-id" && i + 1 < args.Length) interceptAgentId = args[++i];
+            }
+            if (!string.IsNullOrWhiteSpace(interceptMsg2))
+            {
+                var tabSuffix2 = !string.IsNullOrWhiteSpace(interceptAgentId)
+                    ? interceptAgentId.ToLowerInvariant().Replace(' ', '-')
+                    : (GetSessionTag() ?? "default");
+                var agentAi2 = ai == "chatgpt" ? "gpt" : ai;
+                var threadKey = $"{agentAi2}-agent-{tabSuffix2}";
+                var msg2 = interceptQid2 > 0 ? $"[Q{interceptQid2}] {interceptMsg2}" : interceptMsg2;
+                return AskIntercept(agentAi2, msg2, label: $"agent:{agentAi2}", threadKey: threadKey, interrupt: interceptIsInterrupt2);
+            }
+        }
+
         // Agent defaults (triad-agreed)
         int timeoutSec    = 90;
         int loopMaxSteps  = 20;
@@ -84,6 +111,8 @@ internal partial class Program
         bool debateMode   = false;    // --debate: 사회자 루프 관리
         string? modelHint = null;
         string? agentId   = null;     // --agent-id <name>
+        string? injectJsonl = null;   // --inject-jsonl <path>: (legacy)
+        string? liveMdPath = null;    // --live-md <path>: real-time MD output in VS Code
 
         var remaining = new List<string>();
         for (int i = 1; i < args.Length; i++)
@@ -116,6 +145,10 @@ internal partial class Program
                 int.TryParse(args[++i], out verifyDelayMs);
             else if (args[i] == "--model" && i + 1 < args.Length)
                 modelHint = args[++i];
+            else if (args[i] == "--inject-jsonl" && i + 1 < args.Length)
+                injectJsonl = args[++i];
+            else if (args[i] == "--live-md" && i + 1 < args.Length)
+                liveMdPath = args[++i];
             else
                 remaining.Add(args[i]);
         }
@@ -142,6 +175,19 @@ internal partial class Program
 
         // --fresh: clear file tracker session too
         if (newSession) AgentFileTracker.SessionClear();
+
+        // --inject-jsonl: legacy JSONL injection (kept for compat)
+        if (!string.IsNullOrEmpty(injectJsonl) && File.Exists(injectJsonl))
+        {
+            _agentInjectJsonl.Value = injectJsonl;
+            Console.WriteLine($"[AGENT] Inject JSONL: {injectJsonl}");
+        }
+        // --live-md: real-time MD output in VS Code (replaces JSONL for visual feedback)
+        if (!string.IsNullOrEmpty(liveMdPath))
+        {
+            _agentLiveMdPath.Value = liveMdPath;
+            Console.WriteLine($"[AGENT] Live MD: {liveMdPath}");
+        }
 
         Console.WriteLine($"[AGENT] {ai.ToUpperInvariant()} | tag={targetTag} | steps={loopMaxSteps} | timeout={timeoutSec}s | retry={loopRetry} | parallel={loopMaxParallel}");
         if (!string.IsNullOrWhiteSpace(modelHint))
@@ -212,6 +258,8 @@ Defaults (triad-agreed):
   --verify-delay 400    ms to wait after UI actions before verifying
 
 Options:
+  --intercept ""msg"" 훈수두기: post to running agent's Slack thread (no loop reset)
+                      --agent-id 함께 쓰면 named agent 쓰레드로 전송
   --agent-id <name>   Named persistent tab — reuses context across calls, survives restarts
                       Tab: '{ai}-agent-{name}'  (ask uses '{ai}-{session}')
   --fresh             Force new conversation + clear AgentFileTracker session

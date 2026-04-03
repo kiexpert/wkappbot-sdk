@@ -76,13 +76,18 @@ internal partial class Program
         var cards = _cachedCards;
 
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
+        PulseStep.Mark("tick-host-info");
         var eyeSummary = BuildEyeSummary(cards, latest, promptPreview, promptDiag.FileWriteUtc);
+        Console.WriteLine(string.IsNullOrWhiteSpace(eyeSummary)
+            ? "[EYE_RENDER] summary=empty"
+            : $"[EYE_RENDER] summary-len={eyeSummary.Length}");
 
         // CCA live analysis removed from Eye (v4.8) — now in analyze-hack server process.
         // Eye only does read-only operations: card summary, UIA status, context %.
         // No Bitmap/CCA/FlaUI in Eye → memory savings ~500MB+.
 
         host.UpdateAccessibilityText(eyeSummary);
+        PulseStep.Mark("tick-host-text");
         // Update IPC cache so eye tick one-shot gets instant response
         _cachedIpcSummary = eyeSummary;
         _cachedIpcPromptPreview = promptPreview ?? "";
@@ -121,46 +126,10 @@ internal partial class Program
         if (qPending > 0 || qProc > 0)
             Console.WriteLine($"[EYE_QUEUE] pending={qPending} processing={qProc}{(_slackRetiring ? " retiring" : "")}");
 
-        // ── LGDisplayExtensionWnd rogue topmost guard ──
-        try
-        {
-            var lgHwnd = NativeMethods.FindWindowW("HwndWrapper[LGDisplayExtension.exe;;", null);
-            if (lgHwnd != IntPtr.Zero
-                && (NativeMethods.GetWindowLongW(lgHwnd, -20) & 0x8) != 0) // WS_EX_TOPMOST
-            {
-                var fgBuf = new System.Text.StringBuilder(256);
-                NativeMethods.GetWindowTextW(NativeMethods.GetForegroundWindow(), fgBuf, fgBuf.Capacity);
-                Console.WriteLine($"[EYE_TICK][GUARD] LGDisplayExtensionWnd topmost! fg=\"{fgBuf}\"");
+        TryGuardLgOverlay("[EYE_TICK][GUARD]");
 
-                // Step 1: Instant transparency — user sees normal screen immediately
-                var exStyle = NativeMethods.GetWindowLongW(lgHwnd, -20);
-                NativeMethods.SetWindowLongW(lgHwnd, -20, exStyle | NativeMethods.WS_EX_LAYERED);
-                NativeMethods.SetLayeredWindowAttributes(lgHwnd, 0, 0, NativeMethods.LWA_ALPHA);
-                Console.WriteLine("[EYE_TICK][GUARD] → transparent");
-
-                // Step 2: WM_CLOSE
-                NativeMethods.PostMessageW(lgHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
-                Console.WriteLine("[EYE_TICK][GUARD] → WM_CLOSE sent");
-
-                // Step 3: Verify after 500ms — if still alive, kill the process
-                Thread.Sleep(500);
-                if (NativeMethods.IsWindow(lgHwnd))
-                {
-                    Console.WriteLine("[EYE_TICK][GUARD] WM_CLOSE ignored → killing LGDisplayExtension process");
-                    NativeMethods.GetWindowThreadProcessId(lgHwnd, out uint lgPid);
-                    if (lgPid > 0)
-                    {
-                        try { Process.GetProcessById((int)lgPid).Kill(); Console.WriteLine($"[EYE_TICK][GUARD] Kill OK (pid={lgPid})"); }
-                        catch (Exception kex) { Console.WriteLine($"[EYE_TICK][GUARD] Kill failed: {kex.Message}"); }
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("[EYE_TICK][GUARD] LGDisplayExtensionWnd closed OK");
-                }
-            }
-        }
-        catch { }
+        // ── Claude error → Gemini fallback (1s check) ──
+        CheckClaudeSessionsForErrors();
     }
 
     static bool ShouldForceFullLoad()

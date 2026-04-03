@@ -7,6 +7,9 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text;
+using System.Text.Json.Nodes;
+using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
@@ -50,14 +53,15 @@ internal partial class Program
         var sessDir = SessionsDir;
         Directory.CreateDirectory(sessDir);
 
-        var sessionJsonl = FindSessionJsonl(cwd);
+        var resolvedHostType = hostType ?? DetectHostType(ppid);
+        var sessionJsonl = FindSessionJsonl(cwd, resolvedHostType);
 
         var info = new SessionInfo
         {
             Id = $"session-{pid}",
             Pid = pid,
             ParentPid = ppid,
-            HostType = hostType ?? DetectHostType(ppid),
+            HostType = resolvedHostType,
             HostTitle = hostTitle ?? "",
             Cwd = cwd ?? "",
             PromptHwnd = promptHwnd ?? "",
@@ -157,6 +161,9 @@ internal partial class Program
     /// <summary>Detect host type from parent process chain.</summary>
     static string DetectHostType(int parentPid)
     {
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")))
+            return "vscode-codex";
+
         int cur = parentPid;
         for (int depth = 0; cur > 0 && depth < 12; depth++)
         {
@@ -167,7 +174,7 @@ internal partial class Program
                 var title = GetMainWindowTitleSafe(p);
 
                 if (name == "code" || title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
-                    return "vscode";
+                    return ClaudePromptHelper.ClassifyVsCodeHostType(title);
                 if (name == "claude" || name.StartsWith("claude"))
                     return "claude-desktop";
                 if (name == "codex" || title.Contains("Codex", StringComparison.OrdinalIgnoreCase))
@@ -187,7 +194,15 @@ internal partial class Program
     }
 
     /// <summary>Find Claude session JSONL for a given CWD via ~/.claude/projects/ mapping.</summary>
-    static string? FindSessionJsonl(string? cwd)
+    static string? FindSessionJsonl(string? cwd, string? hostType = null)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return null;
+        if (ClaudePromptHelper.IsCodexHostType(hostType))
+            return FindCodexSessionJsonl(cwd) ?? FindClaudeSessionJsonl(cwd);
+        return FindClaudeSessionJsonl(cwd) ?? FindCodexSessionJsonl(cwd);
+    }
+
+    static string? FindClaudeSessionJsonl(string? cwd)
     {
         if (string.IsNullOrWhiteSpace(cwd)) return null;
         try
@@ -216,5 +231,167 @@ internal partial class Program
         }
         catch { }
         return null;
+    }
+
+    static readonly Dictionary<string, string?> _codexSessionJsonlCache = new(StringComparer.OrdinalIgnoreCase);
+
+    static string? FindCodexSessionJsonl(string? cwd)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return null;
+
+        var cacheKey = cwd.Replace('/', '\\').TrimEnd('\\');
+        if (_codexSessionJsonlCache.TryGetValue(cacheKey, out var cached) &&
+            !string.IsNullOrWhiteSpace(cached) &&
+            File.Exists(cached))
+            return cached;
+
+        try
+        {
+            var sessionsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".codex", "sessions");
+            if (!Directory.Exists(sessionsDir)) return null;
+
+            var normalizedCwd = cacheKey.ToLowerInvariant();
+            var recentFiles = Directory.EnumerateFiles(sessionsDir, "*.jsonl", SearchOption.AllDirectories)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .Take(200);
+
+            foreach (var file in recentFiles)
+            {
+                var sessionCwd = TryReadCodexSessionCwd(file);
+                if (string.IsNullOrWhiteSpace(sessionCwd)) continue;
+
+                var normalizedSessionCwd = sessionCwd.Replace('/', '\\').TrimEnd('\\').ToLowerInvariant();
+                if (!string.Equals(normalizedSessionCwd, normalizedCwd, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                _codexSessionJsonlCache[cacheKey] = file;
+                return file;
+            }
+        }
+        catch { }
+
+        _codexSessionJsonlCache[cacheKey] = null;
+        return null;
+    }
+
+    static string? TryReadCodexSessionCwd(string path)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(fs, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            var firstLine = reader.ReadLine();
+            if (string.IsNullOrWhiteSpace(firstLine)) return null;
+
+            var node = JsonNode.Parse(firstLine);
+            if (!string.Equals(node?["type"]?.GetValue<string>(), "session_meta", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            return node?["payload"]?["cwd"]?.GetValue<string>();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Inject a user+assistant message pair into a Claude Code session JSONL file.
+    /// Appended to the end — Claude Code renders new entries on next scroll/reload.
+    /// </summary>
+    /// <param name="jsonlPath">Path to the .jsonl session file.</param>
+    /// <param name="cwd">Workspace CWD (written into each entry).</param>
+    /// <param name="userText">Text for the injected user turn.</param>
+    /// <param name="assistantText">Text for the injected assistant turn.</param>
+    /// <param name="model">Model label shown in Claude Code (e.g. "gemini-2.5-pro").</param>
+    /// <returns>True if both entries were written successfully.</returns>
+    internal static bool InjectMessageToClaudeSession(
+        string jsonlPath, string cwd, string userText, string assistantText, string model = "gemini-2.5-pro")
+    {
+        try
+        {
+            // Read last non-empty line to extract chain context
+            string lastLine = "";
+            using (var fs = new FileStream(jsonlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var sr = new StreamReader(fs, new UTF8Encoding(false)))
+            {
+                string? line;
+                while ((line = sr.ReadLine()) != null)
+                    if (!string.IsNullOrWhiteSpace(line)) lastLine = line;
+            }
+            if (string.IsNullOrEmpty(lastLine)) return false;
+
+            var last = JsonNode.Parse(lastLine);
+            var lastUuid   = last?["uuid"]?.GetValue<string>() ?? Guid.NewGuid().ToString();
+            var sessionId  = last?["sessionId"]?.GetValue<string>() ?? Path.GetFileNameWithoutExtension(jsonlPath);
+            var version    = last?["version"]?.GetValue<string>() ?? "2.1.88";
+            var gitBranch  = last?["gitBranch"]?.GetValue<string>() ?? "main";
+            var cwdNorm    = cwd.Replace('/', '\\');
+
+            var now          = DateTime.UtcNow;
+            var userUuid     = Guid.NewGuid().ToString();
+            var promptId     = Guid.NewGuid().ToString();
+            var assistantUuid = Guid.NewGuid().ToString();
+            var msgId        = "msg_gem_" + Guid.NewGuid().ToString("N")[..16];
+
+            var userEntry = new JsonObject
+            {
+                ["parentUuid"]    = lastUuid,
+                ["isSidechain"]   = false,
+                ["promptId"]      = promptId,
+                ["type"]          = "user",
+                ["uuid"]          = userUuid,
+                ["timestamp"]     = now.ToString("O"),
+                ["userType"]      = "external",
+                ["entrypoint"]    = "claude-vscode",
+                ["cwd"]           = cwdNorm,
+                ["sessionId"]     = sessionId,
+                ["version"]       = version,
+                ["gitBranch"]     = gitBranch,
+                ["message"]       = new JsonObject
+                {
+                    ["role"]    = "user",
+                    ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = userText })
+                }
+            };
+
+            var assistantEntry = new JsonObject
+            {
+                ["parentUuid"]  = userUuid,
+                ["isSidechain"] = false,
+                ["type"]        = "assistant",
+                ["uuid"]        = assistantUuid,
+                ["timestamp"]   = now.AddSeconds(1).ToString("O"),
+                ["userType"]    = "external",
+                ["entrypoint"]  = "claude-vscode",
+                ["cwd"]         = cwdNorm,
+                ["sessionId"]   = sessionId,
+                ["version"]     = version,
+                ["gitBranch"]   = gitBranch,
+                ["message"]     = new JsonObject
+                {
+                    ["model"]         = model,
+                    ["id"]            = msgId,
+                    ["type"]          = "message",
+                    ["role"]          = "assistant",
+                    ["content"]       = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = assistantText }),
+                    ["stop_reason"]   = "end_turn",
+                    ["stop_sequence"] = JsonValue.Create((string?)null),
+                    ["usage"]         = new JsonObject { ["input_tokens"] = 0, ["output_tokens"] = 0 }
+                }
+            };
+
+            using var sw = new StreamWriter(jsonlPath, append: true, new UTF8Encoding(false));
+            sw.WriteLine(userEntry.ToJsonString());
+            sw.WriteLine(assistantEntry.ToJsonString());
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[EYE] InjectMessageToClaudeSession failed: {ex.Message}");
+            return false;
+        }
     }
 }

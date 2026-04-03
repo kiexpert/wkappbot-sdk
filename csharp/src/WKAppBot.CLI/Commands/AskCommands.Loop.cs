@@ -251,6 +251,10 @@ internal partial class Program
                $"               5 Dir(s)  probe_pid={pid}  ts={ts}\n";
     }
 
+    // JSONL injection path: when set, agent loop injects each Gemini response into the Claude session JSONL.
+    // Set by AgentCommand when --inject-jsonl is passed. Thread-safe (AsyncLocal per agent invocation).
+    internal static readonly System.Threading.AsyncLocal<string?> _agentInjectJsonl = new();
+
     // Dry-run mode: tool calls are read-only — write/execute commands return a stub instead of running.
     // Shared with InputReadiness.DryRunMode (same AsyncLocal instance) — final safety net at native level.
     // ask mode = true by default (--no-dry-run to bypass). agent mode = false (unless --dry-run).

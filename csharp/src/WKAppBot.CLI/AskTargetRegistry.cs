@@ -97,6 +97,79 @@ internal static class AskTargetRegistry
         Console.WriteLine($"[SANDBOX] Purged {removed.Count} dead-HWND registry entry/entries");
     }
 
+    // ── Per-tab question ID counter ──────────────────────────────────────────
+    // Each ask on the same tab gets a unique monotonic Q# (Q1, Q2, Q3...).
+    // Persisted to ask_qid.json so counter survives process restarts.
+    // Triad uses its own Game ID — skip Qid for triad mode.
+
+    private static readonly string _qidFilePath = Path.Combine(
+        AppContext.BaseDirectory, "wkappbot.hq", "runtime", "ask_qid.json");
+
+    private static readonly object _qidLock = new();
+
+    /// <summary>
+    /// Atomically assign and return the next question ID for a sandbox key.
+    /// Returns 0 if key is empty (triad/system calls that bypass Q#).
+    /// </summary>
+    internal static int AssignNextQid(string sandboxKey)
+    {
+        if (string.IsNullOrEmpty(sandboxKey)) return 0;
+        lock (_qidLock)
+        {
+            try
+            {
+                var dict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                if (File.Exists(_qidFilePath))
+                    dict = JsonSerializer.Deserialize<Dictionary<string, int>>(File.ReadAllText(_qidFilePath))
+                           ?? dict;
+                dict.TryGetValue(sandboxKey, out var current);
+                var next = current + 1;
+                dict[sandboxKey] = next;
+                Directory.CreateDirectory(Path.GetDirectoryName(_qidFilePath)!);
+                File.WriteAllText(_qidFilePath, JsonSerializer.Serialize(dict));
+                return next;
+            }
+            catch { return 0; }
+        }
+    }
+
+    // ── Per-page Slack thread persistence ────────────────────────────────────
+    // Maps sandboxKey → Slack thread ts. One thread per (command+ai+hwnd) tuple.
+    // File: wkappbot.hq/runtime/ask_slack_threads.json
+
+    private static readonly string _slackThreadsFilePath = Path.Combine(
+        AppContext.BaseDirectory, "wkappbot.hq", "runtime", "ask_slack_threads.json");
+
+    internal static string? GetSlackThread(string sandboxKey)
+    {
+        try
+        {
+            if (!File.Exists(_slackThreadsFilePath)) return null;
+            var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(
+                File.ReadAllText(_slackThreadsFilePath));
+            return dict != null && dict.TryGetValue(sandboxKey, out var ts) ? ts : null;
+        }
+        catch { return null; }
+    }
+
+    internal static void SetSlackThread(string sandboxKey, string threadTs)
+    {
+        try
+        {
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (File.Exists(_slackThreadsFilePath))
+            {
+                dict = JsonSerializer.Deserialize<Dictionary<string, string>>(
+                    File.ReadAllText(_slackThreadsFilePath))
+                    ?? new(StringComparer.OrdinalIgnoreCase);
+            }
+            dict[sandboxKey] = threadTs;
+            Directory.CreateDirectory(Path.GetDirectoryName(_slackThreadsFilePath)!);
+            File.WriteAllText(_slackThreadsFilePath, JsonSerializer.Serialize(dict));
+        }
+        catch { /* best effort */ }
+    }
+
     // ── Legacy shims: backward-compat for any remaining old callers ────────
 
     internal static string? GetTargetId(string tag)

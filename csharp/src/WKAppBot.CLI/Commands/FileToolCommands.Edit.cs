@@ -18,8 +18,8 @@ internal partial class Program
 
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--at" && i + 1 < args.Length) { atPrefix = args[++i]; continue; }
-            if (args[i] == "--path" && i + 1 < args.Length) { searchPath = args[++i]; continue; }
+            if (args[i] is "--at" or "--timestamp" && i + 1 < args.Length) { atPrefix = args[++i]; continue; }
+            if (args[i] is "--path" or "--root" && i + 1 < args.Length) { searchPath = args[++i]; continue; }
             if (args[i] == "--list") { listOnly = true; continue; }
             if (args[i] == "--dry-run") { dryRun = true; continue; }
         }
@@ -27,6 +27,7 @@ internal partial class Program
         if (string.IsNullOrEmpty(atPrefix))
         {
             Console.WriteLine("Usage: wkappbot file undo --at <timestamp> [--path dir] [--list] [--dry-run]");
+            Console.WriteLine("       wkappbot file undo --timestamp <timestamp> [--root dir] [--list] [--dry-run]");
             Console.WriteLine("  --at     timestamp prefix: YYYYMMDD-HHmmss or partial (e.g. 20260320-1126)");
             Console.WriteLine("  --path   search directory (default: caller CWD)");
             Console.WriteLine("  --list   show matching backups without restoring");
@@ -157,12 +158,15 @@ internal partial class Program
     // ── file edit ──────────────────────────────────────────────────────────
     /// <summary>
     /// file edit &lt;old_string&gt; &lt;new_string&gt; &lt;path&gt;... [--replace-all] [--regex] [--i-really-want-lossy-encoding] [--encoding N] [--context N]
+    /// Also accepts option-style aliases for tool compatibility:
+    ///   --old-string/--text/--new-string/--path/--dry-run
     /// Same interface as Claude Code Edit tool. Auto-detects encoding (BOM → system ANSI/CP949).
     /// Fails if old_string not found (exact match). Preserves original encoding on save.
     /// </summary>
     static int FileEditCommand(string[] args)
     {
         var positional = new List<string>();
+        var optionPaths = new List<string>();
         bool replaceAll = false;
         bool useRegex = false;
         bool force = false;
@@ -174,6 +178,8 @@ internal partial class Program
 
         string? oldFile = null, newFile = null;
         string? undoTimestamp = null; // --undo <timestamp>: restore backup first, then edit
+        string? oldStringOpt = null;
+        string? newStringOpt = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -185,12 +191,27 @@ internal partial class Program
             if (args[i] == "--context"  && i + 1 < args.Length) { int.TryParse(args[++i], out context); continue; }
             if (args[i] == "--tab-size" && i + 1 < args.Length) { int.TryParse(args[++i], out tabSize); if (tabSize < 1) tabSize = 4; continue; }
             if (args[i] == "--indent-context" && i + 1 < args.Length) { int.TryParse(args[++i], out indentContext); if (indentContext < 1) indentContext = 7; continue; }
+            if (args[i] == "--dry-run") { _dryRunMode.Value = true; continue; }
+            if (args[i] == "--old-string" && i + 1 < args.Length) { oldStringOpt = args[++i]; continue; }
+            if ((args[i] is "--new-string" or "--text") && i + 1 < args.Length) { newStringOpt = args[++i]; continue; }
+            if ((args[i] is "--path" or "--file") && i + 1 < args.Length) { optionPaths.Add(args[++i]); continue; }
             // --old-file/--new-file: read old/new strings from file (avoids bash Korean encoding issues)
             if (args[i] == "--old-file" && i + 1 < args.Length) { oldFile = args[++i]; continue; }
             if (args[i] == "--new-file" && i + 1 < args.Length) { newFile = args[++i]; continue; }
             // --undo <timestamp>: restore file from .bak-{timestamp} backup before applying edit
             if (args[i] == "--undo" && i + 1 < args.Length) { undoTimestamp = args[++i]; continue; }
             positional.Add(args[i]);
+        }
+
+        if (oldStringOpt != null || newStringOpt != null || optionPaths.Count > 0)
+        {
+            if (oldStringOpt != null) positional.Insert(0, oldStringOpt);
+            if (newStringOpt != null)
+            {
+                var insertIndex = oldStringOpt != null ? 1 : 0;
+                positional.Insert(insertIndex, newStringOpt);
+            }
+            positional.AddRange(optionPaths);
         }
 
         // --old-file/--new-file mode: read strings from files, remaining positionals are target paths
@@ -216,6 +237,7 @@ internal partial class Program
         {
             Console.WriteLine("Usage: wkappbot file edit <old_string> <new_string> <path>... [--replace-all] [--regex]");
             Console.WriteLine("       wkappbot file edit --old-file old.txt --new-file new.txt <path>... [--replace-all]");
+            Console.WriteLine("       wkappbot file edit --old-string <old> --text <new> --path <file> [--replace-all] [--dry-run]");
             Console.WriteLine("       wkappbot file edit --undo <timestamp> <old> <new> <path>  # restore backup, then edit");
             return 1;
         }
@@ -740,9 +762,11 @@ wkappbot file — filesystem tools (read + write + edit + PDF)
 
 Usage:
   wkappbot file read <path> [--offset N] [--limit N] [--encoding N]
+  wkappbot file read --path <path> [--start N] [--end N] [--count N] [--no-line-numbers]
       Read file with line numbers. Encoding: --encoding > BOM > system ANSI (CP949 on KR).
 
   wkappbot file read-pdf <path> [--pages N-M] [--max-chars N] [--ocr]
+  wkappbot file read-pdf --path <path> [--start-page N] [--end-page N]
       Extract text from PDF (Korean/CJK safe). --pages 1-5, --max-chars 50000.
       --ocr: also OCR each page via Windows OCR; appends [+OCR: ...] for content PdfPig missed.
 
@@ -756,17 +780,21 @@ Usage:
       --context N: lines of context around changes (default 1; 0 = header only).
 
   wkappbot file write <path> [--encoding N] (--stdin | --text ""..."" | --file <src>) [--append]
+  wkappbot file write --path <path> [--content ""...""] [--source-file <src>] [--dry-run]
       Write content to file, re-encoding to target charset.
       --encoding N  target codepage (e.g. 949 for CP949/EUC-KR)
       --stdin       read content from stdin (pipe mode)
       --text ""...""  inline content
       --file <src>  copy from source file (auto-detect source encoding)
       --append      append instead of overwrite
+      backup ON by default (.bak/<file>.bak-yyyyMMdd-HHmmss.fff.txt)
 
   wkappbot file grep <pattern> [--path dir/file] [--type ext] [-i] [-C N] [--max N] [--encoding N]
+  wkappbot file grep --pattern <regex> [--root dir] [--file file]
       Regex search across files.
 
   wkappbot file glob <pattern> [--path dir]
+  wkappbot file glob --pattern <glob> [--path dir]
       Find files. Supports ** for recursive.
 
 Examples:

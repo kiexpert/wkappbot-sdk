@@ -4,6 +4,33 @@ namespace WKAppBot.Win32.Accessibility;
 
 public sealed partial class UiaLocator
 {
+    private static List<System.Drawing.Rectangle> TryGetTextSelectionRects(AutomationElement element)
+    {
+        var result = new List<System.Drawing.Rectangle>();
+        try
+        {
+            if (!element.Patterns.Text.IsSupported) return result;
+            var ranges = element.Patterns.Text.Pattern.GetSelection();
+            if (ranges == null) return result;
+            foreach (var range in ranges)
+            {
+                try
+                {
+                    var rects = range.GetBoundingRectangles();
+                    if (rects == null) continue;
+                    foreach (var r in rects)
+                    {
+                        if (r.Width <= 0 || r.Height <= 0) continue;
+                        result.Add(new System.Drawing.Rectangle((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height));
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return result;
+    }
+
     /// <summary>
     /// Render descendants as visual markdown — text only (no node types).
     /// Groups elements by Y coordinate into rows; multi-column rows → MD table.
@@ -212,6 +239,59 @@ public sealed partial class UiaLocator
     /// Each line is indented by depth. First line = deepest focused element.
     /// Returns empty string if no focused element or focus is outside the given window.
     /// </summary>
+    public string GetFocusedInspectText(int maxDepth = 12)
+    {
+        try
+        {
+            var focused = _automation.FocusedElement();
+            if (focused == null) return "";
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("── hot focus (UIA) ──");
+
+            void AppendElementLine(AutomationElement el, string prefix)
+            {
+                string name = "", aid = "", ct = "?";
+                System.Drawing.Rectangle? rect = null;
+                try { name = el.Name ?? ""; } catch { }
+                try { aid = el.AutomationId ?? ""; } catch { }
+                try { ct = el.ControlType.ToString(); } catch { }
+                try
+                {
+                    var r = el.BoundingRectangle;
+                    rect = new System.Drawing.Rectangle((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height);
+                }
+                catch { }
+
+                var line = $"{prefix}{GrapHelper.FormatNodeLabel(ct, aid, name, rect: rect)}";
+                sb.AppendLine(line);
+            }
+
+            AppendElementLine(focused, "⌨ ");
+
+            var walker = _automation.TreeWalkerFactory.GetRawViewWalker();
+            var cur = focused;
+            for (int level = 0; level < maxDepth; level++)
+            {
+                try { cur = walker.GetParent(cur); } catch { break; }
+                if (cur == null) break;
+                AppendElementLine(cur, $"{new string(' ', level * 2 + 2)}└ ");
+                try
+                {
+                    if (cur.ControlType == FlaUI.Core.Definitions.ControlType.Window)
+                        break;
+                }
+                catch { }
+            }
+
+            return sb.ToString().TrimEnd();
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
     /// <summary>Get focused element info with parent chain for keyboard focus analysis.</summary>
     public FocusedElementInfo? GetFocusedElementInfo()
     {
@@ -225,6 +305,14 @@ public sealed partial class UiaLocator
             try { aid = focused.AutomationId ?? ""; } catch { aid = ""; }
             try { ctStr = focused.ControlType.ToString(); } catch { ctStr = "?"; }
             try { if (focused.Patterns.Value.IsSupported) value = focused.Patterns.Value.Pattern.Value.Value ?? ""; } catch { }
+            System.Drawing.Rectangle bounds = System.Drawing.Rectangle.Empty;
+            try
+            {
+                var br = focused.BoundingRectangle;
+                bounds = new System.Drawing.Rectangle((int)br.X, (int)br.Y, (int)br.Width, (int)br.Height);
+            }
+            catch { }
+            var selectionRects = TryGetTextSelectionRects(focused);
 
             // Patterns
             var patterns = new List<string>();
@@ -260,7 +348,12 @@ public sealed partial class UiaLocator
             return new FocusedElementInfo
             {
                 Name = name, AutomationId = aid, ControlType = ctStr, Value = value,
-                Patterns = patterns, ParentChain = chain, WindowTitle = winTitle, ProcessId = pid
+                Patterns = patterns,
+                ParentChain = chain,
+                WindowTitle = winTitle,
+                ProcessId = pid,
+                Bounds = bounds,
+                SelectionRects = selectionRects
             };
         }
         catch { return null; }
@@ -278,4 +371,6 @@ public sealed class FocusedElementInfo
     public List<(string type, string name)> ParentChain { get; init; } = new();
     public string? WindowTitle { get; init; }
     public int ProcessId { get; init; }
+    public System.Drawing.Rectangle Bounds { get; init; } = System.Drawing.Rectangle.Empty;
+    public List<System.Drawing.Rectangle> SelectionRects { get; init; } = new();
 }

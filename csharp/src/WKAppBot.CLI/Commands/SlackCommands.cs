@@ -214,9 +214,12 @@ internal partial class Program
             return 1;
         }
 
+        var dryRun = args.Contains("--dry-run");
+        var sendArgs = dryRun ? args.Where(a => a != "--dry-run").ToArray() : args;
+
         // Parse: text parts + file attachments (shared ParseTextAndFiles)
-        var (textParts, filePaths) = ParseTextAndFiles(args, startIndex: 1);
-        var message = string.Join("\n", textParts);
+        var (textParts, filePaths) = ParseTextAndFiles(sendArgs, startIndex: 1);
+        var message = JoinShellGroupedTextParts(textParts);
         // C-style escape decode: \n → newline, \t → tab, \\ → backslash
         message = DecodeCEscapes(message);
         // Bash history expansion escapes ! to \! even in single quotes — undo it
@@ -238,6 +241,17 @@ internal partial class Program
 
         string? threadTs = null;
         var senderName = GetSendReplyUsername(printDecision: true);
+        if (dryRun)
+        {
+            Console.WriteLine($"[SLACK] DRY-RUN bot-name={senderName} cwd={EyeCmdPipeServer.CallerCwd.Value}");
+            Console.WriteLine($"[SLACK] DRY-RUN message-lines={message.Split('\n').Length} files={filePaths.Count}");
+            if (!string.IsNullOrWhiteSpace(message))
+                Console.WriteLine($"[SLACK] DRY-RUN preview: {message.Replace("\r", "\\r").Replace("\n", "\\n")}");
+            foreach (var fp in filePaths)
+                Console.WriteLine($"[SLACK] DRY-RUN upload: {fp}");
+            return 0;
+        }
+
         if (!string.IsNullOrWhiteSpace(message))
         {
             var (ok, ts) = PostWithOverflow(botToken, channel, message, username: senderName);
@@ -537,6 +551,64 @@ internal partial class Program
             Console.Error.WriteLine($"[SLACK] FindLastMessage error: {ex.Message}");
         }
         return null;
+    }
+
+    /// <summary>
+    /// Find Eye status message for reuse: only adopt if within the last 4 channel messages.
+    /// Also deletes old Eye status messages, keeping only the 2 most recent.
+    /// Returns ts to reuse, or null to post new.
+    /// </summary>
+    static string? FindEyeStatusTsForReuse(string botToken, string channel, string username)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+            var url = $"https://slack.com/api/conversations.history?channel={channel}&limit=20";
+            var resp = http.GetStringAsync(url).GetAwaiter().GetResult();
+            var json = JsonSerializer.Deserialize<JsonNode>(resp);
+            var msgs = json?["messages"]?.AsArray();
+            if (msgs == null) return null;
+
+            // Collect all Eye status message ts values (newest-first)
+            var eyeTsList = new List<string>();
+            for (int i = 0; i < msgs.Count; i++)
+            {
+                var msg = msgs[i];
+                if (msg?["username"]?.GetValue<string>() == username)
+                    eyeTsList.Add(msg?["ts"]?.GetValue<string>() ?? "");
+            }
+            eyeTsList.RemoveAll(string.IsNullOrEmpty);
+
+            // Delete old ones beyond the 2 most recent (fire-and-forget)
+            if (eyeTsList.Count > 2)
+            {
+                var toDelete = eyeTsList.Skip(2).ToList();
+                _ = Task.Run(async () =>
+                {
+                    foreach (var ts in toDelete)
+                    {
+                        await SlackDeleteMessageAsync(botToken, channel, ts, guardThreadStarter: false, skipLastMsgProtection: true);
+                        Console.WriteLine($"[EYE] Deleted old status ts={ts}");
+                    }
+                });
+            }
+
+            // Reuse only if the newest Eye status is within the last 4 channel messages
+            if (eyeTsList.Count == 0) return null;
+            var newestEyeTs = eyeTsList[0];
+            for (int i = 0; i < Math.Min(4, msgs.Count); i++)
+            {
+                if (msgs[i]?["ts"]?.GetValue<string>() == newestEyeTs)
+                    return newestEyeTs; // within top 4 → reuse
+            }
+            return null; // too old → post new
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SLACK] FindEyeStatusTs error: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>Returns true if the most recent channel message is by the given username.</summary>

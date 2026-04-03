@@ -16,7 +16,8 @@ internal partial class Program
 
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--path" && i + 1 < args.Length) root = args[++i];
+            if ((args[i] is "--path" or "--root") && i + 1 < args.Length) root = args[++i];
+            else if (args[i] == "--pattern" && i + 1 < args.Length) pattern = args[++i];
             else if (!args[i].StartsWith("--"))
             {
                 if (pattern == null) pattern = args[i];
@@ -105,14 +106,19 @@ internal partial class Program
         string? srcFile  = null;
         bool    stdin    = false;
         bool    append   = false;
+        bool    backup   = true;
+        bool    dryRun   = false;
 
         for (int i = 0; i < args.Length; i++)
         {
             if      (args[i] == "--encoding" && i + 1 < args.Length) { if (int.TryParse(args[++i], out int cp)) encoding = cp; }
-            else if (args[i] == "--text"     && i + 1 < args.Length) text    = args[++i];
-            else if (args[i] == "--file"     && i + 1 < args.Length) srcFile = args[++i];
+            else if ((args[i] is "--text" or "--content" or "--new-string") && i + 1 < args.Length) text = args[++i];
+            else if ((args[i] is "--file" or "--source-file") && i + 1 < args.Length) srcFile = args[++i];
+            else if ((args[i] is "--path" or "--target") && i + 1 < args.Length) path = args[++i];
             else if (args[i] == "--stdin")  stdin  = true;
             else if (args[i] == "--append") append = true;
+            else if (args[i] == "--i-really-want-no-backup") backup = false;
+            else if (args[i] == "--dry-run") dryRun = true;
             else if (!args[i].StartsWith("--")) path = args[i];
         }
 
@@ -144,13 +150,34 @@ internal partial class Program
         {
             var enc = encoding.HasValue ? Encoding.GetEncoding(encoding.Value) : new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
             var bytes = enc.GetBytes(content);
+
+            if (backup)
+            {
+                if (!TryCreateFileBackup(path, "file write", out _, out var backupErr))
+                    return Error(backupErr ?? "[file write] backup failed");
+            }
+
+            if (dryRun)
+            {
+                var aiName = Environment.GetEnvironmentVariable("WKAPPBOT_LOOP_CALLER") ?? "ai";
+                var ts = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                var dryBakDir = Path.Combine(Path.GetDirectoryName(path) ?? ".", ".bak");
+                var dryFileName = Path.GetFileName(path);
+                var previewPath = Path.Combine(dryBakDir, $"{dryFileName}.bak-{ts}-{aiName}.txt");
+                Directory.CreateDirectory(dryBakDir);
+                File.WriteAllBytes(previewPath, bytes);
+                Console.Error.WriteLine("[DRY-RUN] Your write has been PROPOSED. The original file was NOT modified.");
+                Console.WriteLine($"[file write] backup -> {previewPath}");
+                return 0;
+            }
+
             if (append)
                 using (var fs = File.Open(path, FileMode.Append)) fs.Write(bytes, 0, bytes.Length);
             else
                 File.WriteAllBytes(path, bytes);
 
             var encName = encoding.HasValue ? $"CP{encoding}" : "UTF-8";
-            Console.WriteLine($"[FILE] write OK → {path} ({bytes.Length} bytes, {encName})");
+            Console.WriteLine($"[FILE] write OK -> {path} ({bytes.Length} bytes, {encName})");
             return 0;
         }
         catch (Exception ex) { return Error($"Write failed: {ex.Message}"); }
@@ -172,7 +199,9 @@ internal partial class Program
 
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--pages" && i + 1 < args.Length)
+            if ((args[i] is "--path" or "--file") && i + 1 < args.Length)
+                path = args[++i];
+            else if (args[i] == "--pages" && i + 1 < args.Length)
             {
                 var pages = args[++i];
                 var dash  = pages.IndexOf('-');
@@ -184,6 +213,10 @@ internal partial class Program
                 { pgFrom = pgTo = single; }
                 else return Error($"Invalid --pages value: {pages} (expected N or N-M)");
             }
+            else if (args[i] == "--start-page" && i + 1 < args.Length)
+                int.TryParse(args[++i], out pgFrom);
+            else if (args[i] == "--end-page" && i + 1 < args.Length)
+                int.TryParse(args[++i], out pgTo);
             else if (args[i] == "--max-chars" && i + 1 < args.Length)
                 int.TryParse(args[++i], out maxChars);
             else if (args[i] == "--ocr")
