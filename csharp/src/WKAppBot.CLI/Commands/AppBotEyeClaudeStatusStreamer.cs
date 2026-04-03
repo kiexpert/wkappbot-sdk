@@ -60,7 +60,9 @@ internal partial class Program
         public DateTime? LastRateLimitAlertTime;
         public string? RateLimitAlertMsgTs; // Slack ts for deletion on clear
         public bool GeminiHandoffFired;    // prevent re-fire for same rate-limit/error period
+#pragma warning disable CS0649
         public string? LastServerErrorText; // dedup: don't re-fire for same error text
+#pragma warning restore CS0649
 
         // ── Plan/permission approval ──
         public bool PlanApprovalSentToSlack;
@@ -747,7 +749,7 @@ internal partial class Program
                                     {
                                         var btnList = string.Join(" / ", permButtons);
                                         var fallbackText = $":lock: {label}수락 요구: [{btnList}]";
-                                        var blocks = BuildPermissionBlocks(permButtons, claudeStatus.Item2);
+                                        var blocks = BuildPermissionBlocks(permButtons, claudeStatus.Item2 ?? "");
                                         var (sendOk, sendTs) = Task.Run(async () =>
                                             await SlackSendBlocksViaApi(slackBotToken!, slackChannel!, fallbackText, blocks))
                                             .GetAwaiter().GetResult();

@@ -425,20 +425,6 @@ internal partial class Program
             }
         }
 
-        void KillAllCore()
-        {
-            try
-            {
-                foreach (var proc in Process.GetProcessesByName("wkappbot-core"))
-                {
-                    try { proc.Kill(); }
-                    catch { }
-                    finally { proc.Dispose(); }
-                }
-            }
-            catch { }
-        }
-
         GuardianLog($"[EYE_GUARDIAN] started pollMs={pollMs} respawnDelaySec={respawnDelaySec} launchTimeoutMs={launchTimeoutMs} tickTimeoutMs={tickTimeoutMs} eyeHwnd=0x{eyeHwnd.ToInt64():X}");
         DateTime? deadSinceUtc = null;
         int consecutiveHealthFailures = 0;

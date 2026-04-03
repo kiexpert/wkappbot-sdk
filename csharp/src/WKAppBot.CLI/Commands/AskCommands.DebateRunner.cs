@@ -78,7 +78,7 @@ internal partial class Program
                     // Word limit: R2 = total ≤99 words, R3 = [합의]+[미합의] items only (삼두 합의: Option B)
                     if (roundName.StartsWith("R2"))
                     {
-                        var totalWords = response.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+                        var totalWords = (response ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
                         if (totalWords > 99)
                         {
                             SlackPostToThread($"⚠️ *[Moderator→{ai}]* R2 답변 {totalWords}단어 — 99단어 초과!", "🦉 Moderator");
@@ -92,12 +92,12 @@ internal partial class Program
                         needsRetry = true;
                         retryReason = "no [CLAIM] blocks found";
                     }
-                    else if (roundName.StartsWith("R2") && !response.Contains("[DISPUTE]"))
+                    else if (roundName.StartsWith("R2") && response?.Contains("[DISPUTE]") != true)
                     {
                         needsRetry = true;
                         retryReason = "no [DISPUTE] in critique round";
                     }
-                    else if (roundName.StartsWith("R2") && (response.Contains("[합의]") || response.Contains("[CONCLUSION_KR]")))
+                    else if (roundName.StartsWith("R2") && (response?.Contains("[합의]") == true || response?.Contains("[CONCLUSION_KR]") == true))
                     {
                         // R2 round scope violation: using R3 format prematurely
                         var warnMsg = "[MODERATOR DM] ⚠️ ROUND SCOPE VIOLATION: You used R3 format ([합의]/[CONCLUSION_KR]) in R2. " +
@@ -110,7 +110,7 @@ internal partial class Program
                     }
                     else if (roundName.StartsWith("R3"))
                     {
-                        if (!response.Contains("[CONCLUSION_KR]"))
+                        if (response?.Contains("[CONCLUSION_KR]") != true)
                         {
                             needsRetry = true;
                             retryReason = "no [CONCLUSION_KR] in synthesis round";
@@ -205,7 +205,7 @@ internal partial class Program
                     // Store claims for next round comparison
                     ctx.StoreClaims(ai, claims);
 
-                    var summary = TriadDebateLoop.CompressSummary(response);
+                    var summary = TriadDebateLoop.CompressSummary(response ?? "");
                     var result = new TriadDebateLoop.RoundResult(ai, summary, claims);
 
                     ctx.LogStep(ai, $"[{roundName}] {claims.Count} claims ({restatements} restated): {string.Join("; ", claims.Select(c => $"{c.Text[..Math.Min(50, c.Text.Length)]}({c.Confidence:F1})"))}");
@@ -217,7 +217,7 @@ internal partial class Program
                     // D=0 warning: critique round requires dissent — warn if AI didn't challenge anything
                     if (roundName.StartsWith("R2", StringComparison.OrdinalIgnoreCase))
                     {
-                        var stance = TriadDebateLoop.ParseStance(response);
+                        var stance = TriadDebateLoop.ParseStance(response ?? "");
                         int dissentScore = 0;
                         if (stance != null)
                         {
@@ -226,13 +226,13 @@ internal partial class Program
                         else
                         {
                             // Fallback: parse from DEBATE_JSON
-                            var debateJson = TriadDebateLoop.ParseDebateJson(response);
+                            var debateJson = TriadDebateLoop.ParseDebateJson(response ?? "");
                             dissentScore = debateJson?["stance"]?["D"]?.GetValue<int>() ?? -1;
                         }
 
                         if (dissentScore == 0)
                         {
-                            var disputes = TriadDebateLoop.ParseDisputes(response);
+                            var disputes = TriadDebateLoop.ParseDisputes(response ?? "");
                             if (disputes.Count == 0)
                             {
                                 Console.ForegroundColor = ConsoleColor.Yellow;

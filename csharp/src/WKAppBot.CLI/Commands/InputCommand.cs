@@ -365,7 +365,6 @@ Examples:
         }
 
         bool success = false;
-        const bool RequireOcrForNonA11y = true;
 
         // OCR debug images → experience DB form dir if available, else logs/ocr/
         string OcrDebugPath(string tag)

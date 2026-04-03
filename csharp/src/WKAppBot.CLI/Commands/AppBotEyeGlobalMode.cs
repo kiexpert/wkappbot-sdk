@@ -46,7 +46,9 @@ internal partial class Program
     static string _lastPromptSource = "none";
 
     static System.Windows.Forms.Form? _screenBlankForm;
+#pragma warning disable CS0169
     static ScreenSaverOverlay? _screenSaver;
+#pragma warning restore CS0169
 
     static string _lastPromptSessionFile = "";
     static int _lastPromptLineIndex = -1;
@@ -85,7 +87,9 @@ internal partial class Program
     static DateTime _lastZoomCleanup = DateTime.MinValue;
 
     // ── CCA live analysis cache ──
+#pragma warning disable CS0414
     static string _cachedCcaSummary = "";
+#pragma warning restore CS0414
 
     // ── Dead card + health check ──
     static readonly HashSet<int> _reportedDeadPids = new();          // pids we've already alerted for
@@ -109,7 +113,9 @@ internal partial class Program
     static volatile string? _fswPromptChangedFile; // last changed file name for filtering
     static volatile bool _fswExeDirty; // hot-swap: exe binary changed
     static volatile bool _slackRetiring; // hot-swap retiring: stop DrainSlackQueue, keep EnqueueSlackRoute
+#pragma warning disable CS0169
     static volatile bool _fswClaudeJsonlDirty; // reserved (FSW removed — kept to avoid refactor)
+#pragma warning restore CS0169
     static FileSystemWatcher? _fswTick;
     static FileSystemWatcher? _fswPrompt;
     static FileSystemWatcher? _fswExe;
@@ -121,7 +127,9 @@ internal partial class Program
     static DateTime _lastWhisperRingCheck = DateTime.MinValue;
     static FileSystemWatcher? _fswExeNew; // hot-swap: .new.exe staged file
     static FileSystemWatcher? _fswMcp;
+#pragma warning disable CS0169
     static FileSystemWatcher? _fswClaudeJsonl; // Claude Code projects JSONL (~/.claude/projects/**/*.jsonl)
+#pragma warning restore CS0169
     static readonly HashSet<string> _mcpTabsOpened = new(StringComparer.OrdinalIgnoreCase);
     static readonly HashSet<string> _knownLgOverlayProcesses = new(StringComparer.OrdinalIgnoreCase)
     {

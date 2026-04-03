@@ -31,7 +31,6 @@ internal partial class Program
     var targetFormId = ctx.TargetFormId;
     var targetCid = ctx.TargetCid;
     var expDb = ctx.ExpDb;
-    const bool RequireOcrForNonA11y = true;
     bool success = false;
 
             Console.ForegroundColor = ConsoleColor.Blue;

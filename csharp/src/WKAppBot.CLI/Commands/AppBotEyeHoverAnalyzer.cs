@@ -67,7 +67,7 @@ internal partial class Program
                 });
                 return;
             }
-            _ = Task.Run(async () =>
+            _ = Task.Run(() =>
             {
                 try
                 {
@@ -146,7 +146,9 @@ internal partial class Program
     // ?? Analyze-hack server process ??
     static AppBotPipe.SpawnResult? _hackServerProcess;
     static StreamWriter? _hackServerStdin;
+#pragma warning disable CS0414
     static string _lastHackNodeKey = ""; // change detection: hwnd+elName+elAid
+#pragma warning restore CS0414
 
     /// <summary>
     /// Start unified analysis worker: mouse CCA + keyboard focus in ONE loop.
@@ -642,9 +644,11 @@ internal partial class Program
         Console.WriteLine("[FOCUS-CHAIN] Worker stopped");
     }
 
-    // Track uploaded snippet message ts for delete?뭨eupload cycle
+    // Track uploaded snippet message ts for delete→reupload cycle
+#pragma warning disable CS0169
     static string? _mouseCcaSnippetMsgTs;
     static string? _focusChainSnippetMsgTs;
+#pragma warning restore CS0169
 
     /// <summary>Post/edit mouse CCA result (already formatted with code block).</summary>
     static async Task UpdateMouseCcaSlack(string text)
