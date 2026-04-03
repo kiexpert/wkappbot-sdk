@@ -55,6 +55,7 @@ internal partial class Program
         // Pre-open Slack thread before task so inside-task code (persona injection etc.) can post to it
         EnsureSlackThread("Gemini", question);
 
+        string? capturedEditorSel = null;
         var task = Task.Run(async () =>
         {
             try
@@ -109,6 +110,7 @@ internal partial class Program
                 _currentAskCdp.Value = cdp;
                 _currentAskHost.Value = "gemini";
                 _currentAskEditorSel.Value = editorSel;
+                capturedEditorSel = editorSel;
                 askSession.BindStreamingContext(editorSel);
 
                 // ── Persona injection on fresh Gemini conversation ──
@@ -705,6 +707,9 @@ internal partial class Program
                 var suffix = ok ? "" : "\n[send failed]";
                 var post = forSlack.Length > 2000 ? forSlack[..2000] + "..." : forSlack;
                 SlackPostToThread(post + suffix, SlackAiName("gemini", "Gemini"));
+                _currentAskCdp.Value = cdp;
+                _currentAskHost.Value = "gemini";
+                _currentAskEditorSel.Value = capturedEditorSel;
                 SlackPostAnswerBlocks(forSlack, "Gemini");
             }
         }

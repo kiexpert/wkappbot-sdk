@@ -239,13 +239,12 @@ internal partial class Program
             if (!still) break;
         }
 
-        // Read the latest AI response from DOM (host-specific selector)
-        var js = host switch
-        {
-            "claude"   => "(() => { var msgs = document.querySelectorAll('.prose'); return msgs.length > 0 ? msgs[msgs.length-1].innerText : ''; })()",
-            "gemini"   => "(() => { var msgs = document.querySelectorAll('model-response'); return msgs.length > 0 ? msgs[msgs.length-1].innerText : ''; })()",
-            _          => "(() => { var msgs = document.querySelectorAll('[data-message-author-role=\"assistant\"]'); return msgs.length > 0 ? msgs[msgs.length-1].innerText : ''; })()"
-        };
+        // Read the latest AI response from DOM using registry selectors
+        var msgSels = WKAppBot.WebBot.CdpSelectorRegistry.Get(host, "message");
+        // Build JS that tries each selector and returns innerText of last matched element
+        var selsJson = string.Join(",", msgSels.Select(s => $"'{WKAppBot.WebBot.CdpClient.Esc(s)}'"));
+        var js = $"(()=>{{var sels=[{selsJson}];for(var i=0;i<sels.length;i++){{var els=document.querySelectorAll(sels[i]);if(els.length>0)return els[els.length-1].innerText||'';}}return '';}})()";
+
         var newResponse = await cdp.EvalAsync(js);
         if (string.IsNullOrWhiteSpace(newResponse))
         {
