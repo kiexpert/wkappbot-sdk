@@ -18,16 +18,41 @@ internal partial class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot a11y hack <grap>[#scope] [--engine gemini|gpt]");
-            Console.WriteLine("  Force DYN-A11Y segmentation on target window or element.");
-            Console.WriteLine("  Pipeline: capture ??CCA ??OCR ??Vision ??dynamic a11y tree");
+            Console.WriteLine("Usage: wkappbot a11y hack <grap>[#scope] [options]");
+            Console.WriteLine("  --at x,y       screen point (override cursor for ElementFromPoint)");
+            Console.WriteLine("  --ltrb l,t,r,b screen rect (left,top,right,bottom)");
+            Console.WriteLine("  --ltwh l,t,w,h screen rect (left,top,width,height)");
+            Console.WriteLine("  --engine gemini|gpt  vision engine");
+            Console.WriteLine("  Pipeline: capture → CCA → OCR → Vision → dynamic a11y tree");
             return 1;
         }
 
         // Parse options
         string visionEngine = "gemini";
+        int? atX = null, atY = null; // --at x,y (point) or --ltrb l,t,r,b (rect)
+        Rectangle? atRect = null;
         for (int ai = 0; ai < args.Length; ai++)
+        {
             if (args[ai] == "--engine" && ai + 1 < args.Length) visionEngine = args[++ai].ToLowerInvariant();
+            else if (args[ai] == "--at" && ai + 1 < args.Length)
+            {
+                var parts = args[++ai].Split(',');
+                if (parts.Length >= 2 && int.TryParse(parts[0], out var px) && int.TryParse(parts[1], out var py))
+                { atX = px; atY = py; }
+            }
+            else if (args[ai] is "--ltrb" or "--ltwh" && ai + 1 < args.Length)
+            {
+                var isLtwh = args[ai] == "--ltwh";
+                var parts = args[++ai].Split(',');
+                if (parts.Length == 4 && int.TryParse(parts[0], out var a1) && int.TryParse(parts[1], out var a2)
+                    && int.TryParse(parts[2], out var a3) && int.TryParse(parts[3], out var a4))
+                {
+                    atRect = isLtwh ? new Rectangle(a1, a2, a3, a4) : Rectangle.FromLTRB(a1, a2, a3, a4);
+                    atX = atRect.Value.Left + atRect.Value.Width / 2;
+                    atY = atRect.Value.Top + atRect.Value.Height / 2;
+                }
+            }
+        }
 
         PulseStep.Init("a11y-hack");
 
@@ -53,7 +78,17 @@ internal partial class Program
 
         // If #scope specified, find UIA element and use its BoundingRectangle
         NativeMethods.GetWindowRect(hwnd, out var wr);
-        TryAutoNarrowHackRect(hwnd, grapFull, uiaScope, focusDrillRequested, hasExplicitScope, ref wr);
+        if (atRect.HasValue)
+        {
+            // --ltrb direct rect override (skip auto-narrow)
+            var ar = atRect.Value;
+            wr.Left = ar.Left; wr.Top = ar.Top; wr.Right = ar.Right; wr.Bottom = ar.Bottom;
+            Console.WriteLine($"[HACK] --ltrb override: rect=({ar.Left},{ar.Top} {ar.Width}x{ar.Height})");
+        }
+        else
+        {
+            TryAutoNarrowHackRect(hwnd, grapFull, uiaScope, focusDrillRequested, hasExplicitScope, ref wr, atX, atY);
+        }
         if (!string.IsNullOrEmpty(uiaScope))
         {
             try
@@ -637,7 +672,9 @@ internal partial class Program
         string? uiaScope,
         bool focusDrillRequested,
         bool hasExplicitScope,
-        ref RECT wr)
+        ref RECT wr,
+        int? overrideX = null,
+        int? overrideY = null)
     {
         try
         {
@@ -704,11 +741,16 @@ internal partial class Program
             }
             catch { }
 
-            // 1b. Cursor-based: UIA ElementFromPoint → most specific element under cursor
+            // 1b. ElementFromPoint → most specific element (--at override or cursor)
             try
             {
-                NativeMethods.GetCursorPos(out var cursorPt);
-                var pointed = automation.FromPoint(new System.Drawing.Point(cursorPt.X, cursorPt.Y));
+                int ptX, ptY;
+                if (overrideX.HasValue && overrideY.HasValue)
+                { ptX = overrideX.Value; ptY = overrideY.Value; }
+                else
+                { NativeMethods.GetCursorPos(out var cp); ptX = cp.X; ptY = cp.Y; }
+                Console.WriteLine($"[HACK] ElementFromPoint at ({ptX},{ptY})");
+                var pointed = automation.FromPoint(new System.Drawing.Point(ptX, ptY));
                 if (pointed != null)
                 {
                     // Walk up to find an element with reasonable size (not 1px noise)
