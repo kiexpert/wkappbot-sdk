@@ -138,10 +138,10 @@ internal partial class Program
             var cca = new WKAppBot.Vision.ConnectedComponentAnalyzer();
             var regions = cca.Analyze(bmp);
 
-            int textCnt = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Text);
-            int iconCnt = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Icon);
-            int sepCnt = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Separator);
-            int contCnt = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Container);
+            int textCnt = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.DyText);
+            int iconCnt = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.DyIcon);
+            int sepCnt = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.DySeparator);
+            int contCnt = regions.Count(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.DyContainer);
             var table = cca.DetectTable(regions, cw, ch);
 
             result["cca"] = new JsonObject
@@ -172,14 +172,14 @@ internal partial class Program
             string dynId = "";
             int mx = px - cx, my = py - cy;
             var containers = regions
-                .Where(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Container)
+                .Where(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.DyContainer)
                 .Where(r => r.Bounds.Contains(mx, my))
                 .OrderBy(r => r.Bounds.Width * r.Bounds.Height).ToList();
             if (containers.Count > 0)
             {
                 var c = containers[0];
                 var allConts = regions
-                    .Where(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.Container)
+                    .Where(r => r.Type == WKAppBot.Vision.ConnectedComponentAnalyzer.RegionType.DyContainer)
                     .OrderBy(r => r.Bounds.Y).ThenBy(r => r.Bounds.X).ToList();
                 int idx = allConts.IndexOf(c);
                 int row = 0, col = 0;

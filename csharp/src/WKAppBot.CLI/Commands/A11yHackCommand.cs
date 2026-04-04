@@ -186,11 +186,11 @@ internal partial class Program
                 targetScreenRect.Width, targetScreenRect.Height);
         }
 
-        int textCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.Text);
-        int iconCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.Icon);
-        int sepCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.Separator);
-        int contCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.Container);
-        int noiseCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.Noise);
+        int textCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DyText);
+        int iconCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DyIcon);
+        int sepCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DySeparator);
+        int contCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
+        int noiseCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DyNoise);
 
         Console.WriteLine($"[HACK] CCA: {regions.Count} regions ??Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount} Noise={noiseCount}");
         SaveHackOverlayPreview(bmp, regions, "cca", wr.Left, wr.Top);
@@ -319,22 +319,22 @@ internal partial class Program
                     uiaLabel = !string.IsNullOrEmpty(uia.name) ? uia.name : uia.aid;
                     ocrOk++;
                     CacheSegment(bmp, region.Bounds, w, h, dynId, uiaLabel,
-                        isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.Container);
+                        isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
                     // Mismatch detection: CCA type vs UIA type ??stderr for self-healing
                     var ccaType = region.Type.ToString();
                     var uiaType = uia.type;
                     if (!string.IsNullOrEmpty(uiaType))
                     {
-                        bool match = (ccaType == "Text" && uiaType is "Text" or "Edit" or "Document")
-                                  || (ccaType == "Icon" && uiaType is "Image" or "Button")
-                                  || (ccaType == "Container" && uiaType is "Group" or "Pane" or "Window")
+                        bool match = (ccaType == "DyText" && uiaType is "Text" or "Edit" or "Document")
+                                  || (ccaType == "DyIcon" && uiaType is "Image" or "Button")
+                                  || (ccaType == "DyContainer" && uiaType is "Group" or "Pane" or "Window")
                                   || (ccaType == "Separator" && uiaType is "Separator");
                         if (!match)
                             Console.Error.WriteLine($"[MISMATCH] {dynId}: CCA={ccaType} UIA={uiaType} \"{uiaLabel}\" d={region.Density:F2} ar={region.AspectRatio:F1}");
                     }
 
-                    if (region.Type == ConnectedComponentAnalyzer.RegionType.Text
-                        || region.Type == ConnectedComponentAnalyzer.RegionType.Container)
+                    if (region.Type == ConnectedComponentAnalyzer.RegionType.DyText
+                        || region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer)
                     {
                         try
                         {
@@ -364,8 +364,8 @@ internal partial class Program
                         catch { }
                     }
                 }
-                else if (region.Type == ConnectedComponentAnalyzer.RegionType.Text
-                    || region.Type == ConnectedComponentAnalyzer.RegionType.Container)
+                else if (region.Type == ConnectedComponentAnalyzer.RegionType.DyText
+                    || region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer)
                 {
                     try
                     {
@@ -390,7 +390,7 @@ internal partial class Program
                             {
                                 ocrOk++;
                                 CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText,
-                                    isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.Container);
+                                    isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
                                 stageLabels[regionIdx] = $"ocr {TrimPreview(ocrText, 24)}";
                                 UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
                             }
@@ -403,7 +403,7 @@ internal partial class Program
                                     ocrText = corrected2;
                                     ocrOk++;
                                     CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText,
-                                        isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.Container);
+                                        isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
                                     stageLabels[regionIdx] = $"fix {TrimPreview(ocrText, 24)}";
                                     UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
                                 }
@@ -432,13 +432,13 @@ internal partial class Program
                 // Tree line
                 var typeIcon = region.Type switch
                 {
-                    ConnectedComponentAnalyzer.RegionType.Text => "Text",
-                    ConnectedComponentAnalyzer.RegionType.Icon => "Icon",
-                    ConnectedComponentAnalyzer.RegionType.Container => "Container",
-                    ConnectedComponentAnalyzer.RegionType.Separator => "──",
+                    ConnectedComponentAnalyzer.RegionType.DyText => "DyText",
+                    ConnectedComponentAnalyzer.RegionType.DyIcon => "DyIcon",
+                    ConnectedComponentAnalyzer.RegionType.DyContainer => "DyContainer",
+                    ConnectedComponentAnalyzer.RegionType.DySeparator => "──",
                     _ => "쨌"
                 };
-                if (region.Type == ConnectedComponentAnalyzer.RegionType.Noise) continue; // skip noise in tree
+                if (region.Type == ConnectedComponentAnalyzer.RegionType.DyNoise) continue; // skip noise in tree
 
                 string label;
                 if (uiaLabel.Length > 0)
@@ -446,7 +446,7 @@ internal partial class Program
                 else if (ocrText.Length > 0)
                     label = $" \"{(ocrText.Length > 50 ? ocrText[..50] + "..." : ocrText)}\"";
                 else
-                    label = region.Type == ConnectedComponentAnalyzer.RegionType.Text ? " [?]" : "";
+                    label = region.Type == ConnectedComponentAnalyzer.RegionType.DyText ? " [?]" : "";
                 if (regionIdx >= 0 && stageLabels.TryGetValue(regionIdx, out var stageLabel) && !string.IsNullOrWhiteSpace(stageLabel))
                     label += $" [{stageLabel}]";
                 Console.WriteLine($"{prefix}{typeIcon} {dynId}{label}  ({region.Bounds.Width}횞{region.Bounds.Height})");
@@ -467,7 +467,7 @@ internal partial class Program
             Console.WriteLine($"  Vision needed: {gapCollector.Count} blind region(s)");
             for (int ri = 0; ri < regions.Count; ri++)
             {
-                if (!stageLabels.ContainsKey(ri) && regions[ri].Type is ConnectedComponentAnalyzer.RegionType.Text or ConnectedComponentAnalyzer.RegionType.Container)
+                if (!stageLabels.ContainsKey(ri) && regions[ri].Type is ConnectedComponentAnalyzer.RegionType.DyText or ConnectedComponentAnalyzer.RegionType.DyContainer)
                     stageLabels[ri] = "vision pending";
             }
             UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
@@ -550,7 +550,7 @@ internal partial class Program
         for (int si = 0; si < regions.Count; si++)
         {
             var sr = regions[si];
-            if (sr.Type == ConnectedComponentAnalyzer.RegionType.Noise) continue;
+            if (sr.Type == ConnectedComponentAnalyzer.RegionType.DyNoise) continue;
             var pos = positions.FirstOrDefault(p => ReferenceEquals(p.region, sr));
             var dynId = DynamicA11yAnalyzer.GenerateDynId(pos.row, pos.col, sr.Bounds.Width, sr.Bounds.Height);
             var uiaType = ""; var uiaId = "";
@@ -989,23 +989,24 @@ internal partial class Program
             for (int i = 0; i < regions.Count; i++)
             {
                 var region = regions[i];
-                if (region.Type == ConnectedComponentAnalyzer.RegionType.Noise) continue;
+                if (region.Type == ConnectedComponentAnalyzer.RegionType.DyNoise) continue;
                 // Skip tiny segments (smaller than readable character)
                 if (i > 0 && region.Bounds.Width < 10 && region.Bounds.Height < 10) continue;
 
                 var color = region.Type switch
                 {
-                    ConnectedComponentAnalyzer.RegionType.Text => Color.LimeGreen,
-                    ConnectedComponentAnalyzer.RegionType.Icon => Color.DeepSkyBlue,
-                    ConnectedComponentAnalyzer.RegionType.Container => Color.Orange,
-                    ConnectedComponentAnalyzer.RegionType.Separator => Color.Gold,
+                    ConnectedComponentAnalyzer.RegionType.DyText => Color.LimeGreen,
+                    ConnectedComponentAnalyzer.RegionType.DyIcon => Color.DeepSkyBlue,
+                    ConnectedComponentAnalyzer.RegionType.DyContainer => Color.Orange,
+                    ConnectedComponentAnalyzer.RegionType.DySeparator => Color.Gold,
                     _ => Color.Gray
                 };
 
-                using var pen = new Pen(Color.FromArgb(230, color), region.Type == ConnectedComponentAnalyzer.RegionType.Container ? 2.5f : 1.6f);
+                using var pen = new Pen(Color.FromArgb(230, color), region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer ? 2.5f : 1.6f);
                 g.DrawRectangle(pen, region.Bounds);
 
-                // Label only for UIA-matched nodes (no clutter for unmatched)
+                // Label: UIA type or Dy type
+                string nodeLabel;
                 if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
                 {
                     var parts = new List<string>();
@@ -1013,7 +1014,13 @@ internal partial class Program
                     if (!string.IsNullOrWhiteSpace(uia.aid)) parts.Add(uia.aid);
                     else if (!string.IsNullOrWhiteSpace(uia.name)) parts.Add(TrimPreview(uia.name, 20));
                     else parts.Add($"#{i + 1}");
-                    var nodeLabel = $"{string.Join("_", parts)} {region.Bounds.Width}x{region.Bounds.Height}";
+                    nodeLabel = $"{string.Join("_", parts)} {region.Bounds.Width}x{region.Bounds.Height}";
+                }
+                else
+                {
+                    nodeLabel = $"{region.Type} {region.Bounds.Width}x{region.Bounds.Height}";
+                }
+                {
                     using var smallFont = new Font("Consolas", 7f, FontStyle.Regular);
                     var nlSize = g.MeasureString(nodeLabel, smallFont);
                     var nlx = Math.Max(region.Bounds.Left + 2,
@@ -1120,7 +1127,7 @@ internal partial class Program
             else
                 role = HackBoxRole.Other;
 
-            // Label only for UIA-matched or Scope nodes
+            // Label: UIA type or Dy type + id + size
             string? label = null;
             if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
             {
@@ -1129,6 +1136,11 @@ internal partial class Program
                            : $"#{i + 1}";
                 var typePart = !string.IsNullOrWhiteSpace(uia.type) ? uia.type : "";
                 label = $"{typePart}_{idPart} {region.Bounds.Width}x{region.Bounds.Height}";
+            }
+            else if (region.Type != ConnectedComponentAnalyzer.RegionType.DyNoise)
+            {
+                // Dy type label for non-UIA segments
+                label = $"{region.Type} {region.Bounds.Width}x{region.Bounds.Height}";
             }
 
             // Extract OCR text from stageLabel
@@ -1141,7 +1153,7 @@ internal partial class Program
                 else if (stl.StartsWith("cache 100% ")) ocrText = stl[11..];
             }
 
-            var color = region.Type == ConnectedComponentAnalyzer.RegionType.Noise
+            var color = region.Type == ConnectedComponentAnalyzer.RegionType.DyNoise
                 ? System.Windows.Media.Color.FromArgb(128, 0x00, 0x64, 0x00)
                 : System.Windows.Media.Color.FromArgb(128, 0x32, 0xCD, 0x32);
 
@@ -1170,9 +1182,9 @@ internal partial class Program
         if (regions.Count == 0) return null;
 
         int targetIndex = 0;
-        if (regions[targetIndex].Type == ConnectedComponentAnalyzer.RegionType.Noise)
+        if (regions[targetIndex].Type == ConnectedComponentAnalyzer.RegionType.DyNoise)
         {
-            var firstNonNoise = regions.FindIndex(r => r.Type != ConnectedComponentAnalyzer.RegionType.Noise);
+            var firstNonNoise = regions.FindIndex(r => r.Type != ConnectedComponentAnalyzer.RegionType.DyNoise);
             if (firstNonNoise >= 0) targetIndex = firstNonNoise;
         }
 

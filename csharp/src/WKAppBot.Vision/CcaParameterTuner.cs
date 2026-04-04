@@ -119,7 +119,7 @@ public sealed class CcaParameterTuner
         {
             Params.CorrectCount++;
             // Reinforce: gently tighten boundaries toward this correct sample
-            if (actual == ConnectedComponentAnalyzer.RegionType.Text)
+            if (actual == ConnectedComponentAnalyzer.RegionType.DyText)
             {
                 Params.TextMinDensity = Nudge(Params.TextMinDensity, density, ReinforcementRate, lower: true);
                 Params.TextMaxDensity = Nudge(Params.TextMaxDensity, density, ReinforcementRate, lower: false);
@@ -131,8 +131,8 @@ public sealed class CcaParameterTuner
         {
             Params.MisclassifiedCount++;
             // Misclassified: stronger nudge toward the sample
-            if (predicted == ConnectedComponentAnalyzer.RegionType.Text
-                && actual == ConnectedComponentAnalyzer.RegionType.Icon)
+            if (predicted == ConnectedComponentAnalyzer.RegionType.DyText
+                && actual == ConnectedComponentAnalyzer.RegionType.DyIcon)
             {
                 // CCA said text but it's icon → tighten text boundaries to exclude this sample
                 // If density is low → raise min density; if density is high → lower max density
@@ -146,8 +146,8 @@ public sealed class CcaParameterTuner
                 else
                     Params.TextMaxAR = Nudge(Params.TextMaxAR, aspectRatio - 0.1, alpha, lower: true);
             }
-            else if (predicted == ConnectedComponentAnalyzer.RegionType.Icon
-                     && actual == ConnectedComponentAnalyzer.RegionType.Text)
+            else if (predicted == ConnectedComponentAnalyzer.RegionType.DyIcon
+                     && actual == ConnectedComponentAnalyzer.RegionType.DyText)
             {
                 // CCA said icon but it's text → widen text boundaries to include this sample
                 if (density < Params.TextMinDensity)
@@ -164,10 +164,10 @@ public sealed class CcaParameterTuner
         // Solidity feedback (if provided)
         if (solidity >= 0 && solidity <= 1)
         {
-            if (correct && actual == ConnectedComponentAnalyzer.RegionType.Text)
+            if (correct && actual == ConnectedComponentAnalyzer.RegionType.DyText)
                 Params.TextMinSolidity = Nudge(Params.TextMinSolidity, solidity, ReinforcementRate, lower: true);
-            else if (!correct && predicted == ConnectedComponentAnalyzer.RegionType.Text
-                     && actual == ConnectedComponentAnalyzer.RegionType.Icon)
+            else if (!correct && predicted == ConnectedComponentAnalyzer.RegionType.DyText
+                     && actual == ConnectedComponentAnalyzer.RegionType.DyIcon)
                 Params.TextMinSolidity = Nudge(Params.TextMinSolidity, solidity + 0.05, alpha, lower: false);
         }
 
