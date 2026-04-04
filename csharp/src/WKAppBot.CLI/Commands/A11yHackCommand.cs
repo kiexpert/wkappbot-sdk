@@ -83,9 +83,7 @@ internal partial class Program
         {
             new A11yHackOverlayBox(
                 new System.Windows.Rect(0, 0, Math.Max(1, w - 1), Math.Max(1, h - 1)),
-                System.Windows.Media.Colors.Cyan,
-                "target",
-                2.5)
+                "target", Role: HackBoxRole.Target)
         }));
         liveOverlay?.StartHoverTracking(wr.Left, wr.Top);
 
@@ -1162,11 +1160,7 @@ internal partial class Program
                 else if (stl.StartsWith("cache 100% ")) ocrText = stl[11..];
             }
 
-            var color = region.Type == ConnectedComponentAnalyzer.RegionType.DyNoise
-                ? System.Windows.Media.Color.FromArgb(128, 0x00, 0x64, 0x00)
-                : System.Windows.Media.Color.FromArgb(128, 0x32, 0xCD, 0x32);
-
-            boxes.Add(new A11yHackOverlayBox(bounds, color, label, 0.9, ocrText, role));
+            boxes.Add(new A11yHackOverlayBox(bounds, label, ocrText, role));
         }
         return boxes;
     }
@@ -1181,102 +1175,6 @@ internal partial class Program
         if (liveOverlay == null) return;
         var boxes = BuildHackOverlayBoxes(regions, uiaAnswers, stageLabels);
         liveOverlay.Update(new A11yHackOverlayModel(boxes));
-    }
-
-    static A11yHackOverlayPreview? BuildHackOverlayPreview(
-        Bitmap source,
-        List<ConnectedComponentAnalyzer.Region> regions,
-        Dictionary<int, string>? stageLabels = null)
-    {
-        if (regions.Count == 0) return null;
-
-        int targetIndex = 0;
-        if (regions[targetIndex].Type == ConnectedComponentAnalyzer.RegionType.DyNoise)
-        {
-            var firstNonNoise = regions.FindIndex(r => r.Type != ConnectedComponentAnalyzer.RegionType.DyNoise);
-            if (firstNonNoise >= 0) targetIndex = firstNonNoise;
-        }
-
-        var target = regions[targetIndex].Bounds;
-        if (target.Width <= 0 || target.Height <= 0) return null;
-
-        int srcW = source.Width;
-        int srcH = source.Height;
-        int focusCx = target.Left + target.Width / 2;
-        int focusCy = target.Top + target.Height / 2;
-        int sampleW = Math.Clamp(Math.Max(target.Width * 2, 260), 260, Math.Min(srcW, 900));
-        int sampleH = Math.Clamp(Math.Max(target.Height * 3, 160), 160, Math.Min(srcH, 520));
-        var sample = Rectangle.FromLTRB(
-            Math.Max(0, focusCx - sampleW / 2),
-            Math.Max(0, focusCy - sampleH / 2),
-            Math.Min(srcW, focusCx + sampleW / 2),
-            Math.Min(srcH, focusCy + sampleH / 2));
-        if (sample.Width <= 8 || sample.Height <= 8) return null;
-
-        const int previewW = 360;
-        int previewH = Math.Clamp((int)Math.Round(previewW * (sample.Height / (double)sample.Width)), 180, 300);
-        using var warped = new Bitmap(previewW, previewH, source.PixelFormat);
-        double centerX = (focusCx - sample.Left) / (double)sample.Width;
-        double centerY = (focusCy - sample.Top) / (double)sample.Height;
-        centerX = Math.Clamp(centerX, 0.18, 0.82);
-        centerY = Math.Clamp(centerY, 0.18, 0.82);
-        double maxZoom = 3.0;
-
-        for (int y = 0; y < previewH; y++)
-        {
-            double ny = previewH <= 1 ? 0 : y / (double)(previewH - 1);
-            for (int x = 0; x < previewW; x++)
-            {
-                double nx = previewW <= 1 ? 0 : x / (double)(previewW - 1);
-                double dx = nx - centerX;
-                double dy = ny - centerY;
-                double dist = Math.Sqrt(dx * dx + dy * dy);
-                double zoom = 1.0 + (maxZoom - 1.0) * Math.Pow(Math.Max(0.0, 1.0 - Math.Min(1.0, dist * 2.15)), 2.15);
-                double sxNorm = centerX + dx / zoom;
-                double syNorm = centerY + dy / zoom;
-                int sx = Math.Clamp(sample.Left + (int)Math.Round(sxNorm * (sample.Width - 1)), 0, srcW - 1);
-                int sy = Math.Clamp(sample.Top + (int)Math.Round(syNorm * (sample.Height - 1)), 0, srcH - 1);
-                warped.SetPixel(x, y, source.GetPixel(sx, sy));
-            }
-        }
-
-        using (var g = Graphics.FromImage(warped))
-        {
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using var pen = new Pen(Color.LimeGreen, 2f);
-            int markerX = Math.Clamp((int)Math.Round(centerX * previewW), 12, previewW - 12);
-            int markerY = Math.Clamp((int)Math.Round(centerY * previewH), 12, previewH - 12);
-            g.DrawEllipse(pen, markerX - 7, markerY - 7, 14, 14);
-            g.DrawLine(pen, markerX - 10, markerY, markerX + 10, markerY);
-            g.DrawLine(pen, markerX, markerY - 10, markerX, markerY + 10);
-        }
-
-        var bitmapSource = ConvertHackPreviewToBitmapSource(warped);
-        if (bitmapSource == null) return null;
-        string header = stageLabels != null && stageLabels.TryGetValue(targetIndex, out var stage) && !string.IsNullOrWhiteSpace(stage)
-            ? $"TARGET 3x | {TrimPreview(stage, 40)}"
-            : "TARGET 3x";
-        return new A11yHackOverlayPreview(bitmapSource, previewW + 8, previewH + 28, header);
-    }
-
-    static System.Windows.Media.Imaging.BitmapSource? ConvertHackPreviewToBitmapSource(Bitmap bitmap)
-    {
-        try
-        {
-            using var ms = new MemoryStream();
-            bitmap.Save(ms, ImageFormat.Png);
-            ms.Position = 0;
-            var image = new System.Windows.Media.Imaging.PngBitmapDecoder(
-                ms,
-                System.Windows.Media.Imaging.BitmapCreateOptions.PreservePixelFormat,
-                System.Windows.Media.Imaging.BitmapCacheOption.OnLoad).Frames[0];
-            image.Freeze();
-            return image;
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     static string TrimPreview(string text, int maxLen)
