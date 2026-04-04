@@ -406,10 +406,9 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         var prevForeground = GetForegroundWindow();
 
         await SendAsync("Page.navigate", new JsonObject { ["url"] = url });
-        // Wait for page load
         await SendAsync("Page.enable");
-        // Small delay for page to settle
-        await Task.Delay(500);
+        // Wait for document.readyState === 'complete' (up to 10s)
+        await WaitForLoadAsync(10_000);
 
         // SPA title stabilization: wait for document.title to change from default/stale
         // (SPA sites like Notion update title async after navigation)
@@ -435,6 +434,22 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
 
         // Restore focus to user's previous window (don't steal focus!)
         RestoreFocus(prevForeground);
+    }
+
+    /// <summary>Wait for document.readyState === 'complete' (polls every 200ms).</summary>
+    public async Task WaitForLoadAsync(int timeoutMs = 10_000)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            try
+            {
+                var state = await EvalAsync("document.readyState") ?? "";
+                if (state.Contains("complete")) return;
+            }
+            catch { }
+            await Task.Delay(200);
+        }
     }
 
     /// <summary>Restore focus to a previously active window (best-effort, non-blocking).</summary>
