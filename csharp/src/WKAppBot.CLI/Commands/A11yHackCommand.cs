@@ -679,15 +679,22 @@ internal partial class Program
                 var grapResult = GrapHelper.FindByNameOrAid(root, grapPattern);
                 if (grapResult != null)
                 {
-                    var parent = grapResult.Parent;
-                    var analysisEl = parent ?? grapResult; // parent 없으면 타겟 자체
-                    var aRect = analysisEl.Properties.BoundingRectangle.ValueOrDefault;
-                    if (aRect.Width > 0 && aRect.Height > 0)
+                    // Skip if grap matched the window itself (root level) — fall through to ElementFromPoint
+                    var grapRect = grapResult.Properties.BoundingRectangle.ValueOrDefault;
+                    bool isRootMatch = grapRect.Width >= (wr.Right - wr.Left) * 0.9
+                                    && grapRect.Height >= (wr.Bottom - wr.Top) * 0.9;
+                    if (!isRootMatch)
                     {
-                        wr.Left = aRect.X; wr.Top = aRect.Y;
-                        wr.Right = aRect.X + aRect.Width; wr.Bottom = aRect.Y + aRect.Height;
-                        Console.WriteLine($"[HACK] UIA parent-narrowed: rect=({aRect.X},{aRect.Y} {aRect.Width}x{aRect.Height})");
-                        return;
+                        var parent = grapResult.Parent;
+                        var analysisEl = parent ?? grapResult;
+                        var aRect = analysisEl.Properties.BoundingRectangle.ValueOrDefault;
+                        if (aRect.Width > 0 && aRect.Height > 0)
+                        {
+                            wr.Left = aRect.X; wr.Top = aRect.Y;
+                            wr.Right = aRect.X + aRect.Width; wr.Bottom = aRect.Y + aRect.Height;
+                            Console.WriteLine($"[HACK] UIA parent-narrowed: rect=({aRect.X},{aRect.Y} {aRect.Width}x{aRect.Height})");
+                            return;
+                        }
                     }
                 }
             }
