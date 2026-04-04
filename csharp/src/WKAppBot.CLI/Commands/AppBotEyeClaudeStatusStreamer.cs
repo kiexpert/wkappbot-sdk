@@ -1133,7 +1133,7 @@ internal partial class Program
             {
                 var node = System.Text.Json.Nodes.JsonNode.Parse(line);
                 var status = node?["status"]?.GetValue<string>() ?? "pending";
-                if (status is "done" or "archived") continue;
+                if (status is "done") continue;
 
                 var isMerge = node?["type"]?.GetValue<string>() == "merge";
                 // 서제스트는 발신자 무관 시스템 전체 아이템 — CWD 필터 없음
