@@ -95,13 +95,17 @@ internal partial class Program
         Rectangle targetScreenRect = Rectangle.Empty;
         int lastChangCheckTick = Environment.TickCount;
 
-        // Tier 1: user input only (cheap — called per OCR item, 1s cooldown)
+        // Auto-hack (WKAPPBOT_WORKER=1) = sensitive abort; manual = lenient
+        bool isAutoHack = Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1";
+        int abortIdleThresholdMs = isAutoHack ? 1000 : 3000;
+
+        // Tier 1: user input only (cheap — called per OCR item)
         bool HackShouldAbort()
         {
             if (hackAborted) return true;
             var idleMs = NativeMethods.GetUserIdleMs();
             var elapsed = (uint)(Environment.TickCount - inputBaselineTick);
-            if (idleMs < elapsed && idleMs < 1000)
+            if (idleMs < elapsed && idleMs < abortIdleThresholdMs)
             {
                 hackAborted = true;
                 Console.WriteLine("[HACK] User input detected — aborting");
