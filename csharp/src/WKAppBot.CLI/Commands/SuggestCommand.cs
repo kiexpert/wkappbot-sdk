@@ -1269,7 +1269,17 @@ internal partial class Program
                 // else: same content — overwrite is fine (idempotent)
             }
             File.Copy(evidenceFile, destPath, overwrite: true);
-            Console.WriteLine($"[RESOLVE] Evidence → experience/tests/{cmd}/{subcmd}/{Path.GetFileName(evidenceFile)}");
+            Console.WriteLine($"[RESOLVE] Evidence → experience/tests/{cmd}/{subcmd}/{destName}");
+
+            // Register in .manifest (append-only — never remove lines)
+            var manifestPath2 = Path.Combine(testsDir, ".manifest");
+            var realName = Path.GetFileName(evidenceFile); // original filename (not timestamped dest)
+            var manifestLines = File.Exists(manifestPath2) ? File.ReadAllLines(manifestPath2).ToList() : new List<string>();
+            if (!manifestLines.Any(l => l.Trim() == realName))
+            {
+                manifestLines.Add(realName);
+                File.WriteAllLines(manifestPath2, manifestLines);
+            }
         }
         catch (Exception ex) { Console.Error.WriteLine($"[RESOLVE] Evidence copy failed: {ex.Message}"); }
 
@@ -1414,6 +1424,67 @@ internal partial class Program
             var testsDir = Path.Combine(hqDir, "experience", "tests", cmd, subcmd);
             if (!Directory.Exists(testsDir)) return 0;
 
+            // ── Deleted test detection: check manifest for missing files ──
+            var manifestPath = Path.Combine(testsDir, ".manifest");
+            if (File.Exists(manifestPath))
+            {
+                var manifest = File.ReadAllLines(manifestPath)
+                    .Select(l => l.Trim())
+                    .Where(l => l.Length > 0 && !l.StartsWith('#'))
+                    .ToList();
+                var missing = manifest.Where(name => !File.Exists(Path.Combine(testsDir, name))
+                    && !Directory.GetFiles(testsDir).Any(f => Path.GetFileName(f).StartsWith(
+                        Path.GetFileNameWithoutExtension(name) + ".bak-"))).ToList();
+                if (missing.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine();
+                    Console.WriteLine($"  ╔══════════════════════════════════════════════════════════╗");
+                    Console.WriteLine($"  ║  ❌ EXPERIENCE DB 테스트 삭제 감지!                      ║");
+                    Console.WriteLine($"  ║  테스트 스크립트 삭제는 절대 금지입니다.                  ║");
+                    Console.WriteLine($"  ╚══════════════════════════════════════════════════════════╝");
+                    Console.ResetColor();
+
+                    // Try auto-restore from .bak-* files (latest mtime)
+                    int restored = 0;
+                    foreach (var m in missing.ToList())
+                    {
+                        var stem = Path.GetFileNameWithoutExtension(m);
+                        var baks = Directory.GetFiles(testsDir)
+                            .Where(f => Path.GetFileName(f).StartsWith(stem + ".bak-")
+                                     || Path.GetFileName(f).StartsWith(m + ".bak-"))
+                            .OrderByDescending(File.GetLastWriteTimeUtc)
+                            .ToList();
+                        if (baks.Count > 0)
+                        {
+                            var latest = baks[0];
+                            File.Copy(latest, Path.Combine(testsDir, m), overwrite: true);
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"  ✓ 자동 복구: {m} ← {Path.GetFileName(latest)}");
+                            Console.ResetColor();
+                            missing.Remove(m);
+                            restored++;
+                        }
+                    }
+
+                    if (missing.Count > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"  복구 불가 {missing.Count}개 (백업 없음):");
+                        foreach (var m in missing)
+                            Console.WriteLine($"    ✗ {m}");
+                        Console.WriteLine($"  복구 방법: git 또는 수동 복원 후 재시도");
+                        Console.WriteLine($"  manifest: {manifestPath.Replace('\\', '/')}");
+                        Console.ResetColor();
+                        BackupEvidenceOnFailure(evidenceFile);
+                        return 1;
+                    }
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"  ⚠ {restored}개 테스트 백업에서 자동 복구 완료 — 계속 진행합니다");
+                    Console.ResetColor();
+                }
+            }
+
             var evidenceAbs = Path.GetFullPath(evidenceFile);
             var scripts = Directory.GetFiles(testsDir)
                 .Where(f =>
@@ -1421,6 +1492,7 @@ internal partial class Program
                     var ext = Path.GetExtension(f).ToLowerInvariant();
                     return ext is ".sh" or ".ps1" or ".cmd" or ".bat";
                 })
+                .Where(f => !Path.GetFileName(f).Contains(".bak-")) // skip backup files
                 .Where(f => !string.Equals(Path.GetFullPath(f), evidenceAbs, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(f => f)
                 .ToArray();
