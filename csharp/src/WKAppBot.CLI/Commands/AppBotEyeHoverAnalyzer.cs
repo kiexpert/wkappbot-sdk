@@ -255,10 +255,11 @@ internal partial class Program
         {
             try
             {
-                // 1s debounce — abort if cursor position changed (pixel ignored: cursor blink)
+                // 1s debounce — abort only if cursor moved significantly (>5px)
                 await Task.Delay(1000, debounceCts.Token);
                 WKAppBot.Win32.Native.NativeMethods.GetCursorPos(out var pt);
-                if (pt.X != baselineX || pt.Y != baselineY)
+                int dx = Math.Abs(pt.X - baselineX), dy = Math.Abs(pt.Y - baselineY);
+                if (dx > 5 || dy > 5)
                 {
                     AppendEyeAnalysisTrace("auto-hack-skip", new { reason = "cursor-moved", dx = pt.X - baselineX, dy = pt.Y - baselineY });
                     return;
