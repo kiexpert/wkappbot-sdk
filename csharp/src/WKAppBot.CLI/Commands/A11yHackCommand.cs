@@ -484,6 +484,40 @@ internal partial class Program
         }
 
         gapCollector.Dispose();
+
+        // ── MD table summary: segment inventory ──
+        Console.WriteLine();
+        Console.WriteLine("| # | Type | Id | WxH | OCR/Label |");
+        Console.WriteLine("|---|------|-----|-----|-----------|");
+        for (int si = 0; si < regions.Count; si++)
+        {
+            var sr = regions[si];
+            if (sr.Type == ConnectedComponentAnalyzer.RegionType.Noise) continue;
+            var pos = positions.FirstOrDefault(p => ReferenceEquals(p.region, sr));
+            var dynId = DynamicA11yAnalyzer.GenerateDynId(pos.row, pos.col, sr.Bounds.Width, sr.Bounds.Height);
+            var uiaType = ""; var uiaId = "";
+            if (uiaAnswers != null && uiaAnswers.TryGetValue(si, out var su))
+            {
+                uiaType = su.type ?? "";
+                uiaId = !string.IsNullOrWhiteSpace(su.aid) ? su.aid
+                      : !string.IsNullOrWhiteSpace(su.name) ? TrimPreview(su.name, 20) : $"#{si + 1}";
+            }
+            var typeCol = !string.IsNullOrEmpty(uiaType) ? uiaType : sr.Type.ToString();
+            var idCol = !string.IsNullOrEmpty(uiaId) ? uiaId : dynId;
+            var size = $"{sr.Bounds.Width}x{sr.Bounds.Height}";
+            var labelCol = "";
+            if (stageLabels.TryGetValue(si, out var stl))
+            {
+                if (stl.StartsWith("ocr ")) labelCol = stl[4..];
+                else if (stl.StartsWith("fix ")) labelCol = stl[4..];
+                else if (stl.StartsWith("uia ")) labelCol = stl[4..];
+                else if (stl.StartsWith("cache 100% ")) labelCol = stl[11..];
+                else labelCol = stl;
+            }
+            Console.WriteLine($"| {si} | {typeCol} | {idCol} | {size} | {TrimPreview(labelCol, 30)} |");
+        }
+        Console.WriteLine();
+
         bmp.Dispose();
         PulseStep.Done();
         return 0;
