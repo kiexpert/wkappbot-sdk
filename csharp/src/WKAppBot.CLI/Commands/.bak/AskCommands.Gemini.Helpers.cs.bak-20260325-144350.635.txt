@@ -15,13 +15,13 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Gemini ──
+    // ?�?�?Gemini ?�?�?
     static readonly string[] GeminiStopNoticeKeywords =
     [
-        "응답 생성이 중지되었습니다",
-        "응답이 중지되었습니다",
-        "생성이 중지되었습니다",
-        "생성 중지됨",
+        "������ �����Ǿ����ϴ�",
+        "������ ����",
+        "�����?�����Ǿ����ϴ�",
+        "�����Ǿ����ϴ�",
         "response was stopped",
         "response stopped",
         "stopped response"
@@ -33,16 +33,16 @@ internal partial class Program
         return GeminiStopNoticeKeywords.Any(k => text.Contains(k, StringComparison.OrdinalIgnoreCase));
     }
 
-    /// Strip "Gemini의 응답" UI label prepended by Gemini web UI.
+    /// Strip "Gemini�� ����" UI label prepended by Gemini web UI.
     /// Applied at the source so it doesn't appear in loop context, Slack, or console.
     static string StripGeminiUiPrefix(string text)
     {
         if (!text.StartsWith("Gemini")) return text;
-        // Strip Korean "Gemini’s response (의응답)" or English "Gemini's response"
+        // Strip Korean "Gemini의 응답" or English "Gemini's response"
         foreach (var p in new[] { "Gemini\uC758 \uC751\uB2F5", "Gemini\uC758\uC751\uB2F5", "Gemini's response" })
             if (text.StartsWith(p, StringComparison.OrdinalIgnoreCase))
                 return text[p.Length..].TrimStart();
-        // Fallback: find the 응답 pattern within the first 20 chars
+        // Fallback: find 응답 pattern within first 20 chars
         var eo = text.IndexOf('\uC751');
         if (eo > 0 && eo < 20 && eo + 1 < text.Length && text[eo + 1] == '\uB2F5')
             return text[(eo + 2)..].TrimStart();
@@ -128,7 +128,7 @@ internal partial class Program
         return WKAppBot.Vision.OcrSegmentCache.ParseA11yJson(raw);
     }
 
-    // ── Prompt builders (verbose -- Gemini tokens are free) ──────────────────────
+    // ���� Prompt builders (verbose ? Gemini tokens are free) ������������������������������
 
     static string BuildVisionElementPrompt(string description) => $$"""
         You are an accessibility inspector analyzing a Windows application screenshot.
@@ -206,7 +206,7 @@ internal partial class Program
         Include every element you can see ? the more detail the better.
         """;
 
-    // ── Shared CDP vision transport ─────────────────────────────────────────────
+    // ���� Shared CDP vision transport ������������������������������������������������������������������������������
 
     static async Task<string?> AskGeminiVisionRawAsync(
         System.Drawing.Bitmap screenshot, string prompt, int timeoutMs = 20000)
@@ -230,7 +230,7 @@ internal partial class Program
                 await Task.Delay(2500);
             }
 
-            // Wait for editor (shorter timeout than a regular ask)
+            // Wait for editor (shorter timeout than regular ask)
             var editorSel = await WaitForEditorA11y(cdp,
                 ".ql-editor", "[role='textbox'][contenteditable='true']",
                 "div[contenteditable='true']", "rich-textarea [contenteditable]");

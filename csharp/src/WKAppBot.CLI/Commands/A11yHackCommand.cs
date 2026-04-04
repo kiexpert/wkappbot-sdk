@@ -223,14 +223,14 @@ internal partial class Program
         var rowGroups = positions.GroupBy(p => p.row).OrderBy(g => g.Key).ToList();
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[HACK] ?? DYN-A11Y Tree ({w}횞{h}) ??");
+        Console.WriteLine($"[HACK] ── DYN-A11Y Tree ({w}횞{h}) ──");
         Console.ResetColor();
 
         foreach (var rowGroup in rowGroups)
         {
             var items = rowGroup.OrderBy(p => p.col).ToList();
             bool isLastRow = rowGroup.Key == rowGroups.Last().Key;
-            string rowPrefix = isLastRow ? "?붴?? " : "?쒋?? ";
+            string rowPrefix = isLastRow ? "└── " : "├── ";
             string childPrefix = isLastRow ? "    " : "??  ";
 
             for (int ci = 0; ci < items.Count; ci++)
@@ -330,10 +330,10 @@ internal partial class Program
                 // Tree line
                 var typeIcon = region.Type switch
                 {
-                    ConnectedComponentAnalyzer.RegionType.Text => "?뱷",
-                    ConnectedComponentAnalyzer.RegionType.Icon => "?렓",
-                    ConnectedComponentAnalyzer.RegionType.Container => "?벀",
-                    ConnectedComponentAnalyzer.RegionType.Separator => "??",
+                    ConnectedComponentAnalyzer.RegionType.Text => "Text",
+                    ConnectedComponentAnalyzer.RegionType.Icon => "Icon",
+                    ConnectedComponentAnalyzer.RegionType.Container => "Container",
+                    ConnectedComponentAnalyzer.RegionType.Separator => "──",
                     _ => "쨌"
                 };
                 if (region.Type == ConnectedComponentAnalyzer.RegionType.Noise) continue; // skip noise in tree
@@ -353,7 +353,7 @@ internal partial class Program
         PulseStep.Mark("ocr-done");
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[HACK] ?? Summary ??");
+        Console.WriteLine($"[HACK] ── Summary ──");
         Console.ResetColor();
         Console.WriteLine($"  Segments: {regions.Count} (Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount})");
         Console.WriteLine($"  OCR: {ocrOk} ok, {ocrEmpty} failed");

@@ -1,4 +1,4 @@
-﻿// AppBotEyeHoverAnalyzer.cs ??Mouse CCA Live Analysis (?붾㈃ MD 蹂?섍린)
+﻿// AppBotEyeHoverAnalyzer.cs -- Mouse CCA Live Analysis
 // Background worker in Eye: 1s interval ??mouse pos ??UIA + CCA ??Slack thread reply.
 // Auto a11y hack on InputReadiness probe success.
 
@@ -11,11 +11,11 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ?? Mouse CCA live analysis (1s interval, change-based Slack thread reply) ??
+    // ── Mouse CCA live analysis (1s interval, change-based Slack thread reply) ──
     static string? _mouseCcaReplyTs;            // Slack thread ts for CCA result
     static string _lastMouseCcaResult = "";      // change detection
 
-    // ?? Auto a11y hack on InputReadiness (single worker, no parallel) ??
+    // ── Auto a11y hack on InputReadiness (single worker, no parallel) ──
     static readonly SemaphoreSlim _autoHackSemaphore = new(1, 1);
     static readonly object _liveHackLock = new();
     static AppBotPipe.SpawnResult? _liveHackProcess;
@@ -143,7 +143,7 @@ internal partial class Program
         Console.WriteLine("[AUTO-HACK] Subscribed to InputReadiness.OnProbeSuccess (via analyze-hack server)");
     }
 
-    // ?? Analyze-hack server process ??
+    // ── Analyze-hack server process ──
     static AppBotPipe.SpawnResult? _hackServerProcess;
     static StreamWriter? _hackServerStdin;
 #pragma warning disable CS0414
@@ -296,7 +296,7 @@ internal partial class Program
         for (int wait = 0; wait < 30 && _eyeStatusTs == null && !ct.IsCancellationRequested; wait++)
             await Task.Delay(1000, ct);
 
-        // Set up reply #2 and #3: reuse if existing ?깅큸?꾩씠 reply, else create placeholder
+        // Set up reply #2 and #3: reuse if existing CCABot reply, else create placeholder
         if (_eyeStatusTs != null && !string.IsNullOrEmpty(_eyeBotToken) && !string.IsNullOrEmpty(_eyeChannel))
         {
             try
@@ -308,23 +308,23 @@ internal partial class Program
 
                 // Reply #2 (mouse CCA)
                 var r2 = children?.Count > 1 ? children[1] : null;
-                if (r2?["username"]?.GetValue<string>() == "?깅큸?꾩씠")
+                if (r2?["username"]?.GetValue<string>() == "CCABot")
                     _mouseCcaReplyTs = r2["ts"]?.GetValue<string>();
                 else
                 {
-                    var (ok1, ts1) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "?뵇 遺꾩꽍 以?..",
-                        threadTs: _eyeStatusTs, username: "?깅큸?꾩씠");
+                    var (ok1, ts1) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "Analyzing...",
+                        threadTs: _eyeStatusTs, username: "CCABot");
                     if (ok1 && ts1 != null) _mouseCcaReplyTs = ts1;
                 }
 
                 // Reply #3 (focus chain)
                 var r3 = children?.Count > 2 ? children[2] : null;
-                if (r3?["username"]?.GetValue<string>() == "?깅큸?꾩씠")
+                if (r3?["username"]?.GetValue<string>() == "CCABot")
                     _focusChainReplyTs = r3["ts"]?.GetValue<string>();
                 else
                 {
-                    var (ok2, ts2) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "?⑨툘 遺꾩꽍 以?..",
-                        threadTs: _eyeStatusTs, username: "?깅큸?꾩씠");
+                    var (ok2, ts2) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "Analyzing focus chain...",
+                        threadTs: _eyeStatusTs, username: "CCABot");
                     if (ok2 && ts2 != null) _focusChainReplyTs = ts2;
                 }
 
@@ -350,7 +350,7 @@ internal partial class Program
                 EnsureHackServer();
                 if (_hackServerProcess is not { HasExited: false } || _hackServerStdin == null) continue;
 
-                // ?? Mouse CCA (only if node changed) ??
+                // ── Mouse CCA (only if node changed) ──
                 if (doMouse)
                 {
                 AppendEyeAnalysisTrace("mouse-analyze", new
@@ -452,7 +452,7 @@ internal partial class Program
                 TryLaunchLiveA11yHack(grapPath, "mouse", serverResult.Split('\n')[0]);
                 } // end if (doMouse)
 
-                // ?? Keyboard focus (always, regardless of mouse change) ??
+                // ── Keyboard focus (always, regardless of mouse change) ──
                 try
                 {
                     _hackServerStdin!.WriteLine("{\"type\":\"focus\"}");
@@ -495,7 +495,7 @@ internal partial class Program
                                     else if (_eyeStatusTs != null)
                                     {
                                         var (fok, fts) = await SlackSendViaApi(_eyeBotToken!, _eyeChannel!, focusResult,
-                                            threadTs: _eyeStatusTs, username: "?깅큸?꾩씠");
+                                            threadTs: _eyeStatusTs, username: "CCABot");
                                         if (fok && fts != null) _focusChainReplyTs = fts;
                                     }
                                     AppendEyeAnalysisTrace("focus-result", new
@@ -520,7 +520,7 @@ internal partial class Program
         Console.WriteLine("[MOUSE-CCA] Worker stopped");
     }
 
-    // ?? Keyboard Focus Chain analysis (separate Slack thread reply) ??
+    // ── Keyboard Focus Chain analysis (separate Slack thread reply) ──
     static string? _focusChainReplyTs;
     static string _lastFocusChainResult = "";
 
@@ -629,7 +629,7 @@ internal partial class Program
                         else
                         {
                             var (ok2, ts2) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, chainResult,
-                                threadTs: _eyeStatusTs, username: "?깅큸?꾩씠");
+                                threadTs: _eyeStatusTs, username: "CCABot");
                             if (ok2 && ts2 != null) _focusChainReplyTs = ts2;
                         }
                     }
@@ -664,7 +664,7 @@ internal partial class Program
             else
             {
                 var (ok, ts) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, text,
-                    threadTs: _eyeStatusTs, username: "?깅큸?꾩씠");
+                    threadTs: _eyeStatusTs, username: "CCABot");
                 if (ok && ts != null) _mouseCcaReplyTs = ts;
             }
         }

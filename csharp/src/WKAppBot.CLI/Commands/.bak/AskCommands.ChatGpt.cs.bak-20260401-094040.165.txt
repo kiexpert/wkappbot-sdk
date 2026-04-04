@@ -16,7 +16,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ── ChatGPT ──
+    // ���� ChatGPT ����
     // Shared persona for external AI agents (ChatGPT, Gemini).
     // Injected on fresh conversations to stabilize output format.
     // Single-line to avoid ProseMirror/Quill multiline issues.
@@ -36,14 +36,12 @@ internal partial class Program
         "(6) PARALLEL FIRST: to minimize round-trips, always batch independent tool calls into a single turn. " +
         "Emit multiple TOOL_CALL blocks back-to-back whenever tasks do not depend on each other's results. " +
         "Sequential calls waste a full prompt round ? parallelize by default, serialize only when strictly necessary. " +
-        "(6b) IDENTITY DISCIPLINE: when the prompt contains [G:<gameId>] or [Q:<questionId>] or run identifiers, preserve them across follow-up reasoning, tool calls, and debate replies. Reuse active IDs; do not invent replacements unless the host explicitly requests new IDs. " +
-        "(6c) QUESTION TRACKING: if multiple questions or rounds are active, treat [Q:*] as the stable question identity and never mix evidence, chunks, or conclusions across different question IDs. " +
         "(7) Be concise and action-oriented. Prefer structured actions over explanations. " +
-        "EXECUTION MODEL: User Request → analyze → Thought (what I know / what is missing) → Action (tool call) → Observation (wait for tool_result) → continue or finish. " +
+        "EXECUTION MODEL: User Request �� analyze �� Thought (what I know / what is missing) �� Action (tool call) �� Observation (wait for tool_result) �� continue or finish. " +
         "For tasks requiring >3 tool calls: generate a numbered Execution Plan first. Mark steps [DONE] as you complete them. " +
         "DECISION: Use a tool if the request involves filesystem ops, source code, device/UI interaction, system commands, app automation, external data, repo inspection, or debugging. " +
         "STATE: Read the last tool_result before deciding the next move. Explicitly reference previous tool_result values in reasoning. " +
-        "CODING MODE: Search files → read implementation → understand → plan → modify minimal code → verify correctness. Never write code without inspecting existing files first. " +
+        "CODING MODE: Search files ??read implementation ??understand ??plan ??modify minimal code ??verify correctness. Never write code without inspecting existing files first. " +
         "CODE RULES: Edit existing files, minimal diffs, maintain style, avoid abstractions, no speculative changes, no unrelated modifications. " +
         "VERIFICATION: After any file modification, make a verification tool call (read file back, run test, or lint) to confirm the change persists as intended. " +
         "ERROR HANDLING: If a tool returns an error, analyze it, correct parameters, retry once. If it fails twice, stop and explain the blocker. " +
@@ -60,32 +58,21 @@ internal partial class Program
     static int AskChatGpt(string question, bool slackReport = true, int timeoutSec = 30, bool newTab = false, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
-        var toolLogGpt = new System.Collections.Generic.List<string>();
         Console.WriteLine($"[ASK] ChatGPT: {question}");
         if (!string.IsNullOrWhiteSpace(modelHint))
             Console.WriteLine($"[ASK] ChatGPT model hint: {modelHint}");
 
         PulseStep.Init("ask-gpt");
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "gpt");
-        _askSandboxKey.Value = targetTag;
-        if (string.IsNullOrEmpty(targetTagOverride))
-        {
-            var qid = AskTargetRegistry.AssignNextQid(targetTag);
-            _currentQid.Value = qid;
-            question = $"[Q{qid}] {question}\n[REPLY: A{qid}]";
-            Console.WriteLine($"[ASK] GPT Q{qid} 할당됨 (tab={targetTag[..Math.Min(16, targetTag.Length)]})");
-            Console.WriteLine($"[ASK] 훈수두기: wkappbot ask gpt --intercept \"내용\" --qid {qid}");
-        }
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
         if (triadCtx != null)
         {
             triadCtx.RegisterCdp("gpt", cdp);
-            cdp.OnStreamingChunkEvent = triadCtx.UpdateChunk;
+            cdp.OnStreamingChunk = chunk => triadCtx.UpdateChunk("gpt", chunk);
             cdp.OperationContext = "gpt:SKEPTIC"; // debate role
         }
         using var askSession = new AskSession(AiProvider.ChatGpt, cdp); // gradual migration wrapper
-        BindAskIdentity(askSession, question, "gpt");
         PulseStep.Mark("cdp-connected");
 
         // No tab activation ? CDP works on background tabs via targetId. Truly focusless.
@@ -99,7 +86,7 @@ internal partial class Program
         {
             try
             {
-                // ──?Phase 1: Navigate (iconified OK) ──?                PulseStep.Mark("phase1-navigate");
+                // ?�?�?Phase 1: Navigate (iconified OK) ?�?�?                PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("chatgpt.com"))
@@ -115,12 +102,8 @@ internal partial class Program
                 var editorSel = await WaitForChatGptEditorA11y(cdp);
                 if (editorSel == null)
                     return (false, (string?)null);
-                _currentAskCdp.Value = cdp;
-                _currentAskHost.Value = "chatgpt";
-                _currentAskEditorSel.Value = editorSel;
                 PulseStep.Mark("editor-found");
                 Console.WriteLine($"[ASK] Editor found: {editorSel}");
-                askSession.BindStreamingContext(editorSel);
 
                 // Check if this is a fresh conversation ??try multiple selectors
                 // TODO: migrate to askSession.GetUserMessageCountAsync() when multi-selector counting is unified
@@ -139,7 +122,6 @@ internal partial class Program
                     """) ?? "0";
                 int existingTurns = int.TryParse(turnCountStr, out var etc) ? etc : 0;
 
-                triadCtx?.BindStreamContext("gpt", cdp, editorSel, Environment.GetEnvironmentVariable("WKAPPBOT_RUN_ID"));
                 // Reuse existing session ??only inject persona on fresh (0 turns) conversations
                 if (existingTurns > 0)
                     Console.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
@@ -158,9 +140,9 @@ internal partial class Program
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
                     var personaTextGpt = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (!_suppressLoopPersona.Value && Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
-                        SlackPostToThread($"⚡ *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextGpt.Length > 800 ? personaTextGpt[..800] + "..." : personaTextGpt)}\n```", "System");
+                        SlackPostToThread($"?�� *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextGpt.Length > 800 ? personaTextGpt[..800] + "..." : personaTextGpt)}\n```", "System");
                     var (personaOk, personaResp) = await ChatGptSendAndWait(
-                        cdp, personaTextGpt, timeoutSec: 20, askSession: askSession);
+                        cdp, personaTextGpt, timeoutSec: 20);
                     if (!personaOk)
                     {
                         Console.WriteLine("[ASK] Persona injection failed, continuing anyway");
@@ -192,7 +174,7 @@ internal partial class Program
                     Console.WriteLine("[ASK] ChatGPT timeout ??retrying in 9 seconds...");
                     await TryRecoverChatGptTabAsync(cdp, "timeout before retry");
                     await Task.Delay(9000);
-                    (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, returnAfterSend: noWait, askSession: askSession);
+                    (ok, answer) = await ChatGptSendAndWait(cdp, question, timeoutSec, returnAfterSend: noWait);
                 }
                 {
                     EnsureSlackThread("ChatGPT", question);
@@ -200,7 +182,6 @@ internal partial class Program
                     {
                         var gptSlack = NormalizeBlankLines(answer);
                         SlackPostToThread(gptSlack.Length > 2000 ? gptSlack[..2000] + "..." : gptSlack, SlackAiName("gpt", "ChatGPT"));
-                        SlackPostAnswerBlocks(gptSlack, "ChatGPT");
                     }
                     else
                          SlackPostToThread("[timeout or image failed]", SlackAiName("gpt", "ChatGPT"));
@@ -216,7 +197,7 @@ internal partial class Program
                     triadCtx?.LogStep("ChatGPT", msg);
                 };
                 if (loopMode && ok && !string.IsNullOrWhiteSpace(answer))
-                    (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport, triadCtx, toolLogGpt);
+                    (ok, answer) = await RunChatGptLoopAsync(cdp, answer!, timeoutSec, loopMaxSteps, loopRetry, loopMaxParallel, onStepReport, triadCtx);
                 return (ok, answer);
             }
             catch (Exception ex)
@@ -249,12 +230,12 @@ internal partial class Program
             SendPendingCrossPromptAsync(cdp, "gpt", "#prompt-textarea").GetAwaiter().GetResult();
         // Write ask result to .wkappbot/ask/ MD file
         if (ok && !string.IsNullOrEmpty(answer) && triadCtx == null)
-            WriteAskMd("gpt", question, answer, toolLogGpt.Count > 0 ? toolLogGpt : null);
+            WriteAskMd("gpt", question, answer);
         cdp.Dispose();
         return ok ? 0 : 1;
     }
 
-    // A11y-first selector chain for ChatGPT editor (most stable → least stable)
+    // A11y-first selector chain for ChatGPT editor (most stable ??least stable)
     static readonly string[] ChatGptEditorSelectors =
     [
         "#prompt-textarea",                              // Stable ID
@@ -311,7 +292,7 @@ internal partial class Program
 
              if (matching.Count <= 1) return; // no issue
 
-            // registry에서 매칭된 탭을 키로드하여 열기 (이전 세션 보호)
+            // registry???�?�된 ??�� ?�으�?건드리�? ?�음 (?�의 ?�션 ??보호)
             if (string.IsNullOrEmpty(keepTargetId)) return;
 
             var keepId = keepTargetId;
@@ -396,5 +377,3 @@ internal partial class Program
     }
 
 }
-
-

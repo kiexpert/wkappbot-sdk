@@ -112,7 +112,7 @@ public sealed partial class CdpClient
         };
     }
 
-    // ‚îÄ Editor Operations ‚îÄ
+    // ?ê‚ïê Editor Operations ?ê‚ïê
 
     /// <summary>
     /// Insert text into a contenteditable element (3-tier: innerHTML ??execCommand ??Input.insertText).
@@ -298,7 +298,7 @@ public sealed partial class CdpClient
                 "if(!responseCount){var turns=qsa('[data-testid*=\"conversation-turn\"]');var articles=qsa('article');responseCount=turns.length?Math.floor(turns.length/2):(articles.length||0);}" +
                 "text=lastText(msgs);" +
                 "if(!text){var arts=qsa('article');text=lastText(arts);}" +
-                "stopVisible=!!(document.querySelector(\"button[data-testid='stop-button']\")||document.querySelector(\"button[aria-label='Stop streaming']\"));" +
+                $"stopVisible=!!(document.querySelector(''button[data-testid=\"stop-button\"]'')||document.querySelector(''button[aria-label=\"Stop streaming\"]'')||document.querySelector(''button[aria-label=\"{AskLocaleKeys.KoStopStreaming}\"]''));" +
                 "streaming=stopVisible;" +
             "} else if(provider==='claude'){" +
                 "var streamMsgs=qsa('[data-is-streaming]');" +
@@ -307,13 +307,13 @@ public sealed partial class CdpClient
                 "text=streamMsgs.length?lastText(streamMsgs):lastText(asstMsgs);" +
                 "var last=streamMsgs.length?streamMsgs[streamMsgs.length-1]:null;" +
                 "streaming=!!(last&&last.getAttribute('data-is-streaming')==='true');" +
-                "stopVisible=streaming||!!document.querySelector(\"button[aria-label*='Stop']\");" +
+                $"stopVisible=streaming||!!document.querySelector(''button[aria-label*=\"Stop\"],button[aria-label*=\"{AskLocaleKeys.KoStop}\"]'');" +
             "} else if(provider==='gemini'){" +
                 "var models=qsa('model-response');" +
                 "var arts=qsa('[role=\"article\"]');" +
                 "responseCount=models.length||arts.length||0;" +
                 "text=models.length?lastText(models):lastText(arts);" +
-                "var stopBtn=document.querySelector(\"button[aria-label*='Stop']\");" +
+                $"var stopBtn=document.querySelector(''button[aria-label*=\"Stop\"]'')||document.querySelector(''button[aria-label*=\"{AskLocaleKeys.KoStop}\"]'');" +
                 "var stopIcon=document.querySelector('mat-icon[fonticon=\"stop_circle\"]');" +
                 "stopVisible=!!stopBtn||!!stopIcon;" +
                 "streaming=stopVisible;" +
@@ -365,37 +365,6 @@ public sealed partial class CdpClient
             "})()") ?? "NO_PUMP";
     }
 
-    public async Task<string> CancelPromptPumpAsync(string selector, bool clearEditor = true)
-    {
-        var esc = Esc(selector);
-        var jsClear = JsonSerializer.Serialize(clearEditor);
-        return await EvalAsync(
-            "(()=>{" +
-            "var sel='" + esc + "';" +
-            "var clearEditor=" + jsClear + ";" +
-            "var root=(window.__wkAskPump||(window.__wkAskPump={}));" +
-            "if(!root.states)root.states={};" +
-            "var st=root.states[sel]||(root.states[sel]={gen:0,timer:0,lastResult:'',locked:false});" +
-            "if(st.timer)try{clearTimeout(st.timer);}catch(_e){}" +
-            "st.timer=0;st.gen=(st.gen||0)+1;st.locked=false;st.lastResult='CANCELLED';st.responseStatus='CANCELLED';" +
-            "var el=document.querySelector(sel);" +
-            "if(clearEditor&&el){" +
-                "try{" +
-                    "if(el.tagName==='TEXTAREA'||el.tagName==='INPUT'){" +
-                        "el.value='';" +
-                        "el.dispatchEvent(new Event('input',{bubbles:true}));" +
-                        "el.dispatchEvent(new Event('change',{bubbles:true}));" +
-                    "}else{" +
-                        "el.textContent='';" +
-                        "el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'deleteContentBackward',data:null}));" +
-                        "el.dispatchEvent(new Event('change',{bubbles:true}));" +
-                    "}" +
-                "}catch(_e){}" +
-            "}" +
-            "return clearEditor?'CANCELLED:CLEARED':'CANCELLED';" +
-            "})()") ?? "NO_PUMP";
-    }
-
     /// <summary>Clear a contenteditable editor (selectAll + delete).</summary>
     public async Task ClearEditorAsync(string selector)
     {
@@ -406,7 +375,7 @@ public sealed partial class CdpClient
             "document.execCommand('selectAll');document.execCommand('delete')})()");
     }
 
-    // ‚îÄ Send Button ‚îÄ
+    // ?ê‚ïê Send Button ?ê‚ïê
 
     /// <summary>
     /// Send message via Enter key (modern AI chats use Enter=send, button=stop).
@@ -458,7 +427,7 @@ public sealed partial class CdpClient
             """) ?? "NOT_FOUND";
     }
 
-    // ‚îÄ Streaming Detection ‚îÄ
+    // ?ê‚ïê Streaming Detection ?ê‚ïê
 
     /// <summary>
     /// Check if AI is currently streaming a response.
@@ -511,7 +480,7 @@ public sealed partial class CdpClient
             """);
     }
 
-    // ‚îÄ Common Ask Flow ‚îÄ
+    // ?ê‚ïê Common Ask Flow ?ê‚ïê
 
     /// <summary>
     /// Wait for AI response to complete (streaming done).
@@ -604,7 +573,7 @@ public sealed partial class CdpClient
                     const txt = (btn.textContent || '').trim().toLowerCase();
                     if (txt.includes('ok') || txt.includes('got it') || txt.includes('i understand')
                         || txt.includes('confirm') || txt.includes('agree') || txt.includes('continue')
-                        || txt.includes('\uc911\uc9c0') || txt.includes('\uc815\uc9c0') || txt.includes('Í≥ÑÏÜç')
+                        || txt.includes('?ïÏù∏') || txt.includes('?ôÏùò') || txt.includes('Í≥ÑÏÜç')
                         || btn.classList.contains('primary') || btn.classList.contains('mat-primary')) {
                         btn.click(); return 'DISMISSED:' + txt;
                     }
@@ -615,7 +584,7 @@ public sealed partial class CdpClient
             """) ?? "NONE";
     }
 
-    // ‚îÄ File Attachment ‚îÄ
+    // ?ê‚ïê File Attachment ?ê‚ïê
 
     /// <summary>
     /// Synthetic paste of an image file via clipboard DataTransfer event.
@@ -640,7 +609,7 @@ public sealed partial class CdpClient
         return await EvalAsync("""
             (() => {
                 var bt = (document.body?.innerText || '');
-                if (/already\s*uploaded/i.test(bt) || /duplicate/i.test(bt)) return 'DUPLICATE';
+                if (/?¥Î?\s*??s*?åÏùº(???\s*?ÖÎ°ú??.test(bt) || /already\s*uploaded/i.test(bt)) return 'DUPLICATE';
                 var sels = ['[data-testid="file-thumbnail"]','[data-testid*="attachment"]',
                     '[class*="attachment"]','[class*="file-upload"]','[class*="uploaded-file"]',
                     'img[src*="blob:"]','[class*="file-chip"]','[class*="upload-chip"]',
@@ -747,7 +716,7 @@ public sealed partial class CdpClient
         return string.IsNullOrEmpty(lastText) ? (false, "") : (true, lastText.Trim());
     }
 
-    // ‚îÄ‚îÄ Internal ‚îÄ‚îÄ
+    // ?Ä?Ä Internal ?Ä?Ä
     /// <summary>
     /// Ensure Chrome window is not minimized before DOM-dependent operations.
     /// ProseMirror, contenteditable, and some React components need rendering.
