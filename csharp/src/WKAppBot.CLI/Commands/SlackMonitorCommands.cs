@@ -819,14 +819,14 @@ internal partial class Program
         if (forceClaude is "1" or "true" or "yes" or "on")
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
 
-        // Auto detect host app.
-        if (IsRunningFromCodexApp())
+        // Parent-chain-only detection: no AI in parent → treat as human user.
+        // Heuristics (window scan, IsProcessAlive) are too broad — fire when AI is open but not our parent.
+        if (IsRunningFromCodexAppCertain())
             return BuildSlackBotUsername(SlackCodexPrefix, instanceName, spaceBeforeBracket: false);
-        if (IsRunningFromClaudeApp())
+        if (IsRunningFromClaudeAppCertain())
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
 
-        // Fallback: use Windows login name — "claude.exe alive" heuristic was too broad
-        // (fires even when human user runs wkappbot from bash while Claude happens to be open)
+        // No AI in parent chain → human user
         var loginUser = Environment.UserName;
         if (!string.IsNullOrWhiteSpace(loginUser)) return loginUser;
         return BuildSlackBotUsername(SlackGenericPrefix, instanceName, spaceBeforeBracket: false);
