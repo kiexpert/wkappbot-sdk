@@ -90,17 +90,18 @@ internal partial class Program
         // ── Abort checks (two tiers) ──
         var hackAborted = false;
         var inputBaselineTick = Environment.TickCount;
-        RECT baselineWr = wr; // window position baseline (GetWindowRect is ~0ms)
-        long baselinePixelHash = 0; // 4-pixel sample hash (set after CCA)
+        RECT baselineWr = wr;
+        long baselinePixelHash = 0;
         Rectangle targetScreenRect = Rectangle.Empty;
+        int lastChangCheckTick = Environment.TickCount;
 
-        // Tier 1: user input only (cheap — called per OCR item)
+        // Tier 1: user input only (cheap — called per OCR item, 1s cooldown)
         bool HackShouldAbort()
         {
             if (hackAborted) return true;
             var idleMs = NativeMethods.GetUserIdleMs();
             var elapsed = (uint)(Environment.TickCount - inputBaselineTick);
-            if (idleMs < elapsed && idleMs < 300)
+            if (idleMs < elapsed && idleMs < 1000)
             {
                 hackAborted = true;
                 Console.WriteLine("[HACK] User input detected — aborting");
@@ -110,11 +111,15 @@ internal partial class Program
             return false;
         }
 
-        // Tier 2: position + content change (called at stage boundaries only)
+        // Tier 2: position + content change (stage boundaries, min 1s interval)
         bool HackTargetChanged()
         {
             if (hackAborted) return true;
-            // 1. Window moved/resized? (Win32 GetWindowRect, ~0ms)
+            var now = Environment.TickCount;
+            if (now - lastChangCheckTick < 1000) return false; // 1s cooldown
+            lastChangCheckTick = now;
+
+            // 1. Window moved/resized?
             NativeMethods.GetWindowRect(hwnd, out var curWr);
             if (curWr.Left != baselineWr.Left || curWr.Top != baselineWr.Top
                 || curWr.Right != baselineWr.Right || curWr.Bottom != baselineWr.Bottom)
@@ -124,7 +129,7 @@ internal partial class Program
                 liveOverlay?.Hide();
                 return true;
             }
-            // 2. Target node pixels changed? (4-pixel sample, ~0.1ms)
+            // 2. Target node pixels changed?
             if (baselinePixelHash != 0 && !targetScreenRect.IsEmpty)
             {
                 var cur = SampleCenterPixels(targetScreenRect);
