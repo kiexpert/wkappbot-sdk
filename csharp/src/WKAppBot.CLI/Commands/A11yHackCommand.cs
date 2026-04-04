@@ -217,6 +217,21 @@ internal partial class Program
 
         using var ocr = new SimpleOcrAnalyzer();
         var gapCollector = new OcrGapCollector();
+        // OcrCorrectionDb: self-learning pixel-hash → correct text dictionary
+        WKAppBot.Vision.OcrCorrectionDb? correctionDb = null;
+        try
+        {
+            if (_hackExpDir != null)
+            {
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint cpid);
+                var cproc = System.Diagnostics.Process.GetProcessById((int)cpid);
+                var csb = new System.Text.StringBuilder(256);
+                NativeMethods.GetClassNameW(hwnd, csb, csb.Capacity);
+                correctionDb = WKAppBot.Vision.OcrCorrectionDb.ForProcess(
+                    cproc.ProcessName, csb.ToString());
+            }
+        }
+        catch { }
         int ocrOk = 0, ocrEmpty = 0;
 
         // Group by row for tree display
@@ -281,6 +296,12 @@ internal partial class Program
                                     stageLabels[regionIdx] = sim >= 0.95
                                         ? $"ocr={sim:P0}"
                                         : $"ocr={sim:P0} mismatch";
+                                    // Learn: OCR ≠ UIA → store correction (UIA is ground truth)
+                                    if (sim < 0.95 && correctionDb != null)
+                                    {
+                                        correctionDb.Learn(crop, verifyText, uiaLabel, "uia");
+                                        Console.Error.WriteLine($"[OCR-LEARN] {dynId}: \"{verifyText}\"→\"{uiaLabel}\" (uia, sim={sim:P0})");
+                                    }
                                 }
                             }
                         }
@@ -298,6 +319,16 @@ internal partial class Program
                             using var crop = bmp.Clone(cropRect, bmp.PixelFormat);
                             var result = ocr.RecognizeAll(crop).GetAwaiter().GetResult();
                             ocrText = string.Join(" ", result.Words.Select(x => x.Text)).Trim();
+                            // OcrCorrectionDb: auto-correct known misreads
+                            if (correctionDb != null)
+                            {
+                                var corrected = correctionDb.TryCorrect(crop, ocrText);
+                                if (corrected != null)
+                                {
+                                    Console.Error.WriteLine($"[OCR-FIX] {dynId}: \"{ocrText}\"→\"{corrected}\" (correction db)");
+                                    ocrText = corrected;
+                                }
+                            }
                             if (ocrText.Length > 0)
                             {
                                 ocrOk++;
@@ -308,14 +339,28 @@ internal partial class Program
                             }
                             else
                             {
-                                ocrEmpty++;
-                                if (gapCollector.Add(cropRect, null, null, out var cachedDescription))
-                                    stageLabels[regionIdx] = "vision pending";
-                                else if (!string.IsNullOrWhiteSpace(cachedDescription))
-                                    stageLabels[regionIdx] = $"cache 100% {TrimPreview(cachedDescription, 18)}";
+                                // OCR empty — try correction db before going to Vision API
+                                var corrected2 = correctionDb?.TryCorrect(crop, "");
+                                if (corrected2 != null)
+                                {
+                                    ocrText = corrected2;
+                                    ocrOk++;
+                                    CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText,
+                                        isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.Container);
+                                    stageLabels[regionIdx] = $"fix {TrimPreview(ocrText, 24)}";
+                                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+                                }
                                 else
-                                    stageLabels[regionIdx] = "vision pending";
-                                UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+                                {
+                                    ocrEmpty++;
+                                    if (gapCollector.Add(cropRect, null, null, out var cachedDescription))
+                                        stageLabels[regionIdx] = "vision pending";
+                                    else if (!string.IsNullOrWhiteSpace(cachedDescription))
+                                        stageLabels[regionIdx] = $"cache 100% {TrimPreview(cachedDescription, 18)}";
+                                    else
+                                        stageLabels[regionIdx] = "vision pending";
+                                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+                                }
                             }
                         }
                     }
