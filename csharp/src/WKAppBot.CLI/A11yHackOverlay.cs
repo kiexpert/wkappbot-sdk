@@ -278,9 +278,13 @@ internal sealed class A11yHackOverlayHost : IDisposable
             ref var s = ref (slot == OverlaySlot.Input ? ref _inputSlot : ref _sessionSlot);
             if (s != null && s._dispatcher != null)
             {
-                s.Reposition(screenX, screenY, width, height);
-                s.Show();
-                return s;
+                // Clear stale content first, then move+resize to new target
+                var host = s;
+                host.StopHoverTracking();
+                host._dispatcher?.BeginInvoke(() => host._window?.ClearCanvas());
+                host.Reposition(screenX, screenY, width, height);
+                host.Show();
+                return host;
             }
             try
             {
