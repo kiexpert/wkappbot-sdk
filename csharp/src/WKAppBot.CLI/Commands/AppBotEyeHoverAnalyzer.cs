@@ -227,11 +227,14 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(grapPath))
             return;
 
-        bool sameTarget;
         CancellationTokenSource? oldCts = null;
         lock (_liveHackLock)
         {
-            sameTarget = grapPath == _pendingLiveHackGrap && _lastLiveHackGrap == grapPath;
+            // Same target + debounce already running → don't restart (typing won't reset timer)
+            bool sameTarget = grapPath == _pendingLiveHackGrap;
+            if (sameTarget && _liveHackDebounceCts != null && !_liveHackDebounceCts.IsCancellationRequested)
+                return; // let existing debounce continue
+
             _pendingLiveHackGrap = grapPath;
             _pendingLiveHackSource = reason;
             _pendingLiveHackHeadline = headline;
