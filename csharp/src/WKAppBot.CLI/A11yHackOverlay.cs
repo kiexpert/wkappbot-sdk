@@ -356,6 +356,9 @@ internal sealed class A11yHackOverlayWindow : Window
     static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 }
 
+/// <summary>Fixed overlay slot: Input (mouse/keyboard tracking) vs Session (AI analysis).</summary>
+internal enum OverlaySlot { Input, Session }
+
 internal sealed class A11yHackOverlayHost : IDisposable
 {
     Thread? _uiThread;
@@ -363,18 +366,53 @@ internal sealed class A11yHackOverlayHost : IDisposable
     A11yHackOverlayWindow? _window;
     readonly ManualResetEventSlim _ready = new();
 
-    public static A11yHackOverlayHost? TryStart(int screenX, int screenY, int width, int height)
+    // ── Singleton slots (2 fixed windows) ──
+    static readonly object _slotLock = new();
+    static A11yHackOverlayHost? _inputSlot;
+    static A11yHackOverlayHost? _sessionSlot;
+
+    /// <summary>
+    /// Get or create overlay for the given slot. Reuses existing window (repositions).
+    /// </summary>
+    public static A11yHackOverlayHost? GetOrCreate(OverlaySlot slot, int screenX, int screenY, int width, int height)
     {
-        try
+        lock (_slotLock)
         {
-            var host = new A11yHackOverlayHost();
-            host.Start(screenX, screenY, width, height);
-            return host;
+            ref var slotRef = ref (slot == OverlaySlot.Input ? ref _inputSlot : ref _sessionSlot);
+            if (slotRef != null && slotRef._dispatcher != null)
+            {
+                // Reuse: reposition + show
+                slotRef.Reposition(screenX, screenY, width, height);
+                slotRef.Show();
+                return slotRef;
+            }
+
+            // Create new
+            try
+            {
+                var host = new A11yHackOverlayHost();
+                host.Start(screenX, screenY, width, height);
+                slotRef = host;
+                return host;
+            }
+            catch { return null; }
         }
-        catch
+    }
+
+    /// <summary>Legacy: create unmanaged overlay (backward compat for one-off analysis).</summary>
+    public static A11yHackOverlayHost? TryStart(int screenX, int screenY, int width, int height)
+        => GetOrCreate(OverlaySlot.Session, screenX, screenY, width, height);
+
+    /// <summary>Reposition existing window to new screen coordinates.</summary>
+    public void Reposition(int screenX, int screenY, int width, int height)
+    {
+        _dispatcher?.BeginInvoke(() =>
         {
-            return null;
-        }
+            if (_window == null) return;
+            _window.Width = width;
+            _window.Height = height;
+            ForceWindowPosition(_window, screenX, screenY, width, height);
+        });
     }
 
     void Start(int screenX, int screenY, int width, int height)
@@ -492,6 +530,12 @@ internal sealed class A11yHackOverlayHost : IDisposable
 
     public void Dispose()
     {
+        // Clear singleton slot if this is a managed instance
+        lock (_slotLock)
+        {
+            if (_inputSlot == this) _inputSlot = null;
+            if (_sessionSlot == this) _sessionSlot = null;
+        }
         try
         {
             StopHoverTracking();
