@@ -395,11 +395,31 @@ internal partial class Program
 
         // --수두 (sudo): re-launch with UAC elevation if not already admin.
         // Strip flag before dispatch so the actual command runs normally once elevated.
+        // Eye + --수두: gracefully stop current non-admin Eye first so admin Eye can grab the mutex.
         if (args.Contains("--수두") || args.Contains("--sudo"))
         {
             args = args.Where(a => a != "--수두" && a != "--sudo").ToArray();
             if (!IsElevated())
             {
+                bool isEyeRelaunch = args.Length > 0 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
+                if (isEyeRelaunch)
+                {
+                    // Kill existing Eye so admin Eye can acquire the alive mutex.
+                    // Eye가 어드민이면 파이프 경유 모든 명령이 어드민 컨텍스트 → 개별 --수두 불필요.
+                    Console.WriteLine("[SUDO] Stopping current Eye before admin re-launch...");
+                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("wkappbot-core"))
+                    {
+                        try
+                        {
+                            if (proc.Id == System.Environment.ProcessId) continue;
+                            proc.Kill(entireProcessTree: false);
+                        }
+                        catch { }
+                    }
+                    System.Threading.Thread.Sleep(1500); // 뮤텍스 해제 대기
+                    Console.WriteLine("[SUDO] Eye stopped — launching admin Eye...");
+                }
+
                 var quotedArgs = string.Join(" ", args.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
@@ -411,7 +431,7 @@ internal partial class Program
                 try
                 {
                     var elevated = System.Diagnostics.Process.Start(psi);
-                    elevated?.WaitForExit();
+                    if (!isEyeRelaunch) elevated?.WaitForExit(); // Eye는 데몬 — 기다리지 않음
                     return elevated?.ExitCode ?? 0;
                 }
                 catch (Exception ex)
