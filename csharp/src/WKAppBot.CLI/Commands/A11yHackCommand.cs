@@ -78,7 +78,7 @@ internal partial class Program
             return 1;
         }
         var analysisTargetRect = TryResolveAnalysisTargetRect(wr);
-        using var liveOverlay = A11yHackOverlayHost.TryStart(wr.Left, wr.Top, w, h);
+        var liveOverlay = A11yHackOverlayHost.GetOrCreate(OverlaySlot.Session, wr.Left, wr.Top, w, h);
         liveOverlay?.Update(new A11yHackOverlayModel(new[]
         {
             new A11yHackOverlayBox(
@@ -98,7 +98,7 @@ internal partial class Program
             var idleMs = WKAppBot.Win32.Native.NativeMethods.GetUserIdleMs();
             // Only abort if input happened AFTER hack started (idle < elapsed since start)
             var elapsed = (uint)(Environment.TickCount - inputBaselineTick);
-            if (idleMs < elapsed && idleMs < 500)
+            if (idleMs < elapsed && idleMs < 300)
             {
                 hackAborted = true;
                 Console.WriteLine("[HACK] User input detected — aborting analysis, hiding overlay");
@@ -250,6 +250,7 @@ internal partial class Program
 
             for (int ci = 0; ci < items.Count; ci++)
             {
+                if (HackShouldAbort()) { bmp.Dispose(); return 0; }
                 var (row, col, region) = items[ci];
                 int regionIdx = regions.IndexOf(region);
                 var dynId = DynamicA11yAnalyzer.GenerateDynId(row, col, region.Bounds.Width, region.Bounds.Height);
@@ -406,6 +407,7 @@ internal partial class Program
         Console.WriteLine($"  OCR: {ocrOk} ok, {ocrEmpty} failed");
         if (table != null)
             Console.WriteLine($"  Table: {table.Rows}횞{table.Cols}");
+        if (HackShouldAbort()) { bmp.Dispose(); return 0; }
         if (gapCollector.HasGaps)
         {
             Console.WriteLine($"  Vision needed: {gapCollector.Count} blind region(s)");
@@ -521,6 +523,7 @@ internal partial class Program
         Console.WriteLine();
 
         bmp.Dispose();
+        liveOverlay?.Hide();
         PulseStep.Done();
         return 0;
     }

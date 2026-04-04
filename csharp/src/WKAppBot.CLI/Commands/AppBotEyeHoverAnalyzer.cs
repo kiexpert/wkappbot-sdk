@@ -196,14 +196,18 @@ internal partial class Program
 
     static string EscapeCmdArg(string arg) => arg.Replace("\"", "\\\"");
 
+    static string _lastLiveHackGrap = "";
+
     static void TryLaunchLiveA11yHack(string grapPath, string reason, string headline)
     {
         if (string.IsNullOrWhiteSpace(grapPath))
             return;
 
+        bool sameTarget;
         CancellationTokenSource? oldCts = null;
         lock (_liveHackLock)
         {
+            sameTarget = grapPath == _pendingLiveHackGrap && _lastLiveHackGrap == grapPath;
             _pendingLiveHackGrap = grapPath;
             _pendingLiveHackSource = reason;
             _pendingLiveHackHeadline = headline;
@@ -215,12 +219,18 @@ internal partial class Program
         try { oldCts?.Cancel(); } catch { }
         try { oldCts?.Dispose(); } catch { }
 
+        // Immediately hide session overlay (clear stale content)
+        A11yHackOverlayHost.GetOrCreate(OverlaySlot.Session, 0, 0, 1, 1)?.Hide();
+
         var debounceCts = _liveHackDebounceCts;
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(1000, debounceCts.Token);
+                // Same target content change → no debounce (instant re-analyze)
+                // New target → 1s debounce (wait for stabilization)
+                if (!sameTarget)
+                    await Task.Delay(1000, debounceCts.Token);
                 string currentGrap;
                 string currentSource;
                 string currentHeadline;
@@ -247,6 +257,7 @@ internal partial class Program
                     }
                 }
 
+                _lastLiveHackGrap = currentGrap;
                 var corePath = Environment.ProcessPath ?? "wkappbot";
                 var cwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory;
                 // WKAPPBOT_WORKER=1: suppress per-command TeeTextWriter log (noise).
