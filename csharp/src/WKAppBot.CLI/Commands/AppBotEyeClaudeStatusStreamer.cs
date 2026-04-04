@@ -1201,7 +1201,7 @@ internal partial class Program
 
             // Route through MCP: prompt send finds window by name, respects idle check
             var (output, exitCode) = EyeMcpClient.CallAsync(
-                ["prompt", "send", cwdFilter ?? "", prompt, "--when-idle", "3m", "--timeout", "10m"],
+                ["prompt", "send", cwdFilter ?? "", prompt, "--timeout", "2m"],
                 timeoutMs: 150_000).GetAwaiter().GetResult();
 
             if (exitCode != 0)
