@@ -693,7 +693,7 @@ internal partial class Program
                             && state.IdleMessageSent && !state.HomeworkNotified
                             && state.IdleStartedAt != null
                             && (DateTime.UtcNow - state.IdleStartedAt.Value).TotalMinutes >= 1    // 협의값: 1분
-                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalHours >= 1)) // 협의값: 1시간
+                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalMinutes >= 10)) // 협의값: 10분
                         {
                             try { CheckAndSendHomework(state, hwnd, label); }
                             catch { }
