@@ -849,7 +849,7 @@ internal partial class Program
         try
         {
             var wrPath = Environment.ProcessPath ?? "wkappbot";
-            _whisperRingX = Math.Max(0, posX - 280); // WhisperRing width ~270px + 10px gap
+            _whisperRingX = Math.Max(0, posX - 190); // WhisperRing 180px wide + 10px gap
             _whisperRingY = posY;
             var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
                 cwd: callerCwd,
@@ -1078,7 +1078,7 @@ internal partial class Program
                 {
                     // Recalculate position from current monitors (handles monitor add/remove)
                     var (anchorX, anchorY) = GetRightmostMonitorAnchor(width, height);
-                    int newWrX = Math.Max(0, anchorX - 280);
+                    int newWrX = Math.Max(0, anchorX - 190); // Eye 바로 왼쪽 10px gap (whisperRing 180px wide)
                     int newWrY = anchorY;
 
                     bool alive = false;
