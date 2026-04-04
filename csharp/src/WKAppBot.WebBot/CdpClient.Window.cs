@@ -367,6 +367,17 @@ public sealed partial class CdpClient
         catch { return false; }
     }
 
+    /// <summary>Ensure Chrome window is minimized before tab operations (prevent focus theft).</summary>
+    public async Task EnsureMinimizedAsync(string? targetId = null)
+    {
+        try
+        {
+            await MinimizeWindowAsync(targetId);
+            await Task.Delay(100); // wait for minimize animation
+        }
+        catch { }
+    }
+
     /// <summary>
     /// Create a new Chrome window with a blank tab via CDP Target.createTarget.
     /// Returns the new target's ID, or null on failure.

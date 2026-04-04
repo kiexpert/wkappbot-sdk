@@ -647,6 +647,9 @@ public sealed partial class CdpClient
         // No correctly-positioned window found — create new window
         if (newTargetId == null)
         {
+            // Ensure minimized BEFORE tab creation (prevent focus theft)
+            await EnsureMinimizedAsync();
+
             try { newTargetId = await CreateTargetInNewWindowAsync(createUrl); }
             catch { }
 
@@ -664,8 +667,7 @@ public sealed partial class CdpClient
                 if (newTargetId == null) return TargetId;
             }
 
-            // Minimize new window immediately after creation to return focus to user
-            await Task.Delay(300);
+            // Ensure still minimized after creation
             await MinimizeWindowAsync(newTargetId);
 
             // Position new window at expected bounds (while minimized — takes effect on restore)
