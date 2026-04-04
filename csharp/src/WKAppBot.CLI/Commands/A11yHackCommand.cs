@@ -1125,8 +1125,7 @@ internal partial class Program
                 Math.Max(1, region.Bounds.Width),
                 Math.Max(1, region.Bounds.Height));
 
-            // Determine role
-            bool hasUia = uiaAnswers != null && uiaAnswers.ContainsKey(i);
+            // Determine role — only Target, Scope (parent+siblings), skip the rest
             HackBoxRole role;
             if (i == 0)
                 role = HackBoxRole.Target;
@@ -1134,10 +1133,8 @@ internal partial class Program
                 role = HackBoxRole.Scope; // parent
             else if (parentIdx >= 0 && parentBounds.Contains(region.Bounds))
                 role = HackBoxRole.Scope; // sibling (inside same parent)
-            else if (hasUia)
-                role = HackBoxRole.Known;
             else
-                role = HackBoxRole.Other;
+                continue; // not in scope → no overlay box
 
             // Label: UIA type or Dy type + id + size
             string? label = null;
