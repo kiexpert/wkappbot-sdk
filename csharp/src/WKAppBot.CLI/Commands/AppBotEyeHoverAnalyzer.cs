@@ -485,7 +485,7 @@ internal partial class Program
                                 {
                                     fsb.AppendLine("chain:");
                                     foreach (var p in chain)
-                                        fsb.AppendLine($"  ??[{p?["type"]}] {p?["name"]}");
+                                        fsb.AppendLine($"  \u2514 [{p?["type"]}] {p?["name"]}");
                                 }
                                 if (!string.IsNullOrEmpty(fPatterns))
                                     fsb.AppendLine($"patterns: {fPatterns}");
@@ -606,7 +606,7 @@ internal partial class Program
                         {
                             sb.AppendLine("chain:");
                             foreach (var p in chain)
-                                sb.AppendLine($"  - [{p?["type"]}] {p?["name"]}");
+                                sb.AppendLine($"  \u2514 [{p?["type"]}] {p?["name"]}");
                         }
 
                         if (!string.IsNullOrEmpty(patterns))
