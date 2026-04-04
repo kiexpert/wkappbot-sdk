@@ -313,6 +313,11 @@ partial class Program
         // logcat/grep/grap: streaming log monitor — needs direct stdout, TeeConsole, full error handling
         var isSlowFileCmd = cmd == "file" && args.Length > 1
             && args[1].ToLowerInvariant() is "read-pdf";
+        // First-output guard: if Eye doesn't produce output within 100ms, fall back to Core.
+        // Applies to most commands — prevents 30s+ stall when Eye is busy but Core can handle it.
+        // Excluded: slack (Eye owns WebSocket), ask/newchat (long-running, double-run risk),
+        //           logcat/grep/grap (streaming, already excluded below), eye daemon (isEyeDaemon).
+        var isFirstOutputGuardCmd = cmd != "slack" && cmd != "ask" && cmd != "newchat";
         // eye tick / eye hotswap / eye homework: one-shot subcommands — route through Eye pipe if running
         var eyeSubcmd = forwardArgs.Length > 1 ? forwardArgs[1].ToLowerInvariant() : "";
         var isEyeDaemon = cmd == "eye"
@@ -329,8 +334,9 @@ partial class Program
                 if (forwardArgs[i] == "--timeout-exit" && int.TryParse(forwardArgs[i + 1], out var e)) eyeTimeoutExit = e;
             }
 
+            int firstOutputMs = isFirstOutputGuardCmd ? 100 : 0; // 100ms first-output guard → Core fallback
             prof($"Eye pipe attempt cmd={cmd}");
-            if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code, eyeTimeoutMs, eyeTimeoutExit))
+            if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code, eyeTimeoutMs, eyeTimeoutExit, firstOutputMs))
             {
                 prof("Eye pipe: delegated");
                 // TerminateSelf: avoid 27s CLR/ConPTY handle cleanup delay that keeps bash waiting.
