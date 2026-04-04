@@ -146,7 +146,8 @@ internal static class EyeCmdPipeServer
         var cmdTag = args.Length > 0 ? args[0] : "bg";
         if (args.Length > 1 && cmdTag is "slack" or "ask") cmdTag += $"-{args[1]}";
         var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.log");
-        var tee = new TeeTextWriter(TextWriter.Null, logFile);
+        var oldSubDir = Program.ComputeOldSubDirPublic(args);
+        var tee = new TeeTextWriter(TextWriter.Null, logFile, oldSubDir: oldSubDir);
         _ = Task.Run(() =>
         {
             CallerCwd.Value = null;
@@ -319,7 +320,8 @@ internal static class EyeCmdPipeServer
             Directory.CreateDirectory(bgLogDir);
             var bgCmdTag = args.Length > 1 ? $"{args[0]}-{args[1]}" : (args.Length > 0 ? args[0] : "bg");
             var bgLogFile = Path.Combine(bgLogDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{bgCmdTag}.pid={Environment.ProcessId}.log");
-            var bgTee = new TeeTextWriter(TextWriter.Null, bgLogFile);
+            var bgOldSubDir = Program.ComputeOldSubDirPublic(args);
+            var bgTee = new TeeTextWriter(TextWriter.Null, bgLogFile, oldSubDir: bgOldSubDir);
             _ = Task.Run(() =>
             {
                 CallerCwd.Value = bgCwd;
@@ -340,7 +342,8 @@ internal static class EyeCmdPipeServer
         // ── In-process path for Eye-internal commands ──
         // TeeTextWriter wraps pipeWriter: output goes to pipe (real-time) AND log file.
         // AsyncLocal routing isolates this command's output from concurrent commands.
-        var tee = new TeeTextWriter(pipeWriter, logFile);
+        var oldSubDir2 = Program.ComputeOldSubDirPublic(args);
+        var tee = new TeeTextWriter(pipeWriter, logFile, oldSubDir: oldSubDir2);
         int code;
         // CallerCwd + CallerHwnd stored in AsyncLocal — propagates to all async continuations of this command
         CallerCwd.Value = callerCwd;

@@ -882,6 +882,9 @@ internal partial class Program
         return (dir.Replace(" ", "-"), dir);
     }
 
+    /// <summary>Public accessor for EyeCmdPipeServer — computes "old {cmd} {sub}" directory name.</summary>
+    internal static string ComputeOldSubDirPublic(string[] args) => ComputeOldSubDir(args);
+
     static string ComputeOldSubDir(string[] args)
     {
         if (args.Length == 0) return "noargs";
