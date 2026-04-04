@@ -667,6 +667,8 @@ internal partial class Program
             return EyeHotSwapCommand(args.Skip(1).ToArray());
         if (args.Length > 0 && string.Equals(args[0], "homework", StringComparison.OrdinalIgnoreCase))
             return EyeHomeworkCommand(args.Skip(1).ToArray());
+        if (args.Length > 0 && string.Equals(args[0], "shutdown", StringComparison.OrdinalIgnoreCase))
+            return EyeShutdownCommand(args.Skip(1).ToArray());
 
         PulseStep.Init("eye-cli");
 
@@ -967,6 +969,22 @@ internal partial class Program
             Console.WriteLine($"[HOMEWORK] Error: {ex.Message}");
             return 1;
         }
+    }
+
+    /// <summary>
+    /// eye shutdown — graceful Eye shutdown via CMD pipe. Sets _eyeShutdownRequested flag;
+    /// Eye loop checks this every ~100ms and exits cleanly with WriteEyeCleanExit().
+    /// </summary>
+    static int EyeShutdownCommand(string[] args)
+    {
+        if (!RunningInEye)
+        {
+            Console.WriteLine("[SHUTDOWN] Must run via Eye CMD pipe (use: wkappbot eye shutdown)");
+            return 1;
+        }
+        Console.WriteLine("[SHUTDOWN] Requesting graceful Eye shutdown...");
+        _eyeShutdownRequested = true;
+        return 0;
     }
 
     [DllImport("kernel32.dll")]

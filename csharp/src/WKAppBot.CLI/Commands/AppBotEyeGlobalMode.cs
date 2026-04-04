@@ -112,6 +112,7 @@ internal partial class Program
     static volatile bool _fswPromptDirty;
     static volatile string? _fswPromptChangedFile; // last changed file name for filtering
     static volatile bool _fswExeDirty; // hot-swap: exe binary changed
+    internal static volatile bool _eyeShutdownRequested; // graceful shutdown via CMD pipe (eye shutdown)
     static volatile bool _slackRetiring; // hot-swap retiring: stop DrainSlackQueue, keep EnqueueSlackRoute
 #pragma warning disable CS0169
     static volatile bool _fswClaudeJsonlDirty; // reserved (FSW removed — kept to avoid refactor)
@@ -1196,6 +1197,14 @@ internal partial class Program
                         Console.WriteLine($"[EYE][SLACK] Reconnect failed: {ex.Message}");
                     }
                 }
+            }
+
+            // ── Graceful shutdown (eye shutdown command via CMD pipe) ──
+            if (_eyeShutdownRequested)
+            {
+                Console.WriteLine("[EYE] Graceful shutdown requested — exiting");
+                WriteEyeCleanExit();
+                break;
             }
 
             // ── Hot-swap: FSW-driven instant detection + blue-green restart ──
