@@ -393,12 +393,12 @@ internal partial class Program
         _diagStep = "pipe-mode-check";
         IsPipeMode = Console.IsOutputRedirected;
 
-        // --수두 (sudo): re-launch with UAC elevation if not already admin.
+        // --sudo: re-launch with UAC elevation if not already admin.
         // Strip flag before dispatch so the actual command runs normally once elevated.
         // Eye + --수두: gracefully stop current non-admin Eye first so admin Eye can grab the mutex.
-        if (args.Contains("--수두") || args.Contains("--sudo"))
+        if (args.Contains("--sudo"))
         {
-            args = args.Where(a => a != "--수두" && a != "--sudo").ToArray();
+            args = args.Where(a => a != "--sudo").ToArray();
             if (!IsElevated())
             {
                 bool isEyeRelaunch = args.Length > 0 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
