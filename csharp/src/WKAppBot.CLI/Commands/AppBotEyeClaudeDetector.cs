@@ -546,7 +546,16 @@ internal partial class Program
                 try
                 {
                     var rect = turnForm.BoundingRectangle;
-                    if (rect.Height > 30)
+                    // Liveness: Height > 30 AND at least one child element exists (not a phantom placeholder).
+                    // Previous check relied on Height alone → false positive on collapsed/hidden turn-form.
+                    bool hasEditableChild = false;
+                    try
+                    {
+                        var children = turnForm.FindAllChildren();
+                        hasEditableChild = children != null && children.Length > 0;
+                    }
+                    catch { }
+                    if (rect.Height > 30 && (hasEditableChild || rect.Height > 80))
                     {
                         var turnFormName = turnForm.Name ?? "";
 

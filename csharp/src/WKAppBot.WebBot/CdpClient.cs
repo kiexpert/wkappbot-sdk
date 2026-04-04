@@ -56,8 +56,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         _receiveCts = new CancellationTokenSource();
         _receiveTask = ReceiveLoopAsync(_receiveCts.Token);
 
-        await SendAsync("Runtime.enable");
-        await SendAsync("Page.enable");
+        await EnableRuntimeWithRetry();
         Console.WriteLine($"[CDP] Reconnected to {TargetId}");
     }
     private int? _currentContextId;
@@ -201,10 +200,8 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         _receiveCts = new CancellationTokenSource();
         _receiveTask = ReceiveLoopAsync(_receiveCts.Token);
 
-        // Re-enable main-world contexts on every run
-        await SendAsync("Runtime.enable");
-        await SendAsync("Page.enable");
-        await SendAsync("DOM.enable");
+        // Re-enable main-world contexts on every run (with retry for heavy tab loads)
+        await EnableRuntimeWithRetry();
         await SendAsync("Page.getFrameTree");
 
         // Refresh execution context
@@ -260,6 +257,35 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         }
         catch { }
         return 0;
+    }
+
+    /// <summary>
+    /// Send Runtime.enable + Page.enable + DOM.enable with exponential backoff retry.
+    /// Retries up to maxRetries times with increasing delays before giving up.
+    /// Called from ConnectAsync/ReconnectAsync — prevents premature Chrome restart.
+    /// </summary>
+    internal async Task EnableRuntimeWithRetry(int maxRetries = 3, int baseDelayMs = 500)
+    {
+        string[] enableCmds = ["Runtime.enable", "Page.enable", "DOM.enable"];
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                foreach (var cmd in enableCmds)
+                    await SendAsync(cmd, timeoutMs: attempt == 0 ? 10000 : 15000 + attempt * 5000);
+                if (attempt > 0)
+                    Console.Error.WriteLine($"[CDP] Runtime.enable succeeded on retry {attempt}");
+                return;
+            }
+            catch (TimeoutException) when (attempt < maxRetries)
+            {
+                var delay = baseDelayMs * (1 << attempt); // 500, 1000, 2000ms
+                Console.Error.WriteLine($"[CDP] Runtime.enable timeout (attempt {attempt + 1}/{maxRetries + 1}) — retry in {delay}ms");
+                await Task.Delay(delay);
+            }
+        }
+        // Final attempt failed — throw so caller can handle (e.g., restart Chrome)
+        throw new TimeoutException($"CDP Runtime.enable failed after {maxRetries + 1} attempts");
     }
 
     /// <summary>
