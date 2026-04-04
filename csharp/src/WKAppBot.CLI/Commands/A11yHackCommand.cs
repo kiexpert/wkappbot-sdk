@@ -891,7 +891,7 @@ internal partial class Program
                     else parts.Add($"#{i + 1}"); // sibling index fallback
                     if (parts.Count > 0)
                     {
-                        var nodeLabel = $"{string.Join(":", parts)} {region.Bounds.Width}x{region.Bounds.Height}";
+                        var nodeLabel = $"{string.Join("_", parts)}_{region.Bounds.Width}x{region.Bounds.Height}";
                         using var smallFont = new Font("Consolas", 7f, FontStyle.Regular);
                         var nlSize = g.MeasureString(nodeLabel, smallFont);
                         var nlx = Math.Max(region.Bounds.Left + 2,
