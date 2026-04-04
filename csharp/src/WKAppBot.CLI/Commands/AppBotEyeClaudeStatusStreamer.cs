@@ -1112,11 +1112,15 @@ internal partial class Program
         // This allows skip-and-retry without waiting 1h.
         var cwdKey = state.FullCwd ?? state.CwdLabel;
 
+        // Suggestions are AppBot maintainer items → WKAppBot instance gets ALL suggestions (no CWD filter).
+        // Non-WKAppBot instances (company-work Claudes) get only their own CWD-scoped homework items.
+        var isWkAppBot = (state.FullCwd ?? "").IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0
+                      || (state.CwdLabel ?? "").IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0;
+        var instanceCwd = state.FullCwd ?? state.CwdLabel;
+
         var suggPath = Path.Combine(DataDir, "suggestions.jsonl");
         if (!File.Exists(suggPath)) return;
 
-        // Count non-done/non-archived items that belong to this instance's CWD
-        var instanceCwd = state.FullCwd ?? state.CwdLabel;
         var pending = new List<string>();
         foreach (var line in File.ReadAllLines(suggPath))
         {
@@ -1126,23 +1130,48 @@ internal partial class Program
                 var node = System.Text.Json.Nodes.JsonNode.Parse(line);
                 var status = node?["status"]?.GetValue<string>() ?? "pending";
                 if (status is "done" or "archived") continue;
-                // Route to submitter's CWD — skip items not meant for this instance
-                var suggCwd = node?["cwd"]?.GetValue<string>();
-                if (!string.IsNullOrEmpty(suggCwd) && !string.IsNullOrEmpty(instanceCwd))
+
+                var isMerge  = node?["type"]?.GetValue<string>() == "merge";
+                var suggCwd  = node?["cwd"]?.GetValue<string>();
+
+                if (!isWkAppBot)
                 {
-                    // Match if suggCwd starts with or equals instanceCwd (handles trailing slash variance)
+                    // Non-AppBot instance: CWD-scoped only (basic priority — own workspace homework)
+                    if (string.IsNullOrEmpty(suggCwd) || string.IsNullOrEmpty(instanceCwd)) continue;
                     if (!suggCwd.StartsWith(instanceCwd, StringComparison.OrdinalIgnoreCase) &&
                         !instanceCwd.StartsWith(suggCwd, StringComparison.OrdinalIgnoreCase))
                         continue;
                 }
+                // WKAppBot instance: all items pass (system-wide suggestions + own homework)
+
                 var text = node?["text"]?.GetValue<string>() ?? "";
-                // First line only for summary
-                var summary = text.Split('\n')[0];
-                if (summary.Length > 100) summary = summary[..100] + "...";
+                string summary;
+                if (isMerge)
+                {
+                    var count = node?["count"]?.GetValue<int>() ?? 0;
+                    var risk  = node?["recurrenceRisk"]?.GetValue<string>() ?? "";
+                    var root  = node?["rootCause"]?.GetValue<string>();
+                    var prio  = node?["priority"]?.GetValue<int>() ?? 0;
+                    summary = $"[MERGE×{count} p={prio} {risk}] {text}";
+                    if (root != null) summary += $" — {root}";
+                }
+                else
+                {
+                    summary = text.Split('\n')[0];
+                }
+                if (summary.Length > 120) summary = summary[..120] + "...";
                 pending.Add(summary);
             }
             catch { }
         }
+
+        // Merge records first (self-healing priority), then regular suggestions
+        pending.Sort((a, b) =>
+        {
+            bool am = a.StartsWith("[MERGE");
+            bool bm = b.StartsWith("[MERGE");
+            return am == bm ? 0 : am ? -1 : 1;
+        });
 
         if (pending.Count == 0) return; // no pending → nothing to do
 
