@@ -1,4 +1,4 @@
-# WKAppBot v5.9.0 - Windows + Android App Automation Test Framework
+# WKAppBot v5.10.0 - Windows + Android App Automation Test Framework
 
 ## 클롣 운영 규칙 (필독!)
 
@@ -67,6 +67,19 @@ Eye ↔ MCP 워커(Core) JSON-RPC over pipe. a11y/UIA를 별도 프로세스로 
 ### Self-Healing DYN-A11Y
 UIA 없는 MFC owner-drawn → CCA 세그멘테이션 → OCR 3중 교차검증 → Gemini Vision 추론
 → `dyn_r{row}c{col}` 동적 ID + Experience DB 캐시 + CCA 파라미터 자동 튜닝
+
+### v5.10 신규 (2026-04-04)
+- **Eye 파이프 100ms 타임아웃**: `firstOutputTimeoutMs` — slack/ask/newchat 제외 대부분 명령에 적용. Eye 느리면 Core로 자동 전환
+- **TryRenameSwap 공용 함수**: Eye 메인루프 + 스타트업 gentle-swap + `wkappbot hotswap` CLI — 동일 로직 공유
+- **OcrCorrectionDb**: pixel-hash → 정답 매핑 자기학습 사전 (WKAppBot.Vision). UIA 검증 자동 학습, OCR 결과 자동 보정
+- **suggest show/get/view**: 번호/ts로 전체 내용 조회. 알 수 없는 서브커맨드 가드 (노이즈 방지)
+- **suggest resolve 안전장치**: 중복가드 backup전환, .manifest 삭제감지+자동복구, 실패시 evidence 보존
+- **CDP Input.* minimize 제거**: CDP 렌더러 직접 전달 → minimize 불필요. IsFocusStealingMethod만 minimize
+- **Runtime.enable 재시도**: EnableRuntimeWithRetry (최대 4회 exponential backoff)
+- **로그 라우팅 수정**: Eye 파이프 명령 → 명령별 `old {cmd}/` 폴더. 오타 → `old unknown/`
+- **auto-hack 로그 노이즈 제거**: WKAPPBOT_WORKER=1로 TeeWriter 억제
+- **인코딩 오염 감시**: file edit 후 U+FFFD 감지 + Slack 자동 알림
+- **a11y hack 우상단 노드명**: UIA AutomationId/Name을 세그먼트 내부 top-right에 표시
 
 ### Sunset Screensaver + WhisperRing
 별도 프로세스 (WPF 메모리 격리, 부모 PID 감시 → Eye 종료 시 자동 종료)
