@@ -107,14 +107,10 @@ public sealed partial class CdpClient
         }
     }
 
-    private async Task MaybeLogFocusRiskBeforeAsync(string method, JsonObject? parameters, nint prevFg)
+    private Task MaybeLogFocusRiskBeforeAsync(string method, JsonObject? parameters, nint prevFg)
     {
-        if (!IsFocusRiskMethod(method)) return;
-        if (method == "Runtime.evaluate")
-        {
-            var expr = parameters?["expression"]?.GetValue<string>() ?? "";
-            if (!IsFocusRiskExpression(expr)) return;
-        }
-        await LogFocusRiskAsync("before", method, parameters, prevFg: prevFg);
+        // Before-logging removed: was generating 8000+ noise entries.
+        // Only actual focus-theft events (in SendAsync post-check) are logged now.
+        return Task.CompletedTask;
     }
 }
