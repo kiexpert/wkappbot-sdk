@@ -824,11 +824,11 @@ internal partial class Program
             return BuildSlackBotUsername(SlackCodexPrefix, instanceName, spaceBeforeBracket: false);
         if (IsRunningFromClaudeApp())
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
-        // Heuristic: if claude.exe process is alive, likely running from Claude Code context
-        if (IsProcessAlive("claude"))
-            return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
 
-        // Fallback: generic appbot identity.
+        // Fallback: use Windows login name — "claude.exe alive" heuristic was too broad
+        // (fires even when human user runs wkappbot from bash while Claude happens to be open)
+        var loginUser = Environment.UserName;
+        if (!string.IsNullOrWhiteSpace(loginUser)) return loginUser;
         return BuildSlackBotUsername(SlackGenericPrefix, instanceName, spaceBeforeBracket: false);
     }
 

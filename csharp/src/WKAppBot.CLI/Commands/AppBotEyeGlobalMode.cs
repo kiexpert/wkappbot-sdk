@@ -1227,24 +1227,50 @@ internal partial class Program
                         EyeColor(ConsoleColor.Magenta);
                         Console.WriteLine("[EYE:HOT-SWAP] .new.exe detected — rename-swap");
                         EyeResetColor();
+                        // Step 1: rename running exe → .old (always works — Windows allows renaming running exe)
+                        bool step1Done = false;
                         try
                         {
-                            // No pre-delete needed — timestamped name is always unique
-                            File.Move(exePath, oldExePath);    // running exe → .old-YYYYMMDD-HHmm.exe
-                            File.Move(newExePath, exePath);     // .new.exe → wkappbot.exe
+                            File.Move(exePath, oldExePath);
+                            step1Done = true;
+                        }
+                        catch (Exception ex1)
+                        {
+                            Console.WriteLine($"[EYE:HOT-SWAP] step1 failed ({ex1.Message})");
+                        }
+                        // Step 2: .new.exe → exe. Retry up to 4× (deploy may still have file open)
+                        bool step2Done = false;
+                        if (step1Done)
+                        {
+                            for (int swapRetry = 0; swapRetry < 4 && !step2Done; swapRetry++)
+                            {
+                                if (swapRetry > 0)
+                                {
+                                    Console.WriteLine($"[EYE:HOT-SWAP] step2 retry {swapRetry}/3 (file locked by deploy — waiting 1s)");
+                                    Thread.Sleep(1000);
+                                }
+                                try { File.Move(newExePath, exePath); step2Done = true; }
+                                catch (Exception ex2)
+                                {
+                                    if (swapRetry == 3)
+                                        Console.WriteLine($"[EYE:HOT-SWAP] step2 failed after retries ({ex2.Message})");
+                                }
+                            }
+                            if (!step2Done)
+                            {
+                                // Restore old exe (rollback)
+                                Console.WriteLine("[EYE:HOT-SWAP] rolling back step1");
+                                try { File.Move(oldExePath, exePath); } catch { }
+                            }
+                        }
+                        if (step1Done && step2Done)
+                        {
                             Console.WriteLine($"[EYE:HOT-SWAP] swap OK (.exe→{Path.GetFileName(oldExePath)}, .new→.exe)");
                             _slackRetiring = true; // stop draining queue — new Eye will take over
                             EyeCmdPipeServer.StopAccepting(); // stop accepting new pipe connections immediately
                             EnsureEyeGuardianForWindow(host.GetWindowHandle()); // re-launch guardian for new Eye
                             hotReloadTriggered = true;
                             break;
-                        }
-                        catch (Exception swapEx)
-                        {
-                            Console.WriteLine($"[EYE:HOT-SWAP] swap failed ({swapEx.Message})");
-                            // Rollback if partial (exe was moved but .new rename failed)
-                            if (!File.Exists(exePath) && File.Exists(oldExePath))
-                                try { File.Move(oldExePath, exePath); } catch { }
                         }
                     }
                     else if (File.GetLastWriteTimeUtc(exePath) != exeStartTime)

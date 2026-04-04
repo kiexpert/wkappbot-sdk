@@ -428,8 +428,8 @@ internal partial class Program
         GuardianLog($"[EYE_GUARDIAN] started pollMs={pollMs} respawnDelaySec={respawnDelaySec} launchTimeoutMs={launchTimeoutMs} tickTimeoutMs={tickTimeoutMs} eyeHwnd=0x{eyeHwnd.ToInt64():X}");
         DateTime? deadSinceUtc = null;
         int consecutiveHealthFailures = 0;
-        int consecutiveHealthSuccesses = 0;
-        const int ExitThreshold = 7;
+        // Guardian runs forever — no self-succession to avoid infinite respawn chains.
+        // Diag-file freshness check does not require hwnd; works across hot-swaps.
         while (true)
         {
             var alive = IsEyeAlive();
@@ -437,51 +437,15 @@ internal partial class Program
             {
                 if (IsEyeHealthy())
                 {
-                    consecutiveHealthSuccesses++;
-                    GuardianLog($"[EYE_GUARDIAN] tick ok streak={consecutiveHealthSuccesses}/{ExitThreshold}");
+                    GuardianLog("[EYE_GUARDIAN] tick ok");
                     deadSinceUtc = null;
                     consecutiveHealthFailures = 0;
-                    if (consecutiveHealthSuccesses >= ExitThreshold)
-                    {
-                        GuardianLog($"[EYE_GUARDIAN] {ExitThreshold} consecutive healthy ticks — spawning successor guardian");
-
-                        // Release mutex so successor can acquire it
-                        try { guardianMutex.ReleaseMutex(); } catch { }
-
-                        // Spawn successor with same parameters
-                        var corePath2 = Environment.ProcessPath ?? "wkappbot";
-                        var succArgs = $"eye guardian --respawn-delay {respawnDelaySec} --poll-ms {pollMs}" +
-                                       $" --tick-timeout-ms {tickTimeoutMs} --launch-timeout-ms {launchTimeoutMs}" +
-                                       (eyeHwnd != IntPtr.Zero ? $" --eye-hwnd 0x{eyeHwnd.ToInt64():X}" : "");
-                        AppBotPipe.Spawn(corePath2, succArgs,
-                            EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory,
-                            caller: "EYE-GUARDIAN-SUCCESSOR");
-
-                        // Wait up to 5s for successor to acquire guardian mutex
-                        bool successorConfirmed = false;
-                        for (int si = 0; si < 20; si++)
-                        {
-                            Thread.Sleep(250);
-                            try
-                            {
-                                using var probe = new System.Threading.Mutex(false, "Global\\WKAppBotEyeGuardian");
-                                if (!probe.WaitOne(0)) { successorConfirmed = true; break; }
-                                probe.ReleaseMutex();
-                            }
-                            catch { }
-                        }
-
-                        GuardianLog(successorConfirmed
-                            ? "[EYE_GUARDIAN] successor confirmed — exiting"
-                            : "[EYE_GUARDIAN] successor not confirmed in 5s — exiting anyway");
-                        return 0;
-                    }
-                    Thread.Sleep(1000); // 1s interval for exit threshold check
+                    Thread.Sleep(pollMs);
                     continue;
                 }
 
                 consecutiveHealthFailures++;
-                consecutiveHealthSuccesses = 0;
+                // Re-use consecutiveHealthFailures (no consecutiveHealthSuccesses needed)
                 GuardianLog($"[EYE_GUARDIAN] tick failed/timeout streak={consecutiveHealthFailures}");
                 if (consecutiveHealthFailures < 2)
                 {
@@ -517,8 +481,8 @@ internal partial class Program
             {
                 if (IsEyeAlive())
                 {
-                    GuardianLog("[EYE_GUARDIAN] eye restored — will exit after healthy streak");
-                    consecutiveHealthSuccesses = 0;
+                    GuardianLog("[EYE_GUARDIAN] eye restored — resuming watch");
+                    consecutiveHealthFailures = 0;
                     break;
                 }
                 Thread.Sleep(250);
@@ -533,14 +497,14 @@ internal partial class Program
                 }
                 catch { }
                 try { EyeTickCommand(new[] { "--timeout", "15" }); } catch { }
-                // If still not alive after tick fallback, exit so a fresh guardian can be started
                 if (!IsEyeAlive())
                 {
                     GuardianLog("[EYE_GUARDIAN] eye unrecoverable — guardian exiting");
                     return 1;
                 }
-                GuardianLog("[EYE_GUARDIAN] eye restored via tick — exiting guardian (new Eye will spawn its own)");
-                return 0;
+                GuardianLog("[EYE_GUARDIAN] eye restored via tick — resuming watch");
+                deadSinceUtc = null;
+                consecutiveHealthFailures = 0;
             }
 
             Thread.Sleep(pollMs);
@@ -699,6 +663,8 @@ internal partial class Program
             return EyeTickCommand(args.Skip(1).ToArray());
         if (args.Length > 0 && string.Equals(args[0], "guardian", StringComparison.OrdinalIgnoreCase))
             return EyeGuardianCommand(args.Skip(1).ToArray());
+        if (args.Length > 0 && string.Equals(args[0], "hotswap", StringComparison.OrdinalIgnoreCase))
+            return EyeHotSwapCommand(args.Skip(1).ToArray());
 
         PulseStep.Init("eye-cli");
 
@@ -902,6 +868,60 @@ internal partial class Program
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out MV_RECT lpRect);
+
+    /// <summary>
+    /// eye hotswap — force Eye self-restart by staging a .new.exe and triggering the hot-swap loop.
+    /// Useful when publish produced an identical binary (same mtime) and Eye skipped the swap.
+    /// Works both standalone (FSW picks up .new.exe) and in-process via CMD pipe (flag set directly).
+    /// </summary>
+    static int EyeHotSwapCommand(string[] args)
+    {
+        var selfExe = Environment.ProcessPath ?? "";
+        if (string.IsNullOrEmpty(selfExe) || !File.Exists(selfExe))
+        {
+            Console.WriteLine("[HOTSWAP] Error: cannot determine process path");
+            return 1;
+        }
+
+        var exeDir  = Path.GetDirectoryName(selfExe) ?? "";
+        var exeName = Path.GetFileNameWithoutExtension(selfExe);
+        var newExePath = Path.Combine(exeDir, $"{exeName}.new.exe");
+
+        var curInfo = new FileInfo(selfExe);
+        Console.WriteLine($"[HOTSWAP] exe: {Path.GetFileName(selfExe)}  mtime={curInfo.LastWriteTimeUtc:yyyy-MM-dd HH:mm:ss}UTC  size={curInfo.Length:#,0}");
+
+        if (File.Exists(newExePath))
+        {
+            var prev = new FileInfo(newExePath);
+            Console.WriteLine($"[HOTSWAP] existing .new.exe: mtime={prev.LastWriteTimeUtc:HH:mm:ss}UTC size={prev.Length:#,0} — overwriting");
+        }
+
+        try
+        {
+            // Copy → touch: ensures mtime differs from running exe → identical check fails → swap proceeds
+            File.Copy(selfExe, newExePath, overwrite: true);
+            File.SetLastWriteTimeUtc(newExePath, DateTime.UtcNow);
+            var newInfo = new FileInfo(newExePath);
+            Console.WriteLine($"[HOTSWAP] .new.exe staged  mtime={newInfo.LastWriteTimeUtc:HH:mm:ss}UTC  size={newInfo.Length:#,0}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[HOTSWAP] Failed to stage .new.exe: {ex.Message}");
+            return 1;
+        }
+
+        if (RunningInEye)
+        {
+            // Running in-process via Eye CMD pipe — wake the swap loop immediately (no FSW delay)
+            _fswExeDirty = true;
+            Console.WriteLine("[HOTSWAP] Eye notified — swap will trigger on next loop iteration (~100ms)");
+        }
+        else
+        {
+            Console.WriteLine("[HOTSWAP] .new.exe staged — running Eye will pick up via FSW and restart");
+        }
+        return 0;
+    }
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
