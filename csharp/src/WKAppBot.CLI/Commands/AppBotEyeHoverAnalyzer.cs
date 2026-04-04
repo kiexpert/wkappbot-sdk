@@ -219,18 +219,16 @@ internal partial class Program
         try { oldCts?.Cancel(); } catch { }
         try { oldCts?.Dispose(); } catch { }
 
-        // Immediately hide session overlay (clear stale content)
-        A11yHackOverlayHost.GetOrCreate(OverlaySlot.Session, 0, 0, 1, 1)?.Hide();
+        // Immediately hide session overlay (clear stale content) — don't create new
+        A11yHackOverlayHost.TryGetSlot(OverlaySlot.Session)?.Hide();
 
         var debounceCts = _liveHackDebounceCts;
         _ = Task.Run(async () =>
         {
             try
             {
-                // Same target content change → no debounce (instant re-analyze)
-                // New target → 1s debounce (wait for stabilization)
-                if (!sameTarget)
-                    await Task.Delay(1000, debounceCts.Token);
+                // Always wait at least 1s after cancel (prevent CPU spike from rapid re-spawn)
+                await Task.Delay(1000, debounceCts.Token);
                 string currentGrap;
                 string currentSource;
                 string currentHeadline;
