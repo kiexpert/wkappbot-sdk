@@ -24,7 +24,7 @@ namespace WKAppBot.Vision;
 public sealed class ConnectedComponentAnalyzer
 {
     /// <summary>Region type classification.</summary>
-    public enum RegionType { Text, Icon, Noise, Separator, Container }
+    public enum RegionType { DyText, DyIcon, DyNoise, DySeparator, DyContainer }
 
     /// <summary>A detected table grid with row/column boundaries and cells.</summary>
     public sealed class TableGrid
@@ -72,9 +72,9 @@ public sealed class ConnectedComponentAnalyzer
     /// </summary>
     public TableGrid? DetectTable(List<Region> regions, int imgW, int imgH)
     {
-        var hSeps = regions.Where(r => r.Type == RegionType.Separator && r.Bounds.Width > r.Bounds.Height)
+        var hSeps = regions.Where(r => r.Type == RegionType.DySeparator && r.Bounds.Width > r.Bounds.Height)
             .OrderBy(r => r.Bounds.Y).ToList();
-        var vSeps = regions.Where(r => r.Type == RegionType.Separator && r.Bounds.Height > r.Bounds.Width)
+        var vSeps = regions.Where(r => r.Type == RegionType.DySeparator && r.Bounds.Height > r.Bounds.Width)
             .OrderBy(r => r.Bounds.X).ToList();
 
         if (hSeps.Count < 2 && vSeps.Count < 2) return null;
@@ -139,8 +139,8 @@ public sealed class ConnectedComponentAnalyzer
         var rawRegions = ExtractRegions(labels, w, h, count);
         var regions = Classify(rawRegions, w, h);
 
-        var textRegions = regions.Where(r => r.Type == RegionType.Text).OrderBy(r => r.Bounds.Y).ThenBy(r => r.Bounds.X).ToList();
-        var others = regions.Where(r => r.Type != RegionType.Text).ToList();
+        var textRegions = regions.Where(r => r.Type == RegionType.DyText).OrderBy(r => r.Bounds.Y).ThenBy(r => r.Bounds.X).ToList();
+        var others = regions.Where(r => r.Type != RegionType.DyText).ToList();
 
         // Merge text regions that are close horizontally and on the same line
         var merged = new List<Region>();
@@ -172,7 +172,7 @@ public sealed class ConnectedComponentAnalyzer
                     }
                 }
             }
-            merged.Add(new Region { Bounds = group, Type = RegionType.Text, PixelCount = totalPixels, Label = -1 });
+            merged.Add(new Region { Bounds = group, Type = RegionType.DyText, PixelCount = totalPixels, Label = -1 });
         }
 
         merged.AddRange(others);
@@ -200,7 +200,7 @@ public sealed class ConnectedComponentAnalyzer
         foreach (var region in regions)
         {
             // Only expand Text and Icon (not Noise, Separator, Container)
-            if (region.Type is RegionType.Noise or RegionType.Separator or RegionType.Container)
+            if (region.Type is RegionType.DyNoise or RegionType.DySeparator or RegionType.DyContainer)
             {
                 result.Add(region);
                 continue;
@@ -272,8 +272,8 @@ public sealed class ConnectedComponentAnalyzer
     /// </summary>
     private static List<Region> MergeOverlappingTextRegions(List<Region> regions)
     {
-        var texts = regions.Where(r => r.Type == RegionType.Text).ToList();
-        var others = regions.Where(r => r.Type != RegionType.Text).ToList();
+        var texts = regions.Where(r => r.Type == RegionType.DyText).ToList();
+        var others = regions.Where(r => r.Type != RegionType.DyText).ToList();
         if (texts.Count <= 1) return regions;
 
         var used = new bool[texts.Count];
@@ -307,7 +307,7 @@ public sealed class ConnectedComponentAnalyzer
                 }
             }
 
-            merged.Add(new Region { Bounds = group, Type = RegionType.Text, PixelCount = totalPixels, Label = -1 });
+            merged.Add(new Region { Bounds = group, Type = RegionType.DyText, PixelCount = totalPixels, Label = -1 });
         }
 
         merged.AddRange(others);
@@ -481,7 +481,7 @@ public sealed class ConnectedComponentAnalyzer
                 PixelCount = pixels[i],
                 Perimeter = perim[i],
                 Label = i,
-                Type = RegionType.Text, // classified later
+                Type = RegionType.DyText, // classified later
             });
         }
         return regions;
@@ -563,16 +563,16 @@ public sealed class ConnectedComponentAnalyzer
 
         // Tiny: noise
         int noiseMax = p?.NoiseMaxPixels ?? MinComponentPixels;
-        if (w < 3 || h < 3 || r.PixelCount <= noiseMax) return RegionType.Noise;
+        if (w < 3 || h < 3 || r.PixelCount <= noiseMax) return RegionType.DyNoise;
 
         // Separator: very elongated horizontal or vertical line
-        if (w > imgW * 0.6 && h <= 3) return RegionType.Separator;
-        if (h > imgH * 0.6 && w <= 3) return RegionType.Separator;
+        if (w > imgW * 0.6 && h <= 3) return RegionType.DySeparator;
+        if (h > imgH * 0.6 && w <= 3) return RegionType.DySeparator;
 
         // Container: round border / frame — high thinness (mostly perimeter, little fill)
         // Large component with perimeter/area ratio > 0.6 = hollow frame
         if (r.Thinness > 0.6 && (w > 20 || h > 20) && r.Density < 0.3)
-            return RegionType.Container;
+            return RegionType.DyContainer;
 
         // Text: tunable thresholds
         double minDensity = p?.TextMinDensity ?? 0.10;
@@ -584,13 +584,13 @@ public sealed class ConnectedComponentAnalyzer
         double ar = r.AspectRatio;
         if (ar >= minAR && ar <= maxAR && r.Density >= minDensity && r.Density <= maxDensity
             && w <= maxSize && h <= maxSize)
-            return RegionType.Text;
+            return RegionType.DyText;
 
         // Icon: tunable min size
         int iconMin = p?.IconMinSize ?? 8;
         if (w >= iconMin && h >= iconMin && r.Density > 0.05)
-            return RegionType.Icon;
+            return RegionType.DyIcon;
 
-        return RegionType.Noise;
+        return RegionType.DyNoise;
     }
 }
