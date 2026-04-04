@@ -316,7 +316,7 @@ partial class Program
         // eye tick / eye hotswap / eye homework: one-shot subcommands — route through Eye pipe if running
         var eyeSubcmd = forwardArgs.Length > 1 ? forwardArgs[1].ToLowerInvariant() : "";
         var isEyeDaemon = cmd == "eye"
-            && eyeSubcmd is not ("tick" or "hotswap" or "homework");
+            && eyeSubcmd is not ("tick" or "hotswap" or "homework" or "shutdown");
         var isWorkerMode = Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1";
         if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
