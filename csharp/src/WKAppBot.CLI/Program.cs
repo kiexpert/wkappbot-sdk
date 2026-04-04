@@ -745,6 +745,7 @@ internal partial class Program
                 "claude-usage" => A11yClaudeUsage(),
                 "suggest" => SuggestCommand(restArgs),
                 "gc" => GcCommand(restArgs),
+                "hotswap" => HotSwapCommand(restArgs),
                 "zoom-demo" => ZoomDemoCommand(restArgs),
                 "tick" => TickCommand(restArgs),
                 // External
