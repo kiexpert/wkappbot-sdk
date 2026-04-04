@@ -89,45 +89,18 @@ internal partial class Program
         }));
         liveOverlay?.StartHoverTracking(wr.Left, wr.Top);
 
-        // ── Abort: user input OR target content changed → stop + hide overlay ──
+        // ── Abort checks (two tiers) ──
         var hackAborted = false;
         var inputBaselineTick = Environment.TickCount;
-        long baselineHash = 0; // set after CCA on target node bounds
-        Rectangle targetScreenRect = Rectangle.Empty; // target node in screen coords
+        RECT baselineWr = wr; // window position baseline (GetWindowRect is ~0ms)
+        long baselinePixelHash = 0; // 4-pixel sample hash (set after CCA)
+        Rectangle targetScreenRect = Rectangle.Empty;
 
-        long QuickScreenHash(int sx, int sy, int sw, int sh)
-        {
-            // Sample a few rows for fast comparison (not full screenshot)
-            try
-            {
-                using var sample = new Bitmap(sw, 1);
-                using var g = Graphics.FromImage(sample);
-                int midY = sy + sh / 2;
-                g.CopyFromScreen(sx, midY, 0, 0, new Size(sw, 1));
-                long h = 0;
-                var data = sample.LockBits(new Rectangle(0, 0, sw, 1),
-                    System.Drawing.Imaging.ImageLockMode.ReadOnly,
-                    System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                try
-                {
-                    var buf = new byte[data.Stride];
-                    System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
-                    // FNV-1a hash on sampled pixels (every 4th pixel)
-                    h = unchecked((long)0xcbf29ce484222325);
-                    for (int i = 0; i < buf.Length; i += 16)
-                        h = unchecked((h ^ buf[i]) * (long)0x100000001b3);
-                }
-                finally { sample.UnlockBits(data); }
-                return h;
-            }
-            catch { return baselineHash; } // on error, assume unchanged
-        }
-
+        // Tier 1: user input only (cheap — called per OCR item)
         bool HackShouldAbort()
         {
             if (hackAborted) return true;
-            // User input check
-            var idleMs = WKAppBot.Win32.Native.NativeMethods.GetUserIdleMs();
+            var idleMs = NativeMethods.GetUserIdleMs();
             var elapsed = (uint)(Environment.TickCount - inputBaselineTick);
             if (idleMs < elapsed && idleMs < 300)
             {
@@ -136,12 +109,28 @@ internal partial class Program
                 liveOverlay?.Hide();
                 return true;
             }
-            // Content change check on target node only (compare mid-row hash)
-            if (baselineHash != 0 && !targetScreenRect.IsEmpty)
+            return false;
+        }
+
+        // Tier 2: position + content change (called at stage boundaries only)
+        bool HackTargetChanged()
+        {
+            if (hackAborted) return true;
+            // 1. Window moved/resized? (Win32 GetWindowRect, ~0ms)
+            NativeMethods.GetWindowRect(hwnd, out var curWr);
+            if (curWr.Left != baselineWr.Left || curWr.Top != baselineWr.Top
+                || curWr.Right != baselineWr.Right || curWr.Bottom != baselineWr.Bottom)
             {
-                var currentHash = QuickScreenHash(targetScreenRect.X, targetScreenRect.Y,
-                    targetScreenRect.Width, targetScreenRect.Height);
-                if (currentHash != baselineHash)
+                hackAborted = true;
+                Console.WriteLine("[HACK] Window moved/resized — aborting");
+                liveOverlay?.Hide();
+                return true;
+            }
+            // 2. Target node pixels changed? (4-pixel sample, ~0.1ms)
+            if (baselinePixelHash != 0 && !targetScreenRect.IsEmpty)
+            {
+                var cur = SampleCenterPixels(targetScreenRect);
+                if (cur != baselinePixelHash)
                 {
                     hackAborted = true;
                     Console.WriteLine("[HACK] Content changed — aborting for re-analysis");
@@ -150,6 +139,30 @@ internal partial class Program
                 }
             }
             return false;
+        }
+
+        // Sample 9 pixels (3x3 grid at target center) — no GDI Bitmap, just GetPixel
+        static long SampleCenterPixels(Rectangle r)
+        {
+            try
+            {
+                var hdc = NativeMethods.GetDC(IntPtr.Zero);
+                if (hdc == IntPtr.Zero) return 0;
+                try
+                {
+                    long hash = unchecked((long)0xcbf29ce484222325);
+                    int cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2;
+                    for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        uint px = NativeMethods.GetPixel(hdc, cx + dx, cy + dy);
+                        hash = unchecked((hash ^ (long)px) * (long)0x100000001b3);
+                    }
+                    return hash;
+                }
+                finally { NativeMethods.ReleaseDC(IntPtr.Zero, hdc); }
+            }
+            catch { return 0; }
         }
 
         Bitmap bmp;
@@ -177,13 +190,12 @@ internal partial class Program
         regions = OrderRegionsForTarget(regions, analysisTargetRect, w, h);
         PulseStep.Mark("cca-done");
 
-        // Set baseline hash on target node bounds for content change detection
+        // Set baseline for content change detection (4-pixel sample on target node)
         if (regions.Count > 0)
         {
             var tb = regions[0].Bounds;
             targetScreenRect = new Rectangle(wr.Left + tb.X, wr.Top + tb.Y, tb.Width, tb.Height);
-            baselineHash = QuickScreenHash(targetScreenRect.X, targetScreenRect.Y,
-                targetScreenRect.Width, targetScreenRect.Height);
+            baselinePixelHash = SampleCenterPixels(targetScreenRect);
         }
 
         int textCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DyText);
@@ -204,7 +216,7 @@ internal partial class Program
             Console.WriteLine($"[HACK] Table detected: {table.Rows} rows 횞 {table.Cols} cols");
         PulseStep.Mark("table-detect");
 
-        if (HackShouldAbort()) { bmp.Dispose(); return 0; }
+        if (HackTargetChanged()) { bmp.Dispose(); return 0; }
         // UIA answer key: scan UIA tree, build rect→info map for cross-reference
         var uiaAnswers = new Dictionary<int, (string name, string type, string aid)>();
         var _uiaBestArea = new Dictionary<int, int>(); // track smallest match per region
@@ -264,7 +276,7 @@ internal partial class Program
         }
         catch (Exception ex) { Console.WriteLine($"[HACK] UIA scan error: {ex.Message}"); }
 
-        if (HackShouldAbort()) { bmp.Dispose(); return 0; }
+        if (HackTargetChanged()) { bmp.Dispose(); return 0; }
         // OCR on text regions + tree output
         var positions = DynamicA11yAnalyzer.AssignGridPositions(
             regions, r => r.Bounds, rowGap: 5);
@@ -461,7 +473,7 @@ internal partial class Program
         Console.WriteLine($"  OCR: {ocrOk} ok, {ocrEmpty} failed");
         if (table != null)
             Console.WriteLine($"  Table: {table.Rows}횞{table.Cols}");
-        if (HackShouldAbort()) { bmp.Dispose(); return 0; }
+        if (HackTargetChanged()) { bmp.Dispose(); return 0; }
         if (gapCollector.HasGaps)
         {
             Console.WriteLine($"  Vision needed: {gapCollector.Count} blind region(s)");
