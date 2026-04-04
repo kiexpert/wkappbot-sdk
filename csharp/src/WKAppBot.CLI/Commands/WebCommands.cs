@@ -168,7 +168,19 @@ Options:
     static CdpClient ConnectCdp(int port, bool withBar = false, bool verifyWebBot = false, bool ensureWindow = true, string? navigateUrl = null)
     {
         var cdp = new CdpClient();
-        cdp.ConnectAsync(port).GetAwaiter().GetResult();
+        try
+        {
+            cdp.ConnectAsync(port).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // Auto-launch Chrome WebBot if not running
+            Console.WriteLine($"[WEB] CDP port {port} not available — launching Chrome...");
+            var proc = WKAppBot.WebBot.ChromeLauncher.LaunchAsync(port, navigateUrl).GetAwaiter().GetResult();
+            if (proc != null)
+                Console.WriteLine($"[WEB] Chrome launched (pid={proc.Id})");
+            cdp.ConnectAsync(port).GetAwaiter().GetResult();
+        }
 
         // Ensure we're connected to this session's tab in the correctly-positioned window.
         // When navigateUrl is provided: use sandbox key "web+{host}+{hwnd:X8}" — guaranteed isolated tab per host+HWND.

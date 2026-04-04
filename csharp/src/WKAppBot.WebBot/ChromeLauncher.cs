@@ -119,12 +119,13 @@ public static class ChromeLauncher
         // appMode disabled: always use normal browser UI (tabs + address bar visible)
         arguments += $" \"{targetUrl}\"";
 
+        // UseShellExecute=true so WindowStyle.Minimized is respected (no focus theft)
         var psi = new ProcessStartInfo
         {
             FileName = chromePath,
             Arguments = arguments,
-            UseShellExecute = false,
-            WindowStyle = ProcessWindowStyle.Minimized, // launch iconic → no focus theft
+            UseShellExecute = true,
+            WindowStyle = ProcessWindowStyle.Minimized,
         };
 
         var process = Process.Start(psi)
