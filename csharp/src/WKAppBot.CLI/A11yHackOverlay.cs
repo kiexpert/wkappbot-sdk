@@ -5,13 +5,18 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace WKAppBot.CLI;
 
-internal sealed record A11yHackOverlayBox(Rect Bounds, Color Color, string? Label = null, double Thickness = 2.0);
+/// <summary>
+/// Role: Target=neon green, Scope=semi-transparent fill (sibling/parent), Known=dashed (UIA info), Other=thin border
+/// </summary>
+internal enum HackBoxRole { Other, Known, Scope, Target }
+internal sealed record A11yHackOverlayBox(Rect Bounds, Color Color, string? Label = null, double Thickness = 2.0, string? OcrText = null, HackBoxRole Role = HackBoxRole.Other);
 internal sealed record A11yHackOverlayPreview(BitmapSource Image, double Width, double Height, string? Header = null);
 internal sealed record A11yHackOverlayModel(IReadOnlyList<A11yHackOverlayBox> Boxes, A11yHackOverlayPreview? Preview = null);
 
@@ -66,12 +71,17 @@ internal sealed class A11yHackOverlayWindow : Window
             };
             _canvas.Children.Add(_hoverRect);
         }
-        _hoverRect.Width = Math.Max(1, box.Bounds.Width);
-        _hoverRect.Height = Math.Max(1, box.Bounds.Height);
+        // DPI scale for hover too
+        double hDpi = 1.0;
+        var hSource = PresentationSource.FromVisual(this);
+        if (hSource?.CompositionTarget != null)
+            hDpi = hSource.CompositionTarget.TransformToDevice.M11;
+        _hoverRect.Width = Math.Max(1, box.Bounds.Width / hDpi);
+        _hoverRect.Height = Math.Max(1, box.Bounds.Height / hDpi);
         _hoverRect.Fill = new SolidColorBrush(Color.FromArgb(48, box.Color.R, box.Color.G, box.Color.B));
         _hoverRect.Stroke = new SolidColorBrush(Colors.White);
-        Canvas.SetLeft(_hoverRect, box.Bounds.X);
-        Canvas.SetTop(_hoverRect, box.Bounds.Y);
+        Canvas.SetLeft(_hoverRect, box.Bounds.X / hDpi);
+        Canvas.SetTop(_hoverRect, box.Bounds.Y / hDpi);
         _hoverRect.Visibility = Visibility.Visible;
     }
 
@@ -80,68 +90,189 @@ internal sealed class A11yHackOverlayWindow : Window
         _canvas.Children.Clear();
         _hoverRect = null; // cleared with canvas
 
+        // DPI scale: box coordinates are physical pixels, WPF Canvas uses DIPs
+        double dpiScale = 1.0;
+        var source = PresentationSource.FromVisual(this);
+        if (source?.CompositionTarget != null)
+            dpiScale = source.CompositionTarget.TransformToDevice.M11; // e.g. 1.25 for 125%
+
         for (int i = 0; i < model.Boxes.Count; i++)
         {
             var box = model.Boxes[i];
-            bool isTarget = i == 0;
-            var stroke = new SolidColorBrush(box.Color);
+            var role = box.Role;
+            // Convert physical pixel bounds to DIP
+            var bx = box.Bounds.X / dpiScale;
+            var by = box.Bounds.Y / dpiScale;
+            var bw = box.Bounds.Width / dpiScale;
+            var bh = box.Bounds.Height / dpiScale;
+
+            // Style per role:
+            //   Target = neon green solid + fill + glow
+            //   Scope  = semi-transparent fill + solid border (siblings/parent)
+            //   Known  = dashed border, no fill (has UIA info)
+            //   Other  = thin solid border, no fill
+            Brush stroke; double thickness; Brush fill;
+            DoubleCollection? dash; double radiusX, radiusY;
+            DropShadowEffect? effect;
+
+            switch (role)
+            {
+                case HackBoxRole.Target:
+                    stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88));
+                    thickness = 2.2;
+                    fill = new SolidColorBrush(Color.FromArgb(28, 0x00, 0xFF, 0x88));
+                    dash = null;
+                    radiusX = radiusY = 3;
+                    effect = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 16, ShadowDepth = 0, Opacity = 0.8 };
+                    break;
+                case HackBoxRole.Scope:
+                    stroke = new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5)); // blue
+                    thickness = 1.2;
+                    fill = new SolidColorBrush(Color.FromArgb(22, 0x42, 0xA5, 0xF5));
+                    dash = null;
+                    radiusX = radiusY = 2;
+                    effect = new DropShadowEffect { Color = Color.FromRgb(0x42, 0xA5, 0xF5), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.3 };
+                    break;
+                default: // Known + Other → all dashed (analysis window scope)
+                    stroke = new SolidColorBrush(Color.FromArgb(160, box.Color.R, box.Color.G, box.Color.B));
+                    thickness = 0.8;
+                    fill = Brushes.Transparent;
+                    dash = new DoubleCollection { 3, 2 };
+                    radiusX = radiusY = 0;
+                    effect = null;
+                    break;
+            }
+
             var rect = new Rectangle
             {
-                Width = Math.Max(1, box.Bounds.Width),
-                Height = Math.Max(1, box.Bounds.Height),
+                Width = Math.Max(1, bw),
+                Height = Math.Max(1, bh),
                 Stroke = stroke,
-                StrokeThickness = isTarget ? Math.Max(1.2, box.Thickness + 0.3) : box.Thickness,
-                Fill = Brushes.Transparent,
-                RadiusX = 0,
-                RadiusY = 0,
-                StrokeDashArray = isTarget ? null : new DoubleCollection { 4, 2 },
-                Effect = isTarget
-                    ? new DropShadowEffect
-                    {
-                        Color = box.Color,
-                        BlurRadius = 8,
-                        ShadowDepth = 0,
-                        Opacity = 0.6
-                    }
-                    : new DropShadowEffect
-                    {
-                        Color = box.Color,
-                        BlurRadius = 5,
-                        ShadowDepth = 0,
-                        Opacity = 0.25
-                    },
+                StrokeThickness = thickness,
+                Fill = fill,
+                RadiusX = radiusX,
+                RadiusY = radiusY,
+                StrokeDashArray = dash,
+                Effect = effect,
                 IsHitTestVisible = false
             };
-            Canvas.SetLeft(rect, box.Bounds.X);
-            Canvas.SetTop(rect, box.Bounds.Y);
+            Canvas.SetLeft(rect, bx);
+            Canvas.SetTop(rect, by);
             _canvas.Children.Add(rect);
 
             // Label: placed at top-right of each box border (inside, overlapping border)
             if (!string.IsNullOrWhiteSpace(box.Label))
             {
+                var labelFg = role switch
+                {
+                    HackBoxRole.Target => Color.FromRgb(0x00, 0xFF, 0x88),
+                    HackBoxRole.Scope => Color.FromRgb(0x90, 0xCA, 0xF9), // light blue
+                    _ => Color.FromRgb(0xB0, 0xE0, 0xE6), // light cyan
+                };
+                var labelBgColor = role switch
+                {
+                    HackBoxRole.Target => Color.FromArgb(220, 0, 30, 20),
+                    HackBoxRole.Scope => Color.FromArgb(200, 0, 15, 50),
+                    _ => Color.FromArgb(200, 0, 0, 60),
+                };
                 var labelBg = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(200, 0, 0, 60)),
+                    Background = new SolidColorBrush(labelBgColor),
                     CornerRadius = new CornerRadius(2),
                     Padding = new Thickness(3, 1, 3, 1),
                     Child = new TextBlock
                     {
                         Text = box.Label,
-                        Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xE0, 0xE6)), // LightCyan-ish
+                        Foreground = new SolidColorBrush(labelFg),
                         FontFamily = new FontFamily("Consolas"),
-                        FontSize = 8,
+                        FontSize = role == HackBoxRole.Target ? 9 : 8,
+                        FontWeight = role == HackBoxRole.Target ? FontWeights.Bold : FontWeights.Normal,
                     },
+                    Effect = role == HackBoxRole.Target
+                        ? new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.5 }
+                        : null,
                     IsHitTestVisible = false
                 };
                 labelBg.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 var labelW = labelBg.DesiredSize.Width;
                 var labelH = labelBg.DesiredSize.Height;
                 // Top-right inside the box, overlapping the border
-                var lx = Math.Max(0, box.Bounds.Right - labelW - 2);
-                var ly = Math.Max(0, box.Bounds.Top + 2);
+                var lx = Math.Max(0, bx + bw - labelW - 2);
+                var ly = Math.Max(0, by + 2);
                 Canvas.SetLeft(labelBg, lx);
                 Canvas.SetTop(labelBg, ly);
                 _canvas.Children.Add(labelBg);
+            }
+
+            // OCR text: inside box as content, gold text, marquee scroll if overflows
+            if (!string.IsNullOrWhiteSpace(box.OcrText))
+            {
+                var fontSize = Math.Clamp(bh * 0.45, 7, 12);
+                var boxW = Math.Max(10, (bw - 4) / 2); // half-width: don't cover original text
+
+                var ocrBlock = new TextBlock
+                {
+                    Text = box.OcrText,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00)), // Gold
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize = fontSize,
+                    TextWrapping = TextWrapping.NoWrap,
+                    IsHitTestVisible = false
+                };
+
+                // Clip container to box width
+                var clipCanvas = new Canvas
+                {
+                    Width = boxW,
+                    Height = fontSize + 4,
+                    ClipToBounds = true,
+                    IsHitTestVisible = false
+                };
+                clipCanvas.Children.Add(ocrBlock);
+                Canvas.SetTop(ocrBlock, 0);
+
+                var ocrBg = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromArgb(160, 20, 10, 0)),
+                    CornerRadius = new CornerRadius(1),
+                    Padding = new Thickness(2, 0, 2, 0),
+                    Child = clipCanvas,
+                    IsHitTestVisible = false
+                };
+
+                // Measure text width for scroll decision
+                ocrBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                var textW = ocrBlock.DesiredSize.Width;
+
+                if (textW > boxW)
+                {
+                    // Marquee scroll: left → right → left (ping-pong)
+                    var translate = new TranslateTransform(0, 0);
+                    ocrBlock.RenderTransform = translate;
+                    var scrollDist = textW - boxW;
+                    var duration = TimeSpan.FromSeconds(Math.Max(2, scrollDist / 30.0)); // ~30px/s
+                    var anim = new DoubleAnimation
+                    {
+                        From = 0,
+                        To = -scrollDist,
+                        Duration = new Duration(duration),
+                        AutoReverse = true,
+                        RepeatBehavior = RepeatBehavior.Forever,
+                        EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                    };
+                    translate.BeginAnimation(TranslateTransform.XProperty, anim);
+                }
+
+                ocrBg.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                var ocrH = ocrBg.DesiredSize.Height;
+                // Right-aligned inside box (left half = original text untouched)
+                var ox = bx + bw - boxW - 4;
+                if (ox < bx) ox = bx;
+                var oy = by + (bh - ocrH) / 2;
+                if (oy < by + 1) oy = by + 1;
+                Canvas.SetLeft(ocrBg, ox);
+                Canvas.SetTop(ocrBg, oy);
+                _canvas.Children.Add(ocrBg);
             }
         }
     }

@@ -132,7 +132,13 @@ public sealed class ConnectedComponentAnalyzer
     /// </summary>
     public List<Region> AnalyzeAndMerge(Bitmap bmp, int mergeGapX = 5, int mergeGapY = 3)
     {
-        var regions = Analyze(bmp);
+        int w = bmp.Width, h = bmp.Height;
+        var gray = ToGrayscale(bmp, w, h);
+        var binary = AdaptiveThreshold(gray, w, h);
+        var (labels, count) = LabelComponents(binary, w, h);
+        var rawRegions = ExtractRegions(labels, w, h, count);
+        var regions = Classify(rawRegions, w, h);
+
         var textRegions = regions.Where(r => r.Type == RegionType.Text).OrderBy(r => r.Bounds.Y).ThenBy(r => r.Bounds.X).ToList();
         var others = regions.Where(r => r.Type != RegionType.Text).ToList();
 
@@ -170,7 +176,142 @@ public sealed class ConnectedComponentAnalyzer
         }
 
         merged.AddRange(others);
-        return merged.OrderBy(r => r.Bounds.Y).ThenBy(r => r.Bounds.X).ToList();
+
+        // Expand each region outward into background until hitting a border/edge
+        var expanded = ExpandRegionsToBorders(merged, binary, w, h);
+
+        // Merge expanded text regions that overlap or touch (→ paragraph blocks)
+        expanded = MergeOverlappingTextRegions(expanded);
+
+        return expanded.OrderBy(r => r.Bounds.Y).ThenBy(r => r.Bounds.X).ToList();
+    }
+
+    /// <summary>
+    /// Expand each region's bounding box outward through background pixels
+    /// until hitting a foreground "border" line or image edge.
+    /// A border = a scan line where ≥25% of pixels are foreground.
+    /// </summary>
+    private static List<Region> ExpandRegionsToBorders(List<Region> regions, bool[] binary, int w, int h)
+    {
+        const double borderThreshold = 0.25; // 25% foreground = border line
+        const int maxExpand = 60; // safety cap
+
+        var result = new List<Region>(regions.Count);
+        foreach (var region in regions)
+        {
+            // Only expand Text and Icon (not Noise, Separator, Container)
+            if (region.Type is RegionType.Noise or RegionType.Separator or RegionType.Container)
+            {
+                result.Add(region);
+                continue;
+            }
+
+            var b = region.Bounds;
+            int top = b.Top, bottom = b.Bottom, left = b.Left, right = b.Right;
+
+            // Expand upward
+            for (int step = 0; step < maxExpand && top > 0; step++)
+            {
+                int y = top - 1;
+                int fg = 0;
+                for (int x = left; x < right; x++)
+                    if (binary[y * w + x]) fg++;
+                if ((double)fg / (right - left) >= borderThreshold) break;
+                top = y;
+            }
+
+            // Expand downward
+            for (int step = 0; step < maxExpand && bottom < h; step++)
+            {
+                int y = bottom;
+                int fg = 0;
+                for (int x = left; x < right; x++)
+                    if (binary[y * w + x]) fg++;
+                if ((double)fg / (right - left) >= borderThreshold) break;
+                bottom = y + 1;
+            }
+
+            // Expand leftward
+            for (int step = 0; step < maxExpand && left > 0; step++)
+            {
+                int x = left - 1;
+                int fg = 0;
+                for (int y = top; y < bottom; y++)
+                    if (binary[y * w + x]) fg++;
+                if ((double)fg / (bottom - top) >= borderThreshold) break;
+                left = x;
+            }
+
+            // Expand rightward
+            for (int step = 0; step < maxExpand && right < w; step++)
+            {
+                int x = right;
+                int fg = 0;
+                for (int y = top; y < bottom; y++)
+                    if (binary[y * w + x]) fg++;
+                if ((double)fg / (bottom - top) >= borderThreshold) break;
+                right = x + 1;
+            }
+
+            var newBounds = new Rectangle(left, top, right - left, bottom - top);
+            result.Add(new Region
+            {
+                Bounds = newBounds,
+                Type = region.Type,
+                PixelCount = region.PixelCount,
+                Perimeter = region.Perimeter,
+                Label = region.Label
+            });
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Merge text regions whose expanded bounds overlap or touch.
+    /// Produces paragraph-level blocks instead of individual word segments.
+    /// </summary>
+    private static List<Region> MergeOverlappingTextRegions(List<Region> regions)
+    {
+        var texts = regions.Where(r => r.Type == RegionType.Text).ToList();
+        var others = regions.Where(r => r.Type != RegionType.Text).ToList();
+        if (texts.Count <= 1) return regions;
+
+        var used = new bool[texts.Count];
+        var merged = new List<Region>();
+
+        for (int i = 0; i < texts.Count; i++)
+        {
+            if (used[i]) continue;
+            var group = texts[i].Bounds;
+            int totalPixels = texts[i].PixelCount;
+            used[i] = true;
+
+            // Iteratively absorb all overlapping/touching text regions
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                for (int j = i + 1; j < texts.Count; j++)
+                {
+                    if (used[j]) continue;
+                    var r = texts[j].Bounds;
+                    // Touch or overlap: inflate by 1px to catch adjacent regions
+                    var inflated = Rectangle.Inflate(group, 1, 1);
+                    if (inflated.IntersectsWith(r))
+                    {
+                        group = Rectangle.Union(group, r);
+                        totalPixels += texts[j].PixelCount;
+                        used[j] = true;
+                        changed = true;
+                    }
+                }
+            }
+
+            merged.Add(new Region { Bounds = group, Type = RegionType.Text, PixelCount = totalPixels, Label = -1 });
+        }
+
+        merged.AddRange(others);
+        return merged;
     }
 
     // ── Grayscale ──────────────────────────────────────────────────────────
@@ -355,6 +496,64 @@ public sealed class ConnectedComponentAnalyzer
             var type = ClassifyOne(r, imgW, imgH);
             return new Region { Bounds = r.Bounds, PixelCount = r.PixelCount, Label = r.Label, Type = type };
         }).ToList();
+    }
+
+    /// <summary>
+    /// Trim border pixels from a crop rectangle.
+    /// Scans inward from each edge: if a scan line has ≥25% foreground (border),
+    /// skip it. Returns the inner content rect (or original if no border found).
+    /// </summary>
+    public static Rectangle TrimBorders(Bitmap bmp, Rectangle cropRect)
+    {
+        int w = bmp.Width, h = bmp.Height;
+        var rect = Rectangle.Intersect(cropRect, new Rectangle(0, 0, w, h));
+        if (rect.Width <= 4 || rect.Height <= 4) return rect;
+
+        var gray = ToGrayscale(bmp, w, h);
+        var binary = AdaptiveThreshold(gray, w, h);
+
+        const double threshold = 0.25;
+        int top = rect.Top, bottom = rect.Bottom, left = rect.Left, right = rect.Right;
+        int maxTrim = 4; // max border thickness to trim
+
+        // Trim top
+        for (int step = 0; step < maxTrim && top < bottom - 2; step++)
+        {
+            int fg = 0;
+            for (int x = left; x < right; x++)
+                if (binary[top * w + x]) fg++;
+            if ((double)fg / (right - left) < threshold) break;
+            top++;
+        }
+        // Trim bottom
+        for (int step = 0; step < maxTrim && bottom > top + 2; step++)
+        {
+            int fg = 0;
+            for (int x = left; x < right; x++)
+                if (binary[(bottom - 1) * w + x]) fg++;
+            if ((double)fg / (right - left) < threshold) break;
+            bottom--;
+        }
+        // Trim left
+        for (int step = 0; step < maxTrim && left < right - 2; step++)
+        {
+            int fg = 0;
+            for (int y = top; y < bottom; y++)
+                if (binary[y * w + left]) fg++;
+            if ((double)fg / (bottom - top) < threshold) break;
+            left++;
+        }
+        // Trim right
+        for (int step = 0; step < maxTrim && right > left + 2; step++)
+        {
+            int fg = 0;
+            for (int y = top; y < bottom; y++)
+                if (binary[y * w + (right - 1)]) fg++;
+            if ((double)fg / (bottom - top) < threshold) break;
+            right--;
+        }
+
+        return new Rectangle(left, top, right - left, bottom - top);
     }
 
     private RegionType ClassifyOne(Region r, int imgW, int imgH)
