@@ -652,17 +652,21 @@ internal partial class Program
                     if (error == null && root != null)
                     {
                         var r = root.Properties.BoundingRectangle.ValueOrDefault;
-                        if (r.Width > 0 && r.Height > 0)
+                        // Skip if resolved to window-level (90%+ of hwnd rect)
+                        bool isRootLevel = r.Width >= (wr.Right - wr.Left) * 0.9
+                                        && r.Height >= (wr.Bottom - wr.Top) * 0.9;
+                        if (r.Width > 0 && r.Height > 0 && !isRootLevel)
                         {
                             wr.Left = r.X;
                             wr.Top = r.Y;
                             wr.Right = r.X + r.Width;
                             wr.Bottom = r.Y + r.Height;
                             Console.WriteLine($"[HACK] Scoped to grap root rect=({r.X},{r.Y} {r.Width}x{r.Height})");
+                            return;
                         }
                     }
                 }
-                return;
+                // Fall through to ElementFromPoint if scope resolved to root level
             }
 
             if (!string.IsNullOrEmpty(uiaScope)) return;
