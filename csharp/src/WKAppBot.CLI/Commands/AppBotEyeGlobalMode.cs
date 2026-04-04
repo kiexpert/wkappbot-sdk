@@ -828,6 +828,31 @@ internal partial class Program
 
         // ── FSW hybrid: event-driven file change detection ──
         InitFileWatchers();
+
+        // Startup gentle-swap: if .new.exe already exists (published while Eye was down), apply immediately.
+        // If .new.exe is identical to running exe (same size+mtime), delete silently (no-op rebuild).
+        if (!string.IsNullOrEmpty(exePath))
+        {
+            var exeDir0 = Path.GetDirectoryName(exePath) ?? "";
+            var exeName0 = Path.GetFileNameWithoutExtension(exePath);
+            var newExe0 = Path.Combine(exeDir0, $"{exeName0}.new.exe");
+            if (File.Exists(newExe0))
+            {
+                var newInfo0 = new FileInfo(newExe0);
+                var curInfo0 = new FileInfo(exePath);
+                if (newInfo0.LastWriteTimeUtc == curInfo0.LastWriteTimeUtc && newInfo0.Length == curInfo0.Length)
+                {
+                    Console.WriteLine($"[EYE] Startup: .new.exe identical to running exe (mtime={newInfo0.LastWriteTimeUtc:HH:mm:ss}, size={newInfo0.Length}) — deleting");
+                    try { File.Delete(newExe0); } catch { }
+                }
+                else
+                {
+                    Console.WriteLine($"[EYE] Startup: .new.exe staged (new={newInfo0.Length}b/{newInfo0.LastWriteTimeUtc:HH:mm:ss}, cur={curInfo0.Length}b/{curInfo0.LastWriteTimeUtc:HH:mm:ss}) — triggering gentle-swap");
+                    _fswExeDirty = true;
+                }
+            }
+        }
+
         // Eye 자체 콘솔 탭 오픈 (apbot-mcp 창 최초 생성 + 위치 고정)
         EyeOpenConsoleWtTab(eyeLogFile);
 
