@@ -275,6 +275,21 @@ internal static class EyeCmdPipeServer
             var cmdLine = string.Join(" ", args);
             Console.Error.WriteLine($"[CMD-MCP] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"} hwnd=0x{callerHwnd?.ToInt64():X}");
 
+            // CWD mismatch: caller has different CWD than Eye's own CWD → MCP worker may use wrong base path.
+            // Register as bug for path-sensitive commands (a11y, file, logcat, inspect).
+            var eyeCwd = Program.EyeCallerCwd;
+            if (!string.IsNullOrEmpty(callerCwd) && !string.IsNullOrEmpty(eyeCwd)
+                && !string.Equals(callerCwd.TrimEnd('\\', '/'), eyeCwd.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)
+                && (args.Length > 0 && args[0].ToLowerInvariant() is "a11y" or "file" or "logcat" or "inspect"))
+            {
+                Console.Error.WriteLine($"[CMD-CWD-MISMATCH] caller={callerCwd} eye={eyeCwd}");
+                Program.AutoRegisterBug(
+                    $"[BUG-AUTO] CWD mismatch on `{cmdLine}`\n" +
+                    $"Caller: {callerCwd}\nEye: {eyeCwd}\n" +
+                    $"MCP worker runs with Eye CWD — relative paths in caller may resolve differently.",
+                    args, callerCwd);
+            }
+
             EyeMcpClient.CurrentCallerCwd = callerCwd;
             EyeMcpClient.CurrentCallerHwnd = callerHwnd?.ToInt64().ToString("X");
             BeginCommand();
