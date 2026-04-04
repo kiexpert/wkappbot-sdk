@@ -12,7 +12,7 @@ using WKAppBot.Win32.Native;
 
 namespace WKAppBot.CLI;
 
-internal enum HackBoxRole { Scope, Target, Known }
+internal enum HackBoxRole { Scope, Target, Known, Cached }
 
 internal sealed record A11yHackOverlayBox(
     Rect Bounds,
@@ -125,6 +125,12 @@ internal sealed class A11yHackOverlayWindow : Window
                     dash = new DoubleCollection { 4, 2 }; rx = ry = 2;
                     fx = new DropShadowEffect { Color = Color.FromRgb(0x42, 0xA5, 0xF5), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.3 };
                     break;
+                case HackBoxRole.Cached: // experience DB hit — amber dashed
+                    stroke = new SolidColorBrush(Color.FromArgb(180, 0xFF, 0xA5, 0x00));
+                    thick = 1.0; fill = new SolidColorBrush(Color.FromArgb(12, 0xFF, 0xA5, 0x00));
+                    dash = new DoubleCollection { 2, 2 }; rx = ry = 1;
+                    fx = null;
+                    break;
                 default: // Known — system a11y dashed green
                     stroke = new SolidColorBrush(Color.FromArgb(160, 0x32, 0xCD, 0x32));
                     thick = 0.8; fill = Brushes.Transparent;
@@ -150,7 +156,8 @@ internal sealed class A11yHackOverlayWindow : Window
                 {
                     HackBoxRole.Target => (Color.FromRgb(0x00, 0xFF, 0x88), Color.FromArgb(220, 0, 30, 20)),
                     HackBoxRole.Scope => (Color.FromRgb(0x90, 0xCA, 0xF9), Color.FromArgb(200, 0, 15, 50)),
-                    _ => (Color.FromRgb(0xB0, 0xE0, 0xB0), Color.FromArgb(180, 0, 30, 0)), // Known: light green
+                    HackBoxRole.Cached => (Color.FromRgb(0xFF, 0xD7, 0x80), Color.FromArgb(180, 40, 20, 0)), // amber
+                    _ => (Color.FromRgb(0xB0, 0xE0, 0xB0), Color.FromArgb(180, 0, 30, 0)),
                 };
                 var labelBg = new Border
                 {

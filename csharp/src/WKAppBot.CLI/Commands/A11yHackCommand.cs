@@ -1153,14 +1153,18 @@ internal partial class Program
                 label = $"{region.Type} {region.Bounds.Width}x{region.Bounds.Height}";
             }
 
-            // Extract OCR text from stageLabel
+            // Extract OCR text from stageLabel + promote to Cached if experience DB hit
             string? ocrText = null;
             if (stageLabels != null && stageLabels.TryGetValue(i, out var stl) && !string.IsNullOrWhiteSpace(stl))
             {
                 if (stl.StartsWith("ocr ")) ocrText = stl[4..];
                 else if (stl.StartsWith("fix ")) ocrText = stl[4..];
                 else if (stl.StartsWith("uia ")) ocrText = stl[4..];
-                else if (stl.StartsWith("cache 100% ")) ocrText = stl[11..];
+                else if (stl.StartsWith("cache 100% "))
+                {
+                    ocrText = stl[11..];
+                    if (role != HackBoxRole.Target) role = HackBoxRole.Cached;
+                }
             }
 
             boxes.Add(new A11yHackOverlayBox(bounds, label, ocrText, role));
