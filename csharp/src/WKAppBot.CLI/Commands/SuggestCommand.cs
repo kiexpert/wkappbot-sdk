@@ -1011,7 +1011,7 @@ internal partial class Program
         }
         catch { }
 
-        // Duplicate guard: reject if same filename in experience DB has >50% line overlap
+        // Duplicate guard: if same filename in experience DB has >50% overlap, BACKUP existing (never delete!) and warn.
         try
         {
             var cmd3 = evidenceParts.Length > 1 ? evidenceParts[1] : "misc";
@@ -1028,11 +1028,15 @@ internal partial class Program
                     double ratio = (double)overlap / Math.Max(newLines.Length, oldLines.Length);
                     if (ratio > 0.5)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"  ❌ Evidence too similar to existing {Path.GetFileName(existing)} ({ratio:P0} overlap)");
-                        Console.WriteLine($"     Write a NEW test specific to this fix, don't reuse old scripts!");
+                        // Backup existing test (never delete!) — then allow resolve to continue.
+                        var bakTs = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                        var bakName = $"{Path.GetFileNameWithoutExtension(existing)}.bak-{bakTs}{Path.GetExtension(existing)}";
+                        var bakPath = Path.Combine(existDir, bakName);
+                        File.Copy(existing, bakPath);
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"  ⚠ Evidence similar to existing {Path.GetFileName(existing)} ({ratio:P0} overlap)");
+                        Console.WriteLine($"     Backed up: {bakName}");
                         Console.ResetColor();
-                        return 1;
                     }
                 }
             }
@@ -1102,6 +1106,7 @@ internal partial class Program
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine($"  ❌ Evidence script FAILED (exit={exitCode}). Fix the test before resolving!");
                     Console.ResetColor();
+                    BackupEvidenceOnFailure(evidenceFile);
                     return 1;
                 }
 
@@ -1540,6 +1545,7 @@ internal partial class Program
                     }
                 }
                 catch { }
+                BackupEvidenceOnFailure(evidenceFile);
                 return 1;
             }
         }
@@ -1548,6 +1554,31 @@ internal partial class Program
             Console.Error.WriteLine($"[REGRESSION] Error running regression tests: {ex.Message}");
         }
         return 0;
+    }
+
+    /// <summary>Resolve 실패 시 evidence 스크립트를 experience DB에 file edit 스타일로 백업 (.bak-{ts}-{caller}.txt).</summary>
+    static void BackupEvidenceOnFailure(string evidenceFile)
+    {
+        try
+        {
+            var parts = Path.GetFileNameWithoutExtension(evidenceFile).Split('-');
+            var cmd = parts.Length > 1 ? parts[1] : "misc";
+            var subcmd = parts.Length > 2 ? parts[2] : "general";
+            var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+            var testsDir = Path.Combine(hqDir, "experience", "tests", cmd, subcmd);
+            Directory.CreateDirectory(testsDir);
+
+            // file edit 스타일 백업: .bak-{yyyyMMdd-HHmmss}-{caller}.txt
+            var caller = Environment.GetEnvironmentVariable("WKAPPBOT_LOOP_CALLER") ?? "resolve";
+            var ts = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var origName = Path.GetFileName(evidenceFile);
+            var bakName = $"{origName}.bak-{ts}-{caller}.txt";
+            var bakPath = Path.Combine(testsDir, bakName);
+            File.Copy(evidenceFile, bakPath, overwrite: true);
+            Console.WriteLine($"  [RESOLVE] Evidence backed up → experience/tests/{cmd}/{subcmd}/{bakName}");
+            Console.WriteLine($"  [RESOLVE] Edit hint: wkappbot file edit \"old\" \"new\" \"{bakPath.Replace('\\', '/')}\"");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"  [RESOLVE] Backup failed: {ex.Message}"); }
     }
 
     /// <summary>
