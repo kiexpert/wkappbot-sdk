@@ -236,8 +236,11 @@ internal partial class Program
 
                 var corePath = Environment.ProcessPath ?? "wkappbot";
                 var cwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory;
+                // WKAPPBOT_WORKER=1: suppress per-command TeeTextWriter log (noise).
+                // Auto-hack results go to eye-analysis-trace.jsonl instead of individual files.
                 var spawn = AppBotPipe.Spawn(corePath, $"a11y hack \"{EscapeCmdArg(currentGrap)}\"",
-                    cwd, showNoActivate: true, caller: "EYE-A11Y");
+                    cwd, showNoActivate: true, caller: "EYE-A11Y",
+                    env: new() { ["WKAPPBOT_WORKER"] = "1" });
                 if (spawn == null)
                 {
                     AppendEyeAnalysisTrace("auto-hack-error", new
