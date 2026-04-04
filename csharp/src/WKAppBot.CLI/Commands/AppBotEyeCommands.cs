@@ -665,6 +665,8 @@ internal partial class Program
             return EyeGuardianCommand(args.Skip(1).ToArray());
         if (args.Length > 0 && string.Equals(args[0], "hotswap", StringComparison.OrdinalIgnoreCase))
             return EyeHotSwapCommand(args.Skip(1).ToArray());
+        if (args.Length > 0 && string.Equals(args[0], "homework", StringComparison.OrdinalIgnoreCase))
+            return EyeHomeworkCommand(args.Skip(1).ToArray());
 
         PulseStep.Init("eye-cli");
 
@@ -921,6 +923,50 @@ internal partial class Program
             Console.WriteLine("[HOTSWAP] .new.exe staged — running Eye will pick up via FSW and restart");
         }
         return 0;
+    }
+
+    /// <summary>
+    /// eye homework — force-trigger homework injection immediately, bypassing idle/cooldown checks.
+    /// Finds the WKAppBot Claude instance from _instanceStates and calls CheckAndSendHomework directly.
+    /// </summary>
+    static int EyeHomeworkCommand(string[] args)
+    {
+        if (!RunningInEye)
+        {
+            Console.WriteLine("[HOMEWORK] Must run via Eye CMD pipe (use: wkappbot eye homework)");
+            return 1;
+        }
+
+        // Find WKAppBot instance
+        var pair = _instanceStates.FirstOrDefault(kv =>
+            ((kv.Value.FullCwd ?? kv.Value.CwdLabel) ?? "")
+                .IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0);
+
+        if (pair.Key == IntPtr.Zero)
+        {
+            Console.WriteLine("[HOMEWORK] No WKAppBot Claude instance found in Eye state");
+            return 1;
+        }
+
+        var state = pair.Value;
+        var label = state.CwdLabel ?? state.FullCwd ?? "WKAppBot";
+        Console.WriteLine($"[HOMEWORK] Force-triggering for instance: {label}");
+
+        // Reset cooldown so CheckAndSendHomework can also set LastHomeworkAt
+        state.HomeworkNotified = false;
+        state.LastHomeworkAt = null;
+
+        try
+        {
+            CheckAndSendHomework(state, pair.Key, label);
+            Console.WriteLine("[HOMEWORK] Done");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[HOMEWORK] Error: {ex.Message}");
+            return 1;
+        }
     }
 
     [DllImport("kernel32.dll")]

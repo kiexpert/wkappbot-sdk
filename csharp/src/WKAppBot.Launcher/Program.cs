@@ -313,8 +313,10 @@ partial class Program
         // logcat/grep/grap: streaming log monitor — needs direct stdout, TeeConsole, full error handling
         var isSlowFileCmd = cmd == "file" && args.Length > 1
             && args[1].ToLowerInvariant() is "read-pdf";
+        // eye tick / eye hotswap / eye homework: one-shot subcommands — route through Eye pipe if running
+        var eyeSubcmd = forwardArgs.Length > 1 ? forwardArgs[1].ToLowerInvariant() : "";
         var isEyeDaemon = cmd == "eye"
-            && !(forwardArgs.Length > 1 && forwardArgs[1].ToLowerInvariant() == "tick");
+            && eyeSubcmd is not ("tick" or "hotswap" or "homework");
         var isWorkerMode = Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1";
         if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
