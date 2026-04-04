@@ -64,6 +64,17 @@ internal partial class Program
     /// <summary>When true, UIA write operations (TypeAndSubmit, Click, etc.) are blocked.
     /// Set via --read-only CLI flag. Callers can pass this when they need read-only UIA access.</summary>
     internal static bool ReadOnlyMode = false;
+
+    internal static bool IsElevated()
+    {
+        try
+        {
+            using var id = System.Security.Principal.WindowsIdentity.GetCurrent();
+            return new System.Security.Principal.WindowsPrincipal(id)
+                .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        }
+        catch { return false; }
+    }
     // Relay file path for grap/grep one-shot mode (WKAPPBOT_RELAY_FILE env var).
     // FastExit creates {relayFilePath}.done sentinel after closing the file.
     internal static string? RelayFilePath = null;
@@ -381,6 +392,36 @@ internal partial class Program
         // Must be captured before TeeWriter replaces Console.Out.
         _diagStep = "pipe-mode-check";
         IsPipeMode = Console.IsOutputRedirected;
+
+        // --수두 (sudo): re-launch with UAC elevation if not already admin.
+        // Strip flag before dispatch so the actual command runs normally once elevated.
+        if (args.Contains("--수두") || args.Contains("--sudo"))
+        {
+            args = args.Where(a => a != "--수두" && a != "--sudo").ToArray();
+            if (!IsElevated())
+            {
+                var quotedArgs = string.Join(" ", args.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName        = Environment.ProcessPath ?? exePath,
+                    Arguments       = quotedArgs,
+                    Verb            = "runas",      // UAC prompt
+                    UseShellExecute = true,
+                };
+                try
+                {
+                    var elevated = System.Diagnostics.Process.Start(psi);
+                    elevated?.WaitForExit();
+                    return elevated?.ExitCode ?? 0;
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[SUDO] UAC cancelled or failed: {ex.Message}");
+                    return 1;
+                }
+            }
+            // Already elevated — proceed normally (flag already stripped)
+        }
 
         // --read-only: global flag for UIA read-only mode (strip from args before dispatch)
         if (args.Contains("--read-only"))
