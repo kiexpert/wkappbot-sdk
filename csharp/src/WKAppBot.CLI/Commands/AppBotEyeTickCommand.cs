@@ -21,6 +21,12 @@ internal partial class Program
             }, null, timeoutSec * 1000, System.Threading.Timeout.Infinite);
         }
 
+        // eye tick auto-launch: if Eye is not running, start it (guardian/reboot recovery).
+        if (!RunningInEye)
+        {
+            try { LaunchAppBotEyeIfNeeded(); } catch { }
+        }
+
         PulseStep.Init("eye-tick");
         try
         {
