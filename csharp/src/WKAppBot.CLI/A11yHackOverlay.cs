@@ -89,10 +89,15 @@ internal sealed class A11yHackOverlayWindow : Window
         _hoverRect.Visibility = Visibility.Visible;
     }
 
-    public void Render(A11yHackOverlayModel model)
+    public void ClearCanvas()
     {
         _canvas.Children.Clear();
         _hoverRect = null;
+    }
+
+    public void Render(A11yHackOverlayModel model)
+    {
+        ClearCanvas();
         var dpi = GetDpiScale();
 
         foreach (var box in model.Boxes)
@@ -353,7 +358,12 @@ internal sealed class A11yHackOverlayHost : IDisposable
         => _dispatcher?.BeginInvoke(() => { _hoverTimer?.Stop(); _hoverTimer = null; });
 
     public void Hide()
-        => _dispatcher?.BeginInvoke(() => { if (_window != null) _window.Visibility = Visibility.Collapsed; });
+        => _dispatcher?.BeginInvoke(() =>
+        {
+            if (_window == null) return;
+            _window.ClearCanvas(); // stop animations, free WPF resources
+            _window.Visibility = Visibility.Collapsed;
+        });
 
     public void Show()
         => _dispatcher?.BeginInvoke(() => { if (_window != null) _window.Visibility = Visibility.Visible; });
