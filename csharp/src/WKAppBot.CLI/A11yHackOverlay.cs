@@ -371,6 +371,13 @@ internal sealed class A11yHackOverlayHost : IDisposable
     static A11yHackOverlayHost? _inputSlot;
     static A11yHackOverlayHost? _sessionSlot;
 
+    /// <summary>Get existing slot without creating (for Hide-only calls).</summary>
+    public static A11yHackOverlayHost? TryGetSlot(OverlaySlot slot)
+    {
+        lock (_slotLock)
+            return slot == OverlaySlot.Input ? _inputSlot : _sessionSlot;
+    }
+
     /// <summary>
     /// Get or create overlay for the given slot. Reuses existing window (repositions).
     /// </summary>
