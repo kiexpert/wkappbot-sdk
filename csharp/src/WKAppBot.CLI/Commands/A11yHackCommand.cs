@@ -89,21 +89,65 @@ internal partial class Program
         }));
         liveOverlay?.StartHoverTracking(wr.Left, wr.Top);
 
-        // ── User input abort: any keyboard/mouse activity → stop analysis + hide overlay ──
+        // ── Abort: user input OR target content changed → stop + hide overlay ──
         var hackAborted = false;
-        var inputBaselineTick = Environment.TickCount; // baseline: ignore input before hack starts
+        var inputBaselineTick = Environment.TickCount;
+        long baselineHash = 0; // set after CCA on target node bounds
+        Rectangle targetScreenRect = Rectangle.Empty; // target node in screen coords
+
+        long QuickScreenHash(int sx, int sy, int sw, int sh)
+        {
+            // Sample a few rows for fast comparison (not full screenshot)
+            try
+            {
+                using var sample = new Bitmap(sw, 1);
+                using var g = Graphics.FromImage(sample);
+                int midY = sy + sh / 2;
+                g.CopyFromScreen(sx, midY, 0, 0, new Size(sw, 1));
+                long h = 0;
+                var data = sample.LockBits(new Rectangle(0, 0, sw, 1),
+                    System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                    System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                try
+                {
+                    var buf = new byte[data.Stride];
+                    System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
+                    // FNV-1a hash on sampled pixels (every 4th pixel)
+                    h = unchecked((long)0xcbf29ce484222325);
+                    for (int i = 0; i < buf.Length; i += 16)
+                        h = unchecked((h ^ buf[i]) * (long)0x100000001b3);
+                }
+                finally { sample.UnlockBits(data); }
+                return h;
+            }
+            catch { return baselineHash; } // on error, assume unchanged
+        }
+
         bool HackShouldAbort()
         {
             if (hackAborted) return true;
+            // User input check
             var idleMs = WKAppBot.Win32.Native.NativeMethods.GetUserIdleMs();
-            // Only abort if input happened AFTER hack started (idle < elapsed since start)
             var elapsed = (uint)(Environment.TickCount - inputBaselineTick);
             if (idleMs < elapsed && idleMs < 300)
             {
                 hackAborted = true;
-                Console.WriteLine("[HACK] User input detected — aborting analysis, hiding overlay");
+                Console.WriteLine("[HACK] User input detected — aborting");
                 liveOverlay?.Hide();
                 return true;
+            }
+            // Content change check on target node only (compare mid-row hash)
+            if (baselineHash != 0 && !targetScreenRect.IsEmpty)
+            {
+                var currentHash = QuickScreenHash(targetScreenRect.X, targetScreenRect.Y,
+                    targetScreenRect.Width, targetScreenRect.Height);
+                if (currentHash != baselineHash)
+                {
+                    hackAborted = true;
+                    Console.WriteLine("[HACK] Content changed — aborting for re-analysis");
+                    liveOverlay?.Hide();
+                    return true;
+                }
             }
             return false;
         }
@@ -114,6 +158,7 @@ internal partial class Program
             bmp = new Bitmap(w, h);
             using (var g = Graphics.FromImage(bmp))
                 g.CopyFromScreen(wr.Left, wr.Top, 0, 0, new Size(w, h));
+            // baselineHash set after CCA when target node bounds are known
         }
         catch (Exception ex)
         {
@@ -131,6 +176,15 @@ internal partial class Program
         var regions = cca.AnalyzeAndMerge(bmp);
         regions = OrderRegionsForTarget(regions, analysisTargetRect, w, h);
         PulseStep.Mark("cca-done");
+
+        // Set baseline hash on target node bounds for content change detection
+        if (regions.Count > 0)
+        {
+            var tb = regions[0].Bounds;
+            targetScreenRect = new Rectangle(wr.Left + tb.X, wr.Top + tb.Y, tb.Width, tb.Height);
+            baselineHash = QuickScreenHash(targetScreenRect.X, targetScreenRect.Y,
+                targetScreenRect.Width, targetScreenRect.Height);
+        }
 
         int textCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.Text);
         int iconCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.Icon);
