@@ -824,14 +824,8 @@ internal partial class Program
                 using var pen = new Pen(Color.FromArgb(230, color), region.Type == ConnectedComponentAnalyzer.RegionType.Container ? 2.5f : 1.6f);
                 g.DrawRectangle(pen, region.Bounds);
 
+                // Top-left label: index + type (above rectangle)
                 var label = $"{i}:{region.Type}";
-                if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
-                {
-                    var name = !string.IsNullOrWhiteSpace(uia.name) ? uia.name : uia.aid;
-                    if (!string.IsNullOrWhiteSpace(name))
-                        label += $" {TrimPreview(name, 24)}";
-                }
-
                 var labelSize = g.MeasureString(label, font);
                 var lx = Math.Max(0, region.Bounds.Left);
                 var ly = Math.Max(0, region.Bounds.Top - (int)labelSize.Height - 2);
@@ -840,6 +834,26 @@ internal partial class Program
 
                 g.FillRectangle(textBg, lx, ly, labelSize.Width + 6, labelSize.Height + 2);
                 g.DrawString(label, font, textFg, lx + 3, ly + 1);
+
+                // Top-right label: UIA AutomationId / Name — inside rectangle, top-right corner
+                if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
+                {
+                    var nodeName = !string.IsNullOrWhiteSpace(uia.aid) ? uia.aid
+                                 : !string.IsNullOrWhiteSpace(uia.name) ? uia.name : null;
+                    if (nodeName != null)
+                    {
+                        var nodeLabel = TrimPreview(nodeName, 30);
+                        var nlSize = g.MeasureString(nodeLabel, font);
+                        var nlx = Math.Max(region.Bounds.Left + 2,
+                            Math.Min(region.Bounds.Right - (int)nlSize.Width - 5, overlay.Width - (int)nlSize.Width - 5));
+                        var nly = region.Bounds.Top + 2;
+                        if (nly < 0) nly = 2;
+                        using var nodeBg = new SolidBrush(Color.FromArgb(170, 0, 0, 80));
+                        using var nodeFg = new SolidBrush(Color.LightCyan);
+                        g.FillRectangle(nodeBg, nlx - 2, nly, nlSize.Width + 4, nlSize.Height + 1);
+                        g.DrawString(nodeLabel, font, nodeFg, nlx, nly);
+                    }
+                }
             }
 
             using var headerBg = new SolidBrush(Color.FromArgb(170, 0, 0, 0));
