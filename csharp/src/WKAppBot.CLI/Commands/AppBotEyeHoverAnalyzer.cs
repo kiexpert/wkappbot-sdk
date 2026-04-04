@@ -197,6 +197,30 @@ internal partial class Program
     static string EscapeCmdArg(string arg) => arg.Replace("\"", "\\\"");
 
     static string _lastLiveHackGrap = "";
+    static long _inputPixelBaseline; // 9-pixel hash at last input position
+
+    /// <summary>Hash cursor position + 3x3 pixels around it — position change OR content change = different hash.</summary>
+    static long SampleInputHash(int cx, int cy)
+    {
+        long hash = unchecked((long)0xcbf29ce484222325);
+        // Mix in cursor position
+        hash = unchecked((hash ^ cx) * (long)0x100000001b3);
+        hash = unchecked((hash ^ cy) * (long)0x100000001b3);
+        // Mix in 9 pixels
+        var hdc = WKAppBot.Win32.Native.NativeMethods.GetDC(IntPtr.Zero);
+        if (hdc == IntPtr.Zero) return hash;
+        try
+        {
+            for (int dy = -1; dy <= 1; dy++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                uint px = WKAppBot.Win32.Native.NativeMethods.GetPixel(hdc, cx + dx, cy + dy);
+                hash = unchecked((hash ^ (long)px) * (long)0x100000001b3);
+            }
+            return hash;
+        }
+        finally { WKAppBot.Win32.Native.NativeMethods.ReleaseDC(IntPtr.Zero, hdc); }
+    }
 
     static void TryLaunchLiveA11yHack(string grapPath, string reason, string headline)
     {
@@ -222,13 +246,27 @@ internal partial class Program
         // Immediately hide session overlay (clear stale content) — don't create new
         A11yHackOverlayHost.TryGetSlot(OverlaySlot.Session)?.Hide();
 
+        // Snapshot input pixel baseline at current cursor position
+        WKAppBot.Win32.Native.NativeMethods.GetCursorPos(out var curPt);
+        _inputPixelBaseline = SampleInputHash(curPt.X, curPt.Y);
+
         var debounceCts = _liveHackDebounceCts;
         _ = Task.Run(async () =>
         {
             try
             {
-                // Always wait at least 1s after cancel (prevent CPU spike from rapid re-spawn)
-                await Task.Delay(1000, debounceCts.Token);
+                // 1s debounce with 200ms pixel polling — abort early if content changed
+                for (int poll = 0; poll < 5; poll++)
+                {
+                    await Task.Delay(200, debounceCts.Token);
+                    WKAppBot.Win32.Native.NativeMethods.GetCursorPos(out var pt);
+                    var cur = SampleInputHash(pt.X, pt.Y);
+                    if (cur != _inputPixelBaseline)
+                    {
+                        AppendEyeAnalysisTrace("auto-hack-skip", new { reason = "input-pixels-changed", poll });
+                        return; // content under cursor changed → skip this analysis
+                    }
+                }
                 string currentGrap;
                 string currentSource;
                 string currentHeadline;
