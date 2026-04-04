@@ -943,9 +943,16 @@ internal partial class Program
 
             if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
             {
-                var name = !string.IsNullOrWhiteSpace(uia.name) ? uia.name : uia.aid;
-                if (!string.IsNullOrWhiteSpace(name))
-                    label += $" | {TrimPreview(name, 24)}";
+                // Type_AutomationId WxH (e.g. Button_btnOk 120x32)
+                var idPart = !string.IsNullOrWhiteSpace(uia.aid) ? uia.aid
+                           : !string.IsNullOrWhiteSpace(uia.name) ? TrimPreview(uia.name, 20)
+                           : $"#{i + 1}";
+                var typePart = !string.IsNullOrWhiteSpace(uia.type) ? uia.type : "";
+                label += $" | {typePart}_{idPart} {region.Bounds.Width}x{region.Bounds.Height}";
+            }
+            else
+            {
+                label += $" | {region.Bounds.Width}x{region.Bounds.Height}";
             }
             if (stageLabels != null && stageLabels.TryGetValue(i, out var stage) && !string.IsNullOrWhiteSpace(stage))
                 label += $" | {TrimPreview(stage, 28)}";
