@@ -37,7 +37,7 @@ internal partial class Program
             Console.WriteLine();
             Console.WriteLine("Subcommands:");
             Console.WriteLine("  list / ls              Show pending suggestions");
-            Console.WriteLine("  merge <ts> \"text\"     Append text to existing suggestion + Slack thread reply");
+            Console.WriteLine("  merge <ts1> [ts2..] --title \"...\"  Merge related suggestions into one self-healing record");
             Console.WriteLine("  resolve <ts> \"note\"   Mark resolved + Slack thread reply");
             Console.WriteLine("  repost [ts]            Re-post to Slack entries missing slack_ts, write ID back");
             Console.WriteLine();
@@ -264,59 +264,136 @@ internal partial class Program
             try
             {
                 var d = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(lines[i]);
-                var ts = d?["ts"]?.GetValue<string>() ?? "";
-                var from = d?["from"]?.GetValue<string>() ?? "?";
-                var text = d?["text"]?.GetValue<string>() ?? "";
-                var slackTs = d?["slack_ts"]?.GetValue<string>();
-                var files = d?["files"]?.AsArray();
+                var ts       = d?["ts"]?.GetValue<string>()       ?? "";
+                var from     = d?["from"]?.GetValue<string>()     ?? "?";
+                var slackTs  = d?["slack_ts"]?.GetValue<string>();
+                var entryType = d?["type"]?.GetValue<string>()    ?? "";
+                var slackMark = slackTs != null ? " 🔗" : "   ";
 
                 // Date: ISO → MM-dd HH:mm
                 string dateStr = ts;
                 if (DateTime.TryParse(ts, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
                     dateStr = dt.ToLocalTime().ToString("MM-dd HH:mm");
 
-                // Slack link indicator
-                var slackMark = slackTs != null ? " 🔗" : "   ";
-
-                // First line of text as title, rest as body
-                var textLines = text.Split('\n');
-                var title = textLines[0];
-                var body = textLines.Length > 1 ? string.Join(" ", textLines[1..].Where(l => l.Trim().Length > 0)) : "";
-
-                // Trim title to fit
-                if (title.Length > 70) title = title[..70] + "…";
-                if (body.Length > 80) body = body[..80] + "…";
-
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write($"  {i + 1,2}.");
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($" {dateStr}");
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($" [{from}]");
-                Console.Write(slackMark);
-                Console.ResetColor();
-                Console.WriteLine();
-
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine($"      {title}");
-                Console.ResetColor();
-
-                if (body.Length > 0)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"      {body}");
-                    Console.ResetColor();
-                }
-
-                if (files != null && files.Count > 0)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"      📎 {string.Join(", ", files.Select(f => f?.GetValue<string>()))}");
-                    Console.ResetColor();
-                }
-
-                // ts prefix for resolve
                 var tsPrefix = ts.Length >= 16 ? ts[..16] : ts;
+
+                if (entryType == "merge")
+                {
+                    // ── Merge record display ──────────────────────────────────────────
+                    var mergeTitle   = d?["title"]?.GetValue<string>()       ?? "?";
+                    var rootCause    = d?["rootCause"]?.GetValue<string>();
+                    var count        = d?["count"]?.GetValue<int>()           ?? 0;
+                    var freq         = d?["frequencyPerHour"]?.GetValue<double>() ?? 0;
+                    var risk         = d?["recurrenceRisk"]?.GetValue<string>() ?? "";
+                    var prio         = d?["priority"]?.GetValue<int>()        ?? 0;
+                    var work         = d?["estimatedWork"]?.GetValue<string>();
+                    var components   = d?["components"]?.AsArray().Select(x => x?.GetValue<string>()).Where(x => x != null).ToArray() ?? [];
+                    var affCmds      = d?["affectedCommands"]?.AsArray().Select(x => x?.GetValue<string>()).Where(x => x != null).ToArray() ?? [];
+                    var errPat       = d?["errorPattern"]?.GetValue<string>();
+                    var healScript   = d?["autoHealScript"]?.GetValue<string>();
+                    var healResult   = d?["autoHealResult"]?.GetValue<string>();
+                    var prioStars    = new string('★', prio) + new string('☆', Math.Max(0, 5 - prio));
+                    var riskColor    = risk switch { "critical" => ConsoleColor.Red, "high" => ConsoleColor.Yellow, "medium" => ConsoleColor.DarkYellow, _ => ConsoleColor.DarkGray };
+
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write($"  {i + 1,2}.");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($" {dateStr}");
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write($" [MERGE×{count}]");
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write($" [{from}]");
+                    Console.Write(slackMark);
+                    Console.ResetColor();
+                    Console.WriteLine();
+
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine($"      {(mergeTitle.Length > 72 ? mergeTitle[..72] + "…" : mergeTitle)}");
+                    Console.ResetColor();
+
+                    // Priority + risk + freq row
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.Write($"      {prioStars}({prio}/5)");
+                    Console.ForegroundColor = riskColor;
+                    Console.Write($"  risk={risk}");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($"  freq={freq}/hr");
+                    if (work != null) Console.Write($"  est={work}");
+                    Console.WriteLine();
+                    Console.ResetColor();
+
+                    if (rootCause != null)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      root: {(rootCause.Length > 90 ? rootCause[..90] + "…" : rootCause)}");
+                        Console.ResetColor();
+                    }
+                    if (errPat != null)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      pattern: {errPat}");
+                        Console.ResetColor();
+                    }
+                    if (components.Length > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      components: {string.Join(", ", components)}");
+                        Console.ResetColor();
+                    }
+                    if (affCmds.Length > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      affected: {string.Join(", ", affCmds)}");
+                        Console.ResetColor();
+                    }
+                    if (healScript != null)
+                    {
+                        Console.ForegroundColor = healResult != null ? ConsoleColor.Green : ConsoleColor.DarkYellow;
+                        Console.WriteLine($"      heal: {healScript}{(healResult != null ? $" → {healResult}" : " (pending)")}");
+                        Console.ResetColor();
+                    }
+                }
+                else
+                {
+                    // ── Regular suggestion display ────────────────────────────────────
+                    var text  = d?["text"]?.GetValue<string>()  ?? "";
+                    var files = d?["files"]?.AsArray();
+
+                    var textLines = text.Split('\n');
+                    var title = textLines[0];
+                    var body  = textLines.Length > 1 ? string.Join(" ", textLines[1..].Where(l => l.Trim().Length > 0)) : "";
+                    if (title.Length > 70) title = title[..70] + "…";
+                    if (body.Length > 80)  body  = body[..80]  + "…";
+
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.Write($"  {i + 1,2}.");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($" {dateStr}");
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write($" [{from}]");
+                    Console.Write(slackMark);
+                    Console.ResetColor();
+                    Console.WriteLine();
+
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine($"      {title}");
+                    Console.ResetColor();
+
+                    if (body.Length > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      {body}");
+                        Console.ResetColor();
+                    }
+
+                    if (files != null && files.Count > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      📎 {string.Join(", ", files.Select(f => f?.GetValue<string>()))}");
+                        Console.ResetColor();
+                    }
+                }
+
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.WriteLine($"      ts={tsPrefix}");
                 Console.ResetColor();
@@ -417,21 +494,88 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>suggest merge &lt;ts_prefix&gt; "text" — append text to existing suggestion + Slack thread reply.</summary>
+    /// <summary>
+    /// suggest merge — combine multiple related suggestions into one self-healing merge record.
+    /// Replaces individual entries with a single grouped record tracking frequency, root cause,
+    /// repro cmdlines, estimated work, and auto-heal metadata.
+    /// </summary>
     static int SuggestMergeCommand(string[] args)
     {
-        if (args.Length < 2 || args[0] is "-h" or "--help")
+        if (args.Length == 0 || args[0] is "-h" or "--help")
         {
-            Console.WriteLine("Usage: wkappbot suggest merge <ts> \"additional text\"");
-            Console.WriteLine("  ts  : ISO timestamp prefix or Slack ts of existing suggestion");
-            Console.WriteLine("  text: additional context to append (English preferred)");
+            Console.WriteLine("Usage: wkappbot suggest merge <ts1> [ts2 ...] --title \"...\" [options]");
+            Console.WriteLine("  Merge multiple related suggestions into one self-healing merge record.");
+            Console.WriteLine();
+            Console.WriteLine("  ts               : ISO ts prefix(es) to merge (space-separated)");
+            Console.WriteLine("  --title \"...\"     Merge title (required)");
+            Console.WriteLine("  --root-cause \"..\" Root cause one-liner");
+            Console.WriteLine("  --cmdline \"...\"   Repro/fix command (repeatable)");
+            Console.WriteLine("  --work \"3h30m\"    Estimated total work time");
+            Console.WriteLine("  --components \"..\" Affected source components (comma-separated)");
+            Console.WriteLine("  --priority N      Priority 1-5 (5=critical, default=3)");
+            Console.WriteLine("  --error-pattern \"..\" Regex matching error text (auto-detect recurrence)");
+            Console.WriteLine("  --affected-cmds \"..\" wkappbot commands that trigger this (comma-sep)");
+            Console.WriteLine("  --auto-heal-script path  Script to run on recurrence (self-healing)");
+            Console.WriteLine("  --all-matching \"..\"  Merge ALL suggestions whose text matches pattern");
+            Console.WriteLine("  --keep-originals      Don't remove merged entries from active list");
+            Console.WriteLine();
+            Console.WriteLine("Example:");
+            Console.WriteLine("  wkappbot suggest merge 2026-04-02T02 --all-matching \"Runtime.enable\" \\");
+            Console.WriteLine("    --title \"Chrome CDP timeout on heavy tab load\" \\");
+            Console.WriteLine("    --root-cause \"Runtime.enable blocks when 11+ tabs open\" \\");
+            Console.WriteLine("    --cmdline \"wkappbot ask claude test\" --work \"3h\" \\");
+            Console.WriteLine("    --components \"CdpClient,ChromeLauncher\" --priority 4 \\");
+            Console.WriteLine("    --error-pattern \"TimeoutException.*Runtime\\\\.enable\" \\");
+            Console.WriteLine("    --affected-cmds \"ask\"");
             return 0;
         }
 
-        var tsPrefix = args[0];
-        var appendText = string.Join(" ", args[1..]);
+        // ── Parse args ──────────────────────────────────────────────────────────────
+        var tsPrefixes    = new List<string>();
+        string? title     = null;
+        string? rootCause = null;
+        var cmdlines      = new List<string>();
+        string? estimatedWork    = null;
+        string? componentsRaw    = null;
+        int priority             = 3;
+        string? errorPattern     = null;
+        string? affectedCmdsRaw  = null;
+        string? autoHealScript   = null;
+        bool keepOriginals       = false;
+        string? allMatchingPattern = null;
+        bool forceNoCheck        = false;
 
-        var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--title"          when i + 1 < args.Length: title = args[++i]; break;
+                case "--root-cause"     when i + 1 < args.Length: rootCause = args[++i]; break;
+                case "--cmdline"        when i + 1 < args.Length: cmdlines.Add(args[++i]); break;
+                case "--work"           when i + 1 < args.Length: estimatedWork = args[++i]; break;
+                case "--components"     when i + 1 < args.Length: componentsRaw = args[++i]; break;
+                case "--priority"       when i + 1 < args.Length && int.TryParse(args[i + 1], out var p):
+                    priority = Math.Clamp(p, 1, 5); i++; break;
+                case "--error-pattern"  when i + 1 < args.Length: errorPattern = args[++i]; break;
+                case "--affected-cmds"  when i + 1 < args.Length: affectedCmdsRaw = args[++i]; break;
+                case "--auto-heal-script" when i + 1 < args.Length: autoHealScript = args[++i]; break;
+                case "--all-matching"   when i + 1 < args.Length: allMatchingPattern = args[++i]; break;
+                case "--keep-originals": keepOriginals = true; break;
+                case "--force": forceNoCheck = true; break;
+                default:
+                    if (!args[i].StartsWith("--"))
+                        tsPrefixes.Add(args[i]);
+                    break;
+            }
+        }
+
+        if (title == null)
+        {
+            Console.Error.WriteLine("[MERGE] --title is required. Run 'wkappbot suggest merge --help' for usage.");
+            return 1;
+        }
+
+        var hqDir     = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
         var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
         if (!File.Exists(jsonlPath))
         {
@@ -439,66 +583,236 @@ internal partial class Program
             return 1;
         }
 
-        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
-        int matchIdx = -1;
-        JsonNode? matchEntry = null;
+        var lines    = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        var allNodes = lines.Select((l, idx) => (line: l, idx, node: TryParseNode(l))).ToList();
 
-        for (int i = 0; i < lines.Count; i++)
+        // ── Find matching entries ────────────────────────────────────────────────
+        var matchedIdxs = new HashSet<int>();
+
+        foreach (var tsPrefix in tsPrefixes)
+        {
+            for (int i = 0; i < allNodes.Count; i++)
+            {
+                var node = allNodes[i].node;
+                if (node == null) continue;
+                var entryTs     = node["ts"]?.GetValue<string>()       ?? "";
+                var entrySlackTs = node["slack_ts"]?.GetValue<string>() ?? "";
+                if (entryTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase) ||
+                    entrySlackTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase))
+                    matchedIdxs.Add(i);
+            }
+        }
+
+        if (allMatchingPattern != null)
         {
             try
             {
-                var node = JsonSerializer.Deserialize<JsonNode>(lines[i]);
-                var entryTs = node?["ts"]?.GetValue<string>() ?? "";
-                var entrySlackTs = node?["slack_ts"]?.GetValue<string>() ?? "";
-                if (entryTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase) ||
-                    entrySlackTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase))
+                var rx = new System.Text.RegularExpressions.Regex(allMatchingPattern,
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                    System.Text.RegularExpressions.RegexOptions.Singleline);
+                for (int i = 0; i < allNodes.Count; i++)
                 {
-                    matchIdx = i;
-                    matchEntry = node;
-                    break;
+                    var node = allNodes[i].node;
+                    if (node == null) continue;
+                    var text = node["text"]?.GetValue<string>() ?? "";
+                    if (rx.IsMatch(text)) matchedIdxs.Add(i);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[MERGE] Invalid --all-matching regex: {ex.Message}");
+                return 1;
+            }
         }
 
-        if (matchIdx < 0 || matchEntry == null)
+        if (matchedIdxs.Count == 0)
         {
-            Console.Error.WriteLine($"[MERGE] No suggestion found with ts prefix: {tsPrefix}");
+            Console.Error.WriteLine("[MERGE] No matching suggestions found");
             return 1;
         }
 
-        var existingText = matchEntry["text"]?.GetValue<string>() ?? "";
-        var from = matchEntry["from"]?.GetValue<string>() ?? "unknown";
-        var preview = existingText.Split('\n')[0];
-        if (preview.Length > 80) preview = preview[..80] + "…";
-        Console.WriteLine($"[MERGE] Found: [{from}] {preview}");
+        var matched = matchedIdxs.OrderBy(i => i).Select(i => allNodes[i].node!).ToList();
 
-        // Append text to JSONL entry
-        var mergedText = existingText + "\n\n---\n[MERGE " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm") + "] " + appendText;
-        matchEntry["text"] = mergedText;
-        lines[matchIdx] = JsonSerializer.Serialize(matchEntry);
-        File.WriteAllLines(jsonlPath, lines);
-        Console.WriteLine($"[MERGE] Text appended to local entry");
-
-        // Slack thread reply if slack_ts exists
-        var slackTs = matchEntry["slack_ts"]?.GetValue<string>();
-        if (!string.IsNullOrEmpty(slackTs))
+        // ── Validate: all matched entries must share the same core command ────────
+        // "핵심 명령줄이 일치해야 머지 가능" — prevents accidentally grouping unrelated issues.
+        // Bypass with --force when you know they're related despite different prefixes.
+        if (!forceNoCheck)
         {
-            var config = LoadSlackConfig();
-            var botToken = config?["bot_token"]?.GetValue<string>();
-            var channel  = config?["channel"]?.GetValue<string>();
-            if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
+            var coreCmds = matched
+                .Select(n => ExtractCoreCmd(n["text"]?.GetValue<string>() ?? ""))
+                .Where(c => c != null)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (coreCmds.Count > 1)
             {
-                var cwdTag = AbbreviateCwd(Environment.CurrentDirectory);
-                var senderName = GetSuggestBypassUsername();
-                var slackMsg = $":heavy_plus_sign: *[Merge]* from `{cwdTag}`\n{appendText}";
-                var (ok, _) = SlackSendViaApi(botToken, channel, slackMsg,
-                    threadTs: slackTs, username: senderName).GetAwaiter().GetResult();
-                Console.WriteLine(ok ? "[MERGE] Slack thread reply sent" : "[MERGE] Slack reply failed");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Error.WriteLine($"[MERGE] ❌ Matched suggestions have different core commands:");
+                foreach (var c in coreCmds) Console.Error.WriteLine($"     · {c}");
+                Console.Error.WriteLine("  Merge requires all suggestions to share the same command context.");
+                Console.Error.WriteLine("  Use --all-matching with a tighter pattern, or add --force to override.");
+                Console.ResetColor();
+                return 1;
             }
+
+            // match → silent pass (don't expose what the guard expects)
+        }
+
+        Console.WriteLine($"[MERGE] Merging {matched.Count} suggestion(s) → \"{title}\"");
+
+        // ── Compute time range & frequency ──────────────────────────────────────
+        var timestamps = matched
+            .Select(n => n["ts"]?.GetValue<string>())
+            .Where(ts => ts != null)
+            .Select(ts => DateTime.TryParse(ts, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt) ? dt : (DateTime?)null)
+            .Where(dt => dt != null).Select(dt => dt!.Value)
+            .OrderBy(dt => dt).ToList();
+
+        var firstSeen = timestamps.Count > 0 ? timestamps.First().ToString("o") : DateTime.UtcNow.ToString("o");
+        var lastSeen  = timestamps.Count > 0 ? timestamps.Last().ToString("o")  : DateTime.UtcNow.ToString("o");
+
+        double frequencyPerHour = 0;
+        if (timestamps.Count >= 2)
+        {
+            var hours = (timestamps.Last() - timestamps.First()).TotalHours;
+            if (hours > 0) frequencyPerHour = Math.Round(matched.Count / hours, 2);
+        }
+
+        var recurrenceRisk = frequencyPerHour switch
+        {
+            > 10 => "critical",
+            > 2  => "high",
+            > 0.5 => "medium",
+            _    => "low"
+        };
+
+        // ── Collect original slack_ts list (for linking) ─────────────────────────
+        var mergedTs     = matched.Select(n => n["ts"]?.GetValue<string>() ?? "").Where(ts => ts.Length > 0).ToList();
+        var mergedSlacks = matched.Select(n => n["slack_ts"]?.GetValue<string>()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+
+        // ── Build merge record ───────────────────────────────────────────────────
+        var components   = SplitCsv(componentsRaw);
+        var affectedCmds = SplitCsv(affectedCmdsRaw);
+
+        var mergeRecord = new Dictionary<string, object?>
+        {
+            // Identity
+            ["type"]              = "merge",
+            ["ts"]                = DateTime.UtcNow.ToString("o"),
+            ["from"]              = AbbreviateCwd(Environment.CurrentDirectory),
+            ["title"]             = title,
+            ["text"]              = title,          // backward compat with list/resolve
+            // Provenance
+            ["mergedTs"]          = mergedTs.ToArray(),
+            ["mergedSlackTs"]     = mergedSlacks.ToArray(),
+            ["count"]             = matched.Count,
+            ["firstSeen"]         = firstSeen,
+            ["lastSeen"]          = lastSeen,
+            // Frequency & risk
+            ["frequencyPerHour"]  = frequencyPerHour,
+            ["recurrenceRisk"]    = recurrenceRisk,
+            // Root cause & scope
+            ["rootCause"]         = rootCause,
+            ["components"]        = components,
+            ["affectedCommands"]  = affectedCmds,
+            ["errorPattern"]      = errorPattern,   // regex for auto-detect recurrence
+            // Action
+            ["cmdlines"]          = cmdlines.ToArray(),
+            ["estimatedWork"]     = estimatedWork,
+            ["priority"]          = priority,
+            // Self-healing
+            ["autoHealScript"]    = autoHealScript, // path to script run on recurrence
+            ["autoHealResult"]    = (object?)null,  // filled by auto-heal runner
+            ["autoHealAt"]        = (object?)null,  // UTC ts of last auto-heal attempt
+            // Status
+            ["status"]            = "pending",
+            ["slack_ts"]          = (object?)null,
+            ["files"]             = Array.Empty<string>(),
+        };
+
+        var mergeJson = JsonSerializer.Serialize(mergeRecord);
+
+        // ── Remove originals (unless --keep-originals) ───────────────────────────
+        if (!keepOriginals)
+        {
+            foreach (var idx in matchedIdxs.OrderByDescending(i => i))
+                lines.RemoveAt(idx);
+            Console.WriteLine($"[MERGE] Removed {matchedIdxs.Count} original entries from active list");
+        }
+
+        lines.Add(mergeJson);
+        File.WriteAllLines(jsonlPath, lines);
+        Console.WriteLine($"[MERGE] Saved (priority={priority}, risk={recurrenceRisk}, freq={frequencyPerHour}/hr, est={estimatedWork ?? "??"})");
+
+        // ── Slack notification ───────────────────────────────────────────────────
+        var slackCfg  = LoadSlackConfig();
+        var botToken  = slackCfg?["bot_token"]?.GetValue<string>();
+        var channel   = slackCfg?["channel"]?.GetValue<string>();
+        if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
+        {
+            var senderName = GetSuggestBypassUsername();
+            var prioStars  = new string('★', priority) + new string('☆', 5 - priority);
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($":twisted_rightwards_arrows: *[MERGE]* `{title}`");
+            sb.AppendLine($"• *Count:* {matched.Count}  |  *Priority:* {prioStars} ({priority}/5)  |  *Risk:* `{recurrenceRisk}`");
+            if (rootCause != null)       sb.AppendLine($"• *Root cause:* {rootCause}");
+            if (errorPattern != null)    sb.AppendLine($"• *Error pattern:* `{errorPattern}`");
+            if (cmdlines.Count > 0)      sb.AppendLine($"• *Cmdlines:* {string.Join(", ", cmdlines.Select(c => $"`{c}`"))}");
+            if (estimatedWork != null)   sb.AppendLine($"• *Est. work:* {estimatedWork}");
+            if (components.Length > 0)   sb.AppendLine($"• *Components:* {string.Join(", ", components)}");
+            if (affectedCmds.Length > 0) sb.AppendLine($"• *Affected cmds:* {string.Join(", ", affectedCmds)}");
+            if (autoHealScript != null)  sb.AppendLine($"• *Auto-heal script:* `{autoHealScript}`");
+            sb.Append($"• *Range:* {(timestamps.Count > 0 ? timestamps.First().ToLocalTime().ToString("MM-dd HH:mm") : "?")} → {(timestamps.Count > 0 ? timestamps.Last().ToLocalTime().ToString("MM-dd HH:mm") : "?")}  ({frequencyPerHour}/hr)");
+
+            var (ok, newTs) = SlackSendViaApi(botToken, channel, sb.ToString(), username: senderName).GetAwaiter().GetResult();
+            if (ok && newTs != null)
+            {
+                // Write slack_ts back
+                var obj = JsonSerializer.Deserialize<Dictionary<string, object?>>(lines[^1])!;
+                obj["slack_ts"] = (object?)newTs;
+                lines[^1] = JsonSerializer.Serialize(obj);
+                File.WriteAllLines(jsonlPath, lines);
+                Console.WriteLine($"[MERGE] Slack sent (ts={newTs})");
+            }
+            else Console.Error.WriteLine("[MERGE] Slack send failed");
         }
 
         return 0;
+    }
+
+    private static string[] SplitCsv(string? raw)
+        => raw?.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToArray() ?? Array.Empty<string>();
+
+    private static JsonNode? TryParseNode(string line)
+    {
+        try { return JsonSerializer.Deserialize<JsonNode>(line); } catch { return null; }
+    }
+
+    /// <summary>
+    /// Extract the dominant wkappbot command from suggestion text for merge validation.
+    /// Looks for: bracket tags [ASK], [A11Y], [CDP], [FILE]; or "wkappbot &lt;cmd&gt;" patterns;
+    /// or "BUG-AUTO" prefix. Returns null if text has no recognizable command.
+    /// </summary>
+    private static string? ExtractCoreCmd(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        // Priority 1: explicit bracket tag at start of text e.g. [ASK], [A11Y], [CDP], [BUG-AUTO]
+        var tagM = System.Text.RegularExpressions.Regex.Match(text,
+            @"^\s*\[([A-Z][A-Z0-9\-]{1,15})\]", System.Text.RegularExpressions.RegexOptions.Multiline);
+        if (tagM.Success) return tagM.Groups[1].Value.ToUpperInvariant();
+
+        // Priority 2: "wkappbot <cmd>" anywhere in first 200 chars
+        var wkM = System.Text.RegularExpressions.Regex.Match(text[..Math.Min(200, text.Length)],
+            @"wkappbot\s+([a-z][a-z0-9\-]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (wkM.Success) return wkM.Groups[1].Value.ToLowerInvariant();
+
+        // Priority 3: FEATURE REQUEST / FOCUSLESS-HOMEWORK / BUG-AUTO prefix in brackets
+        var ftrM = System.Text.RegularExpressions.Regex.Match(text,
+            @"\[(FEATURE REQUEST|FOCUSLESS-HOMEWORK|BUG-AUTO|ADDENDUM)\]",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (ftrM.Success) return ftrM.Groups[1].Value.ToUpperInvariant();
+
+        return null;
     }
 
     /// <summary>suggest resolve &lt;ts_prefix&gt; "note" — mark done in JSONL + Slack reply.</summary>
