@@ -72,21 +72,21 @@ internal partial class Program
         if (!args.Contains("--no-policy"))
         {
             var policy = AgentPolicy.EmbeddedInitialPrompt;
-            const string startupSection = "?곣봺 Startup Confirmation ?곣봺";
+            const string startupSection = "⚡ Startup Confirmation ⚡";
             var cutIdx = policy.IndexOf(startupSection, StringComparison.Ordinal);
             if (cutIdx >= 0)
                 policy = policy[..cutIdx].TrimEnd();
             policy += """
 
-?곣봺 Session Start (Handoff Mode) ?곣봺
+⚡ Session Start (Handoff Mode) ⚡
 You are receiving a relay handoff from the previous session.
 
 Begin your response with EXACTLY this line (Korean, no changes):
-"諛뷀넻???댁뼱諛쏆븯?듬땲?? ?댁쟾 ?묒뾽怨??댁쁺 洹쒖튃???숈??섍퀬 以묐떒 ?놁씠 ?щ젮媛寃좎뒿?덈떎. ?봽"
+"인수인계 받았습니다. 이전 작업과 맥락 빠르게 파악하고 끊임없이 이어갑니다. 봽"
 
 Then immediately:
 1. Read CLAUDE.md + memory/MEMORY.md
-2. Send Slack: wkappbot slack send "諛뷀넻 ?몄닔 ?꾨즺! ?댁쟾 ?묒뾽 ?댁뼱媛묐땲???봽"
+2. Send Slack: wkappbot slack send "인수인계 수락! 이전 작업 이어갑니다 봽"
 3. Summarize what you understand is pending (Korean, bullet points)
 4. Continue work without waiting for confirmation
 """;

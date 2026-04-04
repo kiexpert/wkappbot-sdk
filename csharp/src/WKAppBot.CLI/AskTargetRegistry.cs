@@ -97,6 +97,13 @@ internal static class AskTargetRegistry
         Console.WriteLine($"[SANDBOX] Purged {removed.Count} dead-HWND registry entry/entries");
     }
 
+    /// <summary>Wipe all registry entries (used on Chrome restart).</summary>
+    internal static void ClearAll()
+    {
+        try { File.Delete(_filePath); } catch { }
+        Console.WriteLine("[SANDBOX] Registry cleared (Chrome restart)");
+    }
+
     // ── Per-tab question ID counter ──────────────────────────────────────────
     // Each ask on the same tab gets a unique monotonic Q# (Q1, Q2, Q3...).
     // Persisted to ask_qid.json so counter survives process restarts.

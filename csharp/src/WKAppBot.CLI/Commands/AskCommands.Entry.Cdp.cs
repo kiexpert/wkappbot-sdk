@@ -244,10 +244,24 @@ internal partial class Program
                 {
                     await cdp.ConnectAsync(port, timeoutMs: 5000);
                 }
-                catch
+                catch (Exception firstEx)
                 {
-                    // Connection failed — Chrome may not be running. Force launch and retry.
-                    Console.WriteLine("[ASK] CDP connect failed — launching Chrome...");
+                    // If Chrome is running but CDP timed out (Runtime.enable) → broken state → restart
+                    bool chromeBroken = firstEx is TimeoutException
+                        && await ChromeLauncher.IsPortActiveAsync(port);
+                    if (chromeBroken)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("[ASK] Chrome stuck (Runtime.enable timeout) — restarting Chrome…");
+                        Console.ResetColor();
+                        await ChromeLauncher.KillChromeOnPortAsync(port);
+                        AskTargetRegistry.ClearAll();
+                    }
+                    else
+                    {
+                        Console.WriteLine("[ASK] CDP connect failed — launching Chrome...");
+                    }
+
                     var launchUrl2 = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
                     await ChromeLauncher.LaunchAsync(port: port, url: launchUrl2);
                     await Task.Delay(3000);

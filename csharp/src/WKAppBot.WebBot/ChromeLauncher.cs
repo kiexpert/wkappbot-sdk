@@ -185,6 +185,54 @@ public static class ChromeLauncher
     }
 
     /// <summary>
+    /// Kill the Chrome process (and its tree) that is currently listening on the given CDP port.
+    /// Returns true if a process was found and killed.
+    /// </summary>
+    public static async Task<bool> KillChromeOnPortAsync(int port)
+    {
+        try
+        {
+            var pid = FindPidListeningOnPort(port);
+            if (pid <= 0) return false;
+            var proc = Process.GetProcessById(pid);
+            proc.Kill(entireProcessTree: true);
+            await Task.Delay(1500); // wait for port to release
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static int FindPidListeningOnPort(int port)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "netstat",
+                Arguments = "-ano",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var proc = Process.Start(psi);
+            if (proc == null) return 0;
+            var output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(3000);
+            var needle = $":{port}";
+            foreach (var rawLine in output.Split('\n'))
+            {
+                var line = rawLine.Trim();
+                if (!line.Contains(needle) || !line.Contains("LISTENING")) continue;
+                var parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0 && int.TryParse(parts[^1], out var pid))
+                    return pid;
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    /// <summary>
     /// Kill Chrome processes that use our user-data-dir but aren't serving CDP.
     /// This handles zombie/stale Chrome processes that hold the profile lock.
     /// </summary>
