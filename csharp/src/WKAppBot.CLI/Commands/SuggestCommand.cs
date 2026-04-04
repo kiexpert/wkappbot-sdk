@@ -1479,9 +1479,18 @@ internal partial class Program
                         BackupEvidenceOnFailure(evidenceFile);
                         return 1;
                     }
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"  ⚠ {restored}개 테스트 백업에서 자동 복구 완료 — 계속 진행합니다");
+
+                    // Auto-restore succeeded, but still FAIL this attempt as a warning.
+                    // Forces acknowledgment — next retry will pass with restored files.
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine();
+                    Console.WriteLine($"  ╔══════════════════════════════════════════════════════════╗");
+                    Console.WriteLine($"  ║  ⚠ {restored}개 테스트 백업에서 복구됨 — 재발 방지 경고  ║");
+                    Console.WriteLine($"  ║  테스트 삭제는 절대 금지! 다시 시도하면 통과됩니다.      ║");
+                    Console.WriteLine($"  ╚══════════════════════════════════════════════════════════╝");
                     Console.ResetColor();
+                    BackupEvidenceOnFailure(evidenceFile);
+                    return 1;
                 }
             }
 
