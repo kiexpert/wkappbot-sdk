@@ -351,6 +351,15 @@ internal partial class Program
 
                     if (!cards.TryGetValue(cardKey, out var c))
                     {
+                        // Phase 1 may have used sessionJsonl as key (different from cwdRaw/promptHwnd).
+                        // Try CWD match to avoid duplicate cards and update Phase 1 timestamp with tick data.
+                        c = cards.Values.FirstOrDefault(x =>
+                            !string.IsNullOrEmpty(x.Cwd) &&
+                            x.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/') == cwdRaw);
+                    }
+
+                    if (c == null)
+                    {
                         cards[cardKey] = new EyeParentCard
                         {
                             ParentPid = ppid,
