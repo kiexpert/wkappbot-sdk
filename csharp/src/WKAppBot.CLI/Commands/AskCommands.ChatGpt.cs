@@ -78,11 +78,12 @@ internal partial class Program
         }
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+        cdp.OperationContext = "gpt";
         if (triadCtx != null)
         {
             triadCtx.RegisterCdp("gpt", cdp);
             cdp.OnStreamingChunkEvent = triadCtx.UpdateChunk;
-            cdp.OperationContext = "gpt:SKEPTIC"; // debate role
+            cdp.OperationContext = "gpt:SKEPTIC"; // debate role overrides
         }
         using var askSession = new AskSession(AiProvider.ChatGpt, cdp); // gradual migration wrapper
         BindAskIdentity(askSession, question, "gpt");

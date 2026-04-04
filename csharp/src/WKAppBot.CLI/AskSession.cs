@@ -685,6 +685,24 @@ internal sealed class AskSession : IDisposable
         return await Cdp.QueryExistsAsync(Provider.LimitSelector);
     }
 
-    public void Dispose() => Tab?.Dispose();
+    public void Dispose()
+    {
+        // Cleanup: if Chrome was left minimized by any CDP operation, restore it.
+        // Prevents zombie-minimized Chrome windows after ask session ends.
+        try
+        {
+            if (Cdp?.ChromeWindowHandle != 0)
+            {
+                var hwnd = (IntPtr)Cdp.ChromeWindowHandle;
+                if (WKAppBot.Win32.Native.NativeMethods.IsIconic(hwnd))
+                {
+                    WKAppBot.Win32.Native.NativeMethods.ShowWindow(hwnd, 4); // SW_SHOWNOACTIVATE
+                    Console.Error.WriteLine($"[ASK] Dispose: restored minimized Chrome (hwnd=0x{hwnd:X8})");
+                }
+            }
+        }
+        catch { }
+        Tab?.Dispose();
+    }
 }
 
