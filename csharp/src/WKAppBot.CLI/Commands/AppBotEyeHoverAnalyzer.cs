@@ -246,26 +246,22 @@ internal partial class Program
         // Immediately hide session overlay (clear stale content) — don't create new
         A11yHackOverlayHost.TryGetSlot(OverlaySlot.Session)?.Hide();
 
-        // Snapshot input pixel baseline at current cursor position
+        // Snapshot cursor position (ignore pixel content — cursor blink causes false positives)
         WKAppBot.Win32.Native.NativeMethods.GetCursorPos(out var curPt);
-        _inputPixelBaseline = SampleInputHash(curPt.X, curPt.Y);
+        int baselineX = curPt.X, baselineY = curPt.Y;
 
         var debounceCts = _liveHackDebounceCts;
         _ = Task.Run(async () =>
         {
             try
             {
-                // 1s debounce with 200ms pixel polling — abort early if content changed
-                for (int poll = 0; poll < 5; poll++)
+                // 1s debounce — abort if cursor position changed (pixel ignored: cursor blink)
+                await Task.Delay(1000, debounceCts.Token);
+                WKAppBot.Win32.Native.NativeMethods.GetCursorPos(out var pt);
+                if (pt.X != baselineX || pt.Y != baselineY)
                 {
-                    await Task.Delay(200, debounceCts.Token);
-                    WKAppBot.Win32.Native.NativeMethods.GetCursorPos(out var pt);
-                    var cur = SampleInputHash(pt.X, pt.Y);
-                    if (cur != _inputPixelBaseline)
-                    {
-                        AppendEyeAnalysisTrace("auto-hack-skip", new { reason = "input-pixels-changed", poll });
-                        return; // content under cursor changed → skip this analysis
-                    }
+                    AppendEyeAnalysisTrace("auto-hack-skip", new { reason = "cursor-moved", dx = pt.X - baselineX, dy = pt.Y - baselineY });
+                    return;
                 }
                 string currentGrap;
                 string currentSource;
