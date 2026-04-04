@@ -615,30 +615,16 @@ internal partial class Program
                 // Policy broadcast when Eye first spawns (agent reads stdout)
                 AgentPolicy.StartPolicyBroadcast();
 
-                // ── Step 6: Wait for Eye to acquire alive mutex ──
-                // CRITICAL: Hold spawn mutex during this wait!
-                // Without this, another caller sees "alive mutex free" during Eye's
-                // init window and spawns a duplicate. CreateProcess hooks / AV scans
-                // can widen this gap to several seconds.
-                for (int wait = 0; wait < 1000; wait += 200)
+                // ── Step 6: Fire-and-forget — no polling, no blocking ──
+                // Spawn mutex already prevents duplicates. Eye will acquire alive mutex on its own.
+                // Previous design polled alive mutex for up to 1s — removed to eliminate blocking.
                 {
+                    EyeLog($"Eye spawned (fire-and-forget, pid={proc2.Pid})");
+                    // Only check if process died immediately (bad path, missing exe, etc.)
                     System.Threading.Thread.Sleep(200);
-                    try
-                    {
-                        using var probe = new System.Threading.Mutex(false, EyeAliveMutexName);
-                        if (!probe.WaitOne(0))
-                        {
-                            EyeLog($"Eye alive mutex confirmed after {wait + 200}ms");
-                            break;
-                        }
-                        probe.ReleaseMutex();
-                    }
-                    catch (System.Threading.AbandonedMutexException) { break; }
-
                     if (proc2.HasExited)
                     {
                         EyeLog($"Eye process exited during init (exit={proc2.ExitCode})");
-                        break;
                     }
                 }
 
