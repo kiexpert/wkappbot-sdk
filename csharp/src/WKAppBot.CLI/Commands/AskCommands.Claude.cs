@@ -148,11 +148,12 @@ internal partial class Program
         }
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
+        cdp.OperationContext = "claude";
         if (triadCtx != null)
         {
             triadCtx.RegisterCdp("claude", cdp);
             cdp.OnStreamingChunkEvent = triadCtx.UpdateChunk;
-            cdp.OperationContext = "claude:AUDITOR"; // debate role
+            cdp.OperationContext = "claude:AUDITOR"; // debate role overrides
         }
         using var askSession = new AskSession(AiProvider.Claude, cdp); // gradual migration wrapper
         BindAskIdentity(askSession, question, "claude");

@@ -36,12 +36,14 @@ internal partial class Program
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
         PulseStep.Mark("cdp-connected");
+        // Always set OperationContext so minimize watchdog can trace the caller
+        cdp.OperationContext = "gemini";
         // Cross-prompt: stream chunks to shared context + register CDP for injection
         if (triadCtx != null)
         {
             triadCtx.RegisterCdp("gemini", cdp);
             cdp.OnStreamingChunkEvent = triadCtx.UpdateChunk;
-            cdp.OperationContext = "gemini:EXPLORER"; // debate role
+            cdp.OperationContext = "gemini:EXPLORER"; // debate role overrides
         }
         using var askSession = new AskSession(AiProvider.Gemini, cdp); // gradual migration wrapper
         BindAskIdentity(askSession, question, "gemini");

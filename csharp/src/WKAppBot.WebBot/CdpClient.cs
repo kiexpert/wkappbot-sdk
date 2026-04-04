@@ -313,15 +313,15 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
 
         await MaybeLogFocusRiskBeforeAsync(method, parameters, prevFg);
 
-        // Minimize Chrome before Input.* to prevent focus theft (focusless CDP operation)
-        // Zoom zombies: handled by zoom cleanup timer (60s) + target IsIconic check
-        if (method.StartsWith("Input.", StringComparison.Ordinal) && ChromeWindowHandle != 0)
+        // CDP Input.* is delivered via DevTools protocol directly to the renderer —
+        // does NOT require Chrome to be foreground or visible. No minimize needed.
+        // Only pre-minimize for methods that genuinely trigger OS-level focus theft:
+        if (IsFocusStealingMethod(method) && ChromeWindowHandle != 0
+            && !IsIconic((IntPtr)ChromeWindowHandle))
         {
-            if (!IsIconic((IntPtr)ChromeWindowHandle))
-            {
-                ShowWindowNative((IntPtr)ChromeWindowHandle, 6); // SW_MINIMIZE
-                ScheduleMinimizeDump($"input-auto-minimize:{method}", (IntPtr)ChromeWindowHandle);
-            }
+            Console.Error.WriteLine($"[CDP] Pre-minimize for focus-stealing method: {method}");
+            ShowWindowNative((IntPtr)ChromeWindowHandle, 6); // SW_MINIMIZE
+            ScheduleMinimizeDump($"focus-steal-guard:{method}", (IntPtr)ChromeWindowHandle);
         }
 
         var id = Interlocked.Increment(ref _messageId);
@@ -374,8 +374,24 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
             }
         }
 
+        // Post-restore: if we pre-minimized for a focus-stealing method, restore Chrome
+        // to its previous state (SW_SHOWNOACTIVATE=4 — visible but no focus steal).
+        if (IsFocusStealingMethod(method) && ChromeWindowHandle != 0
+            && IsIconic((IntPtr)ChromeWindowHandle))
+        {
+            ShowWindowNative((IntPtr)ChromeWindowHandle, 4); // SW_SHOWNOACTIVATE
+            CancelMinimizeDump($"post-restore:{method}");
+        }
+
         return result;
     }
+
+    /// <summary>
+    /// Methods that trigger Chrome OS-level focus theft (window activation/restoration).
+    /// Input.* is NOT in this list — CDP sends Input events directly to the renderer.
+    /// </summary>
+    private static bool IsFocusStealingMethod(string method) => method is
+        "Page.bringToFront" or "Target.activateTarget" or "Browser.setWindowBounds";
 
     /// <summary>
     /// When true, injects a WebBot URL bar at the top of each page after navigation,
