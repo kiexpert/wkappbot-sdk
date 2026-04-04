@@ -15,6 +15,8 @@ internal partial class Program
 
         if (args.Length > 0 && args[0] is "resolve")
             return SuggestResolveCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "archive")
+            return SuggestArchiveCommand(args[1..]);
         if (args.Length > 0 && args[0] is "list" or "ls")
             return SuggestListCommand(args[1..]);
         if (args.Length > 0 && args[0] is "repost")
@@ -177,7 +179,8 @@ internal partial class Program
         // ── Auto-sync slack_ts: fetch Slack messages since latest HQ entry ──
         var entries = lines
             .Select(l => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(l)!)
-            .Where(e => e["review_status"]?.GetValue<string>() != "done") // skip resolved items
+            .Where(e => e["review_status"]?.GetValue<string>() != "done"   // skip resolved
+                     && e["status"]?.GetValue<string>() is not ("done" or "archived")) // skip archived
             .ToList();
         if (entries.Count == 0)
         {
@@ -569,9 +572,17 @@ internal partial class Program
             }
         }
 
-        if (title == null)
+        // Required argument validation
+        var missing = new List<string>();
+        if (title == null)        missing.Add("--title");
+        if (rootCause == null)    missing.Add("--root-cause");
+        if (estimatedWork == null) missing.Add("--work");
+        if (componentsRaw == null) missing.Add("--components");
+        if (affectedCmdsRaw == null) missing.Add("--affected-cmds");
+        if (missing.Count > 0)
         {
-            Console.WriteLine("[MERGE] --title is required. Run 'wkappbot suggest merge --help' for usage.");
+            Console.WriteLine($"[MERGE] Missing required argument(s): {string.Join(", ", missing)}");
+            Console.WriteLine("  Run 'wkappbot suggest merge --help' for usage.");
             return 1;
         }
 
@@ -1468,6 +1479,77 @@ internal partial class Program
             Console.Error.WriteLine($"[REGRESSION] Error running regression tests: {ex.Message}");
         }
         return 0;
+    }
+
+    /// <summary>suggest archive &lt;ts&gt; [note] — mark entries as archived (no evidence required).
+    /// Use for noise, duplicates, or entries superseded by a merge. No Slack thread reply.</summary>
+    static int SuggestArchiveCommand(string[] args)
+    {
+        if (args.Length == 0 || args[0] is "-h" or "--help")
+        {
+            Console.WriteLine("Usage: wkappbot suggest archive <ts> [note]");
+            Console.WriteLine("  ts  : ISO timestamp prefix or multiple space-separated prefixes");
+            Console.WriteLine("  note: optional reason (noise / duplicate / superseded / etc.)");
+            Console.WriteLine("  No evidence required — use for garbage, test entries, and merged originals.");
+            return 0;
+        }
+
+        var jsonlPath = Path.Combine(DataDir, "suggestions.jsonl");
+        if (!File.Exists(jsonlPath)) { Console.WriteLine("[ARCHIVE] No suggestions.jsonl found."); return 1; }
+
+        // Collect ts prefixes and optional note
+        var tsPrefixes = new List<string>();
+        string note = "archived";
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (!args[i].StartsWith("--") && !args[i].StartsWith("-"))
+            {
+                // First non-flag that doesn't look like a timestamp prefix → treat as note
+                if (tsPrefixes.Count > 0 && !args[i].StartsWith("20"))
+                    note = args[i];
+                else
+                    tsPrefixes.Add(args[i]);
+            }
+        }
+
+        if (tsPrefixes.Count == 0) { Console.WriteLine("[ARCHIVE] No timestamp prefix given."); return 1; }
+
+        var lines = File.ReadAllLines(jsonlPath).ToList();
+        int archived = 0;
+        foreach (var prefix in tsPrefixes)
+        {
+            bool found = false;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(lines[i])) continue;
+                try
+                {
+                    var node = JsonNode.Parse(lines[i]);
+                    var ts = node?["ts"]?.GetValue<string>() ?? "";
+                    if (!ts.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                    var status = node?["status"]?.GetValue<string>() ?? "";
+                    if (status is "done" or "archived") { Console.WriteLine($"[ARCHIVE] {prefix} already {status}"); found = true; continue; }
+
+                    // Rewrite entry with archived status + note
+                    node!["status"] = "archived";
+                    node["archived_at"] = DateTime.UtcNow.ToString("o");
+                    node["archived_note"] = note;
+                    lines[i] = node.ToJsonString();
+                    Console.WriteLine($"[ARCHIVE] {ts[..Math.Min(24, ts.Length)]} → archived ({note})");
+                    archived++;
+                    found = true;
+                }
+                catch { }
+            }
+            if (!found) Console.WriteLine($"[ARCHIVE] No entry found for prefix: {prefix}");
+        }
+
+        if (archived > 0)
+        {
+            File.WriteAllLines(jsonlPath, lines);
+            Console.WriteLine($"[ARCHIVE] Done — {archived} entry/entries archived.");
+        }
+        return archived > 0 ? 0 : 1;
     }
 
     /// <summary>
