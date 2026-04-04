@@ -520,12 +520,42 @@ internal partial class Program
 
             // Sanity check: re-detect encoding of output bytes to catch accidental encoding change
             var verifyEnc = DetectFileEncoding(plan.OutBytes, null);
-            if (verifyEnc.CodePage != plan.Enc.CodePage)
+            bool encodingChanged = verifyEnc.CodePage != plan.Enc.CodePage;
+            if (encodingChanged)
                 Console.Error.WriteLine($"[file edit] WARNING: output encoding changed! {plan.Enc.WebName} → {verifyEnc.WebName} — possible corruption");
+
+            // Corruption check: look for U+FFFD replacement chars (indicates CP949→UTF-8 mojibake)
+            // U+FFFD in UTF-8 = 0xEF 0xBF 0xBD
+            bool hasReplacement = false;
+            if (plan.Enc.CodePage != 65001 /* non-UTF-8 original */ || encodingChanged)
+            {
+                var outStr = plan.Enc.GetString(plan.OutBytes);
+                hasReplacement = outStr.Contains('\uFFFD');
+            }
+            if (hasReplacement)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Error.WriteLine($"[file edit] ⚠ ENCODING CORRUPTION: U+FFFD found in output — Korean/CJK chars may be mojibake!");
+                Console.Error.WriteLine($"  File: {plan.Path}");
+                Console.Error.WriteLine($"  Original encoding: {plan.Enc.WebName} (CP{plan.Enc.CodePage})");
+                Console.Error.WriteLine($"  Restore with: wkappbot file edit --undo {DateTime.Now:yyyyMMdd-HHmmss} \"{plan.Path}\"");
+                Console.ResetColor();
+                // Send Slack alert via Eye pipe if available
+                try
+                {
+                    var alertMsg = $":warning: *[인코딩 오염]* `{Path.GetFileName(plan.Path)}`\n원본 인코딩: {plan.Enc.WebName} → U+FFFD 발견. 한글 깨짐 가능성!\n`{plan.Path}`";
+                    var slackCfg = LoadSlackConfig();
+                    var tok = slackCfg?["bot_token"]?.GetValue<string>();
+                    var ch  = slackCfg?["channel"]?.GetValue<string>();
+                    if (!string.IsNullOrEmpty(tok) && !string.IsNullOrEmpty(ch))
+                        PostWithOverflow(tok, ch, alertMsg);
+                }
+                catch { /* Slack alert is best-effort */ }
+            }
 
             // WriteAllBytes uses FileMode.Create (truncate-in-place) — no delete event fired
             File.WriteAllBytes(plan.Path, plan.OutBytes);
-            Console.WriteLine($"[file edit] {plan.Count} replacement(s) — encoding={plan.Enc.WebName}");
+            Console.WriteLine($"[file edit] {plan.Count} replacement(s) — encoding={plan.Enc.WebName}{(hasReplacement ? " ⚠CORRUPTION" : "")}");
         }
 
         // ── Context output: indent-based block expansion + N extra lines ──

@@ -21,6 +21,19 @@ internal partial class Program
             return SuggestRepostCommand(args[1..]);
         if (args.Length > 0 && args[0] is "merge")
             return SuggestMergeCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "show" or "get" or "view")
+            return SuggestShowCommand(args[1..]);
+
+        // Guard: single lowercase word that looks like an unrecognized subcommand → error instead of saving as text.
+        // Prevents accidental "suggest show 19" → garbage JSONL entry.
+        if (args.Length > 0 && args[0].All(ch => char.IsLower(ch) || ch == '-') && args[0].Length <= 12
+            && !args[0].StartsWith('-'))
+        {
+            Console.Error.WriteLine($"[SUGGEST] Unknown subcommand: '{args[0]}'");
+            Console.Error.WriteLine($"  Known subcommands: list, show, merge, resolve, repost");
+            Console.Error.WriteLine($"  To suggest text starting with '{args[0]}', quote it: wkappbot suggest \"{string.Join(" ", args)}\"");
+            return 1;
+        }
 
         if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
         {
@@ -37,6 +50,7 @@ internal partial class Program
             Console.WriteLine();
             Console.WriteLine("Subcommands:");
             Console.WriteLine("  list / ls              Show pending suggestions");
+            Console.WriteLine("  show <n|ts>            Show full text of suggestion #n or by ts prefix");
             Console.WriteLine("  merge <ts1> [ts2..] --title \"...\"  Merge related suggestions into one self-healing record");
             Console.WriteLine("  resolve <ts> \"note\"   Mark resolved + Slack thread reply");
             Console.WriteLine("  repost [ts]            Re-post to Slack entries missing slack_ts, write ID back");
@@ -404,6 +418,63 @@ internal partial class Program
 
         Console.WriteLine(new string('─', 100));
         Console.WriteLine($"  🔗 = Slack ts recorded  |  resolve: wkappbot suggest resolve <ts> \"note\"");
+        return 0;
+    }
+
+    /// <summary>suggest show &lt;n|ts&gt; — show full content of suggestion by list number or ts prefix.</summary>
+    static int SuggestShowCommand(string[] args)
+    {
+        if (args.Length == 0 || args[0] is "-h" or "--help")
+        {
+            Console.WriteLine("Usage: wkappbot suggest show <n|ts>");
+            Console.WriteLine("  n  : list number (1-based, from 'suggest list')");
+            Console.WriteLine("  ts : timestamp prefix (e.g. 2026-04-02T01)");
+            return 0;
+        }
+
+        var jsonlPath = Path.Combine(DataDir, "suggestions.jsonl");
+        if (!File.Exists(jsonlPath)) { Console.Error.WriteLine("[SUGGEST] No suggestions.jsonl"); return 1; }
+
+        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        var entries = lines
+            .Select(l => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(l)!)
+            .Where(e => e["review_status"]?.GetValue<string>() != "done"
+                     && e["status"]?.GetValue<string>() != "done")
+            .ToList();
+
+        System.Text.Json.Nodes.JsonNode? target = null;
+        var query = args[0];
+
+        if (int.TryParse(query, out var n) && n >= 1 && n <= entries.Count)
+        {
+            target = entries[n - 1];
+        }
+        else
+        {
+            target = entries.FirstOrDefault(e => (e["ts"]?.GetValue<string>() ?? "").StartsWith(query));
+        }
+
+        if (target == null)
+        {
+            Console.Error.WriteLine($"[SUGGEST] Not found: {query}");
+            Console.Error.WriteLine($"  Run 'suggest list' to see numbers. Total: {entries.Count}");
+            return 1;
+        }
+
+        var ts      = target["ts"]?.GetValue<string>() ?? "";
+        var from    = target["from"]?.GetValue<string>() ?? "";
+        var text    = target["text"]?.GetValue<string>() ?? "";
+        var status  = target["status"]?.GetValue<string>() ?? "pending";
+        var slackTs = target["slack_ts"]?.GetValue<string>();
+        var title   = target["title"]?.GetValue<string>();
+
+        Console.WriteLine($"[SUGGEST] ts={ts}  from=[{from}]  status={status}");
+        if (slackTs != null) Console.WriteLine($"          slack_ts={slackTs}");
+        if (title != null) { Console.ForegroundColor = ConsoleColor.Cyan; Console.WriteLine($"  {title}"); Console.ResetColor(); }
+        Console.WriteLine();
+        Console.WriteLine(text);
+        Console.WriteLine();
+        Console.WriteLine($"  resolve: wkappbot suggest resolve {ts} \"note\" --i-completed-... <evidence.sh>");
         return 0;
     }
 

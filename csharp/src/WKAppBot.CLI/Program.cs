@@ -656,8 +656,9 @@ internal partial class Program
 
             // ── Global --help / --regression interceptor ──
             // Any position, any combination of other args — these flags win immediately.
-            if (TryPrintCommandHelp(command, restArgs)) return 0;
-            if (TryRunRegression(command, restArgs)) return 0;
+            // Must set exitCode before return — finally block writes exitCode to exit file.
+            if (TryPrintCommandHelp(command, restArgs)) { exitCode = 0; return 0; }
+            if (TryRunRegression(command, restArgs)) { exitCode = 0; return 0; }
 
             if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
             if (!GrepModeActive && !GrapMode && !IsPipeMode) try { Console.Error.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
