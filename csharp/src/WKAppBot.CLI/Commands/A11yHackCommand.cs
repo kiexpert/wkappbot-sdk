@@ -566,45 +566,52 @@ internal partial class Program
 
             if (!string.IsNullOrEmpty(uiaScope)) return;
 
-            // Clamp to target window RECT — never analyze beyond the root window boundary.
-            // GetWindowRect already gives us the root window. But if grap resolved to a child
-            // element, try to narrow to that element's parent BoundingRectangle.
+            // ── 분석 범위 결정 ──
+            // UIA 정보가 있으면: 타겟 노드의 Parent 영역으로 좁힘
+            // UIA 정보 없으면: 타겟 창(hwnd)의 부모 창으로 제한
+            // 타겟 창이 루트 창이면: 그냥 루트 창 전체 분석 (이미 wr에 설정됨)
             try
             {
+                // 1. UIA로 타겟 찾아서 Parent로 좁히기
                 var root = automation.FromHandle(hwnd);
-                var grapResult = GrapHelper.FindByNameOrAid(root, grapFull.Split('#')[0]);
+                var grapPattern = grapFull.Split('#')[0];
+                var grapResult = GrapHelper.FindByNameOrAid(root, grapPattern);
                 if (grapResult != null)
                 {
-                    // Use parent's rect (one level up from target), clamped to root window
                     var parent = grapResult.Parent;
-                    var parentRect = (parent ?? grapResult).Properties.BoundingRectangle.ValueOrDefault;
-                    if (parentRect.Width > 0 && parentRect.Height > 0)
+                    var analysisEl = parent ?? grapResult; // parent 없으면 타겟 자체
+                    var aRect = analysisEl.Properties.BoundingRectangle.ValueOrDefault;
+                    if (aRect.Width > 0 && aRect.Height > 0)
                     {
-                        // Clamp to root window bounds
-                        var rootRect = root.Properties.BoundingRectangle.ValueOrDefault;
-                        var clampL = Math.Max(parentRect.X, rootRect.X);
-                        var clampT = Math.Max(parentRect.Y, rootRect.Y);
-                        var clampR = Math.Min(parentRect.X + parentRect.Width, rootRect.X + rootRect.Width);
-                        var clampB = Math.Min(parentRect.Y + parentRect.Height, rootRect.Y + rootRect.Height);
-                        if (clampR > clampL && clampB > clampT)
-                        {
-                            wr.Left = clampL; wr.Top = clampT; wr.Right = clampR; wr.Bottom = clampB;
-                            Console.WriteLine($"[HACK] Parent-narrowed: rect=({clampL},{clampT} {clampR - clampL}x{clampB - clampT})");
-                            return;
-                        }
+                        wr.Left = aRect.X; wr.Top = aRect.Y;
+                        wr.Right = aRect.X + aRect.Width; wr.Bottom = aRect.Y + aRect.Height;
+                        Console.WriteLine($"[HACK] UIA parent-narrowed: rect=({aRect.X},{aRect.Y} {aRect.Width}x{aRect.Height})");
+                        return;
                     }
                 }
             }
             catch { }
 
-            // Fallback: focus-based narrowing
-            if (!TryResolveFocusedCaptureRect(automation, hwnd, out var focusRect, out var focusDesc)) return;
-
-            wr.Left = focusRect.Left;
-            wr.Top = focusRect.Top;
-            wr.Right = focusRect.Right;
-            wr.Bottom = focusRect.Bottom;
-            Console.WriteLine($"[HACK] Focus-narrowed: {focusDesc} rect=({focusRect.Left},{focusRect.Top} {focusRect.Width}x{focusRect.Height})");
+            // 2. UIA 실패 → 타겟 창의 부모 창(Win32 Owner/Parent)으로 제한
+            var parentHwnd = NativeMethods.GetParent(hwnd);
+            if (parentHwnd == IntPtr.Zero)
+                parentHwnd = NativeMethods.GetAncestor(hwnd, 2); // GA_ROOT
+            if (parentHwnd != IntPtr.Zero && parentHwnd != hwnd)
+            {
+                NativeMethods.GetWindowRect(parentHwnd, out var parentWr);
+                if (parentWr.Right - parentWr.Left > 0 && parentWr.Bottom - parentWr.Top > 0)
+                {
+                    // 타겟 창 RECT를 부모 창으로 클램프
+                    wr.Left = Math.Max(wr.Left, parentWr.Left);
+                    wr.Top = Math.Max(wr.Top, parentWr.Top);
+                    wr.Right = Math.Min(wr.Right, parentWr.Right);
+                    wr.Bottom = Math.Min(wr.Bottom, parentWr.Bottom);
+                    Console.WriteLine($"[HACK] Win32 parent-clamped: rect=({wr.Left},{wr.Top} {wr.Right - wr.Left}x{wr.Bottom - wr.Top})");
+                    return;
+                }
+            }
+            // 3. 타겟 창 = 루트 창 → wr 그대로 (창 전체 분석)
+            Console.WriteLine($"[HACK] Root window — analyzing full: rect=({wr.Left},{wr.Top} {wr.Right - wr.Left}x{wr.Bottom - wr.Top})");
         }
         catch
         {
