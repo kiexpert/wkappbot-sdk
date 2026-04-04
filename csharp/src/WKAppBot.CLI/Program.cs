@@ -921,7 +921,22 @@ internal partial class Program
                 return sub.Length > 0 ? $"{cmd} {sub}" : cmd;
 
             default:
-                return cmd;
+            {
+                // Known commands → use as-is. Unknown/typo → "unknown" to prevent folder explosion.
+                var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "eye", "run", "find", "inspect", "windows", "ocr", "input", "click", "dismiss",
+                    "win-click", "dialog-click", "tab-select", "cond-add", "focus", "watch", "snapshot",
+                    "readiness", "uia-test", "form-dump", "toolbar-ocr", "titlebar", "validate",
+                    "chart-analyze", "hts-stress", "tooltip-probe", "speak", "whisper", "newchat",
+                    "analyze-hack", "screensaver", "whisper-ring", "prompt", "dashboard", "win-move",
+                    "screen", "clipboard", "claude-usage", "suggest", "gc", "hotswap", "tick",
+                    "kiwoom", "com", "telegram", "stock-scan", "logcat", "grep", "grap",
+                    "help", "--help", "-h", "mcp", "claude-detect", "noise", "capture",
+                    "elevate", "webbot", "code", "vscode", "version", "--version"
+                };
+                return known.Contains(cmd) ? cmd : "unknown";
+            }
         }
     }
 
