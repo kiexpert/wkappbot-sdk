@@ -1123,16 +1123,19 @@ internal partial class Program
                 Math.Max(1, region.Bounds.Width),
                 Math.Max(1, region.Bounds.Height));
 
-            // Determine role — only Target, Scope (parent+siblings), skip the rest
+            // Determine role
+            bool hasUia = uiaAnswers != null && uiaAnswers.ContainsKey(i);
             HackBoxRole role;
             if (i == 0)
                 role = HackBoxRole.Target;
             else if (i == parentIdx)
-                role = HackBoxRole.Scope; // parent
+                role = HackBoxRole.Scope;
             else if (parentIdx >= 0 && parentBounds.Contains(region.Bounds))
-                role = HackBoxRole.Scope; // sibling (inside same parent)
+                role = HackBoxRole.Scope;
+            else if (hasUia)
+                role = HackBoxRole.Known; // system a11y node → dashed
             else
-                continue; // not in scope → no overlay box
+                continue; // no UIA, not in scope → skip
 
             // Label: UIA type or Dy type + id + size
             string? label = null;

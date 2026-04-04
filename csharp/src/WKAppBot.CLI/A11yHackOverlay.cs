@@ -12,7 +12,7 @@ using WKAppBot.Win32.Native;
 
 namespace WKAppBot.CLI;
 
-internal enum HackBoxRole { Scope, Target }
+internal enum HackBoxRole { Scope, Target, Known }
 
 internal sealed record A11yHackOverlayBox(
     Rect Bounds,
@@ -107,26 +107,37 @@ internal sealed class A11yHackOverlayWindow : Window
             var bw = box.Bounds.Width / dpi;
             var bh = box.Bounds.Height / dpi;
 
-            // ── Box style ──
-            bool isTarget = box.Role == HackBoxRole.Target;
+            // ── Box style: Target(neon) / Scope(blue fill) / Known(green dashed) ──
+            var role = box.Role;
+            Brush stroke; double thick; Brush fill;
+            DoubleCollection? dash; double rx, ry; Effect? fx;
+            switch (role)
+            {
+                case HackBoxRole.Target:
+                    stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88));
+                    thick = 2.2; fill = new SolidColorBrush(Color.FromArgb(28, 0x00, 0xFF, 0x88));
+                    dash = null; rx = ry = 3;
+                    fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 16, ShadowDepth = 0, Opacity = 0.8 };
+                    break;
+                case HackBoxRole.Scope:
+                    stroke = new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5));
+                    thick = 1.2; fill = new SolidColorBrush(Color.FromArgb(22, 0x42, 0xA5, 0xF5));
+                    dash = new DoubleCollection { 4, 2 }; rx = ry = 2;
+                    fx = new DropShadowEffect { Color = Color.FromRgb(0x42, 0xA5, 0xF5), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.3 };
+                    break;
+                default: // Known — system a11y dashed green
+                    stroke = new SolidColorBrush(Color.FromArgb(160, 0x32, 0xCD, 0x32));
+                    thick = 0.8; fill = Brushes.Transparent;
+                    dash = new DoubleCollection { 3, 2 }; rx = ry = 0;
+                    fx = null;
+                    break;
+            }
             var rect = new Rectangle
             {
-                Width = Math.Max(1, bw),
-                Height = Math.Max(1, bh),
-                Stroke = isTarget
-                    ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88))
-                    : new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5)),
-                StrokeThickness = isTarget ? 2.2 : 1.2,
-                Fill = isTarget
-                    ? new SolidColorBrush(Color.FromArgb(28, 0x00, 0xFF, 0x88))
-                    : new SolidColorBrush(Color.FromArgb(22, 0x42, 0xA5, 0xF5)),
-                RadiusX = isTarget ? 3 : 2,
-                RadiusY = isTarget ? 3 : 2,
-                StrokeDashArray = isTarget ? null : new DoubleCollection { 4, 2 },
-                Effect = isTarget
-                    ? new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 16, ShadowDepth = 0, Opacity = 0.8 }
-                    : new DropShadowEffect { Color = Color.FromRgb(0x42, 0xA5, 0xF5), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.3 },
-                IsHitTestVisible = false
+                Width = Math.Max(1, bw), Height = Math.Max(1, bh),
+                Stroke = stroke, StrokeThickness = thick, Fill = fill,
+                RadiusX = rx, RadiusY = ry, StrokeDashArray = dash,
+                Effect = fx, IsHitTestVisible = false
             };
             Canvas.SetLeft(rect, bx);
             Canvas.SetTop(rect, by);
@@ -135,11 +146,15 @@ internal sealed class A11yHackOverlayWindow : Window
             // ── Label (top-right) ──
             if (!string.IsNullOrWhiteSpace(box.Label))
             {
-                var fg = isTarget ? Color.FromRgb(0x00, 0xFF, 0x88) : Color.FromRgb(0x90, 0xCA, 0xF9);
-                var bg = isTarget ? Color.FromArgb(220, 0, 30, 20) : Color.FromArgb(200, 0, 15, 50);
+                var (fg, bg2) = role switch
+                {
+                    HackBoxRole.Target => (Color.FromRgb(0x00, 0xFF, 0x88), Color.FromArgb(220, 0, 30, 20)),
+                    HackBoxRole.Scope => (Color.FromRgb(0x90, 0xCA, 0xF9), Color.FromArgb(200, 0, 15, 50)),
+                    _ => (Color.FromRgb(0xB0, 0xE0, 0xB0), Color.FromArgb(180, 0, 30, 0)), // Known: light green
+                };
                 var labelBg = new Border
                 {
-                    Background = new SolidColorBrush(bg),
+                    Background = new SolidColorBrush(bg2),
                     CornerRadius = new CornerRadius(2),
                     Padding = new Thickness(3, 1, 3, 1),
                     Child = new TextBlock
@@ -147,10 +162,10 @@ internal sealed class A11yHackOverlayWindow : Window
                         Text = box.Label,
                         Foreground = new SolidColorBrush(fg),
                         FontFamily = new FontFamily("Consolas"),
-                        FontSize = isTarget ? 9 : 8,
-                        FontWeight = isTarget ? FontWeights.Bold : FontWeights.Normal,
+                        FontSize = role == HackBoxRole.Target ? 9 : 8,
+                        FontWeight = role == HackBoxRole.Target ? FontWeights.Bold : FontWeights.Normal,
                     },
-                    Effect = isTarget
+                    Effect = role == HackBoxRole.Target
                         ? new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.5 }
                         : null,
                     IsHitTestVisible = false
