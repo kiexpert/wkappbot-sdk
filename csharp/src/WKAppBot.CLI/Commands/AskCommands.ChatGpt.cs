@@ -99,7 +99,7 @@ internal partial class Program
         {
             try
             {
-                // ?占?占?Phase 1: Navigate (iconified OK) ?占?占?                PulseStep.Mark("phase1-navigate");
+                // ──?Phase 1: Navigate (iconified OK) ──?                PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("chatgpt.com"))
@@ -158,7 +158,7 @@ internal partial class Program
                         : "[ASK] Loop persona missing on this tab -- re-injecting persona...");
                     var personaTextGpt = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (!_suppressLoopPersona.Value && Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
-                        SlackPostToThread($"?뱥 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextGpt.Length > 800 ? personaTextGpt[..800] + "..." : personaTextGpt)}\n```", "System");
+                        SlackPostToThread($"⚡ *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaTextGpt.Length > 800 ? personaTextGpt[..800] + "..." : personaTextGpt)}\n```", "System");
                     var (personaOk, personaResp) = await ChatGptSendAndWait(
                         cdp, personaTextGpt, timeoutSec: 20, askSession: askSession);
                     if (!personaOk)

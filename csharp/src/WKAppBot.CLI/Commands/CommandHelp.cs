@@ -5,7 +5,7 @@
 // STRUCTURE NOTE: Currently a manual dictionary.
 // FUTURE: Replace with [Command] / [SubCommand] / [Description] attributes on
 //   handler methods + Reflection scan ??code changes auto-expose in --help.
-//   See: suggestions.jsonl "Reflection 湲곕컲 --help ?먮룞??
+//   See: suggestions.jsonl "Reflection-based --help auto-generation
 
 namespace WKAppBot.CLI;
 
@@ -53,7 +53,7 @@ internal partial class Program
         // subcommand: first non-flag arg
         var sub = restArgs.FirstOrDefault(a => !a.StartsWith('-'));
 
-        // ?? Step 1: print --help ??????????????????????????????????????????????
+        // ── Step 1: print --help ──────────────────────────────────────────────
         var key = sub != null ? $"{command} {sub}" : command;
         if (!CommandHelpMap.TryGetValue(key, out var helpText)
             && !CommandHelpMap.TryGetValue(command, out helpText))
@@ -65,7 +65,7 @@ internal partial class Program
             Console.WriteLine(helpText.TrimStart('\n'));
         }
 
-        // ?? Step 2: find test scripts ?????????????????????????????????????????
+        // ── Step 2: find test scripts ─────────────────────────────────────────
         var testsRoot = Path.Combine(DataDir, "experience", "tests");
         string[] scriptFiles;
 
@@ -100,7 +100,7 @@ internal partial class Program
             return true;
         }
 
-        // ?? Step 3: run each script ???????????????????????????????????????????
+        // ── Step 3: run each script ───────────────────────────────────────────
         Console.WriteLine();
         Console.WriteLine($"[REGRESSION] {scriptFiles.Length} script(s) for {command}{(sub != null ? " " + sub : "")}");
         Console.WriteLine(new string('-', 60));
@@ -199,7 +199,7 @@ internal partial class Program
         return true;
     }
 
-    // ?? Help text per command (and command+subcommand) ??????????????????????????
+    // ── Help text per command (and command+subcommand) ──────────────────────────
     // Keep entries short (~10 lines). Focus on: what it does, key options, gotchas,
     // examples. Avoid restating obvious things.
     //
@@ -238,9 +238,9 @@ internal partial class Program
               --eval-js "js"             pre-hook or primary output (web)
 
             Examples:
-              a11y invoke "*硫붾え??#*?뚯씪*"
+              a11y invoke "*MenuBar*#*File*"
               a11y type "*edit*" "hello world"
-              a11y type "*app*#*硫붾돱*" "?뚯씪/??? --hotkey
+              a11y type "*app*#*MenuBar*" "File/Save" --hotkey
               a11y read "*Chrome*#chatgpt.com" --eval-js "document.title"
               a11y close "*Chrome*" --nth 2~
             """,
@@ -389,7 +389,7 @@ internal partial class Program
             Ask AI via CDP (Chrome DevTools Protocol, focusless).
 
             ask triad "<question>" [--debate [N]]
-              Parallel GPT + Gemini + Claude. --debate = ?뺣컲??multi-round synthesis.
+              Parallel GPT + Gemini + Claude. --debate = triad-style multi-round synthesis.
 
             ask gpt|gemini|claude (agent mode):
               Autonomous sub-agent loop with tools.

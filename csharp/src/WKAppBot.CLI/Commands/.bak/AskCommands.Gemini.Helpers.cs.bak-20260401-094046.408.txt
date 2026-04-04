@@ -1,0 +1,311 @@
+using System.Diagnostics;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using FlaUI.UIA3;
+using WKAppBot.WebBot;
+using WKAppBot.Win32.Accessibility;
+using WKAppBot.Win32.Input;
+using NativeMethods = WKAppBot.Win32.Native.NativeMethods;
+
+namespace WKAppBot.CLI;
+
+internal partial class Program
+{
+    // ¦¡¦¡ Gemini ¦¡¦¡
+    static readonly string[] GeminiStopNoticeKeywords =
+    [
+        "ÀÀ´ä »ý¼ºÀÌ ÁßÁöµÇ¾ú½À´Ï´Ù",
+        "ÀÀ´äÀÌ ÁßÁöµÇ¾ú½À´Ï´Ù",
+        "»ý¼ºÀÌ ÁßÁöµÇ¾ú½À´Ï´Ù",
+        "»ý¼º ÁßÁöµÊ",
+        "response was stopped",
+        "response stopped",
+        "stopped response"
+    ];
+
+    static bool IsGeminiStoppedNotice(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        return GeminiStopNoticeKeywords.Any(k => text.Contains(k, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// Strip "GeminiÀÇ ÀÀ´ä" UI label prepended by Gemini web UI.
+    /// Applied at the source so it doesn't appear in loop context, Slack, or console.
+    static string StripGeminiUiPrefix(string text)
+    {
+        if (!text.StartsWith("Gemini")) return text;
+        // Strip Korean "Gemini???‘ë‹µ" or English "Gemini's response"
+        foreach (var p in new[] { "Gemini\uC758 \uC751\uB2F5", "Gemini\uC758\uC751\uB2F5", "Gemini's response" })
+            if (text.StartsWith(p, StringComparison.OrdinalIgnoreCase))
+                return text[p.Length..].TrimStart();
+        // Fallback: find ?‘ë‹µ pattern within first 20 chars
+        var eo = text.IndexOf('\uC751');
+        if (eo > 0 && eo < 20 && eo + 1 < text.Length && text[eo + 1] == '\uB2F5')
+            return text[(eo + 2)..].TrimStart();
+        return text;
+    }
+
+    // Wait for stop to clear naturally ? never clicks stop (preserves ongoing generation)
+    static async Task<bool> WaitWhileGeminiStopVisibleNoClickAsync(CdpClient cdp, int maxWaitMs = 30000)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < maxWaitMs)
+        {
+            if (!await cdp.IsStopButtonVisibleAsync()) return true;
+            Console.WriteLine($"[ASK] Gemini generating... waiting ({sw.ElapsedMilliseconds}ms)");
+            await Task.Delay(1000);
+        }
+        Console.WriteLine("[ASK] Gemini still generating after wait ? proceeding anyway");
+        return false;
+    }
+
+    static async Task<string> GetGeminiLastResponseAsync(CdpClient cdp)
+    {
+        return await cdp.GetLastResponseTextAsync() ?? "";
+    }
+
+    static async Task<bool> WaitWhileGeminiStopVisibleAsync(CdpClient cdp, int maxWaitMs = 12000)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < maxWaitMs)
+        {
+            var stopVisible = await cdp.GetStopButtonDetailAsync() ?? "0";
+            if (stopVisible == "0")
+                return true;
+
+            Console.WriteLine($"[ASK] Gemini stop visible [{stopVisible}]; waiting before send... ({sw.ElapsedMilliseconds}ms)");
+            await Task.Delay(700);
+        }
+
+        // Timed out ? try clicking the stop button to cancel ongoing generation, then wait briefly
+        Console.WriteLine("[ASK] Gemini stop still visible ? clicking stop to cancel generation...");
+        await cdp.ClickStopButtonAsync();
+        await Task.Delay(1500);
+        var stillVisible = await cdp.IsStopButtonVisibleAsync();
+        Console.WriteLine($"[ASK] Gemini stop after click: {(stillVisible ? "still visible" : "cleared")}");
+        return !stillVisible;
+    }
+
+    /// <summary>
+    /// Gemini vision ask ? identifies a specific UI element, returns structured OcrSegment.
+    /// Optimized for speed: dedicated tab, 500ms poll, 15s timeout, no Slack/streaming.
+    ///
+    /// Use as ActionExecutor.AskVisionFn delegate:
+    ///   executor.AskVisionFn = (bmp, desc) => AskGeminiForVisionAsync(bmp, desc);
+    ///
+    /// Prompt is verbose (Gemini tokens are free) ? asks for JSON a11y object with x/y/w/h coords.
+    /// Returns: OcrSegment with position from Gemini JSON, or null on failure.
+    /// </summary>
+    static async Task<WKAppBot.Vision.OcrSegment?> AskGeminiForVisionAsync(
+        System.Drawing.Bitmap screenshot, string description, int timeoutMs = 20000)
+    {
+        var raw = await AskGeminiVisionRawAsync(screenshot, BuildVisionElementPrompt(description), timeoutMs);
+        if (raw == null) return null;
+
+        var segs = WKAppBot.Vision.OcrSegmentCache.ParseA11yJson(raw);
+        if (segs.Count == 0) return null;
+
+        // Best match by description, or first if only one result
+        return segs.Count == 1
+            ? segs[0]
+            : WKAppBot.Vision.OcrSegmentCache.BestMatch(segs, description) ?? segs[0];
+    }
+
+    /// <summary>
+    /// Full-form Gemini a11y scan ? returns ALL visible UI elements as OcrSegment list.
+    /// Called once per form to build OcrSegmentCache entries.
+    /// Returns null on failure, empty list if no elements found.
+    /// </summary>
+    static async Task<List<WKAppBot.Vision.OcrSegment>?> AskGeminiForFormScanAsync(
+        System.Drawing.Bitmap screenshot, int timeoutMs = 30000)
+    {
+        var raw = await AskGeminiVisionRawAsync(screenshot, BuildVisionFormScanPrompt(), timeoutMs);
+        if (raw == null) return null;
+        return WKAppBot.Vision.OcrSegmentCache.ParseA11yJson(raw);
+    }
+
+    // ï¿½ï¿½ï¿½ï¿½ Prompt builders (verbose ? Gemini tokens are free) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+
+    static string BuildVisionElementPrompt(string description) => $$"""
+        You are an accessibility inspector analyzing a Windows application screenshot.
+
+        TARGET: Find the UI element that matches this description: "{{description}}"
+
+        Examine the screenshot carefully. Look for:
+        - Visible text labels, button captions, field labels
+        - Icons, shapes, symbols that represent the target
+        - Input fields, dropdowns, checkboxes, radio buttons
+        - Scroll controls, sliders, progress bars
+        - Any clickable or interactive element matching the description
+
+        Return a SINGLE JSON object for the best matching element:
+        {
+          "type": "<ControlType>",
+          "label": "<visible text or icon description>",
+          "x": <center X, 0.0-1.0 relative to image width>,
+          "y": <center Y, 0.0-1.0 relative to image height>,
+          "w": <width, 0.0-1.0>,
+          "h": <height, 0.0-1.0>,
+          "state": "<enabled|disabled|checked|unchecked>"
+        }
+
+        ControlType must be one of:
+        Button, Edit, Text, CheckBox, RadioButton, ComboBox, List, ListItem,
+        Tab, TabItem, Image, DataGrid, DataItem, Group, Pane, ScrollBar,
+        ProgressBar, Slider, Spinner, MenuItem, ToolBar, StatusBar, Unknown
+
+        If the target element is not found, return:
+        {"type":"unknown","label":"","x":0,"y":0,"w":0,"h":0}
+
+        Return ONLY the JSON object, no explanation, no markdown fences.
+        """;
+
+    static string BuildVisionFormScanPrompt() => """
+        You are an accessibility inspector analyzing a Windows application screenshot.
+
+        Enumerate ALL visible UI elements in this form/window. Be thorough and detailed.
+
+        For each element include:
+        - Readable text paragraphs and labels (type: Text)
+        - All buttons and clickable controls (type: Button)
+        - Input fields and text boxes (type: Edit)
+        - Checkboxes with their checked/unchecked state
+        - Radio buttons with their checked/unchecked state
+        - Dropdown/combo controls (type: ComboBox)
+        - List items and data rows (type: ListItem / DataItem)
+        - Tab headers (type: TabItem)
+        - Icons and image shapes that are meaningful (type: Image)
+        - Scroll bars if visible (type: ScrollBar)
+        - Sliders, spinners, progress bars
+        - Group boxes and panel labels (type: Group / Pane)
+
+        Return a JSON ARRAY of all elements:
+        [
+          {
+            "type": "<ControlType>",
+            "label": "<visible text or description>",
+            "x": <center X, 0.0-1.0>,
+            "y": <center Y, 0.0-1.0>,
+            "w": <width, 0.0-1.0>,
+            "h": <height, 0.0-1.0>,
+            "state": "<enabled|disabled|checked|unchecked>"
+          },
+          ...
+        ]
+
+        ControlType must be one of:
+        Button, Edit, Text, CheckBox, RadioButton, ComboBox, List, ListItem,
+        Tab, TabItem, Image, DataGrid, DataItem, Group, Pane, ScrollBar,
+        ProgressBar, Slider, Spinner, MenuItem, ToolBar, StatusBar, Unknown
+
+        Return ONLY the JSON array, no explanation, no markdown fences.
+        Include every element you can see ? the more detail the better.
+        """;
+
+    // ï¿½ï¿½ï¿½ï¿½ Shared CDP vision transport ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+
+    static async Task<string?> AskGeminiVisionRawAsync(
+        System.Drawing.Bitmap screenshot, string prompt, int timeoutMs = 20000)
+    {
+        var tmpPath = Path.Combine(Path.GetTempPath(), $"wkappbot_vision_{Guid.NewGuid():N}.png");
+        try
+        {
+            screenshot.Save(tmpPath, System.Drawing.Imaging.ImageFormat.Png);
+
+            // Dedicated vision tab ? never contaminates user's AI chat sessions
+            var cdp = EnsureCdpConnection(
+                preferredHost: "gemini.google.com", newTab: false,
+                targetTag: "vision-ask");
+            if (cdp == null) return null;
+
+            // Navigate if drifted
+            var currentUrl = await cdp.GetUrlAsync() ?? "";
+            if (!currentUrl.Contains("gemini.google.com", StringComparison.OrdinalIgnoreCase))
+            {
+                await cdp.NavigateAsync("https://gemini.google.com/app");
+                await Task.Delay(2500);
+            }
+
+            // Wait for editor (shorter timeout than regular ask)
+            var editorSel = await WaitForEditorA11y(cdp,
+                ".ql-editor", "[role='textbox'][contenteditable='true']",
+                "div[contenteditable='true']", "rich-textarea [contenteditable]");
+            if (editorSel == null) return null;
+
+            await WaitWhileGeminiStopVisibleNoClickAsync(cdp, 5000);
+
+            using var tabLock = ChromeTabLock.Acquire("Gemini/vision-ask");
+            if (tabLock == null) return null;
+
+            // Attach screenshot + prompt
+            await AttachFilesViaCdp(cdp, new List<string> { tmpPath }, editorSel);
+            await cdp.ClearEditorAsync(editorSel);
+            await cdp.InsertContentEditableAsync(editorSel, prompt);
+            await Task.Delay(200);
+
+            // Send
+            await cdp.SendPromptAsync(editorSel);
+
+            // Poll 500ms intervals until response stabilizes
+            var sw = Stopwatch.StartNew();
+            string? lastText = null;
+            while (sw.ElapsedMilliseconds < timeoutMs)
+            {
+                await Task.Delay(500);
+                var text = await cdp.GetLastResponseTextAsync() ?? "";
+                text = StripGeminiUiPrefix(text).Trim();
+                if (string.IsNullOrWhiteSpace(text)) continue;
+
+                if (text == lastText)
+                {
+                    return IsGeminiStoppedNotice(text) ? null : text;
+                }
+                lastText = text;
+            }
+            return null;  // timeout
+        }
+        catch (Exception ex)
+        {
+            LogError("VISION-ASK", ex);
+            return null;
+        }
+        finally
+        {
+            try { File.Delete(tmpPath); } catch { }
+        }
+    }
+
+    static async Task<(bool ok, string? text)> RetryGeminiAfterStopAsync(CdpClient cdp, string editorSel, string question)
+    {
+        await WaitWhileGeminiStopVisibleAsync(cdp, 6000);
+        await cdp.ClearEditorAsync(editorSel);
+        await cdp.InsertContentEditableAsync(editorSel, question);
+        await Task.Delay(300);
+        await cdp.SendPromptAsync(editorSel);
+
+        var sw = Stopwatch.StartNew();
+        string? retryText = null;
+        while (sw.Elapsed.TotalSeconds < 30)
+        {
+            await Task.Delay(1000);
+            var text = await cdp.GetLastResponseTextAsync() ?? "";
+            if (string.IsNullOrWhiteSpace(text)) continue;
+            if (text == retryText)
+            {
+                if (IsGeminiStoppedNotice(text))
+                    return (false, text);
+                return (true, StripGeminiUiPrefix(text));
+            }
+            retryText = text;
+        }
+
+        if (!string.IsNullOrWhiteSpace(retryText) && !IsGeminiStoppedNotice(retryText))
+            return (true, retryText);
+        return (false, retryText);
+    }
+
+}

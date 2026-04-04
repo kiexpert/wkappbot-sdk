@@ -15,7 +15,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ?? Slack Report ??
+    // ── Slack Report ──
 
     // AsyncLocal: triad parent can pre-create a shared thread ts before spawning Task.Run children.
     // Each child Task inherits the value and posts to the same thread (no duplicate headers).
@@ -89,7 +89,7 @@ internal partial class Program
 
     /// Post text to the current session's Slack thread. Noop if no active thread.
     /// If the latest thread message was posted by the same username, appends via chat.update
-    /// instead of creating a new message (per user request: "理쒖떊 ?볤????먭린爰쇱씤 寃쎌슦留??몄쭛").
+    /// instead of creating a new message (per user request: "if same author in thread, append instead of creating a new message").
     // Ratelimit guard: min 800ms between Slack posts (prevents Slack API 429)
     static long _lastSlackPostTicks;
 
@@ -121,14 +121,14 @@ internal partial class Program
             if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return;
             var uname = username ?? BotUsername;
 
-            // ?? Always merge bot replies: same author in thread ??edit with separator ??
+            // ── Always merge bot replies: same author in thread -- edit with separator ──
             // No time limit ??bot replies always merge. Keeps thread compact + saves quota.
             if (_slackThreadLastPost.TryGetValue(sessionTs, out var last) && last.user == uname)
             {
                 var iconEmoji = ExtractDebateIconEmoji(uname);
                 var sepIcon = !string.IsNullOrEmpty(iconEmoji) ? $"{iconEmoji} " : "";
                 var timeMark = SmartTimeMark(last.text);
-                var combined = last.text + $"\n{sepIcon}*{uname}* ?곣봺 {timeMark} ?곣봺\n" + msg;
+                var combined = last.text + $"\n{sepIcon}*{uname}* | {timeMark} |\n" + msg;
 
                 if (combined.Length <= SlackMaxAppendLength)
                 {
@@ -149,7 +149,7 @@ internal partial class Program
             for (int pos = 0; pos < msg.Length; pos += chunkSize)
             {
                 var chunk = msg[pos..Math.Min(pos + chunkSize, msg.Length)];
-                // Extract emoji from username for icon_emoji (e.g. "?쫲 GPT(SKEPTIC)" ??":fox:")
+                // Extract emoji from username for icon_emoji (e.g. "🥇 GPT(SKEPTIC)" ??":fox:")
                 var iconEmoji = ExtractDebateIconEmoji(uname);
                 var (ok, ts) = SlackSendViaApiWithIcon(botToken, channel, chunk,
                     threadTs: sessionTs, username: uname, iconEmoji: iconEmoji).GetAwaiter().GetResult();

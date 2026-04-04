@@ -60,8 +60,8 @@ internal partial class Program
         {
             try
             {
-                // ?占?占?Phase 1: Navigate (iconified OK ??CDP works without rendering) ?占?占?
-                // ?? P1: Navigate ??
+                // ──?Phase 1: Navigate (iconified OK ??CDP works without rendering) ──?
+                // ── P1: Navigate ──
                 PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
@@ -89,7 +89,7 @@ internal partial class Program
                     await Task.Delay(500);
                 }
 
-                // ?? P2: Find editor via AskSession (uses AiProvider.Gemini selectors) ??
+                // ── P2: Find editor via AskSession (uses AiProvider.Gemini selectors) ──
                 PulseStep.Mark("find-editor");
                 var editorSel = await askSession.FindEditorAsync(15);
                 if (editorSel == null)
@@ -134,7 +134,7 @@ internal partial class Program
                     await cdp.ClearEditorAsync(editorSel);
                     var personaText = BuildAskPersona(effectiveLoopPersona, triadMode, loopMaxSteps, loopRetry, modelHint);
                     if (!_suppressLoopPersona.Value && Interlocked.CompareExchange(ref _slackPersonaPostedFlag, 1, 0) == 0)
-                        SlackPostToThread($"?뱥 *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "..." : personaText)}\n```", "System");
+                        SlackPostToThread($"⚡ *[persona]* steps={loopMaxSteps} retry={loopRetry}\n```\n{(personaText.Length > 800 ? personaText[..800] + "..." : personaText)}\n```", "System");
                     await cdp.InsertContentEditableAsync(editorSel, personaText);
                     await Task.Delay(300);
 
@@ -431,7 +431,7 @@ internal partial class Program
                 int baseResponseCount = int.TryParse(preResponseCount, out var brc) ? brc : 0;
                 Console.WriteLine($"[POLL-WAIT] start (base={baseResponseCount}, timeout={timeoutSec}s)...");
 
-                // ?? P5 A/B: run new PollStreamingResponseAsync alongside legacy poll ??
+                // ── P5 A/B: run new PollStreamingResponseAsync alongside legacy poll ──
                 var abPollTask = Task.Run(async () =>
                 {
                     try { return await cdp.PollStreamingResponseAsync("gemini", baseResponseCount, timeoutSec); }

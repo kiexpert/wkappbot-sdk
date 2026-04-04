@@ -30,7 +30,7 @@ internal sealed class TriadSharedContext
     private readonly ConcurrentDictionary<string, object> _fileLocks =
         new(StringComparer.OrdinalIgnoreCase);
 
-    // ?? Real-time cross-prompting: streaming chunks shared between AIs ??
+    // ── Real-time cross-prompting: streaming chunks shared between AIs ──
     // When AI-A produces a chunk, other AIs get it as context.
     private readonly ConcurrentDictionary<string, string> _latestChunks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, int> _chunkVersions = new(StringComparer.OrdinalIgnoreCase);
@@ -68,7 +68,7 @@ internal sealed class TriadSharedContext
     /// <summary>The original user question ??used by moderator redirect when debaters go off-topic.</summary>
     public string OriginalQuestion => _question;
 
-    // ?? Live MD minutes: real-time debate transcript (APPEND mode) ??
+    // ── Live MD minutes: real-time debate transcript (APPEND mode) ──
     private string? _mdPath;
     private readonly object _mdLock = new();
 #pragma warning disable CS0414
@@ -80,7 +80,7 @@ internal sealed class TriadSharedContext
     public void InitLiveMinutes(string question, string? mdPath = null)
     {
         _mdQuestion = question;
-        // Default path: triad session dir / ?쇰몢 ?뺣컲???뚯쓽濡?- {short question}.md
+        // Default path: triad session dir / session-named- {short question}.md
         if (mdPath == null)
         {
             var shortQ = question.Length > 40 ? question[..40].Trim() + "..." : question;
@@ -147,7 +147,7 @@ internal sealed class TriadSharedContext
         AppendMd($"\n### {label} ({DateTime.Now:HH:mm})\n\n{newText.Trim()}\n");
     }
 
-    // ?? EEP: Evidence Escalation Protocol ??track claims per AI per round ??
+    // ── EEP: Evidence Escalation Protocol ??track claims per AI per round ──
     internal readonly ConcurrentDictionary<string, List<string>> _priorClaims = new(StringComparer.OrdinalIgnoreCase);
     internal readonly ConcurrentDictionary<string, int> _restatementCount = new(StringComparer.OrdinalIgnoreCase);
 
@@ -173,7 +173,7 @@ internal sealed class TriadSharedContext
     public int IncrementRestatement(string ai)
         => _restatementCount.AddOrUpdate(ai, 1, (_, v) => v + 1);
 
-    // ?? Tool Discovery Sharing (??湲곕컲 ??寃쏀빀 諛⑹?) ??
+    // ── Tool Discovery Sharing (tool-sharing (cross-AI sharing)) ──
     private readonly ConcurrentDictionary<string, ConcurrentQueue<string>> _toolDiscoveryQueues =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -243,7 +243,7 @@ internal sealed class TriadSharedContext
         if (mdDelta.Length > 30)
             AppendMdAiResponse(ai, mdDelta);
 
-        // First meaningful chunk ??assign emoji (speed-based: first responder = ?쫲)
+        // First meaningful chunk ??assign emoji (speed-based: first responder = 🥇)
         if (prev.Length == 0 && chunk.Length > 20)
             Program.AssignEmojiOnFinish(ai);
 
@@ -557,7 +557,7 @@ internal partial class Program
             Console.WriteLine($"[TRIAD:{ai}] ??Failed ??attempting recovery with shared context");
             Console.ResetColor();
 
-            SlackPostToThread($"?봽 *[蹂듦뎄]* `{AiDisplayName(ai)}` ?ㅽ뙣 媛먯? ??而⑦뀓?ㅽ듃 ?ъ＜?????ъ떆??以?..", AiDisplayName(ai));
+            SlackPostToThread($"🔄 *[Recovery]* `{AiDisplayName(ai)}` failed -- attempting fallback with shared context..", AiDisplayName(ai));
 
             var recoveryCtx = ctx.BuildRecoveryContext(ai);
             var recoveryQuestion = recoveryCtx + "\n\nResume task:\n" + question;

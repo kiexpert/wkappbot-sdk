@@ -112,7 +112,7 @@ public sealed partial class CdpClient
         };
     }
 
-    // ?�═ Editor Operations ?�═
+    // ─ Editor Operations ─
 
     /// <summary>
     /// Insert text into a contenteditable element (3-tier: innerHTML ??execCommand ??Input.insertText).
@@ -406,7 +406,7 @@ public sealed partial class CdpClient
             "document.execCommand('selectAll');document.execCommand('delete')})()");
     }
 
-    // ?�═ Send Button ?�═
+    // ─ Send Button ─
 
     /// <summary>
     /// Send message via Enter key (modern AI chats use Enter=send, button=stop).
@@ -458,7 +458,7 @@ public sealed partial class CdpClient
             """) ?? "NOT_FOUND";
     }
 
-    // ?�═ Streaming Detection ?�═
+    // ─ Streaming Detection ─
 
     /// <summary>
     /// Check if AI is currently streaming a response.
@@ -511,7 +511,7 @@ public sealed partial class CdpClient
             """);
     }
 
-    // ?�═ Common Ask Flow ?�═
+    // ─ Common Ask Flow ─
 
     /// <summary>
     /// Wait for AI response to complete (streaming done).
@@ -604,7 +604,7 @@ public sealed partial class CdpClient
                     const txt = (btn.textContent || '').trim().toLowerCase();
                     if (txt.includes('ok') || txt.includes('got it') || txt.includes('i understand')
                         || txt.includes('confirm') || txt.includes('agree') || txt.includes('continue')
-                        || txt.includes('?�인') || txt.includes('?�의') || txt.includes('계속')
+                        || txt.includes('\uc911\uc9c0') || txt.includes('\uc815\uc9c0') || txt.includes('계속')
                         || btn.classList.contains('primary') || btn.classList.contains('mat-primary')) {
                         btn.click(); return 'DISMISSED:' + txt;
                     }
@@ -615,7 +615,7 @@ public sealed partial class CdpClient
             """) ?? "NONE";
     }
 
-    // ?�═ File Attachment ?�═
+    // ─ File Attachment ─
 
     /// <summary>
     /// Synthetic paste of an image file via clipboard DataTransfer event.
@@ -640,7 +640,7 @@ public sealed partial class CdpClient
         return await EvalAsync("""
             (() => {
                 var bt = (document.body?.innerText || '');
-                if (/?��?\s*??s*?�일(???\s*?�로??.test(bt) || /already\s*uploaded/i.test(bt)) return 'DUPLICATE';
+                if (/already\s*uploaded/i.test(bt) || /duplicate/i.test(bt)) return 'DUPLICATE';
                 var sels = ['[data-testid="file-thumbnail"]','[data-testid*="attachment"]',
                     '[class*="attachment"]','[class*="file-upload"]','[class*="uploaded-file"]',
                     'img[src*="blob:"]','[class*="file-chip"]','[class*="upload-chip"]',
@@ -747,7 +747,7 @@ public sealed partial class CdpClient
         return string.IsNullOrEmpty(lastText) ? (false, "") : (true, lastText.Trim());
     }
 
-    // ?�?� Internal ?�?�
+    // ── Internal ──
     /// <summary>
     /// Ensure Chrome window is not minimized before DOM-dependent operations.
     /// ProseMirror, contenteditable, and some React components need rendering.

@@ -275,11 +275,11 @@ File attachment:
   Multiple files supported ??attached in order before sending the question.
 
 Examples:
-  wkappbot ask gemini ""?ㅻ뒛 肄붿뒪???뱀쭠二??뚮젮以?""
-  wkappbot ask gpt ""???⑦꽩 遺꾩꽍?댁쨾""
-  wkappbot ask gpt ""??UI 遺꾩꽍?댁쨾"" screenshot.png
-  wkappbot ask gpt ""肄붾뱶 由щ럭?댁쨾"" main.cs test.log
-  wkappbot ask gemini ""???몄뀡?쇰줈 吏덈Ц"" --new-session
+  wkappbot ask gemini ""What is today's stock market summary?""
+  wkappbot ask gpt ""Explain this UI element""
+  wkappbot ask gpt ""Analyze this UI screenshot"" screenshot.png
+  wkappbot ask gpt ""Review the code"" main.cs test.log
+  wkappbot ask gemini ""Start a new analysis session"" --new-session
 ");
         return 1;
     }

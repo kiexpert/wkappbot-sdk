@@ -38,7 +38,7 @@ internal partial class Program
     static string StripGeminiUiPrefix(string text)
     {
         if (!text.StartsWith("Gemini")) return text;
-        // Strip Korean "Gemini???묐떟" or English "Gemini's response"
+        // Strip Korean "Gemini’s response (의응답)" or English "Gemini's response"
         foreach (var p in new[] { "Gemini\uC758 \uC751\uB2F5", "Gemini\uC758\uC751\uB2F5", "Gemini's response" })
             if (text.StartsWith(p, StringComparison.OrdinalIgnoreCase))
                 return text[p.Length..].TrimStart();

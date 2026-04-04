@@ -22,7 +22,7 @@ internal partial class Program
         ClickZoomHelper? zoom = null;
         try
         {
-            // ?? Mid-input check 1: ?ㅻⅨ ?몄뀡??Win32 ?ㅻ낫???낅젰 以묒씠硫??좉퉸 ?묐낫 ??
+            // ── Mid-input check 1: if another Win32 session is typing, wait before proceeding ──
             if (KeyboardInput.IsInputLockedByOther())
             {
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
@@ -40,10 +40,10 @@ internal partial class Program
                     Console.WriteLine($"[ASK:FOCUS] Lock released after {waited}ms ??proceeding");
             }
 
-            // ?? Mid-input check 2: ?ъ빱???묐낫 ?앹뾽 ??
-            // 議곌굔 A: "send"/"type" 吏곸쟾 + ?좎?媛 3珥??대궡 ?낅젰 以?
-            // 議곌굔 B: Chrome??FocusStealer-ask prop??李랁? ?덉쓬 (?댁쟾 run?먯꽌 媛뺥깉 媛먯???
-            //          ????梨꾪똿???쒕??섏씠???욎씠???ш퀬 諛⑹?
+            // ── Mid-input check 2: overlay check for focus steals ──
+            // Condition A: before "send"/"type" + user typed within last 3s
+            // Condition B: Chrome FocusStealer-ask prop detected (focus was stolen in prior run
+            //          i.e. screen takeover -- user must yield before proceeding)
             // Overlay only when Chrome previously stole focus (FocusStealer-ask prop set).
             // userIsActive check removed — SW_SHOWNOACTIVATE handles background tabs without stealing focus.
             if (action is "send" or "type" or "input-cdp")
@@ -178,7 +178,7 @@ internal partial class Program
             }
         }
 
-        // ?? Snapshot IME state of prevFg (per-window context, readable even when not foreground)
+        // ── Snapshot IME state of prevFg (per-window context, readable even when not foreground)
         uint imeConv = 0, imeSent = 0;
         try
         {
@@ -191,21 +191,21 @@ internal partial class Program
         }
         catch { }
 
-        // ?? Snapshot cursor position before restore (?낅젰?꾩튂?뺣낫)
+        // ── Snapshot cursor position before restore (will be restored after focus steal)
         NativeMethods.GetCursorPos(out var cursorSnap);
 
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"[ASK:FOCUS] ??STOLEN @ {step}: was={prevFg:X8} now={cur:X8} ??restoring");
         Console.ResetColor();
 
-        // ?? Knowhow recording on the thief (Chrome) ??stamps WKAppBot_FocusStealer-ask-{step}
+        // ── Knowhow recording on the thief (Chrome) -- stamps WKAppBot_FocusStealer-ask-{step}
         ActionApi.OnFocusStealer?.Invoke(cur, $"ask-{step}");
         // Also stamp a generic "ask" marker ??EnsureCdpReadyAsync detects it ??forces yield popup next run
         // FocusStealer prop NOT stamped — SW_SHOWNOACTIVATE prevents repeat steals; avoid false-positive overlays
 
         NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg
 
-        // ?? Alert on MY window (prevFg) ??user sees exactly when/where Gemini stole focus
+        // ── Alert on MY window (prevFg) -- user sees exactly when/where Gemini stole focus
         try
         {
             NativeMethods.GetWindowThreadProcessId(cur, out uint thiefPid);
@@ -215,7 +215,7 @@ internal partial class Program
         }
         catch { }
 
-        // ?? Restore IME conversion state (Chrome resets to English; we put Korean back)
+        // ── Restore IME conversion state (Chrome resets to English; we put Korean back)
         try
         {
             var himc2 = NativeMethods.ImmGetContext(prevFg);
@@ -228,7 +228,7 @@ internal partial class Program
         }
         catch { }
 
-        // ?? Restore cursor if moved during steal (>4px threshold)
+        // ── Restore cursor if moved during steal (>4px threshold)
         NativeMethods.GetCursorPos(out var cursorNow);
         int cdx = Math.Abs(cursorNow.X - cursorSnap.X), cdy = Math.Abs(cursorNow.Y - cursorSnap.Y);
         if (cdx > 4 || cdy > 4)
@@ -240,7 +240,7 @@ internal partial class Program
         return true;
     }
 
-    // ?? CDP Zoom: show magnifier on CDP target element ??
+    // ── CDP Zoom: show magnifier on CDP target element ──
     // Gets element's bounding rect (viewport coords) + Chrome window offset ??screen coords ??ClickZoomHelper.
 
     /// <summary>
@@ -316,7 +316,7 @@ internal partial class Program
 
     /// <summary>
     /// Enumerate all top-level #32770 dialogs and find one that looks like a file-open dialog.
-    /// Strategy: title match ("?닿린"/"Open") first, then structural match (ComboBoxEx32/DUIViewWndClassName child).
+    /// Strategy: title match ("열기"/"Open") first, then structural match (ComboBoxEx32/DUIViewWndClassName child).
     /// </summary>
     static IntPtr FindFileOpenDialog()
     {
@@ -337,7 +337,7 @@ internal partial class Program
             var title = titleBuf.ToString();
 
             // Title match ??most reliable
-            if (title is "?닿린" or "Open" or "?뚯씪 ?닿린" or "Open File")
+            if (title is "열기" or "Open" or "파일 열기" or "Open File")
             {
                 result = hWnd;
                 Console.WriteLine($"[ASK] FindFileOpenDialog: title match '{title}' hwnd={hWnd:X}");
@@ -364,7 +364,7 @@ internal partial class Program
         or ".ts" or ".py" or ".java" or ".json" or ".yaml" or ".yml" or ".xml" or ".html"
         or ".htm" or ".csv" or ".css" or ".sql" or ".sh" or ".bat" or ".cfg" or ".ini";
 
-    // ?? Response Image Detection & Download ??
+    // ── Response Image Detection & Download ──
 
     /// <summary>
     /// Detect new images in AI response and download them.

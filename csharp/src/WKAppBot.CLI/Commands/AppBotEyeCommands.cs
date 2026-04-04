@@ -35,11 +35,11 @@ internal partial class Program
         uint uTimeout,
         out IntPtr lpdwResult);
 
-    // AllocConsole BANNED ??肄섏넄 李??덈? ?앹꽦 湲덉?. ?몄텧 ??利됱떆 ?먮윭 + 醫낅즺.
+    // AllocConsole BANNED -- do not create console windows; use log files instead. Throws + exits if called.
     /// <summary>DO NOT USE. Throws + exits if called. Use log files instead.</summary>
     [Obsolete("AllocConsole BANNED ??use log files. Calling this will crash.", true)]
     static bool AllocConsole() => throw new InvalidOperationException(
-        "AllocConsole is BANNED. 肄섏넄 李??앹꽦 湲덉?! 濡쒓렇?뚯씪濡?異쒕젰?섏꽭?? " +
+        "AllocConsole is BANNED. Do not create console windows; use log files! " +
         "Call site: " + new System.Diagnostics.StackTrace(true).ToString());
 
     [DllImport("kernel32.dll")]
@@ -74,9 +74,9 @@ internal partial class Program
     internal static void EyeColor(ConsoleColor c) { try { Console.ForegroundColor = c; } catch { } }
     internal static void EyeResetColor() { try { Console.ResetColor(); } catch { } }
 
-    // ?? Eye Watchdog Task (Task Scheduler) ??????????????????????????????
-    // Eye ?쒖옉留덈떎 ?먮룞 ?щ벑濡????대。??源뚮㉨?대룄 ?먭? 移섏쑀.
-    // 10遺꾨쭏??`eye tick --timeout 15` ?ㅽ뻾 ??Eye 二쎌쑝硫??촶pawn + retry queue flush.
+    // ── Eye Watchdog Task (Task Scheduler) ──────────────────────────────
+    // Eye watchdog keeps ticking while alive; if Eye dies, watchdog restarts it.
+    // Every 10 ticks: run `eye tick --timeout 15` -- if Eye is dead, re-spawn + retry queue flush.
     internal const string EyeWatchdogStartupRunKeyName = "WKAppBot Eye Startup Recovery";
 
     /// <summary>
@@ -234,7 +234,7 @@ internal partial class Program
         SetConsoleCtrlHandler(_eyeCtrlHandler, true);
     }
 
-    // ?? Crash detection helpers ??????????????????????????????????????????
+    // ── Crash detection helpers ──────────────────────────────────────────
 
     static string GetEyeVbsDir()
     {
@@ -283,7 +283,7 @@ internal partial class Program
         try { File.WriteAllText(Path.Combine(GetEyeVbsDir(), "eye-clean-exit"), "1"); } catch { }
     }
 
-    // ?? Eye auto-launch (called from Program.cs for every command) ??
+    // ── Eye auto-launch (called from Program.cs for every command) ──
 
     /// <summary>
     /// Auto-launch AppBotEye in unified mode (ActionState IPC) if not already running.
@@ -552,7 +552,7 @@ internal partial class Program
     /// <summary>
     /// Eye auto-launch ??called from Program.Main for every CLI command.
     ///
-    /// ?뚢???????????????????????????????????????????????????????????????????    /// ?? Eye Launch Flow (single-instance guarantee)                   ??    /// ??                                                               ??    /// ?? Step 1: Guard checks (RunningInEye, LOOP_CALLER)             ??    /// ?? Step 2: Alive mutex fast check ??is Eye already running?      ??    /// ?? Step 3: Spawn mutex acquire ??serialize concurrent spawners   ??    /// ??         ??If timeout (3s) ??another spawner active ??bail    ??    /// ?? Step 4: Alive mutex re-check ??Eye may have started while    ??    /// ??         we waited for spawn mutex                             ??    /// ?? Step 5: Process.Start("wkappbot-core.exe eye")               ??    /// ??         ??CreateProcess hooks / AV can add 1-5s delay here   ??    /// ?? Step 6: Poll alive mutex (max 5s) ??wait for Eye to signal   ??    /// ??         "I'm alive" before releasing spawn mutex              ??    /// ?? Step 7: Release spawn mutex ??other callers can proceed      ??    /// ?붴???????????????????????????????????????????????????????????????????    ///
+    /// ─────────────────────────────────────────────────────────────────??    /// ?? Eye Launch Flow (single-instance guarantee)                   ??    /// ??                                                               ??    /// ?? Step 1: Guard checks (RunningInEye, LOOP_CALLER)             ??    /// ?? Step 2: Alive mutex fast check ??is Eye already running?      ??    /// ?? Step 3: Spawn mutex acquire ??serialize concurrent spawners   ??    /// ??         ??If timeout (3s) ??another spawner active ??bail    ??    /// ?? Step 4: Alive mutex re-check ??Eye may have started while    ??    /// ??         we waited for spawn mutex                             ??    /// ?? Step 5: Process.Start("wkappbot-core.exe eye")               ??    /// ??         ??CreateProcess hooks / AV can add 1-5s delay here   ??    /// ?? Step 6: Poll alive mutex (max 5s) ??wait for Eye to signal   ??    /// ??         "I'm alive" before releasing spawn mutex              ??    /// ?? Step 7: Release spawn mutex ??other callers can proceed      ??    /// ─────────────────────────────────────────────────────────────────??    ///
     /// Why spawn mutex is held during Step 6:
     ///   Without this, caller B sees "alive mutex free" during Eye's init
     ///   window (between Process.Start and Eye acquiring alive mutex) and
@@ -560,7 +560,7 @@ internal partial class Program
     /// </summary>
     internal static void LaunchAppBotEyeIfNeededCore(string extraArgs)
     {
-        // ?? Step 1: Guard checks ??
+        // ── Step 1: Guard checks ──
         if (RunningInEye) return;
         if (IsMcpMode) return; // MCP server must NEVER spawn Eye/console windows
         // Loop subprocess mode: Eye inherits stdout pipe handle ??blocks parent's ReadToEndAsync.
@@ -568,7 +568,7 @@ internal partial class Program
 
         PulseStep.Init("eye-launch");
 
-        // ?? Step 2: Alive mutex fast check ??
+        // ── Step 2: Alive mutex fast check ──
         // WaitOne(0) fails ??Eye holds it ??alive ??skip.
         // WaitOne(0) succeeds ??Eye dead ??release + proceed to spawn.
         try
@@ -586,7 +586,7 @@ internal partial class Program
         PulseStep.Mark("alive-check-passed");
         EyeLog("Eye not running ??attempting spawn");
 
-        // ?? Step 3: Spawn mutex acquire ??
+        // ── Step 3: Spawn mutex acquire ──
         // Serializes concurrent spawn attempts across all wkappbot processes.
         // 3s timeout: if another process is already spawning, trust it and bail.
         using var spawnMutex = new System.Threading.Mutex(false, EyeSpawnMutexName);
@@ -608,7 +608,7 @@ internal partial class Program
 
         try
         {
-            // ?? Step 4: Alive mutex re-check ??
+            // ── Step 4: Alive mutex re-check ──
             // Eye may have started while we waited for the spawn mutex.
             try
             {
@@ -623,7 +623,7 @@ internal partial class Program
             }
             catch (System.Threading.AbandonedMutexException) { } // Eye crashed ??spawn
 
-            // ?? Step 5: Resolve core exe path and spawn ??
+            // ── Step 5: Resolve core exe path and spawn ──
             var launcherPath = Environment.ProcessPath ?? "";
             var dir  = Path.GetDirectoryName(launcherPath) ?? "";
             var exeName = Path.GetFileNameWithoutExtension(launcherPath); // e.g. "wkappbot" or "a11y"
@@ -651,7 +651,7 @@ internal partial class Program
                 // Policy broadcast when Eye first spawns (agent reads stdout)
                 AgentPolicy.StartPolicyBroadcast();
 
-                // ?? Step 6: Wait for Eye to acquire alive mutex ??
+                // ── Step 6: Wait for Eye to acquire alive mutex ──
                 // CRITICAL: Hold spawn mutex during this wait!
                 // Without this, another caller sees "alive mutex free" during Eye's
                 // init window and spawns a duplicate. CreateProcess hooks / AV scans
@@ -687,7 +687,7 @@ internal partial class Program
         }
         finally
         {
-            // ?? Step 7: Release spawn mutex ??
+            // ── Step 7: Release spawn mutex ──
             if (acquired) try { spawnMutex.ReleaseMutex(); } catch { }
         }
     }
@@ -743,7 +743,7 @@ internal partial class Program
         {
             PulseStep.Mark("detached-console");
             // DETACHED context: no console, no AllocConsole (flash 諛⑹?).
-            // Eye??Core媛 吏곸젒 spawn (Launcher ?뚯씠????嫄곗묠) ??stdout/stderr 濡쒓렇 ?뚯씪濡?蹂댁〈.
+            // Eye is spawned directly by Core (not via Launcher relay) -- redirect stdout/stderr to log file.
             var logDir = Path.Combine(
                 Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".",
                 "wkappbot.hq", "logs");
@@ -758,7 +758,7 @@ internal partial class Program
             }
             catch
             {
-                // log ?뚯씪 紐??대㈃ ??Null (異쒕젰 ?좎떎?댁?留?Eye ?숈옉??吏???놁쓬)
+                // Log file creation failed -- fall back to Null (output lost, but Eye can still run)
                 Console.SetOut(TextWriter.Null);
                 Console.SetError(TextWriter.Null);
             }
@@ -860,7 +860,7 @@ internal partial class Program
         return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, eyeCwd, elevated, replacePid);
     }
 
-    // ?? P/Invoke declarations (shared across all AppBotEye partial class files) ??
+    // ── P/Invoke declarations (shared across all AppBotEye partial class files) ──
 
     [StructLayout(LayoutKind.Sequential)]
     private struct PROCESS_BASIC_INFORMATION
