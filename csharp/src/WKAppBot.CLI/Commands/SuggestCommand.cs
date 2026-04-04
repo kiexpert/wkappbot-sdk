@@ -571,15 +571,14 @@ internal partial class Program
 
         if (title == null)
         {
-            Console.Error.WriteLine("[MERGE] --title is required. Run 'wkappbot suggest merge --help' for usage.");
+            Console.WriteLine("[MERGE] --title is required. Run 'wkappbot suggest merge --help' for usage.");
             return 1;
         }
 
-        var hqDir     = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
-        var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
+        var jsonlPath = Path.Combine(DataDir, "suggestions.jsonl");
         if (!File.Exists(jsonlPath))
         {
-            Console.Error.WriteLine("[MERGE] suggestions.jsonl not found");
+            Console.WriteLine("[MERGE] suggestions.jsonl not found");
             return 1;
         }
 
@@ -620,14 +619,14 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[MERGE] Invalid --all-matching regex: {ex.Message}");
+                Console.WriteLine($"[MERGE] Invalid --all-matching regex: {ex.Message}");
                 return 1;
             }
         }
 
         if (matchedIdxs.Count == 0)
         {
-            Console.Error.WriteLine("[MERGE] No matching suggestions found");
+            Console.WriteLine("[MERGE] No matching suggestions found");
             return 1;
         }
 
@@ -647,10 +646,10 @@ internal partial class Program
             if (coreCmds.Count > 1)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.Error.WriteLine($"[MERGE] ❌ Matched suggestions have different core commands:");
-                foreach (var c in coreCmds) Console.Error.WriteLine($"     · {c}");
-                Console.Error.WriteLine("  Merge requires all suggestions to share the same command context.");
-                Console.Error.WriteLine("  Use --all-matching with a tighter pattern, or add --force to override.");
+                Console.WriteLine($"[MERGE] Matched suggestions have different core commands:");
+                foreach (var c in coreCmds) Console.WriteLine($"     * {c}");
+                Console.WriteLine("  Merge requires all suggestions to share the same command context.");
+                Console.WriteLine("  Use --all-matching with a tighter pattern, or add --force to override.");
                 Console.ResetColor();
                 return 1;
             }
@@ -806,9 +805,10 @@ internal partial class Program
             @"wkappbot\s+([a-z][a-z0-9\-]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (wkM.Success) return wkM.Groups[1].Value.ToLowerInvariant();
 
-        // Priority 3: FEATURE REQUEST / FOCUSLESS-HOMEWORK / BUG-AUTO prefix in brackets
+        // Priority 3: command-level meta-tags (FOCUSLESS-HOMEWORK, BUG-AUTO indicate a specific pipeline)
+        // Note: FEATURE REQUEST and ADDENDUM are user-classification tags, NOT command contexts — skip them.
         var ftrM = System.Text.RegularExpressions.Regex.Match(text,
-            @"\[(FEATURE REQUEST|FOCUSLESS-HOMEWORK|BUG-AUTO|ADDENDUM)\]",
+            @"\[(FOCUSLESS-HOMEWORK|BUG-AUTO)\]",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (ftrM.Success) return ftrM.Groups[1].Value.ToUpperInvariant();
 
