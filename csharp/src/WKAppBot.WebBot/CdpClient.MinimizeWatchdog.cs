@@ -61,6 +61,14 @@ public sealed partial class CdpClient
 
                 await File.AppendAllTextAsync(GetMinimizeDumpPath(), payload.ToJsonString() + Environment.NewLine, Encoding.UTF8, CancellationToken.None);
                 Console.Error.WriteLine($"[CDP:MINIMIZE] dump persisted after {delayMs}ms ({reason}) hwnd={hwnd:X8}");
+
+                // Force-restore: if Chrome is STILL minimized after dump delay, something forgot to restore.
+                // SW_SHOWNOACTIVATE=4: visible without stealing focus from user's active window.
+                if (IsWindow(hwnd) && IsIconic(hwnd))
+                {
+                    ShowWindowNative(hwnd, 4); // SW_SHOWNOACTIVATE
+                    Console.Error.WriteLine($"[CDP:MINIMIZE] force-restored hwnd={hwnd:X8} (was stuck minimized)");
+                }
             }
             catch (TaskCanceledException) { }
             catch (Exception ex)
