@@ -392,9 +392,7 @@ public sealed partial class CdpClient
         _receiveCts = new CancellationTokenSource();
         _receiveTask = ReceiveLoopAsync(_receiveCts.Token);
 
-        await SendAsync("Runtime.enable");
-        await SendAsync("Page.enable");
-        await SendAsync("DOM.enable");
+        await EnableRuntimeWithRetry();
 
         try
         {
