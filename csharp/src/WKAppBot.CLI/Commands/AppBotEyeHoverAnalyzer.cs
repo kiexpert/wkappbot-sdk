@@ -48,6 +48,19 @@ internal partial class Program
         AppendEyeAnalysisTrace("auto-hack-subscribed", new { source = "InputReadiness.OnProbeSuccess" });
         InputReadiness.OnProbeSuccess += (targetHwnd, processName, className) =>
         {
+            // Guard: skip LG overlay processes (fullscreen topmost screen-cover windows)
+            if (_knownLgOverlayProcesses.Contains(processName))
+            {
+                AppendEyeAnalysisTrace("auto-hack-skip", new
+                {
+                    reason = "lg-overlay",
+                    hwnd = $"0x{targetHwnd.ToInt64():X}",
+                    processName,
+                    className
+                });
+                return;
+            }
+
             AppendEyeAnalysisTrace("auto-hack-probe", new
             {
                 hwnd = $"0x{targetHwnd.ToInt64():X}",

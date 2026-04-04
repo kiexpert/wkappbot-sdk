@@ -266,6 +266,16 @@ internal partial class Program
                 NativeMethods.GetWindowRect(hWnd, out var r);
                 if (px >= r.Left && px < r.Right && py >= r.Top && py < r.Bottom)
                 {
+                    // Skip LG overlay processes (fullscreen topmost screen-cover)
+                    try
+                    {
+                        NativeMethods.GetWindowThreadProcessId(hWnd, out uint zpid);
+                        var zProc = System.Diagnostics.Process.GetProcessById((int)zpid).ProcessName;
+                        if (_knownLgOverlayProcesses.Contains(zProc))
+                            return true; // continue enumeration, skip this window
+                    }
+                    catch { }
+
                     zTop = hWnd;
                     return false;
                 }

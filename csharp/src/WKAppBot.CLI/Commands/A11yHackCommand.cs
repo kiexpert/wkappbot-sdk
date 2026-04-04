@@ -198,7 +198,7 @@ internal partial class Program
                 }
             }
             Console.WriteLine($"[HACK] UIA answer key: {uiaMatched}/{regions.Count} segments matched");
-            SaveHackOverlayPreview(bmp, regions, "uia", wr.Left, wr.Top, uiaAnswers);
+            SaveHackOverlayPreview(bmp, regions, "uia", wr.Left, wr.Top, uiaAnswers, stageLabels);
             for (int ri = 0; ri < regions.Count; ri++)
             {
                 if (!uiaAnswers.TryGetValue(ri, out var uia)) continue;
@@ -283,7 +283,8 @@ internal partial class Program
                     {
                         try
                         {
-                            var cropRect = Rectangle.Intersect(region.Bounds, new Rectangle(0, 0, w, h));
+                            var cropRect = ConnectedComponentAnalyzer.TrimBorders(bmp,
+                                Rectangle.Intersect(region.Bounds, new Rectangle(0, 0, w, h)));
                             if (cropRect.Width > 0 && cropRect.Height > 0)
                             {
                                 using var crop = bmp.Clone(cropRect, bmp.PixelFormat);
@@ -313,7 +314,8 @@ internal partial class Program
                 {
                     try
                     {
-                        var cropRect = Rectangle.Intersect(region.Bounds, new Rectangle(0, 0, w, h));
+                        var cropRect = ConnectedComponentAnalyzer.TrimBorders(bmp,
+                            Rectangle.Intersect(region.Bounds, new Rectangle(0, 0, w, h)));
                         if (cropRect.Width > 0 && cropRect.Height > 0)
                         {
                             using var crop = bmp.Clone(cropRect, bmp.PixelFormat);
@@ -910,7 +912,8 @@ internal partial class Program
         string stage,
         int screenLeft,
         int screenTop,
-        Dictionary<int, (string name, string type, string aid)>? uiaAnswers = null)
+        Dictionary<int, (string name, string type, string aid)>? uiaAnswers = null,
+        Dictionary<int, string>? stageLabels = null)
     {
         try
         {
@@ -930,6 +933,8 @@ internal partial class Program
             {
                 var region = regions[i];
                 if (region.Type == ConnectedComponentAnalyzer.RegionType.Noise) continue;
+                // Skip tiny segments (smaller than readable character)
+                if (i > 0 && region.Bounds.Width < 10 && region.Bounds.Height < 10) continue;
 
                 var color = region.Type switch
                 {
@@ -943,39 +948,49 @@ internal partial class Program
                 using var pen = new Pen(Color.FromArgb(230, color), region.Type == ConnectedComponentAnalyzer.RegionType.Container ? 2.5f : 1.6f);
                 g.DrawRectangle(pen, region.Bounds);
 
-                // Top-left label: index + type (above rectangle)
-                var label = $"{i}:{region.Type}";
-                var labelSize = g.MeasureString(label, font);
-                var lx = Math.Max(0, region.Bounds.Left);
-                var ly = Math.Max(0, region.Bounds.Top - (int)labelSize.Height - 2);
-                if (ly + labelSize.Height > overlay.Height) ly = Math.Max(0, overlay.Height - (int)labelSize.Height - 1);
-                if (lx + labelSize.Width > overlay.Width) lx = Math.Max(0, overlay.Width - (int)labelSize.Width - 1);
-
-                g.FillRectangle(textBg, lx, ly, labelSize.Width + 6, labelSize.Height + 2);
-                g.DrawString(label, font, textFg, lx + 3, ly + 1);
-
-                // Top-right label: UIA ControlType:AutomationId (e.g. "Button:btnOk", "Edit:#3")
-                // No AutomationId → sibling index (#1, #2, ...). Small font, inside rectangle.
+                // Label only for UIA-matched nodes (no clutter for unmatched)
                 if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
                 {
                     var parts = new List<string>();
                     if (!string.IsNullOrWhiteSpace(uia.type)) parts.Add(uia.type);
                     if (!string.IsNullOrWhiteSpace(uia.aid)) parts.Add(uia.aid);
                     else if (!string.IsNullOrWhiteSpace(uia.name)) parts.Add(TrimPreview(uia.name, 20));
-                    else parts.Add($"#{i + 1}"); // sibling index fallback
-                    if (parts.Count > 0)
+                    else parts.Add($"#{i + 1}");
+                    var nodeLabel = $"{string.Join("_", parts)} {region.Bounds.Width}x{region.Bounds.Height}";
+                    using var smallFont = new Font("Consolas", 7f, FontStyle.Regular);
+                    var nlSize = g.MeasureString(nodeLabel, smallFont);
+                    var nlx = Math.Max(region.Bounds.Left + 2,
+                        Math.Min(region.Bounds.Right - (int)nlSize.Width - 5, overlay.Width - (int)nlSize.Width - 5));
+                    var nly = region.Bounds.Top + 2;
+                    if (nly < 0) nly = 2;
+                    using var nodeBg = new SolidBrush(Color.FromArgb(170, 0, 0, 80));
+                    using var nodeFg = new SolidBrush(Color.LightCyan);
+                    g.FillRectangle(nodeBg, nlx - 2, nly, nlSize.Width + 4, nlSize.Height + 1);
+                    g.DrawString(nodeLabel, smallFont, nodeFg, nlx, nly);
+                }
+
+                // OCR text: inside box, right half, gold color
+                if (stageLabels != null && stageLabels.TryGetValue(i, out var stl) && !string.IsNullOrWhiteSpace(stl))
+                {
+                    string? ocrTxt = null;
+                    if (stl.StartsWith("ocr ")) ocrTxt = stl[4..];
+                    else if (stl.StartsWith("fix ")) ocrTxt = stl[4..];
+                    else if (stl.StartsWith("uia ")) ocrTxt = stl[4..];
+                    else if (stl.StartsWith("cache 100% ")) ocrTxt = stl[11..];
+                    if (ocrTxt != null)
                     {
-                        var nodeLabel = $"{string.Join("_", parts)} {region.Bounds.Width}x{region.Bounds.Height}";
-                        using var smallFont = new Font("Consolas", 7f, FontStyle.Regular);
-                        var nlSize = g.MeasureString(nodeLabel, smallFont);
-                        var nlx = Math.Max(region.Bounds.Left + 2,
-                            Math.Min(region.Bounds.Right - (int)nlSize.Width - 5, overlay.Width - (int)nlSize.Width - 5));
-                        var nly = region.Bounds.Top + 2;
-                        if (nly < 0) nly = 2;
-                        using var nodeBg = new SolidBrush(Color.FromArgb(170, 0, 0, 80));
-                        using var nodeFg = new SolidBrush(Color.LightCyan);
-                        g.FillRectangle(nodeBg, nlx - 2, nly, nlSize.Width + 4, nlSize.Height + 1);
-                        g.DrawString(nodeLabel, smallFont, nodeFg, nlx, nly);
+                        using var ocrFont = new Font("Consolas", 6.5f, FontStyle.Regular);
+                        var halfW = Math.Max(20, region.Bounds.Width / 2);
+                        var trimmed = TrimPreview(ocrTxt, (int)(halfW / 5)); // ~5px per char
+                        var ocrSize = g.MeasureString(trimmed, ocrFont);
+                        var ox = region.Bounds.Right - (int)ocrSize.Width - 3;
+                        if (ox < region.Bounds.Left) ox = region.Bounds.Left + 1;
+                        var oy = region.Bounds.Top + (region.Bounds.Height - (int)ocrSize.Height) / 2;
+                        if (oy < region.Bounds.Top) oy = region.Bounds.Top;
+                        using var ocrBg = new SolidBrush(Color.FromArgb(150, 40, 20, 0));
+                        using var ocrFg = new SolidBrush(Color.Gold);
+                        g.FillRectangle(ocrBg, ox - 1, oy, ocrSize.Width + 2, ocrSize.Height);
+                        g.DrawString(trimmed, ocrFont, ocrFg, ox, oy);
                     }
                 }
             }
@@ -1003,41 +1018,77 @@ internal partial class Program
         Dictionary<int, string>? stageLabels = null)
     {
         var boxes = new List<A11yHackOverlayBox>(regions.Count);
+
+        // Determine scope: target's parent (contains target) and siblings (share same parent)
+        var targetBounds = regions.Count > 0 ? regions[0].Bounds : Rectangle.Empty;
+        // Parent = smallest region that fully contains the target (excluding target itself)
+        int parentIdx = -1;
+        long parentArea = long.MaxValue;
+        for (int i = 1; i < regions.Count; i++)
+        {
+            var rb = regions[i].Bounds;
+            if (rb.Contains(targetBounds))
+            {
+                long area = (long)rb.Width * rb.Height;
+                if (area < parentArea) { parentIdx = i; parentArea = area; }
+            }
+        }
+        var parentBounds = parentIdx >= 0 ? regions[parentIdx].Bounds : Rectangle.Empty;
+
         for (int i = 0; i < regions.Count; i++)
         {
             var region = regions[i];
+
+            // Skip tiny segments (smaller than a readable character ~10x10)
+            if (i > 0 && region.Bounds.Width < 10 && region.Bounds.Height < 10)
+                continue;
 
             var bounds = new System.Windows.Rect(
                 region.Bounds.X,
                 region.Bounds.Y,
                 Math.Max(1, region.Bounds.Width),
                 Math.Max(1, region.Bounds.Height));
-            var title = i == 0 ? "TARGET" : $"NODE {i:00}";
-            var label = $"{title} | {region.Type}";
 
+            // Determine role
+            bool hasUia = uiaAnswers != null && uiaAnswers.ContainsKey(i);
+            HackBoxRole role;
+            if (i == 0)
+                role = HackBoxRole.Target;
+            else if (i == parentIdx)
+                role = HackBoxRole.Scope; // parent
+            else if (parentIdx >= 0 && parentBounds.Contains(region.Bounds))
+                role = HackBoxRole.Scope; // sibling (inside same parent)
+            else if (hasUia)
+                role = HackBoxRole.Known;
+            else
+                role = HackBoxRole.Other;
+
+            // Label only for UIA-matched or Scope nodes
+            string? label = null;
             if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
             {
-                // Type_AutomationId WxH (e.g. Button_btnOk 120x32)
                 var idPart = !string.IsNullOrWhiteSpace(uia.aid) ? uia.aid
                            : !string.IsNullOrWhiteSpace(uia.name) ? TrimPreview(uia.name, 20)
                            : $"#{i + 1}";
                 var typePart = !string.IsNullOrWhiteSpace(uia.type) ? uia.type : "";
-                label += $" | {typePart}_{idPart} {region.Bounds.Width}x{region.Bounds.Height}";
+                label = $"{typePart}_{idPart} {region.Bounds.Width}x{region.Bounds.Height}";
             }
-            else
-            {
-                label += $" | {region.Bounds.Width}x{region.Bounds.Height}";
-            }
-            if (stageLabels != null && stageLabels.TryGetValue(i, out var stage) && !string.IsNullOrWhiteSpace(stage))
-                label += $" | {TrimPreview(stage, 28)}";
 
-            boxes.Add(new A11yHackOverlayBox(
-                bounds,
-                region.Type == ConnectedComponentAnalyzer.RegionType.Noise
-                    ? System.Windows.Media.Color.FromArgb(128, 0x00, 0x64, 0x00)
-                    : System.Windows.Media.Color.FromArgb(128, 0x32, 0xCD, 0x32),
-                label,
-                0.9));
+            // Extract OCR text from stageLabel
+            string? ocrText = null;
+            if (stageLabels != null && stageLabels.TryGetValue(i, out var stl) && !string.IsNullOrWhiteSpace(stl))
+            {
+                if (stl.StartsWith("ocr ")) ocrText = stl[4..];
+                else if (stl.StartsWith("fix ")) ocrText = stl[4..];
+                else if (stl.StartsWith("uia ")) ocrText = stl[4..];
+                else if (stl.StartsWith("cache 100% ")) ocrText = stl[11..];
+            }
+
+            var color = region.Type == ConnectedComponentAnalyzer.RegionType.Noise
+                ? System.Windows.Media.Color.FromArgb(128, 0x00, 0x64, 0x00)
+                : System.Windows.Media.Color.FromArgb(128, 0x32, 0xCD, 0x32);
+
+            boxes.Add(new A11yHackOverlayBox(bounds, color, label, 0.9, ocrText, role));
         }
         return boxes;
     }
