@@ -830,26 +830,14 @@ internal partial class Program
         InitFileWatchers();
 
         // Startup gentle-swap: if .new.exe already exists (published while Eye was down), apply immediately.
-        // If .new.exe is identical to running exe (same size+mtime), delete silently (no-op rebuild).
-        if (!string.IsNullOrEmpty(exePath))
+        // Uses shared TryRenameSwap — Swapped → enter cleanup mode (hotReloadTriggered before main loop).
         {
-            var exeDir0 = Path.GetDirectoryName(exePath) ?? "";
-            var exeName0 = Path.GetFileNameWithoutExtension(exePath);
-            var newExe0 = Path.Combine(exeDir0, $"{exeName0}.new.exe");
-            if (File.Exists(newExe0))
+            var startupSwap = TryRenameSwap(exePath, "EYE:STARTUP");
+            if (startupSwap == HotSwapResult.Swapped)
             {
-                var newInfo0 = new FileInfo(newExe0);
-                var curInfo0 = new FileInfo(exePath);
-                if (newInfo0.LastWriteTimeUtc == curInfo0.LastWriteTimeUtc && newInfo0.Length == curInfo0.Length)
-                {
-                    Console.WriteLine($"[EYE] Startup: .new.exe identical to running exe (mtime={newInfo0.LastWriteTimeUtc:HH:mm:ss}, size={newInfo0.Length}) — deleting");
-                    try { File.Delete(newExe0); } catch { }
-                }
-                else
-                {
-                    Console.WriteLine($"[EYE] Startup: .new.exe staged (new={newInfo0.Length}b/{newInfo0.LastWriteTimeUtc:HH:mm:ss}, cur={curInfo0.Length}b/{curInfo0.LastWriteTimeUtc:HH:mm:ss}) — triggering gentle-swap");
-                    _fswExeDirty = true;
-                }
+                Console.WriteLine("[EYE:STARTUP] Swap applied — entering cleanup mode (will re-launch with new binary)");
+                hotReloadTriggered = true;
+                // Skip main loop entirely — go straight to blue-green re-launch + shutdown.
             }
         }
 
@@ -909,7 +897,7 @@ internal partial class Program
         EyeDiag("loop-ready");
         int frameCount = 0;
         Console.WriteLine("[EYE_LOOP] entering main loop");
-        while (host.IsAlive && !cts.IsCancellationRequested)
+        while (host.IsAlive && !cts.IsCancellationRequested && !hotReloadTriggered)
         {
             if (frameCount < 3) EyeDiag($"frame-{frameCount}-start");
             if (frameCount < 3) Console.WriteLine($"[EYE_LOOP] frame={frameCount} start");
@@ -1239,86 +1227,28 @@ internal partial class Program
                 _fswExeDirty = false; // consume flag
                 try
                 {
-                    var exeDir = Path.GetDirectoryName(exePath) ?? "";
-                    var exeName = Path.GetFileNameWithoutExtension(exePath);
-                    var newExePath = Path.Combine(exeDir, $"{exeName}.new.exe");
-                    // Timestamped old name — avoids collision with locked ghost-magnifier .old.exe
-                    var oldExePath = Path.Combine(exeDir, $"{exeName}.old-{DateTime.Now:yyyyMMdd-HHmm}.exe");
-
-                    if (File.Exists(newExePath))
+                    var swapResult = TryRenameSwap(exePath, "EYE:HOT-SWAP");
+                    if (swapResult == HotSwapResult.Swapped)
                     {
-                        // Skip if .new.exe is identical to running exe (same mtime + size = no actual rebuild)
-                        var newInfo = new FileInfo(newExePath);
-                        var curInfo = new FileInfo(exePath);
-                        if (newInfo.LastWriteTimeUtc == curInfo.LastWriteTimeUtc && newInfo.Length == curInfo.Length)
-                        {
-                            Console.WriteLine($"[EYE:HOT-SWAP] .new.exe identical (mtime={newInfo.LastWriteTimeUtc:HH:mm:ss}, size={newInfo.Length}) — skipping");
-                            try { File.Delete(newExePath); } catch { }
-                            continue;
-                        }
-
-                        // .new.exe staged — rename-swap (running exe CAN be renamed on Windows!)
-                        EyeColor(ConsoleColor.Magenta);
-                        Console.WriteLine("[EYE:HOT-SWAP] .new.exe detected — rename-swap");
-                        EyeResetColor();
-                        // Step 1: rename running exe → .old (always works — Windows allows renaming running exe)
-                        bool step1Done = false;
-                        try
-                        {
-                            File.Move(exePath, oldExePath);
-                            step1Done = true;
-                        }
-                        catch (Exception ex1)
-                        {
-                            Console.WriteLine($"[EYE:HOT-SWAP] step1 failed ({ex1.Message})");
-                        }
-                        // Step 2: .new.exe → exe. Retry up to 4× (deploy may still have file open)
-                        bool step2Done = false;
-                        if (step1Done)
-                        {
-                            for (int swapRetry = 0; swapRetry < 4 && !step2Done; swapRetry++)
-                            {
-                                if (swapRetry > 0)
-                                {
-                                    Console.WriteLine($"[EYE:HOT-SWAP] step2 retry {swapRetry}/3 (file locked by deploy — waiting 1s)");
-                                    Thread.Sleep(1000);
-                                }
-                                try { File.Move(newExePath, exePath); step2Done = true; }
-                                catch (Exception ex2)
-                                {
-                                    if (swapRetry == 3)
-                                        Console.WriteLine($"[EYE:HOT-SWAP] step2 failed after retries ({ex2.Message})");
-                                }
-                            }
-                            if (!step2Done)
-                            {
-                                // Restore old exe (rollback)
-                                Console.WriteLine("[EYE:HOT-SWAP] rolling back step1");
-                                try { File.Move(oldExePath, exePath); } catch { }
-                            }
-                        }
-                        if (step1Done && step2Done)
-                        {
-                            Console.WriteLine($"[EYE:HOT-SWAP] swap OK (.exe→{Path.GetFileName(oldExePath)}, .new→.exe)");
-                            _slackRetiring = true; // stop draining queue — new Eye will take over
-                            EyeCmdPipeServer.StopAccepting(); // stop accepting new pipe connections immediately
-                            EnsureEyeGuardianForWindow(host.GetWindowHandle()); // re-launch guardian for new Eye
-                            hotReloadTriggered = true;
-                            break;
-                        }
-                    }
-                    else if (File.GetLastWriteTimeUtc(exePath) != exeStartTime)
-                    {
-                        // Direct overwrite succeeded (exe wasn't locked somehow)
-                        EyeColor(ConsoleColor.Magenta);
-                        Console.WriteLine("[EYE:HOT-SWAP] EXE timestamp changed — binary updated!");
-                        EyeResetColor();
-                        _slackRetiring = true;
+                        _slackRetiring = true; // stop draining queue — new Eye will take over
                         EyeCmdPipeServer.StopAccepting(); // stop accepting new pipe connections immediately
                         EnsureEyeGuardianForWindow(host.GetWindowHandle()); // re-launch guardian for new Eye
                         hotReloadTriggered = true;
                         break;
                     }
+                    else if (swapResult == HotSwapResult.NoNewExe && File.GetLastWriteTimeUtc(exePath) != exeStartTime)
+                    {
+                        // Direct overwrite (exe wasn't locked) — timestamp changed
+                        EyeColor(ConsoleColor.Magenta);
+                        Console.WriteLine("[EYE:HOT-SWAP] EXE timestamp changed — binary updated!");
+                        EyeResetColor();
+                        _slackRetiring = true;
+                        EyeCmdPipeServer.StopAccepting();
+                        EnsureEyeGuardianForWindow(host.GetWindowHandle());
+                        hotReloadTriggered = true;
+                        break;
+                    }
+                    // Identical/Failed: continue main loop (no restart needed)
                 }
                 catch { }
             }
@@ -1613,6 +1543,73 @@ internal partial class Program
         WriteEyeCleanExit();
         Console.WriteLine("[EYE:HOT-SWAP] Old Eye shutting down");
         return 0;
+    }
+
+    // ── Hot-swap: reusable rename-swap function ──────────────────────────────────
+    // Called from: Eye main loop, Eye startup gentle-swap, `wkappbot hotswap` command.
+    // Thread-safe: callers serialize externally (Eye uses _fswExeDirty flag).
+
+    internal enum HotSwapResult { NoNewExe, Identical, Swapped, Failed }
+
+    /// <summary>
+    /// Check for {exeName}.new.exe next to exePath and apply rename-swap.
+    /// Returns: NoNewExe (nothing to do), Identical (deleted, no-op), Swapped (success), Failed (rollback).
+    /// All steps logged to stdout for transparency.
+    /// </summary>
+    internal static HotSwapResult TryRenameSwap(string exePath, string tag = "HOT-SWAP")
+    {
+        if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+            return HotSwapResult.NoNewExe;
+
+        var exeDir = Path.GetDirectoryName(exePath) ?? "";
+        var exeName = Path.GetFileNameWithoutExtension(exePath);
+        var newExePath = Path.Combine(exeDir, $"{exeName}.new.exe");
+
+        if (!File.Exists(newExePath))
+            return HotSwapResult.NoNewExe;
+
+        var newInfo = new FileInfo(newExePath);
+        var curInfo = new FileInfo(exePath);
+
+        // Identical check: same mtime + size = no actual rebuild → delete .new.exe
+        if (newInfo.LastWriteTimeUtc == curInfo.LastWriteTimeUtc && newInfo.Length == curInfo.Length)
+        {
+            Console.WriteLine($"[{tag}] .new.exe identical (mtime={newInfo.LastWriteTimeUtc:HH:mm:ss}, size={newInfo.Length}) — deleting");
+            try { File.Delete(newExePath); } catch { }
+            return HotSwapResult.Identical;
+        }
+
+        Console.WriteLine($"[{tag}] .new.exe detected (new={newInfo.Length}b/{newInfo.LastWriteTimeUtc:HH:mm:ss}, cur={curInfo.Length}b/{curInfo.LastWriteTimeUtc:HH:mm:ss}) — rename-swap");
+
+        // Step 1: running exe → .old (Windows allows renaming running exe)
+        var oldExePath = Path.Combine(exeDir, $"{exeName}.old-{DateTime.Now:yyyyMMdd-HHmm}.exe");
+        bool step1 = false;
+        try { File.Move(exePath, oldExePath); step1 = true; }
+        catch (Exception ex) { Console.WriteLine($"[{tag}] step1 rename→.old failed: {ex.Message}"); }
+
+        // Step 2: .new.exe → exe (retry up to 4× for deploy file lock)
+        bool step2 = false;
+        if (step1)
+        {
+            for (int r = 0; r < 4 && !step2; r++)
+            {
+                if (r > 0) { Console.WriteLine($"[{tag}] step2 retry {r}/3 (file locked — waiting 1s)"); Thread.Sleep(1000); }
+                try { File.Move(newExePath, exePath); step2 = true; }
+                catch (Exception ex) { if (r == 3) Console.WriteLine($"[{tag}] step2 .new→.exe failed: {ex.Message}"); }
+            }
+            if (!step2)
+            {
+                Console.WriteLine($"[{tag}] rollback: .old→.exe");
+                try { File.Move(oldExePath, exePath); } catch { }
+            }
+        }
+
+        if (step1 && step2)
+        {
+            Console.WriteLine($"[{tag}] swap OK (.exe→{Path.GetFileName(oldExePath)}, .new→.exe)");
+            return HotSwapResult.Swapped;
+        }
+        return HotSwapResult.Failed;
     }
 
 }
