@@ -222,7 +222,8 @@ internal partial class Program
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
         // UIA answer key: scan UIA tree, build rect→info map for cross-reference
         var uiaAnswers = new Dictionary<int, (string name, string type, string aid)>();
-        var _uiaBestArea = new Dictionary<int, int>(); // track smallest match per region
+        var uiaBounds = new Dictionary<int, Rectangle>(); // UIA element screen rect (most specific)
+        var _uiaBestArea = new Dictionary<int, int>();
         try
         {
             PulseStep.Mark("uia-scan");
@@ -257,6 +258,7 @@ internal partial class Program
                                 if (!existing || elArea < _uiaBestArea.GetValueOrDefault(ri, int.MaxValue))
                                 {
                                     uiaAnswers[ri] = (name, ct, aid);
+                                    uiaBounds[ri] = elR; // screen coords
                                     _uiaBestArea[ri] = elArea;
                                     if (!existing) uiaMatched++;
                                 }
@@ -267,6 +269,27 @@ internal partial class Program
                 }
             }
             Console.WriteLine($"[HACK] UIA answer key: {uiaMatched}/{regions.Count} segments matched");
+
+            // Narrow target + parent bounds using UIA (most specific element rect)
+            for (int ri = 0; ri < Math.Min(regions.Count, 2); ri++) // target(0) + parent candidate
+            {
+                if (!uiaBounds.TryGetValue(ri, out var uiaR)) continue;
+                var seg = regions[ri];
+                // Convert UIA screen rect to bitmap coords
+                var narrowed = new Rectangle(
+                    uiaR.X - wr.Left, uiaR.Y - wr.Top, uiaR.Width, uiaR.Height);
+                narrowed = Rectangle.Intersect(narrowed, new Rectangle(0, 0, w, h));
+                if (narrowed.Width > 0 && narrowed.Height > 0 && narrowed.Width * narrowed.Height < seg.Bounds.Width * seg.Bounds.Height)
+                {
+                    Console.WriteLine($"[HACK] Region[{ri}] narrowed: {seg.Bounds.Width}x{seg.Bounds.Height} → {narrowed.Width}x{narrowed.Height} (UIA)");
+                    regions[ri] = new ConnectedComponentAnalyzer.Region
+                    {
+                        Bounds = narrowed, Type = seg.Type, PixelCount = seg.PixelCount,
+                        Perimeter = seg.Perimeter, Label = seg.Label
+                    };
+                }
+            }
+
             SaveHackOverlayPreview(bmp, regions, "uia", wr.Left, wr.Top, uiaAnswers, stageLabels);
             for (int ri = 0; ri < regions.Count; ri++)
             {
@@ -660,6 +683,45 @@ internal partial class Program
                         wr.Left = aRect.X; wr.Top = aRect.Y;
                         wr.Right = aRect.X + aRect.Width; wr.Bottom = aRect.Y + aRect.Height;
                         Console.WriteLine($"[HACK] UIA parent-narrowed: rect=({aRect.X},{aRect.Y} {aRect.Width}x{aRect.Height})");
+                        return;
+                    }
+                }
+            }
+            catch { }
+
+            // 1b. Cursor-based: UIA ElementFromPoint → most specific element under cursor
+            try
+            {
+                NativeMethods.GetCursorPos(out var cursorPt);
+                var pointed = automation.FromPoint(new System.Drawing.Point(cursorPt.X, cursorPt.Y));
+                if (pointed != null)
+                {
+                    // Walk up to find an element with reasonable size (not 1px noise)
+                    var target = pointed;
+                    var tRect = target.Properties.BoundingRectangle.ValueOrDefault;
+
+                    // Use parent for analysis context (shows target + siblings)
+                    var parent = target.Parent;
+                    if (parent != null)
+                    {
+                        var pRect = parent.Properties.BoundingRectangle.ValueOrDefault;
+                        if (pRect.Width > 0 && pRect.Height > 0
+                            && pRect.Width < (wr.Right - wr.Left) * 0.95) // parent smaller than full window
+                        {
+                            wr.Left = pRect.X; wr.Top = pRect.Y;
+                            wr.Right = pRect.X + pRect.Width; wr.Bottom = pRect.Y + pRect.Height;
+                            Console.WriteLine($"[HACK] ElementFromPoint parent: rect=({pRect.X},{pRect.Y} {pRect.Width}x{pRect.Height}) target=\"{tRect.Width}x{tRect.Height}\"");
+                            return;
+                        }
+                    }
+
+                    // No useful parent → use target element itself if smaller than window
+                    if (tRect.Width > 0 && tRect.Height > 0
+                        && tRect.Width * tRect.Height < (wr.Right - wr.Left) * (wr.Bottom - wr.Top) * 0.8)
+                    {
+                        wr.Left = tRect.X; wr.Top = tRect.Y;
+                        wr.Right = tRect.X + tRect.Width; wr.Bottom = tRect.Y + tRect.Height;
+                        Console.WriteLine($"[HACK] ElementFromPoint direct: rect=({tRect.X},{tRect.Y} {tRect.Width}x{tRect.Height})");
                         return;
                     }
                 }
