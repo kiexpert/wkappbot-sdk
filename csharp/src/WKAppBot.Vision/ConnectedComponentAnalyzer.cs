@@ -272,35 +272,44 @@ public sealed class ConnectedComponentAnalyzer
     /// </summary>
     private static List<Region> MergeOverlappingTextRegions(List<Region> regions)
     {
-        var texts = regions.Where(r => r.Type == RegionType.DyText).ToList();
-        var others = regions.Where(r => r.Type != RegionType.DyText).ToList();
-        if (texts.Count <= 1) return regions;
+        // Collect text + small icons (emoji-sized: both dimensions within typical text range)
+        var mergeable = new List<(Region r, int idx)>();
+        var keep = new List<Region>();
+        for (int i = 0; i < regions.Count; i++)
+        {
+            var r = regions[i];
+            if (r.Type == RegionType.DyText)
+                mergeable.Add((r, i));
+            else if (r.Type == RegionType.DyIcon && r.Bounds.Width <= 32 && r.Bounds.Height <= 32)
+                mergeable.Add((r, i)); // small icon = inline emoji
+            else
+                keep.Add(r);
+        }
+        if (mergeable.Count <= 1) return regions;
 
-        var used = new bool[texts.Count];
+        var used = new bool[mergeable.Count];
         var merged = new List<Region>();
 
-        for (int i = 0; i < texts.Count; i++)
+        for (int i = 0; i < mergeable.Count; i++)
         {
             if (used[i]) continue;
-            var group = texts[i].Bounds;
-            int totalPixels = texts[i].PixelCount;
+            var group = mergeable[i].r.Bounds;
+            int totalPixels = mergeable[i].r.PixelCount;
             used[i] = true;
 
-            // Iteratively absorb all overlapping/touching text regions
             bool changed = true;
             while (changed)
             {
                 changed = false;
-                for (int j = i + 1; j < texts.Count; j++)
+                for (int j = i + 1; j < mergeable.Count; j++)
                 {
                     if (used[j]) continue;
-                    var r = texts[j].Bounds;
-                    // Touch or overlap: inflate by 1px to catch adjacent regions
+                    var r = mergeable[j].r.Bounds;
                     var inflated = Rectangle.Inflate(group, 1, 1);
                     if (inflated.IntersectsWith(r))
                     {
                         group = Rectangle.Union(group, r);
-                        totalPixels += texts[j].PixelCount;
+                        totalPixels += mergeable[j].r.PixelCount;
                         used[j] = true;
                         changed = true;
                     }
@@ -310,7 +319,7 @@ public sealed class ConnectedComponentAnalyzer
             merged.Add(new Region { Bounds = group, Type = RegionType.DyText, PixelCount = totalPixels, Label = -1 });
         }
 
-        merged.AddRange(others);
+        merged.AddRange(keep);
         return merged;
     }
 
