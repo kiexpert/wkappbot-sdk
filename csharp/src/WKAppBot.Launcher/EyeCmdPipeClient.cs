@@ -21,8 +21,11 @@ internal static class EyeCmdPipeClient
     ///
     /// timeoutMs: if >0, close the pipe after this many ms (enforces Launcher-level timeout
     /// even for Eye in-process commands that don't implement their own timeout).
+    /// firstOutputTimeoutMs: if >0, fall back to Core if Eye produces no output within this time.
+    ///   Use for fast commands (file edit/read/grep) where Eye stall → Core is safer than waiting.
+    ///   Returns false so caller runs Core; pipe is closed (Eye gets BrokenPipe and skips command).
     /// </summary>
-    public static bool TryDelegate(string[] args, out int exitCode, int timeoutMs = 0, int timeoutExitCode = 2)
+    public static bool TryDelegate(string[] args, out int exitCode, int timeoutMs = 0, int timeoutExitCode = 2, int firstOutputTimeoutMs = 0)
     {
         exitCode = 0;
         bool connected = false;
@@ -46,6 +49,21 @@ internal static class EyeCmdPipeClient
             var payload = prefixes.Concat(args).ToArray();
             w.WriteLine(JsonSerializer.Serialize(payload, LauncherJsonContext.Default.StringArray));
 
+            // First-output timeout: for fast commands, if Eye doesn't respond within N ms,
+            // close the pipe and return false → caller falls back to Core directly.
+            string? peekedLine = null;
+            if (firstOutputTimeoutMs > 0)
+            {
+                var firstReadTask = Task.Run(() => r.ReadLine());
+                if (!firstReadTask.Wait(firstOutputTimeoutMs))
+                {
+                    // Eye is stalled — fall back to Core. Eye will get BrokenPipe and skip.
+                    try { pipe.Close(); } catch { }
+                    return false;
+                }
+                peekedLine = firstReadTask.Result;
+            }
+
             // Timeout: fire timer closes pipe → unblocks ReadLine with IOException.
             // Eye continues executing in background; Launcher returns timeout exit code.
             bool timedOut = false;
@@ -61,9 +79,17 @@ internal static class EyeCmdPipeClient
 
             try
             {
-                string? line;
-                while ((line = r.ReadLine()) != null)
+                // Drain: process peeked line first (if first-output timeout was used), then loop.
+                IEnumerable<string?> Lines()
                 {
+                    if (peekedLine != null) yield return peekedLine;
+                    string? l;
+                    while ((l = r.ReadLine()) != null) yield return l;
+                }
+
+                foreach (var line in Lines())
+                {
+                    if (line == null) break;
                     if (line.StartsWith(EndMarker))
                     {
                         int.TryParse(line.AsSpan(EndMarker.Length).Trim(), out exitCode);
