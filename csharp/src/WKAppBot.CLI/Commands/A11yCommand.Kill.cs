@@ -68,6 +68,25 @@ internal partial class Program
                     // e.g. "tick eye" matches "wkappbot eye tick --timeout 15" regardless of token order
                     try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
                     if (!KillCmdLineMatch(cmdLine, targetPattern)) continue;
+
+                    // Self-kill guard: pattern matched only via cmdLine of a wkappbot-core process.
+                    // This happens when wkappbot is analyzing the target (e.g., a11y hack "*LG*")
+                    // and the pattern "LG" matches our own worker's cmdLine arguments — not the target app.
+                    // Skip + register bug unless user explicitly targeted wkappbot.
+                    if (procName.Equals("wkappbot-core", StringComparison.OrdinalIgnoreCase)
+                        && !targetPattern.Contains("wkappbot", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var brief = cmdLine.Length > 120 ? cmdLine[..120] + "..." : cmdLine;
+                        Console.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (self-kill guard: pattern \"{targetPattern}\" matched own cmdLine)\n       cmd: {brief}");
+                        skipped.Add($"[{p.Id}]{procName} (self-kill-guard)");
+                        AutoRegisterBug(
+                            $"[BUG-AUTO] a11y kill \"{grap}\" self-kill: pattern matched wkappbot-core cmdLine\n" +
+                            $"pid={p.Id} cmd={brief}\n" +
+                            $"Pattern \"{targetPattern}\" hit our own worker's arguments, not the target process.",
+                            new[] { "a11y", "kill", grap },
+                            callerCwd: EyeCmdPipeServer.CallerCwd.Value);
+                        continue;
+                    }
                 }
 
                 if (exeMatcher != null && !exeMatcher.IsMatch(string.IsNullOrEmpty(exePath) ? nodeKey : exePath))

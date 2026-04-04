@@ -1470,4 +1470,48 @@ internal partial class Program
         return 0;
     }
 
+    /// <summary>
+    /// Append a [BUG-AUTO] entry to suggestions.jsonl. Deduplicates within 1 hour by text prefix.
+    /// Call from any command that detects a clearly structural bug (CWD mismatch, self-kill, etc.).
+    /// </summary>
+    internal static void AutoRegisterBug(string text, string[]? args = null, string? callerCwd = null, string? logFile = null)
+    {
+        try
+        {
+            var suggPath = Path.Combine(DataDir, "suggestions.jsonl");
+            // Dedup: same first 80 chars within last 1h
+            var prefix = text[..Math.Min(80, text.Length)];
+            var since  = DateTime.UtcNow.AddHours(-1);
+            if (File.Exists(suggPath))
+            {
+                foreach (var line in File.ReadLines(suggPath).TakeLast(100))
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    try
+                    {
+                        var n = JsonNode.Parse(line);
+                        if (DateTime.TryParse(n?["ts"]?.GetValue<string>(), out var ts) && ts > since
+                            && (n?["text"]?.GetValue<string>() ?? "").StartsWith(prefix, StringComparison.Ordinal))
+                            return; // already registered recently
+                    }
+                    catch { }
+                }
+            }
+
+            var entry = JsonSerializer.Serialize(new
+            {
+                ts     = DateTime.UtcNow.ToString("o"),
+                from   = "bug-auto",
+                cwd    = callerCwd ?? Environment.CurrentDirectory,
+                text,
+                files  = logFile != null ? new[] { logFile } : Array.Empty<string>(),
+                status = "pending",
+                tag    = "bug-auto",
+            });
+            File.AppendAllText(suggPath, entry + "\n");
+            Console.WriteLine($"[BUG-AUTO] 등록: {prefix}…");
+        }
+        catch { }
+    }
+
 }
