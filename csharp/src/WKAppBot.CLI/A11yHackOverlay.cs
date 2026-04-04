@@ -80,7 +80,6 @@ internal sealed class A11yHackOverlayWindow : Window
         _canvas.Children.Clear();
         _hoverRect = null; // cleared with canvas
 
-        var labelRows = new List<Border>();
         for (int i = 0; i < model.Boxes.Count; i++)
         {
             var box = model.Boxes[i];
@@ -117,48 +116,33 @@ internal sealed class A11yHackOverlayWindow : Window
             Canvas.SetTop(rect, box.Bounds.Y);
             _canvas.Children.Add(rect);
 
+            // Label: placed at top-right of each box border (inside, overlapping border)
             if (!string.IsNullOrWhiteSpace(box.Label))
             {
                 var labelBg = new Border
                 {
-                    Background = new SolidColorBrush(isTarget
-                        ? Color.FromArgb(220, 7, 26, 24)
-                        : Color.FromArgb(188, 8, 10, 14)),
-                    BorderBrush = stroke,
-                    BorderThickness = new Thickness(isTarget ? 1.5 : 1),
-                    CornerRadius = new CornerRadius(isTarget ? 5 : 3),
-                    Padding = new Thickness(isTarget ? 6 : 4, 2, isTarget ? 6 : 4, 2),
-                    Effect = new DropShadowEffect
-                    {
-                        Color = box.Color,
-                        BlurRadius = isTarget ? 12 : 6,
-                        ShadowDepth = 0,
-                        Opacity = isTarget ? 0.75 : 0.35
-                    },
+                    Background = new SolidColorBrush(Color.FromArgb(200, 0, 0, 60)),
+                    CornerRadius = new CornerRadius(2),
+                    Padding = new Thickness(3, 1, 3, 1),
                     Child = new TextBlock
                     {
                         Text = box.Label,
-                        Foreground = isTarget ? Brushes.White : Brushes.Gainsboro,
+                        Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xE0, 0xE6)), // LightCyan-ish
                         FontFamily = new FontFamily("Consolas"),
-                        FontSize = isTarget ? 10.5 : 10,
-                        FontWeight = isTarget ? FontWeights.Bold : FontWeights.SemiBold
+                        FontSize = 8,
                     },
                     IsHitTestVisible = false
                 };
-                labelRows.Add(labelBg);
+                labelBg.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                var labelW = labelBg.DesiredSize.Width;
+                var labelH = labelBg.DesiredSize.Height;
+                // Top-right inside the box, overlapping the border
+                var lx = Math.Max(0, box.Bounds.Right - labelW - 2);
+                var ly = Math.Max(0, box.Bounds.Top + 2);
+                Canvas.SetLeft(labelBg, lx);
+                Canvas.SetTop(labelBg, ly);
+                _canvas.Children.Add(labelBg);
             }
-        }
-
-        const double left = 8;
-        double top = 8;
-        foreach (var row in labelRows)
-        {
-            row.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            var desired = row.DesiredSize;
-            Canvas.SetLeft(row, left);
-            Canvas.SetTop(row, top);
-            _canvas.Children.Add(row);
-            top += desired.Height + 4;
         }
     }
 
