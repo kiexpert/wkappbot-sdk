@@ -675,18 +675,25 @@ internal partial class Program
                             catch { }
                         }
 
-                        // ── Homework injection: idle 1min + pending suggestions → newchat (WKAppBot only) ──
-                        // LastHomeworkAt persisted to disk — survives Eye restarts (no re-fire on restart).
-                        // 4h cooldown prevents loop: homework opens newchat → new session idle → re-fire.
-                        if (state.LastHomeworkAt == null && !string.IsNullOrEmpty(state.FullCwd ?? state.CwdLabel))
+                        // ── Homework injection (WKAppBot 담당 인스턴스 전용) ────────────────────────────
+                        // 타이밍 (유저와 협의 확정):
+                        //   · Claude 유휴 1분  — 짧은 멈춤이 아닌 진짜 쉬는 상태 판정
+                        //   · 쿨다운 1시간    — 서제스트 축적 속도 감안, 루프 방지
+                        // LastHomeworkAt 디스크 영속 → Eye 재시작 후에도 쿨다운 유지.
+                        // 비앱봇 인스턴스(회사업무 클롣)는 유휴여도 측정 제외 — 담당자 유휴만 의미있음.
+                        var _isWkAppBotInstance =
+                            (state.FullCwd  ?? "").IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            (state.CwdLabel ?? "").IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (_isWkAppBotInstance && state.LastHomeworkAt == null && !string.IsNullOrEmpty(state.FullCwd ?? state.CwdLabel))
                         {
                             var ck = state.FullCwd ?? state.CwdLabel;
                             state.LastHomeworkAt = LoadHomeworkAt(ck);
                         }
-                        if (state.IdleMessageSent && !state.HomeworkNotified
+                        if (_isWkAppBotInstance
+                            && state.IdleMessageSent && !state.HomeworkNotified
                             && state.IdleStartedAt != null
-                            && (DateTime.UtcNow - state.IdleStartedAt.Value).TotalMinutes >= 1
-                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalHours >= 1))
+                            && (DateTime.UtcNow - state.IdleStartedAt.Value).TotalMinutes >= 1    // 협의값: 1분
+                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalHours >= 1)) // 협의값: 1시간
                         {
                             try { CheckAndSendHomework(state, hwnd, label); }
                             catch { }
@@ -1112,10 +1119,7 @@ internal partial class Program
         // This allows skip-and-retry without waiting 1h.
         var cwdKey = state.FullCwd ?? state.CwdLabel;
 
-        // Suggestions are AppBot maintainer items → WKAppBot instance gets ALL suggestions (no CWD filter).
-        // Non-WKAppBot instances (company-work Claudes) get only their own CWD-scoped homework items.
-        var isWkAppBot = (state.FullCwd ?? "").IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0
-                      || (state.CwdLabel ?? "").IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0;
+        // 트리거 시점에 이미 WKAppBot 인스턴스 여부 확인 완료 — 여기선 전체 서제스트 처리.
         var instanceCwd = state.FullCwd ?? state.CwdLabel;
 
         var suggPath = Path.Combine(DataDir, "suggestions.jsonl");
@@ -1131,18 +1135,8 @@ internal partial class Program
                 var status = node?["status"]?.GetValue<string>() ?? "pending";
                 if (status is "done" or "archived") continue;
 
-                var isMerge  = node?["type"]?.GetValue<string>() == "merge";
-                var suggCwd  = node?["cwd"]?.GetValue<string>();
-
-                if (!isWkAppBot)
-                {
-                    // Non-AppBot instance: CWD-scoped only (basic priority — own workspace homework)
-                    if (string.IsNullOrEmpty(suggCwd) || string.IsNullOrEmpty(instanceCwd)) continue;
-                    if (!suggCwd.StartsWith(instanceCwd, StringComparison.OrdinalIgnoreCase) &&
-                        !instanceCwd.StartsWith(suggCwd, StringComparison.OrdinalIgnoreCase))
-                        continue;
-                }
-                // WKAppBot instance: all items pass (system-wide suggestions + own homework)
+                var isMerge = node?["type"]?.GetValue<string>() == "merge";
+                // 서제스트는 발신자 무관 시스템 전체 아이템 — CWD 필터 없음
 
                 var text = node?["text"]?.GetValue<string>() ?? "";
                 string summary;
