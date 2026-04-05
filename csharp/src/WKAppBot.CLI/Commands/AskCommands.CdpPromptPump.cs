@@ -58,8 +58,31 @@ internal sealed class CdpPromptPump : IDisposable
         var ok = await cdp.AppendContentEditableAsync(editorSelector, text, separator);
         if (!ok) return false;
 
+        // Snapshot editor state for submit watchdog
+        var dumpPreview = text.Length > 120 ? text[..120] + "..." : text;
+        var dumpTarget = cdp.TargetId ?? "no-target";
+        var dumpAt = DateTime.UtcNow;
+
         var armed = await cdp.ArmPromptPumpAsync(editorSelector, idleMs: 1000);
-        Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: {(armed ? "armed" : "arm-failed")}");
+        Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: {(armed ? "armed" : "arm-failed")}");
+
+        // Submit watchdog: 3s later check if editor still has content (= submit failed)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(3000);
+                var remaining = await cdp.GetTextLengthAsync(editorSelector);
+                if (remaining > 0)
+                {
+                    var msg = $"[PUMP] Submit watchdog: editor still has {remaining} chars after 3s! scope={scope} target={dumpTarget} text=[{dumpPreview}]";
+                    Console.Error.WriteLine(msg);
+                    Program.AutoRegisterBug(msg);
+                }
+            }
+            catch { }
+        });
+
         return armed;
     }
 

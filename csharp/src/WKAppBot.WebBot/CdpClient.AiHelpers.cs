@@ -229,15 +229,24 @@ public sealed partial class CdpClient
                 "}catch(_e){}" +
                 "return 'NO_SEND_PATH';" +
             "};" +
-            "var st=root.states[sel]||(root.states[sel]={gen:0,timer:0,lastResult:'',locked:false});" +
+            "var st=root.states[sel]||(root.states[sel]={gen:0,timer:0,lastResult:'',locked:false,firstArmAt:0,maxTimer:0});" +
             "st.gen=(st.gen||0)+1;" +
             "if(st.timer)try{clearTimeout(st.timer);}catch(_e){}" +
+            "if(!st.firstArmAt)st.firstArmAt=Date.now();" +
             "var myGen=st.gen;" +
+            // Idle timer: send after idleMs of silence
             "st.timer=setTimeout(function(){" +
                 "var cur=root.states[sel];if(!cur||cur.gen!==myGen)return;" +
                 "if(cur.locked)return;" +
-                "cur.lastResult=root.trySend(sel);" +
+                "cur.lastResult=root.trySend(sel);cur.firstArmAt=0;" +
             "}, idleMs);" +
+            // Max wait timer: force flush after 5s even if chunks keep arriving
+            "if(!st.maxTimer){st.maxTimer=setTimeout(function(){" +
+                "var cur=root.states[sel];if(!cur)return;cur.maxTimer=0;" +
+                "if(cur.locked)return;" +
+                "if(cur.timer)try{clearTimeout(cur.timer);}catch(_e){}" +
+                "cur.lastResult=root.trySend(sel);cur.firstArmAt=0;" +
+            "}, 5000);}" +
             "return 'ARMED';" +
             "})()");
         return result == "ARMED";
@@ -361,6 +370,8 @@ public sealed partial class CdpClient
             "(()=>{" +
             "var sel='" + esc + "';" +
             "var root=window.__wkAskPump;if(!root||!root.trySend)return 'NO_PUMP';" +
+            "var st=root.states?root.states[sel]:null;" +
+            "if(st){if(st.timer)try{clearTimeout(st.timer);}catch(_e){}if(st.maxTimer)try{clearTimeout(st.maxTimer);}catch(_e){}st.firstArmAt=0;st.maxTimer=0;}" +
             "return root.trySend(sel);" +
             "})()") ?? "NO_PUMP";
     }
