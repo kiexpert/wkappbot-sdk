@@ -323,7 +323,11 @@ partial class Program
         var isEyeDaemon = cmd == "eye"
             && eyeSubcmd is not ("tick" or "hotswap" or "homework" or "shutdown");
         var isWorkerMode = Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1";
-        if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && cmd != "logcat" && cmd != "grep" && cmd != "grap"
+        // hack-* workers are long-running → bypass Eye pipe (would timeout)
+        var isHackWorker = cmd == "a11y" && forwardArgs.Length > 1
+            && forwardArgs[1].StartsWith("hack-", StringComparison.OrdinalIgnoreCase);
+        if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker
+            && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
             // Parse --timeout / --timeout-exit for Eye pipe enforcement
