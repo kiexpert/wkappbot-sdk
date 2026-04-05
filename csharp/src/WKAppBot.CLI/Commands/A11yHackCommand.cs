@@ -73,7 +73,8 @@ internal partial class Program
         }
         var win = targets.First();
         var hwnd = win.Handle;
-        Console.WriteLine($"[HACK] Target: 0x{hwnd.ToInt64():X} \"{win.Title}\"");
+        if (!_hackHoverQuiet)
+            if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Target: 0x{hwnd.ToInt64():X} \"{win.Title}\"");
         PulseStep.Mark("target-found");
 
         // If #scope specified, find UIA element and use its BoundingRectangle
@@ -85,7 +86,7 @@ internal partial class Program
             // --ltrb direct rect override (skip auto-narrow)
             var ar = atRect.Value;
             wr.Left = ar.Left; wr.Top = ar.Top; wr.Right = ar.Right; wr.Bottom = ar.Bottom;
-            Console.WriteLine($"[HACK] --ltrb override: rect=({ar.Left},{ar.Top} {ar.Width}x{ar.Height})");
+            if (!_hackHoverQuiet) Console.WriteLine($"[HACK] --ltrb override: rect=({ar.Left},{ar.Top} {ar.Width}x{ar.Height})");
         }
         else
         {
@@ -102,11 +103,11 @@ internal partial class Program
                 {
                     var r = scoped.Properties.BoundingRectangle.ValueOrDefault;
                     wr.Left = r.X; wr.Top = r.Y; wr.Right = r.X + r.Width; wr.Bottom = r.Y + r.Height;
-                    Console.WriteLine($"[HACK] Scoped to: \"{uiaScope}\" rect=({r.X},{r.Y} {r.Width}x{r.Height})");
+                    if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Scoped to: \"{uiaScope}\" rect=({r.X},{r.Y} {r.Width}x{r.Height})");
                 }
-                else Console.WriteLine($"[HACK] Scope \"{uiaScope}\" not found ??using full window");
+                else if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Scope \"{uiaScope}\" not found ??using full window");
             }
-            catch { Console.WriteLine($"[HACK] Scope error ??using full window"); }
+            catch { if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Scope error ??using full window"); }
         }
         int w = wr.Right - wr.Left, h = wr.Bottom - wr.Top;
         if (w <= 0 || h <= 0)
@@ -149,7 +150,7 @@ internal partial class Program
             if (idleMs < elapsed && idleMs < abortIdleThresholdMs)
             {
                 hackAborted = true;
-                Console.WriteLine("[HACK] User input detected — aborting");
+                if (!_hackHoverQuiet) Console.WriteLine("[HACK] User input detected — aborting");
                 liveOverlay?.Hide();
                 return true;
             }
@@ -170,7 +171,7 @@ internal partial class Program
                 || curWr.Right != baselineWr.Right || curWr.Bottom != baselineWr.Bottom)
             {
                 hackAborted = true;
-                Console.WriteLine("[HACK] Window moved/resized — aborting");
+                if (!_hackHoverQuiet) Console.WriteLine("[HACK] Window moved/resized — aborting");
                 liveOverlay?.Hide();
                 return true;
             }
@@ -181,7 +182,7 @@ internal partial class Program
                 if (cur != baselinePixelHash)
                 {
                     hackAborted = true;
-                    Console.WriteLine("[HACK] Content changed — aborting for re-analysis");
+                    if (!_hackHoverQuiet) Console.WriteLine("[HACK] Content changed — aborting for re-analysis");
                     liveOverlay?.Hide();
                     return true;
                 }
@@ -226,7 +227,7 @@ internal partial class Program
             Console.Error.WriteLine($"[HACK] Capture failed: {ex.Message}");
             return 1;
         }
-        Console.WriteLine($"[HACK] Captured: {w}x{h}");
+        if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Captured: {w}x{h}");
         InitHackExpDir(hwnd);
         PulseStep.Mark("captured");
 
@@ -252,7 +253,7 @@ internal partial class Program
         int contCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
         int noiseCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DyNoise);
 
-        Console.WriteLine($"[HACK] CCA: {regions.Count} regions ??Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount} Noise={noiseCount}");
+        if (!_hackHoverQuiet) Console.WriteLine($"[HACK] CCA: {regions.Count} regions ??Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount} Noise={noiseCount}");
         SaveHackOverlayPreview(bmp, regions, "cca", wr.Left, wr.Top);
         var stageLabels = new Dictionary<int, string>();
         UpdateHackOverlay(liveOverlay, bmp, regions, null, stageLabels, null, ccaOffX, ccaOffY);
@@ -261,7 +262,7 @@ internal partial class Program
         var allRegions = cca.Analyze(bmp); // non-merged for table detection
         var table = cca.DetectTable(allRegions, w, h);
         if (table != null)
-            Console.WriteLine($"[HACK] Table detected: {table.Rows} rows 횞 {table.Cols} cols");
+            if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Table detected: {table.Rows} rows 횞 {table.Cols} cols");
         PulseStep.Mark("table-detect");
 
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
@@ -330,7 +331,7 @@ internal partial class Program
                     catch { }
                 }
             }
-            Console.WriteLine($"[HACK] UIA answer key: {uiaMatched}/{regions.Count} segments matched");
+            if (!_hackHoverQuiet) Console.WriteLine($"[HACK] UIA answer key: {uiaMatched}/{regions.Count} segments matched");
 
             // Collect standalone UIA boxes from FULL root window (depth-limited for speed)
             // FindAllDescendants on Electron can take 60s+, so use breadth-limited walk (depth ≤ 3)
@@ -386,7 +387,7 @@ internal partial class Program
                 }
             }
             catch { }
-            Console.WriteLine($"[HACK] UIA standalone boxes: {uiaStandaloneBoxes.Count}");
+            if (!_hackHoverQuiet) Console.WriteLine($"[HACK] UIA standalone boxes: {uiaStandaloneBoxes.Count}");
 
             // Print UIA tree summary: window root → children (depth-limited)
             try
@@ -396,7 +397,7 @@ internal partial class Program
                 var rootCt = ""; try { rootCt = uiaRoot.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                 var rootClass = uiaRoot.Properties.ClassName.ValueOrDefault ?? "";
                 Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.WriteLine($"[HACK] UIA tree root: {rootCt} \"{rootName}\" aid={rootAid} class={rootClass}");
+                if (!_hackHoverQuiet) Console.WriteLine($"[HACK] UIA tree root: {rootCt} \"{rootName}\" aid={rootAid} class={rootClass}");
                 Console.ResetColor();
                 var rootChildren = uiaRoot.FindAllChildren();
                 for (int ci = 0; ci < rootChildren.Length && ci < 30; ci++)
@@ -427,7 +428,7 @@ internal partial class Program
                 narrowed = Rectangle.Intersect(narrowed, new Rectangle(0, 0, w, h));
                 if (narrowed.Width > 0 && narrowed.Height > 0 && narrowed.Width * narrowed.Height < seg.Bounds.Width * seg.Bounds.Height)
                 {
-                    Console.WriteLine($"[HACK] Region[{ri}] narrowed: {seg.Bounds.Width}x{seg.Bounds.Height} → {narrowed.Width}x{narrowed.Height} (UIA)");
+                    if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Region[{ri}] narrowed: {seg.Bounds.Width}x{seg.Bounds.Height} → {narrowed.Width}x{narrowed.Height} (UIA)");
                     regions[ri] = new ConnectedComponentAnalyzer.Region
                     {
                         Bounds = narrowed, Type = seg.Type, PixelCount = seg.PixelCount,
@@ -446,7 +447,7 @@ internal partial class Program
             }
             UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
         }
-        catch (Exception ex) { Console.WriteLine($"[HACK] UIA scan error: {ex.Message}"); }
+        catch (Exception ex) { if (!_hackHoverQuiet) Console.WriteLine($"[HACK] UIA scan error: {ex.Message}"); }
 
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
         // OCR on text regions + tree output
@@ -476,7 +477,7 @@ internal partial class Program
         var rowGroups = positions.GroupBy(p => p.row).OrderBy(g => g.Key).ToList();
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[HACK] ── DYN-A11Y Tree ({w}횞{h}) ──");
+        if (!_hackHoverQuiet) Console.WriteLine($"[HACK] ── DYN-A11Y Tree ({w}횞{h}) ──");
         Console.ResetColor();
 
         foreach (var rowGroup in rowGroups)
@@ -639,7 +640,7 @@ internal partial class Program
         PulseStep.Mark("ocr-done");
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[HACK] ── Summary ──");
+        if (!_hackHoverQuiet) Console.WriteLine($"[HACK] ── Summary ──");
         Console.ResetColor();
         Console.WriteLine($"  Segments: {regions.Count} (Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount})");
         Console.WriteLine($"  OCR: {ocrOk} ok, {ocrEmpty} failed");
@@ -675,11 +676,11 @@ internal partial class Program
                     File.WriteAllText(promptPath, prompt);
 
                     Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.WriteLine($"[HACK] Asking Gemini Vision ({gapCollector.Count} regions)...");
+                    if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Asking Gemini Vision ({gapCollector.Count} regions)...");
                     Console.ResetColor();
 
                     // Ask Gemini with composite image
-                    Console.WriteLine($"[HACK] Engine: {visionEngine}");
+                    if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Engine: {visionEngine}");
                     int exitCode = visionEngine switch
                     {
                         "gpt" => AskChatGpt(prompt, slackReport: false, timeoutSec: 60,
@@ -698,7 +699,7 @@ internal partial class Program
                     }
                     UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"[HACK] Vision query complete (exit={exitCode})");
+                    if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Vision query complete (exit={exitCode})");
                     Console.ResetColor();
 
                     // Cache: save composite with pixel hash for future lookups
@@ -714,14 +715,14 @@ internal partial class Program
                         var cachePath = Path.Combine(cacheDir, cacheName);
                         if (!File.Exists(cachePath))
                             File.Copy(compositePath, cachePath);
-                        Console.WriteLine($"[HACK] Cached: {cacheName}");
+                        if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Cached: {cacheName}");
                     }
                     catch { }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[HACK] Vision error: {ex.Message}");
+                if (!_hackHoverQuiet) Console.WriteLine($"[HACK] Vision error: {ex.Message}");
             }
         }
 
