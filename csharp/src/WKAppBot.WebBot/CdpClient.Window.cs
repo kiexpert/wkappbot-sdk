@@ -342,18 +342,8 @@ public sealed partial class CdpClient
                 ["windowId"] = windowId,
                 ["bounds"] = new JsonObject { ["windowState"] = "normal" }
             });
-            // Poll until windowState is "normal" (replaces fragile 50ms fixed delay)
-            for (int poll = 0; poll < 20; poll++) // max 2s (20 × 100ms)
-            {
-                await Task.Delay(100);
-                try
-                {
-                    var wb = await SendAsync("Browser.getWindowBounds", new JsonObject { ["windowId"] = windowId });
-                    var state = wb?["bounds"]?["windowState"]?.GetValue<string>();
-                    if (state == "normal") break;
-                }
-                catch { break; }
-            }
+            // Poll until windowState is "normal" using shared helper
+            await WaitForWindowStateAsync(windowId, "normal", timeoutMs: 2000);
             var restoreMs = sw.ElapsedMilliseconds;
             // Now set actual bounds (window confirmed normal)
             await SendAsync("Browser.setWindowBounds", new JsonObject
@@ -390,13 +380,41 @@ public sealed partial class CdpClient
         catch { return false; }
     }
 
-    /// <summary>Ensure Chrome window is minimized before tab operations (prevent focus theft).</summary>
+    /// <summary>
+    /// Poll Browser.getWindowBounds until windowState matches expected value.
+    /// Replaces fragile fixed delays with state-based synchronization.
+    /// </summary>
+    public async Task<bool> WaitForWindowStateAsync(int windowId, string expectedState, int timeoutMs = 2000, int pollMs = 50)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            try
+            {
+                var wb = await SendAsync("Browser.getWindowBounds", new JsonObject { ["windowId"] = windowId }, timeoutMs: 3000);
+                var state = wb?["bounds"]?["windowState"]?.GetValue<string>();
+                if (state == expectedState) return true;
+            }
+            catch { break; }
+            await Task.Delay(pollMs);
+        }
+        return false;
+    }
+
+    /// <summary>Ensure Chrome window is minimized before tab operations (prevent focus theft).
+    /// Polls windowState instead of fixed 100ms delay.</summary>
     public async Task EnsureMinimizedAsync(string? targetId = null)
     {
         try
         {
-            await MinimizeWindowAsync(targetId);
-            await Task.Delay(100); // wait for minimize animation
+            var wb = await GetWindowForTargetAsync(targetId);
+            if (wb == null) return;
+            await SendAsync("Browser.setWindowBounds", new JsonObject
+            {
+                ["windowId"] = wb.Value.windowId,
+                ["bounds"] = new JsonObject { ["windowState"] = "minimized" }
+            });
+            await WaitForWindowStateAsync(wb.Value.windowId, "minimized", timeoutMs: 1000);
         }
         catch { }
     }

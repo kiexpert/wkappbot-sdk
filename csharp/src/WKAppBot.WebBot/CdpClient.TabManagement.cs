@@ -343,8 +343,11 @@ public sealed partial class CdpClient
     {
         // Minimize Chrome before switching tab — prevents OS focus fight during tab switch.
         // Chrome processes tab changes internally fine while minimized.
+        // Poll windowState=minimized instead of fixed 80ms delay.
+        var preWb = await GetWindowForTargetAsync();
         MinimizeChrome();
-        await Task.Delay(80);
+        if (preWb != null)
+            await WaitForWindowStateAsync(preWb.Value.windowId, "minimized", timeoutMs: 1000);
 
         // Find new target's WebSocket URL
         string? wsUrl = null;
@@ -406,10 +409,11 @@ public sealed partial class CdpClient
         // Proactive focusless measures — best-effort, non-fatal
         await EmulateActiveTabAsync();
 
-        // Restore Chrome to visible (non-minimized) after tab switch is complete
-        // Delay to ensure Chrome has fully settled the internal tab change
-        await Task.Delay(200);
+        // Restore Chrome to visible after tab switch — poll windowState=normal instead of fixed 200ms
         RestoreChromeNoActivate();
+        var postWb = await GetWindowForTargetAsync(targetId);
+        if (postWb != null)
+            await WaitForWindowStateAsync(postWb.Value.windowId, "normal", timeoutMs: 1000);
 
         return true;
     }
@@ -631,9 +635,9 @@ public sealed partial class CdpClient
                 if (existingWb != null && IsAtExpectedBounds(existingWb.Value, expX, expY, expW, expH))
                 {
                     // Minimize Chrome BEFORE creating tab — Chrome may activate window on tab create.
-                    // SwitchToTargetAsync also minimizes; pre-minimize here closes the gap window.
+                    // Poll windowState=minimized instead of fixed 100ms delay.
                     MinimizeChrome();
-                    await Task.Delay(100);
+                    await WaitForWindowStateAsync(existingWb.Value.windowId, "minimized", timeoutMs: 1000);
                     Console.WriteLine($"[ASK] Reusing window at ({existingWb.Value.left},{existingWb.Value.top}) for new tab");
                     var beforeTargets = CloneTargets(allTargets);
                     var result = await SendAsync("Target.createTarget", new JsonObject { ["url"] = createUrl });
@@ -679,7 +683,26 @@ public sealed partial class CdpClient
             }
         }
 
-        await Task.Delay(200);
+        // Poll /json until new target appears (replaces fixed 200ms delay)
+        var targetSw = Stopwatch.StartNew();
+        bool targetReady = false;
+        while (targetSw.ElapsedMilliseconds < 2000)
+        {
+            try
+            {
+                var checkJson = await _http.GetStringAsync($"http://localhost:{port}/json");
+                var checkTargets = JsonSerializer.Deserialize<JsonArray>(checkJson);
+                if (checkTargets?.Any(t => t?["id"]?.GetValue<string>() == newTargetId) == true)
+                {
+                    targetReady = true;
+                    break;
+                }
+            }
+            catch { }
+            await Task.Delay(50);
+        }
+        if (!targetReady)
+            Console.Error.WriteLine($"[CDP:TARGET] warning: new target {newTargetId} not visible in /json after 2s");
         await SwitchToTargetAsync(newTargetId, port);
         Console.WriteLine($"[CDP:TARGET] created new target={newTargetId} name={targetName} url={navigateUrl}");
 
