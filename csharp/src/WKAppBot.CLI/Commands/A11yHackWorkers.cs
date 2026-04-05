@@ -14,6 +14,7 @@ internal partial class Program
 {
     static volatile int _hackHoverDebounceSeq;
     static volatile bool _hackHoverAnalyzing;
+    static volatile bool _hackHoverBlindMode; // blind hack in progress — don't cancel on mouse move
     static CancellationTokenSource? _hackHoverAnalyzeCts;
 
     static int A11yHackHoverWorker(string[] args)
@@ -98,12 +99,15 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 if (hwnd == IntPtr.Zero) continue;
 
-                // Mouse moved? → reset debounce + cancel running analysis
+                // Mouse moved? → reset debounce + cancel running analysis (but not blind hack)
                 if (pt.X != lastMouseX || pt.Y != lastMouseY)
                 {
                     lastMouseX = pt.X; lastMouseY = pt.Y;
-                    _hackHoverDebounceSeq++;
-                    _hackHoverAnalyzeCts?.Cancel();
+                    if (!_hackHoverBlindMode) // blind hack runs regardless of mouse movement
+                    {
+                        _hackHoverDebounceSeq++;
+                        _hackHoverAnalyzeCts?.Cancel();
+                    }
                 }
 
                 // Direct UIA: find element at mouse position
@@ -175,29 +179,30 @@ internal partial class Program
                     try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
                 }
 
-                // Debounce before starting heavy analysis
-                // Blind window (no UIA label, no patterns) → 1s fast-hack
+                // Blind window (no UIA label, no patterns) → immediate hack (experience DB build)
                 // Normal → 9s idle debounce
                 bool isBlind = string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns);
-                int debounceMs = isBlind ? 1000 : 9000;
                 if (changed)
                 {
-                    // Cancel any running analysis
-                    _hackHoverAnalyzeCts?.Cancel();
-                    var hackGrap = isBlind ? json5Short : compactGrap; // blind → window-level hack
+                    if (!isBlind) _hackHoverAnalyzeCts?.Cancel(); // don't cancel blind hack
+                    var hackGrap = isBlind ? json5Short : compactGrap;
                     var debounceStamp = ++_hackHoverDebounceSeq;
                     var analyzeCts = new CancellationTokenSource();
                     _hackHoverAnalyzeCts = analyzeCts;
                     _ = Task.Run(async () =>
                     {
-                        try { await Task.Delay(debounceMs, analyzeCts.Token); }
-                        catch (OperationCanceledException) { return; }
-                        if (_hackHoverDebounceSeq != debounceStamp) return;
-                        Console.WriteLine($"\n[ANALYZING] {hackGrap}");
+                        if (!isBlind)
+                        {
+                            try { await Task.Delay(9000, analyzeCts.Token); }
+                            catch (OperationCanceledException) { return; }
+                            if (_hackHoverDebounceSeq != debounceStamp) return;
+                        }
+                        _hackHoverBlindMode = isBlind;
+                        Console.WriteLine($"\n[ANALYZING{(isBlind ? ":BLIND" : "")}] {hackGrap}");
                         _hackHoverAnalyzing = true;
                         try { A11yHackCommand(new[] { hackGrap }); }
                         catch (Exception hex) { Log($"Hack error: {hex.Message}"); }
-                        finally { _hackHoverAnalyzing = false; }
+                        finally { _hackHoverAnalyzing = false; _hackHoverBlindMode = false; }
                     });
                 }
             }
