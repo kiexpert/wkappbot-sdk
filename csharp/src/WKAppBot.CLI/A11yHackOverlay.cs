@@ -125,14 +125,14 @@ internal sealed class A11yHackOverlayWindow : Window
                     dash = new DoubleCollection { 4, 2 }; rx = ry = 2;
                     fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 8, ShadowDepth = 0, Opacity = 0.4 };
                     break;
-                case HackBoxRole.Cached: // experience DB hit — amber dashed, subtle
-                    stroke = new SolidColorBrush(Color.FromArgb(50, 0xFF, 0xA5, 0x00));
+                case HackBoxRole.Cached: // experience DB hit — amber dashed, 10% alpha
+                    stroke = new SolidColorBrush(Color.FromArgb(25, 0xFF, 0xA5, 0x00));
                     thick = 1.0; fill = Brushes.Transparent;
                     dash = new DoubleCollection { 2, 2 }; rx = ry = 1;
                     fx = null;
                     break;
-                default: // Known — system a11y dashed green, subtle
-                    stroke = new SolidColorBrush(Color.FromArgb(50, 0x32, 0xCD, 0x32));
+                default: // Known — system a11y dashed green, 10% alpha border
+                    stroke = new SolidColorBrush(Color.FromArgb(25, 0x32, 0xCD, 0x32));
                     thick = 1.2; fill = Brushes.Transparent;
                     dash = new DoubleCollection { 3, 2 }; rx = ry = 1;
                     fx = null;
@@ -157,7 +157,7 @@ internal sealed class A11yHackOverlayWindow : Window
                     HackBoxRole.Target => (Color.FromRgb(0x00, 0xFF, 0x88), Color.FromArgb(220, 0, 30, 20)),
                     HackBoxRole.Scope => (Color.FromRgb(0x90, 0xCA, 0xF9), Color.FromArgb(200, 0, 15, 50)),
                     HackBoxRole.Cached => (Color.FromRgb(0xFF, 0xD7, 0x80), Color.FromArgb(180, 40, 20, 0)), // amber
-                    _ => (Color.FromRgb(0xB0, 0xE0, 0xB0), Color.FromArgb(180, 0, 30, 0)),
+                    _ => (Color.FromRgb(0x90, 0xFF, 0x90), Color.FromArgb(210, 0, 20, 0)),
                 };
                 var labelBg = new Border
                 {
