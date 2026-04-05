@@ -237,15 +237,42 @@ internal partial class Program
                             if (overlay != null)
                             {
                                 var boxes = new List<A11yHackOverlayBox>();
-                                // Current hovered element
+                                // Current hovered element + parent chain
                                 if (elBounds.Width > 0 && elBounds.Height > 0)
                                 {
-                                    var label = $"{elType} {elBounds.Width}x{elBounds.Height}";
                                     boxes.Add(new A11yHackOverlayBox(
                                         new System.Windows.Rect(
                                             elBounds.X - rootWr.Left, elBounds.Y - rootWr.Top,
                                             elBounds.Width, elBounds.Height),
-                                        label, null, HackBoxRole.Target));
+                                        $"{elType} {elBounds.Width}x{elBounds.Height}", null, HackBoxRole.Target));
+                                }
+                                // Parent chain → root (Scope = 2x thick dashed)
+                                if (curEl != null)
+                                {
+                                    try
+                                    {
+                                        var walker = uia.TreeWalkerFactory.GetRawViewWalker();
+                                        var parent = curEl;
+                                        for (int depth = 0; depth < 20; depth++)
+                                        {
+                                            try { parent = walker.GetParent(parent); } catch { break; }
+                                            if (parent == null) break;
+                                            try
+                                            {
+                                                var pr = parent.BoundingRectangle;
+                                                if (pr.Width < 5 || pr.Height < 5) continue;
+                                                string pType = "?";
+                                                try { pType = parent.ControlType.ToString(); } catch { }
+                                                boxes.Add(new A11yHackOverlayBox(
+                                                    new System.Windows.Rect(
+                                                        pr.X - rootWr.Left, pr.Y - rootWr.Top,
+                                                        pr.Width, pr.Height),
+                                                    $"{pType} {(int)pr.Width}x{(int)pr.Height}", null, HackBoxRole.Scope));
+                                            }
+                                            catch { }
+                                        }
+                                    }
+                                    catch { }
                                 }
                                 // Quick UIA children of root (depth 1 — lightweight)
                                 // Refresh on: window change OR experience DB file change

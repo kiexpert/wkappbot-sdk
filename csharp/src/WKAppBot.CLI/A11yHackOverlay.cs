@@ -119,11 +119,11 @@ internal sealed class A11yHackOverlayWindow : Window
                     dash = null; rx = ry = 3;
                     fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 16, ShadowDepth = 0, Opacity = 0.8 };
                     break;
-                case HackBoxRole.Scope: // analyzing — no fill, only dashed outline
-                    stroke = new SolidColorBrush(Color.FromRgb(0x42, 0xA5, 0xF5));
-                    thick = 1.2; fill = Brushes.Transparent;
+                case HackBoxRole.Scope: // parent chain — 2x thick neon dashed
+                    stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88));
+                    thick = 2.4; fill = Brushes.Transparent;
                     dash = new DoubleCollection { 4, 2 }; rx = ry = 2;
-                    fx = new DropShadowEffect { Color = Color.FromRgb(0x42, 0xA5, 0xF5), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.3 };
+                    fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 8, ShadowDepth = 0, Opacity = 0.4 };
                     break;
                 case HackBoxRole.Cached: // experience DB hit — amber dashed, no fill
                     stroke = new SolidColorBrush(Color.FromArgb(180, 0xFF, 0xA5, 0x00));
