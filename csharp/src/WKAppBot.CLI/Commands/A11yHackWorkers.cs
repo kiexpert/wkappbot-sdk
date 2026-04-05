@@ -79,6 +79,7 @@ internal partial class Program
 
         // Main loop: mouse/focus → UIA → console output
         string lastResult = "";
+        IntPtr lastHwnd = IntPtr.Zero;
         int loopCount = 0;
         int lastMouseX = -1, lastMouseY = -1;
         using var uia = new FlaUI.UIA3.UIA3Automation(); // reuse — avoid 4s init per loop
@@ -159,8 +160,11 @@ internal partial class Program
 
                 bool changed = result != lastResult;
                 if (changed) lastResult = result;
+                // \r overwrite = same window (hwnd). New line = different window.
+                bool windowChanged = hwnd != lastHwnd;
+                lastHwnd = hwnd;
                 if (RunningInEye && !changed) continue; // Eye: change-only
-                if (changed) Console.WriteLine(); // new target → new line
+                if (windowChanged) Console.WriteLine(); // different window → new line
                 Console.Write($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})          \r");
                 Console.Out.Flush();
 
