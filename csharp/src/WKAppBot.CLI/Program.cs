@@ -648,9 +648,10 @@ internal partial class Program
             // kill/close subcommands may target Eye itself — don't auto-launch Eye before they run.
             var subCmd = restArgs.Length > 0 ? restArgs[0].ToLowerInvariant() : "";
             bool isKillOrClose = command == "a11y" && subCmd is "kill" or "close";
+            bool isHackWorker = command == "a11y" && subCmd.StartsWith("hack-", StringComparison.OrdinalIgnoreCase);
             // Eye auto-launch: 긴급 명령만 제외, 나머지는 무조건 발동 (ThreadPool — 블록 없음).
-            // 제외: eye 데몬 자체, kill/close (Eye 대상 가능), mcp (stdio), grap/grep (FastExit)
-            var isExcluded = isEyeCommand || isMcpCommand || isKillOrClose || _fastExitAfterCommand;
+            // 제외: eye 데몬 자체, kill/close (Eye 대상 가능), mcp (stdio), grap/grep (FastExit), hack-* (독립 워커)
+            var isExcluded = isEyeCommand || isMcpCommand || isKillOrClose || isHackWorker || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
