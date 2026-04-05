@@ -644,12 +644,12 @@ internal partial class Program
                     for (int oi = origStart; oi <= origEnd && oi < origLines.Length; oi++)
                     {
                         if (origLines[oi].Trim().Length > 0)
-                            Console.WriteLine($"← {oi + 1,5}│ {origLines[oi]}");
+                            Console.WriteLine($"< {oi + 1,5}| {origLines[oi]}");
                     }
                     rangeIdx++;
                 }
 
-                Console.WriteLine($"{(changed ? "→" : " ")} {li + 1,5}│ {resultLines[li]}");
+                Console.WriteLine($"{(changed ? ">" : " ")} {li + 1,5}| {resultLines[li]}");
                 prev = li;
             }
         }

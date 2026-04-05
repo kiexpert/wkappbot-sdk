@@ -158,9 +158,9 @@ internal partial class Program
                     for (int ci = ctxStart; ci <= ctxEnd; ci++)
                     {
                         if (ci == i) // match line: arrow marker
-                            Console.WriteLine($"→ {ci + 1,5}│ {lines[ci]}");
+                            Console.WriteLine($"> {ci + 1,5}| {lines[ci]}");
                         else         // context line
-                            Console.WriteLine($"  {ci + 1,5}│ {lines[ci]}");
+                            Console.WriteLine($"  {ci + 1,5}| {lines[ci]}");
                     }
                     lastCtxEnd = ctxEnd;
 
@@ -323,8 +323,8 @@ Examples:
                             fileCount++;
                         }
                         // Truncate long lines for display
-                        var display = line.Length > 200 ? line[..200] + "…" : line;
-                        Console.WriteLine($"→ {lineNo,5}│ {display}");
+                        var display = line.Length > 200 ? line[..200] + "..." : line;
+                        Console.WriteLine($"> {lineNo,5}| {display}");
                         matchCount++;
                     }
                 }
