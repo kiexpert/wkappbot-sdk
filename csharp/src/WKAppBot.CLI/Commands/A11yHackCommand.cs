@@ -78,6 +78,8 @@ internal partial class Program
 
         // If #scope specified, find UIA element and use its BoundingRectangle
         NativeMethods.GetWindowRect(hwnd, out var wr);
+        // Save full window rect for UIA standalone overlay (before narrowing)
+        var fullWr = wr;
         if (atRect.HasValue)
         {
             // --ltrb direct rect override (skip auto-narrow)
@@ -113,14 +115,18 @@ internal partial class Program
             return 1;
         }
         var analysisTargetRect = TryResolveAnalysisTargetRect(wr);
-        var liveOverlay = A11yHackOverlayHost.GetOrCreate(OverlaySlot.Session, wr.Left, wr.Top, w, h);
+        // Overlay covers full root window (UIA tree needs full coverage)
+        int fullWw = fullWr.Right - fullWr.Left, fullWh = fullWr.Bottom - fullWr.Top;
+        // CCA offset: narrowed area position relative to full window
+        int ccaOffX = wr.Left - fullWr.Left, ccaOffY = wr.Top - fullWr.Top;
+        var liveOverlay = A11yHackOverlayHost.GetOrCreate(OverlaySlot.Session, fullWr.Left, fullWr.Top, fullWw, fullWh);
         liveOverlay?.Update(new A11yHackOverlayModel(new[]
         {
             new A11yHackOverlayBox(
-                new System.Windows.Rect(0, 0, Math.Max(1, w - 1), Math.Max(1, h - 1)),
+                new System.Windows.Rect(ccaOffX, ccaOffY, Math.Max(1, w - 1), Math.Max(1, h - 1)),
                 "target", Role: HackBoxRole.Target)
         }));
-        liveOverlay?.StartHoverTracking(wr.Left, wr.Top);
+        liveOverlay?.StartHoverTracking(fullWr.Left, fullWr.Top);
 
         // ── Abort checks (two tiers) ──
         var hackAborted = false;
@@ -249,7 +255,7 @@ internal partial class Program
         Console.WriteLine($"[HACK] CCA: {regions.Count} regions ??Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount} Noise={noiseCount}");
         SaveHackOverlayPreview(bmp, regions, "cca", wr.Left, wr.Top);
         var stageLabels = new Dictionary<int, string>();
-        UpdateHackOverlay(liveOverlay, bmp, regions, null, stageLabels);
+        UpdateHackOverlay(liveOverlay, bmp, regions, null, stageLabels, null, ccaOffX, ccaOffY);
 
         // Table detection
         var allRegions = cca.Analyze(bmp); // non-merged for table detection
@@ -263,12 +269,29 @@ internal partial class Program
         var uiaAnswers = new Dictionary<int, (string name, string type, string aid)>();
         var uiaBounds = new Dictionary<int, Rectangle>(); // UIA element screen rect (most specific)
         var _uiaBestArea = new Dictionary<int, int>();
+        List<A11yHackOverlayBox>? uiaStandaloneBoxes = null;
         try
         {
             PulseStep.Mark("uia-scan");
             using var automation = new FlaUI.UIA3.UIA3Automation();
             var uiaRoot = automation.FromHandle(hwnd);
-            var uiaElements = uiaRoot.FindAllDescendants();
+            // Depth-limited BFS instead of FindAllDescendants (Electron can take 60s+)
+            var uiaElements = new List<FlaUI.Core.AutomationElements.AutomationElement>();
+            {
+                var q = new Queue<(FlaUI.Core.AutomationElements.AutomationElement el, int d)>();
+                q.Enqueue((uiaRoot, 0));
+                const int scanDepth = 4;
+                while (q.Count > 0 && uiaElements.Count < 500)
+                {
+                    var (n, d) = q.Dequeue();
+                    uiaElements.Add(n);
+                    if (d < scanDepth)
+                    {
+                        try { foreach (var c in n.FindAllChildren()) q.Enqueue((c, d + 1)); }
+                        catch { }
+                    }
+                }
+            }
             int uiaMatched = 0;
             for (int ri = 0; ri < regions.Count; ri++)
             {
@@ -309,6 +332,90 @@ internal partial class Program
             }
             Console.WriteLine($"[HACK] UIA answer key: {uiaMatched}/{regions.Count} segments matched");
 
+            // Collect standalone UIA boxes from FULL root window (depth-limited for speed)
+            // FindAllDescendants on Electron can take 60s+, so use breadth-limited walk (depth ≤ 3)
+            int fullW = fullWr.Right - fullWr.Left, fullH = fullWr.Bottom - fullWr.Top;
+            uiaStandaloneBoxes = new List<A11yHackOverlayBox>();
+            try
+            {
+                var uiaQueue = new Queue<(FlaUI.Core.AutomationElements.AutomationElement el, int depth)>();
+                uiaQueue.Enqueue((uiaRoot, 0));
+                const int maxDepth = 3; // root → children → grandchildren → great-grandchildren
+                const int maxBoxes = 200;
+                while (uiaQueue.Count > 0 && uiaStandaloneBoxes.Count < maxBoxes)
+                {
+                    var (cur, depth) = uiaQueue.Dequeue();
+                    try
+                    {
+                        var elRect = cur.Properties.BoundingRectangle.ValueOrDefault;
+                        if (elRect.Width >= 5 && elRect.Height >= 5)
+                        {
+                            int bx = (int)elRect.X - fullWr.Left, by = (int)elRect.Y - fullWr.Top;
+                            int bw = (int)elRect.Width, bh = (int)elRect.Height;
+                            if (bx < 0) { bw += bx; bx = 0; } if (by < 0) { bh += by; by = 0; }
+                            if (bx + bw > fullW) bw = fullW - bx; if (by + bh > fullH) bh = fullH - by;
+                            if (bw >= 5 && bh >= 5)
+                            {
+                                var name = cur.Properties.Name.ValueOrDefault ?? "";
+                                var aid = cur.Properties.AutomationId.ValueOrDefault ?? "";
+                                var ct = ""; try { ct = cur.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                                // Include if has name/aid OR has controlType (for unnamed Pane/Group nodes)
+                                {
+                                    var idPart = !string.IsNullOrWhiteSpace(aid) ? aid
+                                               : !string.IsNullOrWhiteSpace(name) ? TrimPreview(name, 20)
+                                               : $"d{depth}";
+                                    var typePart = !string.IsNullOrWhiteSpace(ct) ? ct : "?";
+                                    var label = $"{typePart}_{idPart} {bw}x{bh}";
+                                    uiaStandaloneBoxes.Add(new A11yHackOverlayBox(
+                                        new System.Windows.Rect(bx, by, bw, bh), label, null, HackBoxRole.Known));
+                                }
+                            }
+                        }
+                        // Enqueue children (depth-limited)
+                        if (depth < maxDepth)
+                        {
+                            try
+                            {
+                                foreach (var child in cur.FindAllChildren())
+                                    uiaQueue.Enqueue((child, depth + 1));
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+            Console.WriteLine($"[HACK] UIA standalone boxes: {uiaStandaloneBoxes.Count}");
+
+            // Print UIA tree summary: window root → children (depth-limited)
+            try
+            {
+                var rootName = uiaRoot.Properties.Name.ValueOrDefault ?? "";
+                var rootAid = uiaRoot.Properties.AutomationId.ValueOrDefault ?? "";
+                var rootCt = ""; try { rootCt = uiaRoot.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                var rootClass = uiaRoot.Properties.ClassName.ValueOrDefault ?? "";
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.WriteLine($"[HACK] UIA tree root: {rootCt} \"{rootName}\" aid={rootAid} class={rootClass}");
+                Console.ResetColor();
+                var rootChildren = uiaRoot.FindAllChildren();
+                for (int ci = 0; ci < rootChildren.Length && ci < 30; ci++)
+                {
+                    var c = rootChildren[ci];
+                    try
+                    {
+                        var cn = c.Properties.Name.ValueOrDefault ?? "";
+                        var ca = c.Properties.AutomationId.ValueOrDefault ?? "";
+                        var cc = ""; try { cc = c.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                        var cr = c.Properties.BoundingRectangle.ValueOrDefault;
+                        Console.WriteLine($"  |--{cc} \"{TrimPreview(cn, 30)}\" aid={ca} ({(int)cr.Width}×{(int)cr.Height})");
+                    }
+                    catch { Console.WriteLine($"  |--(error reading child #{ci})"); }
+                }
+                if (rootChildren.Length > 30) Console.WriteLine($"  `--... +{rootChildren.Length - 30} more");
+            }
+            catch { }
+
             // Narrow target + parent bounds using UIA (most specific element rect)
             for (int ri = 0; ri < Math.Min(regions.Count, 2); ri++) // target(0) + parent candidate
             {
@@ -337,7 +444,7 @@ internal partial class Program
                 if (!string.IsNullOrWhiteSpace(text))
                     stageLabels[ri] = $"uia {TrimPreview(text, 24)}";
             }
-            UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+            UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
         }
         catch (Exception ex) { Console.WriteLine($"[HACK] UIA scan error: {ex.Message}"); }
 
@@ -376,7 +483,7 @@ internal partial class Program
         {
             var items = rowGroup.OrderBy(p => p.col).ToList();
             bool isLastRow = rowGroup.Key == rowGroups.Last().Key;
-            string rowPrefix = isLastRow ? "└── " : "├── ";
+            string rowPrefix = isLastRow ? "`-- " : "|-- ";
             string childPrefix = isLastRow ? "    " : "??  ";
 
             for (int ci = 0; ci < items.Count; ci++)
@@ -469,7 +576,7 @@ internal partial class Program
                                 CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText,
                                     isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
                                 stageLabels[regionIdx] = $"ocr {TrimPreview(ocrText, 24)}";
-                                UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+                                UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
                             }
                             else
                             {
@@ -482,7 +589,7 @@ internal partial class Program
                                     CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText,
                                         isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
                                     stageLabels[regionIdx] = $"fix {TrimPreview(ocrText, 24)}";
-                                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+                                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
                                 }
                                 else
                                 {
@@ -493,7 +600,7 @@ internal partial class Program
                                         stageLabels[regionIdx] = $"cache 100% {TrimPreview(cachedDescription, 18)}";
                                     else
                                         stageLabels[regionIdx] = "vision pending";
-                                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+                                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
                                 }
                             }
                         }
@@ -502,7 +609,7 @@ internal partial class Program
                     {
                         ocrEmpty++;
                         stageLabels[regionIdx] = "ocr error";
-                        UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+                        UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
                     }
                 }
 
@@ -547,7 +654,7 @@ internal partial class Program
                 if (!stageLabels.ContainsKey(ri) && regions[ri].Type is ConnectedComponentAnalyzer.RegionType.DyText or ConnectedComponentAnalyzer.RegionType.DyContainer)
                     stageLabels[ri] = "vision pending";
             }
-            UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+            UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
             PulseStep.Mark("vision-query");
 
             // Build triple composite ??save ??ask Gemini
@@ -589,7 +696,7 @@ internal partial class Program
                         if (stageLabels.TryGetValue(ri, out var cur) && cur == "vision pending")
                             stageLabels[ri] = $"vision {visionEngine}";
                     }
-                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels);
+                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine($"[HACK] Vision query complete (exit={exitCode})");
                     Console.ResetColor();
@@ -657,747 +764,6 @@ internal partial class Program
         liveOverlay?.Hide();
         PulseStep.Done();
         return 0;
-    }
-
-    /// <summary>
-    /// Cache segment to experience DB. Container segments become subdirectories.
-    /// Path: experience/{proc}/{class}/hack_{containerId}/{dynId}'{hash}={desc}.png
-    /// </summary>
-    static string? _hackExpDir; // set once per hack run
-    static string? _currentContainerDir; // current container subfolder
-
-    static void TryAutoNarrowHackRect(
-        IntPtr hwnd,
-        string grapFull,
-        string? uiaScope,
-        bool focusDrillRequested,
-        bool hasExplicitScope,
-        ref RECT wr,
-        int? overrideX = null,
-        int? overrideY = null)
-    {
-        try
-        {
-            using var automation = new FlaUI.UIA3.UIA3Automation();
-
-            if (hasExplicitScope || focusDrillRequested)
-            {
-                var resolved = GrapHelper.ResolveFullGrap(grapFull, automation);
-                if (resolved.HasValue)
-                {
-                    var (_, root, error) = resolved.Value;
-                    if (error == null && root != null)
-                    {
-                        var r = root.Properties.BoundingRectangle.ValueOrDefault;
-                        // Skip if resolved to window-level (90%+ of hwnd rect)
-                        bool isRootLevel = r.Width >= (wr.Right - wr.Left) * 0.9
-                                        && r.Height >= (wr.Bottom - wr.Top) * 0.9;
-                        if (r.Width > 0 && r.Height > 0 && !isRootLevel)
-                        {
-                            wr.Left = r.X;
-                            wr.Top = r.Y;
-                            wr.Right = r.X + r.Width;
-                            wr.Bottom = r.Y + r.Height;
-                            Console.WriteLine($"[HACK] Scoped to grap root rect=({r.X},{r.Y} {r.Width}x{r.Height})");
-                            return;
-                        }
-                    }
-                }
-                // Fall through to ElementFromPoint if scope resolved to root level
-            }
-
-            if (!string.IsNullOrEmpty(uiaScope)) return;
-
-            // ── 분석 범위 결정 ──
-            // UIA 정보가 있으면: 타겟 노드의 Parent 영역으로 좁힘
-            // UIA 정보 없으면: 타겟 창(hwnd)의 부모 창으로 제한
-            // 타겟 창이 루트 창이면: 그냥 루트 창 전체 분석 (이미 wr에 설정됨)
-            try
-            {
-                // 1. UIA로 타겟 찾아서 Parent로 좁히기
-                var root = automation.FromHandle(hwnd);
-                var grapPattern = grapFull.Split('#')[0];
-                var grapResult = GrapHelper.FindByNameOrAid(root, grapPattern);
-                if (grapResult != null)
-                {
-                    // Skip if grap matched the window itself (root level) — fall through to ElementFromPoint
-                    var grapRect = grapResult.Properties.BoundingRectangle.ValueOrDefault;
-                    bool isRootMatch = grapRect.Width >= (wr.Right - wr.Left) * 0.9
-                                    && grapRect.Height >= (wr.Bottom - wr.Top) * 0.9;
-                    if (!isRootMatch)
-                    {
-                        var parent = grapResult.Parent;
-                        var analysisEl = parent ?? grapResult;
-                        var aRect = analysisEl.Properties.BoundingRectangle.ValueOrDefault;
-                        if (aRect.Width > 0 && aRect.Height > 0)
-                        {
-                            wr.Left = aRect.X; wr.Top = aRect.Y;
-                            wr.Right = aRect.X + aRect.Width; wr.Bottom = aRect.Y + aRect.Height;
-                            Console.WriteLine($"[HACK] UIA parent-narrowed: rect=({aRect.X},{aRect.Y} {aRect.Width}x{aRect.Height})");
-                            return;
-                        }
-                    }
-                }
-            }
-            catch { }
-
-            // 1b. ElementFromPoint → most specific element (--at override or cursor)
-            try
-            {
-                int ptX, ptY;
-                if (overrideX.HasValue && overrideY.HasValue)
-                { ptX = overrideX.Value; ptY = overrideY.Value; }
-                else
-                { NativeMethods.GetCursorPos(out var cp); ptX = cp.X; ptY = cp.Y; }
-                Console.WriteLine($"[HACK] ElementFromPoint at ({ptX},{ptY})");
-                var pointed = automation.FromPoint(new System.Drawing.Point(ptX, ptY));
-                if (pointed != null)
-                {
-                    // Walk up to find an element with reasonable size (not 1px noise)
-                    var target = pointed;
-                    var tRect = target.Properties.BoundingRectangle.ValueOrDefault;
-
-                    // Use parent for analysis context (shows target + siblings)
-                    var parent = target.Parent;
-                    if (parent != null)
-                    {
-                        var pRect = parent.Properties.BoundingRectangle.ValueOrDefault;
-                        if (pRect.Width > 0 && pRect.Height > 0
-                            && pRect.Width < (wr.Right - wr.Left) * 0.95) // parent smaller than full window
-                        {
-                            wr.Left = pRect.X; wr.Top = pRect.Y;
-                            wr.Right = pRect.X + pRect.Width; wr.Bottom = pRect.Y + pRect.Height;
-                            Console.WriteLine($"[HACK] ElementFromPoint parent: rect=({pRect.X},{pRect.Y} {pRect.Width}x{pRect.Height}) target=\"{tRect.Width}x{tRect.Height}\"");
-                            return;
-                        }
-                    }
-
-                    // No useful parent → use target element itself if smaller than window
-                    if (tRect.Width > 0 && tRect.Height > 0
-                        && tRect.Width * tRect.Height < (wr.Right - wr.Left) * (wr.Bottom - wr.Top) * 0.8)
-                    {
-                        wr.Left = tRect.X; wr.Top = tRect.Y;
-                        wr.Right = tRect.X + tRect.Width; wr.Bottom = tRect.Y + tRect.Height;
-                        Console.WriteLine($"[HACK] ElementFromPoint direct: rect=({tRect.X},{tRect.Y} {tRect.Width}x{tRect.Height})");
-                        return;
-                    }
-                }
-            }
-            catch { }
-
-            // 2. UIA 실패 → 타겟 창의 부모 창(Win32 Owner/Parent)으로 제한
-            var parentHwnd = NativeMethods.GetParent(hwnd);
-            if (parentHwnd == IntPtr.Zero)
-                parentHwnd = NativeMethods.GetAncestor(hwnd, 2); // GA_ROOT
-            if (parentHwnd != IntPtr.Zero && parentHwnd != hwnd)
-            {
-                NativeMethods.GetWindowRect(parentHwnd, out var parentWr);
-                if (parentWr.Right - parentWr.Left > 0 && parentWr.Bottom - parentWr.Top > 0)
-                {
-                    // 타겟 창 RECT를 부모 창으로 클램프
-                    wr.Left = Math.Max(wr.Left, parentWr.Left);
-                    wr.Top = Math.Max(wr.Top, parentWr.Top);
-                    wr.Right = Math.Min(wr.Right, parentWr.Right);
-                    wr.Bottom = Math.Min(wr.Bottom, parentWr.Bottom);
-                    Console.WriteLine($"[HACK] Win32 parent-clamped: rect=({wr.Left},{wr.Top} {wr.Right - wr.Left}x{wr.Bottom - wr.Top})");
-                    return;
-                }
-            }
-            // 3. 타겟 창 = 루트 창 → wr 그대로 (창 전체 분석)
-            Console.WriteLine($"[HACK] Root window — analyzing full: rect=({wr.Left},{wr.Top} {wr.Right - wr.Left}x{wr.Bottom - wr.Top})");
-        }
-        catch
-        {
-            Console.WriteLine("[HACK] Scope/focus narrowing error - using full window");
-        }
-    }
-
-    static Rectangle TryResolveAnalysisTargetRect(RECT wr)
-    {
-        var captureRect = Rectangle.FromLTRB(wr.Left, wr.Top, wr.Right, wr.Bottom);
-        if (captureRect.Width <= 1 || captureRect.Height <= 1)
-            return new Rectangle(0, 0, 1, 1);
-
-        try
-        {
-            if (NativeMethods.TryGetCurrentCursorRect(out var cursorRect) && captureRect.Contains(cursorRect))
-            {
-                return new Rectangle(
-                    cursorRect.X - wr.Left,
-                    cursorRect.Y - wr.Top,
-                    Math.Max(1, cursorRect.Width),
-                    Math.Max(1, cursorRect.Height));
-            }
-        }
-        catch
-        {
-        }
-
-        return new Rectangle(
-            Math.Max(0, captureRect.Width / 2),
-            Math.Max(0, captureRect.Height / 2),
-            1,
-            1);
-    }
-
-    static List<ConnectedComponentAnalyzer.Region> OrderRegionsForTarget(
-        List<ConnectedComponentAnalyzer.Region> regions,
-        Rectangle targetRect,
-        int captureWidth,
-        int captureHeight)
-    {
-        if (regions.Count <= 1)
-            return regions;
-
-        var captureBounds = new Rectangle(0, 0, Math.Max(1, captureWidth), Math.Max(1, captureHeight));
-        if (!captureBounds.Contains(targetRect))
-            targetRect = new Rectangle(
-                Math.Clamp(targetRect.X, 0, captureBounds.Width - 1),
-                Math.Clamp(targetRect.Y, 0, captureBounds.Height - 1),
-                Math.Max(1, targetRect.Width),
-                Math.Max(1, targetRect.Height));
-
-        int TargetPriority(ConnectedComponentAnalyzer.Region region)
-        {
-            var bounds = region.Bounds;
-            if (ContainsRect(bounds, targetRect))
-                return 0;
-            if (bounds.IntersectsWith(targetRect))
-                return 1;
-            return 2;
-        }
-
-        int DistanceToTarget(ConnectedComponentAnalyzer.Region region)
-        {
-            var bounds = region.Bounds;
-            var rx = bounds.Left + bounds.Width / 2;
-            var ry = bounds.Top + bounds.Height / 2;
-            var tx = targetRect.Left + targetRect.Width / 2;
-            var ty = targetRect.Top + targetRect.Height / 2;
-            return Math.Abs(rx - tx) + Math.Abs(ry - ty);
-        }
-
-        return regions
-            .OrderBy(TargetPriority)
-            .ThenByDescending(region => ContainsRect(region.Bounds, targetRect) ? region.Bounds.Width * region.Bounds.Height : 0)
-            .ThenBy(DistanceToTarget)
-            .ThenBy(region => region.Bounds.Width * region.Bounds.Height)
-            .ThenBy(region => region.Bounds.Top)
-            .ThenBy(region => region.Bounds.Left)
-            .ToList();
-    }
-
-    static bool TryResolveFocusedCaptureRect(
-        FlaUI.UIA3.UIA3Automation automation,
-        IntPtr hwnd,
-        out Rectangle rect,
-        out string description)
-    {
-        rect = Rectangle.Empty;
-        description = "";
-
-        try
-        {
-            if (NativeMethods.GetForegroundWindow() != hwnd)
-                return false;
-
-            var root = automation.FromHandle(hwnd);
-            if (root == null) return false;
-
-            var focused = GrapHelper.FindFocusedLeaf(automation, root, hwnd);
-            if (focused == null) return false;
-
-            var focusedRect = TryGetScreenRect(focused);
-            if (focusedRect.Width <= 1 || focusedRect.Height <= 1) return false;
-            NativeMethods.GetWindowRect(hwnd, out var wr);
-            var winRect = Rectangle.FromLTRB(wr.Left, wr.Top, wr.Right, wr.Bottom);
-            var anchorRect = TryGetPreferredFocusAnchorRect(focused, focusedRect, winRect);
-
-            AutomationElement? best = focused;
-            int bestScore = ScoreHackFocusCandidate(focused, focusedRect, anchorRect, winRect);
-            var cur = focused;
-            for (int depth = 0; depth < 6 && cur != null; depth++)
-            {
-                var candidateRect = TryGetScreenRect(cur);
-                if (candidateRect.Width <= 1 || candidateRect.Height <= 1) break;
-                if (!IsRectInsideWindow(candidateRect, hwnd)) break;
-                if (!ContainsRect(candidateRect, anchorRect))
-                {
-                    try { cur = cur.Parent; } catch { break; }
-                    continue;
-                }
-
-                int candidateScore = ScoreHackFocusCandidate(cur, focusedRect, anchorRect, winRect);
-                if (candidateScore > bestScore)
-                {
-                    best = cur;
-                    bestScore = candidateScore;
-                }
-
-                try { cur = cur.Parent; } catch { break; }
-            }
-
-            var bestRect = InflateWithinWindow(TryGetScreenRect(best), hwnd, 12, 10);
-            if (bestRect.Width <= 1 || bestRect.Height <= 1) return false;
-
-            rect = bestRect;
-            description = $"[{SafeControlType(best)}] \"{SafeName(best)}\"";
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    static Rectangle TryGetPreferredFocusAnchorRect(AutomationElement focused, Rectangle focusedRect, Rectangle winRect)
-    {
-        try
-        {
-            if (focused.Patterns.Text.IsSupported)
-            {
-                var ranges = focused.Patterns.Text.Pattern.GetSelection();
-                if (ranges != null)
-                {
-                    var best = Rectangle.Empty;
-                    foreach (var range in ranges)
-                    {
-                        try
-                        {
-                            var rects = range.GetBoundingRectangles();
-                            if (rects == null) continue;
-                            foreach (var rr in rects)
-                            {
-                                var candidate = Rectangle.FromLTRB(
-                                    (int)Math.Floor((double)rr.X),
-                                    (int)Math.Floor((double)rr.Y),
-                                    (int)Math.Ceiling((double)(rr.X + rr.Width)),
-                                    (int)Math.Ceiling((double)(rr.Y + rr.Height)));
-                                if (candidate.Width <= 0 || candidate.Height <= 0) continue;
-                                candidate = Rectangle.Intersect(candidate, winRect);
-                                if (candidate.Width <= 0 || candidate.Height <= 0) continue;
-                                if (best == Rectangle.Empty || candidate.Width * candidate.Height < best.Width * best.Height)
-                                    best = candidate;
-                            }
-                        }
-                        catch { }
-                    }
-
-                    if (best != Rectangle.Empty)
-                        return best;
-                }
-            }
-        }
-        catch { }
-
-        return focusedRect;
-    }
-
-    static int ScoreHackFocusCandidate(
-        AutomationElement candidate,
-        Rectangle focusedRect,
-        Rectangle anchorRect,
-        Rectangle winRect)
-    {
-        var rect = TryGetScreenRect(candidate);
-        if (rect.Width <= 1 || rect.Height <= 1) return int.MinValue;
-        if (!ContainsRect(rect, anchorRect)) return int.MinValue;
-
-        var ct = SafeControlType(candidate);
-        bool isPrimary = ct is "Document" or "Edit";
-        bool isSecondary = ct is "Pane";
-        bool isFallback = ct is "Group";
-        if (!isPrimary && !isSecondary && !isFallback) return int.MinValue;
-
-        int minWidth = isPrimary ? Math.Max(320, anchorRect.Width * 3) : Math.Max(260, focusedRect.Width * 2);
-        int minHeight = isPrimary ? Math.Max(72, anchorRect.Height * 4) : Math.Max(48, focusedRect.Height * 2);
-        int maxWidth = isPrimary ? Math.Min(winRect.Width, 1800) : Math.Min(winRect.Width, 1400);
-        int maxHeight = isPrimary ? Math.Min(winRect.Height, 1100) : Math.Min(winRect.Height, 520);
-
-        if (rect.Width < minWidth || rect.Height < minHeight) return int.MinValue / 2;
-        if (rect.Width > maxWidth || rect.Height > maxHeight) return int.MinValue / 2;
-
-        int score = ct switch
-        {
-            "Document" => 150,
-            "Edit" => 135,
-            "Pane" => 90,
-            "Group" => 45,
-            _ => 0
-        };
-
-        score += Math.Min(90, rect.Width / 18);
-        score += Math.Min(90, rect.Height / 12);
-
-        bool nearBottom = rect.Bottom >= winRect.Bottom - Math.Max(90, winRect.Height / 7);
-        bool bannerLike = rect.Height <= Math.Max(160, winRect.Height / 4) && rect.Width <= Math.Max(700, winRect.Width / 2);
-        if (nearBottom && bannerLike)
-            score -= 160;
-
-        if (ct == "Group" && rect.Height <= Math.Max(180, winRect.Height / 3))
-            score -= 50;
-
-        if (ct == "Pane" && rect.Height <= Math.Max(90, anchorRect.Height * 3))
-            score -= 30;
-
-        var name = SafeName(candidate);
-        if (!string.IsNullOrWhiteSpace(name) && name.Length <= 60)
-            score += 8;
-
-        return score;
-    }
-
-    static bool ContainsRect(Rectangle outer, Rectangle inner)
-    {
-        return inner.Left >= outer.Left
-            && inner.Top >= outer.Top
-            && inner.Right <= outer.Right
-            && inner.Bottom <= outer.Bottom;
-    }
-
-    static Rectangle TryGetScreenRect(AutomationElement? element)
-    {
-        if (element == null) return Rectangle.Empty;
-        try
-        {
-            var r = element.Properties.BoundingRectangle.ValueOrDefault;
-            return new Rectangle(r.X, r.Y, r.Width, r.Height);
-        }
-        catch
-        {
-            return Rectangle.Empty;
-        }
-    }
-
-    static string SafeControlType(AutomationElement? element)
-    {
-        if (element == null) return "?";
-        try { return element.Properties.ControlType.ValueOrDefault.ToString(); }
-        catch { return "?"; }
-    }
-
-    static string SafeName(AutomationElement? element)
-    {
-        if (element == null) return "";
-        try { return element.Properties.Name.ValueOrDefault ?? ""; }
-        catch { return ""; }
-    }
-
-    static bool IsRectInsideWindow(Rectangle rect, IntPtr hwnd)
-    {
-        NativeMethods.GetWindowRect(hwnd, out var wr);
-        var winRect = Rectangle.FromLTRB(wr.Left, wr.Top, wr.Right, wr.Bottom);
-        return winRect.IntersectsWith(rect) && rect.Left >= winRect.Left && rect.Top >= winRect.Top;
-    }
-
-    static Rectangle InflateWithinWindow(Rectangle rect, IntPtr hwnd, int dx, int dy)
-    {
-        NativeMethods.GetWindowRect(hwnd, out var wr);
-        var winRect = Rectangle.FromLTRB(wr.Left, wr.Top, wr.Right, wr.Bottom);
-        return Rectangle.Intersect(Rectangle.Inflate(rect, dx, dy), winRect);
-    }
-
-    static void SaveHackOverlayPreview(
-        Bitmap source,
-        List<ConnectedComponentAnalyzer.Region> regions,
-        string stage,
-        int screenLeft,
-        int screenTop,
-        Dictionary<int, (string name, string type, string aid)>? uiaAnswers = null,
-        Dictionary<int, string>? stageLabels = null)
-    {
-        try
-        {
-            var baseDir = _hackExpDir ?? Path.Combine(DataDir, "hack-preview");
-            Directory.CreateDirectory(baseDir);
-
-            using var overlay = new Bitmap(source);
-            using var g = Graphics.FromImage(overlay);
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
-
-            using var font = new Font("Consolas", 9, FontStyle.Bold);
-            using var textBg = new SolidBrush(Color.FromArgb(190, 15, 20, 28));
-            using var textFg = new SolidBrush(Color.White);
-
-            for (int i = 0; i < regions.Count; i++)
-            {
-                var region = regions[i];
-                if (region.Type == ConnectedComponentAnalyzer.RegionType.DyNoise) continue;
-                // Skip tiny segments (smaller than readable character)
-                if (i > 0 && region.Bounds.Width < 10 && region.Bounds.Height < 10) continue;
-
-                var color = region.Type switch
-                {
-                    ConnectedComponentAnalyzer.RegionType.DyText => Color.LimeGreen,
-                    ConnectedComponentAnalyzer.RegionType.DyIcon => Color.DeepSkyBlue,
-                    ConnectedComponentAnalyzer.RegionType.DyContainer => Color.Orange,
-                    ConnectedComponentAnalyzer.RegionType.DySeparator => Color.Gold,
-                    _ => Color.Gray
-                };
-
-                using var pen = new Pen(Color.FromArgb(230, color), region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer ? 2.5f : 1.6f);
-                g.DrawRectangle(pen, region.Bounds);
-
-                // Label: UIA type or Dy type
-                string nodeLabel;
-                if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
-                {
-                    var parts = new List<string>();
-                    if (!string.IsNullOrWhiteSpace(uia.type)) parts.Add(uia.type);
-                    if (!string.IsNullOrWhiteSpace(uia.aid)) parts.Add(uia.aid);
-                    else if (!string.IsNullOrWhiteSpace(uia.name)) parts.Add(TrimPreview(uia.name, 20));
-                    else parts.Add($"#{i + 1}");
-                    nodeLabel = $"{string.Join("_", parts)} {region.Bounds.Width}x{region.Bounds.Height}";
-                }
-                else
-                {
-                    nodeLabel = $"{region.Type} {region.Bounds.Width}x{region.Bounds.Height}";
-                }
-                {
-                    using var smallFont = new Font("Consolas", 7f, FontStyle.Regular);
-                    var nlSize = g.MeasureString(nodeLabel, smallFont);
-                    var nlx = Math.Max(region.Bounds.Left + 2,
-                        Math.Min(region.Bounds.Right - (int)nlSize.Width - 5, overlay.Width - (int)nlSize.Width - 5));
-                    var nly = region.Bounds.Top + 2;
-                    if (nly < 0) nly = 2;
-                    using var nodeBg = new SolidBrush(Color.FromArgb(170, 0, 0, 80));
-                    using var nodeFg = new SolidBrush(Color.LightCyan);
-                    g.FillRectangle(nodeBg, nlx - 2, nly, nlSize.Width + 4, nlSize.Height + 1);
-                    g.DrawString(nodeLabel, smallFont, nodeFg, nlx, nly);
-                }
-
-                // OCR text: inside box, right half, gold color
-                if (stageLabels != null && stageLabels.TryGetValue(i, out var stl) && !string.IsNullOrWhiteSpace(stl))
-                {
-                    string? ocrTxt = null;
-                    if (stl.StartsWith("ocr ")) ocrTxt = stl[4..];
-                    else if (stl.StartsWith("fix ")) ocrTxt = stl[4..];
-                    else if (stl.StartsWith("uia ")) ocrTxt = stl[4..];
-                    else if (stl.StartsWith("cache 100% ")) ocrTxt = stl[11..];
-                    if (ocrTxt != null)
-                    {
-                        using var ocrFont = new Font("Consolas", 6.5f, FontStyle.Regular);
-                        var halfW = Math.Max(20, region.Bounds.Width / 2);
-                        var trimmed = TrimPreview(ocrTxt, (int)(halfW / 5)); // ~5px per char
-                        var ocrSize = g.MeasureString(trimmed, ocrFont);
-                        var ox = region.Bounds.Right - (int)ocrSize.Width - 3;
-                        if (ox < region.Bounds.Left) ox = region.Bounds.Left + 1;
-                        var oy = region.Bounds.Top + (region.Bounds.Height - (int)ocrSize.Height) / 2;
-                        if (oy < region.Bounds.Top) oy = region.Bounds.Top;
-                        using var ocrBg = new SolidBrush(Color.FromArgb(150, 40, 20, 0));
-                        using var ocrFg = new SolidBrush(Color.Gold);
-                        g.FillRectangle(ocrBg, ox - 1, oy, ocrSize.Width + 2, ocrSize.Height);
-                        g.DrawString(trimmed, ocrFont, ocrFg, ox, oy);
-                    }
-                }
-            }
-
-            using var headerBg = new SolidBrush(Color.FromArgb(170, 0, 0, 0));
-            using var headerFg = new SolidBrush(Color.Cyan);
-            var header = $"a11y-hack {stage}  screen=({screenLeft},{screenTop})  regions={regions.Count}";
-            g.FillRectangle(headerBg, 0, 0, Math.Min(overlay.Width, 760), 24);
-            g.DrawString(header, font, headerFg, 6, 4);
-
-            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-            var path = Path.Combine(baseDir, $"hack-overlay-{stage}-{stamp}.png");
-            overlay.Save(path, ImageFormat.Png);
-            Console.WriteLine($"[HACK] Overlay preview: {path}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[HACK] Overlay preview save failed: {ex.Message}");
-        }
-    }
-
-    static IReadOnlyList<A11yHackOverlayBox> BuildHackOverlayBoxes(
-        List<ConnectedComponentAnalyzer.Region> regions,
-        Dictionary<int, (string name, string type, string aid)>? uiaAnswers = null,
-        Dictionary<int, string>? stageLabels = null)
-    {
-        var boxes = new List<A11yHackOverlayBox>(regions.Count);
-
-        // Determine scope: target's parent (contains target) and siblings (share same parent)
-        var targetBounds = regions.Count > 0 ? regions[0].Bounds : Rectangle.Empty;
-        // Parent = smallest region that fully contains the target (excluding target itself)
-        int parentIdx = -1;
-        long parentArea = long.MaxValue;
-        for (int i = 1; i < regions.Count; i++)
-        {
-            var rb = regions[i].Bounds;
-            if (rb.Contains(targetBounds))
-            {
-                long area = (long)rb.Width * rb.Height;
-                if (area < parentArea) { parentIdx = i; parentArea = area; }
-            }
-        }
-        var parentBounds = parentIdx >= 0 ? regions[parentIdx].Bounds : Rectangle.Empty;
-
-        for (int i = 0; i < regions.Count; i++)
-        {
-            var region = regions[i];
-
-            // Skip tiny segments (smaller than a readable character ~10x10)
-            if (i > 0 && region.Bounds.Width < 10 && region.Bounds.Height < 10)
-                continue;
-
-            var bounds = new System.Windows.Rect(
-                region.Bounds.X,
-                region.Bounds.Y,
-                Math.Max(1, region.Bounds.Width),
-                Math.Max(1, region.Bounds.Height));
-
-            // Determine role
-            bool hasUia = uiaAnswers != null && uiaAnswers.ContainsKey(i);
-            HackBoxRole role;
-            if (i == 0)
-                role = HackBoxRole.Target;
-            else if (i == parentIdx)
-                role = HackBoxRole.Scope;
-            else if (parentIdx >= 0 && parentBounds.Contains(region.Bounds))
-                role = HackBoxRole.Scope;
-            else if (hasUia)
-                role = HackBoxRole.Known; // system a11y node → dashed
-            else
-                continue; // no UIA, not in scope → skip
-
-            // Label: UIA type or Dy type + id + size
-            string? label = null;
-            if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
-            {
-                var idPart = !string.IsNullOrWhiteSpace(uia.aid) ? uia.aid
-                           : !string.IsNullOrWhiteSpace(uia.name) ? TrimPreview(uia.name, 20)
-                           : $"#{i + 1}";
-                var typePart = !string.IsNullOrWhiteSpace(uia.type) ? uia.type : "";
-                label = $"{typePart}_{idPart} {region.Bounds.Width}x{region.Bounds.Height}";
-            }
-            else if (region.Type != ConnectedComponentAnalyzer.RegionType.DyNoise)
-            {
-                // Dy type label for non-UIA segments
-                label = $"{region.Type} {region.Bounds.Width}x{region.Bounds.Height}";
-            }
-
-            // Extract OCR text from stageLabel + promote to Cached if experience DB hit
-            string? ocrText = null;
-            if (stageLabels != null && stageLabels.TryGetValue(i, out var stl) && !string.IsNullOrWhiteSpace(stl))
-            {
-                if (stl.StartsWith("ocr ")) ocrText = stl[4..];
-                else if (stl.StartsWith("fix ")) ocrText = stl[4..];
-                else if (stl.StartsWith("uia ")) ocrText = stl[4..];
-                else if (stl.StartsWith("cache 100% "))
-                {
-                    ocrText = stl[11..];
-                    if (role != HackBoxRole.Target) role = HackBoxRole.Cached;
-                }
-            }
-
-            boxes.Add(new A11yHackOverlayBox(bounds, label, ocrText, role));
-        }
-        return boxes;
-    }
-
-    static void UpdateHackOverlay(
-        A11yHackOverlayHost? liveOverlay,
-        Bitmap source,
-        List<ConnectedComponentAnalyzer.Region> regions,
-        Dictionary<int, (string name, string type, string aid)>? uiaAnswers = null,
-        Dictionary<int, string>? stageLabels = null)
-    {
-        if (liveOverlay == null) return;
-        var boxes = BuildHackOverlayBoxes(regions, uiaAnswers, stageLabels);
-        liveOverlay.Update(new A11yHackOverlayModel(boxes));
-    }
-
-    static string TrimPreview(string text, int maxLen)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return "";
-        text = text.Replace("\r", " ").Replace("\n", " ").Trim();
-        return text.Length <= maxLen ? text : text[..maxLen] + "...";
-    }
-
-    static double CalculateHackTextSimilarity(string a, string b)
-    {
-        var na = NormalizeHackText(a);
-        var nb = NormalizeHackText(b);
-        if (na.Length == 0 || nb.Length == 0) return 0;
-        if (na == nb) return 1.0;
-        if (na.Contains(nb) || nb.Contains(na))
-            return (double)Math.Min(na.Length, nb.Length) / Math.Max(na.Length, nb.Length);
-
-        var tokA = new HashSet<string>(na.Split(' ', StringSplitOptions.RemoveEmptyEntries));
-        var tokB = new HashSet<string>(nb.Split(' ', StringSplitOptions.RemoveEmptyEntries));
-        if (tokA.Count == 0 || tokB.Count == 0) return 0;
-        int intersection = tokA.Count(t => tokB.Contains(t));
-        int union = tokA.Count + tokB.Count - intersection;
-        return union > 0 ? (double)intersection / union : 0;
-    }
-
-    static string NormalizeHackText(string text)
-    {
-        text = text.Normalize(System.Text.NormalizationForm.FormC).ToLowerInvariant();
-        var chars = text.Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c)).ToArray();
-        return new string(chars).Trim();
-    }
-
-    static void CacheSegment(Bitmap source, Rectangle bounds, int imgW, int imgH,
-        string dynId, string description, bool isContainer = false)
-    {
-        try
-        {
-            var cropRect = Rectangle.Intersect(bounds, new Rectangle(0, 0, imgW, imgH));
-            if (cropRect.Width <= 0 || cropRect.Height <= 0) return;
-            using var crop = source.Clone(cropRect, source.PixelFormat);
-            var hash = OcrGapCollector.ComputePixelHash(crop);
-
-            // Build experience DB path
-            var baseDir = _hackExpDir ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "WKAppBot", "gap_cache");
-
-            string targetDir;
-            if (isContainer)
-            {
-                // Container = subfolder in experience DB
-                targetDir = Path.Combine(baseDir, $"hack_{dynId}");
-                _currentContainerDir = targetDir;
-            }
-            else
-            {
-                // Child goes into current container folder, or root if no container
-                targetDir = _currentContainerDir ?? baseDir;
-            }
-
-            Directory.CreateDirectory(targetDir);
-            var desc = description.Length > 50 ? description[..50] : description;
-            foreach (var c in Path.GetInvalidFileNameChars()) desc = desc.Replace(c, '_');
-            desc = desc.Replace('=', '_').Replace('\'', '_');
-            var fileName = $"{dynId}'{hash}={desc}.png";
-            var filePath = Path.Combine(targetDir, fileName);
-            if (!File.Exists(filePath))
-                crop.Save(filePath, ImageFormat.Png);
-        }
-        catch { }
-    }
-
-    static void InitHackExpDir(IntPtr hwnd)
-    {
-        try
-        {
-            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
-            var proc = System.Diagnostics.Process.GetProcessById((int)pid);
-            var procName = proc.ProcessName;
-            var className = "";
-            var sb = new System.Text.StringBuilder(256);
-            NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
-            className = sb.ToString();
-            _hackExpDir = Path.Combine(DataDir, "experience",
-                procName.Length > 0 ? procName : "unknown",
-                className.Length > 0 ? className : "unknown");
-            Directory.CreateDirectory(_hackExpDir);
-            _currentContainerDir = null;
-            Console.Error.WriteLine($"[HACK] ExpDB: {_hackExpDir}");
-        }
-        catch { }
     }
 }
 
