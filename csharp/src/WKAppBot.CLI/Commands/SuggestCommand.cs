@@ -427,8 +427,11 @@ internal partial class Program
         }
 
         Console.WriteLine(new string('─', 100));
-        Console.WriteLine($"  🔗 = Slack ts recorded  |  resolve: wkappbot suggest resolve <ts> \"note\"");
-        Console.WriteLine($"  merge: wkappbot suggest merge --all-matching \"pattern\" --title \"title\" --work \"1h\"");
+        Console.WriteLine($"  resolve: wkappbot suggest resolve <ts> \"note\" --i-completed-... <test.sh>");
+        Console.WriteLine($"  merge:   wkappbot suggest merge --all-matching \"pattern\" --title \"title\" --work \"1h\"");
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"  >> 쉬운 것 / 긴급한 것부터 즉시 작업 시작! 중복은 merge로 정리하세요.");
+        Console.ResetColor();
         return 0;
     }
 
