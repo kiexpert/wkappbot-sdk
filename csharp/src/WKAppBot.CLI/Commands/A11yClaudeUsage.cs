@@ -100,7 +100,7 @@ internal partial class Program
                     {
                         var fi = new FileInfo(jsonl);
                         fileSize = fi.Length;
-                        pct = (int)(fileSize / (40.0 * 1024 * 1024) * 100);
+                        pct = (int)(fileSize / (20.0 * 1024 * 1024) * 100);
                     }
                 }
             }
