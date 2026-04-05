@@ -40,6 +40,9 @@ internal partial class Program
             try { File.AppendAllText(logPath, line + Environment.NewLine, Encoding.UTF8); } catch { }
         }
 
+        // Force UTF-8 console output (CP949 default breaks Korean UIA names)
+        try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
+
         Log($"Worker started (PID={Environment.ProcessId}, parent={parentPid})");
 
         // Start analyze-hack server
