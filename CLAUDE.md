@@ -1,4 +1,4 @@
-# WKAppBot v5.10.0 - Windows + Android App Automation Test Framework
+# WKAppBot v5.11.0 - Windows + Android App Automation Test Framework
 
 ## 클롣 운영 규칙 (필독!)
 
@@ -68,7 +68,21 @@ Eye ↔ MCP 워커(Core) JSON-RPC over pipe. a11y/UIA를 별도 프로세스로 
 UIA 없는 MFC owner-drawn → CCA 세그멘테이션 → OCR 3중 교차검증 → Gemini Vision 추론
 → `dyn_r{row}c{col}` 동적 ID + Experience DB 캐시 + CCA 파라미터 자동 튜닝
 
-### v5.10 신규 (2026-04-04)
+### v5.11 신규 (2026-04-05)
+- **TargetAmbiguityGuard 6-Layer**: AI를 위한 타겟 모호성 감지 + 자동 안내 시스템
+  - L1: 모호 패턴 다중 윈도우 매칭 → 목록 + `[OK]` 검증 + hwnd 오토힐
+  - L2: 모달 알러트 차단 → 알러트 내부 auto-find (UIA + Win32 버튼)
+  - L3: FOCUSED/LEAF 말단 노드 → 모든 명령에서 grap 타겟 안내
+  - L4: Win32 자식창 미발견 → 형제 윈도우 리스팅 (MFC/HTS)
+  - L5: #scope 없는 element action → 루트 자식 + 포커스 체인
+  - L6: UIA scope 요소 미발견 → 사용 가능 요소 리스팅
+- **CDP fixed delay → state-based polling**: 삼두 합의 구현
+  - `WaitForWindowStateAsync` 공용 헬퍼 (50ms 간격 windowState 폴링)
+  - SetWindowBoundsAsync, EnsureMinimizedAsync, SwitchToTargetAsync, EnsureCorrectWindowAsync 전부 교체
+  - WebOpenCommand: Thread.Sleep(1-2s) → document.readyState 폴링
+- **BuildTargetJson5 개선**: title 50자 truncate, 말줄임표 제거 (substring 매칭 보장)
+
+### v5.10 (2026-04-04)
 - **Eye 파이프 100ms 타임아웃**: `firstOutputTimeoutMs` — slack/ask/newchat 제외 대부분 명령에 적용. Eye 느리면 Core로 자동 전환
 - **TryRenameSwap 공용 함수**: Eye 메인루프 + 스타트업 gentle-swap + `wkappbot hotswap` CLI — 동일 로직 공유
 - **OcrCorrectionDb**: pixel-hash → 정답 매핑 자기학습 사전 (WKAppBot.Vision). UIA 검증 자동 학습, OCR 결과 자동 보정
