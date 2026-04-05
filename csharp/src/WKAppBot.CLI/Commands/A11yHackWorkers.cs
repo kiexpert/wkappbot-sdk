@@ -179,9 +179,22 @@ internal partial class Program
                     try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
                 }
 
-                // Blind window (no UIA label, no patterns) → immediate hack (experience DB build)
-                // Normal → 9s idle debounce
-                bool isBlind = string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns);
+                // Blind = no UIA info OR no experience DB layout for this window
+                // → immediate hack (experience DB build, uncancellable)
+                bool uiaBlind = string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns);
+                bool expMissing = false;
+                if (!uiaBlind) // UIA has info, but check experience DB for window layout
+                {
+                    try
+                    {
+                        var clsBuf = new System.Text.StringBuilder(256);
+                        NativeMethods.GetClassNameW(hwnd, clsBuf, clsBuf.Capacity);
+                        var expDir = Path.Combine(DataDir, "experience", proc, clsBuf.ToString());
+                        expMissing = !Directory.Exists(expDir) || Directory.GetFiles(expDir, "*.png").Length == 0;
+                    }
+                    catch { }
+                }
+                bool isBlind = uiaBlind || expMissing;
                 if (changed)
                 {
                     if (!isBlind) _hackHoverAnalyzeCts?.Cancel(); // don't cancel blind hack
