@@ -258,16 +258,17 @@ internal partial class Program
                                         var rootEl = uia.FromHandle(rootHwnd);
                                         if (rootEl != null)
                                         {
-                                            var children = rootEl.FindAllChildren();
-                                            foreach (var ch in children)
+                                            // Full descendant scan — show all known nodes
+                                            var descendants = rootEl.FindAllDescendants();
+                                            foreach (var ch in descendants)
                                             {
+                                                if (_hoverUiaBoxes.Count >= 500) break; // safety cap
                                                 try
                                                 {
                                                     var cr = ch.BoundingRectangle;
                                                     if (cr.Width < 5 || cr.Height < 5) continue;
-                                                    string cName = "", cAid = "", cType = "?";
-                                                    try { cName = ch.Name ?? ""; } catch { }
-                                                    try { cAid = ch.AutomationId ?? ""; } catch { }
+                                                    if (cr.X < rootWr.Left - 10 || cr.Y < rootWr.Top - 10) continue; // off-screen
+                                                    string cType = "?";
                                                     try { cType = ch.ControlType.ToString(); } catch { }
                                                     _hoverUiaBoxes.Add(new A11yHackOverlayBox(
                                                         new System.Windows.Rect(
