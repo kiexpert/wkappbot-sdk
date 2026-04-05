@@ -259,7 +259,7 @@ internal partial class Program
                 var cdp = new CdpClient();
                 try
                 {
-                    await cdp.ConnectAsync(port, timeoutMs: 5000);
+                    await cdp.ConnectAsync(port, timeoutMs: 5000, preferredTargetTag: preferredHost);
                 }
                 catch (Exception firstEx)
                 {
@@ -282,7 +282,7 @@ internal partial class Program
                     var launchUrl2 = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
                     await ChromeLauncher.LaunchAsync(port: port, url: launchUrl2);
                     await Task.Delay(3000);
-                    await cdp.ConnectAsync(port, timeoutMs: 10000);
+                    await cdp.ConnectAsync(port, timeoutMs: 10000, preferredTargetTag: preferredHost);
                 }
 
                 // ── Pre-minimize Chrome BEFORE any tab action (prevent focus steal) ──
