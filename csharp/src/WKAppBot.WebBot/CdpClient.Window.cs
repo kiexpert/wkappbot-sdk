@@ -342,9 +342,20 @@ public sealed partial class CdpClient
                 ["windowId"] = windowId,
                 ["bounds"] = new JsonObject { ["windowState"] = "normal" }
             });
+            // Poll until windowState is "normal" (replaces fragile 50ms fixed delay)
+            for (int poll = 0; poll < 20; poll++) // max 2s (20 × 100ms)
+            {
+                await Task.Delay(100);
+                try
+                {
+                    var wb = await SendAsync("Browser.getWindowBounds", new JsonObject { ["windowId"] = windowId });
+                    var state = wb?["bounds"]?["windowState"]?.GetValue<string>();
+                    if (state == "normal") break;
+                }
+                catch { break; }
+            }
             var restoreMs = sw.ElapsedMilliseconds;
-            await Task.Delay(50);
-            // Now set actual bounds
+            // Now set actual bounds (window confirmed normal)
             await SendAsync("Browser.setWindowBounds", new JsonObject
             {
                 ["windowId"] = windowId,

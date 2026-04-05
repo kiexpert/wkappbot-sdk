@@ -229,16 +229,20 @@ public sealed partial class CdpClient
                 "}catch(_e){}" +
                 "return 'NO_SEND_PATH';" +
             "};" +
-            "var st=root.states[sel]||(root.states[sel]={interval:0,lastResult:'',locked:false,ticks:0});" +
+            "var st=root.states[sel]||(root.states[sel]={interval:0,lastResult:'',locked:false,ticks:0,lastHash:0});" +
+            // Simple hash function for content change detection
+            "if(!root.hash)root.hash=function(s){var h=0;for(var i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0;return h;};" +
             // Start periodic tick if not already running (single setInterval per editor)
             "if(!st.interval){st.interval=setInterval(function(){" +
                 "var cur=root.states[sel];if(!cur||cur.locked)return;" +
                 "var el=document.querySelector(sel);if(!el)return;" +
                 "var txt=((el.value||el.innerText||el.textContent||'')).trim();" +
-                "if(!txt){cur.ticks=0;return;}" + // empty → reset counter
-                "cur.ticks++;" + // content present → count up
-                "if(cur.ticks>=2){" + // 2 ticks × 500ms = 1s of content presence
-                    "cur.lastResult=root.trySend(sel);cur.ticks=0;" + // submit + reset
+                "if(!txt){cur.ticks=0;cur.lastHash=0;return;}" + // empty → reset
+                "var h=root.hash(txt);" +
+                "if(h!==cur.lastHash){cur.ticks=0;cur.lastHash=h;return;}" + // content changed → reset ticks
+                "cur.ticks++;" + // content stable → count up
+                "if(cur.ticks>=2){" + // 2 ticks × 500ms = 1s of STABLE content
+                    "cur.lastResult=root.trySend(sel);cur.ticks=0;cur.lastHash=0;" +
                 "}" +
             "}, 500);}" + // 500ms tick
             "return 'ARMED';" +
