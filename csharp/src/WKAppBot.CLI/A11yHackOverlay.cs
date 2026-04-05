@@ -44,7 +44,7 @@ internal sealed class A11yHackOverlayWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false;
         ResizeMode = ResizeMode.NoResize;
-        Opacity = 0.92;
+        Opacity = 0.5;
         _canvas = new Canvas { Background = Brushes.Transparent, IsHitTestVisible = false };
         Content = _canvas;
     }
