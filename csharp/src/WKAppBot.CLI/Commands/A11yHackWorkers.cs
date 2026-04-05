@@ -12,7 +12,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    static volatile string _hackHoverDebounceGrap = "";
+    static volatile int _hackHoverDebounceSeq;
 
     static int A11yHackHoverWorker(string[] args)
     {
@@ -67,10 +67,10 @@ internal partial class Program
         if (timeoutSec > 0)
             Task.Run(async () => { await Task.Delay(timeoutSec * 1000); Log($"Timeout {timeoutSec}s — exiting"); cts.Cancel(); });
 
-        // Main loop: mouse/focus → server pipe → console output
+        // Main loop: mouse/focus → UIA → console output
         string lastResult = "";
-        string lastNodeKey = "";
         int loopCount = 0;
+        int lastMouseX = -1, lastMouseY = -1;
 
         Log("Loop started — monitoring mouse/focus");
 
@@ -94,7 +94,12 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 if (hwnd == IntPtr.Zero) continue;
 
-                // No early skip — always compute UIA, compare result after
+                // Mouse moved? → reset debounce timer
+                if (pt.X != lastMouseX || pt.Y != lastMouseY)
+                {
+                    lastMouseX = pt.X; lastMouseY = pt.Y;
+                    _hackHoverDebounceSeq++; // cancel any pending analysis
+                }
 
                 // Direct UIA: find element at mouse position
                 var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -125,8 +130,16 @@ internal partial class Program
                 if (elName.Length > 30) elName = elName[..30];
                 if (winTitle.Length > 40) winTitle = winTitle[..40];
                 var elLabel = !string.IsNullOrEmpty(elAid) ? elAid : elName;
-                grapPath = $"*{winTitle}*" + (!string.IsNullOrEmpty(elLabel) ? $"#*{elLabel}*" : "");
-                var result = $"{grapPath} [{elType}]";
+                // Build targetable grap using JSON5 (hwnd-based = always works)
+                var json5 = WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(hwnd);
+                grapPath = !string.IsNullOrEmpty(elLabel) ? $"{json5}#*{elLabel}*" : json5;
+
+                // Verify: can we actually target this?
+                var verifyHits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(json5, true);
+                bool verified = verifyHits.Any(v => v.Handle == hwnd);
+                var mark = verified ? "OK" : "MISS";
+
+                var result = $"{grapPath} [{elType}] {mark}";
 
                 // Change detection on result
                 if (result == lastResult) continue;
@@ -134,22 +147,22 @@ internal partial class Program
 
                 // Console output — \r overwrite for live status
                 var elMs = sw.ElapsedMilliseconds;
-                var statusLine = $"#{loopCount} {elMs}ms [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}){(!string.IsNullOrEmpty(elPatterns) ? $" [{elPatterns}]" : "")}";
-                if (statusLine.Length > 115) statusLine = statusLine[..115];
-                Console.Write($"\r{statusLine.PadRight(120)}\r");
+                var statusLine = $"#{loopCount} {elMs}ms [{elType}] \"{elLabel}\" [{mark}] ({pt.X},{pt.Y}){(!string.IsNullOrEmpty(elPatterns) ? $" {elPatterns}" : "")}";
+                if (statusLine.Length > 120) statusLine = statusLine[..120];
+                Console.Write($"\r{statusLine.PadRight(125)}\r");
 
                 // Detailed log (file only, on change)
                 var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                var logLine = $"[{ts2}] [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}) {elPatterns} -> {grapPath}";
+                var logLine = $"[{ts2}] [{mark}] [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}) {elPatterns} -> {grapPath}";
                 try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
 
-                // Debounce: wait 9s stable before starting heavy analysis
+                // Debounce: 9s mouse idle before starting heavy analysis
                 var hackGrap = grapPath;
-                _hackHoverDebounceGrap = hackGrap;
+                var debounceStamp = ++_hackHoverDebounceSeq;
                 _ = Task.Run(async () =>
                 {
                     await Task.Delay(9000);
-                    if (_hackHoverDebounceGrap != hackGrap) return; // changed during wait
+                    if (_hackHoverDebounceSeq != debounceStamp) return; // mouse moved during wait
                     Console.WriteLine(); // newline after \r status
                     Log($"Analyzing: {hackGrap}");
                     try { A11yHackCommand(new[] { hackGrap }); }
