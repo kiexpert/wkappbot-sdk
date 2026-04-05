@@ -125,9 +125,13 @@ internal partial class Program
                         {
                             Log("[HOTSWAP] Binary swapped, restarting...");
                             Console.WriteLine($"\n[HOTSWAP] Restarting with new version...");
+                            // Spawn Launcher (wkappbot.exe), not Core — preserves normal pipe chain
+                            var launcherDir = Path.GetDirectoryName(corePath) ?? "";
+                            var launcherPath = Path.Combine(launcherDir, "wkappbot.exe");
+                            if (!File.Exists(launcherPath)) launcherPath = corePath; // fallback
                             var psi = new System.Diagnostics.ProcessStartInfo
                             {
-                                FileName = corePath,
+                                FileName = launcherPath,
                                 UseShellExecute = false,
                             };
                             psi.ArgumentList.Add("a11y");
