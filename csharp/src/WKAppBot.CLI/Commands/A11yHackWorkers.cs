@@ -131,6 +131,8 @@ internal partial class Program
                 catch { }
 
                 if (elName.Length > 30) elName = elName[..30];
+                // ASCII-safe title (strip non-ASCII to avoid encoding corruption)
+                winTitle = new string(winTitle.Where(c => c >= 0x20 && c < 0x7F).ToArray());
                 if (winTitle.Length > 40) winTitle = winTitle[..40];
                 var elLabel = !string.IsNullOrEmpty(elAid) ? elAid : elName;
                 // Build targetable grap using JSON5 (hwnd-based = always works)
