@@ -14,7 +14,6 @@ internal partial class Program
 {
     static volatile int _hackHoverDebounceSeq;
     static volatile bool _hackHoverAnalyzing;
-    internal static volatile bool _hackHoverQuiet; // suppress [HACK] console noise when called from hover
     static CancellationTokenSource? _hackHoverAnalyzeCts;
 
     static int A11yHackHoverWorker(string[] args)
@@ -182,10 +181,9 @@ internal partial class Program
                         if (_hackHoverDebounceSeq != debounceStamp) return;
                         Console.WriteLine($"\n[ANALYZING] {hackGrap}");
                         _hackHoverAnalyzing = true;
-                        _hackHoverQuiet = true; // suppress [HACK] noisy output
                         try { A11yHackCommand(new[] { hackGrap }); }
                         catch (Exception hex) { Log($"Hack error: {hex.Message}"); }
-                        finally { _hackHoverAnalyzing = false; _hackHoverQuiet = false; }
+                        finally { _hackHoverAnalyzing = false; }
                     });
                 }
             }

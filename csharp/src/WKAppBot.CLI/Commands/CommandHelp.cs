@@ -483,6 +483,8 @@ internal partial class Program
 
         ["clipboard"] = "clipboard [read|write] [text]\nRead or write system clipboard.\nNo args: read. With text: write.",
 
+        ["speak"] = "speak \"text\" [--bg] [--mouse] [--target <grap>] [--size N]\nWindows TTS voice output + karaoke overlay.\n--bg: background (return immediately).\n--mouse: overlay at cursor position.\n--target <grap>: overlay on specified window.\n--size N: font size px (default 32).",
+
         ["screen"] = "screen blank [--duration N] | restore\nBlank all monitors (privacy/automation). Auto-restore after N seconds.",
 
         ["hotswap"] = "hotswap\nManually trigger Eye hot-swap check (normally automatic on publish).",
