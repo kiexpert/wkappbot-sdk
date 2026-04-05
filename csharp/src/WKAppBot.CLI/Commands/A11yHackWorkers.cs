@@ -82,6 +82,7 @@ internal partial class Program
         string lastResult = "";
         string lastGrap = "";
         var _hoverUiaBoxes = new List<A11yHackOverlayBox>();
+        string _lastOverlayHash = "";
         int loopCount = 0;
         int lastMouseX = -1, lastMouseY = -1;
         using var uia = new FlaUI.UIA3.UIA3Automation(); // reuse — avoid 4s init per loop
@@ -283,7 +284,13 @@ internal partial class Program
                                     catch { }
                                 }
                                 boxes.AddRange(_hoverUiaBoxes);
-                                overlay.Update(new A11yHackOverlayModel(boxes));
+                                // Skip render if boxes unchanged (avoid flicker on FSW noise)
+                                var hash = string.Join("|", boxes.Select(b => $"{b.Bounds}{b.Label}{b.Role}"));
+                                if (hash != _lastOverlayHash)
+                                {
+                                    _lastOverlayHash = hash;
+                                    overlay.Update(new A11yHackOverlayModel(boxes));
+                                }
                             }
                         }
                     }
