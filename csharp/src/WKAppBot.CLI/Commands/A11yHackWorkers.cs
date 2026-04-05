@@ -148,17 +148,15 @@ internal partial class Program
                 }
                 var compactGrap = !string.IsNullOrEmpty(elLabel) ? $"{json5Short}#*{elLabel}*" : json5Short;
 
+                // Always output (0.1s interval), include mouse coords
+                var elMs = sw.ElapsedMilliseconds;
+                var richGrap = $"{{hwnd:0x{hwnd.ToInt64():X8},pid:{pid},proc:'{proc}'}}";
+                if (!string.IsNullOrEmpty(elLabel))
+                    richGrap += $"#*{elLabel}*";
+                Console.WriteLine($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})");
+
                 bool changed = result != lastResult;
-                if (changed)
-                {
-                    lastResult = result;
-                    var elMs = sw.ElapsedMilliseconds;
-                    // All info baked into grap: {hwnd,pid,proc}#*[Type]elLabel*
-                    var richGrap = $"{{hwnd:0x{hwnd.ToInt64():X8},pid:{pid},proc:'{proc}'}}";
-                    if (!string.IsNullOrEmpty(elLabel))
-                        richGrap += $"#*{elLabel}*";
-                    Console.WriteLine($"{richGrap} [{mark}] {elMs}ms");
-                }
+                if (changed) lastResult = result;
 
                 // Detailed log (file only, on change)
                 if (changed)
