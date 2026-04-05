@@ -1027,6 +1027,32 @@ internal partial class Program
                             catch { }
                         }
                         Console.Error.WriteLine($"[A11Y] UIA scope not found: \"{uiaPath}\" in {tag}");
+                        // Auto-find: show available children so user can pick the right element
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"[A11Y] \"{uiaPath}\" 요소 없음 -> find 자동 전환. 사용 가능한 요소:");
+                        Console.ResetColor();
+                        try
+                        {
+                            var children = root.FindAllChildren();
+                            int shown = 0;
+                            foreach (var child in children)
+                            {
+                                if (shown >= 15) { Console.WriteLine($"     ... (+{children.Length - shown}개)"); break; }
+                                var cType = "?"; try { cType = child.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                                var cName = child.Properties.Name.ValueOrDefault ?? "";
+                                var cAid = child.Properties.AutomationId.ValueOrDefault ?? "";
+                                if (cName.Length > 40) cName = cName[..40];
+                                var cLabel = !string.IsNullOrEmpty(cAid) ? cAid : cName;
+                                if (string.IsNullOrEmpty(cLabel)) { shown++; continue; }
+                                var winJson5 = WindowFinder.BuildTargetJson5(hwnd);
+                                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                                Console.WriteLine($"     {cType}(\"{cLabel}\") -> a11y {action} \"{winJson5}#*{cLabel}*\"");
+                                Console.ResetColor();
+                                shown++;
+                            }
+                        }
+                        catch { }
+                        Console.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
                         fail++;
                         continue;
                     }
