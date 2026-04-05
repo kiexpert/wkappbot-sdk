@@ -640,13 +640,103 @@ internal partial class Program
             Console.WriteLine($"[A11Y] TARGET: {WindowFinder.BuildTargetJson5(t.Handle)}");
         Console.ResetColor();
 
-        // ═══ STEP 4.5: Hot focus chain (show on all actions) ═══
+        // ═══ STEP 4.5: Focused leaf node → target suggestion (all actions) ═══
+        // Find focused element WITHIN the target window (not OS-global focus)
         try
         {
-            using var uiaFocus = new UiaLocator();
-            var focusChain = uiaFocus.GetFocusChain(targets[0].Handle);
-            if (!string.IsNullOrEmpty(focusChain))
-                Console.Error.Write(focusChain);
+            using var uiaFocAuto = new UIA3Automation();
+            var targetRoot = uiaFocAuto.FromHandle(targets[0].Handle);
+            // Strategy 1: OS focused element if it belongs to this window's process
+            FocusedElementInfo? focLeaf = null;
+            using var uiaFocLoc = new UiaLocator();
+            var osFocus = uiaFocLoc.GetFocusedElementInfo();
+            NativeMethods.GetWindowThreadProcessId(targets[0].Handle, out uint focWinPid);
+            if (osFocus != null && osFocus.ProcessId == (int)focWinPid)
+                focLeaf = osFocus;
+
+            // Strategy 2: Walk target window's UIA tree to find deepest leaf with keyboard focus
+            if (focLeaf == null)
+            {
+                try
+                {
+                    var walker = uiaFocAuto.TreeWalkerFactory.GetRawViewWalker();
+                    AutomationElement? deepest = null;
+                    string dType = "", dName = "", dAid = "";
+                    var patterns = new List<string>();
+                    void WalkForFocus(AutomationElement el, int depth)
+                    {
+                        if (depth > 15) return;
+                        try
+                        {
+                            var child = walker.GetFirstChild(el);
+                            while (child != null)
+                            {
+                                var name = child.Properties.Name.ValueOrDefault ?? "";
+                                var aid = child.Properties.AutomationId.ValueOrDefault ?? "";
+                                if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(aid))
+                                {
+                                    deepest = child;
+                                    dType = child.Properties.ControlType.ValueOrDefault.ToString();
+                                    dName = name; dAid = aid;
+                                    patterns.Clear();
+                                    try { if (child.Patterns.Invoke.IsSupported) patterns.Add("Invoke"); } catch { }
+                                    try { if (child.Patterns.Value.IsSupported) patterns.Add("Value"); } catch { }
+                                    try { if (child.Patterns.Toggle.IsSupported) patterns.Add("Toggle"); } catch { }
+                                }
+                                bool hasFocus = false;
+                                try { hasFocus = child.Patterns.SelectionItem.IsSupported && child.Patterns.SelectionItem.Pattern.IsSelected; } catch { }
+                                if (hasFocus || !string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(aid))
+                                    WalkForFocus(child, depth + 1);
+                                child = walker.GetNextSibling(child);
+                            }
+                        }
+                        catch { }
+                    }
+                    WalkForFocus(targetRoot, 0);
+                    if (deepest != null)
+                    {
+                        var label = !string.IsNullOrEmpty(dAid) ? dAid : dName;
+                        if (label.Length > 40) label = label[..40];
+                        var focJson5 = WindowFinder.BuildTargetJson5(targets[0].Handle);
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.Write($"[A11Y] LEAF: {dType}(\"{label}\")");
+                        if (patterns.Count > 0) Console.Write($" [{string.Join(",", patterns)}]");
+                        Console.WriteLine();
+                        Console.ResetColor();
+                        if (!string.IsNullOrEmpty(label))
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkGreen;
+                            Console.WriteLine($"[A11Y] LEAF TARGET: a11y {action} \"{focJson5}#*{label}*\"");
+                            Console.ResetColor();
+                        }
+                    }
+                }
+                catch { }
+            }
+            else
+            {
+                // OS focus is in our target window — show leaf + parent chain
+                var fLabel = !string.IsNullOrEmpty(focLeaf.AutomationId) ? focLeaf.AutomationId : focLeaf.Name;
+                if (fLabel.Length > 40) fLabel = fLabel[..40];
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Write($"[A11Y] FOCUSED: {focLeaf.ControlType}(\"{fLabel}\")");
+                if (focLeaf.Patterns.Count > 0) Console.Write($" [{string.Join(",", focLeaf.Patterns)}]");
+                Console.WriteLine();
+                foreach (var (pType, pName) in focLeaf.ParentChain)
+                {
+                    if (string.IsNullOrEmpty(pName)) continue;
+                    Console.Write($"         <- {pType}(\"{pName}\")");
+                    Console.WriteLine();
+                }
+                Console.ResetColor();
+                if (!string.IsNullOrEmpty(fLabel))
+                {
+                    var focJson5 = WindowFinder.BuildTargetJson5(targets[0].Handle);
+                    Console.ForegroundColor = ConsoleColor.DarkGreen;
+                    Console.WriteLine($"[A11Y] FOCUSED TARGET: a11y {action} \"{focJson5}#*{fLabel}*\"");
+                    Console.ResetColor();
+                }
+            }
         }
         catch { /* best effort */ }
 
