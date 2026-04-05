@@ -498,26 +498,48 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"[A11Y] \"{grap}\" -> {allWindows.Count}개 매칭. 정확한 타겟을 지정하세요:");
             Console.ResetColor();
+
+            // Get focused UIA element info (applies to foreground window only)
+            FocusedElementInfo? focusInfo = null;
+            try { using var uiaLoc = new UiaLocator(); focusInfo = uiaLoc.GetFocusedElementInfo(); }
+            catch { }
+
             for (int idx = 0; idx < allWindows.Count; idx++)
             {
                 var w = allWindows[idx];
                 var r = w.Rect;
+                NativeMethods.GetWindowThreadProcessId(w.Handle, out uint wpid);
                 string proc;
-                try
-                {
-                    NativeMethods.GetWindowThreadProcessId(w.Handle, out uint wpid);
-                    proc = System.Diagnostics.Process.GetProcessById((int)wpid).ProcessName;
-                }
+                try { proc = System.Diagnostics.Process.GetProcessById((int)wpid).ProcessName; }
                 catch { proc = "?"; }
-                var json5 = WindowFinder.BuildTargetJson5(w.Handle);
+
+                // Truncate title for display (no ellipsis — keeps pattern-matchable)
+                var title = w.Title.Length > 50 ? w.Title[..50] : w.Title;
+
+                // Summary line: index, proc, class, title, size
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.Write($"  {idx + 1}. ");
                 Console.ResetColor();
                 Console.Write($"{proc} ");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"[{w.ClassName}] ");
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.Write($"\"{w.Title}\"");
+                Console.Write($"\"{title}\"");
                 Console.ResetColor();
                 Console.WriteLine($" ({r.Right - r.Left}x{r.Bottom - r.Top})");
+
+                // Focused UIA node (only for the window that owns the focus)
+                if (focusInfo != null && focusInfo.ProcessId == (int)wpid)
+                {
+                    var fDesc = focusInfo.AutomationId != "" ? focusInfo.AutomationId : focusInfo.Name;
+                    if (fDesc.Length > 40) fDesc = fDesc[..40] + "...";
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.WriteLine($"     [FOCUS] {focusInfo.ControlType}(\"{fDesc}\"){(focusInfo.Patterns.Count > 0 ? " " + string.Join(",", focusInfo.Patterns) : "")}");
+                    Console.ResetColor();
+                }
+
+                // Precise grap command
+                var json5 = WindowFinder.BuildTargetJson5(w.Handle);
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
                 Console.WriteLine($"     a11y {action} \"{json5}\"");
                 Console.ResetColor();
