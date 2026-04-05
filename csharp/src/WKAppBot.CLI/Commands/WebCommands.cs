@@ -583,7 +583,22 @@ Options:
         if (!string.IsNullOrEmpty(url))
         {
             if (freshLaunch)
-                Thread.Sleep(appMode ? 2000 : 1000); // App mode needs extra time for initial load
+            {
+                // Wait for Chrome renderer to be responsive instead of fixed 1-2s sleep.
+                // Runtime.enable is already done by ConnectCdp; verify eval works.
+                var rdySw = System.Diagnostics.Stopwatch.StartNew();
+                for (int i = 0; i < 20; i++) // max 2s (20 × 100ms)
+                {
+                    try
+                    {
+                        var rs = cdp.EvalAsync("document.readyState").GetAwaiter().GetResult();
+                        if (!string.IsNullOrEmpty(rs)) break;
+                    }
+                    catch { }
+                    Thread.Sleep(100);
+                }
+                Console.Error.WriteLine($"[WEB] Chrome renderer ready in {rdySw.ElapsedMilliseconds}ms");
+            }
 
             {
                 Console.Write($"[WEB] Navigating to {url}... ");
