@@ -496,7 +496,7 @@ internal partial class Program
         if (!isSpecificPattern && allWindows.Count > 1 && !all && nthRaw == null)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[A11Y] \"{grap}\" -> {allWindows.Count}개 매칭. 정확한 타겟을 지정하세요:");
+            Console.WriteLine($"[A11Y] \"{grap}\" -> {allWindows.Count}개 매칭 -> find 자동 전환. 정확한 타겟을 지정하세요:");
             Console.ResetColor();
 
             // Get focused UIA element info (applies to foreground window only)
@@ -529,22 +529,25 @@ internal partial class Program
                 Console.WriteLine($" ({r.Right - r.Left}x{r.Bottom - r.Top})");
 
                 // Focused UIA node (only for the window that owns the focus)
+                string? focusScope = null;
                 if (focusInfo != null && focusInfo.ProcessId == (int)wpid)
                 {
-                    var fDesc = focusInfo.AutomationId != "" ? focusInfo.AutomationId : focusInfo.Name;
-                    if (fDesc.Length > 40) fDesc = fDesc[..40] + "...";
+                    var fId = focusInfo.AutomationId != "" ? focusInfo.AutomationId : focusInfo.Name;
+                    if (fId.Length > 40) fId = fId[..40];
+                    focusScope = fId;
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"     [FOCUS] {focusInfo.ControlType}(\"{fDesc}\"){(focusInfo.Patterns.Count > 0 ? " " + string.Join(",", focusInfo.Patterns) : "")}");
+                    Console.WriteLine($"     [FOCUS] {focusInfo.ControlType}(\"{fId}\"){(focusInfo.Patterns.Count > 0 ? " " + string.Join(",", focusInfo.Patterns) : "")}");
                     Console.ResetColor();
                 }
 
-                // Precise grap command
+                // Precise grap command (append #focusScope for combined target)
                 var json5 = WindowFinder.BuildTargetJson5(w.Handle);
+                var fullTarget = focusScope != null ? $"{json5}#*{focusScope}*" : json5;
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.WriteLine($"     a11y {action} \"{json5}\"");
+                Console.WriteLine($"     a11y {action} \"{fullTarget}\"");
                 Console.ResetColor();
             }
-            Console.WriteLine($"[A11Y] Tip: --all 또는 --nth 1 으로 강제 실행 가능");
+            Console.WriteLine($"[A11Y] Tip: a11y find \"<target>\" 으로 상세 탐색 / --all 또는 --nth 1 으로 강제 실행");
             return 1;
         }
 
