@@ -310,39 +310,38 @@ internal partial class Program
                 }
 
                 _lastLiveHackGrap = currentGrap;
-                var corePath = Environment.ProcessPath ?? "wkappbot";
-                var cwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory;
-                // WKAPPBOT_WORKER=1: suppress per-command TeeTextWriter log (noise).
-                // Auto-hack results go to eye-analysis-trace.jsonl instead of individual files.
-                var spawn = AppBotPipe.Spawn(corePath, $"a11y hack \"{EscapeCmdArg(currentGrap)}\"",
-                    cwd, showNoActivate: true, caller: "EYE-A11Y",
-                    env: new() { ["WKAPPBOT_WORKER"] = "1" });
-                if (spawn == null)
-                {
-                    AppendEyeAnalysisTrace("auto-hack-error", new
-                    {
-                        reason = "live-spawn-failed",
-                        grapPath = currentGrap,
-                        source = currentSource
-                    });
-                    return;
-                }
 
+                // In-process hack: call A11yHackCommand directly (no spawn)
+                // This runs the overlay in the same process — no extra PID needed.
                 lock (_liveHackLock)
                 {
-                    if (debounceCts != _liveHackDebounceCts)
+                    if (debounceCts != _liveHackDebounceCts) return;
+                    if (_liveHackProcess is { HasExited: false })
                     {
-                        try { spawn.Kill(); } catch { }
-                        try { spawn.Dispose(); } catch { }
-                        return;
+                        try { _liveHackProcess.Kill(); } catch { }
+                        try { _liveHackProcess.Dispose(); } catch { }
+                        _liveHackProcess = null;
                     }
-                    _liveHackProcess = spawn;
                 }
 
-                HackLog($"[AUTO-HACK] Live overlay spawned (pid={spawn.Pid}) {currentSource}: {currentGrap}");
+                HackLog($"[AUTO-HACK] In-process hack: {currentSource}: {currentGrap}");
+                try
+                {
+                    // Run hack command in-process on a background thread (non-blocking)
+                    var hackArgs = new[] { currentGrap };
+                    _ = Task.Run(() =>
+                    {
+                        try { A11yHackCommand(hackArgs); }
+                        catch (Exception hex) { HackLog($"[AUTO-HACK] Hack error: {hex.Message}"); }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    AppendEyeAnalysisTrace("auto-hack-error", new { reason = "in-process-failed", error = ex.Message });
+                }
                 AppendEyeAnalysisTrace("auto-hack-live", new
                 {
-                    pid = spawn.Pid,
+                    pid = Environment.ProcessId,
                     grapPath = currentGrap,
                     source = currentSource,
                     headline = currentHeadline
