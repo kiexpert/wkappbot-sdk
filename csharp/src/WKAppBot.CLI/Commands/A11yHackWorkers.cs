@@ -144,13 +144,24 @@ internal partial class Program
 
                 var result = $"{grapPath} [{elType}] {mark}";
 
-                // Console: only print on change (no flicker)
+                // Console: compact for non-browser, full JSON5 for browser only
+                var json5Short = json5;
+                // Non-browser: strip domain/url (already filtered in BuildTargetJson5)
+                // Further compact: just hwnd + proc for readability
+                if (!json5.Contains("domain:"))
+                {
+                    NativeMethods.GetWindowThreadProcessId(hwnd, out uint cpid);
+                    string cproc; try { cproc = System.Diagnostics.Process.GetProcessById((int)cpid).ProcessName; } catch { cproc = "?"; }
+                    json5Short = $"{{hwnd:0x{hwnd.ToInt64():X8},proc:'{cproc}'}}";
+                }
+                var compactGrap = !string.IsNullOrEmpty(elLabel) ? $"{json5Short}#*{elLabel}*" : json5Short;
+
                 bool changed = result != lastResult;
                 if (changed)
                 {
                     lastResult = result;
                     var elMs = sw.ElapsedMilliseconds;
-                    Console.WriteLine($"[{mark}] {elMs}ms {grapPath}");
+                    Console.WriteLine($"{compactGrap} [{mark}] {elMs}ms");
                 }
 
                 // Detailed log (file only, on change)
