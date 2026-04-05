@@ -284,6 +284,9 @@ public static partial class NativeMethods
     // SCS_SETSTR=0x0002: re-inject composition string into IME buffer
     [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
     public static extern bool ImmSetCompositionStringW(IntPtr hIMC, uint dwIndex, string lpComp, uint dwCompLen, IntPtr lpRead, uint dwReadLen);
+    // NI_COMPOSITIONSTR=0x0015, CPS_COMPLETE=0x0001: finalize composition → commit to app
+    [DllImport("imm32.dll")]
+    public static extern bool ImmNotifyIME(IntPtr hIMC, uint dwAction, uint dwIndex, uint dwValue);
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();

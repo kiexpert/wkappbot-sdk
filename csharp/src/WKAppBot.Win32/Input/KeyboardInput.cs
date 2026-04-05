@@ -127,6 +127,58 @@ public static class KeyboardInput
     /// </summary>
     public static Action<string, string, IntPtr>? OnMidInputAbort { get; set; }
 
+    // ── IME injection (focusless text input via IMM32) ─────────────────────
+    private const uint SCS_SETSTR = 0x0002;
+    private const uint GCS_COMPSTR_IME = 0x0008;
+    private const uint NI_COMPOSITIONSTR = 0x0015;
+    private const uint CPS_COMPLETE = 0x0001;
+
+    /// <summary>
+    /// Type text into target window via IME composition injection.
+    /// Focusless: uses AttachThreadInput to access target's IME context.
+    /// Returns true if IME accepted the text.
+    /// </summary>
+    public static bool TypeViaIme(IntPtr hwnd, string text)
+    {
+        if (hwnd == IntPtr.Zero || string.IsNullOrEmpty(text)) return false;
+
+        // Find the focused control inside the target window
+        uint targetTid = NativeMethods.GetWindowThreadProcessId(hwnd, out _);
+        uint ourTid = NativeMethods.GetCurrentThreadId();
+
+        bool attached = NativeMethods.AttachThreadInput(ourTid, targetTid, true);
+        try
+        {
+            // Get IME context of target (focused control preferred)
+            var gti = new NativeMethods.GUITHREADINFO { cbSize = Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+            NativeMethods.GetGUIThreadInfo(targetTid, ref gti);
+            var imeWnd = gti.hwndFocus != IntPtr.Zero ? gti.hwndFocus : hwnd;
+
+            var hIMC = NativeMethods.ImmGetContext(imeWnd);
+            if (hIMC == IntPtr.Zero) return false;
+
+            try
+            {
+                // Set composition string
+                bool ok = NativeMethods.ImmSetCompositionStringW(hIMC, SCS_SETSTR,
+                    text, (uint)(text.Length * 2), IntPtr.Zero, 0);
+                if (!ok) return false;
+
+                // Complete composition → commit text to application
+                NativeMethods.ImmNotifyIME(hIMC, NI_COMPOSITIONSTR, CPS_COMPLETE, 0);
+                return true;
+            }
+            finally
+            {
+                NativeMethods.ImmReleaseContext(imeWnd, hIMC);
+            }
+        }
+        finally
+        {
+            if (attached) NativeMethods.AttachThreadInput(ourTid, targetTid, false);
+        }
+    }
+
     // ── Global keyboard input lock ────────────────────────────────────────────
     // Cross-process named Mutex: "먼저 잡은 넘이 우선권" (first grabber wins).
     // While any wkappbot session is sending keystrokes, others skip SmartSetForegroundWindow.
