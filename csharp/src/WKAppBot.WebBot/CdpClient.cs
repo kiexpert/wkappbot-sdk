@@ -190,6 +190,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
 
         TargetId = resolvedTargetId;
         WebSocketUrl = wsUrl;
+        Console.Error.WriteLine($"[CDP:CONNECT] target={resolvedTargetId} url={resolvedTargetUrl ?? "?"} port={port}{(preferredTargetTag != null ? $" tag={preferredTargetTag}" : "")}");
         _ws = new ClientWebSocket();
         await _ws.ConnectAsync(new Uri(wsUrl), ct);
 
