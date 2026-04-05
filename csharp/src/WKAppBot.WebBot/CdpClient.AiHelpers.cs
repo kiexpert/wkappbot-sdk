@@ -229,24 +229,18 @@ public sealed partial class CdpClient
                 "}catch(_e){}" +
                 "return 'NO_SEND_PATH';" +
             "};" +
-            "var st=root.states[sel]||(root.states[sel]={gen:0,timer:0,lastResult:'',locked:false,firstArmAt:0,maxTimer:0});" +
-            "st.gen=(st.gen||0)+1;" +
-            "if(st.timer)try{clearTimeout(st.timer);}catch(_e){}" +
-            "if(!st.firstArmAt)st.firstArmAt=Date.now();" +
-            "var myGen=st.gen;" +
-            // Idle timer: send after idleMs of silence
-            "st.timer=setTimeout(function(){" +
-                "var cur=root.states[sel];if(!cur||cur.gen!==myGen)return;" +
-                "if(cur.locked)return;" +
-                "cur.lastResult=root.trySend(sel);cur.firstArmAt=0;" +
-            "}, idleMs);" +
-            // Max wait timer: force flush after 5s even if chunks keep arriving
-            "if(!st.maxTimer){st.maxTimer=setTimeout(function(){" +
-                "var cur=root.states[sel];if(!cur)return;cur.maxTimer=0;" +
-                "if(cur.locked)return;" +
-                "if(cur.timer)try{clearTimeout(cur.timer);}catch(_e){}" +
-                "cur.lastResult=root.trySend(sel);cur.firstArmAt=0;" +
-            "}, 5000);}" +
+            "var st=root.states[sel]||(root.states[sel]={interval:0,lastResult:'',locked:false,ticks:0});" +
+            // Start periodic tick if not already running (single setInterval per editor)
+            "if(!st.interval){st.interval=setInterval(function(){" +
+                "var cur=root.states[sel];if(!cur||cur.locked)return;" +
+                "var el=document.querySelector(sel);if(!el)return;" +
+                "var txt=((el.value||el.innerText||el.textContent||'')).trim();" +
+                "if(!txt){cur.ticks=0;return;}" + // empty → reset counter
+                "cur.ticks++;" + // content present → count up
+                "if(cur.ticks>=2){" + // 2 ticks × 500ms = 1s of content presence
+                    "cur.lastResult=root.trySend(sel);cur.ticks=0;" + // submit + reset
+                "}" +
+            "}, 500);}" + // 500ms tick
             "return 'ARMED';" +
             "})()");
         return result == "ARMED";
@@ -371,7 +365,7 @@ public sealed partial class CdpClient
             "var sel='" + esc + "';" +
             "var root=window.__wkAskPump;if(!root||!root.trySend)return 'NO_PUMP';" +
             "var st=root.states?root.states[sel]:null;" +
-            "if(st){if(st.timer)try{clearTimeout(st.timer);}catch(_e){}if(st.maxTimer)try{clearTimeout(st.maxTimer);}catch(_e){}st.firstArmAt=0;st.maxTimer=0;}" +
+            "if(st)st.ticks=0;" + // reset so interval doesn't re-fire
             "return root.trySend(sel);" +
             "})()") ?? "NO_PUMP";
     }
@@ -386,9 +380,9 @@ public sealed partial class CdpClient
             "var clearEditor=" + jsClear + ";" +
             "var root=(window.__wkAskPump||(window.__wkAskPump={}));" +
             "if(!root.states)root.states={};" +
-            "var st=root.states[sel]||(root.states[sel]={gen:0,timer:0,lastResult:'',locked:false});" +
-            "if(st.timer)try{clearTimeout(st.timer);}catch(_e){}" +
-            "st.timer=0;st.gen=(st.gen||0)+1;st.locked=false;st.lastResult='CANCELLED';st.responseStatus='CANCELLED';" +
+            "var st=root.states[sel]||(root.states[sel]={interval:0,lastResult:'',locked:false,ticks:0});" +
+            "if(st.interval)try{clearInterval(st.interval);}catch(_e){}" +
+            "st.interval=0;st.ticks=0;st.locked=false;st.lastResult='CANCELLED';st.responseStatus='CANCELLED';" +
             "var el=document.querySelector(sel);" +
             "if(clearEditor&&el){" +
                 "try{" +
