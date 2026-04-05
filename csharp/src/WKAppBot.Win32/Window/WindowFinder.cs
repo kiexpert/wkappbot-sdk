@@ -988,6 +988,15 @@ public static class WindowFinder
         try
         {
             url = GetPrimaryUrlToken(GetBrowserUrl(hWnd, pid));
+            // Skip Electron internal URLs (not real web — noise in grap pattern)
+            if (!string.IsNullOrEmpty(url) &&
+                (url.StartsWith("vscode-file://", StringComparison.OrdinalIgnoreCase) ||
+                 url.StartsWith("chrome-extension://", StringComparison.OrdinalIgnoreCase) ||
+                 url.StartsWith("devtools://", StringComparison.OrdinalIgnoreCase) ||
+                 url.StartsWith("file:///", StringComparison.OrdinalIgnoreCase)))
+            {
+                url = "";
+            }
             if (!string.IsNullOrEmpty(url))
                 domain = new Uri(url).Host;
         }
