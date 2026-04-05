@@ -366,7 +366,7 @@ internal partial class Program
                 if (gtiOk && gti.hwndFocus == IntPtr.Zero)
                 {
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine("    ⌨ focus: (none — no stored keyboard focus for this thread)");
+                    Console.WriteLine("    KB focus: (none — no stored keyboard focus for this thread)");
                     Console.ResetColor();
                 }
                 // Show focus child (including focus == self for a11y path)
@@ -377,7 +377,7 @@ internal partial class Program
                     var focusClassBuf = new StringBuilder(128);
                     NativeMethods.GetClassNameW(gti.hwndFocus, focusClassBuf, focusClassBuf.Capacity);
                     Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.Write("    ⌨ focus: ");
+                    Console.Write("    KB focus: ");
                     Console.ForegroundColor = ConsoleColor.White;
                     var focusTitle = focusBuf.ToString();
                     Console.WriteLine($"[{gti.hwndFocus:X8}] \"{(focusTitle.Length > 40 ? focusTitle[..37] + "..." : focusTitle)}\" ({focusClassBuf})");
@@ -516,7 +516,7 @@ internal partial class Program
                 int w = rect.Right - rect.Left, ht = rect.Bottom - rect.Top;
 
                 string indent = new string(' ', i * 2);
-                string arrow = i == 0 ? "⌨ " : "└ ";
+                string arrow = i == 0 ? "KB " : "`- ";
                 string title = titleBuf.ToString();
                 string displayTitle = title.Length > 50 ? title[..47] + "..." : title;
                 if (string.IsNullOrEmpty(displayTitle)) displayTitle = "(no title)";

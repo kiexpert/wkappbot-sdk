@@ -630,9 +630,9 @@ internal partial class Program
         string FormatLine(int j, bool isMatch) {
             if (GrapMode && !Console.IsOutputRedirected)
             {
-                // wkedit-style: → arrow marker + padded line number + │ separator
-                var arrow = isMatch ? "→" : " ";
-                return $"{arrow} {lineNums[j],5}│ {buf[j]}";
+                // wkedit-style: arrow marker + padded line number + | separator (ASCII-safe)
+                var arrow = isMatch ? ">" : " ";
+                return $"{arrow} {lineNums[j],5}| {buf[j]}";
             }
             var prefix = showFilename ? $"{path}:" : "";
             var numPfx = showLineNums ? $"{lineNums[j]}:" : "";

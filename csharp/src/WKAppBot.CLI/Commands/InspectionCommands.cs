@@ -100,7 +100,7 @@ internal partial class Program
             {
                 targetHwnd = childMatch.Value.handle;
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write($"  └ Child: ");
+                Console.Write($"  `- Child: ");
                 Console.ResetColor();
                 Console.WriteLine($"\"{childMatch.Value.title}\" (hWnd=0x{targetHwnd:X})");
             }
@@ -231,7 +231,7 @@ internal partial class Program
         {
             Console.WriteLine($"Window: {mainWin}");
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write($"  └ Child: ");
+            Console.Write($"  `- Child: ");
             Console.ResetColor();
             Console.WriteLine($"\"{matchedFormTitle}\" (hWnd=0x{inspectHandle:X})");
         }
