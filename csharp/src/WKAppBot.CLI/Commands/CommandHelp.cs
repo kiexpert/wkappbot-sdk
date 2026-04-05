@@ -455,6 +455,63 @@ internal partial class Program
             + "Adding test scripts:\n"
             + "  Use suggest resolve with --i-completed-...-willkim-allowed-this-script <test.sh|test.ps1|test.cmd>\n"
             + "  Scripts auto-copied to experience/tests/{cmd}/{subcmd}/ on resolve.",
+
+        ["web"] = """
+            web open [url] [--port N] [--headless] [--no-launch]
+            web eval "<js>" [--port N]
+            web navigate <url> [--port N]
+            web tabs [--port N]
+            web read <url> [--max-chars N]
+            web fetch <url> [--max-chars N]
+            web search <query> [--limit N]
+
+            Chrome CDP integration: launch, connect, navigate, evaluate JS.
+            Default port: 9222. Auto-launches Chrome if not running.
+            """,
+
+        ["windows"] = """
+            windows [grap] [--deep] [--process <name>] [--cmd <substr>]
+            List top-level windows with title, class, PID, size.
+
+            No args: all visible windows. With grap: filter by pattern.
+            --deep: include child windows. --process: filter by process name.
+            """,
+
+        ["mcp"] = "mcp\nRun as MCP (Model Context Protocol) stdio server.\nExposes wkappbot_cli tool for JSON-RPC calls.\nUsed by Claude Desktop, VS Code MCP clients.",
+
+        ["gc"] = "gc [pattern] [--days N] [--sweep]\nGarbage collect old logs, temp files, stale caches.\n--days N: only files older than N days (default: 7).\n--sweep: aggressive cleanup.",
+
+        ["clipboard"] = "clipboard [read|write] [text]\nRead or write system clipboard.\nNo args: read. With text: write.",
+
+        ["screen"] = "screen blank [--duration N] | restore\nBlank all monitors (privacy/automation). Auto-restore after N seconds.",
+
+        ["hotswap"] = "hotswap\nManually trigger Eye hot-swap check (normally automatic on publish).",
+
+        ["tick"] = "tick\nOne-shot Eye status check (ctx%, memory, cards, guardian).",
+
+        ["dashboard"] = "dashboard\nOpen WKAppBot dashboard (WPF UI).",
+
+        ["model"] = "model [list|set <name>]\nManage AI model selection for ask/agent commands.",
+
+        ["knowhow"] = "knowhow [show|list] [--app <proc>] [--action <action>]\nView recorded automation knowhow from experience DB.",
+
+        ["run"] = "run <scenario.yaml> [--dry-run]\nExecute YAML automation scenario.",
+
+        ["validate"] = "validate <scenario.yaml>\nValidate YAML scenario syntax without executing.",
+
+        ["capture"] = "capture [grap] [--output file.png]\nScreenshot a window or screen region.",
+
+        ["ocr"] = "ocr [grap] [--lang kor+eng]\nOCR text from a window or element.",
+
+        ["inspect"] = "inspect [grap] [--depth N]\nInspect UIA tree of a window.",
+
+        ["find"] = "find [grap] [--depth N]\nFind elements in a window's UIA tree.",
+
+        ["focus"] = "focus [grap]\nBring a window to foreground.",
+
+        ["prompt"] = "prompt send \"<name>\" \"<msg>\" [--after 60s] [--when-idle 9s]\nprompt list\nDeliver prompts to AI chat windows.",
+
+        ["win-move"] = "win-move <grap> --x N --y N [--w N] [--h N]\nMove/resize a window by grap pattern.",
     };
 }
 
