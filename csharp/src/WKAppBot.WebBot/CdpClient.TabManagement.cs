@@ -305,15 +305,50 @@ public sealed partial class CdpClient
     }
 
     /// <summary>
+    /// Find ALL tabs matching a URL/title pattern. For disambiguation when multiple match.
+    /// </summary>
+    public async Task<List<TabInfo>> FindAllTabsByPatternAsync(int port, string pattern)
+    {
+        var tabs = await ListTabsAsync(port);
+        var matchPattern = pattern.Contains('*') ? pattern : $"*{pattern}*";
+        return tabs.Where(tab => GlobMatch(tab.Title, matchPattern) || GlobMatch(tab.Url, matchPattern)).ToList();
+    }
+
+    /// <summary>
     /// Connect to a specific tab by pattern match (URL or title).
-    /// Returns true if found and connected, false if no match.
+    /// If multiple tabs match, lists all candidates and returns false (disambiguation needed).
+    /// Returns true if found and connected, false if no match or ambiguous.
     /// </summary>
     public async Task<bool> ConnectToTabAsync(int port, string pattern)
     {
-        var tab = await FindTabByPatternAsync(port, pattern);
-        if (tab == null) return false;
-        if (tab.Id == TargetId) return true; // already connected
-        return await SwitchToTargetAsync(tab.Id, port);
+        var allMatches = await FindAllTabsByPatternAsync(port, pattern);
+        if (allMatches.Count == 0) return false;
+        if (allMatches.Count == 1)
+        {
+            var tab = allMatches[0];
+            if (tab.Id == TargetId) return true;
+            return await SwitchToTargetAsync(tab.Id, port);
+        }
+        // Multiple matches → show disambiguation list
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[WEB] \"{pattern}\" -> {allMatches.Count}개 탭 매칭. 정확한 URL을 지정하세요:");
+        Console.ResetColor();
+        for (int i = 0; i < allMatches.Count; i++)
+        {
+            var t = allMatches[i];
+            var urlShort = t.Url.Length > 60 ? t.Url[..60] : t.Url;
+            var titleShort = t.Title.Length > 40 ? t.Title[..40] : t.Title;
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write($"  {i + 1}. ");
+            Console.ResetColor();
+            Console.Write($"\"{titleShort}\"");
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($" ({urlShort})");
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
+            Console.WriteLine($"     wkappbot web read \"{urlShort}\"");
+            Console.ResetColor();
+        }
+        return false;
     }
 
     static bool GlobMatch(string text, string pattern)
