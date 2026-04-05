@@ -206,7 +206,7 @@ internal partial class Program
     // Key format: "command" or "command subcommand"
     // FUTURE: auto-generated from [Description] attributes via reflection.
 
-    static readonly Dictionary<string, string> CommandHelpMap = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly Dictionary<string, string> CommandHelpMap = new(StringComparer.OrdinalIgnoreCase)
     {
         ["a11y"] = """
             a11y <action> <grap>[#uia-scope] [options]
