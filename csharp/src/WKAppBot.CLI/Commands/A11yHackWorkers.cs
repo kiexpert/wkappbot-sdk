@@ -154,14 +154,10 @@ internal partial class Program
                     richGrap += $"#*{elLabel}*";
 
                 bool changed = result != lastResult;
-                if (changed)
-                {
-                    if (lastResult.Length > 0) Console.WriteLine(); // newline after previous \r line
-                    lastResult = result;
-                }
-                var line = $"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})";
-                int padWidth; try { padWidth = Console.WindowWidth - 1; } catch { padWidth = 120; }
-                Console.Write($"\r{line.PadRight(padWidth)}");
+                if (changed) lastResult = result;
+                if (!changed) continue; // same target → skip (pipe relay is line-based, \r won't work)
+                if (!RunningInEye) // Eye에서는 분석 시작 시만 출력 (로그 최적화)
+                    Console.WriteLine($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})");
 
                 // Detailed log (file only, on change)
                 if (changed)
