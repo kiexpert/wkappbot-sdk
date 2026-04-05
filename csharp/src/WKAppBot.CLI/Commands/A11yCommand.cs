@@ -653,9 +653,54 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"[A11Y] ALERT: 모달 다이얼로그가 타겟을 차단 중 → \"{popTitle}\"");
                 Console.ResetColor();
-                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.WriteLine($"[A11Y] ALERT TARGET: a11y {action} \"{popJson5}\"");
+                // Auto-find inside the alert dialog
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[A11Y] ALERT -> find 자동 전환. 알러트 내부 요소:");
                 Console.ResetColor();
+                try
+                {
+                    using var alertAuto = new UIA3Automation();
+                    var alertRoot = alertAuto.FromHandle(ownedPopup);
+                    var alertChildren = alertRoot.FindAllDescendants();
+                    int shown = 0;
+                    foreach (var ac in alertChildren)
+                    {
+                        if (shown >= 15) { Console.WriteLine($"     ... (+{alertChildren.Length - shown}개 더)"); break; }
+                        var acType = "?"; try { acType = ac.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                        var acName = ac.Properties.Name.ValueOrDefault ?? "";
+                        var acAid = ac.Properties.AutomationId.ValueOrDefault ?? "";
+                        if (acName.Length > 40) acName = acName[..40];
+                        var acLabel = !string.IsNullOrEmpty(acAid) ? acAid : acName;
+                        if (string.IsNullOrEmpty(acLabel)) { shown++; continue; }
+                        // Highlight actionable elements (Button, Hyperlink, CheckBox)
+                        bool actionable = acType is "Button" or "Hyperlink" or "CheckBox" or "RadioButton" or "MenuItem";
+                        Console.ForegroundColor = actionable ? ConsoleColor.Cyan : ConsoleColor.DarkGreen;
+                        Console.Write(actionable ? "  >> " : "     ");
+                        Console.Write($"{acType}(\"{acLabel}\")");
+                        if (actionable)
+                            Console.Write($" -> a11y invoke \"{popJson5}#*{acLabel}*\"");
+                        Console.WriteLine();
+                        Console.ResetColor();
+                        shown++;
+                    }
+                }
+                catch { }
+                // Also show Win32 children (MFC dialogs often have no UIA)
+                var alertKids = WindowFinder.GetChildrenZOrder(ownedPopup);
+                if (alertKids.Count > 0)
+                {
+                    int btnCount = 0;
+                    foreach (var ak in alertKids)
+                    {
+                        var akCls = WindowFinder.GetClassName(ak.Handle);
+                        var akTitle = ak.Title;
+                        if (akCls != "Button" || string.IsNullOrEmpty(akTitle)) continue;
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"  >> [Button] \"{akTitle}\" -> a11y click \"{popJson5}#*{akTitle}*\"");
+                        Console.ResetColor();
+                        btnCount++;
+                    }
+                }
             }
         }
         // Find focused element WITHIN the target window (not OS-global focus)
