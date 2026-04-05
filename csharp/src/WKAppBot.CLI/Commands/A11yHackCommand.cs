@@ -150,7 +150,7 @@ internal partial class Program
             {
                 hackAborted = true;
                 Console.WriteLine("[HACK] User input detected — aborting");
-                liveOverlay?.Hide();
+                if (!_hackHoverAnalyzing) liveOverlay?.Hide();
                 return true;
             }
             return false;
@@ -171,7 +171,7 @@ internal partial class Program
             {
                 hackAborted = true;
                 Console.WriteLine("[HACK] Window moved/resized — aborting");
-                liveOverlay?.Hide();
+                if (!_hackHoverAnalyzing) liveOverlay?.Hide();
                 return true;
             }
             // 2. Target node pixels changed?
@@ -762,7 +762,7 @@ internal partial class Program
         Console.WriteLine();
 
         bmp.Dispose();
-        liveOverlay?.Hide();
+        if (!_hackHoverAnalyzing) liveOverlay?.Hide(); // hover mode: keep overlay visible
         PulseStep.Done();
         return 0;
     }
