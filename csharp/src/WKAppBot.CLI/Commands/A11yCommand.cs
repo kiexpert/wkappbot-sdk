@@ -907,6 +907,71 @@ internal partial class Program
                 }
                 PulseStep.Mark("uia-from-handle-done");
 
+                // ── Element action without #scope → auto-find: list available UIA nodes ──
+                if (string.IsNullOrEmpty(uiaPath) && isInteractiveAction && action is not ("close" or "minimize" or "maximize" or "restore" or "focus" or "move" or "resize"))
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[A11Y] #scope 없음 -> find 자동 전환. \"{title}\" 의 UIA 요소:");
+                    Console.ResetColor();
+                    try
+                    {
+                        var winJson5 = WindowFinder.BuildTargetJson5(hwnd);
+
+                        // Show focused element first (leaf → parent chain)
+                        try
+                        {
+                            using var focLoc = new UiaLocator();
+                            var focInfo = focLoc.GetFocusedElementInfo();
+                            NativeMethods.GetWindowThreadProcessId(hwnd, out uint winPid2);
+                            if (focInfo != null && focInfo.ProcessId == (int)winPid2)
+                            {
+                                var fLabel = !string.IsNullOrEmpty(focInfo.AutomationId) ? focInfo.AutomationId : focInfo.Name;
+                                if (fLabel.Length > 40) fLabel = fLabel[..40];
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write($"  >> [FOCUS] {focInfo.ControlType}(\"{fLabel}\")");
+                                if (focInfo.Patterns.Count > 0) Console.Write($" {string.Join(",", focInfo.Patterns)}");
+                                Console.WriteLine();
+                                // Parent chain (leaf → root)
+                                foreach (var (pType, pName) in focInfo.ParentChain)
+                                {
+                                    if (string.IsNullOrEmpty(pName)) continue;
+                                    Console.Write($"       <- {pType}(\"{pName}\")");
+                                    Console.WriteLine();
+                                }
+                                Console.ResetColor();
+                                if (!string.IsNullOrEmpty(fLabel))
+                                {
+                                    Console.ForegroundColor = ConsoleColor.DarkGreen;
+                                    Console.WriteLine($"     -> a11y {action} \"{winJson5}#*{fLabel}*\"");
+                                    Console.ResetColor();
+                                }
+                            }
+                        }
+                        catch { }
+
+                        var children = root.FindAllChildren();
+                        int shown = 0;
+                        foreach (var child in children)
+                        {
+                            if (shown >= 20) { Console.WriteLine($"     ... (+{children.Length - shown}개 더 — a11y find로 전체 탐색)"); break; }
+                            var cType = "?"; try { cType = child.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                            var cName = child.Properties.Name.ValueOrDefault ?? "";
+                            var cAid = child.Properties.AutomationId.ValueOrDefault ?? "";
+                            if (cName.Length > 40) cName = cName[..40];
+                            var cLabel = !string.IsNullOrEmpty(cAid) ? cAid : cName;
+                            if (string.IsNullOrEmpty(cLabel)) { shown++; continue; }
+                            Console.ForegroundColor = ConsoleColor.DarkGreen;
+                            Console.WriteLine($"     {cType}(\"{cLabel}\") -> a11y {action} \"{winJson5}#*{cLabel}*\"");
+                            Console.ResetColor();
+                            shown++;
+                        }
+                    }
+                    catch { }
+                    Console.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
+                    fail++;
+                    continue;
+                }
+
                 if (!string.IsNullOrEmpty(uiaPath))
                 {
                     AutomationElement? scoped = null;
