@@ -543,9 +543,32 @@ internal partial class Program
                 // Precise grap command (append #focusScope for combined target)
                 var json5 = WindowFinder.BuildTargetJson5(w.Handle);
                 var fullTarget = focusScope != null ? $"{json5}#*{focusScope}*" : json5;
+
+                // Verify: re-search with the generated pattern to confirm it actually works
+                var verifyHits = WindowFinder.FindByTitle(json5, true);
+                var verified = verifyHits.Any(v => v.Handle == w.Handle);
+
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.WriteLine($"     a11y {action} \"{fullTarget}\"");
+                Console.Write($"     a11y {action} \"{fullTarget}\"");
+                Console.ForegroundColor = verified ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.WriteLine(verified ? " [OK]" : " [MISS]");
                 Console.ResetColor();
+                if (!verified)
+                {
+                    // Auto-heal: generate a simpler hwnd-only fallback pattern
+                    var healPattern = $"*hwnd={w.Handle:X8}*";
+                    var healHits = WindowFinder.FindByTitle(healPattern, true);
+                    var healed = healHits.Any(v => v.Handle == w.Handle);
+                    if (healed)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"     [HEAL] hwnd fallback: a11y {action} \"{healPattern}\"");
+                        Console.ResetColor();
+                    }
+                    Program.AutoRegisterBug(
+                        $"[BUG-AUTO] auto-find grap verify MISS: pattern={json5} hwnd=0x{w.Handle:X8} title=\"{title}\" healed={healed}",
+                        args: ["a11y", "find", json5]);
+                }
             }
             Console.WriteLine($"[A11Y] Tip: a11y find \"<target>\" 으로 상세 탐색 / --all 또는 --nth 1 으로 강제 실행");
             return 1;
