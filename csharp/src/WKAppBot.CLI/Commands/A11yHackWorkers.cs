@@ -144,15 +144,14 @@ internal partial class Program
 
                 var result = $"{grapPath} [{elType}] {mark}";
 
-                // Log only on change (file), but always \r output (console)
+                // Console: only print on change (no flicker)
                 bool changed = result != lastResult;
-                if (changed) lastResult = result;
-
-                // Console output — grap pattern + verify mark, \r continuous
-                var elMs = sw.ElapsedMilliseconds;
-                var line = $"[{mark}] {elMs}ms {grapPath}";
-                if (line.Length > 150) line = line[..150];
-                Console.Write($"\r{line.PadRight(155)}\r");
+                if (changed)
+                {
+                    lastResult = result;
+                    var elMs = sw.ElapsedMilliseconds;
+                    Console.WriteLine($"[{mark}] {elMs}ms {grapPath}");
+                }
 
                 // Detailed log (file only, on change)
                 if (changed)
