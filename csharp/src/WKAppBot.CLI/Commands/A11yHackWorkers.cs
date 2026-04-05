@@ -90,6 +90,20 @@ internal partial class Program
         var corePath = Environment.ProcessPath ?? "";
         int swapCheckCounter = 0;
 
+        // Experience DB FSW: file changes → overlay refresh
+        var expDir = Path.Combine(DataDir, "experience");
+        Directory.CreateDirectory(expDir);
+        int _expDirty = 0;
+        var expWatcher = new FileSystemWatcher(expDir)
+        {
+            IncludeSubdirectories = true,
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+            EnableRaisingEvents = true,
+        };
+        expWatcher.Created += (_, _) => Interlocked.Exchange(ref _expDirty, 1);
+        expWatcher.Changed += (_, _) => Interlocked.Exchange(ref _expDirty, 1);
+        Log($"ExpDB watcher: {expDir}");
+
         Log("Loop started — monitoring mouse/focus");
 
         while (!cts.IsCancellationRequested)
@@ -233,7 +247,9 @@ internal partial class Program
                                         label, null, HackBoxRole.Target));
                                 }
                                 // Quick UIA children of root (depth 1 — lightweight)
-                                if (grapChanged)
+                                // Refresh on: window change OR experience DB file change
+                                bool expRefresh = Interlocked.Exchange(ref _expDirty, 0) != 0;
+                                if (grapChanged || expRefresh)
                                 {
                                     _hoverUiaBoxes.Clear();
                                     try
@@ -292,8 +308,8 @@ internal partial class Program
                     {
                         var clsBuf = new System.Text.StringBuilder(256);
                         NativeMethods.GetClassNameW(hwnd, clsBuf, clsBuf.Capacity);
-                        var expDir = Path.Combine(DataDir, "experience", proc, clsBuf.ToString());
-                        expMissing = !Directory.Exists(expDir) || Directory.GetFiles(expDir, "*.png").Length == 0;
+                        var winExpDir = Path.Combine(DataDir, "experience", proc, clsBuf.ToString());
+                        expMissing = !Directory.Exists(winExpDir) || Directory.GetFiles(winExpDir, "*.png").Length == 0;
                     }
                     catch { }
                 }
