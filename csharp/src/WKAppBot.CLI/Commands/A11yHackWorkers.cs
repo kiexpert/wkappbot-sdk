@@ -152,10 +152,16 @@ internal partial class Program
                 var richGrap = $"{{hwnd:0x{hwnd.ToInt64():X8},pid:{pid},proc:'{proc}'}}";
                 if (!string.IsNullOrEmpty(elLabel))
                     richGrap += $"#*{elLabel}*";
-                Console.WriteLine($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})");
 
                 bool changed = result != lastResult;
-                if (changed) lastResult = result;
+                if (changed)
+                {
+                    if (lastResult.Length > 0) Console.WriteLine(); // newline after previous \r line
+                    lastResult = result;
+                }
+                var line = $"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})";
+                int padWidth; try { padWidth = Console.WindowWidth - 1; } catch { padWidth = 120; }
+                Console.Write($"\r{line.PadRight(padWidth)}");
 
                 // Detailed log (file only, on change)
                 if (changed)
