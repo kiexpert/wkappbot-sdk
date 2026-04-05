@@ -40,8 +40,9 @@ internal partial class Program
             try { File.AppendAllText(logPath, line + Environment.NewLine, Encoding.UTF8); } catch { }
         }
 
-        // Force UTF-8 console output (CP949 default breaks Korean UIA names)
-        try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
+        // UTF-8 output: Launcher already sets SetConsoleOutputCP(65001) + transcoding fallback
+        // Core direct run: ensure UTF-8 just in case
+        try { Console.OutputEncoding = new System.Text.UTF8Encoding(false); } catch { }
 
         Log($"Worker started (PID={Environment.ProcessId}, parent={parentPid})");
 
