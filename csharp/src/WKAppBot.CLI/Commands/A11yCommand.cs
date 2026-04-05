@@ -641,6 +641,23 @@ internal partial class Program
         Console.ResetColor();
 
         // ═══ STEP 4.5: Focused leaf node → target suggestion (all actions) ═══
+        // Check for modal dialog blocking the target window first
+        if (!NativeMethods.IsWindowEnabled(targets[0].Handle))
+        {
+            // Window is disabled → likely a modal dialog on top
+            var ownedPopup = NativeMethods.GetWindow(targets[0].Handle, 6 /* GW_ENABLEDPOPUP */);
+            if (ownedPopup != IntPtr.Zero && ownedPopup != targets[0].Handle)
+            {
+                var popTitle = WindowFinder.GetWindowText(ownedPopup);
+                var popJson5 = WindowFinder.BuildTargetJson5(ownedPopup);
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[A11Y] ALERT: 모달 다이얼로그가 타겟을 차단 중 → \"{popTitle}\"");
+                Console.ResetColor();
+                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                Console.WriteLine($"[A11Y] ALERT TARGET: a11y {action} \"{popJson5}\"");
+                Console.ResetColor();
+            }
+        }
         // Find focused element WITHIN the target window (not OS-global focus)
         try
         {
