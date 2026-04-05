@@ -444,12 +444,22 @@ internal partial class Program
         if (win32Segments.Length == 0)
             return Error("No window title in grap pattern");
 
+        // ═══ STEP 1.5: Detect vague pattern (no hwnd/pid/automationId) ═══
+        // Specific patterns: {hwnd:...}, {pid:...}, [XXXXXXXX], hwnd:0x..., hwnd=...
+        // Vague patterns: "*Chrome*", "계산기", "*메모장*" — need full scan for ambiguity check
+        bool isSpecificPattern = grap.Contains("hwnd", StringComparison.OrdinalIgnoreCase)
+            || grap.Contains("pid:", StringComparison.OrdinalIgnoreCase)
+            || grap.Contains("pid=", StringComparison.OrdinalIgnoreCase)
+            || (grap.StartsWith("[") && grap.EndsWith("]") && grap.Length <= 12)
+            || (grap.StartsWith("{") && grap.Contains(":"));
+
         // ═══ STEP 2: Find all matching windows ═══
         var firstSegPatterns = win32Segments[0]
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var allWindows = new List<WindowInfo>();
         var seen = new HashSet<IntPtr>();
-        bool stopOnFirstWindowMatch = isInteractiveAction && !all && nthRaw == null;
+        // Vague patterns: always full scan to detect ambiguity
+        bool stopOnFirstWindowMatch = isSpecificPattern && isInteractiveAction && !all && nthRaw == null;
         foreach (var pat in firstSegPatterns)
         {
             foreach (var w in WindowFinder.FindByTitle(pat, stopOnFirstWindowMatch))
@@ -479,6 +489,42 @@ internal partial class Program
 
         if (allWindows.Count == 0)
             return Error($"No window found: \"{win32Segments[0]}\"");
+
+        // ═══ STEP 2.5: Vague pattern + multiple matches → auto-find ═══
+        // When pattern has no specific target (hwnd/pid) and matches multiple windows,
+        // show all matches with precise JSON5 grap patterns instead of guessing.
+        if (!isSpecificPattern && allWindows.Count > 1 && !all && nthRaw == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[A11Y] \"{grap}\" -> {allWindows.Count}개 매칭. 정확한 타겟을 지정하세요:");
+            Console.ResetColor();
+            for (int idx = 0; idx < allWindows.Count; idx++)
+            {
+                var w = allWindows[idx];
+                var r = w.Rect;
+                string proc;
+                try
+                {
+                    NativeMethods.GetWindowThreadProcessId(w.Handle, out uint wpid);
+                    proc = System.Diagnostics.Process.GetProcessById((int)wpid).ProcessName;
+                }
+                catch { proc = "?"; }
+                var json5 = WindowFinder.BuildTargetJson5(w.Handle);
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Write($"  {idx + 1}. ");
+                Console.ResetColor();
+                Console.Write($"{proc} ");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write($"\"{w.Title}\"");
+                Console.ResetColor();
+                Console.WriteLine($" ({r.Right - r.Left}x{r.Bottom - r.Top})");
+                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                Console.WriteLine($"     a11y {action} \"{json5}\"");
+                Console.ResetColor();
+            }
+            Console.WriteLine($"[A11Y] Tip: --all 또는 --nth 1 으로 강제 실행 가능");
+            return 1;
+        }
 
         // ── User idle time (input readiness hint) ──
         if (isInteractiveAction)
