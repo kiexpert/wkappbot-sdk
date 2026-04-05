@@ -131,10 +131,10 @@ internal sealed class A11yHackOverlayWindow : Window
                     dash = new DoubleCollection { 2, 2 }; rx = ry = 1;
                     fx = null;
                     break;
-                default: // Known — system a11y dashed green
-                    stroke = new SolidColorBrush(Color.FromArgb(160, 0x32, 0xCD, 0x32));
-                    thick = 0.8; fill = Brushes.Transparent;
-                    dash = new DoubleCollection { 3, 2 }; rx = ry = 0;
+                default: // Known — system a11y dashed green (visible!)
+                    stroke = new SolidColorBrush(Color.FromArgb(220, 0x32, 0xCD, 0x32));
+                    thick = 1.2; fill = new SolidColorBrush(Color.FromArgb(15, 0x32, 0xCD, 0x32));
+                    dash = new DoubleCollection { 3, 2 }; rx = ry = 1;
                     fx = null;
                     break;
             }
