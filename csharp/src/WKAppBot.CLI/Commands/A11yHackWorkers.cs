@@ -155,9 +155,8 @@ internal partial class Program
 
                 bool changed = result != lastResult;
                 if (changed) lastResult = result;
-                if (!changed) continue; // same target → skip (pipe relay is line-based, \r won't work)
-                if (!RunningInEye) // Eye에서는 분석 시작 시만 출력 (로그 최적화)
-                    Console.WriteLine($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})");
+                if (parentPid > 0 && !changed) continue; // Eye spawn: change-only (log optimization)
+                Console.WriteLine($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})");
 
                 // Detailed log (file only, on change)
                 if (changed)
