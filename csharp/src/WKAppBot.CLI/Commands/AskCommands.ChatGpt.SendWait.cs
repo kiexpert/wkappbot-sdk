@@ -387,6 +387,34 @@ internal partial class Program
                     Console.Out.Flush();
                     continue; // Keep polling; likely just a transient idle gap.
                 }
+                // Auto-select first response if GPT shows A/B comparison mode
+                try
+                {
+                    var abChoice = await cdp.EvalAsync(
+                        "(() => {" +
+                        "var btns = document.querySelectorAll('button');" +
+                        // Detect A/B comparison header: "피드백" or "Which response" or "어떤 응답"
+                        "var abHeader = document.body.innerText.indexOf('\\uD53C\\uB4DC\\uBC31') >= 0" + // 피드백
+                        "  || document.body.innerText.indexOf('Which response') >= 0" +
+                        "  || document.body.innerText.indexOf('\\uC5B4\\uB5A4 \\uC751\\uB2F5') >= 0;" + // 어떤 응답
+                        "if (!abHeader) return 'NO_AB';" +
+                        // Find first response button (contains "1" as standalone or "Response 1" or "응답 1")
+                        "for (var b of btns) {" +
+                        "  var txt = (b.textContent || '').trim();" +
+                        "  if (/Response\\s*1/i.test(txt) || /\\uC751\\uB2F5\\s*1/.test(txt) || txt === '1') {" +
+                        "    b.click(); return 'PICKED_1:' + txt;" +
+                        "  }" +
+                        "}" +
+                        // Fallback: click first of any prefer/thumbs buttons
+                        "var prefs = document.querySelectorAll('[data-testid*=\"prefer\"], [data-testid*=\"thumbs-up\"]');" +
+                        "if (prefs.length > 0) { prefs[0].click(); return 'PREFER_FIRST'; }" +
+                        "return 'NO_AB';" +
+                        "})()") ?? "NO_AB";
+                    if (abChoice != "NO_AB")
+                        Console.WriteLine($"[ASK] GPT A/B comparison detected -> auto-selected first ({abChoice})");
+                }
+                catch { }
+
                 // Final image check before completion
                 var finalImages = await DetectAndDownloadImages(cdp, knownImageUrls, "gpt");
                 savedImages.AddRange(finalImages);
