@@ -445,13 +445,7 @@ internal partial class Program
             return Error("No window title in grap pattern");
 
         // ═══ STEP 1.5: Detect vague pattern (no hwnd/pid/automationId) ═══
-        // Specific patterns: {hwnd:...}, {pid:...}, [XXXXXXXX], hwnd:0x..., hwnd=...
-        // Vague patterns: "*Chrome*", "계산기", "*메모장*" — need full scan for ambiguity check
-        bool isSpecificPattern = grap.Contains("hwnd", StringComparison.OrdinalIgnoreCase)
-            || grap.Contains("pid:", StringComparison.OrdinalIgnoreCase)
-            || grap.Contains("pid=", StringComparison.OrdinalIgnoreCase)
-            || (grap.StartsWith("[") && grap.EndsWith("]") && grap.Length <= 12)
-            || (grap.StartsWith("{") && grap.Contains(":"));
+        bool isSpecificPattern = TargetAmbiguityGuard.IsSpecificPattern(grap);
 
         // ═══ STEP 2: Find all matching windows ═══
         var firstSegPatterns = win32Segments[0]
@@ -490,89 +484,9 @@ internal partial class Program
         if (allWindows.Count == 0)
             return Error($"No window found: \"{win32Segments[0]}\"");
 
-        // ═══ STEP 2.5: Vague pattern + multiple matches → auto-find ═══
-        // When pattern has no specific target (hwnd/pid) and matches multiple windows,
-        // show all matches with precise JSON5 grap patterns instead of guessing.
-        if (!isSpecificPattern && allWindows.Count > 1 && !all && nthRaw == null)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[A11Y] \"{grap}\" -> {allWindows.Count}개 매칭 -> find 자동 전환. 정확한 타겟을 지정하세요:");
-            Console.ResetColor();
-
-            // Get focused UIA element info (applies to foreground window only)
-            FocusedElementInfo? focusInfo = null;
-            try { using var uiaLoc = new UiaLocator(); focusInfo = uiaLoc.GetFocusedElementInfo(); }
-            catch { }
-
-            for (int idx = 0; idx < allWindows.Count; idx++)
-            {
-                var w = allWindows[idx];
-                var r = w.Rect;
-                NativeMethods.GetWindowThreadProcessId(w.Handle, out uint wpid);
-                string proc;
-                try { proc = System.Diagnostics.Process.GetProcessById((int)wpid).ProcessName; }
-                catch { proc = "?"; }
-
-                // Truncate title for display (no ellipsis — keeps pattern-matchable)
-                var title = w.Title.Length > 50 ? w.Title[..50] : w.Title;
-
-                // Summary line: index, proc, class, title, size
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write($"  {idx + 1}. ");
-                Console.ResetColor();
-                Console.Write($"{proc} ");
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($"[{w.ClassName}] ");
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write($"\"{title}\"");
-                Console.ResetColor();
-                Console.WriteLine($" ({r.Right - r.Left}x{r.Bottom - r.Top})");
-
-                // Focused UIA node (only for the window that owns the focus)
-                string? focusScope = null;
-                if (focusInfo != null && focusInfo.ProcessId == (int)wpid)
-                {
-                    var fId = focusInfo.AutomationId != "" ? focusInfo.AutomationId : focusInfo.Name;
-                    if (fId.Length > 40) fId = fId[..40];
-                    focusScope = fId;
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"     [FOCUS] {focusInfo.ControlType}(\"{fId}\"){(focusInfo.Patterns.Count > 0 ? " " + string.Join(",", focusInfo.Patterns) : "")}");
-                    Console.ResetColor();
-                }
-
-                // Precise grap command (append #focusScope for combined target)
-                var json5 = WindowFinder.BuildTargetJson5(w.Handle);
-                var fullTarget = focusScope != null ? $"{json5}#*{focusScope}*" : json5;
-
-                // Verify: re-search with the generated pattern to confirm it actually works
-                var verifyHits = WindowFinder.FindByTitle(json5, true);
-                var verified = verifyHits.Any(v => v.Handle == w.Handle);
-
-                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.Write($"     a11y {action} \"{fullTarget}\"");
-                Console.ForegroundColor = verified ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine(verified ? " [OK]" : " [MISS]");
-                Console.ResetColor();
-                if (!verified)
-                {
-                    // Auto-heal: generate a simpler hwnd-only fallback pattern
-                    var healPattern = $"*hwnd={w.Handle:X8}*";
-                    var healHits = WindowFinder.FindByTitle(healPattern, true);
-                    var healed = healHits.Any(v => v.Handle == w.Handle);
-                    if (healed)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"     [HEAL] hwnd fallback: a11y {action} \"{healPattern}\"");
-                        Console.ResetColor();
-                    }
-                    Program.AutoRegisterBug(
-                        $"[BUG-AUTO] auto-find grap verify MISS: pattern={json5} hwnd=0x{w.Handle:X8} title=\"{title}\" healed={healed}",
-                        args: ["a11y", "find", json5]);
-                }
-            }
-            Console.WriteLine($"[A11Y] Tip: a11y find \"<target>\" 으로 상세 탐색 / --all 또는 --nth 1 으로 강제 실행");
+        // ═══ STEP 2.5: Vague pattern + multiple matches → auto-find (Guard Layer 1) ═══
+        if (TargetAmbiguityGuard.CheckMultiWindow(grap, action, allWindows, all, nthRaw))
             return 1;
-        }
 
         // ── User idle time (input readiness hint) ──
         if (isInteractiveAction)
@@ -640,167 +554,9 @@ internal partial class Program
             Console.WriteLine($"[A11Y] TARGET: {WindowFinder.BuildTargetJson5(t.Handle)}");
         Console.ResetColor();
 
-        // ═══ STEP 4.5: Focused leaf node → target suggestion (all actions) ═══
-        // Check for modal dialog blocking the target window first
-        if (!NativeMethods.IsWindowEnabled(targets[0].Handle))
-        {
-            // Window is disabled → likely a modal dialog on top
-            var ownedPopup = NativeMethods.GetWindow(targets[0].Handle, 6 /* GW_ENABLEDPOPUP */);
-            if (ownedPopup != IntPtr.Zero && ownedPopup != targets[0].Handle)
-            {
-                var popTitle = WindowFinder.GetWindowText(ownedPopup);
-                var popJson5 = WindowFinder.BuildTargetJson5(ownedPopup);
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[A11Y] ALERT: 모달 다이얼로그가 타겟을 차단 중 → \"{popTitle}\"");
-                Console.ResetColor();
-                // Auto-find inside the alert dialog
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[A11Y] ALERT -> find 자동 전환. 알러트 내부 요소:");
-                Console.ResetColor();
-                try
-                {
-                    using var alertAuto = new UIA3Automation();
-                    var alertRoot = alertAuto.FromHandle(ownedPopup);
-                    var alertChildren = alertRoot.FindAllDescendants();
-                    int shown = 0;
-                    foreach (var ac in alertChildren)
-                    {
-                        if (shown >= 15) { Console.WriteLine($"     ... (+{alertChildren.Length - shown}개 더)"); break; }
-                        var acType = "?"; try { acType = ac.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                        var acName = ac.Properties.Name.ValueOrDefault ?? "";
-                        var acAid = ac.Properties.AutomationId.ValueOrDefault ?? "";
-                        if (acName.Length > 40) acName = acName[..40];
-                        var acLabel = !string.IsNullOrEmpty(acAid) ? acAid : acName;
-                        if (string.IsNullOrEmpty(acLabel)) { shown++; continue; }
-                        // Highlight actionable elements (Button, Hyperlink, CheckBox)
-                        bool actionable = acType is "Button" or "Hyperlink" or "CheckBox" or "RadioButton" or "MenuItem";
-                        Console.ForegroundColor = actionable ? ConsoleColor.Cyan : ConsoleColor.DarkGreen;
-                        Console.Write(actionable ? "  >> " : "     ");
-                        Console.Write($"{acType}(\"{acLabel}\")");
-                        if (actionable)
-                            Console.Write($" -> a11y invoke \"{popJson5}#*{acLabel}*\"");
-                        Console.WriteLine();
-                        Console.ResetColor();
-                        shown++;
-                    }
-                }
-                catch { }
-                // Also show Win32 children (MFC dialogs often have no UIA)
-                var alertKids = WindowFinder.GetChildrenZOrder(ownedPopup);
-                if (alertKids.Count > 0)
-                {
-                    int btnCount = 0;
-                    foreach (var ak in alertKids)
-                    {
-                        var akCls = WindowFinder.GetClassName(ak.Handle);
-                        var akTitle = ak.Title;
-                        if (akCls != "Button" || string.IsNullOrEmpty(akTitle)) continue;
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine($"  >> [Button] \"{akTitle}\" -> a11y click \"{popJson5}#*{akTitle}*\"");
-                        Console.ResetColor();
-                        btnCount++;
-                    }
-                }
-            }
-        }
-        // Find focused element WITHIN the target window (not OS-global focus)
-        try
-        {
-            using var uiaFocAuto = new UIA3Automation();
-            var targetRoot = uiaFocAuto.FromHandle(targets[0].Handle);
-            // Strategy 1: OS focused element if it belongs to this window's process
-            FocusedElementInfo? focLeaf = null;
-            using var uiaFocLoc = new UiaLocator();
-            var osFocus = uiaFocLoc.GetFocusedElementInfo();
-            NativeMethods.GetWindowThreadProcessId(targets[0].Handle, out uint focWinPid);
-            if (osFocus != null && osFocus.ProcessId == (int)focWinPid)
-                focLeaf = osFocus;
-
-            // Strategy 2: Walk target window's UIA tree to find deepest leaf with keyboard focus
-            if (focLeaf == null)
-            {
-                try
-                {
-                    var walker = uiaFocAuto.TreeWalkerFactory.GetRawViewWalker();
-                    AutomationElement? deepest = null;
-                    string dType = "", dName = "", dAid = "";
-                    var patterns = new List<string>();
-                    void WalkForFocus(AutomationElement el, int depth)
-                    {
-                        if (depth > 15) return;
-                        try
-                        {
-                            var child = walker.GetFirstChild(el);
-                            while (child != null)
-                            {
-                                var name = child.Properties.Name.ValueOrDefault ?? "";
-                                var aid = child.Properties.AutomationId.ValueOrDefault ?? "";
-                                if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(aid))
-                                {
-                                    deepest = child;
-                                    dType = child.Properties.ControlType.ValueOrDefault.ToString();
-                                    dName = name; dAid = aid;
-                                    patterns.Clear();
-                                    try { if (child.Patterns.Invoke.IsSupported) patterns.Add("Invoke"); } catch { }
-                                    try { if (child.Patterns.Value.IsSupported) patterns.Add("Value"); } catch { }
-                                    try { if (child.Patterns.Toggle.IsSupported) patterns.Add("Toggle"); } catch { }
-                                }
-                                bool hasFocus = false;
-                                try { hasFocus = child.Patterns.SelectionItem.IsSupported && child.Patterns.SelectionItem.Pattern.IsSelected; } catch { }
-                                if (hasFocus || !string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(aid))
-                                    WalkForFocus(child, depth + 1);
-                                child = walker.GetNextSibling(child);
-                            }
-                        }
-                        catch { }
-                    }
-                    WalkForFocus(targetRoot, 0);
-                    if (deepest != null)
-                    {
-                        var label = !string.IsNullOrEmpty(dAid) ? dAid : dName;
-                        if (label.Length > 40) label = label[..40];
-                        var focJson5 = WindowFinder.BuildTargetJson5(targets[0].Handle);
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.Write($"[A11Y] LEAF: {dType}(\"{label}\")");
-                        if (patterns.Count > 0) Console.Write($" [{string.Join(",", patterns)}]");
-                        Console.WriteLine();
-                        Console.ResetColor();
-                        if (!string.IsNullOrEmpty(label))
-                        {
-                            Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            Console.WriteLine($"[A11Y] LEAF TARGET: a11y {action} \"{focJson5}#*{label}*\"");
-                            Console.ResetColor();
-                        }
-                    }
-                }
-                catch { }
-            }
-            else
-            {
-                // OS focus is in our target window — show leaf + parent chain
-                var fLabel = !string.IsNullOrEmpty(focLeaf.AutomationId) ? focLeaf.AutomationId : focLeaf.Name;
-                if (fLabel.Length > 40) fLabel = fLabel[..40];
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.Write($"[A11Y] FOCUSED: {focLeaf.ControlType}(\"{fLabel}\")");
-                if (focLeaf.Patterns.Count > 0) Console.Write($" [{string.Join(",", focLeaf.Patterns)}]");
-                Console.WriteLine();
-                foreach (var (pType, pName) in focLeaf.ParentChain)
-                {
-                    if (string.IsNullOrEmpty(pName)) continue;
-                    Console.Write($"         <- {pType}(\"{pName}\")");
-                    Console.WriteLine();
-                }
-                Console.ResetColor();
-                if (!string.IsNullOrEmpty(fLabel))
-                {
-                    var focJson5 = WindowFinder.BuildTargetJson5(targets[0].Handle);
-                    Console.ForegroundColor = ConsoleColor.DarkGreen;
-                    Console.WriteLine($"[A11Y] FOCUSED TARGET: a11y {action} \"{focJson5}#*{fLabel}*\"");
-                    Console.ResetColor();
-                }
-            }
-        }
-        catch { /* best effort */ }
+        // ═══ STEP 4.5: Guard Layer 2+3 — modal alert + focused leaf ═══
+        TargetAmbiguityGuard.CheckModalAlert(targets[0].Handle, action);
+        TargetAmbiguityGuard.ShowFocusedLeaf(targets[0].Handle, action);
 
         // ═══ STEP 4.9: Elevation auto-detect → Elevated Eye Proxy delegation ═══
         // Pre-check: if target is elevated AND we have #scope, delegate BEFORE UIA traversal
@@ -975,41 +731,8 @@ internal partial class Program
                 if (child == null)
                 {
                     Console.Error.WriteLine($"[A11Y] Win32 child not found: \"{win32Segments[i]}\" in {tag}");
-                    // Auto-find: list Win32 child windows for MFC/HTS navigation
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[A11Y] \"{win32Segments[i]}\" 자식창 없음 -> find 자동 전환. Win32 자식 윈도우:");
-                    Console.ResetColor();
-                    var siblings = WindowFinder.GetChildrenZOrder(hwnd);
-                    int shown = 0;
-                    foreach (var sib in siblings)
-                    {
-                        if (shown >= 20) { Console.WriteLine($"     ... (+{siblings.Count - shown}개 더)"); break; }
-                        var sibCls = WindowFinder.GetClassName(sib.Handle);
-                        var sibTitle = sib.Title;
-                        if (sibTitle.Length > 40) sibTitle = sibTitle[..40];
-                        var sibR = sib.Rect;
-                        var sibW = sibR.Right - sibR.Left;
-                        var sibH = sibR.Bottom - sibR.Top;
-                        var sibLabel = !string.IsNullOrEmpty(sibTitle) ? sibTitle : sibCls;
-                        Console.ForegroundColor = ConsoleColor.DarkGreen;
-                        Console.Write($"     [{sibCls}] ");
-                        Console.ResetColor();
-                        Console.Write($"\"{sibTitle}\" ({sibW}x{sibH})");
-                        if (!string.IsNullOrEmpty(sibLabel))
-                        {
-                            // Build grap: parent/child pattern
-                            var parentPat = string.Join("/", win32Segments.Take(i));
-                            Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            Console.Write($" -> a11y {action} \"{grap.Split('#')[0]}/{(sibTitle != "" ? "*" + sibTitle + "*" : sibCls)}");
-                            if (!string.IsNullOrEmpty(uiaPath)) Console.Write($"#{uiaPath}");
-                            Console.Write("\"");
-                            Console.ResetColor();
-                        }
-                        Console.WriteLine();
-                        shown++;
-                    }
-                    if (siblings.Count == 0)
-                        Console.WriteLine("     (자식 윈도우 없음 — UIA 탐색 필요)");
+                    // Guard Layer 4: Win32 child miss
+                    TargetAmbiguityGuard.ShowWin32ChildSiblings(hwnd, win32Segments[i], grap, action, uiaPath, win32Segments, i);
                     childError = true;
                     break;
                 }
@@ -1094,67 +817,9 @@ internal partial class Program
                 }
                 PulseStep.Mark("uia-from-handle-done");
 
-                // ── Element action without #scope → auto-find: list available UIA nodes ──
-                if (string.IsNullOrEmpty(uiaPath) && isInteractiveAction && action is not ("close" or "minimize" or "maximize" or "restore" or "focus" or "move" or "resize"))
+                // ── Guard Layer 5: Element action without #scope ──
+                if (string.IsNullOrEmpty(uiaPath) && TargetAmbiguityGuard.CheckMissingScope(root, hwnd, title, action, isInteractiveAction))
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[A11Y] #scope 없음 -> find 자동 전환. \"{title}\" 의 UIA 요소:");
-                    Console.ResetColor();
-                    try
-                    {
-                        var winJson5 = WindowFinder.BuildTargetJson5(hwnd);
-
-                        // Show focused element first (leaf → parent chain)
-                        try
-                        {
-                            using var focLoc = new UiaLocator();
-                            var focInfo = focLoc.GetFocusedElementInfo();
-                            NativeMethods.GetWindowThreadProcessId(hwnd, out uint winPid2);
-                            if (focInfo != null && focInfo.ProcessId == (int)winPid2)
-                            {
-                                var fLabel = !string.IsNullOrEmpty(focInfo.AutomationId) ? focInfo.AutomationId : focInfo.Name;
-                                if (fLabel.Length > 40) fLabel = fLabel[..40];
-                                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                                Console.Write($"  >> [FOCUS] {focInfo.ControlType}(\"{fLabel}\")");
-                                if (focInfo.Patterns.Count > 0) Console.Write($" {string.Join(",", focInfo.Patterns)}");
-                                Console.WriteLine();
-                                // Parent chain (leaf → root)
-                                foreach (var (pType, pName) in focInfo.ParentChain)
-                                {
-                                    if (string.IsNullOrEmpty(pName)) continue;
-                                    Console.Write($"       <- {pType}(\"{pName}\")");
-                                    Console.WriteLine();
-                                }
-                                Console.ResetColor();
-                                if (!string.IsNullOrEmpty(fLabel))
-                                {
-                                    Console.ForegroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine($"     -> a11y {action} \"{winJson5}#*{fLabel}*\"");
-                                    Console.ResetColor();
-                                }
-                            }
-                        }
-                        catch { }
-
-                        var children = root.FindAllChildren();
-                        int shown = 0;
-                        foreach (var child in children)
-                        {
-                            if (shown >= 20) { Console.WriteLine($"     ... (+{children.Length - shown}개 더 — a11y find로 전체 탐색)"); break; }
-                            var cType = "?"; try { cType = child.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                            var cName = child.Properties.Name.ValueOrDefault ?? "";
-                            var cAid = child.Properties.AutomationId.ValueOrDefault ?? "";
-                            if (cName.Length > 40) cName = cName[..40];
-                            var cLabel = !string.IsNullOrEmpty(cAid) ? cAid : cName;
-                            if (string.IsNullOrEmpty(cLabel)) { shown++; continue; }
-                            Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            Console.WriteLine($"     {cType}(\"{cLabel}\") -> a11y {action} \"{winJson5}#*{cLabel}*\"");
-                            Console.ResetColor();
-                            shown++;
-                        }
-                    }
-                    catch { }
-                    Console.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
                     fail++;
                     continue;
                 }
@@ -1279,32 +944,8 @@ internal partial class Program
                             catch { }
                         }
                         Console.Error.WriteLine($"[A11Y] UIA scope not found: \"{uiaPath}\" in {tag}");
-                        // Auto-find: show available children so user can pick the right element
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"[A11Y] \"{uiaPath}\" 요소 없음 -> find 자동 전환. 사용 가능한 요소:");
-                        Console.ResetColor();
-                        try
-                        {
-                            var children = root.FindAllChildren();
-                            int shown = 0;
-                            foreach (var child in children)
-                            {
-                                if (shown >= 15) { Console.WriteLine($"     ... (+{children.Length - shown}개)"); break; }
-                                var cType = "?"; try { cType = child.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                                var cName = child.Properties.Name.ValueOrDefault ?? "";
-                                var cAid = child.Properties.AutomationId.ValueOrDefault ?? "";
-                                if (cName.Length > 40) cName = cName[..40];
-                                var cLabel = !string.IsNullOrEmpty(cAid) ? cAid : cName;
-                                if (string.IsNullOrEmpty(cLabel)) { shown++; continue; }
-                                var winJson5 = WindowFinder.BuildTargetJson5(hwnd);
-                                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                                Console.WriteLine($"     {cType}(\"{cLabel}\") -> a11y {action} \"{winJson5}#*{cLabel}*\"");
-                                Console.ResetColor();
-                                shown++;
-                            }
-                        }
-                        catch { }
-                        Console.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
+                        // Guard Layer 6: UIA scope miss
+                        TargetAmbiguityGuard.ShowUiaScopeMiss(root, hwnd, uiaPath, action);
                         fail++;
                         continue;
                     }
