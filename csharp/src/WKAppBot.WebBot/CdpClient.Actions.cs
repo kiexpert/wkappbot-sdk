@@ -11,15 +11,17 @@ namespace WKAppBot.WebBot;
 
 public sealed partial class CdpClient
 {
-    /// <summary>Evaluate JavaScript and return the result as string. Retries once on timeout.</summary>
+    /// <summary>Evaluate JavaScript and return the result as string. Retries with backoff on timeout.</summary>
     public async Task<string?> EvalAsync(string expression, bool awaitPromise = false)
     {
-        for (int attempt = 0; attempt < 2; attempt++)
+        for (int attempt = 0; attempt < 3; attempt++)
         {
             try { return await EvalAsyncCore(expression, awaitPromise); }
-            catch (TimeoutException) when (attempt == 0)
+            catch (TimeoutException) when (attempt < 2)
             {
-                Console.Error.WriteLine($"[CDP:EVAL] Timeout on attempt 0 — retrying once ({expression[..Math.Min(60, expression.Length)]})");
+                var delayMs = (attempt + 1) * 500; // 500ms, 1000ms
+                Console.Error.WriteLine($"[CDP:EVAL] Timeout attempt {attempt} — retry in {delayMs}ms ({expression[..Math.Min(60, expression.Length)]})");
+                await Task.Delay(delayMs);
             }
         }
         return await EvalAsyncCore(expression, awaitPromise); // final attempt, let exception propagate
