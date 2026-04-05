@@ -42,6 +42,21 @@ internal partial class Program
         catch { }
     }
 
+    /// <summary>Write to dedicated hack log file (not Eye main log).
+    /// All [AUTO-HACK] / [MOUSE-CCA] / [HACK] entries go here.</summary>
+    static void HackLog(string message)
+    {
+        try
+        {
+            var ts = DateTime.Now.ToString("HH:mm:ss.fff");
+            var line = $"[{ts}] {message}";
+            Console.WriteLine(line); // still visible in Eye main log
+            var path = Path.Combine(GetEyeLogDir(), "eye-hack.log");
+            File.AppendAllText(path, line + Environment.NewLine, Encoding.UTF8);
+        }
+        catch { }
+    }
+
     /// <summary>Subscribe to InputReadiness.OnProbeSuccess for auto a11y hack.</summary>
     internal static void SetupAutoHackOnProbe()
     {
@@ -84,13 +99,13 @@ internal partial class Program
             {
                 try
                 {
-                    Console.WriteLine($"[AUTO-HACK] Probe success ??routing to analyze-hack server ({processName}/{className} 0x{targetHwnd:X8})");
+                    HackLog($"[AUTO-HACK] Probe success ??routing to analyze-hack server ({processName}/{className} 0x{targetHwnd:X8})");
 
                     // Route CCA+UIA analysis to analyze-hack server process (avoids loading Vision assembly in Eye)
                     EnsureHackServer();
                     if (_hackServerProcess is not { HasExited: false } || _hackServerStdin == null)
                     {
-                        Console.Error.WriteLine("[AUTO-HACK] analyze-hack server not available");
+                        HackLog("[AUTO-HACK] analyze-hack server not available");
                         AppendEyeAnalysisTrace("auto-hack-error", new
                         {
                             reason = "server-not-available",
@@ -119,7 +134,7 @@ internal partial class Program
 
                     if (!string.IsNullOrEmpty(response))
                     {
-                        Console.WriteLine($"[AUTO-HACK] Done: {response}");
+                        HackLog($"[AUTO-HACK] Done: {response}");
                         AppendEyeAnalysisTrace("auto-hack-done", new
                         {
                             hwnd = $"0x{targetHwnd.ToInt64():X}",
@@ -130,7 +145,7 @@ internal partial class Program
                     }
                     else
                     {
-                        Console.WriteLine($"[AUTO-HACK] No response from server");
+                        HackLog("[AUTO-HACK] No response from server");
                         AppendEyeAnalysisTrace("auto-hack-empty", new
                         {
                             hwnd = $"0x{targetHwnd.ToInt64():X}",
@@ -141,7 +156,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"[AUTO-HACK] Error: {ex.Message}");
+                    HackLog($"[AUTO-HACK] Error: {ex.Message}");
                     AppendEyeAnalysisTrace("auto-hack-error", new
                     {
                         hwnd = $"0x{targetHwnd.ToInt64():X}",
@@ -153,7 +168,7 @@ internal partial class Program
                 finally { _autoHackSemaphore.Release(); }
             });
         };
-        Console.WriteLine("[AUTO-HACK] Subscribed to InputReadiness.OnProbeSuccess (via analyze-hack server)");
+        HackLog("[AUTO-HACK] Subscribed to InputReadiness.OnProbeSuccess (via analyze-hack server)");
     }
 
     // ── Analyze-hack server process ──
@@ -183,13 +198,13 @@ internal partial class Program
             if (_hackServerProcess != null)
             {
                 _hackServerStdin = _hackServerProcess.StdIn;
-                Console.WriteLine($"[MOUSE-CCA] analyze-hack server started (PID={_hackServerProcess.Pid})");
+                HackLog($"[MOUSE-CCA] analyze-hack server started (PID={_hackServerProcess.Pid})");
                 AppendEyeAnalysisTrace("hack-server-started", new { pid = _hackServerProcess.Pid });
             }
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[MOUSE-CCA] Server spawn failed: {ex.Message}");
+            HackLog($"[MOUSE-CCA] Server spawn failed: {ex.Message}");
             AppendEyeAnalysisTrace("hack-server-error", new { error = ex.Message });
         }
     }
@@ -323,7 +338,7 @@ internal partial class Program
                     _liveHackProcess = spawn;
                 }
 
-                Console.WriteLine($"[AUTO-HACK] Live overlay spawned (pid={spawn.Pid}) {currentSource}: {currentGrap}");
+                HackLog($"[AUTO-HACK] Live overlay spawned (pid={spawn.Pid}) {currentSource}: {currentGrap}");
                 AppendEyeAnalysisTrace("auto-hack-live", new
                 {
                     pid = spawn.Pid,
@@ -482,7 +497,7 @@ internal partial class Program
                         serverResult += $"\n`\n{visualMd}\n`";
                 }
                 catch (TimeoutException) { continue; }
-                catch (Exception ex) { Console.Error.WriteLine($"[MOUSE-CCA] Server error: {ex.Message}"); continue; }
+                catch (Exception ex) { HackLog($"[MOUSE-CCA] Server error: {ex.Message}"); continue; }
 
                 // Change detection on result
                 if (serverResult == _lastMouseCcaResult) continue;
@@ -580,7 +595,7 @@ internal partial class Program
 
         // Cleanup server process
         try { _hackServerProcess?.Kill(); } catch { }
-        Console.WriteLine("[MOUSE-CCA] Worker stopped");
+        HackLog("[MOUSE-CCA] Worker stopped");
     }
 
     // ── Keyboard Focus Chain analysis (separate Slack thread reply) ──
