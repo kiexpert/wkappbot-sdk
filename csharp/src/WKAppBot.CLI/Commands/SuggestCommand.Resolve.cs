@@ -319,8 +319,13 @@ internal partial class Program
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("  CMD execution guard FAILED: no [CMD] entries in debug output.");
-                    Console.WriteLine("  → evidence 스크립트 안에서 wkappbot 명령을 실제로 실행해야 합니다.");
-                    Console.WriteLine("  → 예: WKAPPBOT_WORKER=1 timeout 8 W:/SDK/bin/wkappbot.exe suggest list 2>/dev/null");
+                    Console.WriteLine("  → evidence 스크립트 안에서 핵심 wkappbot 명령을 실제로 실행해야 합니다.");
+                    Console.WriteLine("  → 예: WKAPPBOT_WORKER=1 timeout 8 W:/SDK/bin/wkappbot.exe a11y click \"*App*\" --eval-js \"...\"");
+                    Console.WriteLine();
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("  핵심 명령줄이 무엇인지 evidence 파일명 또는 스크립트에 포함시키세요:");
+                    Console.WriteLine($"  파일명: test-{{cmd}}-{{subcmd}}-{{option}}.sh  (예: test-a11y-click-eval-js.sh)");
+                    Console.WriteLine($"  스크립트: wkappbot {{cmd}} {{subcmd}} ... --{{option}} 실제 실행");
                     Console.ResetColor();
                     return 1;
                 }
