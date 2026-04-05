@@ -241,9 +241,9 @@ internal partial class Program
                 if (string.IsNullOrWhiteSpace(card.Cwd)) continue;
                 var (pct, _, jsonlPath, fileSize) = GetContextInfoForCwdEx(card.Cwd);
                 var sizeMB = fileSize / (1024.0 * 1024.0);
-                const double ContextLimitMB = 40.0;
-                const double WarnStartMB = 20.0;   // 경고 시작 (토큰 절약 여유)
-                const double UrgentMB = 30.0;       // 긴급 (75% 이상)
+                const double ContextLimitMB = 20.0;
+                const double WarnStartMB = 8.0;    // 경고 시작 (10MB 제한 접근)
+                const double UrgentMB = 10.0;       // 긴급 (10MB 초과 → 인수인계)
                 if (sizeMB < WarnStartMB || jsonlPath == null) continue;
 
                 var cwdKey = card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');

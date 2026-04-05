@@ -115,7 +115,7 @@ internal partial class Program
                     if (jsonls.Count > 0)
                     {
                         var lf = jsonls[0]!;
-                        _lastContextPct = (int)(lf.Length / (1024.0 * 1024.0) / 40.0 * 100);
+                        _lastContextPct = (int)(lf.Length / (1024.0 * 1024.0) / 20.0 * 100);
                     }
                 }
             }

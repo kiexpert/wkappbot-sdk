@@ -195,7 +195,7 @@ internal partial class Program
 
     /// <summary>
     /// Extended: also returns JSONL path and file size (for context monitor dedup).
-    /// Estimate: 40MB = 100% context. JSONL ÷ 40MB = ctx%.
+    /// Estimate: 20MB = 100% context. JSONL ÷ 20MB = ctx%.
     /// </summary>
     static (int pct, TimeSpan? age, string? jsonlPath, long fileSize) GetContextInfoForCwdEx(string? cwd, string? preferredHostType = null)
     {
@@ -208,7 +208,7 @@ internal partial class Program
             var latestFile = session.Value.path;
             var latestMtime = File.GetLastWriteTimeUtc(latestFile);
             var size = new FileInfo(latestFile).Length;
-            var pct = size > 0 ? (int)(size / (1024.0 * 1024.0) / 40.0 * 100) : -1;
+            var pct = size > 0 ? (int)(size / (1024.0 * 1024.0) / 20.0 * 100) : -1;
             var age = DateTime.UtcNow - latestMtime;
             return (pct, age, latestFile, size);
         }
