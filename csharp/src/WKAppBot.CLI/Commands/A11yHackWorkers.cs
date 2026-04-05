@@ -14,6 +14,7 @@ internal partial class Program
 {
     static volatile int _hackHoverDebounceSeq;
     static volatile bool _hackHoverAnalyzing;
+    static CancellationTokenSource? _hackHoverAnalyzeCts;
 
     static int A11yHackHoverWorker(string[] args)
     {
@@ -95,11 +96,12 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 if (hwnd == IntPtr.Zero) continue;
 
-                // Mouse moved? → reset debounce timer
+                // Mouse moved? → reset debounce + cancel running analysis
                 if (pt.X != lastMouseX || pt.Y != lastMouseY)
                 {
                     lastMouseX = pt.X; lastMouseY = pt.Y;
-                    _hackHoverDebounceSeq++; // cancel any pending analysis
+                    _hackHoverDebounceSeq++;
+                    _hackHoverAnalyzeCts?.Cancel(); // cancel pending/running analysis
                 }
 
                 // Direct UIA: find element at mouse position
@@ -161,23 +163,26 @@ internal partial class Program
                 }
 
                 // Debounce: 9s mouse idle before starting heavy analysis
-                var hackGrap = grapPath;
-                var debounceStamp = ++_hackHoverDebounceSeq;
-                _ = Task.Run(async () =>
+                if (changed)
                 {
-                    await Task.Delay(9000);
-                    if (_hackHoverDebounceSeq != debounceStamp) return; // mouse moved during wait
-                    Console.WriteLine($"\n[ANALYZING] {hackGrap}");
-                    _hackHoverAnalyzing = true;
-                    try { A11yHackCommand(new[] { hackGrap }); }
-                    catch (Exception hex) { Log($"Hack error: {hex.Message}"); }
-                    finally
+                    // Cancel any running analysis
+                    _hackHoverAnalyzeCts?.Cancel();
+                    var hackGrap = grapPath;
+                    var debounceStamp = ++_hackHoverDebounceSeq;
+                    var analyzeCts = new CancellationTokenSource();
+                    _hackHoverAnalyzeCts = analyzeCts;
+                    _ = Task.Run(async () =>
                     {
-                        _hackHoverAnalyzing = false;
-                        if (_hackHoverDebounceSeq != debounceStamp)
-                            Console.WriteLine("[ANALYZING] Cancelled — mouse moved");
-                    }
-                });
+                        try { await Task.Delay(9000, analyzeCts.Token); }
+                        catch (OperationCanceledException) { return; }
+                        if (_hackHoverDebounceSeq != debounceStamp) return;
+                        Console.WriteLine($"\n[ANALYZING] {hackGrap}");
+                        _hackHoverAnalyzing = true;
+                        try { A11yHackCommand(new[] { hackGrap }); }
+                        catch (Exception hex) { Log($"Hack error: {hex.Message}"); }
+                        finally { _hackHoverAnalyzing = false; }
+                    });
+                }
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
