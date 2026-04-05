@@ -823,6 +823,41 @@ internal partial class Program
                 if (child == null)
                 {
                     Console.Error.WriteLine($"[A11Y] Win32 child not found: \"{win32Segments[i]}\" in {tag}");
+                    // Auto-find: list Win32 child windows for MFC/HTS navigation
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[A11Y] \"{win32Segments[i]}\" 자식창 없음 -> find 자동 전환. Win32 자식 윈도우:");
+                    Console.ResetColor();
+                    var siblings = WindowFinder.GetChildrenZOrder(hwnd);
+                    int shown = 0;
+                    foreach (var sib in siblings)
+                    {
+                        if (shown >= 20) { Console.WriteLine($"     ... (+{siblings.Count - shown}개 더)"); break; }
+                        var sibCls = WindowFinder.GetClassName(sib.Handle);
+                        var sibTitle = sib.Title;
+                        if (sibTitle.Length > 40) sibTitle = sibTitle[..40];
+                        var sibR = sib.Rect;
+                        var sibW = sibR.Right - sibR.Left;
+                        var sibH = sibR.Bottom - sibR.Top;
+                        var sibLabel = !string.IsNullOrEmpty(sibTitle) ? sibTitle : sibCls;
+                        Console.ForegroundColor = ConsoleColor.DarkGreen;
+                        Console.Write($"     [{sibCls}] ");
+                        Console.ResetColor();
+                        Console.Write($"\"{sibTitle}\" ({sibW}x{sibH})");
+                        if (!string.IsNullOrEmpty(sibLabel))
+                        {
+                            // Build grap: parent/child pattern
+                            var parentPat = string.Join("/", win32Segments.Take(i));
+                            Console.ForegroundColor = ConsoleColor.DarkGreen;
+                            Console.Write($" -> a11y {action} \"{grap.Split('#')[0]}/{(sibTitle != "" ? "*" + sibTitle + "*" : sibCls)}");
+                            if (!string.IsNullOrEmpty(uiaPath)) Console.Write($"#{uiaPath}");
+                            Console.Write("\"");
+                            Console.ResetColor();
+                        }
+                        Console.WriteLine();
+                        shown++;
+                    }
+                    if (siblings.Count == 0)
+                        Console.WriteLine("     (자식 윈도우 없음 — UIA 탐색 필요)");
                     childError = true;
                     break;
                 }
