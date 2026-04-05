@@ -115,7 +115,7 @@ internal sealed class A11yHackOverlayWindow : Window
             {
                 case HackBoxRole.Target:
                     stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88));
-                    thick = 2.2; fill = new SolidColorBrush(Color.FromArgb(28, 0x00, 0xFF, 0x88));
+                    thick = 2.2; fill = Brushes.Transparent;
                     dash = null; rx = ry = 3;
                     fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 16, ShadowDepth = 0, Opacity = 0.8 };
                     break;
