@@ -13,6 +13,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     static volatile int _hackHoverDebounceSeq;
+    static volatile bool _hackHoverAnalyzing;
 
     static int A11yHackHoverWorker(string[] args)
     {
@@ -166,10 +167,16 @@ internal partial class Program
                 {
                     await Task.Delay(9000);
                     if (_hackHoverDebounceSeq != debounceStamp) return; // mouse moved during wait
-                    Console.WriteLine(); // newline after \r status
-                    Log($"Analyzing: {hackGrap}");
+                    Console.WriteLine($"\n[ANALYZING] {hackGrap}");
+                    _hackHoverAnalyzing = true;
                     try { A11yHackCommand(new[] { hackGrap }); }
                     catch (Exception hex) { Log($"Hack error: {hex.Message}"); }
+                    finally
+                    {
+                        _hackHoverAnalyzing = false;
+                        if (_hackHoverDebounceSeq != debounceStamp)
+                            Console.WriteLine("[ANALYZING] Cancelled — mouse moved");
+                    }
                 });
             }
             catch (OperationCanceledException) { break; }
