@@ -125,14 +125,14 @@ internal sealed class A11yHackOverlayWindow : Window
                     dash = new DoubleCollection { 4, 2 }; rx = ry = 2;
                     fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 8, ShadowDepth = 0, Opacity = 0.4 };
                     break;
-                case HackBoxRole.Cached: // experience DB hit — amber dashed, no fill
-                    stroke = new SolidColorBrush(Color.FromArgb(180, 0xFF, 0xA5, 0x00));
+                case HackBoxRole.Cached: // experience DB hit — amber dashed, subtle
+                    stroke = new SolidColorBrush(Color.FromArgb(50, 0xFF, 0xA5, 0x00));
                     thick = 1.0; fill = Brushes.Transparent;
                     dash = new DoubleCollection { 2, 2 }; rx = ry = 1;
                     fx = null;
                     break;
-                default: // Known — system a11y dashed green, no fill
-                    stroke = new SolidColorBrush(Color.FromArgb(220, 0x32, 0xCD, 0x32));
+                default: // Known — system a11y dashed green, subtle
+                    stroke = new SolidColorBrush(Color.FromArgb(50, 0x32, 0xCD, 0x32));
                     thick = 1.2; fill = Brushes.Transparent;
                     dash = new DoubleCollection { 3, 2 }; rx = ry = 1;
                     fx = null;
