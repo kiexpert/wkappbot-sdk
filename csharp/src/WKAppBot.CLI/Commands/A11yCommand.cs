@@ -789,6 +789,39 @@ internal partial class Program
                     }
                 }
 
+                // ── --eval-js: JS-first tier — try CDP eval before UIA/Win32 on ANY window ──
+                if (!string.IsNullOrEmpty(evalJs) && !GrapHelper.LooksLikeCssSelector(uiaPath ?? ""))
+                {
+                    NativeMethods.GetWindowThreadProcessId(hwnd, out uint jsPid);
+                    var jsPort = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)jsPid);
+                    if (jsPort > 0)
+                    {
+                        Console.WriteLine($"[A11Y] --eval-js: CDP port={jsPort} detected, JS-first tier");
+                        try
+                        {
+                            using var jsCdp = new WKAppBot.WebBot.CdpClient();
+                            jsCdp.ConnectAsync(jsPort).GetAwaiter().GetResult();
+                            var jsResult = jsCdp.EvalAsync(evalJs).GetAwaiter().GetResult();
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"[A11Y] --eval-js OK: {jsResult}");
+                            Console.ResetColor();
+                            ok++;
+                            continue; // JS succeeded — skip UIA/Win32
+                        }
+                        catch (Exception jsEx)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.Error.WriteLine($"[A11Y] --eval-js FAILED: {jsEx.Message} → UIA/Win32 fallback");
+                            Console.ResetColor();
+                            // Fall through to UIA/Win32
+                        }
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"[A11Y] --eval-js: no CDP port for PID {jsPid} → UIA/Win32 fallback");
+                    }
+                }
+
                 // ── CDP Telepathy: if CSS pattern, try CDP first on ANY browser ──
                 bool isCssPattern = !string.IsNullOrEmpty(uiaPath) && GrapHelper.LooksLikeCssSelector(uiaPath);
 
