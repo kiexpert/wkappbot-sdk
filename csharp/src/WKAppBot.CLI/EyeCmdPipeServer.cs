@@ -366,6 +366,15 @@ internal static class EyeCmdPipeServer
             if (Math.Abs(delta2) >= 5)
                 Console.Error.WriteLine($"[PIPE-MEM] {cmdTag}: {memBefore2}→{memAfter2}MB ({(delta2 >= 0 ? "+" : "")}{delta2})");
         }
+        // Guard: command dispatched but missing from CommandHelpMap → auto-suggest (once per command)
+        var cmdForHelp = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+        if (!string.IsNullOrEmpty(cmdForHelp) && !Program.CommandHelpMap.ContainsKey(cmdForHelp)
+            && cmdForHelp is not ("--help" or "-h" or "help" or "--version" or "version")
+            && !cmdForHelp.StartsWith("file-") && !cmdForHelp.StartsWith("kro-trial-"))
+        {
+            Program.AutoRegisterBug($"[BUG-AUTO] Command \"{cmdForHelp}\" missing from CommandHelpMap — add --help entry for discoverability");
+        }
+
         tee.Dispose(); // moves log to old/, updates tee.LogPath
         // "Log saved:" goes through pipeWriter directly (tee already disposed)
         pipeWriter.WriteLine($"Log saved: {tee.LogPath}");
