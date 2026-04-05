@@ -340,7 +340,7 @@ internal partial class Program
             {
                 var uiaQueue = new Queue<(FlaUI.Core.AutomationElements.AutomationElement el, int depth)>();
                 uiaQueue.Enqueue((uiaRoot, 0));
-                const int maxDepth = 3; // root → children → grandchildren → great-grandchildren
+                const int maxDepth = 5; // deeper for Electron apps (actual UI at depth 4-5)
                 const int maxBoxes = 200;
                 while (uiaQueue.Count > 0 && uiaStandaloneBoxes.Count < maxBoxes)
                 {
