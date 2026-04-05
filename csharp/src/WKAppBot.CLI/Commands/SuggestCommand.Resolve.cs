@@ -365,20 +365,32 @@ internal partial class Program
                     var guardSource = mergeAffectedCmds != null ? "merge affectedCommands" : "filename";
                     Console.WriteLine($"  [RESOLVE] CMD execution verified: {cmdCount} command(s) captured, pattern '{expectedCmdPattern}' confirmed ({guardSource})");
 
-                    // Validate captured commands are real wkappbot commands (구라 검출)
+                    // Validate captured commands are registered in CommandHelpMap (구라 검출 + help 강제)
                     foreach (var dbgLine in dbgLines.Where(l => l.Contains("[CMD]")))
                     {
-                        // Extract cmd from "[CMD] name=... cmd=<command> <args>"
                         var cmdIdx = dbgLine.IndexOf("cmd=", StringComparison.Ordinal);
                         if (cmdIdx < 0) continue;
                         var cmdRest = dbgLine[(cmdIdx + 4)..].Trim();
                         var cmdWord = cmdRest.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
-                        if (!string.IsNullOrEmpty(cmdWord) && !CommandHelpMap.ContainsKey(cmdWord)
-                            && cmdWord is not ("eye" or "mcp" or "hotswap" or "tick" or "gc"))
+                        if (!string.IsNullOrEmpty(cmdWord) && !CommandHelpMap.ContainsKey(cmdWord))
                         {
-                            Console.ForegroundColor = ConsoleColor.Yellow;
-                            Console.WriteLine($"  [WARN] Evidence ran unknown command \"{cmdWord}\" — verify it's a real wkappbot command");
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine($"  RESOLVE BLOCKED: command \"{cmdWord}\" is not in CommandHelpMap.");
+                            Console.WriteLine($"  → CommandHelp.cs의 CommandHelpMap에 \"{cmdWord}\" help 텍스트를 먼저 추가하세요.");
+                            Console.WriteLine($"  → 그래야 --help 자동 지원 + regression 테스트 카테고리가 올바르게 동작합니다.");
                             Console.ResetColor();
+                            return 1;
+                        }
+                        // Help quality check: too short = probably placeholder
+                        if (!string.IsNullOrEmpty(cmdWord) && CommandHelpMap.TryGetValue(cmdWord, out var helpText))
+                        {
+                            var helpLen = helpText.Trim().Length;
+                            if (helpLen < 30)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                                Console.WriteLine($"  [WARN] \"{cmdWord}\" help is too short ({helpLen} chars) — consider adding usage examples");
+                                Console.ResetColor();
+                            }
                         }
                     }
                 }
