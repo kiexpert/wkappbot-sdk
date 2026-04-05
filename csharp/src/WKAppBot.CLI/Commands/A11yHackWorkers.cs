@@ -175,18 +175,22 @@ internal partial class Program
                     try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
                 }
 
-                // Debounce: 9s mouse idle before starting heavy analysis
+                // Debounce before starting heavy analysis
+                // Blind window (no UIA label, no patterns) → 1s fast-hack
+                // Normal → 9s idle debounce
+                bool isBlind = string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns);
+                int debounceMs = isBlind ? 1000 : 9000;
                 if (changed)
                 {
                     // Cancel any running analysis
                     _hackHoverAnalyzeCts?.Cancel();
-                    var hackGrap = compactGrap;
+                    var hackGrap = isBlind ? json5Short : compactGrap; // blind → window-level hack
                     var debounceStamp = ++_hackHoverDebounceSeq;
                     var analyzeCts = new CancellationTokenSource();
                     _hackHoverAnalyzeCts = analyzeCts;
                     _ = Task.Run(async () =>
                     {
-                        try { await Task.Delay(9000, analyzeCts.Token); }
+                        try { await Task.Delay(debounceMs, analyzeCts.Token); }
                         catch (OperationCanceledException) { return; }
                         if (_hackHoverDebounceSeq != debounceStamp) return;
                         Console.WriteLine($"\n[ANALYZING] {hackGrap}");
