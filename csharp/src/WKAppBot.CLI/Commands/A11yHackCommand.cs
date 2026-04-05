@@ -16,6 +16,9 @@ internal partial class Program
     /// </summary>
     static int A11yHackCommand(string[] args)
     {
+        // Ensure UTF-8 output (may be lost in Task.Run / pipe contexts)
+        try { Console.OutputEncoding = new System.Text.UTF8Encoding(false); } catch { }
+
         if (args.Length == 0)
         {
             Console.WriteLine("Usage: wkappbot a11y hack <grap>[#scope] [options]");
@@ -261,7 +264,7 @@ internal partial class Program
         var allRegions = cca.Analyze(bmp); // non-merged for table detection
         var table = cca.DetectTable(allRegions, w, h);
         if (table != null)
-            Console.WriteLine($"[HACK] Table detected: {table.Rows} rows 횞 {table.Cols} cols");
+            Console.WriteLine($"[HACK] Table detected: {table.Rows} rows x {table.Cols} cols");
         PulseStep.Mark("table-detect");
 
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
@@ -476,7 +479,7 @@ internal partial class Program
         var rowGroups = positions.GroupBy(p => p.row).OrderBy(g => g.Key).ToList();
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[HACK] ── DYN-A11Y Tree ({w}횞{h}) ──");
+        Console.WriteLine($"[HACK] ── DYN-A11Y Tree ({w}x{h}) ──");
         Console.ResetColor();
 
         foreach (var rowGroup in rowGroups)
@@ -634,7 +637,7 @@ internal partial class Program
                 if (regionIdx >= 0 && stageLabels.TryGetValue(regionIdx, out var stageLabel) && !string.IsNullOrWhiteSpace(stageLabel))
                     label += $" [{stageLabel}]";
                 if (!_hackHoverAnalyzing) // hover mode: skip per-region tree lines (progress markers still show)
-                    Console.WriteLine($"{prefix}{typeIcon} {dynId}{label}  ({region.Bounds.Width}횞{region.Bounds.Height})");
+                    Console.WriteLine($"{prefix}{typeIcon} {dynId}{label}  ({region.Bounds.Width}x{region.Bounds.Height})");
             }
         }
         PulseStep.Mark("ocr-done");
@@ -645,7 +648,7 @@ internal partial class Program
         Console.WriteLine($"  Segments: {regions.Count} (Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount})");
         Console.WriteLine($"  OCR: {ocrOk} ok, {ocrEmpty} failed");
         if (table != null)
-            Console.WriteLine($"  Table: {table.Rows}횞{table.Cols}");
+            Console.WriteLine($"  Table: {table.Rows}x{table.Cols}");
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
         if (gapCollector.HasGaps)
         {
