@@ -67,7 +67,8 @@ internal sealed class CdpPromptPump : IDisposable
         var armed = await cdp.ArmPromptPumpAsync(editorSelector, idleMs: 1000);
         Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: {(armed ? "armed" : "arm-failed")}");
 
-        // Submit watchdog: 3s after LAST append, check if editor still has content
+        // Submit watchdog: 5s after LAST append, check if editor still has content
+        // Two-phase: check at 3s and 5s — if content decreased between checks, submission is in progress
         int myWatchdog;
         lock (state.SyncRoot) { myWatchdog = ++state.WatchdogGen; }
         _ = Task.Run(async () =>
@@ -75,14 +76,17 @@ internal sealed class CdpPromptPump : IDisposable
             try
             {
                 await Task.Delay(3000);
-                lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; } // newer append superseded
-                var remaining = await cdp.GetTextLengthAsync(editorSelector);
-                if (remaining > 0)
-                {
-                    var msg = $"[PUMP] Submit watchdog: editor still has {remaining} chars after 3s! scope={scope} target={dumpTarget} text=[{dumpPreview}]";
-                    Console.Error.WriteLine(msg);
-                    Program.AutoRegisterBug(msg);
-                }
+                lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; }
+                var first = await cdp.GetTextLengthAsync(editorSelector);
+                if (first <= 0) return; // already submitted
+                await Task.Delay(2000);
+                lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; }
+                var second = await cdp.GetTextLengthAsync(editorSelector);
+                if (second <= 0) return; // submitted between checks
+                if (second < first) return; // content decreasing = submission in progress
+                var msg = $"[PUMP] Submit watchdog: editor still has {second} chars after 5s! scope={scope} target={dumpTarget} text=[{dumpPreview}]";
+                Console.Error.WriteLine(msg);
+                Program.AutoRegisterBug(msg);
             }
             catch { }
         });
