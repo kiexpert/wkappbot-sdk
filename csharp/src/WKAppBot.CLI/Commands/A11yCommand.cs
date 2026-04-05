@@ -61,7 +61,7 @@ internal partial class Program
         if (args.Length >= 1)
         {
             var maybeAction = args[0].ToLowerInvariant();
-            if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr" or "hack")
+            if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr" or "hack" or "hack-hover")
             {
                 var delegateArgs = args.Skip(1).ToArray();
                 // ADB check: if first delegate arg is adb:// → route to Android pipeline
