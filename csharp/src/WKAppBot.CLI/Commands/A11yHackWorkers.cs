@@ -240,7 +240,7 @@ internal partial class Program
                                 // Current hovered element
                                 if (elBounds.Width > 0 && elBounds.Height > 0)
                                 {
-                                    var label = !string.IsNullOrEmpty(elLabel) ? $"{elType}:{elLabel}" : elType;
+                                    var label = $"{elType} {elBounds.Width}x{elBounds.Height}";
                                     boxes.Add(new A11yHackOverlayBox(
                                         new System.Windows.Rect(
                                             elBounds.X - rootWr.Left, elBounds.Y - rootWr.Top,
@@ -269,13 +269,11 @@ internal partial class Program
                                                     try { cName = ch.Name ?? ""; } catch { }
                                                     try { cAid = ch.AutomationId ?? ""; } catch { }
                                                     try { cType = ch.ControlType.ToString(); } catch { }
-                                                    var cLabel = !string.IsNullOrEmpty(cAid) ? cAid : cName;
-                                                    if (cLabel.Length > 25) cLabel = cLabel[..25];
                                                     _hoverUiaBoxes.Add(new A11yHackOverlayBox(
                                                         new System.Windows.Rect(
                                                             cr.X - rootWr.Left, cr.Y - rootWr.Top,
                                                             cr.Width, cr.Height),
-                                                        $"{cType}:{cLabel}", null, HackBoxRole.Known));
+                                                        $"{cType} {(int)cr.Width}x{(int)cr.Height}", null, HackBoxRole.Known));
                                                 }
                                                 catch { }
                                             }
