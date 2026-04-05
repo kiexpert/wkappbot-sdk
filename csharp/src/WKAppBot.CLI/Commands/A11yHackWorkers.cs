@@ -156,11 +156,8 @@ internal partial class Program
                 bool changed = result != lastResult;
                 if (changed) lastResult = result;
                 if (RunningInEye && !changed) continue; // Eye: change-only
-                var outputLine = $"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})";
-                if (changed)
-                    Console.Write($"\n{outputLine}    "); // new target → new line + trailing spaces
-                else
-                    Console.Write($"\r{outputLine}    "); // same target → overwrite + trailing spaces
+                if (changed) Console.WriteLine(); // new target → new line
+                Console.Write($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})          \r");
                 Console.Out.Flush();
 
                 // Detailed log (file only, on change)
