@@ -512,6 +512,15 @@ internal partial class Program
         ["prompt"] = "prompt send \"<name>\" \"<msg>\" [--after 60s] [--when-idle 9s]\nprompt list\nDeliver prompts to AI chat windows.",
 
         ["win-move"] = "win-move <grap> --x N --y N [--w N] [--h N]\nMove/resize a window by grap pattern.",
+
+        ["a11y hack-hover"] = """
+            a11y hack-hover [--parent-pid N]
+            Standalone hover analysis worker — mouse CCA + UIA + overlay.
+
+            Independent process: runs until Ctrl+C or parent exits.
+            Logs to eye-hack.log (consolidated).
+            Eye spawns this automatically; can also run from console directly.
+            """,
     };
 }
 

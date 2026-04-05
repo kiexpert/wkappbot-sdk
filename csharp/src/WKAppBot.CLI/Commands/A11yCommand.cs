@@ -74,6 +74,7 @@ internal partial class Program
                     "screenshot" => CaptureCommand(delegateArgs),
                     "ocr"        => OcrCommand(delegateArgs),
                     "hack"       => A11yHackCommand(delegateArgs),
+                    "hack-hover" => A11yHackHoverWorker(delegateArgs),
                     _ => 1
                 };
             }
