@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!-- Major.Minor set manually on each minor/major bump. Patch is auto-counted from git tag v$(WKAppBotBaseVersion). -->
-    <WKAppBotBaseVersion>5.10</WKAppBotBaseVersion>
+    <WKAppBotBaseVersion>5.11</WKAppBotBaseVersion>
     <WKAppBotVersion>$(WKAppBotBaseVersion).0</WKAppBotVersion>
   </PropertyGroup>
 
