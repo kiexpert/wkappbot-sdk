@@ -123,6 +123,17 @@ internal partial class Program
             }
         }
 
+        // Validate cmd/subcmd against known CLI commands
+        {
+            var cmdCheck = evidenceParts.Length > 1 ? evidenceParts[1] : "";
+            if (!string.IsNullOrEmpty(cmdCheck) && !CommandHelpMap.ContainsKey(cmdCheck))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"  [WARN] Unknown command \"{cmdCheck}\" in evidence filename. Known: {string.Join(", ", CommandHelpMap.Keys.Order())}");
+                Console.ResetColor();
+            }
+        }
+
         // Show existing test scripts for this cmd/subcmd
         {
             var cmd1 = evidenceParts.Length > 1 ? evidenceParts[1] : "";
