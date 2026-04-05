@@ -81,6 +81,7 @@ internal partial class Program
         // Main loop: mouse/focus → UIA → console output
         string lastResult = "";
         string lastGrap = "";
+        var _hoverUiaBoxes = new List<A11yHackOverlayBox>();
         int loopCount = 0;
         int lastMouseX = -1, lastMouseY = -1;
         using var uia = new FlaUI.UIA3.UIA3Automation(); // reuse — avoid 4s init per loop
@@ -113,20 +114,23 @@ internal partial class Program
                 // Direct UIA: find element at mouse position
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 string elType = "?", elName = "", elAid = "", elPatterns = "";
+                System.Drawing.Rectangle elBounds = default;
                 NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
                 string proc; try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { proc = "?"; }
+                FlaUI.Core.AutomationElements.AutomationElement? curEl = null;
                 try
                 {
-                    var el = uia.FromPoint(new System.Drawing.Point(pt.X, pt.Y));
-                    if (el != null)
+                    curEl = uia.FromPoint(new System.Drawing.Point(pt.X, pt.Y));
+                    if (curEl != null)
                     {
-                        try { elType = el.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                        try { elName = el.Properties.Name.ValueOrDefault ?? ""; } catch { }
-                        try { elAid = el.Properties.AutomationId.ValueOrDefault ?? ""; } catch { }
+                        try { elType = curEl.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                        try { elName = curEl.Properties.Name.ValueOrDefault ?? ""; } catch { }
+                        try { elAid = curEl.Properties.AutomationId.ValueOrDefault ?? ""; } catch { }
+                        try { var br = curEl.BoundingRectangle; elBounds = new System.Drawing.Rectangle((int)br.X, (int)br.Y, (int)br.Width, (int)br.Height); } catch { }
                         var pats = new List<string>();
-                        try { if (el.Patterns.Invoke.IsSupported) pats.Add("Invoke"); } catch { }
-                        try { if (el.Patterns.Value.IsSupported) pats.Add("Value"); } catch { }
-                        try { if (el.Patterns.Toggle.IsSupported) pats.Add("Toggle"); } catch { }
+                        try { if (curEl.Patterns.Invoke.IsSupported) pats.Add("Invoke"); } catch { }
+                        try { if (curEl.Patterns.Value.IsSupported) pats.Add("Value"); } catch { }
+                        try { if (curEl.Patterns.Toggle.IsSupported) pats.Add("Toggle"); } catch { }
                         elPatterns = string.Join(",", pats);
                     }
                 }
@@ -170,6 +174,75 @@ internal partial class Program
                 if (grapChanged) Console.WriteLine(); // different target pattern → new line
                 Console.Write($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})          \r");
                 Console.Out.Flush();
+
+                // ── Live overlay: root window size, known nodes as dashed boxes ──
+                if (!_hackHoverAnalyzing) // don't interfere with hack analysis overlay
+                {
+                    try
+                    {
+                        // Root window rect
+                        var rootHwnd = NativeMethods.GetAncestor(hwnd, 2 /* GA_ROOT */);
+                        if (rootHwnd == IntPtr.Zero) rootHwnd = hwnd;
+                        NativeMethods.GetWindowRect(rootHwnd, out var rootWr);
+                        int rootW = rootWr.Right - rootWr.Left, rootH = rootWr.Bottom - rootWr.Top;
+                        if (rootW > 0 && rootH > 0)
+                        {
+                            var overlay = A11yHackOverlayHost.GetOrCreate(
+                                OverlaySlot.Input, rootWr.Left, rootWr.Top, rootW, rootH);
+                            if (overlay != null)
+                            {
+                                var boxes = new List<A11yHackOverlayBox>();
+                                // Current hovered element
+                                if (elBounds.Width > 0 && elBounds.Height > 0)
+                                {
+                                    var label = !string.IsNullOrEmpty(elLabel) ? $"{elType}:{elLabel}" : elType;
+                                    boxes.Add(new A11yHackOverlayBox(
+                                        new System.Windows.Rect(
+                                            elBounds.X - rootWr.Left, elBounds.Y - rootWr.Top,
+                                            elBounds.Width, elBounds.Height),
+                                        label, null, HackBoxRole.Target));
+                                }
+                                // Quick UIA children of root (depth 1 — lightweight)
+                                if (grapChanged)
+                                {
+                                    _hoverUiaBoxes.Clear();
+                                    try
+                                    {
+                                        var rootEl = uia.FromHandle(rootHwnd);
+                                        if (rootEl != null)
+                                        {
+                                            var children = rootEl.FindAllChildren();
+                                            foreach (var ch in children)
+                                            {
+                                                try
+                                                {
+                                                    var cr = ch.BoundingRectangle;
+                                                    if (cr.Width < 5 || cr.Height < 5) continue;
+                                                    string cName = "", cAid = "", cType = "?";
+                                                    try { cName = ch.Name ?? ""; } catch { }
+                                                    try { cAid = ch.AutomationId ?? ""; } catch { }
+                                                    try { cType = ch.ControlType.ToString(); } catch { }
+                                                    var cLabel = !string.IsNullOrEmpty(cAid) ? cAid : cName;
+                                                    if (cLabel.Length > 25) cLabel = cLabel[..25];
+                                                    _hoverUiaBoxes.Add(new A11yHackOverlayBox(
+                                                        new System.Windows.Rect(
+                                                            cr.X - rootWr.Left, cr.Y - rootWr.Top,
+                                                            cr.Width, cr.Height),
+                                                        $"{cType}:{cLabel}", null, HackBoxRole.Known));
+                                                }
+                                                catch { }
+                                            }
+                                        }
+                                    }
+                                    catch { }
+                                }
+                                boxes.AddRange(_hoverUiaBoxes);
+                                overlay.Update(new A11yHackOverlayModel(boxes));
+                            }
+                        }
+                    }
+                    catch { }
+                }
 
                 // Detailed log (file only, on change)
                 if (changed)
