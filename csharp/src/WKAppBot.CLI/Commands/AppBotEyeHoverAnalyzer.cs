@@ -311,8 +311,7 @@ internal partial class Program
 
                 _lastLiveHackGrap = currentGrap;
 
-                // In-process hack: call A11yHackCommand directly (no spawn)
-                // This runs the overlay in the same process — no extra PID needed.
+                // Spawn hack as separate process — avoid loading Vision/CCA DLLs into Eye (memory leak)
                 lock (_liveHackLock)
                 {
                     if (debounceCts != _liveHackDebounceCts) return;
@@ -324,24 +323,29 @@ internal partial class Program
                     }
                 }
 
-                HackLog($"[AUTO-HACK] In-process hack: {currentSource}: {currentGrap}");
+                HackLog($"[AUTO-HACK] Spawning hack process: {currentSource}: {currentGrap}");
                 try
                 {
-                    // Run hack command in-process on a background thread (non-blocking)
-                    var hackArgs = new[] { currentGrap };
-                    _ = Task.Run(() =>
+                    var corePath = Environment.ProcessPath ?? "wkappbot";
+                    var cwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory;
+                    var escapedGrap = EscapeCmdArg(currentGrap);
+                    lock (_liveHackLock)
                     {
-                        try { A11yHackCommand(hackArgs); }
-                        catch (Exception hex) { HackLog($"[AUTO-HACK] Hack error: {hex.Message}"); }
-                    });
+                        _liveHackProcess = AppBotPipe.Spawn(corePath, $"a11y hack \"{escapedGrap}\"",
+                            cwd, redirectStdIn: false, redirectStdOut: false,
+                            env: new() { ["WKAPPBOT_WORKER"] = "1" }, caller: "AUTO-HACK");
+                    }
+                    if (_liveHackProcess != null)
+                        HackLog($"[AUTO-HACK] Started (PID={_liveHackProcess.Pid})");
                 }
                 catch (Exception ex)
                 {
-                    AppendEyeAnalysisTrace("auto-hack-error", new { reason = "in-process-failed", error = ex.Message });
+                    HackLog($"[AUTO-HACK] Spawn failed: {ex.Message}");
+                    AppendEyeAnalysisTrace("auto-hack-error", new { reason = "spawn-failed", error = ex.Message });
                 }
                 AppendEyeAnalysisTrace("auto-hack-live", new
                 {
-                    pid = Environment.ProcessId,
+                    pid = _liveHackProcess?.Pid ?? 0,
                     grapPath = currentGrap,
                     source = currentSource,
                     headline = currentHeadline
