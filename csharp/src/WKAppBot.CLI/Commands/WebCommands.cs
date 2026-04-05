@@ -168,9 +168,13 @@ Options:
     static CdpClient ConnectCdp(int port, bool withBar = false, bool verifyWebBot = false, bool ensureWindow = true, string? navigateUrl = null)
     {
         var cdp = new CdpClient();
+        // Prefer domain-based tab lookup over title (titles are unstable — GPT changes them)
+        string? domainHint = null;
+        try { if (!string.IsNullOrWhiteSpace(navigateUrl)) domainHint = new Uri(navigateUrl).Host; } catch { }
+
         try
         {
-            cdp.ConnectAsync(port).GetAwaiter().GetResult();
+            cdp.ConnectAsync(port, preferredTargetTag: domainHint).GetAwaiter().GetResult();
         }
         catch
         {
@@ -179,7 +183,7 @@ Options:
             var proc = WKAppBot.WebBot.ChromeLauncher.LaunchAsync(port, navigateUrl).GetAwaiter().GetResult();
             if (proc != null)
                 Console.WriteLine($"[WEB] Chrome launched (pid={proc.Id})");
-            cdp.ConnectAsync(port).GetAwaiter().GetResult();
+            cdp.ConnectAsync(port, preferredTargetTag: domainHint).GetAwaiter().GetResult();
         }
 
         // Ensure we're connected to this session's tab in the correctly-positioned window.
