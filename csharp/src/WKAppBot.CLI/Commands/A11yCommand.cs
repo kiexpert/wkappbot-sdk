@@ -61,7 +61,7 @@ internal partial class Program
         if (args.Length >= 1)
         {
             var maybeAction = args[0].ToLowerInvariant();
-            if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr" or "hack" or "hack-hover")
+            if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr" or "hack" or "hack-hover" or "hack-input")
             {
                 var delegateArgs = args.Skip(1).ToArray();
                 // ADB check: if first delegate arg is adb:// → route to Android pipeline
@@ -75,6 +75,7 @@ internal partial class Program
                     "ocr"        => OcrCommand(delegateArgs),
                     "hack"       => A11yHackCommand(delegateArgs),
                     "hack-hover" => A11yHackHoverWorker(delegateArgs),
+                    "hack-input" => A11yHackInputWorker(delegateArgs),
                     _ => 1
                 };
             }
