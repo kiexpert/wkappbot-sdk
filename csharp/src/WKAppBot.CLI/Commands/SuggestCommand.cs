@@ -428,6 +428,7 @@ internal partial class Program
 
         Console.WriteLine(new string('─', 100));
         Console.WriteLine($"  🔗 = Slack ts recorded  |  resolve: wkappbot suggest resolve <ts> \"note\"");
+        Console.WriteLine($"  merge: wkappbot suggest merge --all-matching \"pattern\" --title \"title\" --work \"1h\"");
         return 0;
     }
 
