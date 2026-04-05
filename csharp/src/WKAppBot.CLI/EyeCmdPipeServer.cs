@@ -97,6 +97,9 @@ internal static class EyeCmdPipeServer
         // "a11y kill" must NOT go through MCP — it kills processes including the MCP worker itself
         if (cmd == "a11y" && args.Length > 1 && args[1].Equals("kill", StringComparison.OrdinalIgnoreCase))
             return false;
+        // "a11y hack-hover" is long-running — MCP 60s timeout too short
+        if (cmd == "a11y" && args.Length > 1 && args[1].StartsWith("hack-", StringComparison.OrdinalIgnoreCase))
+            return false;
 
         // Eye-internal commands — run in-process (no UIA dependency)
         return cmd switch
