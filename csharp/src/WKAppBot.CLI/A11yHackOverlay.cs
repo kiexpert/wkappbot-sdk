@@ -97,7 +97,8 @@ internal sealed class A11yHackOverlayWindow : Window
 
     public void Render(A11yHackOverlayModel model)
     {
-        ClearCanvas();
+        // Build all new elements first, then swap — no flicker
+        var newChildren = new List<UIElement>();
         var dpi = GetDpiScale();
 
         foreach (var box in model.Boxes)
@@ -147,7 +148,7 @@ internal sealed class A11yHackOverlayWindow : Window
             };
             Canvas.SetLeft(rect, bx);
             Canvas.SetTop(rect, by);
-            _canvas.Children.Add(rect);
+            newChildren.Add(rect);
 
             // ── Label (top-right) ──
             if (!string.IsNullOrWhiteSpace(box.Label))
@@ -180,7 +181,7 @@ internal sealed class A11yHackOverlayWindow : Window
                 labelBg.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 Canvas.SetLeft(labelBg, Math.Max(0, bx + bw - labelBg.DesiredSize.Width - 2));
                 Canvas.SetTop(labelBg, Math.Max(0, by + 2));
-                _canvas.Children.Add(labelBg);
+                newChildren.Add(labelBg);
             }
 
             // ── OCR text (inside box, right half, gold, marquee) ──
@@ -232,9 +233,14 @@ internal sealed class A11yHackOverlayWindow : Window
                 if (oy < by + 1) oy = by + 1;
                 Canvas.SetLeft(ocrBg, ox);
                 Canvas.SetTop(ocrBg, oy);
-                _canvas.Children.Add(ocrBg);
+                newChildren.Add(ocrBg);
             }
         }
+
+        // Atomic swap: clear + add all at once — no flicker
+        ClearCanvas();
+        foreach (var child in newChildren)
+            _canvas.Children.Add(child);
     }
 
     const int GWL_EXSTYLE = -20;
@@ -281,7 +287,7 @@ internal sealed class A11yHackOverlayHost : IDisposable
                 // Clear stale content first, then move+resize to new target
                 var host = s;
                 host.StopHoverTracking();
-                host._dispatcher?.BeginInvoke(() => host._window?.ClearCanvas());
+                // Don't clear here — Render() does atomic swap when new content is ready
                 host.Reposition(screenX, screenY, width, height);
                 host.Show();
                 return host;
