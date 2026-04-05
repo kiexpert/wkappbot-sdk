@@ -73,6 +73,7 @@ internal partial class Program
         string lastResult = "";
         int loopCount = 0;
         int lastMouseX = -1, lastMouseY = -1;
+        using var uia = new FlaUI.UIA3.UIA3Automation(); // reuse — avoid 4s init per loop
 
         Log("Loop started — monitoring mouse/focus");
 
@@ -80,16 +81,8 @@ internal partial class Program
         {
             try
             {
-                Thread.Sleep(100); // 0.1초마다 계산
+                Thread.Sleep(100);
                 loopCount++;
-
-                // Check server alive
-                if (_hackServerProcess is not { HasExited: false })
-                {
-                    Log("Server pipe broken — restarting");
-                    EnsureHackServer();
-                    if (_hackServerProcess is not { HasExited: false }) { Thread.Sleep(2000); continue; }
-                }
 
                 // Get mouse position + window
                 NativeMethods.GetCursorPos(out var pt);
@@ -101,16 +94,16 @@ internal partial class Program
                 {
                     lastMouseX = pt.X; lastMouseY = pt.Y;
                     _hackHoverDebounceSeq++;
-                    _hackHoverAnalyzeCts?.Cancel(); // cancel pending/running analysis
+                    _hackHoverAnalyzeCts?.Cancel();
                 }
 
                 // Direct UIA: find element at mouse position
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                string elType = "?", elName = "", elAid = "", elPatterns = "", winTitle = "";
-                string grapPath = "";
+                string elType = "?", elName = "", elAid = "", elPatterns = "";
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                string proc; try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { proc = "?"; }
                 try
                 {
-                    using var uia = new FlaUI.UIA3.UIA3Automation();
                     var el = uia.FromPoint(new System.Drawing.Point(pt.X, pt.Y));
                     if (el != null)
                     {
@@ -123,28 +116,20 @@ internal partial class Program
                         try { if (el.Patterns.Toggle.IsSupported) pats.Add("Toggle"); } catch { }
                         elPatterns = string.Join(",", pats);
                     }
-                    // Window title
-                    var winEl = uia.FromHandle(hwnd);
-                    if (winEl != null)
-                        try { winTitle = winEl.Properties.Name.ValueOrDefault ?? ""; } catch { }
                 }
                 catch { }
 
                 if (elName.Length > 30) elName = elName[..30];
-                // ASCII-safe title (strip non-ASCII to avoid encoding corruption)
-                winTitle = new string(winTitle.Where(c => c >= 0x20 && c < 0x7F).ToArray());
-                if (winTitle.Length > 40) winTitle = winTitle[..40];
                 var elLabel = !string.IsNullOrEmpty(elAid) ? elAid : elName;
-                // Build targetable grap using JSON5 (hwnd-based = always works)
                 var json5 = WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(hwnd);
-                grapPath = !string.IsNullOrEmpty(elLabel) ? $"{json5}#*{elLabel}*" : json5;
+                var fullGrap = !string.IsNullOrEmpty(elLabel) ? $"{json5}#*{elLabel}*" : json5;
 
                 // Verify: can we actually target this?
                 var verifyHits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(json5, true);
                 bool verified = verifyHits.Any(v => v.Handle == hwnd);
                 var mark = verified ? "OK" : "MISS";
 
-                var result = $"{grapPath} [{elType}] {mark}";
+                var result = $"{fullGrap} [{elType}] {mark}";
 
                 // Console: compact for non-browser, full JSON5 for browser only
                 var json5Short = json5;
@@ -163,14 +148,16 @@ internal partial class Program
                 {
                     lastResult = result;
                     var elMs = sw.ElapsedMilliseconds;
-                    Console.WriteLine($"{compactGrap} [{mark}] {elMs}ms");
+                    var elInfo = $"[{elType}]" + (!string.IsNullOrEmpty(elLabel) ? $" \"{elLabel}\"" : "");
+                    var patInfo = !string.IsNullOrEmpty(elPatterns) ? $" ({elPatterns})" : "";
+                    Console.WriteLine($"{proc}({pid}) {elInfo}{patInfo} -> {compactGrap} [{mark}] {elMs}ms");
                 }
 
                 // Detailed log (file only, on change)
                 if (changed)
                 {
                     var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                    var logLine = $"[{ts2}] [{mark}] [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}) {elPatterns} -> {grapPath}";
+                    var logLine = $"[{ts2}] [{mark}] [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}) {elPatterns} -> {compactGrap}";
                     try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
                 }
 
@@ -179,7 +166,7 @@ internal partial class Program
                 {
                     // Cancel any running analysis
                     _hackHoverAnalyzeCts?.Cancel();
-                    var hackGrap = grapPath;
+                    var hackGrap = compactGrap;
                     var debounceStamp = ++_hackHoverDebounceSeq;
                     var analyzeCts = new CancellationTokenSource();
                     _hackHoverAnalyzeCts = analyzeCts;
