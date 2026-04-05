@@ -20,11 +20,13 @@ internal partial class Program
     {
         int parentPid = 0;
         int.TryParse(Environment.GetEnvironmentVariable("WKAPPBOT_PARENT_PID"), out parentPid);
-        int timeoutSec = 0; // 0 = infinite
-        for (int i = 0; i < args.Length - 1; i++)
+        int timeoutSec = 0;
+        bool quiet = false; // --quiet: suppress polling output, show analysis only
+        for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--parent-pid" && int.TryParse(args[i + 1], out var pp)) parentPid = pp;
-            if (args[i] == "--timeout" && int.TryParse(args[i + 1], out var ts)) timeoutSec = ts;
+            if (args[i] == "--quiet") quiet = true;
+            if (i + 1 < args.Length && args[i] == "--parent-pid" && int.TryParse(args[i + 1], out var pp)) parentPid = pp;
+            if (i + 1 < args.Length && args[i] == "--timeout" && int.TryParse(args[i + 1], out var ts)) timeoutSec = ts;
         }
 
         var logPath = Path.Combine(
@@ -155,7 +157,7 @@ internal partial class Program
 
                 bool changed = result != lastResult;
                 if (changed) lastResult = result;
-                if (parentPid > 0 && !changed) continue; // Eye spawn: change-only (log optimization)
+                if (quiet && !changed) continue; // --quiet: change-only (Eye uses this)
                 Console.WriteLine($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})");
 
                 // Detailed log (file only, on change)

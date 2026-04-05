@@ -485,7 +485,7 @@ internal partial class Program
 
         ["hack"] = "a11y hack <grap>[#scope] [--at x,y] [--ltrb l,t,r,b] [--engine gemini|gpt]\nForce DYN-A11Y analysis: capture → CCA segmentation → OCR → Vision → dynamic a11y tree.",
 
-        ["hack-hover"] = "a11y hack-hover [--parent-pid N] [--timeout Ns]\nMouse hover analysis worker. Tracks mouse → UIA element → grap pattern + verification.\n9s idle triggers full hack analysis. Ctrl+C to stop.",
+        ["hack-hover"] = "a11y hack-hover [--quiet] [--parent-pid N] [--timeout Ns]\nMouse hover analysis worker. Tracks mouse → UIA element → grap pattern + verification.\n--quiet: suppress polling output, show analysis only.\n9s idle triggers full hack analysis. Ctrl+C to stop.",
 
         ["hack-input"] = "a11y hack-input [--parent-pid N] [--timeout Ns]\nKeyboard focus analysis worker. Tracks focused element → input capabilities + parent chain.\nShows: patterns (Value/Text/Invoke/Toggle), grap, process info. Ctrl+C to stop.",
 
