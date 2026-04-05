@@ -151,7 +151,7 @@ internal partial class Program
             }
         }
 
-        // Verify script content: command-name coupling
+        // Verify script content: command-name coupling + option validation
         try
         {
             var cmd2 = evidenceParts.Length > 1 ? evidenceParts[1] : "";
@@ -166,6 +166,29 @@ internal partial class Program
                 Console.WriteLine($"  Script doesn't contain \"{expectedCmd}\" -- filename says test-{cmd2}-{subcmd2} but command not used!");
                 Console.ResetColor();
                 return 1;
+            }
+
+            // Option validation: filename segments after cmd-subcmd that look like options (e.g. "eval-js")
+            // test-a11y-click-eval-js.sh → must contain "--eval-js" in script
+            for (int pi = 3; pi < evidenceParts.Length; pi++)
+            {
+                var seg = evidenceParts[pi];
+                // Skip common non-option description words
+                if (seg.Length < 2) continue;
+                var optionFlag = $"--{seg}";
+                if (scriptContent.Contains(optionFlag, StringComparison.OrdinalIgnoreCase))
+                    continue; // option found in script — OK
+                // Check if it's a known CLI option (heuristic: contains hyphen = likely option)
+                if (seg.Contains('-') || seg.All(c => char.IsLetter(c) || c == '-'))
+                {
+                    // Only warn, don't block — description segments may not be options
+                    if (seg.Contains('-')) // multi-word segments like "eval-js" are definitely options
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"  [WARN] Filename mentions \"{seg}\" but \"{optionFlag}\" not found in evidence script");
+                        Console.ResetColor();
+                    }
+                }
             }
         }
         catch { }
