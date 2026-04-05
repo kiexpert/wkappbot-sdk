@@ -141,20 +141,23 @@ internal partial class Program
 
                 var result = $"{grapPath} [{elType}] {mark}";
 
-                // Change detection on result
-                if (result == lastResult) continue;
-                lastResult = result;
+                // Log only on change (file), but always \r output (console)
+                bool changed = result != lastResult;
+                if (changed) lastResult = result;
 
-                // Console output — \r overwrite for live status
+                // Console output — grap pattern + verify mark, \r continuous
                 var elMs = sw.ElapsedMilliseconds;
-                var statusLine = $"#{loopCount} {elMs}ms [{elType}] \"{elLabel}\" [{mark}] ({pt.X},{pt.Y}){(!string.IsNullOrEmpty(elPatterns) ? $" {elPatterns}" : "")}";
-                if (statusLine.Length > 120) statusLine = statusLine[..120];
-                Console.Write($"\r{statusLine.PadRight(125)}\r");
+                var line = $"[{mark}] {elMs}ms {grapPath}";
+                if (line.Length > 150) line = line[..150];
+                Console.Write($"\r{line.PadRight(155)}\r");
 
                 // Detailed log (file only, on change)
-                var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                var logLine = $"[{ts2}] [{mark}] [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}) {elPatterns} -> {grapPath}";
-                try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
+                if (changed)
+                {
+                    var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
+                    var logLine = $"[{ts2}] [{mark}] [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}) {elPatterns} -> {grapPath}";
+                    try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
+                }
 
                 // Debounce: 9s mouse idle before starting heavy analysis
                 var hackGrap = grapPath;
