@@ -86,6 +86,10 @@ internal partial class Program
         int lastMouseX = -1, lastMouseY = -1;
         using var uia = new FlaUI.UIA3.UIA3Automation(); // reuse — avoid 4s init per loop
 
+        // Hot-swap: detect .new.exe via shared TryRenameSwap
+        var corePath = Environment.ProcessPath ?? "";
+        int swapCheckCounter = 0;
+
         Log("Loop started — monitoring mouse/focus");
 
         while (!cts.IsCancellationRequested)
@@ -94,6 +98,32 @@ internal partial class Program
             {
                 Thread.Sleep(100);
                 loopCount++;
+
+                // Hot-swap check every 5s via shared TryRenameSwap
+                if (++swapCheckCounter >= 50)
+                {
+                    swapCheckCounter = 0;
+                    try
+                    {
+                        var swapResult = TryRenameSwap(corePath, "HOVER:HOTSWAP");
+                        if (swapResult == HotSwapResult.Swapped)
+                        {
+                            Log("[HOTSWAP] Binary swapped, restarting...");
+                            Console.WriteLine($"\n[HOTSWAP] Restarting with new version...");
+                            var psi = new System.Diagnostics.ProcessStartInfo
+                            {
+                                FileName = corePath,
+                                UseShellExecute = false,
+                            };
+                            psi.ArgumentList.Add("a11y");
+                            psi.ArgumentList.Add("hack-hover");
+                            foreach (var a in args) psi.ArgumentList.Add(a);
+                            System.Diagnostics.Process.Start(psi);
+                            return 0;
+                        }
+                    }
+                    catch { }
+                }
 
                 // Get mouse position + window
                 NativeMethods.GetCursorPos(out var pt);
