@@ -262,8 +262,18 @@ internal partial class Program
             var elHwnd = GetElementHwnd(el);
             bool isElectron = IsElectronWindow(hwnd);
 
-            // Tier 2: LegacyIA SetValue — Electron 우선 (WM_CHAR은 Chromium renderer가 무시)
-            // 일반 Win32는 WM_CHAR 후 LegacyIA로 넘어오지 않으므로 순서 문제 없음
+            // Tier 2: IME composition injection (focusless — Win32/MFC native apps)
+            if (!isElectron)
+            {
+                var imeTarget = elHwnd != IntPtr.Zero ? elHwnd : hwnd;
+                if (WKAppBot.Win32.Input.KeyboardInput.TypeViaIme(imeTarget, text))
+                {
+                    Console.WriteLine($"[A11Y] type — IME injection ({text.Length} chars, focusless)");
+                    return true;
+                }
+            }
+
+            // Tier 3: LegacyIA SetValue — Electron 우선 (WM_CHAR은 Chromium renderer 무시)
             if (isElectron || elHwnd == IntPtr.Zero)
             {
                 try
@@ -279,9 +289,8 @@ internal partial class Program
                 catch { }
             }
 
-            // Tier 3: Win32 WM_CHAR — 네이티브 컨트롤 전용 (Electron 제외)
-            // TranslateMessage가 WM_CHAR 자동생성하는 MFC 컨트롤(CMaskEditEx 등)에서 유일한 방법
-            // Electron은 Tier 2(LegacyIA)로 처리됐으므로 여기 도달하면 네이티브 Win32
+            // Tier 4: Win32 WM_CHAR — 네이티브 컨트롤 전용 (Electron 제외)
+            // IME 실패한 MFC 컨트롤(CMaskEditEx 등)에서 유일한 방법
             if (!isElectron && elHwnd != IntPtr.Zero)
             {
                 foreach (char c in text)
@@ -292,7 +301,7 @@ internal partial class Program
         }
         // ConPTY clipboard paste failed — fall through to SendInput
 
-        // Tier 4: SendKeys keystroke fallback (requires focus)
+        // Tier 5: SendKeys keystroke fallback (requires focus)
         try
         {
             Console.WriteLine("[A11Y] type — focusless failed, falling back to SendKeys (focus required)");
