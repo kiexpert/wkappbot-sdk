@@ -483,6 +483,12 @@ internal partial class Program
 
         ["clipboard"] = "clipboard [read|write] [text]\nRead or write system clipboard.\nNo args: read. With text: write.",
 
+        ["hack"] = "a11y hack <grap>[#scope] [--at x,y] [--ltrb l,t,r,b] [--engine gemini|gpt]\nForce DYN-A11Y analysis: capture → CCA segmentation → OCR → Vision → dynamic a11y tree.",
+
+        ["hack-hover"] = "a11y hack-hover [--parent-pid N] [--timeout Ns]\nMouse hover analysis worker. Tracks mouse → UIA element → grap pattern + verification.\n9s idle triggers full hack analysis. Ctrl+C to stop.",
+
+        ["hack-input"] = "a11y hack-input [--parent-pid N] [--timeout Ns]\nKeyboard focus analysis worker. Tracks focused element → input capabilities + parent chain.\nShows: patterns (Value/Text/Invoke/Toggle), grap, process info. Ctrl+C to stop.",
+
         ["speak"] = "speak \"text\" [--bg] [--mouse] [--target <grap>] [--size N]\nWindows TTS voice output + karaoke overlay.\n--bg: background (return immediately).\n--mouse: overlay at cursor position.\n--target <grap>: overlay on specified window.\n--size N: font size px (default 32).",
 
         ["screen"] = "screen blank [--duration N] | restore\nBlank all monitors (privacy/automation). Auto-restore after N seconds.",
