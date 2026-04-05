@@ -94,13 +94,10 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 if (hwnd == IntPtr.Zero) continue;
 
-                // Change detection (20px grid)
-                var nodeKey = $"{hwnd:X8}:{pt.X / 20},{pt.Y / 20}";
-                bool changed = nodeKey != lastNodeKey;
-                if (!changed && loopCount > 1) continue;
-                lastNodeKey = nodeKey;
+                // No early skip — always compute UIA, compare result after
 
                 // Direct UIA: find element at mouse position
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 string elType = "?", elName = "", elAid = "", elPatterns = "", winTitle = "";
                 string grapPath = "";
                 try
@@ -136,17 +133,15 @@ internal partial class Program
                 lastResult = result;
 
                 // Console output — \r overwrite for live status
-                var statusLine = $"[{elType}] \"{elLabel}\" ({pt.X},{pt.Y}){(!string.IsNullOrEmpty(elPatterns) ? $" [{elPatterns}]" : "")}";
-                if (statusLine.Length > 110) statusLine = statusLine[..110];
-                Console.Write($"\r{statusLine.PadRight(115)}\r");
+                var elMs = sw.ElapsedMilliseconds;
+                var statusLine = $"#{loopCount} {elMs}ms [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}){(!string.IsNullOrEmpty(elPatterns) ? $" [{elPatterns}]" : "")}";
+                if (statusLine.Length > 115) statusLine = statusLine[..115];
+                Console.Write($"\r{statusLine.PadRight(120)}\r");
 
-                // Detailed log (file only)
-                if (changed)
-                {
-                    var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                    var logLine = $"[{ts2}] [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}) {elPatterns} -> {grapPath}";
-                    try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
-                }
+                // Detailed log (file only, on change)
+                var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
+                var logLine = $"[{ts2}] [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}) {elPatterns} -> {grapPath}";
+                try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
 
                 // Debounce: wait 9s stable before starting heavy analysis
                 var hackGrap = grapPath;
