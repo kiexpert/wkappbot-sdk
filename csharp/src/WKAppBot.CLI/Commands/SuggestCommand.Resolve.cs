@@ -102,7 +102,7 @@ internal partial class Program
                         if (entryTs.StartsWith(preTsPrefix, StringComparison.OrdinalIgnoreCase) ||
                             entrySlackTs.StartsWith(preTsPrefix, StringComparison.OrdinalIgnoreCase))
                         {
-                            // Check if merge record with affectedCommands
+                            // Check merge record's affectedCommands
                             if (node?["type"]?.GetValue<string>() == "merge")
                             {
                                 var cmds = node?["affectedCommands"]?.AsArray()
@@ -113,6 +113,21 @@ internal partial class Program
                                 {
                                     mergeAffectedCmds = cmds!;
                                     Console.WriteLine($"[RESOLVE] Merge affectedCommands: [{string.Join(", ", mergeAffectedCmds)}] -- using for CMD guard");
+                                }
+                            }
+                            // Non-merge: extract mentioned commands from suggest text
+                            if (mergeAffectedCmds == null)
+                            {
+                                var sugText = node?["text"]?.GetValue<string>() ?? "";
+                                var mentioned = CommandHelpMap.Keys
+                                    .Where(k => sugText.Contains($"wkappbot {k}", StringComparison.OrdinalIgnoreCase)
+                                             || sugText.Contains($"a11y {k}", StringComparison.OrdinalIgnoreCase)
+                                             || sugText.Contains($"--{k}", StringComparison.OrdinalIgnoreCase))
+                                    .Distinct().ToArray();
+                                if (mentioned.Length > 0)
+                                {
+                                    mergeAffectedCmds = mentioned;
+                                    Console.WriteLine($"[RESOLVE] Suggest mentions commands: [{string.Join(", ", mentioned)}] -- using for CMD guard");
                                 }
                             }
                             break;
@@ -349,6 +364,23 @@ internal partial class Program
                 {
                     var guardSource = mergeAffectedCmds != null ? "merge affectedCommands" : "filename";
                     Console.WriteLine($"  [RESOLVE] CMD execution verified: {cmdCount} command(s) captured, pattern '{expectedCmdPattern}' confirmed ({guardSource})");
+
+                    // Validate captured commands are real wkappbot commands (구라 검출)
+                    foreach (var dbgLine in dbgLines.Where(l => l.Contains("[CMD]")))
+                    {
+                        // Extract cmd from "[CMD] name=... cmd=<command> <args>"
+                        var cmdIdx = dbgLine.IndexOf("cmd=", StringComparison.Ordinal);
+                        if (cmdIdx < 0) continue;
+                        var cmdRest = dbgLine[(cmdIdx + 4)..].Trim();
+                        var cmdWord = cmdRest.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+                        if (!string.IsNullOrEmpty(cmdWord) && !CommandHelpMap.ContainsKey(cmdWord)
+                            && cmdWord is not ("eye" or "mcp" or "hotswap" or "tick" or "gc"))
+                        {
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine($"  [WARN] Evidence ran unknown command \"{cmdWord}\" — verify it's a real wkappbot command");
+                            Console.ResetColor();
+                        }
+                    }
                 }
 
                 Console.ForegroundColor = ConsoleColor.Green;
