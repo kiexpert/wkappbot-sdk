@@ -13,6 +13,7 @@ internal sealed class CdpPromptPump : IDisposable
         public bool Locked { get; set; }
         public List<string> QueuedChunks { get; } = new();
         public object SyncRoot { get; } = new();
+        public int WatchdogGen { get; set; }
     }
 
     private static readonly ConcurrentDictionary<string, PageState> _pages = new(StringComparer.OrdinalIgnoreCase);
@@ -66,12 +67,15 @@ internal sealed class CdpPromptPump : IDisposable
         var armed = await cdp.ArmPromptPumpAsync(editorSelector, idleMs: 1000);
         Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: {(armed ? "armed" : "arm-failed")}");
 
-        // Submit watchdog: 3s later check if editor still has content (= submit failed)
+        // Submit watchdog: 3s after LAST append, check if editor still has content
+        int myWatchdog;
+        lock (state.SyncRoot) { myWatchdog = ++state.WatchdogGen; }
         _ = Task.Run(async () =>
         {
             try
             {
                 await Task.Delay(3000);
+                lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; } // newer append superseded
                 var remaining = await cdp.GetTextLengthAsync(editorSelector);
                 if (remaining > 0)
                 {
