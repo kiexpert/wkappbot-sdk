@@ -138,18 +138,18 @@ public static class KeyboardInput
     /// Focusless: uses AttachThreadInput to access target's IME context.
     /// Returns true if IME accepted the text.
     /// </summary>
+    private const uint CPS_CANCEL = 0x0004;
+
     public static bool TypeViaIme(IntPtr hwnd, string text)
     {
         if (hwnd == IntPtr.Zero || string.IsNullOrEmpty(text)) return false;
 
-        // Find the focused control inside the target window
         uint targetTid = NativeMethods.GetWindowThreadProcessId(hwnd, out _);
         uint ourTid = NativeMethods.GetCurrentThreadId();
 
         bool attached = NativeMethods.AttachThreadInput(ourTid, targetTid, true);
         try
         {
-            // Get IME context of target (focused control preferred)
             var gti = new NativeMethods.GUITHREADINFO { cbSize = Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
             NativeMethods.GetGUIThreadInfo(targetTid, ref gti);
             var imeWnd = gti.hwndFocus != IntPtr.Zero ? gti.hwndFocus : hwnd;
@@ -159,13 +159,48 @@ public static class KeyboardInput
 
             try
             {
-                // Set composition string
+                // Backup: save existing IME conversion state + any in-progress composition
+                NativeMethods.ImmGetConversionStatus(hIMC, out uint savedConv, out uint savedSent);
+                var prevCompLen = NativeMethods.ImmGetCompositionStringW(hIMC, GCS_COMPSTR_IME, null, 0);
+                string? prevComp = null;
+                if (prevCompLen > 0)
+                {
+                    var buf = new char[prevCompLen / 2];
+                    NativeMethods.ImmGetCompositionStringW(hIMC, GCS_COMPSTR_IME, buf, (uint)prevCompLen);
+                    prevComp = new string(buf);
+                }
+
+                // Inject: set composition + complete
                 bool ok = NativeMethods.ImmSetCompositionStringW(hIMC, SCS_SETSTR,
                     text, (uint)(text.Length * 2), IntPtr.Zero, 0);
-                if (!ok) return false;
+                if (!ok)
+                {
+                    // Restore previous composition if injection failed
+                    if (!string.IsNullOrEmpty(prevComp))
+                        NativeMethods.ImmSetCompositionStringW(hIMC, SCS_SETSTR,
+                            prevComp, (uint)(prevComp.Length * 2), IntPtr.Zero, 0);
+                    return false;
+                }
 
-                // Complete composition → commit text to application
                 NativeMethods.ImmNotifyIME(hIMC, NI_COMPOSITIONSTR, CPS_COMPLETE, 0);
+
+                // Verify: composition buffer should be empty after commit
+                Thread.Sleep(50);
+                var afterLen = NativeMethods.ImmGetCompositionStringW(hIMC, GCS_COMPSTR_IME, null, 0);
+                if (afterLen > 0)
+                {
+                    // Composition stuck — cancel and report failure
+                    NativeMethods.ImmNotifyIME(hIMC, NI_COMPOSITIONSTR, CPS_CANCEL, 0);
+                    // Restore previous state
+                    NativeMethods.ImmSetConversionStatus(hIMC, savedConv, savedSent);
+                    if (!string.IsNullOrEmpty(prevComp))
+                        NativeMethods.ImmSetCompositionStringW(hIMC, SCS_SETSTR,
+                            prevComp, (uint)(prevComp.Length * 2), IntPtr.Zero, 0);
+                    return false;
+                }
+
+                // Restore IME mode (한/영) — injection may have changed it
+                NativeMethods.ImmSetConversionStatus(hIMC, savedConv, savedSent);
                 return true;
             }
             finally
