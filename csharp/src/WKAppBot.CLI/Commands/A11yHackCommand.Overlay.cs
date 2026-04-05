@@ -161,14 +161,16 @@ internal partial class Program
                 Math.Max(1, region.Bounds.Width),
                 Math.Max(1, region.Bounds.Height));
 
-            // Role: UIA/cache take priority over spatial containment
+            // Role: analyzed (UIA/OCR/cache) → Known, otherwise Scope
             bool hasUia = uiaAnswers != null && uiaAnswers.ContainsKey(i);
+            bool hasStage = stageLabels != null && stageLabels.ContainsKey(i);
+            bool analyzed = hasUia || hasStage;
             HackBoxRole role;
             if (i == 0)
                 role = HackBoxRole.Target;
             else if (i == parentIdx)
                 role = HackBoxRole.Scope;
-            else if (hasUia)
+            else if (analyzed)
                 role = HackBoxRole.Known;
             else if (parentIdx >= 0 && parentBounds.Contains(region.Bounds))
                 role = HackBoxRole.Scope;
