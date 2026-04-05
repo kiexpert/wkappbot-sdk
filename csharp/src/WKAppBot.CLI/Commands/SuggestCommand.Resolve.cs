@@ -296,6 +296,8 @@ internal partial class Program
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("  CMD execution guard FAILED: no [CMD] entries in debug output.");
+                    Console.WriteLine("  → evidence 스크립트 안에서 wkappbot 명령을 실제로 실행해야 합니다.");
+                    Console.WriteLine("  → 예: WKAPPBOT_WORKER=1 timeout 8 W:/SDK/bin/wkappbot.exe suggest list 2>/dev/null");
                     Console.ResetColor();
                     return 1;
                 }
@@ -303,9 +305,15 @@ internal partial class Program
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     if (mergeAffectedCmds != null)
+                    {
                         Console.WriteLine($"  CMD execution guard FAILED: none of merge affectedCommands [{string.Join(", ", mergeAffectedCmds)}] found in debug output.");
+                        Console.WriteLine($"  → evidence에서 [{string.Join(" 또는 ", mergeAffectedCmds)}] 명령을 실행하세요.");
+                    }
                     else
+                    {
                         Console.WriteLine($"  CMD execution guard FAILED: expected '{expectedCmdPattern}' command not found.");
+                        Console.WriteLine($"  → evidence에서 'wkappbot {expectedCmdPattern} ...' 명령을 실행하세요.");
+                    }
                     Console.ResetColor();
                     return 1;
                 }
