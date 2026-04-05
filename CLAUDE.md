@@ -1,4 +1,4 @@
-# WKAppBot v5.11.0 - Windows + Android App Automation Test Framework
+# WKAppBot v5.11.73 - Windows + Android App Automation Test Framework
 
 ## 클롣 운영 규칙 (필독!)
 
@@ -81,6 +81,25 @@ UIA 없는 MFC owner-drawn → CCA 세그멘테이션 → OCR 3중 교차검증 
   - SetWindowBoundsAsync, EnsureMinimizedAsync, SwitchToTargetAsync, EnsureCorrectWindowAsync 전부 교체
   - WebOpenCommand: Thread.Sleep(1-2s) → document.readyState 폴링
 - **BuildTargetJson5 개선**: title 50자 truncate, 말줄임표 제거 (substring 매칭 보장)
+
+### v5.11.37~73 (2026-04-06, Session 5)
+- **hack-hover 대폭 개선**:
+  - 라이브 오버레이: 루트 창 크기, UIA 전체 descendant 점선 표시
+  - 타겟 부모 체인 2배 두께 네온 점선 강조
+  - blind 윈도우(UIA 없음/경험DB 없음) 즉시 핵 발동 (취소 불가)
+  - 경험DB FSW: 파일 변경 즉시 오버레이 갱신
+  - 핫스왑: TryRenameSwap으로 .new.exe 감지 → Launcher 재spawn
+  - 콘솔: 매 틱 출력, Eye: 변경+분석만 (RunningInEye 자동 판단)
+  - 스크린리더 자동 활성화 (Chromium UIA 트리 보강)
+- **hack-input 워커**: 키보드 포커스 분석 (UIA GetFocusedElementInfo)
+- **TypeViaIme**: IMM32 focusless 텍스트 입력 Tier 2 통합
+  - AttachThreadInput + ImmSetCompositionString + CPS_COMPLETE
+  - 상태 백업/검증/복구 (실패 시 이전 composition 원복)
+- **auto-hack 프로세스 격리**: Eye 내 A11yHackCommand → AppBotPipe.Spawn (메모리 누수 방지)
+- **CDP EvalAsync**: 2회→3회 retry + 500ms/1000ms exponential backoff
+- **pump watchdog**: 3s→5s + 2차 감소 확인 (오탐 방지)
+- **오버레이 개선**: 반투명 필 전면 제거, Known/Cached 알파 10%, atomic swap 렌더
+- **CommandHelpMap**: speak, hack, hack-hover, hack-input help 등록
 
 ### v5.10 (2026-04-04)
 - **Eye 파이프 100ms 타임아웃**: `firstOutputTimeoutMs` — slack/ask/newchat 제외 대부분 명령에 적용. Eye 느리면 Core로 자동 전환
