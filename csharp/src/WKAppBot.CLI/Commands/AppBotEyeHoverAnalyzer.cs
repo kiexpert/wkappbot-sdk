@@ -24,6 +24,7 @@ internal partial class Program
     static string _pendingLiveHackGrap = "";
     static string _pendingLiveHackSource = "";
     static string _pendingLiveHackHeadline = "";
+    static string _hackConsoleGrap = "", _hackConsoleUia = "", _hackConsoleCca = "";
 
     static void AppendEyeAnalysisTrace(string kind, object payload)
     {
@@ -370,9 +371,13 @@ internal partial class Program
         AppendEyeAnalysisTrace("analysis-loop-started", new { worker = "mouse+focus" });
         bool firstRun = true;
 
-        // Wait for Eye startup Slack message
-        for (int wait = 0; wait < 30 && _eyeStatusTs == null && !ct.IsCancellationRequested; wait++)
-            await Task.Delay(1000, ct);
+        // Wait for Eye startup Slack message (skip if standalone worker — no Eye)
+        bool isStandalone = !RunningInEye;
+        if (!isStandalone)
+        {
+            for (int wait = 0; wait < 30 && _eyeStatusTs == null && !ct.IsCancellationRequested; wait++)
+                await Task.Delay(1000, ct);
+        }
 
         // Set up reply #2 and #3: reuse if existing CCABot reply, else create placeholder
         if (_eyeStatusTs != null && !string.IsNullOrEmpty(_eyeBotToken) && !string.IsNullOrEmpty(_eyeChannel))
@@ -495,6 +500,11 @@ internal partial class Program
                     serverResult = header.ToString().TrimEnd();
                     if (!string.IsNullOrEmpty(visualMd) && visualMd.Trim().Length > 0)
                         serverResult += $"\n`\n{visualMd}\n`";
+
+                    // Console output: analysis result as tags
+                    _hackConsoleGrap = grapPath;
+                    _hackConsoleUia = $"[{elType}] \"{elName}\"{(!string.IsNullOrEmpty(elPatterns) ? $" ({elPatterns})" : "")}";
+                    _hackConsoleCca = $"{totalSeg} seg (T={textCnt} I={iconCnt} S={sepCnt} C={contCnt}{tableInfo})";
                 }
                 catch (TimeoutException) { continue; }
                 catch (Exception ex) { HackLog($"[MOUSE-CCA] Server error: {ex.Message}"); continue; }
@@ -502,6 +512,10 @@ internal partial class Program
                 // Change detection on result
                 if (serverResult == _lastMouseCcaResult) continue;
                 _lastMouseCcaResult = serverResult;
+
+                HackLog($"[HOVER] {_hackConsoleGrap}");
+                HackLog($"  UIA: {_hackConsoleUia}");
+                HackLog($"  CCA: {_hackConsoleCca}");
 
                 // Post mouse to Slack
                 await UpdateMouseCcaSlack(serverResult);
