@@ -45,6 +45,10 @@ internal partial class Program
 
         Log($"Worker started (PID={Environment.ProcessId}, parent={parentPid})");
 
+        // Ensure screen reader mode for Chromium/Electron UIA tree access
+        WKAppBot.Win32.Native.ScreenReaderMode.Enable();
+        Log($"ScreenReader: enabled={WKAppBot.Win32.Native.ScreenReaderMode.IsEnabled}");
+
         // Start analyze-hack server
         EnsureHackServer();
         if (_hackServerProcess is not { HasExited: false } || _hackServerStdin == null)

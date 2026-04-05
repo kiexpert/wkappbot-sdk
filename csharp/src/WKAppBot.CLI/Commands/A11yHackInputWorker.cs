@@ -39,6 +39,10 @@ internal partial class Program
         try { Console.OutputEncoding = new UTF8Encoding(false); } catch { }
         Log($"Worker started (PID={Environment.ProcessId}, parent={parentPid})");
 
+        // Ensure screen reader mode for Chromium/Electron UIA tree access
+        WKAppBot.Win32.Native.ScreenReaderMode.Enable();
+        Log($"ScreenReader: enabled={WKAppBot.Win32.Native.ScreenReaderMode.IsEnabled}");
+
         using var cts = new CancellationTokenSource();
 
         // Parent PID watch
