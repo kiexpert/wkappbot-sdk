@@ -153,9 +153,11 @@ internal partial class Program
                 {
                     lastResult = result;
                     var elMs = sw.ElapsedMilliseconds;
-                    var elInfo = $"[{elType}]" + (!string.IsNullOrEmpty(elLabel) ? $" \"{elLabel}\"" : "");
-                    var patInfo = !string.IsNullOrEmpty(elPatterns) ? $" ({elPatterns})" : "";
-                    Console.WriteLine($"{proc}({pid}) {elInfo}{patInfo} -> {compactGrap} [{mark}] {elMs}ms");
+                    // All info baked into grap: {hwnd,pid,proc}#*[Type]elLabel*
+                    var richGrap = $"{{hwnd:0x{hwnd.ToInt64():X8},pid:{pid},proc:'{proc}'}}";
+                    if (!string.IsNullOrEmpty(elLabel))
+                        richGrap += $"#*{elLabel}*";
+                    Console.WriteLine($"{richGrap} [{mark}] {elMs}ms");
                 }
 
                 // Detailed log (file only, on change)
