@@ -328,11 +328,23 @@ public sealed partial class CdpClient
         catch { return null; }
     }
 
-    /// <summary>Set Chrome window bounds via CDP Browser.setWindowBounds.</summary>
+    /// <summary>Set Chrome window bounds via CDP Browser.setWindowBounds.
+    /// Two-step: restore from minimized first (Chrome ignores bounds while minimized),
+    /// then apply position/size. Caller should re-minimize after if needed.</summary>
     public async Task<bool> SetWindowBoundsAsync(int windowId, int left, int top, int width, int height)
     {
         try
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            // Chrome ignores bounds changes while minimized — must restore first
+            await SendAsync("Browser.setWindowBounds", new JsonObject
+            {
+                ["windowId"] = windowId,
+                ["bounds"] = new JsonObject { ["windowState"] = "normal" }
+            });
+            var restoreMs = sw.ElapsedMilliseconds;
+            await Task.Delay(50);
+            // Now set actual bounds
             await SendAsync("Browser.setWindowBounds", new JsonObject
             {
                 ["windowId"] = windowId,
@@ -342,9 +354,9 @@ public sealed partial class CdpClient
                     ["top"] = top,
                     ["width"] = width,
                     ["height"] = height,
-                    ["windowState"] = "normal"
                 }
             });
+            Console.Error.WriteLine($"[CDP:BOUNDS] wid={windowId} restore={restoreMs}ms bounds={sw.ElapsedMilliseconds}ms -> ({left},{top} {width}x{height})");
             return true;
         }
         catch { return false; }

@@ -194,9 +194,26 @@ internal partial class Program
             }
         }
 
-        // Registry miss — ALWAYS create a fresh isolated tab.
-        // Do NOT call EnsureCorrectWindowAsync here: its Step 3 steals any host-matching tab,
-        // breaking sandbox isolation (e.g. whisper-study grabs the regular ask tab, or vice-versa).
+        // Registry miss — first check if a matching-host tab already exists (e.g. Chrome launched with URL)
+        // This prevents duplicate tabs when ChromeLauncher already opened the target URL.
+        {
+            var existingTargets = await GetPageTargetsAsync(port);
+            var hostMatch = existingTargets.FirstOrDefault(t =>
+                t.Url.Contains(expectedHost, StringComparison.OrdinalIgnoreCase)
+                && !t.Url.Contains("#wkbot-", StringComparison.Ordinal));
+            if (hostMatch != null)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"[SANDBOX] Miss but host-match found: {key} -> {hostMatch.Id[..Math.Min(8,hostMatch.Id.Length)]} ({hostMatch.Url[..Math.Min(50,hostMatch.Url.Length)]})");
+                Console.ResetColor();
+                if (cdp.TargetId != hostMatch.Id)
+                    await cdp.SwitchToTargetAsync(hostMatch.Id, port);
+                AskTargetRegistry.SetEntry(key, hostMatch.Id, expectedHost);
+                return hostMatch.Id;
+            }
+        }
+
+        // No existing tab — create a fresh isolated tab.
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine($"[SANDBOX] Miss: {key} — creating fresh tab for {expectedHost}");
         Console.ResetColor();

@@ -514,12 +514,13 @@ public sealed partial class CdpClient
                     else
                         Console.WriteLine("[ASK] Cannot get window bounds (OK — reusing tab anyway)");
 
+                    Console.WriteLine($"[CDP:TARGET] reused saved target={tid} name={targetName}");
                     if (minimizeAfter)
                         await MinimizeWindowAsync(tid);
                     return tid;
                 }
             }
-            // Saved target no longer alive or window moved — fall through
+            Console.WriteLine($"[CDP:TARGET] saved target {savedTargetId} not found — scanning");
         }
 
         // Step 2: Scan by URL fragment (legacy / backup)
@@ -532,6 +533,7 @@ public sealed partial class CdpClient
             var url = target?["url"]?.GetValue<string>() ?? "";
             if (tid == null || !url.Contains(fragment, StringComparison.Ordinal)) continue;
 
+            Console.WriteLine($"[CDP:TARGET] fragment match target={tid} name={targetName}");
             if (tid != TargetId)
                 await SwitchToTargetAsync(tid, port);
             if (minimizeAfter)
@@ -667,17 +669,19 @@ public sealed partial class CdpClient
                 if (newTargetId == null) return TargetId;
             }
 
-            // Ensure still minimized after creation
-            await MinimizeWindowAsync(newTargetId);
-
-            // Position new window at expected bounds (while minimized — takes effect on restore)
+            // Position new window at expected bounds (restore → resize → re-minimize)
             var newWb = await GetWindowForTargetAsync(newTargetId);
             if (newWb != null)
+            {
                 await SetWindowBoundsAsync(newWb.Value.windowId, expX, expY, expW, expH);
+                // Re-minimize after bounds applied (prevent focus theft)
+                await MinimizeWindowAsync(newTargetId);
+            }
         }
 
         await Task.Delay(200);
         await SwitchToTargetAsync(newTargetId, port);
+        Console.WriteLine($"[CDP:TARGET] created new target={newTargetId} name={targetName} url={navigateUrl}");
 
         return newTargetId;
     }
