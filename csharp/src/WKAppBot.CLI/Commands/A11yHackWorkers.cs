@@ -83,6 +83,7 @@ internal partial class Program
         // Main loop: mouse/focus → UIA → console output
         string lastResult = "";
         string lastGrap = "";
+        IntPtr lastRootHwnd = IntPtr.Zero;
         var _hoverUiaBoxes = new List<A11yHackOverlayBox>();
         var _hoverExpBoxes = new List<A11yHackOverlayBox>();
         string _lastExpProc = "";
@@ -143,6 +144,15 @@ internal partial class Program
                 // Root window: for UIA tree access and proc name resolution
                 var rootHwndEarly = NativeMethods.GetAncestor(hwnd, 2 /* GA_ROOT */);
                 if (rootHwndEarly == IntPtr.Zero) rootHwndEarly = hwnd;
+
+                // Drill into deepest real child at cursor (RealChildWindowFromPoint ignores transparent/disabled layers)
+                // Convert screen pt → client coords relative to root, then drill
+                {
+                    var clientPt = pt;
+                    NativeMethods.ScreenToClient(rootHwndEarly, ref clientPt);
+                    var deep = NativeMethods.RealChildWindowFromPoint(rootHwndEarly, clientPt);
+                    if (deep != IntPtr.Zero && deep != rootHwndEarly) hwnd = deep;
+                }
 
                 // Mouse moved? → reset debounce + cancel running analysis (but not blind hack)
                 if (pt.X != lastMouseX || pt.Y != lastMouseY)
@@ -231,7 +241,9 @@ internal partial class Program
 
                 bool changed = result != lastResult;
                 if (changed) lastResult = result;
-                bool grapChanged = shortWin != lastGrap;
+                // grapChanged = root window switched (different app) — bestHwnd alone stays same inside Electron/WPF
+                bool grapChanged = rootHwndEarly != lastRootHwnd;
+                lastRootHwnd = rootHwndEarly;
                 lastGrap = shortWin;
                 if (RunningInEye && !changed) continue; // Eye: change-only
                 if (grapChanged) Console.WriteLine(); // different target pattern → new line

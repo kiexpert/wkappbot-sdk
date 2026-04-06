@@ -247,6 +247,13 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern IntPtr WindowFromPoint(POINT point);
 
+    /// <summary>
+    /// Like WindowFromPoint but ignores transparent/disabled windows and drills into real child controls.
+    /// Returns the deepest child that actually owns the point — useful for WPF/Electron host windows.
+    /// </summary>
+    [DllImport("user32.dll")]
+    public static extern IntPtr RealChildWindowFromPoint(IntPtr hwndParent, POINT ptParentClientCoords);
+
     [DllImport("user32.dll", EntryPoint = "SetFocus")]
     public static extern IntPtr SetFocusRaw(IntPtr hWnd);
 
