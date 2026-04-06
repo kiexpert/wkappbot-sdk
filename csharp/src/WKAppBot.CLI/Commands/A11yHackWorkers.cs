@@ -185,10 +185,12 @@ internal partial class Program
                 var mark = verified ? "OK" : "MISS";
 
                 var elNodeTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
-                var rectStr = elBounds.Width > 0 ? $" {elBounds.Width}x{elBounds.Height}" : "";
-                var nameAttr = !string.IsNullOrEmpty(elName) ? $" name=\"{elName}\"" : "";
-                var patAttr = !string.IsNullOrEmpty(elPatterns) ? $" [{elPatterns}]" : "";
-                var result = $"{fullGrap} <{elNodeTag}> {mark}";
+                var attrs = new List<string>();
+                if (elBounds.Width > 0) attrs.Add($"ltwh={elBounds.X},{elBounds.Y},{elBounds.Width},{elBounds.Height}");
+                if (!string.IsNullOrEmpty(elName)) attrs.Add($"name=\"{elName}\"");
+                if (!string.IsNullOrEmpty(elPatterns)) attrs.Add($"pat=\"{elPatterns}\"");
+                var xmlTag = attrs.Count > 0 ? $"<{elNodeTag} {string.Join(" ", attrs)}>" : $"<{elNodeTag}>";
+                var result = $"{fullGrap} {xmlTag} {mark}";
 
                 var elMs = sw.ElapsedMilliseconds;
 
@@ -198,7 +200,7 @@ internal partial class Program
                 lastGrap = fullGrap;
                 if (RunningInEye && !changed) continue; // Eye: change-only
                 if (grapChanged) Console.WriteLine(); // different target pattern → new line
-                Console.Write($"{fullGrap} // <{elNodeTag}>{rectStr}{nameAttr}{patAttr} [{mark}] {elMs}ms          \r");
+                Console.Write($"{fullGrap} // {xmlTag} [{mark}] {elMs}ms          \r");
                 Console.Out.Flush();
 
                 // ── Live overlay: root window size, known nodes as dashed boxes ──
@@ -361,7 +363,7 @@ internal partial class Program
                 if (changed)
                 {
                     var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                    var logLine = $"[{ts2}] {fullGrap} // <{elNodeTag}>{rectStr} [{mark}] {elMs}ms {elPatterns}";
+                    var logLine = $"[{ts2}] {fullGrap} // {xmlTag} [{mark}] {elMs}ms";
                     try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
                 }
 
