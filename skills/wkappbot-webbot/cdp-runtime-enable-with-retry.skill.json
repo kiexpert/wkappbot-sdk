@@ -2,11 +2,12 @@
   "id": "cdp-runtime-enable-with-retry",
   "app": "wkappbot-webbot",
   "title": "CDP Runtime.enable with retry",
-  "desc": "Runtime.enable can fail on first call. Use EnableRuntimeWithRetry: up to 4 attempts with exponential backoff (100ms, 200ms, 400ms).",
+  "desc": "Runtime.enable + Page.enable + DOM.enable can fail on first call. EnableRuntimeWithRetry: 4 total attempts (0..maxRetries=3), exponential backoff 500ms→1000ms→2000ms. Final failure throws TimeoutException.",
   "steps": [
-    "Try Runtime.enable up to 4 times",
-    "Exponential backoff: 100ms 200ms 400ms",
-    "Log each failure \u2014 not fatal until all retries exhausted"
+    "attempt <= maxRetries (default 3) → 4 total tries",
+    "delay = 500 * (1 << attempt): 500ms, 1000ms, 2000ms",
+    "Only retries on TimeoutException (not other errors)",
+    "Throw TimeoutException after all attempts exhausted"
   ],
   "tags": [
     "cdp",
@@ -14,7 +15,19 @@
     "stability",
     "retry"
   ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.cs",
+      "line": 268,
+      "pattern": "EnableRuntimeWithRetry(int maxRetries = 3, int baseDelayMs = 500)"
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.cs",
+      "line": 283,
+      "pattern": "baseDelayMs * (1 << attempt)"
+    }
+  ],
   "author": "claude",
   "created": "2026-04-06T17:01:53.8614476Z",
-  "version": "1.1"
+  "version": "1.2"
 }
