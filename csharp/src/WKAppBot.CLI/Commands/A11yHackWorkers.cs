@@ -219,9 +219,9 @@ internal partial class Program
                 // '?' tagPath = UIA completely blind → replace with temp coord-based name + force blind analysis
                 if (tagPath == "?")
                 {
-                    tagPath = elBounds.Width > 0
-                        ? $"Node_{elBounds.Width}x{elBounds.Height}@{elBounds.X},{elBounds.Y}"
-                        : $"Node@{pt.X},{pt.Y}";
+                    int nx = elBounds.Width > 0 ? elBounds.X + elBounds.Width / 2 : pt.X;
+                    int ny = elBounds.Height > 0 ? elBounds.Y + elBounds.Height / 2 : pt.Y;
+                    tagPath = $"NodeXY({nx},{ny})";
                 }
 
                 var shortWin = $"{{hwnd:0x{bestHwnd.ToInt64():X},proc:'{proc}'}}";
@@ -644,8 +644,8 @@ internal partial class Program
                 // Blind = no UIA info OR no experience DB layout for this window
                 // → immediate hack (experience DB build, uncancellable)
                 // tagPath containing '@' = was '?' (coord-temp name) = fully UIA-blind
-                bool uiaBlind = string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns)
-                    || tagPath.Contains('@');
+                bool uiaBlind = (string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns))
+                    || tagPath.StartsWith("NodeXY(");
                 bool expMissing = false;
                 if (!uiaBlind) // UIA has info, but check experience DB for window layout
                 {
