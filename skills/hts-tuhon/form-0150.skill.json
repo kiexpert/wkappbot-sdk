@@ -1,0 +1,25 @@
+{
+  "id": "form-0150",
+  "app": "hts-tuhon",
+  "title": "Form 0150 \uC870\uAC74\uAC80\uC0C9 \uD3EC\uCEE4\uC2A4\uB9AC\uC2A4 \uB9E4\uD551",
+  "desc": "\uC870\uAC74\uAC80\uC0C9 \uD3FC\uC5D0\uC11C UIA Invoke \uAC00\uB2A5\uD55C \uBC84\uD2BC\uACFC PostMessage\uB9CC \uB418\uB294 owner-drawn \uCEE8\uD2B8\uB864 \uAD6C\uBD84 \uD544\uC218",
+  "steps": [
+    "UIA Invoke OK: \u002B(4009) -(4010) \uAC80\uC0C9(4035) \uC88C\uCE21\uD1A0\uAE00(4000) \uBD88\uB7EC\uC624\uAE30(4004) \uC218\uC2DD\uBC84\uD2BC(4018-4023)",
+    "UIA Invoke NG (owner-drawn PostMessage \uD544\uC694): \uCE74\uD14C\uACE0\uB9AC\uBAA9\uB85D(10001) \uC9C0\uD45C\uBAA9\uB85D(4014) \uC218\uC2DD\uC601\uC5ED(4015) \uC870\uAC74\uC120\uD0DD(4015)",
+    "\uC870\uAC74\uBAA9\uB85D \uC120\uD0DD: PostMessage WM_LBUTTONDOWN/UP \u2014 SendInput \uAE08\uC9C0 (\uD654\uBA74 \uBC29\uD574)",
+    "\uAC80\uC0C9\uC2E4\uD589: cond-add --run (do \u0027\uAC80\uC0C9\u0027 \uC4F0\uBA74 \uC2E4\uC2DC\uAC04\uAC80\uC0C9 \uBA3C\uC800 \uB9E4\uCE6D\uB428 \uC8FC\uC758!)",
+    "cid=1 \uC911\uBCF5 \uC8FC\uC758 \u2014 \uC5EC\uB7EC \uD3FC\uC5D0 \uAC78\uCCD0 \uC798\uBABB\uB41C \uCEE8\uD2B8\uB864 \uD0C0\uAC9F\uD305 \uBC1C\uC0DD"
+  ],
+  "tags": [
+    "hts",
+    "tuhon",
+    "uia",
+    "owner-drawn",
+    "\uC870\uAC74\uAC80\uC0C9",
+    "form-0150",
+    "focusless"
+  ],
+  "author": "claude",
+  "created": "2026-04-06T17:05:31.8733087Z",
+  "version": "1.1"
+}
