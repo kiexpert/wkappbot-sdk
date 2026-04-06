@@ -1,0 +1,20 @@
+{
+  "id": "chatgpt-blank-false-positive-guard",
+  "app": "wkappbot-webbot",
+  "title": "ChatGPT BLANK false-positive guard",
+  "desc": "After response, ChatGPT navigates to /c/UUID causing blank-page false positive. Allow up to 8 blanks in first 20s before treating as real blank.",
+  "steps": [
+    "Track blankCount and firstBlankTime",
+    "If blankCount \u003C 8 AND elapsed \u003C 20s: continue polling",
+    "Only abort after threshold exceeded"
+  ],
+  "tags": [
+    "cdp",
+    "chatgpt",
+    "ask",
+    "stability"
+  ],
+  "author": "claude",
+  "created": "2026-04-06T17:01:39.4664287Z",
+  "version": "1.1"
+}

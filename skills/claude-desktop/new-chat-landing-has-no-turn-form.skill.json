@@ -1,0 +1,20 @@
+{
+  "id": "new-chat-landing-has-no-turn-form",
+  "app": "claude-desktop",
+  "title": "New chat landing has no turn-form",
+  "desc": "On new chat landing page, turn-form (aid=turn-form) does not exist. Find prompt by locating Button \u0027\uC81C\uCD9C\u0027 and walking up to parent Group. Fallback: retry 3x then Ctrl\u002BV \u002B Enter (no click \u2014 cursor already focused).",
+  "steps": [
+    "Try FindByAid(\u0027turn-form\u0027) first",
+    "On new chat: find Button \u0027\uC81C\uCD9C\u0027 \u2192 parent Group is the input container",
+    "Fallback: Ctrl\u002BV \u002B Enter (do NOT click \u2014 cursor is focused)"
+  ],
+  "tags": [
+    "claude-desktop",
+    "uia",
+    "prompt",
+    "new-chat"
+  ],
+  "author": "claude",
+  "created": "2026-04-06T17:02:24.0426936Z",
+  "version": "1.1"
+}
