@@ -519,19 +519,12 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine(crashMsg);
                 Console.ResetColor();
-                // Crash alert to Slack (best-effort, last gasp)
+                // Bug suggest: Slack + suggestions.jsonl via shared suggest command
                 try
                 {
-                    var cfg = LoadSlackConfig();
-                    var bt = cfg?["bot_token"]?.GetValue<string>();
-                    var ch = cfg?["channel"]?.GetValue<string>();
-                    if (!string.IsNullOrEmpty(bt) && !string.IsNullOrEmpty(ch))
-                    {
-                        var stack = ex?.StackTrace?.Length > 500 ? ex.StackTrace[..500] + "..." : ex?.StackTrace;
-                        SlackSendViaApi(bt, ch,
-                            $"💥 Eye CRASH (PID={Environment.ProcessId})\n{ex?.GetType().Name}: {ex?.Message}\n```\n{stack}\n```",
-                            username: "앱봇아이").GetAwaiter().GetResult();
-                    }
+                    var stack = ex?.StackTrace?.Length > 300 ? ex.StackTrace[..300] + "..." : ex?.StackTrace;
+                    var logRef = tee?.LogPath != null ? $"\nlog: {Path.GetFileName(tee.LogPath)}" : "";
+                    RunSuggestCommand($"[CRASH] {ex?.GetType().Name}: {ex?.Message}{logRef}\n{stack}");
                 }
                 catch { }
 

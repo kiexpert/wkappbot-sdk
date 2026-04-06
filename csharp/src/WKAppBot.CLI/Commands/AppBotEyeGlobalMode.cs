@@ -1111,28 +1111,41 @@ internal partial class Program
                 catch { }
             }
 
-            // ── Screensaver kill: user active → kill screensaver process (every 5s) ──
-            // Screensaver self-exit is unreliable — Eye enforces kill from outside.
+            // ── Screensaver lifecycle: kill when active, respawn when idle (every 5s) ──
             if (frameCount % 50 == 25) // every 5s at 100ms interval
             {
                 try
                 {
                     var userIdleMs = NativeMethods.GetUserIdleMs();
-                    if (userIdleMs < 3000) // user active
+                    bool ssAlive = false;
+                    foreach (var p in Process.GetProcessesByName("wkappbot-core"))
                     {
-                        foreach (var p in Process.GetProcessesByName("wkappbot-core"))
+                        try
                         {
-                            try
+                            var cmd = WKAppBot.Win32.Native.NativeMethods.GetProcessCommandLine(p.Id);
+                            if (cmd != null && cmd.Contains("screensaver"))
                             {
-                                var cmd = WKAppBot.Win32.Native.NativeMethods.GetProcessCommandLine(p.Id);
-                                if (cmd != null && cmd.Contains("screensaver"))
+                                if (userIdleMs < 3000) // user active → kill
                                 {
                                     p.Kill();
                                     Console.WriteLine($"[EYE] Killed screensaver (PID={p.Id}) — user active");
                                 }
+                                else
+                                    ssAlive = true;
                             }
-                            catch { }
                         }
+                        catch { }
+                    }
+                    // Respawn screensaver when idle ≥10s and no screensaver process alive
+                    if (!ssAlive && userIdleMs >= 10_000)
+                    {
+                        var ssPath = Environment.ProcessPath ?? "wkappbot";
+                        AppBotPipe.Spawn(ssPath, "screensaver",
+                            cwd: callerCwd,
+                            env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
+                            showNoActivate: true,
+                            caller: "EYE-SCREENSAVER-RESPAWN");
+                        Console.WriteLine("[EYE] ScreenSaver respawned (idle ≥10s)");
                     }
                 }
                 catch { }
@@ -1494,9 +1507,11 @@ internal partial class Program
                 Console.WriteLine($"[EYE:HOT-SWAP] Launching new Eye: {Path.GetFileName(exePath)} {argsStr}");
                 EyeResetColor();
 
+                PulseStep.Init("HOT-SWAP");
                 var newProc = AppBotPipe.Spawn(exePath, argsStr, callerCwd,
                     redirectStdIn: true, redirectStdOut: true, redirectStdErr: true,
                     caller: "EYE-HOTSWAP");
+                PulseStep.Line("spawn");
                 if (newProc != null)
                 {
                     // Close pipe ends immediately — new Eye writes to its own AllocConsole (hidden).
@@ -1504,6 +1519,7 @@ internal partial class Program
                     try { newProc.StdOut?.Close(); } catch { }
                     try { newProc.StdErr?.Close(); } catch { }
                 }
+                PulseStep.Mark("pipes-closed");
                 if (newProc != null)
                 {
                     // Wait for new Eye's window to appear (pipe server is up by then) before closing old Eye.
@@ -1521,15 +1537,21 @@ internal partial class Program
                         }
                         Thread.Sleep(200);
                     }
-                    Console.WriteLine($"[EYE:HOT-SWAP] New Eye responding ({hsw.Elapsed.TotalMilliseconds:F0}ms) — freeing old Eye windows");
+                    PulseStep.Line($"new-eye-ready ({hsw.Elapsed.TotalMilliseconds:F0}ms)");
+                    // Kill old WhisperRing — new Eye will spawn its own
+                    if (_whisperRingPid > 0) { try { Process.GetProcessById(_whisperRingPid).Kill(); } catch { } }
+                    PulseStep.Mark("whisper-killed");
                     try { host.Dispose(); } catch { } // free WPF "WK AppBot Eye" window first (prevents duplicate detection)
+                    PulseStep.Mark("wpf-disposed");
                     TryHideConsoleWindow(); // hide console too
-                    Console.WriteLine("[EYE:HOT-SWAP] Stopping MCP worker...");
+                    PulseStep.Mark("console-hidden");
                     EyeMcpClient.Stop();
-                    Console.WriteLine("[EYE:HOT-SWAP] Draining active pipe connections...");
+                    PulseStep.Line("mcp-stopped");
                     EyeCmdPipeServer.StopAcceptingAndWaitForDrain();
+                    PulseStep.Line("pipe-drained");
                     Console.WriteLine("[EYE:HOT-SWAP] Pipe drain complete — old Eye exiting");
                 }
+                PulseStep.Finish("done");
             }
             catch (Exception ex)
             {

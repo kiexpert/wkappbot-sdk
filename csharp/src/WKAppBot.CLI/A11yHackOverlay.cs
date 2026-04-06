@@ -325,12 +325,20 @@ internal sealed class A11yHackOverlayHost : IDisposable
         _screenY = screenY;
         _uiThread = new Thread(() =>
         {
-            _window = new A11yHackOverlayWindow(width, height) { Left = screenX, Top = screenY };
-            _dispatcher = Dispatcher.CurrentDispatcher;
-            _ready.Set();
-            _window.Show();
-            ForceWindowPosition(_window, screenX, screenY, width, height);
-            Dispatcher.Run();
+            try
+            {
+                _window = new A11yHackOverlayWindow(width, height) { Left = screenX, Top = screenY };
+                _dispatcher = Dispatcher.CurrentDispatcher;
+                _ready.Set();
+                _window.Show();
+                ForceWindowPosition(_window, screenX, screenY, width, height);
+                Dispatcher.Run();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[OVERLAY] WPF init failed: {ex.Message}");
+                _ready.Set(); // unblock caller even on failure
+            }
         });
         _uiThread.SetApartmentState(ApartmentState.STA);
         _uiThread.IsBackground = true;
@@ -347,6 +355,17 @@ internal sealed class A11yHackOverlayHost : IDisposable
 
     public void Update(IReadOnlyList<A11yHackOverlayBox> boxes)
         => Update(new A11yHackOverlayModel(boxes));
+
+    /// <summary>Move overlay to follow window position changes.</summary>
+    public void Move(int screenX, int screenY)
+    {
+        _screenX = screenX;
+        _screenY = screenY;
+        _dispatcher?.BeginInvoke(() =>
+        {
+            if (_window != null) { _window.Left = screenX; _window.Top = screenY; }
+        });
+    }
 
     public void StartHoverTracking(int screenX, int screenY)
     {

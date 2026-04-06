@@ -57,6 +57,7 @@ internal partial class Program
             }
         }
 
+        var hackLog = Console.Error;
         PulseStep.Init("a11y-hack");
 
         // Parse grap#scope
@@ -71,12 +72,12 @@ internal partial class Program
         var targets = WindowFinder.FindByTitle(grap);
         if (!targets.Any())
         {
-            Console.Error.WriteLine($"[HACK] No window found: \"{grap}\"");
+            hackLog.WriteLine($"[HACK] No window found: \"{grap}\"");
             return 1;
         }
         var win = targets.First();
         var hwnd = win.Handle;
-        Console.WriteLine($"[HACK] Target: 0x{hwnd.ToInt64():X} \"{win.Title}\"");
+        hackLog.WriteLine($"[HACK] Target: 0x{hwnd.ToInt64():X} \"{win.Title}\"");
         PulseStep.Mark("target-found");
 
         // If #scope specified, find UIA element and use its BoundingRectangle
@@ -88,7 +89,7 @@ internal partial class Program
             // --ltrb direct rect override (skip auto-narrow)
             var ar = atRect.Value;
             wr.Left = ar.Left; wr.Top = ar.Top; wr.Right = ar.Right; wr.Bottom = ar.Bottom;
-            Console.WriteLine($"[HACK] --ltrb override: rect=({ar.Left},{ar.Top} {ar.Width}x{ar.Height})");
+            hackLog.WriteLine($"[HACK] --ltrb override: rect=({ar.Left},{ar.Top} {ar.Width}x{ar.Height})");
         }
         else
         {
@@ -105,16 +106,16 @@ internal partial class Program
                 {
                     var r = scoped.Properties.BoundingRectangle.ValueOrDefault;
                     wr.Left = r.X; wr.Top = r.Y; wr.Right = r.X + r.Width; wr.Bottom = r.Y + r.Height;
-                    Console.WriteLine($"[HACK] Scoped to: \"{uiaScope}\" rect=({r.X},{r.Y} {r.Width}x{r.Height})");
+                    hackLog.WriteLine($"[HACK] Scoped to: \"{uiaScope}\" rect=({r.X},{r.Y} {r.Width}x{r.Height})");
                 }
-                else Console.WriteLine($"[HACK] Scope \"{uiaScope}\" not found ??using full window");
+                else hackLog.WriteLine($"[HACK] Scope \"{uiaScope}\" not found — using full window");
             }
-            catch { Console.WriteLine($"[HACK] Scope error ??using full window"); }
+            catch { hackLog.WriteLine($"[HACK] Scope error — using full window"); }
         }
         int w = wr.Right - wr.Left, h = wr.Bottom - wr.Top;
         if (w <= 0 || h <= 0)
         {
-            Console.Error.WriteLine("[HACK] Window has zero size");
+            hackLog.WriteLine("[HACK] Window has zero size");
             return 1;
         }
         var analysisTargetRect = TryResolveAnalysisTargetRect(wr);
@@ -122,6 +123,7 @@ internal partial class Program
         int fullWw = fullWr.Right - fullWr.Left, fullWh = fullWr.Bottom - fullWr.Top;
         // CCA offset: narrowed area position relative to full window
         int ccaOffX = wr.Left - fullWr.Left, ccaOffY = wr.Top - fullWr.Top;
+        _hackOverlayHwnd = hwnd;
         var liveOverlay = A11yHackOverlayHost.GetOrCreate(OverlaySlot.Session, fullWr.Left, fullWr.Top, fullWw, fullWh);
         liveOverlay?.Update(new A11yHackOverlayModel(new[]
         {
@@ -152,7 +154,7 @@ internal partial class Program
             if (idleMs < elapsed && idleMs < abortIdleThresholdMs)
             {
                 hackAborted = true;
-                Console.WriteLine("[HACK] User input detected — aborting");
+                hackLog.WriteLine("[HACK] User input detected — aborting");
                 if (!_hackHoverAnalyzing) liveOverlay?.Hide();
                 return true;
             }
@@ -173,7 +175,7 @@ internal partial class Program
                 || curWr.Right != baselineWr.Right || curWr.Bottom != baselineWr.Bottom)
             {
                 hackAborted = true;
-                Console.WriteLine("[HACK] Window moved/resized — aborting");
+                hackLog.WriteLine("[HACK] Window moved/resized — aborting");
                 if (!_hackHoverAnalyzing) liveOverlay?.Hide();
                 return true;
             }
@@ -184,7 +186,7 @@ internal partial class Program
                 if (cur != baselinePixelHash)
                 {
                     hackAborted = true;
-                    Console.WriteLine("[HACK] Content changed — aborting for re-analysis");
+                    hackLog.WriteLine("[HACK] Content changed — aborting for re-analysis");
                     liveOverlay?.Hide();
                     return true;
                 }
@@ -226,10 +228,10 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[HACK] Capture failed: {ex.Message}");
+            hackLog.WriteLine($"[HACK] Capture failed: {ex.Message}");
             return 1;
         }
-        Console.WriteLine($"[HACK] Captured: {w}x{h}");
+        hackLog.WriteLine($"[HACK] Captured: {w}x{h}");
         InitHackExpDir(hwnd);
         PulseStep.Mark("captured");
 
@@ -255,7 +257,7 @@ internal partial class Program
         int contCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
         int noiseCount = regions.Count(r => r.Type == ConnectedComponentAnalyzer.RegionType.DyNoise);
 
-        Console.WriteLine($"[HACK] CCA: {regions.Count} regions ??Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount} Noise={noiseCount}");
+        hackLog.WriteLine($"[HACK] CCA: {regions.Count} regions ??Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount} Noise={noiseCount}");
         SaveHackOverlayPreview(bmp, regions, "cca", wr.Left, wr.Top);
         var stageLabels = new Dictionary<int, string>();
         UpdateHackOverlay(liveOverlay, bmp, regions, null, stageLabels, null, ccaOffX, ccaOffY);
@@ -264,12 +266,13 @@ internal partial class Program
         var allRegions = cca.Analyze(bmp); // non-merged for table detection
         var table = cca.DetectTable(allRegions, w, h);
         if (table != null)
-            Console.WriteLine($"[HACK] Table detected: {table.Rows} rows x {table.Cols} cols");
+            hackLog.WriteLine($"[HACK] Table detected: {table.Rows} rows x {table.Cols} cols");
         PulseStep.Mark("table-detect");
 
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
         // UIA answer key: scan UIA tree, build rect→info map for cross-reference
         var uiaAnswers = new Dictionary<int, (string name, string type, string aid)>();
+        var uiaSibIdx = new Dictionary<int, int>(); // region → sibling index (1-based)
         var uiaBounds = new Dictionary<int, Rectangle>(); // UIA element screen rect (most specific)
         var _uiaBestArea = new Dictionary<int, int>();
         List<A11yHackOverlayBox>? uiaStandaloneBoxes = null;
@@ -279,18 +282,23 @@ internal partial class Program
             using var automation = new FlaUI.UIA3.UIA3Automation();
             var uiaRoot = automation.FromHandle(hwnd);
             // Depth-limited BFS instead of FindAllDescendants (Electron can take 60s+)
-            var uiaElements = new List<FlaUI.Core.AutomationElements.AutomationElement>();
+            var uiaElements = new List<(FlaUI.Core.AutomationElements.AutomationElement el, int sibIdx)>();
             {
-                var q = new Queue<(FlaUI.Core.AutomationElements.AutomationElement el, int d)>();
-                q.Enqueue((uiaRoot, 0));
+                var q = new Queue<(FlaUI.Core.AutomationElements.AutomationElement el, int d, int sibIdx)>();
+                q.Enqueue((uiaRoot, 0, 0));
                 const int scanDepth = 4;
                 while (q.Count > 0 && uiaElements.Count < 500)
                 {
-                    var (n, d) = q.Dequeue();
-                    uiaElements.Add(n);
+                    var (n, d, sib) = q.Dequeue();
+                    uiaElements.Add((n, sib));
                     if (d < scanDepth)
                     {
-                        try { foreach (var c in n.FindAllChildren()) q.Enqueue((c, d + 1)); }
+                        try
+                        {
+                            var children = n.FindAllChildren();
+                            for (int ci = 0; ci < children.Length; ci++)
+                                q.Enqueue((children[ci], d + 1, ci + 1));
+                        }
                         catch { }
                     }
                 }
@@ -301,14 +309,12 @@ internal partial class Program
                 var seg = regions[ri];
                 // Convert segment rect to screen coordinates
                 var segScreen = new Rectangle(seg.Bounds.X + wr.Left, seg.Bounds.Y + wr.Top, seg.Bounds.Width, seg.Bounds.Height);
-                foreach (var el in uiaElements)
+                foreach (var (el, elSibIdx) in uiaElements)
                 {
                     try
                     {
                         var elRect = el.Properties.BoundingRectangle.ValueOrDefault;
                         var elR = new Rectangle(elRect.X, elRect.Y, elRect.Width, elRect.Height);
-                        // Overlap > 50% of segment area = match
-                        // Pick smallest matching UIA element (most specific)
                         var overlap = Rectangle.Intersect(segScreen, elR);
                         if (overlap.Width * overlap.Height > seg.Bounds.Width * seg.Bounds.Height * 0.5)
                         {
@@ -319,11 +325,11 @@ internal partial class Program
                             {
                                 int elArea = elR.Width * elR.Height;
                                 bool existing = uiaAnswers.ContainsKey(ri);
-                                // Keep smallest (most specific) match
                                 if (!existing || elArea < _uiaBestArea.GetValueOrDefault(ri, int.MaxValue))
                                 {
                                     uiaAnswers[ri] = (name, ct, aid);
-                                    uiaBounds[ri] = elR; // screen coords
+                                    uiaSibIdx[ri] = elSibIdx;
+                                    uiaBounds[ri] = elR;
                                     _uiaBestArea[ri] = elArea;
                                     if (!existing) uiaMatched++;
                                 }
@@ -333,7 +339,7 @@ internal partial class Program
                     catch { }
                 }
             }
-            Console.WriteLine($"[HACK] UIA answer key: {uiaMatched}/{regions.Count} segments matched");
+            hackLog.WriteLine($"[HACK] UIA answer key: {uiaMatched}/{regions.Count} segments matched");
 
             // Collect standalone UIA boxes from FULL root window (depth-limited for speed)
             // FindAllDescendants on Electron can take 60s+, so use breadth-limited walk (depth ≤ 3)
@@ -341,13 +347,13 @@ internal partial class Program
             uiaStandaloneBoxes = new List<A11yHackOverlayBox>();
             try
             {
-                var uiaQueue = new Queue<(FlaUI.Core.AutomationElements.AutomationElement el, int depth)>();
-                uiaQueue.Enqueue((uiaRoot, 0));
-                const int maxDepth = 5; // deeper for Electron apps (actual UI at depth 4-5)
+                var uiaQueue = new Queue<(FlaUI.Core.AutomationElements.AutomationElement el, int depth, int sibIdx)>();
+                uiaQueue.Enqueue((uiaRoot, 0, 0));
+                const int maxDepth = 5;
                 const int maxBoxes = 200;
                 while (uiaQueue.Count > 0 && uiaStandaloneBoxes.Count < maxBoxes)
                 {
-                    var (cur, depth) = uiaQueue.Dequeue();
+                    var (cur, depth, sibIdx) = uiaQueue.Dequeue();
                     try
                     {
                         var elRect = cur.Properties.BoundingRectangle.ValueOrDefault;
@@ -359,28 +365,21 @@ internal partial class Program
                             if (bx + bw > fullW) bw = fullW - bx; if (by + bh > fullH) bh = fullH - by;
                             if (bw >= 5 && bh >= 5)
                             {
-                                var name = cur.Properties.Name.ValueOrDefault ?? "";
                                 var aid = cur.Properties.AutomationId.ValueOrDefault ?? "";
                                 var ct = ""; try { ct = cur.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                                // Include if has name/aid OR has controlType (for unnamed Pane/Group nodes)
-                                {
-                                    var idPart = !string.IsNullOrWhiteSpace(aid) ? aid
-                                               : !string.IsNullOrWhiteSpace(name) ? TrimPreview(name, 20)
-                                               : $"d{depth}";
-                                    var typePart = !string.IsNullOrWhiteSpace(ct) ? ct : "?";
-                                    var label = $"{typePart}_{idPart} {bw}x{bh}";
-                                    uiaStandaloneBoxes.Add(new A11yHackOverlayBox(
-                                        new System.Windows.Rect(bx, by, bw, bh), label, null, HackBoxRole.Known));
-                                }
+                                var typePart = !string.IsNullOrWhiteSpace(ct) ? ct : "?";
+                                var label = $"{WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(typePart, aid, sibIdx + 1)} {bw}x{bh}";
+                                uiaStandaloneBoxes.Add(new A11yHackOverlayBox(
+                                    new System.Windows.Rect(bx, by, bw, bh), label, null, HackBoxRole.Known));
                             }
                         }
-                        // Enqueue children (depth-limited)
                         if (depth < maxDepth)
                         {
                             try
                             {
-                                foreach (var child in cur.FindAllChildren())
-                                    uiaQueue.Enqueue((child, depth + 1));
+                                var children = cur.FindAllChildren();
+                                for (int ci = 0; ci < children.Length; ci++)
+                                    uiaQueue.Enqueue((children[ci], depth + 1, ci));
                             }
                             catch { }
                         }
@@ -389,7 +388,7 @@ internal partial class Program
                 }
             }
             catch { }
-            Console.WriteLine($"[HACK] UIA standalone boxes: {uiaStandaloneBoxes.Count}");
+            hackLog.WriteLine($"[HACK] UIA standalone boxes: {uiaStandaloneBoxes.Count}");
 
             // Print UIA tree summary: window root → children (depth-limited)
             try
@@ -398,9 +397,7 @@ internal partial class Program
                 var rootAid = uiaRoot.Properties.AutomationId.ValueOrDefault ?? "";
                 var rootCt = ""; try { rootCt = uiaRoot.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                 var rootClass = uiaRoot.Properties.ClassName.ValueOrDefault ?? "";
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.WriteLine($"[HACK] UIA tree root: {rootCt} \"{rootName}\" aid={rootAid} class={rootClass}");
-                Console.ResetColor();
+                hackLog.WriteLine($"[HACK] UIA tree root: {rootCt} \"{rootName}\" aid={rootAid} class={rootClass}");
                 var rootChildren = uiaRoot.FindAllChildren();
                 for (int ci = 0; ci < rootChildren.Length && ci < 30; ci++)
                 {
@@ -411,11 +408,11 @@ internal partial class Program
                         var ca = c.Properties.AutomationId.ValueOrDefault ?? "";
                         var cc = ""; try { cc = c.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                         var cr = c.Properties.BoundingRectangle.ValueOrDefault;
-                        Console.WriteLine($"  |--{cc} \"{TrimPreview(cn, 30)}\" aid={ca} ({(int)cr.Width}×{(int)cr.Height})");
+                        hackLog.WriteLine($"  |--{cc} \"{TrimPreview(cn, 30)}\" aid={ca} ({(int)cr.Width}x{(int)cr.Height})");
                     }
-                    catch { Console.WriteLine($"  |--(error reading child #{ci})"); }
+                    catch { hackLog.WriteLine($"  |--(error reading child #{ci})"); }
                 }
-                if (rootChildren.Length > 30) Console.WriteLine($"  `--... +{rootChildren.Length - 30} more");
+                if (rootChildren.Length > 30) hackLog.WriteLine($"  `--... +{rootChildren.Length - 30} more");
             }
             catch { }
 
@@ -430,7 +427,7 @@ internal partial class Program
                 narrowed = Rectangle.Intersect(narrowed, new Rectangle(0, 0, w, h));
                 if (narrowed.Width > 0 && narrowed.Height > 0 && narrowed.Width * narrowed.Height < seg.Bounds.Width * seg.Bounds.Height)
                 {
-                    Console.WriteLine($"[HACK] Region[{ri}] narrowed: {seg.Bounds.Width}x{seg.Bounds.Height} → {narrowed.Width}x{narrowed.Height} (UIA)");
+                    hackLog.WriteLine($"[HACK] Region[{ri}] narrowed: {seg.Bounds.Width}x{seg.Bounds.Height} → {narrowed.Width}x{narrowed.Height} (UIA)");
                     regions[ri] = new ConnectedComponentAnalyzer.Region
                     {
                         Bounds = narrowed, Type = seg.Type, PixelCount = seg.PixelCount,
@@ -449,307 +446,60 @@ internal partial class Program
             }
             UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
         }
-        catch (Exception ex) { Console.WriteLine($"[HACK] UIA scan error: {ex.Message}"); }
+        catch (Exception ex) { hackLog.WriteLine($"[HACK] UIA scan error: {ex.Message}"); }
 
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
-        // OCR on text regions + tree output
+
+        // ── OCR + Vision: background workers (overlay stays responsive) ──
+        var gapCollector = new OcrGapCollector();
+        var workerCtx = new HackWorkerContext
+        {
+            Bmp = bmp, Regions = regions, UiaAnswers = uiaAnswers,
+            StageLabels = stageLabels, UiaStandaloneBoxes = uiaStandaloneBoxes,
+            LiveOverlay = liveOverlay, CcaOffX = ccaOffX, CcaOffY = ccaOffY,
+            Hwnd = hwnd, ExpDir = _hackExpDir, GapCollector = gapCollector,
+        };
+
+        var ocrThread = new Thread(() => RunOcrWorker(workerCtx, () => HackShouldAbort()))
+        { IsBackground = true, Name = "HackOcr" };
+        ocrThread.Start();
+        ocrThread.Join();
+        PulseStep.Mark("ocr-done");
+
+        if (!HackShouldAbort() && gapCollector.HasGaps)
+        {
+            var visionThread = new Thread(() => RunVisionWorker(workerCtx, visionEngine, () => HackShouldAbort()))
+            { IsBackground = true, Name = "HackVision" };
+            visionThread.Start();
+            visionThread.Join();
+            PulseStep.Mark("vision-done");
+        }
+        gapCollector.Dispose();
+
+        // ── Summary + MD table ──
+        hackLog.WriteLine($"[HACK] ── Summary ──");
+        hackLog.WriteLine($"  Segments: {regions.Count} (Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount})");
+        hackLog.WriteLine($"  OCR: {workerCtx.OcrOk} ok, {workerCtx.OcrEmpty} failed");
+        if (table != null) hackLog.WriteLine($"  Table: {table.Rows}x{table.Cols}");
+
         var positions = DynamicA11yAnalyzer.AssignGridPositions(
             regions, r => r.Bounds, rowGap: 5);
 
-        using var ocr = new SimpleOcrAnalyzer();
-        var gapCollector = new OcrGapCollector();
-        // OcrCorrectionDb: self-learning pixel-hash → correct text dictionary
-        WKAppBot.Vision.OcrCorrectionDb? correctionDb = null;
-        try
-        {
-            if (_hackExpDir != null)
-            {
-                NativeMethods.GetWindowThreadProcessId(hwnd, out uint cpid);
-                var cproc = System.Diagnostics.Process.GetProcessById((int)cpid);
-                var csb = new System.Text.StringBuilder(256);
-                NativeMethods.GetClassNameW(hwnd, csb, csb.Capacity);
-                correctionDb = WKAppBot.Vision.OcrCorrectionDb.ForProcess(
-                    cproc.ProcessName, csb.ToString());
-            }
-        }
-        catch { }
-        int ocrOk = 0, ocrEmpty = 0;
+        // (OCR/Vision moved to background workers — see OcrWorker.cs / VisionWorker.cs)
 
-        // Group by row for tree display
-        var rowGroups = positions.GroupBy(p => p.row).OrderBy(g => g.Key).ToList();
-
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[HACK] ── DYN-A11Y Tree ({w}x{h}) ──");
-        Console.ResetColor();
-
-        foreach (var rowGroup in rowGroups)
-        {
-            var items = rowGroup.OrderBy(p => p.col).ToList();
-            bool isLastRow = rowGroup.Key == rowGroups.Last().Key;
-            string rowPrefix = isLastRow ? "`-- " : "|-- ";
-            string childPrefix = isLastRow ? "    " : "??  ";
-
-            for (int ci = 0; ci < items.Count; ci++)
-            {
-                if (HackShouldAbort()) { bmp.Dispose(); return 0; }
-                var (row, col, region) = items[ci];
-                int regionIdx = regions.IndexOf(region);
-                var dynId = DynamicA11yAnalyzer.GenerateDynId(row, col, region.Bounds.Width, region.Bounds.Height);
-                string ocrText = "";
-                string uiaLabel = "";
-                bool isLastChild = ci == items.Count - 1;
-                string prefix = ci == 0 ? rowPrefix : childPrefix + (isLastChild ? "??" : "??");
-
-                // Check UIA answer key first ??skip OCR if matched
-                if (regionIdx >= 0 && uiaAnswers.TryGetValue(regionIdx, out var uia))
-                {
-                    uiaLabel = !string.IsNullOrEmpty(uia.name) ? uia.name : uia.aid;
-                    ocrOk++;
-                    CacheSegment(bmp, region.Bounds, w, h, dynId, uiaLabel,
-                        isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
-                    // Mismatch detection: CCA type vs UIA type ??stderr for self-healing
-                    var ccaType = region.Type.ToString();
-                    var uiaType = uia.type;
-                    if (!string.IsNullOrEmpty(uiaType))
-                    {
-                        bool match = (ccaType == "DyText" && uiaType is "Text" or "Edit" or "Document")
-                                  || (ccaType == "DyIcon" && uiaType is "Image" or "Button")
-                                  || (ccaType == "DyContainer" && uiaType is "Group" or "Pane" or "Window")
-                                  || (ccaType == "Separator" && uiaType is "Separator");
-                        if (!match)
-                            Console.Error.WriteLine($"[MISMATCH] {dynId}: CCA={ccaType} UIA={uiaType} \"{uiaLabel}\" d={region.Density:F2} ar={region.AspectRatio:F1}");
-                    }
-
-                    if (region.Type == ConnectedComponentAnalyzer.RegionType.DyText
-                        || region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer)
-                    {
-                        try
-                        {
-                            var cropRect = ConnectedComponentAnalyzer.TrimBorders(bmp,
-                                Rectangle.Intersect(region.Bounds, new Rectangle(0, 0, w, h)));
-                            if (cropRect.Width > 0 && cropRect.Height > 0)
-                            {
-                                using var crop = bmp.Clone(cropRect, bmp.PixelFormat);
-                                var verify = ocr.RecognizeAll(crop).GetAwaiter().GetResult();
-                                var verifyText = string.Join(" ", verify.Words.Select(x => x.Text)).Trim();
-                                if (!string.IsNullOrWhiteSpace(verifyText))
-                                {
-                                    ocrText = verifyText;
-                                    var sim = CalculateHackTextSimilarity(uiaLabel, verifyText);
-                                    stageLabels[regionIdx] = sim >= 0.95
-                                        ? $"ocr={sim:P0}"
-                                        : $"ocr={sim:P0} mismatch";
-                                    // Learn: OCR ≠ UIA → store correction (UIA is ground truth)
-                                    if (sim < 0.95 && correctionDb != null)
-                                    {
-                                        correctionDb.Learn(crop, verifyText, uiaLabel, "uia");
-                                        Console.Error.WriteLine($"[OCR-LEARN] {dynId}: \"{verifyText}\"→\"{uiaLabel}\" (uia, sim={sim:P0})");
-                                    }
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-                }
-                else if (region.Type == ConnectedComponentAnalyzer.RegionType.DyText
-                    || region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer)
-                {
-                    try
-                    {
-                        var cropRect = ConnectedComponentAnalyzer.TrimBorders(bmp,
-                            Rectangle.Intersect(region.Bounds, new Rectangle(0, 0, w, h)));
-                        if (cropRect.Width > 0 && cropRect.Height > 0)
-                        {
-                            using var crop = bmp.Clone(cropRect, bmp.PixelFormat);
-                            var result = ocr.RecognizeAll(crop).GetAwaiter().GetResult();
-                            ocrText = string.Join(" ", result.Words.Select(x => x.Text)).Trim();
-                            // OcrCorrectionDb: auto-correct known misreads
-                            if (correctionDb != null)
-                            {
-                                var corrected = correctionDb.TryCorrect(crop, ocrText);
-                                if (corrected != null)
-                                {
-                                    Console.Error.WriteLine($"[OCR-FIX] {dynId}: \"{ocrText}\"→\"{corrected}\" (correction db)");
-                                    ocrText = corrected;
-                                }
-                            }
-                            if (ocrText.Length > 0)
-                            {
-                                ocrOk++;
-                                CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText,
-                                    isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
-                                stageLabels[regionIdx] = $"ocr {TrimPreview(ocrText, 24)}";
-                                UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
-                            }
-                            else
-                            {
-                                // OCR empty — try correction db before going to Vision API
-                                var corrected2 = correctionDb?.TryCorrect(crop, "");
-                                if (corrected2 != null)
-                                {
-                                    ocrText = corrected2;
-                                    ocrOk++;
-                                    CacheSegment(bmp, region.Bounds, w, h, dynId, ocrText,
-                                        isContainer: region.Type == ConnectedComponentAnalyzer.RegionType.DyContainer);
-                                    stageLabels[regionIdx] = $"fix {TrimPreview(ocrText, 24)}";
-                                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
-                                }
-                                else
-                                {
-                                    ocrEmpty++;
-                                    if (gapCollector.Add(cropRect, null, null, out var cachedDescription))
-                                        stageLabels[regionIdx] = "vision pending";
-                                    else if (!string.IsNullOrWhiteSpace(cachedDescription))
-                                        stageLabels[regionIdx] = $"cache 100% {TrimPreview(cachedDescription, 18)}";
-                                    else
-                                        stageLabels[regionIdx] = "vision pending";
-                                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
-                                }
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        ocrEmpty++;
-                        stageLabels[regionIdx] = "ocr error";
-                        UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
-                    }
-                }
-
-                // Tree line
-                var typeIcon = region.Type switch
-                {
-                    ConnectedComponentAnalyzer.RegionType.DyText => "DyText",
-                    ConnectedComponentAnalyzer.RegionType.DyIcon => "DyIcon",
-                    ConnectedComponentAnalyzer.RegionType.DyContainer => "DyContainer",
-                    ConnectedComponentAnalyzer.RegionType.DySeparator => "──",
-                    _ => "쨌"
-                };
-                if (region.Type == ConnectedComponentAnalyzer.RegionType.DyNoise) continue; // skip noise in tree
-
-                string label;
-                if (uiaLabel.Length > 0)
-                    label = $" \"{(uiaLabel.Length > 50 ? uiaLabel[..50] + "..." : uiaLabel)}\"";
-                else if (ocrText.Length > 0)
-                    label = $" \"{(ocrText.Length > 50 ? ocrText[..50] + "..." : ocrText)}\"";
-                else
-                    label = region.Type == ConnectedComponentAnalyzer.RegionType.DyText ? " [?]" : "";
-                if (regionIdx >= 0 && stageLabels.TryGetValue(regionIdx, out var stageLabel) && !string.IsNullOrWhiteSpace(stageLabel))
-                    label += $" [{stageLabel}]";
-                if (!_hackHoverAnalyzing) // hover mode: skip per-region tree lines (progress markers still show)
-                    Console.WriteLine($"{prefix}{typeIcon} {dynId}{label}  ({region.Bounds.Width}x{region.Bounds.Height})");
-            }
-        }
-        PulseStep.Mark("ocr-done");
-
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[HACK] ── Summary ──");
-        Console.ResetColor();
-        Console.WriteLine($"  Segments: {regions.Count} (Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount})");
-        Console.WriteLine($"  OCR: {ocrOk} ok, {ocrEmpty} failed");
-        if (table != null)
-            Console.WriteLine($"  Table: {table.Rows}x{table.Cols}");
-        if (HackTargetChanged()) { bmp.Dispose(); return 0; }
-        if (gapCollector.HasGaps)
-        {
-            Console.WriteLine($"  Vision needed: {gapCollector.Count} blind region(s)");
-            for (int ri = 0; ri < regions.Count; ri++)
-            {
-                if (!stageLabels.ContainsKey(ri) && regions[ri].Type is ConnectedComponentAnalyzer.RegionType.DyText or ConnectedComponentAnalyzer.RegionType.DyContainer)
-                    stageLabels[ri] = "vision pending";
-            }
-            UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
-            PulseStep.Mark("vision-query");
-
-            // Build triple composite ??save ??ask Gemini
-            try
-            {
-                var (images, prompt) = gapCollector.BuildTripleComposite();
-                if (images.Count > 0)
-                {
-                    var gapDir = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "WKAppBot", "gap_screenshots");
-                    Directory.CreateDirectory(gapDir);
-                    var ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                    // Save first image for Gemini ask
-                    var compositePath = Path.Combine(gapDir, $"hack_{ts}_A.png");
-                    File.WriteAllBytes(compositePath, images[0]);
-                    var promptPath = Path.Combine(gapDir, $"hack_{ts}.prompt.txt");
-                    File.WriteAllText(promptPath, prompt);
-
-                    Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.WriteLine($"[HACK] Asking Gemini Vision ({gapCollector.Count} regions)...");
-                    Console.ResetColor();
-
-                    // Ask Gemini with composite image
-                    Console.WriteLine($"[HACK] Engine: {visionEngine}");
-                    int exitCode = visionEngine switch
-                    {
-                        "gpt" => AskChatGpt(prompt, slackReport: false, timeoutSec: 60,
-                            attachFiles: new List<string> { compositePath }, noWait: false),
-                        "claude" => AskClaude(prompt, slackReport: false, timeoutSec: 60,
-                            noWait: false),
-                        _ => AskGemini(prompt, slackReport: false, timeoutSec: 60,
-                            attachFiles: new List<string> { compositePath }, noWait: false),
-                    };
-
-                    PulseStep.Mark("vision-done");
-                    for (int ri = 0; ri < regions.Count; ri++)
-                    {
-                        if (stageLabels.TryGetValue(ri, out var cur) && cur == "vision pending")
-                            stageLabels[ri] = $"vision {visionEngine}";
-                    }
-                    UpdateHackOverlay(liveOverlay, bmp, regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"[HACK] Vision query complete (exit={exitCode})");
-                    Console.ResetColor();
-
-                    // Cache: save composite with pixel hash for future lookups
-                    try
-                    {
-                        var cacheDir = Path.Combine(
-                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                            "WKAppBot", "gap_cache");
-                        Directory.CreateDirectory(cacheDir);
-                        using var hashBmp = new Bitmap(compositePath);
-                        var hash = OcrGapCollector.ComputePixelHash(hashBmp);
-                        var cacheName = $"hack'{hash}={ts}.png";
-                        var cachePath = Path.Combine(cacheDir, cacheName);
-                        if (!File.Exists(cachePath))
-                            File.Copy(compositePath, cachePath);
-                        Console.WriteLine($"[HACK] Cached: {cacheName}");
-                    }
-                    catch { }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[HACK] Vision error: {ex.Message}");
-            }
-        }
-
-        gapCollector.Dispose();
-
-        // ── MD table summary: segment inventory ──
-        Console.WriteLine();
-        Console.WriteLine("| # | Type | Id | WxH | OCR/Label |");
-        Console.WriteLine("|---|------|-----|-----|-----------|");
+        Console.WriteLine("| # | Tag | WxH | OCR/Label |");
+        Console.WriteLine("|---|-----|-----|-----------|");
         for (int si = 0; si < regions.Count; si++)
         {
             var sr = regions[si];
             if (sr.Type == ConnectedComponentAnalyzer.RegionType.DyNoise) continue;
             var pos = positions.FirstOrDefault(p => ReferenceEquals(p.region, sr));
             var dynId = DynamicA11yAnalyzer.GenerateDynId(pos.row, pos.col, sr.Bounds.Width, sr.Bounds.Height);
-            var uiaType = ""; var uiaId = "";
+            string tag;
             if (uiaAnswers != null && uiaAnswers.TryGetValue(si, out var su))
-            {
-                uiaType = su.type ?? "";
-                uiaId = !string.IsNullOrWhiteSpace(su.aid) ? su.aid
-                      : !string.IsNullOrWhiteSpace(su.name) ? TrimPreview(su.name, 20) : $"#{si + 1}";
-            }
-            var typeCol = !string.IsNullOrEmpty(uiaType) ? uiaType : sr.Type.ToString();
-            var idCol = !string.IsNullOrEmpty(uiaId) ? uiaId : dynId;
+                tag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(su.type ?? "?", su.aid, uiaSibIdx.GetValueOrDefault(si));
+            else
+                tag = $"Dy{sr.Type}_{dynId}";
             var size = $"{sr.Bounds.Width}x{sr.Bounds.Height}";
             var labelCol = "";
             if (stageLabels.TryGetValue(si, out var stl))
@@ -760,14 +510,13 @@ internal partial class Program
                 else if (stl.StartsWith("cache 100% ")) labelCol = stl[11..];
                 else labelCol = stl;
             }
-            Console.WriteLine($"| {si} | {typeCol} | {idCol} | {size} | {TrimPreview(labelCol, 30)} |");
+            Console.WriteLine($"| {si} | {tag} | {size} | {TrimPreview(labelCol, 30)} |");
         }
         Console.WriteLine();
 
         bmp.Dispose();
-        if (!_hackHoverAnalyzing) liveOverlay?.Hide(); // hover mode: keep overlay visible
+        if (!_hackHoverAnalyzing) liveOverlay?.Hide();
         PulseStep.Done();
         return 0;
     }
 }
-

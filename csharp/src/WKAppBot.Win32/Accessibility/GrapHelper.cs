@@ -57,6 +57,20 @@ public static class GrapHelper
     // ── 공용 a11y 노드 포맷터 ──────────────────────────────────────────────
 
     /// <summary>
+    /// Short tag for overlay/console labels: "Type_aid" / "Type_N" / "Type".
+    /// No text/Name — only AutomationId or sibling index as fallback.
+    /// isDynamic=true → prefix "Dy" (experience DB only, no system UIA).
+    /// </summary>
+    public static string FormatNodeTag(string controlType, string? automationId, int siblingIndex = 0, bool isDynamic = false)
+    {
+        var prefix = isDynamic ? "Dy" : "";
+        var id = !string.IsNullOrWhiteSpace(automationId) ? automationId
+               : siblingIndex > 0 ? siblingIndex.ToString()
+               : "";
+        return string.IsNullOrEmpty(id) ? $"{prefix}{controlType}" : $"{prefix}{controlType}_{id}";
+    }
+
+    /// <summary>
     /// Format a11y node label: "ControlType(AutomationId)" or "ControlType("Name")".
     /// Used everywhere a11y nodes are displayed: windows, inspect, find, read, etc.
     /// </summary>

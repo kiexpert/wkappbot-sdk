@@ -154,6 +154,18 @@ public sealed partial class UiaLocator
         string name;
         try { name = element.Name ?? ""; } catch { name = ""; }
 
+        // Build tag prefix: <Type_aid> or <Type_name> for AI readability
+        string tagPrefix = "";
+        try
+        {
+            string ct = "?", aid = "", nm = "";
+            try { ct = element.ControlType.ToString(); } catch { }
+            try { aid = element.AutomationId ?? ""; } catch { }
+            nm = name; // reuse already-read Name
+            tagPrefix = $"<{GrapHelper.FormatNodeTag(ct, aid)}> ";
+        }
+        catch { }
+
         bool hasChildren = false;
         try
         {
@@ -200,13 +212,14 @@ public sealed partial class UiaLocator
                                 int matchCount = Math.Min(lines.Length, children.Length);
                                 for (int li = 0; li < matchCount; li++)
                                 {
+                                    var lineText = (li == 0 ? tagPrefix : "") + lines[li].Trim();
                                     try
                                     {
                                         var cr = children[li].BoundingRectangle;
                                         if (cr.Width > 0 && cr.Height > 0)
-                                            leaves.Add((lines[li].Trim(), cr.X, cr.Y, cr.Width, cr.Height, depth));
+                                            leaves.Add((lineText, cr.X, cr.Y, cr.Width, cr.Height, depth));
                                     }
-                                    catch { leaves.Add((lines[li].Trim(), rect.X, rect.Y + li * 16, rect.Width, 16, depth)); }
+                                    catch { leaves.Add((lineText, rect.X, rect.Y + li * 16, rect.Width, 16, depth)); }
                                 }
                                 // Remaining lines (no child rect) → append with estimated Y
                                 if (lines.Length != children.Length)
@@ -221,12 +234,12 @@ public sealed partial class UiaLocator
                     if (!matched)
                     {
                         // No children at all: first line + ⋯
-                        leaves.Add((lines[0].TrimEnd() + "⋯", rect.X, rect.Y, rect.Width, rect.Height, depth));
+                        leaves.Add((tagPrefix + lines[0].TrimEnd() + "⋯", rect.X, rect.Y, rect.Width, rect.Height, depth));
                     }
                 }
                 else
                 {
-                    leaves.Add((name, rect.X, rect.Y, rect.Width, rect.Height, depth));
+                    leaves.Add((tagPrefix + name, rect.X, rect.Y, rect.Width, rect.Height, depth));
                 }
             }
             catch { }

@@ -82,6 +82,8 @@ internal partial class Program
         string lastResult = "";
         string lastGrap = "";
         var _hoverUiaBoxes = new List<A11yHackOverlayBox>();
+        var _hoverExpBoxes = new List<A11yHackOverlayBox>();
+        string _lastExpProc = "";
         string _lastOverlayHash = "";
         int loopCount = 0;
         int lastMouseX = -1, lastMouseY = -1;
@@ -123,22 +125,9 @@ internal partial class Program
                         var swapResult = TryRenameSwap(corePath, "HOVER:HOTSWAP");
                         if (swapResult == HotSwapResult.Swapped)
                         {
-                            Log("[HOTSWAP] Binary swapped, restarting...");
+                            Log("[HOTSWAP] Binary swapped — exit 99 → Launcher will re-spawn Core");
                             Console.WriteLine($"\n[HOTSWAP] Restarting with new version...");
-                            // Spawn Launcher (wkappbot.exe), not Core — preserves normal pipe chain
-                            var launcherDir = Path.GetDirectoryName(corePath) ?? "";
-                            var launcherPath = Path.Combine(launcherDir, "wkappbot.exe");
-                            if (!File.Exists(launcherPath)) launcherPath = corePath; // fallback
-                            var psi = new System.Diagnostics.ProcessStartInfo
-                            {
-                                FileName = launcherPath,
-                                UseShellExecute = false,
-                            };
-                            psi.ArgumentList.Add("a11y");
-                            psi.ArgumentList.Add("hack-hover");
-                            foreach (var a in args) psi.ArgumentList.Add(a);
-                            System.Diagnostics.Process.Start(psi);
-                            return 0;
+                            return 99; // Signal Launcher to re-spawn Core (same terminal, no new window)
                         }
                     }
                     catch { }
@@ -195,7 +184,8 @@ internal partial class Program
                 bool verified = verifyHits.Any(v => v.Handle == hwnd);
                 var mark = verified ? "OK" : "MISS";
 
-                var result = $"{fullGrap} [{elType}] {mark}";
+                var elNodeTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
+                var result = $"{fullGrap} <{elNodeTag}> {mark}";
 
                 // Console: compact for non-browser, full JSON5 for browser only
                 var json5Short = json5;
@@ -221,7 +211,7 @@ internal partial class Program
                 lastGrap = richGrap;
                 if (RunningInEye && !changed) continue; // Eye: change-only
                 if (grapChanged) Console.WriteLine(); // different target pattern → new line
-                Console.Write($"{richGrap} [{mark}] {elMs}ms ({pt.X},{pt.Y})          \r");
+                Console.Write($"{richGrap} <{elNodeTag}> [{mark}] {elMs}ms ({pt.X},{pt.Y})          \r");
                 Console.Out.Flush();
 
                 // ── Live overlay: root window size, known nodes as dashed boxes ──
@@ -244,11 +234,12 @@ internal partial class Program
                                 // Current hovered element + parent chain
                                 if (elBounds.Width > 0 && elBounds.Height > 0)
                                 {
+                                    var elTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
                                     boxes.Add(new A11yHackOverlayBox(
                                         new System.Windows.Rect(
                                             elBounds.X - rootWr.Left, elBounds.Y - rootWr.Top,
                                             elBounds.Width, elBounds.Height),
-                                        $"{elType} {elBounds.Width}x{elBounds.Height}", null, HackBoxRole.Target));
+                                        $"{elTag} {elBounds.Width}x{elBounds.Height}", null, HackBoxRole.Target));
                                 }
                                 // Parent chain → root (Scope = 2x thick dashed)
                                 if (curEl != null)
@@ -265,13 +256,16 @@ internal partial class Program
                                             {
                                                 var pr = parent.BoundingRectangle;
                                                 if (pr.Width < 5 || pr.Height < 5) continue;
-                                                string pType = "?";
-                                                try { pType = parent.ControlType.ToString(); } catch { }
+                                                string pCt = "?", pAid = "", pNm = "";
+                                                try { pCt = parent.ControlType.ToString(); } catch { }
+                                                try { pAid = parent.AutomationId ?? ""; } catch { }
+                                                try { pNm = parent.Name ?? ""; } catch { }
+                                                var pTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(pCt, pAid, depth);
                                                 boxes.Add(new A11yHackOverlayBox(
                                                     new System.Windows.Rect(
                                                         pr.X - rootWr.Left, pr.Y - rootWr.Top,
                                                         pr.Width, pr.Height),
-                                                    $"{pType} {(int)pr.Width}x{(int)pr.Height}", null, HackBoxRole.Scope));
+                                                    $"{pTag} {(int)pr.Width}x{(int)pr.Height}", null, HackBoxRole.Scope));
                                             }
                                             catch { }
                                         }
@@ -289,23 +283,71 @@ internal partial class Program
                                         var rootEl = uia.FromHandle(rootHwnd);
                                         if (rootEl != null)
                                         {
-                                            // Full descendant scan — show all known nodes
-                                            var descendants = rootEl.FindAllDescendants();
-                                            foreach (var ch in descendants)
+                                            // Recursive scan with sibling index tracking
+                                            void ScanChildren(FlaUI.Core.AutomationElements.AutomationElement parent)
                                             {
-                                                if (_hoverUiaBoxes.Count >= 500) break; // safety cap
+                                                if (_hoverUiaBoxes.Count >= 500) return;
+                                                FlaUI.Core.AutomationElements.AutomationElement[] children;
+                                                try { children = parent.FindAllChildren(); } catch { return; }
+                                                for (int ci = 0; ci < children.Length; ci++)
+                                                {
+                                                    if (_hoverUiaBoxes.Count >= 500) break;
+                                                    var ch = children[ci];
+                                                    try
+                                                    {
+                                                        var cr = ch.BoundingRectangle;
+                                                        if (cr.Width < 5 || cr.Height < 5) { ScanChildren(ch); continue; }
+                                                        if (cr.X < rootWr.Left - 10 || cr.Y < rootWr.Top - 10) { ScanChildren(ch); continue; }
+                                                        string cCt = "?", cAid = "";
+                                                        try { cCt = ch.ControlType.ToString(); } catch { }
+                                                        try { cAid = ch.AutomationId ?? ""; } catch { }
+                                                        var cTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(cCt, cAid, ci + 1);
+                                                        _hoverUiaBoxes.Add(new A11yHackOverlayBox(
+                                                            new System.Windows.Rect(
+                                                                cr.X - rootWr.Left, cr.Y - rootWr.Top,
+                                                                cr.Width, cr.Height),
+                                                            $"{cTag} {(int)cr.Width}x{(int)cr.Height}", null, HackBoxRole.Known));
+                                                    }
+                                                    catch { }
+                                                    ScanChildren(ch);
+                                                }
+                                            }
+                                            ScanChildren(rootEl);
+                                        }
+                                    }
+                                    catch { }
+                                }
+                                boxes.AddRange(_hoverUiaBoxes);
+
+                                // ── Experience DB overlay: Cached boxes from form_*.json ──
+                                if (grapChanged || expRefresh || proc != _lastExpProc)
+                                {
+                                    _hoverExpBoxes.Clear();
+                                    _lastExpProc = proc;
+                                    try
+                                    {
+                                        var profDir = Path.Combine(DataDir, "profiles", $"{proc.ToLowerInvariant()}_exp");
+                                        if (Directory.Exists(profDir))
+                                        {
+                                            foreach (var formFile in Directory.GetFiles(profDir, "form_*.json"))
+                                            {
                                                 try
                                                 {
-                                                    var cr = ch.BoundingRectangle;
-                                                    if (cr.Width < 5 || cr.Height < 5) continue;
-                                                    if (cr.X < rootWr.Left - 10 || cr.Y < rootWr.Top - 10) continue; // off-screen
-                                                    string cType = "?";
-                                                    try { cType = ch.ControlType.ToString(); } catch { }
-                                                    _hoverUiaBoxes.Add(new A11yHackOverlayBox(
-                                                        new System.Windows.Rect(
-                                                            cr.X - rootWr.Left, cr.Y - rootWr.Top,
-                                                            cr.Width, cr.Height),
-                                                        $"{cType} {(int)cr.Width}x{(int)cr.Height}", null, HackBoxRole.Known));
+                                                    var form = System.Text.Json.JsonSerializer.Deserialize<WKAppBot.Win32.Window.FormExperience>(
+                                                        File.ReadAllText(formFile));
+                                                    if (form?.Controls == null) continue;
+                                                    foreach (var ctrl in form.Controls)
+                                                    {
+                                                        if (ctrl.Width < 5 || ctrl.Height < 5) continue;
+                                                        if (ctrl.RelativeX <= 0 && ctrl.RelativeY <= 0) continue;
+                                                        var cx = ctrl.RelativeX * rootW;
+                                                        var cy = ctrl.RelativeY * rootH;
+                                                        var tag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
+                                                            ctrl.ClassName ?? "?", null, ctrl.ControlId, isDynamic: true);
+                                                        _hoverExpBoxes.Add(new A11yHackOverlayBox(
+                                                            new System.Windows.Rect(cx, cy, ctrl.Width, ctrl.Height),
+                                                            $"{tag} {ctrl.Width}x{ctrl.Height}", null, HackBoxRole.Cached));
+                                                    }
                                                 }
                                                 catch { }
                                             }
@@ -313,7 +355,8 @@ internal partial class Program
                                     }
                                     catch { }
                                 }
-                                boxes.AddRange(_hoverUiaBoxes);
+                                boxes.AddRange(_hoverExpBoxes);
+
                                 // Skip render if boxes unchanged (avoid flicker on FSW noise)
                                 var hash = string.Join("|", boxes.Select(b => $"{b.Bounds}{b.Label}{b.Role}"));
                                 if (hash != _lastOverlayHash)
@@ -331,7 +374,7 @@ internal partial class Program
                 if (changed)
                 {
                     var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                    var logLine = $"[{ts2}] [{mark}] [{elType}] \"{elLabel}\" ({pt.X},{pt.Y}) {elPatterns} -> {compactGrap}";
+                    var logLine = $"[{ts2}] [{mark}] <{elNodeTag}> ({pt.X},{pt.Y}) {elPatterns} -> {compactGrap}";
                     try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
                 }
 

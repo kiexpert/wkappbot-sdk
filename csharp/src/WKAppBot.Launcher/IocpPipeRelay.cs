@@ -65,7 +65,18 @@ partial class Program
 
         try
         {
-            return RunCoreDetachedIocp(core, args, envPtr, exitFilePath, timeoutSec, timeoutExit, showStderr, stderrBuf);
+            // Exit code 99 = hot-swap restart: Core swapped binary and wants Launcher to re-spawn.
+            // Loop keeps same Launcher process → same terminal/console → no new window.
+            while (true)
+            {
+                int code = RunCoreDetachedIocp(core, args, envPtr, exitFilePath, timeoutSec, timeoutExit, showStderr, stderrBuf);
+                if (code != 99) return code;
+                Prof("IOCP: exit code 99 — hot-swap restart, re-spawning Core");
+                // Re-resolve core path (binary was swapped on disk)
+                core = ResolveCoreExe();
+                if (!System.IO.File.Exists(core)) { Prof("IOCP: new core not found, abort"); return 1; }
+                try { System.IO.File.Delete(exitFilePath); } catch { }
+            }
         }
         finally
         {
