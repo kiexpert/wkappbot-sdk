@@ -213,30 +213,6 @@ internal partial class Program
     static string EscapeCmdArg(string arg) => arg.Replace("\"", "\\\"");
 
     static string _lastLiveHackGrap = "";
-    static long _inputPixelBaseline; // 9-pixel hash at last input position
-
-    /// <summary>Hash cursor position + 3x3 pixels around it — position change OR content change = different hash.</summary>
-    static long SampleInputHash(int cx, int cy)
-    {
-        long hash = unchecked((long)0xcbf29ce484222325);
-        // Mix in cursor position
-        hash = unchecked((hash ^ cx) * (long)0x100000001b3);
-        hash = unchecked((hash ^ cy) * (long)0x100000001b3);
-        // Mix in 9 pixels
-        var hdc = WKAppBot.Win32.Native.NativeMethods.GetDC(IntPtr.Zero);
-        if (hdc == IntPtr.Zero) return hash;
-        try
-        {
-            for (int dy = -1; dy <= 1; dy++)
-            for (int dx = -1; dx <= 1; dx++)
-            {
-                uint px = WKAppBot.Win32.Native.NativeMethods.GetPixel(hdc, cx + dx, cy + dy);
-                hash = unchecked((hash ^ (long)px) * (long)0x100000001b3);
-            }
-            return hash;
-        }
-        finally { WKAppBot.Win32.Native.NativeMethods.ReleaseDC(IntPtr.Zero, hdc); }
-    }
 
     static void TryLaunchLiveA11yHack(string grapPath, string reason, string headline)
     {
@@ -403,18 +379,7 @@ internal partial class Program
                     if (ok1 && ts1 != null) _mouseCcaReplyTs = ts1;
                 }
 
-                // Reply #3 (focus chain)
-                var r3 = children?.Count > 2 ? children[2] : null;
-                if (r3?["username"]?.GetValue<string>() == "CCABot")
-                    _focusChainReplyTs = r3["ts"]?.GetValue<string>();
-                else
-                {
-                    var (ok2, ts2) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "Analyzing focus chain...",
-                        threadTs: _eyeStatusTs, username: "CCABot");
-                    if (ok2 && ts2 != null) _focusChainReplyTs = ts2;
-                }
-
-                Console.WriteLine($"[ANALYSIS] Replies ready: mouse={_mouseCcaReplyTs != null} focus={_focusChainReplyTs != null}");
+                Console.WriteLine($"[ANALYSIS] Replies ready: mouse={_mouseCcaReplyTs != null}");
             }
             catch { }
         }
@@ -547,7 +512,7 @@ internal partial class Program
                 TryLaunchLiveA11yHack(grapPath, "mouse", serverResult.Split('\n')[0]);
                 } // end if (doMouse)
 
-                // ── Keyboard focus (always, regardless of mouse change) ──
+                // ── Keyboard focus chain (console output only, no Slack) ──
                 try
                 {
                     _hackServerStdin!.WriteLine("{\"type\":\"focus\"}");
@@ -559,48 +524,14 @@ internal partial class Program
                         var fr = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(focusLine);
                         if (fr?["error"] == null)
                         {
-                            var fName = fr?["name"]?.GetValue<string>() ?? "";
-                            var fType = fr?["type"]?.GetValue<string>() ?? "?";
-                            var fValue = fr?["value"]?.GetValue<string>() ?? "";
                             var fGrap = fr?["grapPath"]?.GetValue<string>() ?? "";
-                            var fWin = fr?["winTitle"]?.GetValue<string>() ?? "";
-                            var fPatterns = fr?["patterns"]?.GetValue<string>() ?? "";
-                                var fWinShort = fWin.Length > 30 ? fWin[..30] + ".." : fWin;
-                                var fsb = new StringBuilder();
-                                fsb.AppendLine($"Keyboard: `{fGrap}`");
-                                fsb.AppendLine($"focus: [{fType}] \"{fName}\"");
-                                if (!string.IsNullOrEmpty(fValue))
-                                    fsb.AppendLine($"value: \"{(fValue)}\"");
-                                fsb.AppendLine($"win: {fWinShort}");
-                                var chain = fr?["chain"] as System.Text.Json.Nodes.JsonArray;
-                                if (chain?.Count > 0)
-                                {
-                                    fsb.AppendLine("chain:");
-                                    foreach (var p in chain)
-                                        fsb.AppendLine($"  \u2514 [{p?["type"]}] {p?["name"]}");
-                                }
-                                if (!string.IsNullOrEmpty(fPatterns))
-                                    fsb.AppendLine($"patterns: {fPatterns}");
-                                var focusResult = fsb.ToString().TrimEnd();
-                                if (focusResult != _lastFocusChainResult)
-                                {
-                                    _lastFocusChainResult = focusResult;
-                                    if (_focusChainReplyTs != null)
-                                        await SlackUpdateMessageAsync(_eyeBotToken!, _eyeChannel!, _focusChainReplyTs, focusResult);
-                                    else if (_eyeStatusTs != null)
-                                    {
-                                        var (fok, fts) = await SlackSendViaApi(_eyeBotToken!, _eyeChannel!, focusResult,
-                                            threadTs: _eyeStatusTs, username: "CCABot");
-                                        if (fok && fts != null) _focusChainReplyTs = fts;
-                                    }
-                                    AppendEyeAnalysisTrace("focus-result", new
-                                    {
-                                        headline = focusResult.Split('\n')[0],
-                                        replyTs = _focusChainReplyTs
-                                    });
-                                    Console.WriteLine($"[ANALYSIS] focus: {focusResult.Split('\n')[0]}");
-                                    TryLaunchLiveA11yHack(fGrap, "focus", focusResult.Split('\n')[0]);
-                                }
+                            var focusHeadline = $"[{fr?["type"]}] \"{fr?["name"]}\" {fGrap}";
+                            if (focusHeadline != _lastFocusChainResult)
+                            {
+                                _lastFocusChainResult = focusHeadline;
+                                Console.WriteLine($"[ANALYSIS] focus: {focusHeadline}");
+                                TryLaunchLiveA11yHack(fGrap, "focus", focusHeadline);
+                            }
                         }
                     }
                 }
@@ -615,134 +546,19 @@ internal partial class Program
         HackLog("[MOUSE-CCA] Worker stopped");
     }
 
-    // ── Keyboard Focus Chain analysis (separate Slack thread reply) ──
-    static string? _focusChainReplyTs;
     static string _lastFocusChainResult = "";
 
     /// <summary>
     /// Restore reply ts values from a recovered Eye status thread (Eye restart reuse).
-    /// Called from AppBotEyeGlobalMode when _eyeStatusTs is reused from previous session.
     /// </summary>
-    internal static void RestoreHoverReplyTs(string? mouseTs, string? focusTs)
+    internal static void RestoreHoverReplyTs(string? mouseTs, string? _)
     {
         if (mouseTs != null) { _mouseCcaReplyTs = mouseTs; Console.WriteLine($"[EYE] Restored mouse CCA reply ts={mouseTs}"); }
-        if (focusTs != null) { _focusChainReplyTs = focusTs; Console.WriteLine($"[EYE] Restored focus chain reply ts={focusTs}"); }
-    }
-
-    /// <summary>
-    /// Start keyboard focus chain analysis worker.
-    /// Every 1s: UIA focused element ??parent chain ??root window ??Slack thread reply.
-    /// </summary>
-    internal static void StartFocusChainWorker(CancellationToken ct) =>
-        Task.Run(() => FocusChainLoop(ct), ct);
-
-    static async Task FocusChainLoop(CancellationToken ct)
-    {
-        Console.WriteLine("[FOCUS-CHAIN] Keyboard focus (via analyze-hack server)");
-        while (!ct.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(1000, ct);
-
-                // Send focus request to shared analyze-hack server
-                EnsureHackServer();
-                if (_hackServerProcess is not { HasExited: false } || _hackServerStdin == null) continue;
-
-                string chainResult;
-                try
-                {
-                    _hackServerStdin.WriteLine("{\"type\":\"focus\"}");
-                    _hackServerStdin.Flush();
-
-                    var responseLine = await Task.Run(() => _hackServerProcess.StdOut!.ReadLine(), ct)
-                        .WaitAsync(TimeSpan.FromSeconds(5), ct);
-                    if (string.IsNullOrEmpty(responseLine)) continue;
-
-                    var resp = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(responseLine);
-                    if (resp?["error"] != null) continue;
-
-                                        var focusName = resp?["name"]?.GetValue<string>() ?? "";
-                    var focusType = resp?["type"]?.GetValue<string>() ?? "?";
-                    var focusValue = resp?["value"]?.GetValue<string>() ?? "";
-                    var grapPath = resp?["grapPath"]?.GetValue<string>() ?? "";
-                    var winTitle = resp?["winTitle"]?.GetValue<string>() ?? "";
-                    var patterns = resp?["patterns"]?.GetValue<string>() ?? "";
-                    var inspectText = resp?["inspectText"]?.GetValue<string>() ?? "";
-                    var bounds = resp?["bounds"]?.GetValue<string>() ?? "";
-                    var selectionRects = resp?["selectionRects"] as System.Text.Json.Nodes.JsonArray;
-
-                    var winShort = winTitle.Length > 30 ? winTitle[..30] + ".." : winTitle;
-                    var sb = new StringBuilder();
-                    sb.AppendLine($"win: {winShort}");
-                    sb.AppendLine($"Keyboard: {grapPath}");
-                    if (!string.IsNullOrEmpty(bounds))
-                        sb.AppendLine($"bounds: {bounds}");
-                    if (selectionRects?.Count > 0)
-                        sb.AppendLine($"selection: {string.Join(" | ", selectionRects.Select(x => x?.ToString()).Where(x => !string.IsNullOrEmpty(x))!)}");
-
-                    if (!string.IsNullOrWhiteSpace(inspectText))
-                    {
-                        sb.AppendLine("`");
-                        sb.AppendLine(inspectText.TrimEnd());
-                        sb.AppendLine("`");
-                    }
-                    else
-                    {
-                        sb.AppendLine($"focus: [{focusType}] \"{focusName}\"");
-                        if (!string.IsNullOrEmpty(focusValue))
-                            sb.AppendLine($"value: \"{focusValue}\"");
-
-                        var chain = resp?["chain"] as System.Text.Json.Nodes.JsonArray;
-                        if (chain?.Count > 0)
-                        {
-                            sb.AppendLine("chain:");
-                            foreach (var p in chain)
-                                sb.AppendLine($"  \u2514 [{p?["type"]}] {p?["name"]}");
-                        }
-
-                        if (!string.IsNullOrEmpty(patterns))
-                            sb.AppendLine($"patterns: {patterns}");
-                    }
-
-                    chainResult = sb.ToString().TrimEnd();
-                }
-                catch (TimeoutException) { continue; }
-                catch { continue; }
-
-                // Change detection
-                if (chainResult == _lastFocusChainResult) continue;
-                _lastFocusChainResult = chainResult;
-
-                // Post/edit as simple message (no file upload)
-                if (_eyeStatusTs != null && !string.IsNullOrEmpty(_eyeBotToken) && !string.IsNullOrEmpty(_eyeChannel))
-                {
-                    try
-                    {
-                        if (_focusChainReplyTs != null)
-                            await SlackUpdateMessageAsync(_eyeBotToken, _eyeChannel, _focusChainReplyTs, chainResult);
-                        else
-                        {
-                            var (ok2, ts2) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, chainResult,
-                                threadTs: _eyeStatusTs, username: "CCABot");
-                            if (ok2 && ts2 != null) _focusChainReplyTs = ts2;
-                        }
-                    }
-                    catch { }
-                }
-
-                Console.WriteLine($"[FOCUS-CHAIN] {chainResult.Split('\n')[0]}");
-            }
-            catch (OperationCanceledException) { break; }
-            catch (Exception ex) { Console.WriteLine($"[FOCUS-CHAIN] Error: {ex.Message}"); }
-        }
-        Console.WriteLine("[FOCUS-CHAIN] Worker stopped");
     }
 
     // Track uploaded snippet message ts for delete→reupload cycle
 #pragma warning disable CS0169
     static string? _mouseCcaSnippetMsgTs;
-    static string? _focusChainSnippetMsgTs;
 #pragma warning restore CS0169
 
     /// <summary>Post/edit mouse CCA result (already formatted with code block).</summary>

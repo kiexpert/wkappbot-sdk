@@ -12,7 +12,7 @@ using WKAppBot.Win32.Native;
 
 namespace WKAppBot.CLI;
 
-internal enum HackBoxRole { Scope, Target, Known, Cached }
+internal enum HackBoxRole { Scope, Target, Known, Cached, Focus, FocusChain }
 
 internal sealed record A11yHackOverlayBox(
     Rect Bounds,
@@ -35,8 +35,7 @@ internal sealed class A11yHackOverlayWindow : Window
     public A11yHackOverlayWindow(int width, int height)
     {
         Title = "A11yHackOverlay";
-        Width = width;
-        Height = height;
+        Width = 4000; Height = 3000; // oversized — SetWindowPos clips to actual pixel size
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -83,7 +82,7 @@ internal sealed class A11yHackOverlayWindow : Window
         var dpi = GetDpiScale();
         _hoverRect.Width = Math.Max(1, box.Bounds.Width / dpi);
         _hoverRect.Height = Math.Max(1, box.Bounds.Height / dpi);
-        _hoverRect.Fill = new SolidColorBrush(Color.FromArgb(48, 0x42, 0xA5, 0xF5));
+        _hoverRect.Fill = Brushes.Transparent;
         Canvas.SetLeft(_hoverRect, box.Bounds.X / dpi);
         Canvas.SetTop(_hoverRect, box.Bounds.Y / dpi);
         _hoverRect.Visibility = Visibility.Visible;
@@ -125,6 +124,18 @@ internal sealed class A11yHackOverlayWindow : Window
                     thick = 2.4; fill = Brushes.Transparent;
                     dash = new DoubleCollection { 4, 2 }; rx = ry = 2;
                     fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 8, ShadowDepth = 0, Opacity = 0.4 };
+                    break;
+                case HackBoxRole.Focus: // keyboard focus element — cyan solid glow
+                    stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
+                    thick = 2.2; fill = Brushes.Transparent;
+                    dash = null; rx = ry = 3;
+                    fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xBF, 0xFF), BlurRadius = 14, ShadowDepth = 0, Opacity = 0.7 };
+                    break;
+                case HackBoxRole.FocusChain: // keyboard focus parent chain — cyan dashed
+                    stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
+                    thick = 1.8; fill = Brushes.Transparent;
+                    dash = new DoubleCollection { 4, 2 }; rx = ry = 2;
+                    fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xBF, 0xFF), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.3 };
                     break;
                 case HackBoxRole.Cached: // experience DB hit — amber dashed, 10% alpha
                     stroke = new SolidColorBrush(Color.FromArgb(25, 0xFF, 0xA5, 0x00));
@@ -313,8 +324,7 @@ internal sealed class A11yHackOverlayHost : IDisposable
         _dispatcher?.BeginInvoke(() =>
         {
             if (_window == null) return;
-            _window.Width = width;
-            _window.Height = height;
+            // Use SetWindowPos only — WPF Width/Height is DPI-logical, causes mismatch on scaled displays
             ForceWindowPosition(_window, screenX, screenY, width, height);
         });
     }
@@ -327,7 +337,7 @@ internal sealed class A11yHackOverlayHost : IDisposable
         {
             try
             {
-                _window = new A11yHackOverlayWindow(width, height) { Left = screenX, Top = screenY };
+                _window = new A11yHackOverlayWindow(width, height) { Left = 0, Top = 0 };
                 _dispatcher = Dispatcher.CurrentDispatcher;
                 _ready.Set();
                 _window.Show();
