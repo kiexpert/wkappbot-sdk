@@ -36,7 +36,7 @@ internal partial class Program
         void Log(string msg)
         {
             var line = $"[{DateTime.Now:HH:mm:ss.fff}] [HACK-HOVER] {msg}";
-            Console.WriteLine(line);
+            Console.Error.WriteLine(line);
             try { File.AppendAllText(logPath, line + Environment.NewLine, Encoding.UTF8); } catch { }
         }
 
@@ -126,7 +126,7 @@ internal partial class Program
                         if (swapResult == HotSwapResult.Swapped)
                         {
                             Log("[HOTSWAP] Binary swapped — exit 99 → Launcher will re-spawn Core");
-                            Console.WriteLine($"\n[HOTSWAP] Restarting with new version...");
+                            Console.Error.WriteLine($"\n[HOTSWAP] Restarting with new version...");
                             return 99; // Signal Launcher to re-spawn Core (same terminal, no new window)
                         }
                     }
@@ -410,7 +410,7 @@ internal partial class Program
                             if (_hackHoverDebounceSeq != debounceStamp) return;
                         }
                         _hackHoverBlindMode = isBlind;
-                        Console.WriteLine($"\n[ANALYZING{(isBlind ? ":BLIND" : "")}] {hackGrap}");
+                        Console.Error.WriteLine($"\n[ANALYZING{(isBlind ? ":BLIND" : "")}] {hackGrap}");
                         _hackHoverAnalyzing = true;
                         try { A11yHackCommand(new[] { hackGrap }); }
                         catch (Exception hex) { Log($"Hack error: {hex.Message}"); }

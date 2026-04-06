@@ -487,8 +487,12 @@ internal partial class Program
 
         // (OCR/Vision moved to background workers — see OcrWorker.cs / VisionWorker.cs)
 
+        bool hasRows = regions.Any(r => r.Type != ConnectedComponentAnalyzer.RegionType.DyNoise);
+        if (hasRows)
+        {
         Console.WriteLine("| # | Tag | WxH | OCR/Label |");
         Console.WriteLine("|---|-----|-----|-----------|");
+        }
         for (int si = 0; si < regions.Count; si++)
         {
             var sr = regions[si];

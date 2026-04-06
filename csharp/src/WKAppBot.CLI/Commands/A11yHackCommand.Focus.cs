@@ -43,7 +43,7 @@ internal partial class Program
                             wr.Top = r.Y;
                             wr.Right = r.X + r.Width;
                             wr.Bottom = r.Y + r.Height;
-                            Console.WriteLine($"[HACK] Scoped to grap root rect=({r.X},{r.Y} {r.Width}x{r.Height})");
+                            Console.Error.WriteLine($"[HACK] Scoped to grap root rect=({r.X},{r.Y} {r.Width}x{r.Height})");
                             return;
                         }
                     }
@@ -78,7 +78,7 @@ internal partial class Program
                         {
                             wr.Left = aRect.X; wr.Top = aRect.Y;
                             wr.Right = aRect.X + aRect.Width; wr.Bottom = aRect.Y + aRect.Height;
-                            Console.WriteLine($"[HACK] UIA parent-narrowed: rect=({aRect.X},{aRect.Y} {aRect.Width}x{aRect.Height})");
+                            Console.Error.WriteLine($"[HACK] UIA parent-narrowed: rect=({aRect.X},{aRect.Y} {aRect.Width}x{aRect.Height})");
                             return;
                         }
                     }
@@ -94,7 +94,7 @@ internal partial class Program
                 { ptX = overrideX.Value; ptY = overrideY.Value; }
                 else
                 { NativeMethods.GetCursorPos(out var cp); ptX = cp.X; ptY = cp.Y; }
-                Console.WriteLine($"[HACK] ElementFromPoint at ({ptX},{ptY})");
+                Console.Error.WriteLine($"[HACK] ElementFromPoint at ({ptX},{ptY})");
                 var pointed = automation.FromPoint(new System.Drawing.Point(ptX, ptY));
                 if (pointed != null)
                 {
@@ -112,7 +112,7 @@ internal partial class Program
                         {
                             wr.Left = pRect.X; wr.Top = pRect.Y;
                             wr.Right = pRect.X + pRect.Width; wr.Bottom = pRect.Y + pRect.Height;
-                            Console.WriteLine($"[HACK] ElementFromPoint parent: rect=({pRect.X},{pRect.Y} {pRect.Width}x{pRect.Height}) target=\"{tRect.Width}x{tRect.Height}\"");
+                            Console.Error.WriteLine($"[HACK] ElementFromPoint parent: rect=({pRect.X},{pRect.Y} {pRect.Width}x{pRect.Height}) target=\"{tRect.Width}x{tRect.Height}\"");
                             return;
                         }
                     }
@@ -123,7 +123,7 @@ internal partial class Program
                     {
                         wr.Left = tRect.X; wr.Top = tRect.Y;
                         wr.Right = tRect.X + tRect.Width; wr.Bottom = tRect.Y + tRect.Height;
-                        Console.WriteLine($"[HACK] ElementFromPoint direct: rect=({tRect.X},{tRect.Y} {tRect.Width}x{tRect.Height})");
+                        Console.Error.WriteLine($"[HACK] ElementFromPoint direct: rect=({tRect.X},{tRect.Y} {tRect.Width}x{tRect.Height})");
                         return;
                     }
                 }
@@ -143,16 +143,16 @@ internal partial class Program
                     wr.Top = Math.Max(wr.Top, parentWr.Top);
                     wr.Right = Math.Min(wr.Right, parentWr.Right);
                     wr.Bottom = Math.Min(wr.Bottom, parentWr.Bottom);
-                    Console.WriteLine($"[HACK] Win32 parent-clamped: rect=({wr.Left},{wr.Top} {wr.Right - wr.Left}x{wr.Bottom - wr.Top})");
+                    Console.Error.WriteLine($"[HACK] Win32 parent-clamped: rect=({wr.Left},{wr.Top} {wr.Right - wr.Left}x{wr.Bottom - wr.Top})");
                     return;
                 }
             }
             // 3. Target = root window -> analyze full window
-            Console.WriteLine($"[HACK] Root window -- analyzing full: rect=({wr.Left},{wr.Top} {wr.Right - wr.Left}x{wr.Bottom - wr.Top})");
+            Console.Error.WriteLine($"[HACK] Root window -- analyzing full: rect=({wr.Left},{wr.Top} {wr.Right - wr.Left}x{wr.Bottom - wr.Top})");
         }
         catch
         {
-            Console.WriteLine("[HACK] Scope/focus narrowing error - using full window");
+            Console.Error.WriteLine("[HACK] Scope/focus narrowing error - using full window");
         }
     }
 

@@ -36,7 +36,7 @@ public static class ScreenReaderMode
 
         if (!modern)
         {
-            Console.WriteLine($"  [PROF:A11Y] ScreenReader skip (native) classCheck={sw.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"  [PROF:A11Y] ScreenReader skip (native) classCheck={sw.ElapsedMilliseconds}ms");
             Console.Out.Flush();
             return;
         }
@@ -85,7 +85,7 @@ public static class ScreenReaderMode
             // Already enabled (previous wkappbot run or real AT) — skip broadcast
             _weEnabled = true;
             sw.Stop();
-            Console.WriteLine($"  [PROF:A11Y] ScreenReader already_on={sw.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"  [PROF:A11Y] ScreenReader already_on={sw.ElapsedMilliseconds}ms");
             Console.Out.Flush();
             return;
         }
@@ -99,12 +99,12 @@ public static class ScreenReaderMode
         if (ok)
         {
             _weEnabled = true;
-            Console.WriteLine($"[A11Y] Screen reader mode enabled — Chromium/Electron A11Y trees activated");
-            Console.WriteLine($"  [PROF:A11Y] ScreenReader broadcast={sw.ElapsedMilliseconds}ms (SPIF_SENDCHANGE)");
+            Console.Error.WriteLine($"[A11Y] Screen reader mode enabled — Chromium/Electron A11Y trees activated");
+            Console.Error.WriteLine($"  [PROF:A11Y] ScreenReader broadcast={sw.ElapsedMilliseconds}ms (SPIF_SENDCHANGE)");
         }
         else
         {
-            Console.WriteLine($"  [PROF:A11Y] ScreenReader FAILED={sw.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"  [PROF:A11Y] ScreenReader FAILED={sw.ElapsedMilliseconds}ms");
         }
         Console.Out.Flush();
     }
