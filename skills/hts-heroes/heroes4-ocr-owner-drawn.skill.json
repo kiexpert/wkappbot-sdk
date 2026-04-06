@@ -1,0 +1,24 @@
+{
+  "id": "heroes4-ocr-owner-drawn",
+  "app": "hts-heroes",
+  "title": "영웅문4 owner-drawn OCR 폴백",
+  "desc": "영웅문4(PC HTS)는 MFC owner-drawn 컨트롤이라 UIA 패턴 거의 없음. UIA 실패 → Win32 메시지 폴백 → 그래도 안 되면 SimpleOCR 폴백 3단계 필수.",
+  "steps": [
+    "1단계: UIA Invoke/Value/Toggle 시도 (owner-drawn은 대부분 실패)",
+    "2단계: Win32 PostMessage(WM_LBUTTONDOWN/UP) 또는 WM_CHAR",
+    "3단계: SimpleOcr로 화면 텍스트 읽기 → FuzzyDigitMatch(Levenshtein ≤2) 비교",
+    "종목코드 입력: CMaskEditEx → WM_CHAR(Method 10)만 통과 (WM_SETTEXT 무효)",
+    "GetSupportedPatterns() 절대 호출 금지 — COM 오염 (→ uia-getsupportedpatterns-forbidden 스킬 참고)"
+  ],
+  "tags": [
+    "hts",
+    "heroes4",
+    "mfc",
+    "ocr",
+    "owner-drawn",
+    "fallback"
+  ],
+  "author": "claude",
+  "created": "2026-04-07T03:20:00.0000000Z",
+  "version": "1.0"
+}
