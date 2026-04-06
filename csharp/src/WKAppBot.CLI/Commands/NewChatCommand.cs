@@ -66,6 +66,18 @@ internal partial class Program
             return 1;
         }
 
+        // ── Prepend skill summary as reference ──
+        try
+        {
+            var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+            var skillLines = BuildSkillSummary(cwd);
+            if (skillLines != null)
+            {
+                text = $"## 📚 참고 스킬 (필요할 때 `wkappbot skill show <id>` 로 상세 조회)\n{skillLines}→ 관련 작업 전 해당 스킬 먼저 확인하면 삽질 방지!\n\n---\n{text}";
+            }
+        }
+        catch { /* skill summary optional */ }
+
         // ── Append EmbeddedInitialPrompt + regenerate policy file ──
         // Handoff prompt goes first (handoff context first), policy appended after.
         // Strip "Startup Confirmation" section ??newchat expects handoff response, not "Policy loaded. Ready."
