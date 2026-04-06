@@ -223,12 +223,18 @@ internal partial class Program
                     ? WKAppBot.Win32.Accessibility.GrapHelper.BuildAbsoluteTagPath(curEl, uia.TreeWalkerFactory.GetRawViewWalker())
                     : WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
 
-                // '?' tagPath = UIA completely blind → replace with temp coord-based name + force blind analysis
+                // '?' tagPath = UIA completely blind → look up experience DB first, then coord fallback
                 if (tagPath == "?")
                 {
-                    int nx = elBounds.Width > 0 ? elBounds.X + elBounds.Width / 2 : pt.X;
-                    int ny = elBounds.Height > 0 ? elBounds.Y + elBounds.Height / 2 : pt.Y;
-                    tagPath = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(nx, ny);
+                    var expTag = TryLookupExpDbTag(rootHwndEarly, proc, pt, elBounds);
+                    if (expTag != null)
+                        tagPath = expTag;
+                    else
+                    {
+                        int nx = elBounds.Width > 0 ? elBounds.X + elBounds.Width / 2 : pt.X;
+                        int ny = elBounds.Height > 0 ? elBounds.Y + elBounds.Height / 2 : pt.Y;
+                        tagPath = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(nx, ny);
+                    }
                 }
 
                 var shortWin = $"{{hwnd:0x{bestHwnd.ToInt64():X},proc:'{proc}'}}";
@@ -702,5 +708,53 @@ internal partial class Program
 
         Log("Worker stopped");
         return 0;
+    }
+
+    /// <summary>
+    /// Look up experience DB (form_uia_{winClass}.json) for the node closest to cursor/bounds.
+    /// Returns DyTag string ("DyEdit_active", "DyGroup_3th", ...) or null if no match.
+    /// </summary>
+    static string? TryLookupExpDbTag(IntPtr rootHwnd, string proc, POINT pt, System.Drawing.Rectangle elBounds)
+    {
+        try
+        {
+            var clsBuf = new System.Text.StringBuilder(256);
+            NativeMethods.GetClassNameW(rootHwnd, clsBuf, clsBuf.Capacity);
+            var winCls = clsBuf.ToString();
+            if (string.IsNullOrEmpty(winCls)) return null;
+
+            var formPath = Path.Combine(DataDir, "profiles", $"{proc.ToLowerInvariant()}_exp",
+                $"form_uia_{winCls.Replace(" ", "_")}.json");
+            if (!File.Exists(formPath)) return null;
+
+            var form = System.Text.Json.JsonSerializer.Deserialize<WKAppBot.Win32.Window.FormExperience>(
+                File.ReadAllText(formPath));
+            if (form == null || form.Controls.Count == 0) return null;
+
+            NativeMethods.GetWindowRect(rootHwnd, out var wr);
+            int winW = wr.Right - wr.Left, winH = wr.Bottom - wr.Top;
+            if (winW <= 0 || winH <= 0) return null;
+
+            // Target center: prefer UIA bounds, fall back to cursor
+            int tx = elBounds.Width > 0 ? elBounds.X + elBounds.Width / 2 : pt.X;
+            int ty = elBounds.Height > 0 ? elBounds.Y + elBounds.Height / 2 : pt.Y;
+
+            WKAppBot.Win32.Window.ControlExperience? best = null;
+            double bestDist = double.MaxValue;
+            foreach (var ctrl in form.Controls)
+            {
+                int cx = wr.Left + (int)(ctrl.RelativeX * winW) + ctrl.Width / 2;
+                int cy = wr.Top  + (int)(ctrl.RelativeY * winH) + ctrl.Height / 2;
+                double dist = Math.Sqrt((cx - tx) * (cx - tx) + (cy - ty) * (cy - ty));
+                if (dist < bestDist) { bestDist = dist; best = ctrl; }
+            }
+
+            // Accept match within 40px
+            if (best == null || bestDist > 40) return null;
+
+            return WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
+                best.ClassName ?? "Node", best.Role, best.ControlId, isDynamic: true);
+        }
+        catch { return null; }
     }
 }
