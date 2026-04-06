@@ -555,12 +555,14 @@ internal partial class Program
                                     }
                                     catch { }
                                 }
-                                // Filter: ±9 Cached entries closest to target box (Y-sorted index)
+                                // Hybrid: Cached(경험DB) + Known(UIA) — UIA가 커버하는 영역은 Cached 억제
+                                // UIA-blind 영역만 Cached로 채움 (DyGroup_3th 등)
                                 if (_hoverExpBoxes.Count > 0)
                                 {
                                     var targetBox = boxes.FirstOrDefault(b => b.Role == HackBoxRole.Target);
                                     if (targetBox != null)
                                     {
+                                        // ±9 filter: Y-sorted, closest to target
                                         var sorted = _hoverExpBoxes
                                             .OrderBy(b => b.Bounds.Y).ThenBy(b => b.Bounds.X).ToList();
                                         var tcx = targetBox.Bounds.X + targetBox.Bounds.Width / 2;
@@ -569,15 +571,26 @@ internal partial class Program
                                         for (int i = 0; i < sorted.Count; i++)
                                         {
                                             var b = sorted[i];
-                                            // Y-weighted distance: vertical proximity matters most
                                             var d = Math.Abs(b.Bounds.Y + b.Bounds.Height / 2 - tcy)
                                                   + Math.Abs(b.Bounds.X + b.Bounds.Width / 2 - tcx) * 0.1;
                                             if (d < bestDist) { bestDist = d; bestIdx = i; }
                                         }
+                                        // Known 박스 목록 (UIA 커버 영역 판정용)
+                                        var knownBoxes = boxes.Where(b =>
+                                            b.Role is HackBoxRole.Known or HackBoxRole.Target or HackBoxRole.Scope).ToList();
                                         const int ExpSpan = 9;
                                         for (int i = Math.Max(0, bestIdx - ExpSpan);
                                              i <= Math.Min(sorted.Count - 1, bestIdx + ExpSpan); i++)
-                                            boxes.Add(sorted[i]);
+                                        {
+                                            var cb = sorted[i];
+                                            // UIA가 이미 커버하면 억제 — Cached 중심점이 Known 박스 안에 있으면 스킵
+                                            var ccx = cb.Bounds.X + cb.Bounds.Width / 2;
+                                            var ccy = cb.Bounds.Y + cb.Bounds.Height / 2;
+                                            bool covered = knownBoxes.Any(k =>
+                                                ccx >= k.Bounds.X && ccx <= k.Bounds.X + k.Bounds.Width &&
+                                                ccy >= k.Bounds.Y && ccy <= k.Bounds.Y + k.Bounds.Height);
+                                            if (!covered) boxes.Add(cb);
+                                        }
                                     }
                                 }
 
