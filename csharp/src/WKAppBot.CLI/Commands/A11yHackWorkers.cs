@@ -189,15 +189,34 @@ internal partial class Program
                 bool verified = verifyHits.Any(v => v.Handle == hwnd);
                 var mark = verified ? "OK" : "MISS";
 
-                // XML tag with attributes
+                // Build tag path: walk parent chain → "Pane/Group_1th/Edit_1052"
                 var elNodeTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
-                var attrs = new List<string>();
-                if (elBounds.Width > 0) attrs.Add($"ltwh={elBounds.X},{elBounds.Y},{elBounds.Width},{elBounds.Height}");
-                if (!string.IsNullOrEmpty(elName)) attrs.Add($"name=\"{elName}\"");
-                if (!string.IsNullOrEmpty(elPatterns)) attrs.Add($"pat=\"{elPatterns}\"");
-                var xmlTag = attrs.Count > 0 ? $"<{elNodeTag} {string.Join(" ", attrs)}>" : $"<{elNodeTag}>";
+                var pathParts = new List<string> { elNodeTag };
+                if (curEl != null)
+                {
+                    try
+                    {
+                        var walker = uia.TreeWalkerFactory.GetRawViewWalker();
+                        var p = curEl;
+                        for (int d = 0; d < 8; d++)
+                        {
+                            try { p = walker.GetParent(p); } catch { break; }
+                            if (p == null) break;
+                            string pCt = "?", pAid = "";
+                            try { pCt = p.ControlType.ToString(); } catch { }
+                            try { pAid = p.AutomationId ?? ""; } catch { }
+                            var pTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(pCt, pAid);
+                            if (pCt == "Window") break; // stop at window root
+                            pathParts.Add(pTag);
+                        }
+                    }
+                    catch { }
+                }
+                pathParts.Reverse();
+                var tagPath = string.Join("/", pathParts);
+
                 var shortWin = $"{{hwnd:0x{hwnd.ToInt64():X},proc:'{proc}'}}";
-                var result = $"{shortWin}#{xmlTag} {mark}";
+                var result = $"{shortWin}#{tagPath} {mark}";
 
                 var elMs = sw.ElapsedMilliseconds;
 
@@ -207,7 +226,7 @@ internal partial class Program
                 lastGrap = shortWin;
                 if (RunningInEye && !changed) continue; // Eye: change-only
                 if (grapChanged) Console.WriteLine(); // different target pattern → new line
-                Console.Write($"{shortWin}#{xmlTag} [{mark}] {elMs}ms          \r");
+                Console.Write($"{shortWin}#{tagPath} [{mark}] {elMs}ms          \r");
                 Console.Out.Flush();
 
                 // ── Live overlay: root window size, known nodes as dashed boxes ──
@@ -370,7 +389,7 @@ internal partial class Program
                 if (changed)
                 {
                     var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                    var logLine = $"[{ts2}] {fullGrap} // {xmlTag} [{mark}] {elMs}ms";
+                    var logLine = $"[{ts2}] {shortWin}#{tagPath} [{mark}] {elMs}ms";
                     try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
                 }
 
