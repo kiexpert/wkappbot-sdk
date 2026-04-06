@@ -231,7 +231,11 @@ internal partial class Program
                     }
                 }
 
-                var shortWin = $"{{hwnd:0x{bestHwnd.ToInt64():X},proc:'{proc}'}}";
+                var clsBuf2 = new System.Text.StringBuilder(256);
+                NativeMethods.GetClassNameW(bestHwnd, clsBuf2, clsBuf2.Capacity);
+                var winCls2 = clsBuf2.ToString();
+                var shortWin = $"{{hwnd:0x{bestHwnd.ToInt64():X},proc:'{proc}',cls:'{winCls2}'}}";
+
                 var result = $"{shortWin}#{tagPath} {mark}";
 
                 var elMs = sw.ElapsedMilliseconds;
