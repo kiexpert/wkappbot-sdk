@@ -130,10 +130,37 @@ internal partial class Program
     // ── form_uia experience DB fallback ──
     // Looks up Dy-tagged elements from UIA scan saved by hack-hover.
     // Returns true=success, false=fail, null=not found (caller tries next tier).
+
+    // File-level cache: formPath → (mtime, FormExperience)
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime mtime, WKAppBot.Win32.Window.FormExperience form)>
+        _formUiaFileCache = new(StringComparer.OrdinalIgnoreCase);
+
+    // Last-hit cache: (hwnd, uiaPath) → ControlExperience (invalidated on hwnd rect change)
+    static (IntPtr hwnd, string uiaPath, System.Drawing.Rectangle rect, WKAppBot.Win32.Window.ControlExperience ctrl)
+        _formUiaLastHit;
+
     static bool? TryFormUiaExpDbAction(IntPtr hwnd, string uiaPath, string action)
     {
         try
         {
+            // ── Last-hit fast path ──
+            var lh = _formUiaLastHit;
+            if (lh.hwnd == hwnd && lh.uiaPath == uiaPath && lh.ctrl != null)
+            {
+                NativeMethods.GetWindowRect(hwnd, out var wrFast);
+                var rectFast = new System.Drawing.Rectangle(wrFast.Left, wrFast.Top, wrFast.Right - wrFast.Left, wrFast.Bottom - wrFast.Top);
+                if (rectFast == lh.rect)
+                {
+                    int winW2 = rectFast.Width, winH2 = rectFast.Height;
+                    int cx2 = wrFast.Left + (int)(lh.ctrl.RelativeX * winW2) + lh.ctrl.Width / 2;
+                    int cy2 = wrFast.Top  + (int)(lh.ctrl.RelativeY * winH2) + lh.ctrl.Height / 2;
+                    var lhLabel = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
+                        lh.ctrl.ClassName ?? "Node", lh.ctrl.Role, lh.ctrl.ControlId, isDynamic: true);
+                    Console.WriteLine($"[A11Y] form_uia cache: \"{uiaPath}\" → {lhLabel} ({cx2},{cy2})");
+                    return DispatchFormUiaAction(action, lhLabel, lh.ctrl, cx2, cy2);
+                }
+            }
+
             NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
             string procName;
             try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant(); }
@@ -148,11 +175,21 @@ internal partial class Program
                 $"form_uia_{winCls.Replace(" ", "_")}.json");
             if (!File.Exists(formPath)) return null;
 
-            WKAppBot.Win32.Window.FormExperience? form;
+            // ── File cache (mtime-invalidated) ──
+            WKAppBot.Win32.Window.FormExperience? form = null;
             try
             {
-                form = System.Text.Json.JsonSerializer.Deserialize<WKAppBot.Win32.Window.FormExperience>(
-                    File.ReadAllText(formPath));
+                var mtime = File.GetLastWriteTimeUtc(formPath);
+                if (_formUiaFileCache.TryGetValue(formPath, out var cached) && cached.mtime == mtime)
+                {
+                    form = cached.form;
+                }
+                else
+                {
+                    form = System.Text.Json.JsonSerializer.Deserialize<WKAppBot.Win32.Window.FormExperience>(
+                        File.ReadAllText(formPath));
+                    if (form != null) _formUiaFileCache[formPath] = (mtime, form);
+                }
             }
             catch { return null; }
             if (form == null || form.Controls.Count == 0) return null;
@@ -181,24 +218,32 @@ internal partial class Program
             int cx = wr.Left + (int)(best.RelativeX * winW) + best.Width / 2;
             int cy = wr.Top  + (int)(best.RelativeY * winH) + best.Height / 2;
 
+            // Store last-hit for next call
+            _formUiaLastHit = (hwnd, uiaPath,
+                new System.Drawing.Rectangle(wr.Left, wr.Top, winW, winH), best);
+
             var dyLabel = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
                 best.ClassName ?? "Node", best.Role, best.ControlId, isDynamic: true);
             Console.WriteLine($"[A11Y] form_uia hit: \"{uiaPath}\" → {dyLabel} ({cx},{cy})");
-
-            if (action is "click" or "invoke")
-            {
-                WKAppBot.Win32.Input.MouseInput.Click(cx, cy);
-                return true;
-            }
-            if (action is "find" or "inspect" or "read")
-            {
-                Console.WriteLine($"[A11Y] form_uia element: {dyLabel} rel=({best.RelativeX:F3},{best.RelativeY:F3}) size={best.Width}x{best.Height} screen=({cx},{cy})");
-                return true;
-            }
-            // Other actions: report coord but no action supported
-            Console.WriteLine($"[A11Y] form_uia: action '{action}' not supported for coordinate-only element");
-            return false;
+            return DispatchFormUiaAction(action, dyLabel, best, cx, cy);
         }
         catch { return null; }
+    }
+
+    static bool DispatchFormUiaAction(string action, string label,
+        WKAppBot.Win32.Window.ControlExperience ctrl, int cx, int cy)
+    {
+        if (action is "click" or "invoke")
+        {
+            WKAppBot.Win32.Input.MouseInput.Click(cx, cy);
+            return true;
+        }
+        if (action is "find" or "inspect" or "read")
+        {
+            Console.WriteLine($"[A11Y] form_uia element: {label} rel=({ctrl.RelativeX:F3},{ctrl.RelativeY:F3}) size={ctrl.Width}x{ctrl.Height} screen=({cx},{cy})");
+            return true;
+        }
+        Console.WriteLine($"[A11Y] form_uia: action '{action}' not supported for coordinate-only element");
+        return false;
     }
 }
