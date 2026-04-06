@@ -588,6 +588,9 @@ public static class GrapHelper
         var current = root;
         foreach (var segment in segments)
         {
+            // "?" = unknown segment from hack-hover path capture → skip narrowing, keep current scope
+            if (segment == "?") continue;
+
             var found = FindByNameOrAid(current, segment, maxDepth);
             if (found == null)
                 return null;
