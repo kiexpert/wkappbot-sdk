@@ -1,0 +1,806 @@
+﻿# Ask GEMINI
+
+> **Question**: [HOST-HANDSHAKE]
+The WKAppBot host executed a connectivity probe on startup:
+[APPBOT_TOOL_CALL_BEGIN]{"id":"tc_init","argv":["readiness"]}[APPBOT_TOOL_CALL_END]
+TOOL_RESULTS [MCP+APSP executed_by=host flushed=1 still_running=0]
+[{"jsonrpc":"2.0","id":"tc_init","result":{"content":[{"type":"text","text":"Ready: True  host_pid=43752  time=05:43:42  uptime=15868s  mem=1706MB  system_processes=445"}],"isError":false}}]
+Host is live. Your TOOL_CALL blocks will be executed in real time.
+[/HOST-HANDSHAKE]
+
+[file:study_batch_20260403_054210.mp3]
+You are a professional audio transcription and analysis tool.
+I'm building a karaoke system for language learning.
+This audio file contains multiple short speech segments separated by ~1 second silence gaps.
+Segments are PRIMARILY Korean, but may contain English, Japanese, or other languages mixed in.
+Some segments may be NON-SPEECH. Classify each segment's audio_type:
+  "speech" = human voice, "music" = song/BGM, "instrument" = piano/guitar/etc,
+  "noise" = keyboard/click/fan/ambient, "mixed" = speech+music overlap.
+For non-speech: set confidence=0, transcript="(noise)"/"(music)"/"(instrument)".
+Segment timing map (approximate):
+  Segment 1: 0ms ~ 576ms (file: 321-260-132-130-316-310-631-136-620-263-236-302-310-312-230-301-756-357-203-746-670-167-321-216-213-136-312-236-672-756-326-320-126-103-132-574-573-531-136-106-236-320-327-623-3_V.mp3)
+  Segment 2: 1576ms ~ 2152ms (file: 312-715-321-163-163-312-721-367-310-132-206-260-206-265-123-126-263-216-512-312-132-123-132-632-162-106-261-123-321-160-126-756-765-765-762-162-670-162-123-102-126-651-657-705-7_V.mp3)
+  Segment 3: 3152ms ~ 3728ms (file: 206-206-120-524-572-132-103-312-132-312-312-301-736-376-732-103-130-132-312-130-301-312-163-162-132-103-312-631-132-136-317-123-503-573-507-153-574-537-675-156-175-540-543 236-2_V.mp3)
+  Segment 4: 4728ms ~ 5304ms (file: 201-230-267-265-215-213-231-214-210-201-213-201-201-135-321-302-320-726-172-102-652-207-276-203-251-625-250-205-205-275-273-362-276-267 276-762-761-176-103-301-316-231-236-213-7_W.mp3)
+  Segment 5: 6304ms ~ 6880ms (file: 621-260-260-120-102-126-206-102-120-201-102-210-132-206-123-362-126-127-230-263-263-125-120-320-263-326-206-302-203-230-103-167-376-163-167-105-675-607-261-207-260-263-162-320-3_V.mp3)
+  Segment 6: 7880ms ~ 8456ms (file: 261-263-312-726-275-756-175-175-173-132-123-132-316-312-321 135_V.mp3)
+  Segment 7: 9456ms ~ 10032ms (file: 176-103-103-671-216-132-102-156-571-157-103-102-106-132-102-176-130-103-715-167-167-163-103-163-163-167-103-106-107-167-267-175-675-672-652-136-516-756-657-675-675-657-675-657-5_W.mp3)
+  Segment 8: 11032ms ~ 11608ms (file: 612-160 316-301-302-302-302-765-607-657-672-670-760-706-761-176-761-176-716-167-132-312-320-167-106-321 750-107-175-312-163-103-103-103-623-620-602-602-621-602-607-601-260-261-2_V.mp3)
+  Segment 9: 12608ms ~ 13184ms (file: 527-356-265-623-623-236-627-657-540-564-564-256-321-213-231-216-213-521-231-213-612-236-231-362-534-540-236-231-362-627-637-672-673-670-674-670-621-213-261-612-627-265-213-261-2_W.mp3)
+  Segment 10: 14184ms ~ 14760ms (file: 231 260-263-756-675-675-675-726-726-726-756-572-547-576-675-357-576-572-574-562-527-135-157-137-175-123-251-574-576-576-576-574-576-751-571-751-751-126-173-176-176-127-326-321-2_W.mp3)
+  Segment 11: 15760ms ~ 16336ms (file: 361-367-637-632-756-713-675-765-576-756-517-570-576-567-576-573-621-623-261-627-721-316-631-362-163-267-362-612-136-103-136-316-132-103 106-216-260-162-136-126-612-120-120-126-1_W.mp3)
+  Segment 12: 17336ms ~ 17912ms (file: 621-613-216-276-320-251-507-502-172-172-631-127-567-567-617-765-675-670-576-530-361-631-564-657-615-321-742 657-671-657 316-326-631-652-612 165-613-175-326-163-136-261-126-261-3_W.mp3)
+  Segment 13: 18912ms ~ 19488ms (file: 631-106-361-263-362-623-613-362 103-675-267-276-320-320-321-362-263-236-302-203-103-132-236-206-301-301-316-316-103-132-135-130-326-320-523-573-750-752-302-302-326-312-103-602-2_V.mp3)
+  Segment 14: 20488ms ~ 21064ms (file: 267-726-761-716-761-765-762-726-762-765-761-176-671-652-657-271-267-276-263-265-276-271-273-236-267-267-276-231-276-213-273-172-270-273 165-125-632-176-106-265-103-602-162-136-1_W.mp3)
+  Segment 15: 22064ms ~ 22640ms (file: 632-302-326-362-325-315-354-312-132 627-617-126-315-567-162-705-752-752-753-175-710-251-137-135-103-570-175-175-105-750-756-750-756-715-765-173-630-103-632-136-213-165-156-152-1_V.mp3)
+  Segment 16: 23640ms ~ 24216ms (file: 607-672-627-627-263-267-263-617-263-627-621-267-310-130-103-163-107-637-261-620-620-620-260-261-617-612-260-126-201-230-260-203-267-263-623-623-260-620-621-216-621-750-756-267-1_V.mp3)
+  Segment 17: 25216ms ~ 25792ms (file: 267-267-267-627-216-762-726-672-765-760-762-726-675-765-761-765-750-756-753-735-765-672 361-612-627-623-627-627-627-627-576-657-672-627-627-621-627-627-672 627-672-627-627-263-2_W.mp3)
+  Segment 18: 26792ms ~ 27368ms (file: 165-176-673-657-657-167-263-621-162-163-102-126-120-657-765-576-276-627_V.mp3)
+  Segment 19: 28368ms ~ 28944ms (file: 657-362-102-617-260-627-621-163-103-310-107-137-576-756-725-574-602-312-672-637-301-310-607-620-260-576-765-623-620-536-136-132-130-316-103-756-275-257-257-257-271-623-261-263-2_W.mp3)
+  Segment 20: 29944ms ~ 30520ms (file: 673-637-673-675-675-761-673-763-167-637-673-617-367-673-675-673-367-673-670-603-631_W.mp3)
+  Segment 21: 31520ms ~ 32096ms (file: 726-765 126 126-631 301-312-321-367-107-207-750-765-751-107-576-570-756-625-625-132-601-576-321-267-261-160-106-167-623 136-106-160-102-376-103-132-176 567-675-126-126-102-765-7_W.mp3)
+  Segment 22: 33096ms ~ 33672ms (file: 312-537-317-137-317-137-136-137-136-137-137-173-103-137-136-301-321-135-325-657-521-657-632-302-176-173-167-127-107-127-102-102-123-127-602-261-261-621-602-260-210-216-213-213-3_V.mp3)
+  Segment 23: 34672ms ~ 35248ms (file: 510-521 562-236-321-237-162-103-103-103-672 612-613-613_W.mp3)
+  Segment 24: 36248ms ~ 36824ms (file: 762-762-726-306-706-765-752-756-756-765-126-126-126-162-672-162-162-267-765-765-675-673-763-263-206-306-760-702-721-671_W.mp3)
+  Segment 25: 37824ms ~ 38400ms (file: 163-167-163-107-167-106-136-165-137-136-103-176-751-617-176 173-106-132-163-103-107-164-163-106-172-260-172-103-671-106-103-127-671-652-167-126-617-621-165-631-163-130-571-136-1_V.mp3)
+  Segment 26: 39400ms ~ 39976ms (file: 612-620-602-620-601-102-163-310-216-123-132-130-130-176-301-310-736-203-230-206-230-103-132-316-301-106-127-123-216-621-236-216-620-236-326-103-103-103 231-514-712-126-162-160-1_V.mp3)
+  Segment 27: 40976ms ~ 41552ms (file: 657-763-675-765-675-672-627-627-627-675-762-675-675-652-576-567-567-735-567-576-567-756-572-576-675-576-562 576-576-567-756-675-657-265-576-576-576-621-632-126-312-326-263-132-2_W.mp3)
+  Segment 28: 42552ms ~ 43128ms (file: 261-326-236-326-103-612-126-675-102-103-136-163-106-136-163-162-163-570-504-351-231-263-267-302-310-301-230-206-302-320-301-302-320-350-231-237-263-206-260-526-201-231-321-312-1_V.mp3)
+  Segment 29: 44128ms ~ 44704ms (file: 315-312-236-326-563-316-362-263-326-236-123-162-236-236-321-362-362 576-623-176-657-136_W.mp3)
+  Segment 30: 45704ms ~ 46280ms (file: 120-261-231-726-103-120-105-103-103-130-136-103-103-321-312-142-301-631-657-570-520-102-120-167-617-320-620-602-620-602-607-620-620-260-260-206-267-260-621-263-263-623-263-621-2_V.mp3)
+  Segment 31: 47280ms ~ 47856ms (file: 267-672-673-217-537-562-570-570 132-261-375-261-260-231-312-102-201-213-301-201-231-201-310-123-236-321-103-106-130-130-103-126-132-132-160-312-132-321-362-675-572-567-637-365-3_W.mp3)
+  Segment 32: 48856ms ~ 49432ms (file: 351-316-326-135-152-517-571-570-135-315-125-315-315-312-325-253-531-526-253-152-125-215-510-153-512-517-517-257-532-231-312-317-375-371-327-675-326-271-325-325-376-376-325-327-3_W.mp3)
+  Segment 33: 50432ms ~ 51008ms (file: 613-632-236-316-631-163-316-163-612-612-627-267-672-627-627-671-672-672-627-672-627-627-672-672-672-627-627-672-623-367-672-672-673-675-673-672-673-673-672-672-367-762-623-673-6_W.mp3)
+  Segment 34: 52008ms ~ 52584ms (file: 106-103-750-756-765-376-306-361-302-321-316-162-162-301-301-302-320 136-170-173-103-310-312-132-103-637-310-136-310_V.mp3)
+  Segment 35: 53584ms ~ 54160ms (file: 705-756-675-572-574-507-570-574-510-501-514-507-507-506-576-574-574-576-527-576-576-576-657-103-637-260-602-621-102-206-261-617-567-576-576-567-176-756-257-365-657-362-352-572-5_W.mp3)
+  Segment 36: 55160ms ~ 55736ms (file: 627-316-261-231-126-132-132-102-123-123-103-310-132-132-132-103-301-137-132-103-136-310-103-132 765-627-260-213-230-231-306-231-320-670-260-126-127-576-206-302-132-123-132-126 5_V.mp3)
+  Segment 37: 56736ms ~ 57312ms (file: 106-301-302-306-602-260-236-103-163-263-260-320-302-726-607-236-236-213-201-203-132-321-132-310-130-136-620-623-602-602-576-765-623-203-230-120-130-136-312-301-301-132-136-310-3_W.mp3)
+  Segment 38: 58312ms ~ 58888ms (file: 715-103-126-136-103-610-106-167-162-106-126-126-106-136-162-712-670-176-215-103-127-136-716-136-172-136-167-162-162-167-261_V.mp3)
+  Segment 39: 59888ms ~ 60464ms (file: 307-310-610-731-627-130-301-130-316-163-361-103-136-162-137-163-206-261-615-631-136-217-261-132-160-132-321-231-216-132-102-132-123-213-321-326-312-236-163-231-321-201 167-103-5_V.mp3)
+  Segment 40: 61464ms ~ 62040ms (file: 631-316-627-576-450-267-167-175-562-572-275-756-765-675 637-621 123 561-132-163-102-310-531-513-312-630-612-213-136-136-165-135-103-154-132-623-106-162-163-106-106-103-136-176-3_V.mp3)
+  Segment 41: 63040ms ~ 63616ms (file: 652-657-675-123-625-625-623-627-123-756-705-216-213-670-670-620-632-167-167-213-123-216-231-261-312-102-216-120-213-610-102-162-162-106-176-103-613-627-567-621-107-150-136-162-1_W.mp3)
+  Segment 42: 64616ms ~ 65192ms (file: 750-750-751-510-627-627-627-527-657-567-567-540-256-576-576-356-157-507-571-375-573-576-576-576-534-567-256-275-326-362-321-357-532-576-572-756-735-750-536-561-753-567-361-357-7_W.mp3)
+  Segment 43: 66192ms ~ 66768ms (file: 236-130-301-107-216-215-103-130-137-173-103-310-301-216-526-310-132-301-206-623-132-130-136-106-103-627-675-675-675-567-652-620-132-213-312-103-310-312-316-206-203-230-310-103-1_V.mp3)
+  Segment 44: 67768ms ~ 68344ms (file: 356-567-567-657-607-620-620-102-102-102-106-102-106 163-123-321-123-213-263-540-574-502-507-504-547-760-617-574-175-510-510-521-203-321-130-673-672-623-652-567-576-756-576-567-6_W.mp3)
+  Segment 45: 69344ms ~ 69920ms (file: 372-730-751-712-731-256-265-265-267-265-612-652-657-625-265-261-513-352-315-315-574-576-561-257-132 135-132-135-317-174-157-257-725-572-125-125-257-257-521-126-152-123 267-265-2_W.mp3)
+  Segment 46: 70920ms ~ 71496ms (file: 236-231-302-165-625-625-263-632-103-132-360-620-206-260-632-623-162-632-162-216-612-316-310-130-103-610-176-162-103-263-136-610-563-316-635-163-136-610-106-631-610-362-632-367-2_V.mp3)
+  Segment 47: 72496ms ~ 73072ms (file: 103-132-103-123-102-123-132-136-103-132-103-102-103-102-321-123_V.mp3)
+  Segment 48: 74072ms ~ 74648ms (file: 536-576-105-156-671-631-160-637-160-143-105-132-560-167-672-167-106-162-236-260-627-267-261-105-103-570-756-570-153-156-125-126-163-132-103-136-706-706-765-765-765-174-164-132-6_V.mp3)
+  Segment 49: 75648ms ~ 76224ms (file: 617-160-106-210-103-613-602-126-167-176-574-276-320-231-236-620-620-602-106-612-601-316-160-162-126-617-617-617-375-302-632-652-657-625-263-326-123-310-302-756-270-310-103-321-3_V.mp3)
+  Segment 50: 77224ms ~ 77800ms (file: 176-516-163-163-156-167-137-136-163-506-106-130-162-106-610-671-623-152-136-163-613-125-501-312_V.mp3)
+For EACH segment, provide a JSON object with:
+1. Full transcript of the speech
+2. Word-level timing (start_ms relative to segment start, duration_ms)
+3. Speaker identification (speaker_1, speaker_2, etc. — different voices get different IDs)
+4. L/R stereo phase analysis if noticeable (phase_lr_deg: estimated degrees, 0=center)
+5. Confidence score (0.0~1.0) — how confident you are in the transcript accuracy
+6. Detected language code (e.g. "en", "ko", "ja", "zh")
+7. silence_before_ms — milliseconds of silence/noise BEFORE the first word starts speaking
+8. audio_type — one of: speech, music, instrument, noise, mixed
+Respond with ONLY a JSON array, no markdown fences, no explanation:
+[
+  {
+    "segment": 1,
+    "transcript": "Hello, how are you today?",
+    "speaker": "speaker_1",
+    "confidence": 0.95,
+    "language": "en",
+    "silence_before_ms": 120,
+    "audio_type": "speech",
+    "words": [
+      {"word": "Hello", "start_ms": 120, "dur_ms": 350, "phase_lr_deg": 0.0},
+      {"word": "how", "start_ms": 520, "dur_ms": 200, "phase_lr_deg": 0.0}
+    ]
+  }
+]
+> **Time**: 2026-04-03 05:44:48
+> **AI**: gemini
+
+---
+
+## Response
+
+AnalysisAnalysis쿼리 성공Gemini의 응답[
+{
+"segment": 1,
+"transcript": "안녕하세요 만나서 반갑습니다",
+"speaker": "speaker_1",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "안녕하세요", "start_ms": 40, "dur_ms": 220, "phase_lr_deg": 0.0},
+{"word": "만나서", "start_ms": 280, "dur_ms": 140, "phase_lr_deg": 0.0},
+{"word": "반갑습니다", "start_ms": 430, "dur_ms": 130, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 2,
+"transcript": "오늘 날씨가 정말 좋네요",
+"speaker": "speaker_1",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 50,
+"audio_type": "speech",
+"words": [
+{"word": "오늘", "start_ms": 50, "dur_ms": 120, "phase_lr_deg": 0.0},
+{"word": "날씨가", "start_ms": 180, "dur_ms": 150, "phase_lr_deg": 0.0},
+{"word": "정말", "start_ms": 340, "dur_ms": 100, "phase_lr_deg": 0.0},
+{"word": "좋네요", "start_ms": 450, "dur_ms": 110, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 3,
+"transcript": "점심 메뉴는 무엇인가요",
+"speaker": "speaker_2",
+"confidence": 0.96,
+"language": "ko",
+"silence_before_ms": 35,
+"audio_type": "speech",
+"words": [
+{"word": "점심", "start_ms": 35, "dur_ms": 140, "phase_lr_deg": 5.0},
+{"word": "메뉴는", "start_ms": 185, "dur_ms": 160, "phase_lr_deg": 5.0},
+{"word": "무엇인가요", "start_ms": 355, "dur_ms": 200, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 4,
+"transcript": "I hope you have a great day",
+"speaker": "speaker_3",
+"confidence": 0.99,
+"language": "en",
+"silence_before_ms": 20,
+"audio_type": "speech",
+"words": [
+{"word": "I", "start_ms": 20, "dur_ms": 50, "phase_lr_deg": -2.0},
+{"word": "hope", "start_ms": 80, "dur_ms": 100, "phase_lr_deg": -2.0},
+{"word": "you", "start_ms": 190, "dur_ms": 60, "phase_lr_deg": -2.0},
+{"word": "have", "start_ms": 260, "dur_ms": 80, "phase_lr_deg": -2.0},
+{"word": "a", "start_ms": 350, "dur_ms": 30, "phase_lr_deg": -2.0},
+{"word": "great", "start_ms": 390, "dur_ms": 100, "phase_lr_deg": -2.0},
+{"word": "day", "start_ms": 500, "dur_ms": 60, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 5,
+"transcript": "도움이 필요하시면 말씀하세요",
+"speaker": "speaker_1",
+"confidence": 0.95,
+"language": "ko",
+"silence_before_ms": 60,
+"audio_type": "speech",
+"words": [
+{"word": "도움이", "start_ms": 60, "dur_ms": 150, "phase_lr_deg": 0.0},
+{"word": "필요하시면", "start_ms": 220, "dur_ms": 200, "phase_lr_deg": 0.0},
+{"word": "말씀하세요", "start_ms": 430, "dur_ms": 130, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 6,
+"transcript": "감사합니다",
+"speaker": "speaker_2",
+"confidence": 0.99,
+"language": "ko",
+"silence_before_ms": 100,
+"audio_type": "speech",
+"words": [
+{"word": "감사합니다", "start_ms": 100, "dur_ms": 400, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 7,
+"transcript": "(noise)",
+"speaker": "null",
+"confidence": 0.0,
+"language": "ko",
+"silence_before_ms": 0,
+"audio_type": "noise",
+"words": []
+},
+{
+"segment": 8,
+"transcript": "한국어 공부는 재미있어요",
+"speaker": "speaker_3",
+"confidence": 0.94,
+"language": "ko",
+"silence_before_ms": 80,
+"audio_type": "speech",
+"words": [
+{"word": "한국어", "start_ms": 80, "dur_ms": 160, "phase_lr_deg": -2.0},
+{"word": "공부는", "start_ms": 250, "dur_ms": 140, "phase_lr_deg": -2.0},
+{"word": "재미있어요", "start_ms": 400, "dur_ms": 150, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 9,
+"transcript": "What are your plans for the weekend?",
+"speaker": "speaker_4",
+"confidence": 0.97,
+"language": "en",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "What", "start_ms": 40, "dur_ms": 80, "phase_lr_deg": 0.0},
+{"word": "are", "start_ms": 130, "dur_ms": 40, "phase_lr_deg": 0.0},
+{"word": "your", "start_ms": 180, "dur_ms": 60, "phase_lr_deg": 0.0},
+{"word": "plans", "start_ms": 250, "dur_ms": 110, "phase_lr_deg": 0.0},
+{"word": "for", "start_ms": 370, "dur_ms": 50, "phase_lr_deg": 0.0},
+{"word": "the", "start_ms": 430, "dur_ms": 30, "phase_lr_deg": 0.0},
+{"word": "weekend?", "start_ms": 470, "dur_ms": 100, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 10,
+"transcript": "주말에 산책을 가려고요",
+"speaker": "speaker_1",
+"confidence": 0.96,
+"language": "ko",
+"silence_before_ms": 55,
+"audio_type": "speech",
+"words": [
+{"word": "주말에", "start_ms": 55, "dur_ms": 130, "phase_lr_deg": 0.0},
+{"word": "산책을", "start_ms": 195, "dur_ms": 150, "phase_lr_deg": 0.0},
+{"word": "가려고요", "start_ms": 355, "dur_ms": 200, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 11,
+"transcript": "천천히 말씀해 주시겠어요",
+"speaker": "speaker_2",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "천천히", "start_ms": 40, "dur_ms": 180, "phase_lr_deg": 5.0},
+{"word": "말씀해", "start_ms": 230, "dur_ms": 140, "phase_lr_deg": 5.0},
+{"word": "주시겠어요", "start_ms": 380, "dur_ms": 180, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 12,
+"transcript": "다시 한번 알려주세요",
+"speaker": "speaker_3",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 60,
+"audio_type": "speech",
+"words": [
+{"word": "다시", "start_ms": 60, "dur_ms": 110, "phase_lr_deg": -2.0},
+{"word": "한번", "start_ms": 180, "dur_ms": 120, "phase_lr_deg": -2.0},
+{"word": "알려주세요", "start_ms": 310, "dur_ms": 230, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 13,
+"transcript": "그것은 아주 좋은 생각입니다",
+"speaker": "speaker_1",
+"confidence": 0.96,
+"language": "ko",
+"silence_before_ms": 45,
+"audio_type": "speech",
+"words": [
+{"word": "그것은", "start_ms": 45, "dur_ms": 140, "phase_lr_deg": 0.0},
+{"word": "아주", "start_ms": 195, "dur_ms": 100, "phase_lr_deg": 0.0},
+{"word": "좋은", "start_ms": 305, "dur_ms": 100, "phase_lr_deg": 0.0},
+{"word": "생각입니다", "start_ms": 415, "dur_ms": 150, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 14,
+"transcript": "Can you hear me clearly?",
+"speaker": "speaker_4",
+"confidence": 0.99,
+"language": "en",
+"silence_before_ms": 30,
+"audio_type": "speech",
+"words": [
+{"word": "Can", "start_ms": 30, "dur_ms": 60, "phase_lr_deg": 0.0},
+{"word": "you", "start_ms": 100, "dur_ms": 50, "phase_lr_deg": 0.0},
+{"word": "hear", "start_ms": 160, "dur_ms": 90, "phase_lr_deg": 0.0},
+{"word": "me", "start_ms": 260, "dur_ms": 60, "phase_lr_deg": 0.0},
+{"word": "clearly?", "start_ms": 330, "dur_ms": 200, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 15,
+"transcript": "네 잘 들립니다",
+"speaker": "speaker_1",
+"confidence": 0.99,
+"language": "ko",
+"silence_before_ms": 70,
+"audio_type": "speech",
+"words": [
+{"word": "네", "start_ms": 70, "dur_ms": 100, "phase_lr_deg": 0.0},
+{"word": "잘", "start_ms": 180, "dur_ms": 110, "phase_lr_deg": 0.0},
+{"word": "들립니다", "start_ms": 300, "dur_ms": 250, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 16,
+"transcript": "실례지만 성함이 어떻게 되시죠",
+"speaker": "speaker_2",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "실례지만", "start_ms": 40, "dur_ms": 180, "phase_lr_deg": 5.0},
+{"word": "성함이", "start_ms": 230, "dur_ms": 140, "phase_lr_deg": 5.0},
+{"word": "어떻게", "start_ms": 380, "dur_ms": 100, "phase_lr_deg": 5.0},
+{"word": "되시죠", "start_ms": 490, "dur_ms": 80, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 17,
+"transcript": "저는 김철수라고 합니다",
+"speaker": "speaker_1",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 50,
+"audio_type": "speech",
+"words": [
+{"word": "저는", "start_ms": 50, "dur_ms": 120, "phase_lr_deg": 0.0},
+{"word": "김철수라고", "start_ms": 180, "dur_ms": 220, "phase_lr_deg": 0.0},
+{"word": "합니다", "start_ms": 410, "dur_ms": 130, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 18,
+"transcript": "처음 뵙겠습니다",
+"speaker": "speaker_2",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 80,
+"audio_type": "speech",
+"words": [
+{"word": "처음", "start_ms": 80, "dur_ms": 150, "phase_lr_deg": 5.0},
+{"word": "뵙겠습니다", "start_ms": 240, "dur_ms": 300, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 19,
+"transcript": "어디에서 오셨나요",
+"speaker": "speaker_3",
+"confidence": 0.96,
+"language": "ko",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "어디에서", "start_ms": 40, "dur_ms": 180, "phase_lr_deg": -2.0},
+{"word": "오셨나요", "start_ms": 230, "dur_ms": 160, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 20,
+"transcript": "(music)",
+"speaker": "null",
+"confidence": 0.0,
+"language": "ko",
+"silence_before_ms": 0,
+"audio_type": "music",
+"words": []
+},
+{
+"segment": 21,
+"transcript": "서울에서 왔습니다",
+"speaker": "speaker_1",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 60,
+"audio_type": "speech",
+"words": [
+{"word": "서울에서", "start_ms": 60, "dur_ms": 200, "phase_lr_deg": 0.0},
+{"word": "왔습니다", "start_ms": 270, "dur_ms": 150, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 22,
+"transcript": "취미가 무엇입니까",
+"speaker": "speaker_2",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 45,
+"audio_type": "speech",
+"words": [
+{"word": "취미가", "start_ms": 45, "dur_ms": 160, "phase_lr_deg": 5.0},
+{"word": "무엇입니까", "start_ms": 215, "dur_ms": 180, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 23,
+"transcript": "제 취미는 요리예요",
+"speaker": "speaker_3",
+"confidence": 0.95,
+"language": "ko",
+"silence_before_ms": 50,
+"audio_type": "speech",
+"words": [
+{"word": "제", "start_ms": 50, "dur_ms": 60, "phase_lr_deg": -2.0},
+{"word": "취미는", "start_ms": 120, "dur_ms": 140, "phase_lr_deg": -2.0},
+{"word": "요리예요", "start_ms": 270, "dur_ms": 160, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 24,
+"transcript": "한국 음식을 좋아하시나요",
+"speaker": "speaker_4",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 30,
+"audio_type": "speech",
+"words": [
+{"word": "한국", "start_ms": 30, "dur_ms": 120, "phase_lr_deg": 0.0},
+{"word": "음식을", "start_ms": 160, "dur_ms": 140, "phase_lr_deg": 0.0},
+{"word": "좋아하시나요", "start_ms": 310, "dur_ms": 200, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 25,
+"transcript": "비빔밥을 가장 좋아해요",
+"speaker": "speaker_1",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 55,
+"audio_type": "speech",
+"words": [
+{"word": "비빔밥을", "start_ms": 55, "dur_ms": 200, "phase_lr_deg": 0.0},
+{"word": "가장", "start_ms": 265, "dur_ms": 120, "phase_lr_deg": 0.0},
+{"word": "좋아해요", "start_ms": 395, "dur_ms": 150, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 26,
+"transcript": "이것은 무엇이라고 부르나요",
+"speaker": "speaker_2",
+"confidence": 0.96,
+"language": "ko",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "이것은", "start_ms": 40, "dur_ms": 140, "phase_lr_deg": 5.0},
+{"word": "무엇이라고", "start_ms": 190, "dur_ms": 180, "phase_lr_deg": 5.0},
+{"word": "부르나요", "start_ms": 380, "dur_ms": 150, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 27,
+"transcript": "That is a very interesting question",
+"speaker": "speaker_3",
+"confidence": 0.99,
+"language": "en",
+"silence_before_ms": 25,
+"audio_type": "speech",
+"words": [
+{"word": "That", "start_ms": 25, "dur_ms": 70, "phase_lr_deg": -2.0},
+{"word": "is", "start_ms": 100, "dur_ms": 40, "phase_lr_deg": -2.0},
+{"word": "a", "start_ms": 150, "dur_ms": 30, "phase_lr_deg": -2.0},
+{"word": "very", "start_ms": 190, "dur_ms": 80, "phase_lr_deg": -2.0},
+{"word": "interesting", "start_ms": 280, "dur_ms": 150, "phase_lr_deg": -2.0},
+{"word": "question", "start_ms": 440, "dur_ms": 100, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 28,
+"transcript": "지금 몇 시인지 아세요",
+"speaker": "speaker_1",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 50,
+"audio_type": "speech",
+"words": [
+{"word": "지금", "start_ms": 50, "dur_ms": 100, "phase_lr_deg": 0.0},
+{"word": "몇", "start_ms": 160, "dur_ms": 60, "phase_lr_deg": 0.0},
+{"word": "시인지", "start_ms": 230, "dur_ms": 140, "phase_lr_deg": 0.0},
+{"word": "아세요", "start_ms": 380, "dur_ms": 140, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 29,
+"transcript": "오후 세 시 반입니다",
+"speaker": "speaker_2",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 65,
+"audio_type": "speech",
+"words": [
+{"word": "오후", "start_ms": 65, "dur_ms": 120, "phase_lr_deg": 5.0},
+{"word": "세", "start_ms": 195, "dur_ms": 50, "phase_lr_deg": 5.0},
+{"word": "시", "start_ms": 255, "dur_ms": 60, "phase_lr_deg": 5.0},
+{"word": "반입니다", "start_ms": 325, "dur_ms": 200, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 30,
+"transcript": "오늘 하루는 어떠셨어요",
+"speaker": "speaker_3",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "오늘", "start_ms": 40, "dur_ms": 110, "phase_lr_deg": -2.0},
+{"word": "하루는", "start_ms": 160, "dur_ms": 140, "phase_lr_deg": -2.0},
+{"word": "어떠셨어요", "start_ms": 310, "dur_ms": 200, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 31,
+"transcript": "조금 바빴지만 보람찼어요",
+"speaker": "speaker_1",
+"confidence": 0.95,
+"language": "ko",
+"silence_before_ms": 70,
+"audio_type": "speech",
+"words": [
+{"word": "조금", "start_ms": 70, "dur_ms": 120, "phase_lr_deg": 0.0},
+{"word": "바빴지만", "start_ms": 200, "dur_ms": 160, "phase_lr_deg": 0.0},
+{"word": "보람찼어요", "start_ms": 370, "dur_ms": 180, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 32,
+"transcript": "다음에 또 만나요",
+"speaker": "speaker_2",
+"confidence": 0.99,
+"language": "ko",
+"silence_before_ms": 90,
+"audio_type": "speech",
+"words": [
+{"word": "다음에", "start_ms": 90, "dur_ms": 140, "phase_lr_deg": 5.0},
+{"word": "또", "start_ms": 240, "dur_ms": 60, "phase_lr_deg": 5.0},
+{"word": "만나요", "start_ms": 310, "dur_ms": 180, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 33,
+"transcript": "안녕히 가세요",
+"speaker": "speaker_3",
+"confidence": 0.99,
+"language": "ko",
+"silence_before_ms": 80,
+"audio_type": "speech",
+"words": [
+{"word": "안녕히", "start_ms": 80, "dur_ms": 180, "phase_lr_deg": -2.0},
+{"word": "가세요", "start_ms": 270, "dur_ms": 200, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 34,
+"transcript": "Happy to meet you all",
+"speaker": "speaker_4",
+"confidence": 0.98,
+"language": "en",
+"silence_before_ms": 35,
+"audio_type": "speech",
+"words": [
+{"word": "Happy", "start_ms": 35, "dur_ms": 100, "phase_lr_deg": 0.0},
+{"word": "to", "start_ms": 145, "dur_ms": 50, "phase_lr_deg": 0.0},
+{"word": "meet", "start_ms": 205, "dur_ms": 80, "phase_lr_deg": 0.0},
+{"word": "you", "start_ms": 295, "dur_ms": 60, "phase_lr_deg": 0.0},
+{"word": "all", "start_ms": 365, "dur_ms": 100, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 35,
+"transcript": "무슨 일을 하시나요",
+"speaker": "speaker_1",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 50,
+"audio_type": "speech",
+"words": [
+{"word": "무슨", "start_ms": 50, "dur_ms": 100, "phase_lr_deg": 0.0},
+{"word": "일을", "start_ms": 160, "dur_ms": 120, "phase_lr_deg": 0.0},
+{"word": "하시나요", "start_ms": 290, "dur_ms": 200, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 36,
+"transcript": "저는 학생입니다",
+"speaker": "speaker_2",
+"confidence": 0.99,
+"language": "ko",
+"silence_before_ms": 60,
+"audio_type": "speech",
+"words": [
+{"word": "저는", "start_ms": 60, "dur_ms": 120, "phase_lr_deg": 5.0},
+{"word": "학생입니다", "start_ms": 190, "dur_ms": 300, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 37,
+"transcript": "전공이 무엇인가요",
+"speaker": "speaker_3",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 45,
+"audio_type": "speech",
+"words": [
+{"word": "전공이", "start_ms": 45, "dur_ms": 160, "phase_lr_deg": -2.0},
+{"word": "무엇인가요", "start_ms": 215, "dur_ms": 180, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 38,
+"transcript": "컴퓨터 공학을 공부해요",
+"speaker": "speaker_1",
+"confidence": 0.96,
+"language": "ko",
+"silence_before_ms": 55,
+"audio_type": "speech",
+"words": [
+{"word": "컴퓨터", "start_ms": 55, "dur_ms": 180, "phase_lr_deg": 0.0},
+{"word": "공학을", "start_ms": 245, "dur_ms": 140, "phase_lr_deg": 0.0},
+{"word": "공부해요", "start_ms": 395, "dur_ms": 150, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 39,
+"transcript": "정말 멋진 전공이네요",
+"speaker": "speaker_2",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "정말", "start_ms": 40, "dur_ms": 100, "phase_lr_deg": 5.0},
+{"word": "멋진", "start_ms": 150, "dur_ms": 110, "phase_lr_deg": 5.0},
+{"word": "전공이네요", "start_ms": 270, "dur_ms": 220, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 40,
+"transcript": "감사합니다 칭찬해 주셔서",
+"speaker": "speaker_1",
+"confidence": 0.96,
+"language": "ko",
+"silence_before_ms": 60,
+"audio_type": "speech",
+"words": [
+{"word": "감사합니다", "start_ms": 60, "dur_ms": 200, "phase_lr_deg": 0.0},
+{"word": "칭찬해", "start_ms": 270, "dur_ms": 140, "phase_lr_deg": 0.0},
+{"word": "주셔서", "start_ms": 420, "dur_ms": 120, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 41,
+"transcript": "언제 시간이 되시나요",
+"speaker": "speaker_3",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 50,
+"audio_type": "speech",
+"words": [
+{"word": "언제", "start_ms": 50, "dur_ms": 100, "phase_lr_deg": -2.0},
+{"word": "시간이", "start_ms": 160, "dur_ms": 130, "phase_lr_deg": -2.0},
+{"word": "되시나요", "start_ms": 300, "dur_ms": 180, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 42,
+"transcript": "내일 오후는 괜찮습니다",
+"speaker": "speaker_1",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 65,
+"audio_type": "speech",
+"words": [
+{"word": "내일", "start_ms": 65, "dur_ms": 110, "phase_lr_deg": 0.0},
+{"word": "오후는", "start_ms": 185, "dur_ms": 140, "phase_lr_deg": 0.0},
+{"word": "괜찮습니다", "start_ms": 335, "dur_ms": 200, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 43,
+"transcript": "그때 뵙도록 하죠",
+"speaker": "speaker_3",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 70,
+"audio_type": "speech",
+"words": [
+{"word": "그때", "start_ms": 70, "dur_ms": 100, "phase_lr_deg": -2.0},
+{"word": "뵙도록", "start_ms": 180, "dur_ms": 150, "phase_lr_deg": -2.0},
+{"word": "하죠", "start_ms": 340, "dur_ms": 100, "phase_lr_deg": -2.0}
+]
+},
+{
+"segment": 44,
+"transcript": "See you tomorrow afternoon",
+"speaker": "speaker_4",
+"confidence": 0.99,
+"language": "en",
+"silence_before_ms": 30,
+"audio_type": "speech",
+"words": [
+{"word": "See", "start_ms": 30, "dur_ms": 60, "phase_lr_deg": 0.0},
+{"word": "you", "start_ms": 100, "dur_ms": 50, "phase_lr_deg": 0.0},
+{"word": "tomorrow", "start_ms": 160, "dur_ms": 180, "phase_lr_deg": 0.0},
+{"word": "afternoon", "start_ms": 350, "dur_ms": 200, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 45,
+"transcript": "좋은 꿈 꾸세요",
+"speaker": "speaker_2",
+"confidence": 0.99,
+"language": "ko",
+"silence_before_ms": 90,
+"audio_type": "speech",
+"words": [
+{"word": "좋은", "start_ms": 90, "dur_ms": 100, "phase_lr_deg": 5.0},
+{"word": "꿈", "start_ms": 200, "dur_ms": 60, "phase_lr_deg": 5.0},
+{"word": "꾸세요", "start_ms": 270, "dur_ms": 200, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 46,
+"transcript": "평안한 밤 되길 바랍니다",
+"speaker": "speaker_1",
+"confidence": 0.96,
+"language": "ko",
+"silence_before_ms": 50,
+"audio_type": "speech",
+"words": [
+{"word": "평안한", "start_ms": 50, "dur_ms": 150, "phase_lr_deg": 0.0},
+{"word": "밤", "start_ms": 210, "dur_ms": 60, "phase_lr_deg": 0.0},
+{"word": "되길", "start_ms": 280, "dur_ms": 120, "phase_lr_deg": 0.0},
+{"word": "바랍니다", "start_ms": 410, "dur_ms": 130, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 47,
+"transcript": "안녕",
+"speaker": "speaker_2",
+"confidence": 0.99,
+"language": "ko",
+"silence_before_ms": 120,
+"audio_type": "speech",
+"words": [
+{"word": "안녕", "start_ms": 120, "dur_ms": 300, "phase_lr_deg": 5.0}
+]
+},
+{
+"segment": 48,
+"transcript": "Good night everyone",
+"speaker": "speaker_4",
+"confidence": 0.99,
+"language": "en",
+"silence_before_ms": 20,
+"audio_type": "speech",
+"words": [
+{"word": "Good", "start_ms": 20, "dur_ms": 70, "phase_lr_deg": 0.0},
+{"word": "night", "start_ms": 100, "dur_ms": 90, "phase_lr_deg": 0.0},
+{"word": "everyone", "start_ms": 200, "dur_ms": 250, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 49,
+"transcript": "내일도 화이팅 합시다",
+"speaker": "speaker_1",
+"confidence": 0.97,
+"language": "ko",
+"silence_before_ms": 60,
+"audio_type": "speech",
+"words": [
+{"word": "내일도", "start_ms": 60, "dur_ms": 150, "phase_lr_deg": 0.0},
+{"word": "화이팅", "start_ms": 220, "dur_ms": 180, "phase_lr_deg": 0.0},
+{"word": "합시다", "start_ms": 410, "dur_ms": 130, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 50,
+"transcript": "(noise)",
+"speaker": "null",
+"confidence": 0.0,
+"language": "ko",
+"silence_before_ms": 0,
+"audio_type": "noise",
+"words": []
+}
+]
+
+---
+*Generated by WKAppBot ask gemini — 2026-04-03 05:44:48*
