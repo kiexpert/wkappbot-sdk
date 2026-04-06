@@ -399,21 +399,21 @@ internal partial class Program
                                                     if (ctrls.Count >= 500) return;
                                                     FlaUI.Core.AutomationElements.AutomationElement[] ch;
                                                     try { ch = parent.FindAllChildren(); } catch { return; }
-                                                    foreach (var c in ch)
+                                                    NativeMethods.GetWindowRect(capturedRootHwnd, out var wr2);
+                                                    for (int ci = 0; ci < ch.Length; ci++)
                                                     {
                                                         if (ctrls.Count >= 500) return;
                                                         try
                                                         {
-                                                            var cr = c.BoundingRectangle;
+                                                            var cr = ch[ci].BoundingRectangle;
                                                             if (cr.Width < 5 || cr.Height < 5) continue;
                                                             string ct2 = "?", aid2 = "";
-                                                            try { ct2 = c.ControlType.ToString(); } catch { }
-                                                            try { aid2 = c.AutomationId ?? ""; } catch { }
-                                                            var tag2 = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(ct2, aid2);
-                                                            NativeMethods.GetWindowRect(capturedRootHwnd, out var wr2);
+                                                            try { ct2 = ch[ci].ControlType.ToString(); } catch { }
+                                                            try { aid2 = ch[ci].AutomationId ?? ""; } catch { }
                                                             ctrls.Add(new WKAppBot.Win32.Window.ControlExperience
                                                             {
-                                                                ClassName = tag2,
+                                                                ClassName = ct2,
+                                                                ControlId = ci + 1, // sibling index (1-based)
                                                                 Width = (int)cr.Width,
                                                                 Height = (int)cr.Height,
                                                                 RelativeX = capturedRootW > 0 ? (cr.X - wr2.Left) / (double)capturedRootW : 0,
@@ -421,7 +421,7 @@ internal partial class Program
                                                             });
                                                         }
                                                         catch { }
-                                                        ScanForExp(c);
+                                                        ScanForExp(ch[ci]);
                                                     }
                                                 }
                                                 ScanForExp(capturedRootEl);
