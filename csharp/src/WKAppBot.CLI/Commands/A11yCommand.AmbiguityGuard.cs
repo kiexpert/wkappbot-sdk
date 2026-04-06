@@ -115,10 +115,15 @@ internal partial class Program
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine($"     [HEAL] hwnd fallback: a11y {action} \"{healPattern}\"");
                         Console.ResetColor();
+                        // Self-healed via hwnd fallback — title changed (e.g. Chrome navigation).
+                        // Not a real bug; skip AutoRegisterBug.
                     }
-                    AutoRegisterBug(
-                        $"[BUG-AUTO] auto-find grap verify MISS: pattern={json5} hwnd=0x{w.Handle:X8} title=\"{title}\" healed={healed}",
-                        args: ["a11y", "find", json5]);
+                    else
+                    {
+                        AutoRegisterBug(
+                            $"[BUG-AUTO] auto-find grap verify MISS: pattern={json5} hwnd=0x{w.Handle:X8} title=\"{title}\" healed={healed}",
+                            args: ["a11y", "find", json5]);
+                    }
                 }
             }
             Console.WriteLine($"[A11Y] Tip: a11y find \"<target>\" 으로 상세 탐색 / --all 또는 --nth 1 으로 강제 실행");
