@@ -530,6 +530,36 @@ internal partial class Program
             Eye spawns this automatically; can also run from console directly.
             """,
 
+        ["skill"] = """
+            skill <subcommand> [options]
+            AI skill management — executable knowhow for Claude instances.
+            Storage: {callerCwd}/skills/ (project, git-tracked)
+                     {hq}/skills/       (installed, [HQ] tag in list)
+
+            Subcommands:
+              list [app]                        List skills grouped by app, most recent first
+              show <id>                         Full detail: steps, refs, version
+              search <keyword> [--app X]        Search title/desc/tags/steps
+              contribute --app X --title Y --desc Z
+                         [--steps "s1|s2"] [--tags "t1,t2"] [--id <slug>]
+                         [--refs "file:line:pattern|..."]
+                                               Create or update (auto version bump)
+              delete <id>                       Remove from project dir
+              install [--app X] [--force]       Copy project → HQ (runs on publish)
+              export [--app X] [--out f.zip]    Export to zip
+              import <file.zip>                 Import into project dir
+              verify <id>                       Check source_refs still match code
+              audit [--app X]                   Audit all skills for stale/missing refs
+
+            Examples:
+              wkappbot skill list
+              wkappbot skill audit
+              wkappbot skill show handoff-checklist
+              wkappbot skill search retry
+              wkappbot skill contribute --app wkappbot-webbot --title "X" --desc "Y" \\
+                --refs "csharp/src/WKAppBot.WebBot/CdpClient.cs::pattern"
+            """,
+
         ["claude-usage"] = """
             claude-usage
             Show Claude API token usage: JSONL size + ctx% estimate.
