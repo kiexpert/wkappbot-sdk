@@ -186,6 +186,57 @@ public static class ChromeLauncher
     }
 
     /// <summary>
+    /// Scan CDP ports [startPort, startPort+scanCount) and return the first port
+    /// where any open page-type tab has a URL containing <paramref name="host"/>.
+    /// Returns -1 if no matching port found.
+    /// Uses a short timeout per port so the scan completes quickly even if most ports are idle.
+    /// </summary>
+    public static async Task<int> FindBestPortForHostAsync(string host, int startPort = 9222, int scanCount = 9)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(800) };
+        for (int port = startPort; port < startPort + scanCount; port++)
+        {
+            try
+            {
+                var json = await http.GetStringAsync($"http://localhost:{port}/json");
+                var arr = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonArray>(json);
+                if (arr == null) continue;
+                foreach (var node in arr)
+                {
+                    var type = node?["type"]?.GetValue<string>() ?? "";
+                    if (!string.Equals(type, "page", StringComparison.OrdinalIgnoreCase)) continue;
+                    var url = node?["url"]?.GetValue<string>() ?? "";
+                    if (url.Contains(host, StringComparison.OrdinalIgnoreCase))
+                        return port;
+                }
+            }
+            catch { }
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Scan CDP ports [startPort, startPort+scanCount) and return the first port
+    /// that has no active CDP endpoint (free for launching a new Chrome instance).
+    /// Falls back to startPort+scanCount if all ports are taken.
+    /// Uses a short timeout so inactive ports fail fast.
+    /// </summary>
+    public static async Task<int> FindFirstFreePortAsync(int startPort = 9222, int scanCount = 9)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
+        for (int port = startPort; port < startPort + scanCount; port++)
+        {
+            try
+            {
+                var json = await http.GetStringAsync($"http://localhost:{port}/json/version");
+                if (!string.IsNullOrEmpty(json)) continue; // port active
+            }
+            catch { return port; } // connect failed → port is free
+        }
+        return startPort + scanCount; // all taken
+    }
+
+    /// <summary>
     /// Kill the Chrome process (and its tree) that is currently listening on the given CDP port.
     /// Returns true if a process was found and killed.
     /// </summary>

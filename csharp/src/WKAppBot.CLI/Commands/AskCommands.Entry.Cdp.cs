@@ -247,11 +247,41 @@ internal partial class Program
         {
             try
             {
+                // ── Multi-browser port scan ──
+                // When a preferred host is set, scan ports 9222-9230 to find which Chrome
+                // instance already has that host open — avoids hardcoding port 9222.
+                if (!string.IsNullOrWhiteSpace(preferredHost))
+                {
+                    var hostPort = await ChromeLauncher.FindBestPortForHostAsync(preferredHost);
+                    if (hostPort > 0)
+                    {
+                        if (hostPort != port)
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkGray;
+                            Console.WriteLine($"[ASK] Multi-browser: {preferredHost} found on port {hostPort}");
+                            Console.ResetColor();
+                        }
+                        port = hostPort;
+                    }
+                    else
+                    {
+                        // Host not open anywhere — find a free port for new Chrome launch
+                        var freePort = await ChromeLauncher.FindFirstFreePortAsync();
+                        if (freePort != port)
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkGray;
+                            Console.WriteLine($"[ASK] Port {port} taken, using port {freePort} for new Chrome");
+                            Console.ResetColor();
+                            port = freePort;
+                        }
+                    }
+                }
+
                 var active = await ChromeLauncher.IsPortActiveAsync(port);
                 if (!active)
                 {
                     var launchUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
-                    Console.WriteLine($"[ASK] Launching Chrome …{launchUrl ?? "about:blank"}...");
+                    Console.WriteLine($"[ASK] Launching Chrome on port {port}…{launchUrl ?? "about:blank"}...");
                     await ChromeLauncher.LaunchAsync(port: port, url: launchUrl);
                     await Task.Delay(2500);
                 }
