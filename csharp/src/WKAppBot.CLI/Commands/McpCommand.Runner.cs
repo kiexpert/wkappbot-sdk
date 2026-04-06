@@ -20,6 +20,13 @@ internal partial class Program
         Console.SetOut(capture);
         Console.SetError(capture);
 
+        // Set CWD to caller's working directory so relative paths resolve correctly.
+        // Restore on exit — Environment.CurrentDirectory is process-wide.
+        var callerCwd = EyeCmdPipeServer.CallerCwd.Value;
+        var prevCwd = Environment.CurrentDirectory;
+        if (!string.IsNullOrEmpty(callerCwd) && Directory.Exists(callerCwd))
+            try { Environment.CurrentDirectory = callerCwd; } catch { }
+
         int exitCode = 0;
         try
         {
@@ -47,6 +54,7 @@ internal partial class Program
             capture.FlushPartialLine();
             Console.SetOut(prevOut);
             Console.SetError(prevErr);
+            try { Environment.CurrentDirectory = prevCwd; } catch { }
         }
 
         return (capture.GetAllText().Trim(), exitCode);
