@@ -176,14 +176,20 @@ internal partial class Program
 
                 if (elName.Length > 30) elName = elName[..30];
                 var elLabel = !string.IsNullOrEmpty(elAid) ? elAid : elName;
-                var json5 = WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(hwnd);
-                var fullGrap = !string.IsNullOrEmpty(elLabel) ? $"{json5}#*{elLabel}*" : json5;
+                // Window grap: short pattern for readability
+                var winTitle = NativeMethods.GetWindowTextW(hwnd);
+                if (winTitle.Length > 20) winTitle = winTitle[..20];
+                var winGrap = $"\"*{winTitle}*\"";
+                // Full grap with #scope for targeting
+                var fullGrap = !string.IsNullOrEmpty(elLabel) ? $"{winGrap}#*{elLabel}*" : winGrap;
 
-                // Verify: can we actually target this?
+                // Verify
+                var json5 = WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(hwnd);
                 var verifyHits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(json5, true);
                 bool verified = verifyHits.Any(v => v.Handle == hwnd);
                 var mark = verified ? "OK" : "MISS";
 
+                // XML tag with attributes
                 var elNodeTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
                 var attrs = new List<string>();
                 if (elBounds.Width > 0) attrs.Add($"ltwh={elBounds.X},{elBounds.Y},{elBounds.Width},{elBounds.Height}");
