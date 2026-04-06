@@ -140,6 +140,10 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 if (hwnd == IntPtr.Zero) continue;
 
+                // Use root window for grap/UIA (child hwnds often have no title / no UIA tree)
+                var rootHwndEarly = NativeMethods.GetAncestor(hwnd, 2 /* GA_ROOT */);
+                if (rootHwndEarly == IntPtr.Zero) rootHwndEarly = hwnd;
+
                 // Mouse moved? → reset debounce + cancel running analysis (but not blind hack)
                 if (pt.X != lastMouseX || pt.Y != lastMouseY)
                 {
@@ -155,7 +159,7 @@ internal partial class Program
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 string elType = "?", elName = "", elAid = "", elPatterns = "";
                 System.Drawing.Rectangle elBounds = default;
-                NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                NativeMethods.GetWindowThreadProcessId(rootHwndEarly, out uint pid);
                 string proc; try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { proc = "?"; }
                 FlaUI.Core.AutomationElements.AutomationElement? curEl = null;
                 try
@@ -178,17 +182,17 @@ internal partial class Program
 
                 if (elName.Length > 30) elName = elName[..30];
                 var elLabel = !string.IsNullOrEmpty(elAid) ? elAid : elName;
-                // Window grap: short pattern for readability
-                var winTitle = NativeMethods.GetWindowTextW(hwnd);
+                // Window grap: use root hwnd for title + json5 (child hwnds have empty titles)
+                var winTitle = NativeMethods.GetWindowTextW(rootHwndEarly);
                 if (winTitle.Length > 20) winTitle = winTitle[..20];
                 var winGrap = $"\"*{winTitle}*\"";
                 // Full grap with #scope for targeting
                 var fullGrap = !string.IsNullOrEmpty(elLabel) ? $"{winGrap}#*{elLabel}*" : winGrap;
 
-                // Verify
-                var json5 = WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(hwnd);
+                // Verify against root hwnd
+                var json5 = WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(rootHwndEarly);
                 var verifyHits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(json5, true);
-                bool verified = verifyHits.Any(v => v.Handle == hwnd);
+                bool verified = verifyHits.Any(v => v.Handle == rootHwndEarly);
                 var mark = verified ? "OK" : "MISS";
 
                 // Build tag path: walk parent chain → "Pane/Group_1th/Edit_1052"
@@ -197,7 +201,7 @@ internal partial class Program
                     ? WKAppBot.Win32.Accessibility.GrapHelper.BuildAbsoluteTagPath(curEl, uia.TreeWalkerFactory.GetRawViewWalker())
                     : WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
 
-                var shortWin = $"{{hwnd:0x{hwnd.ToInt64():X},proc:'{proc}'}}";
+                var shortWin = $"{{hwnd:0x{rootHwndEarly.ToInt64():X},proc:'{proc}'}}";
                 var result = $"{shortWin}#{tagPath} {mark}";
 
                 var elMs = sw.ElapsedMilliseconds;
@@ -216,9 +220,8 @@ internal partial class Program
                 {
                     try
                     {
-                        // Root window rect
-                        var rootHwnd = NativeMethods.GetAncestor(hwnd, 2 /* GA_ROOT */);
-                        if (rootHwnd == IntPtr.Zero) rootHwnd = hwnd;
+                        // Root window rect (reuse rootHwndEarly computed above)
+                        var rootHwnd = rootHwndEarly;
                         NativeMethods.GetWindowRect(rootHwnd, out var rootWr);
                         int rootW = rootWr.Right - rootWr.Left, rootH = rootWr.Bottom - rootWr.Top;
                         if (rootW > 0 && rootH > 0)
