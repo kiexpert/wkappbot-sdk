@@ -165,7 +165,7 @@ internal partial class Program
                     }
                 }
 
-                // Direct UIA: find element at mouse position
+                // Direct UIA: find element at mouse position via shared BuildElementAtPointInfo
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 string elType = "?", elName = "", elAid = "", elPatterns = "";
                 System.Drawing.Rectangle elBounds = default;
@@ -177,15 +177,12 @@ internal partial class Program
                     curEl = uia.FromPoint(new System.Drawing.Point(pt.X, pt.Y));
                     if (curEl != null)
                     {
-                        try { elType = curEl.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                        try { elName = curEl.Properties.Name.ValueOrDefault ?? ""; } catch { }
-                        try { elAid = curEl.Properties.AutomationId.ValueOrDefault ?? ""; } catch { }
-                        try { var br = curEl.BoundingRectangle; elBounds = new System.Drawing.Rectangle((int)br.X, (int)br.Y, (int)br.Width, (int)br.Height); } catch { }
-                        var pats = new List<string>();
-                        try { if (curEl.Patterns.Invoke.IsSupported) pats.Add("Invoke"); } catch { }
-                        try { if (curEl.Patterns.Value.IsSupported) pats.Add("Value"); } catch { }
-                        try { if (curEl.Patterns.Toggle.IsSupported) pats.Add("Toggle"); } catch { }
-                        elPatterns = string.Join(",", pats);
+                        var info = WKAppBot.Win32.Accessibility.UiaLocator.BuildElementAtPointInfo(curEl);
+                        elType = info.ControlType;
+                        elName = info.Name == "(null)" || info.Name == "(err)" ? "" : info.Name;
+                        elAid  = info.AutomationId;
+                        elBounds = new System.Drawing.Rectangle(info.BoundsX, info.BoundsY, info.BoundsW, info.BoundsH);
+                        elPatterns = string.Join(",", info.Patterns);
                     }
                 }
                 catch { }

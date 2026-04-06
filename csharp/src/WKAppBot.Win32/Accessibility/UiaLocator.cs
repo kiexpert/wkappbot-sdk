@@ -754,7 +754,7 @@ public sealed partial class UiaLocator : IDisposable
         inner.Right <= outer.Right &&
         inner.Bottom <= outer.Bottom;
 
-    private ElementAtPointInfo BuildElementAtPointInfo(AutomationElement element)
+    public static ElementAtPointInfo BuildElementAtPointInfo(AutomationElement element)
     {
         string name, aid, ctStr;
         try { name = element.Name ?? "(null)"; } catch { name = "(err)"; }
