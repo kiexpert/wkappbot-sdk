@@ -196,17 +196,18 @@ internal partial class Program
                 if (!string.IsNullOrEmpty(elName)) attrs.Add($"name=\"{elName}\"");
                 if (!string.IsNullOrEmpty(elPatterns)) attrs.Add($"pat=\"{elPatterns}\"");
                 var xmlTag = attrs.Count > 0 ? $"<{elNodeTag} {string.Join(" ", attrs)}>" : $"<{elNodeTag}>";
-                var result = $"{fullGrap} {xmlTag} {mark}";
+                var shortWin = $"{{hwnd:0x{hwnd.ToInt64():X},proc:'{proc}'}}";
+                var result = $"{shortWin}#{xmlTag} {mark}";
 
                 var elMs = sw.ElapsedMilliseconds;
 
                 bool changed = result != lastResult;
                 if (changed) lastResult = result;
-                bool grapChanged = fullGrap != lastGrap;
-                lastGrap = fullGrap;
+                bool grapChanged = shortWin != lastGrap;
+                lastGrap = shortWin;
                 if (RunningInEye && !changed) continue; // Eye: change-only
                 if (grapChanged) Console.WriteLine(); // different target pattern → new line
-                Console.Write($"{fullGrap} // {xmlTag} [{mark}] {elMs}ms          \r");
+                Console.Write($"{shortWin}#{xmlTag} [{mark}] {elMs}ms          \r");
                 Console.Out.Flush();
 
                 // ── Live overlay: root window size, known nodes as dashed boxes ──
