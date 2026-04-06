@@ -29,23 +29,8 @@ internal partial class Program
                 { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
             if (NativeMethods.GetGUIThreadInfo(0, ref gti) && gti.hwndFocus != IntPtr.Zero)
             {
-                var focusTitle = NativeMethods.GetWindowTextW(gti.hwndFocus);
-                var focusClass = new System.Text.StringBuilder(128);
-                NativeMethods.GetClassNameW(gti.hwndFocus, focusClass, 128);
-                var winShort = fgTitle.Length > 30 ? fgTitle[..27] + "*" : fgTitle;
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.Write("[FOCUS] ");
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write($"\"{winShort}\"");
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.Write($"#0x{gti.hwndFocus:X}({focusClass})");
-                if (focusTitle.Length > 0)
-                {
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Write($" \"{(focusTitle.Length > 30 ? focusTitle[..27] + "..." : focusTitle)}\"");
-                }
-                Console.ResetColor();
-                Console.WriteLine();
+                var focusGrap = WindowFinder.BuildTargetJson5(gti.hwndFocus);
+                Console.WriteLine($"[FOCUS] {focusGrap}");
             }
         }
         catch { }
