@@ -286,12 +286,26 @@ internal static class EyeCmdPipeServer
                 && !string.Equals(callerCwd.TrimEnd('\\', '/'), eyeCwd.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)
                 && (args.Length > 0 && args[0].ToLowerInvariant() is "a11y" or "file" or "logcat" or "inspect"))
             {
-                Console.Error.WriteLine($"[CMD-CWD-MISMATCH] caller={callerCwd} eye={eyeCwd}");
-                Program.AutoRegisterBug(
-                    $"[BUG-AUTO] CWD mismatch on `{cmdLine}`\n" +
-                    $"Caller: {callerCwd}\nEye: {eyeCwd}\n" +
-                    $"MCP worker runs with Eye CWD — relative paths in caller may resolve differently.",
-                    args, callerCwd);
+                // Benign case: caller is at a parent directory of Eye's CWD.
+                // e.g. caller=W:\GitHub\WKAppBot, eye=W:\GitHub\WKAppBot\csharp\src\WKAppBot.CLI
+                // Eye launched from a subdir (hot-swap artifact). Auto-correct EyeCallerCwd upward.
+                var callerNorm = callerCwd.TrimEnd('\\', '/').Replace('/', '\\');
+                var eyeNorm = eyeCwd.TrimEnd('\\', '/').Replace('/', '\\');
+                bool callerIsParent = eyeNorm.StartsWith(callerNorm + '\\', StringComparison.OrdinalIgnoreCase);
+                if (callerIsParent)
+                {
+                    Console.Error.WriteLine($"[CMD-CWD-CORRECT] Eye CWD subdir of caller — auto-correcting EyeCallerCwd: {eyeCwd} → {callerCwd}");
+                    Program.SetEyeCallerCwd(callerCwd);
+                }
+                else
+                {
+                    Console.Error.WriteLine($"[CMD-CWD-MISMATCH] caller={callerCwd} eye={eyeCwd}");
+                    Program.AutoRegisterBug(
+                        $"[BUG-AUTO] CWD mismatch on `{cmdLine}`\n" +
+                        $"Caller: {callerCwd}\nEye: {eyeCwd}\n" +
+                        $"MCP worker runs with Eye CWD — relative paths in caller may resolve differently.",
+                        args, callerCwd);
+                }
             }
 
             EyeMcpClient.CurrentCallerCwd = callerCwd;

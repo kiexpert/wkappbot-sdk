@@ -330,6 +330,9 @@ internal partial class Program
     /// <summary>Eye's working directory — set once at startup, used for all child process spawns.</summary>
     internal static string EyeCallerCwd { get; private set; } = "";
 
+    /// <summary>Correct EyeCallerCwd when a caller provides a more accurate (parent) CWD.</summary>
+    internal static void SetEyeCallerCwd(string cwd) => EyeCallerCwd = cwd;
+
     static int EyeGlobalPollingLoop(int width, int height, int posX, int posY, int intervalMs, string callerCwd, bool elevated = false, int replacePid = 0)
     {
         EyeCallerCwd = callerCwd; // store for DrainSlackQueueIfNeeded and HoverAnalyzer
