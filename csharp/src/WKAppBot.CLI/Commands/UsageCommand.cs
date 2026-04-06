@@ -24,7 +24,7 @@ Your testing, coding, and ideas are appreciated. Let's build together.
 Usage:
   wkappbot <command> [options]
 
-═══ Public Commands ═══════════════════════════════════════════
+=== Public Commands ===================================================
 
   a11y <action> <grap>[#uia-scope] [options]        (alias: a11y.exe / wka11y.exe)
       Universal accessibility interface — 20 standard actions for ANY window.
@@ -113,7 +113,7 @@ Usage:
   slack send|reply|upload|screenshot|listen|catch-up
       Slack messaging (Socket Mode, always-on prompt forwarding).
 
-═══ Detail Commands ═══════════════════════════════════════════
+=== Detail Commands ===================================================
 
 Inspection:
   windows [filter] [--uia] [--deep] [--process <name>] [--limit N]
@@ -163,6 +163,8 @@ Utility:
       One-shot diagnostic: UIA tree + screenshot + OCR.
   knowhow write|read|web|web-read
       Record/read per-control automation notes.
+  skill list|show|contribute|export|import
+      Manage executable automation skills (YAML-like structured knowledge).
   schedule add|list|remove|clear
       Manage scheduled prompts for auto-recovery.
   logcat [regex] [file1.glob] [file2.glob ...] [options]

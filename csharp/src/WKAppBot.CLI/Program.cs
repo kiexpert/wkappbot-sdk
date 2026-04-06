@@ -711,6 +711,7 @@ internal partial class Program
                 "schedule" => ScheduleCommand(restArgs),
                 "dashboard" => DashboardCommand(restArgs),
                 "knowhow" => KnowhowCommand(restArgs),
+                "skill" => SkillCommand(restArgs),
                 "win-move" => WindowMoveCommand(restArgs),
                 "screen" => ScreenCommand(restArgs),
                 "clipboard" => ClipboardCommand(restArgs),
@@ -885,6 +886,7 @@ internal partial class Program
             case "file":
             case "schedule":
             case "knowhow":
+            case "skill":
                 return sub.Length > 0 ? $"{cmd} {sub}" : cmd;
 
             default:
