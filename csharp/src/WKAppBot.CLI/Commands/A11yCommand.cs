@@ -875,7 +875,10 @@ internal partial class Program
                                 {
                                     var (mel, mcov, mtxt) = allMatches[mi];
                                     string melType = "?"; try { melType = mel.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                                    Console.WriteLine($"[A11Y]   #{mi + 1} {melType} \"{mtxt}\" cov={mcov:P0}");
+                                    string melAid = ""; try { melAid = mel.Properties.AutomationId.ValueOrDefault ?? ""; } catch { }
+                                    string melName = ""; try { melName = mel.Properties.Name.ValueOrDefault ?? ""; } catch { }
+                                    var melTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(melType, melAid, mi + 1);
+                                    Console.WriteLine($"[A11Y]   #{mi + 1} {melTag} \"{mtxt}\" cov={mcov:P0}");
                                 }
                             }
                             int elNth = 1;
@@ -995,7 +998,8 @@ internal partial class Program
                 System.Drawing.Rectangle? elBounds = null;
                 try { var r = root.Properties.BoundingRectangle.ValueOrDefault; elBounds = new(r.X, r.Y, r.Width, r.Height); elRectStr = $" rect=({r.X},{r.Y} {r.Width}x{r.Height})"; } catch { }
 
-                Console.WriteLine($"[A11Y] element: {elType} \"{elName}\" (aid=\"{elAid}\"){elRectStr} in {tag}");
+                var elNodeTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
+                Console.WriteLine($"[A11Y] element: <{elNodeTag}>{elRectStr} in {tag}");
 
                 // ── OCR gap analysis: detect missing text in element rect ──
                 // Applies to all elements wider than one character (~14px)

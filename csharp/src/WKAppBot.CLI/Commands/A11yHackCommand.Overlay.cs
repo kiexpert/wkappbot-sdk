@@ -118,11 +118,11 @@ internal partial class Program
             var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
             var path = Path.Combine(baseDir, $"hack-overlay-{stage}-{stamp}.png");
             overlay.Save(path, ImageFormat.Png);
-            Console.WriteLine($"[HACK] Overlay preview: {path}");
+            Console.Error.WriteLine($"[HACK] Overlay preview: {path}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[HACK] Overlay preview save failed: {ex.Message}");
+            Console.Error.WriteLine($"[HACK] Overlay preview save failed: {ex.Message}");
         }
     }
 
@@ -180,15 +180,14 @@ internal partial class Program
             string? label = null;
             if (uiaAnswers != null && uiaAnswers.TryGetValue(i, out var uia))
             {
-                var idPart = !string.IsNullOrWhiteSpace(uia.aid) ? uia.aid
-                           : !string.IsNullOrWhiteSpace(uia.name) ? TrimPreview(uia.name, 20)
-                           : $"#{i + 1}";
-                var typePart = !string.IsNullOrWhiteSpace(uia.type) ? uia.type : "";
-                label = $"{typePart}_{idPart} {region.Bounds.Width}x{region.Bounds.Height}";
+                var tag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
+                    !string.IsNullOrWhiteSpace(uia.type) ? uia.type : "?", uia.aid);
+                label = $"{tag} {region.Bounds.Width}x{region.Bounds.Height}";
             }
             else if (region.Type != ConnectedComponentAnalyzer.RegionType.DyNoise)
             {
-                label = $"{region.Type} {region.Bounds.Width}x{region.Bounds.Height}";
+                // CCA region without UIA → dynamic (experience DB only)
+                label = $"Dy{region.Type} {region.Bounds.Width}x{region.Bounds.Height}";
             }
 
             string? ocrText = null;
@@ -217,6 +216,8 @@ internal partial class Program
         return boxes;
     }
 
+    static IntPtr _hackOverlayHwnd;
+
     static void UpdateHackOverlay(
         A11yHackOverlayHost? liveOverlay,
         Bitmap source,
@@ -227,6 +228,16 @@ internal partial class Program
         int ccaOffX = 0, int ccaOffY = 0)
     {
         if (liveOverlay == null) return;
+        // Track window movement — move overlay to follow
+        if (_hackOverlayHwnd != IntPtr.Zero)
+        {
+            var rootHwnd = NativeMethods.GetAncestor(_hackOverlayHwnd, 2);
+            if (rootHwnd != IntPtr.Zero)
+            {
+                NativeMethods.GetWindowRect(rootHwnd, out var curWr);
+                liveOverlay.Move(curWr.Left, curWr.Top);
+            }
+        }
         var boxes = BuildHackOverlayBoxes(regions, uiaAnswers, stageLabels, uiaStandaloneBoxes, ccaOffX, ccaOffY);
         liveOverlay.Update(new A11yHackOverlayModel(boxes));
     }
