@@ -70,28 +70,33 @@ internal partial class Program
                     if (!KillCmdLineMatch(cmdLine, targetPattern)) continue;
 
                     // Self-kill guard: pattern matched only via cmdLine of a wkappbot-core process.
-                    // This happens when wkappbot is analyzing the target (e.g., a11y hack "*LG*")
-                    // and the pattern "LG" matches our own worker's cmdLine arguments — not the target app.
-                    // Skip + register bug unless user explicitly targeted wkappbot.
+                    // Two cases:
+                    //   (A) wkappbot-core running as a daemon (e.g. "screensaver", "whisper-ring") —
+                    //       first arg matches the pattern → legitimate kill target, let it proceed.
+                    //   (B) wkappbot-core running a command (e.g. a11y hack "*LG*") and the pattern
+                    //       "LG" only matched its command args — false positive, skip without bug.
                     if (procName.Equals("wkappbot-core", StringComparison.OrdinalIgnoreCase)
                         && !targetPattern.Contains("wkappbot", StringComparison.OrdinalIgnoreCase))
                     {
                         var brief = cmdLine.Length > 120 ? cmdLine[..120] + "..." : cmdLine;
-                        // If the matching wkappbot-core is ourselves (or an ancestor), skip silently — expected.
+                        // If the matching wkappbot-core is ourselves (or an ancestor), skip silently.
                         if (selfPids.Contains(p.Id))
                         {
                             skipped.Add($"[{p.Id}]{procName} (self-skip)");
                             continue;
                         }
-                        Console.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (self-kill guard: pattern \"{targetPattern}\" matched own cmdLine)\n       cmd: {brief}");
-                        skipped.Add($"[{p.Id}]{procName} (self-kill-guard)");
-                        AutoRegisterBug(
-                            $"[BUG-AUTO] a11y kill \"{grap}\" self-kill: pattern matched wkappbot-core cmdLine\n" +
-                            $"pid={p.Id} cmd={brief}\n" +
-                            $"Pattern \"{targetPattern}\" hit our own worker's arguments, not the target process.",
-                            new[] { "a11y", "kill", grap },
-                            callerCwd: EyeCmdPipeServer.CallerCwd.Value);
-                        continue;
+                        // If the pattern matches the FIRST positional arg (daemon subcommand), allow kill.
+                        // e.g. "wkappbot-core screensaver ..." → pattern "screensaver" → legitimate target.
+                        var firstArg = ExtractFirstCmdArg(cmdLine);
+                        bool isDaemonTarget = !string.IsNullOrEmpty(firstArg) && targetMatcher.IsMatch(firstArg);
+                        if (!isDaemonTarget)
+                        {
+                            // Pattern only hit command args, not the daemon name — false positive guard.
+                            Console.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (self-kill guard: \"{targetPattern}\" only matched cmd args)\n       cmd: {brief}");
+                            skipped.Add($"[{p.Id}]{procName} (self-kill-guard)");
+                            continue;
+                        }
+                        // isDaemonTarget=true: fall through to kill the daemon process
                     }
                 }
 
@@ -266,5 +271,42 @@ internal partial class Program
         var m = PatternMatcher.Create(pat);
         if (!m.IsMatch(ancestors[ai]) && !m.IsMatch($"[0]{ancestors[ai]}.exe")) return false;
         return KillMatchChainRec(patterns, pi + 1, ancestors, ai + 1);
+    }
+
+    // Extracts the first positional argument from a Windows command line string.
+    // e.g. `"C:\bin\wkappbot-core.exe" "screensaver" "1400"` → "screensaver"
+    static string ExtractFirstCmdArg(string cmdLine)
+    {
+        if (string.IsNullOrWhiteSpace(cmdLine)) return "";
+        // Simple tokenizer: skip the exe (first quoted or unquoted token), return the next.
+        int i = 0;
+        // Skip the executable token
+        if (i < cmdLine.Length && cmdLine[i] == '"')
+        {
+            i++; // skip opening quote
+            while (i < cmdLine.Length && cmdLine[i] != '"') i++;
+            if (i < cmdLine.Length) i++; // skip closing quote
+        }
+        else
+        {
+            while (i < cmdLine.Length && cmdLine[i] != ' ') i++;
+        }
+        // Skip whitespace
+        while (i < cmdLine.Length && cmdLine[i] == ' ') i++;
+        if (i >= cmdLine.Length) return "";
+        // Read the next token (first arg)
+        if (cmdLine[i] == '"')
+        {
+            i++;
+            int start = i;
+            while (i < cmdLine.Length && cmdLine[i] != '"') i++;
+            return cmdLine[start..i];
+        }
+        else
+        {
+            int start = i;
+            while (i < cmdLine.Length && cmdLine[i] != ' ') i++;
+            return cmdLine[start..i];
+        }
     }
 }
