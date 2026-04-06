@@ -654,7 +654,7 @@ internal partial class Program
                 // → immediate hack (experience DB build, uncancellable)
                 // tagPath containing '@' = was '?' (coord-temp name) = fully UIA-blind
                 bool uiaBlind = (string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns))
-                    || tagPath.StartsWith("NodeXY(");
+                    || tagPath.StartsWith("FindNodeXY(");
                 bool expMissing = false;
                 if (!uiaBlind) // UIA has info, but check experience DB for window layout
                 {
