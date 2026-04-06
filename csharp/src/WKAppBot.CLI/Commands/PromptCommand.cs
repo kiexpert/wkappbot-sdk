@@ -139,6 +139,9 @@ internal partial class Program
 
     static int PromptDeliver(string nameQuery, string message)
     {
+        // Unescape \n / \t so callers can embed escape sequences in string args
+        message = message.Replace("\\n", "\n").Replace("\\t", "\t");
+
         using var ph = new ClaudePromptHelper();
         var all = ph.FindAllPrompts();
         if (all.Count == 0) { Console.Error.WriteLine("[PROMPT] No prompt windows found."); return 1; }

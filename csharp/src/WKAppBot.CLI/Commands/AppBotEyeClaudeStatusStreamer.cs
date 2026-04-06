@@ -293,7 +293,7 @@ internal partial class Program
                     // 프창에도 긴급 경고 전송 (MCP subprocess에서 실행)
                     try
                     {
-                        var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요!\\nwkappbot newchat 실행 필요";
+                        var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요!\nwkappbot newchat 실행 필요";
                         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, urgentNudge]);
                         Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Urgent nudge sent via MCP");
                     }
@@ -312,7 +312,12 @@ internal partial class Program
                     var handoff = BuildHandoffPrompt(jsonlPath, _cachedCards, sizeMB, ContextLimitMB);
                     try
                     {
-                        var nudge = $"⚠️ 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!\\n준비되면 아래 명령을 실행:\\n\\nwkappbot newchat \"{handoff.Replace("\"", "\\\"")}\"";
+                        var nudge = $"""
+                            ⚠️ 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!
+                            준비되면 아래 명령을 실행:
+
+                            wkappbot newchat "{handoff}"
+                            """;
                         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, nudge]);
                         Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent via MCP");
                         Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
