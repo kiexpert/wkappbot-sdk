@@ -1,0 +1,23 @@
+{
+  "id": "mts",
+  "app": "hts-kiwoom-mts",
+  "title": "\uC601\uC6C5\uBB38 MTS \uC804\uCCB4\uBA54\uB274 \uD0D0\uC0C9",
+  "desc": "\uC804\uCCB4\uBA54\uB274\uB294 \uC0AC\uC774\uB4DC\uBC14(ScrollView 11\uAC1C \uB300\uBD84\uB958)\u002B\uC6B0\uCE21 \uC11C\uBE0C\uBA54\uB274(ScrollView) \uAD6C\uC870. \uD558\uB2E8 \uCE74\uD14C\uACE0\uB9AC\uB294 \uC2A4\uD06C\uB864 \uD6C4 \uD074\uB9AD \uD544\uC694.",
+  "steps": [
+    "\uC5F4\uAE30: a11y click \u0027adb://*heromts*#\uC804\uCCB4\uBA54\uB274\u0027",
+    "\uB2EB\uAE30: a11y click \u0027adb://*heromts*#\uB2EB\uAE30\u0027 or #\uB4A4\uB85C\uAC00\uAE30",
+    "\uC0AC\uC774\uB4DC\uBC14 \uC2A4\uD06C\uB864 \uC601\uC5ED: [0,230][261,1800] \u2014 swipe (130,1200)\u2192(130,600)",
+    "\uAE08\uC735\uC0C1\uD488 \uC774\uD6C4 \uB300\uBD84\uB958\uB294 \uC2A4\uD06C\uB864 \uD544\uC218",
+    "\uC6B0\uCE21 \uC11C\uBE0C\uBA54\uB274\uB3C4 ScrollView \u2014 \uD56D\uBAA9 \uB9CE\uC73C\uBA74 \uC2A4\uD06C\uB864"
+  ],
+  "tags": [
+    "android",
+    "adb",
+    "heromts",
+    "navigation",
+    "scroll"
+  ],
+  "author": "claude",
+  "created": "2026-04-06T17:06:33.9531638Z",
+  "version": "1.1"
+}
