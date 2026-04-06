@@ -65,7 +65,7 @@ public static class GrapHelper
     {
         var prefix = isDynamic ? "Dy" : "";
         var id = !string.IsNullOrWhiteSpace(automationId) ? automationId
-               : siblingIndex > 0 ? siblingIndex.ToString()
+               : siblingIndex > 0 ? $"{siblingIndex}th"
                : "";
         return string.IsNullOrEmpty(id) ? $"{prefix}{controlType}" : $"{prefix}{controlType}_{id}";
     }
