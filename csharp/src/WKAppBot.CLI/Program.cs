@@ -190,6 +190,19 @@ internal partial class Program
         try { Console.InputEncoding = Encoding.UTF8; } catch { }
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
         try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
+        // DETACHED_PROCESS fallback: no console attached → SetConsoleOutputCP no-ops,
+        // Console.OutputEncoding silently stays at system ACP (CP949 on Korean Windows).
+        // Force UTF-8 StreamWriter directly on the raw stdout handle.
+        if (Console.OutputEncoding.CodePage != 65001)
+        {
+            try
+            {
+                var raw = Console.OpenStandardOutput();
+                var utf8Out = new System.IO.StreamWriter(raw, new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+                Console.SetOut(utf8Out);
+            }
+            catch { }
+        }
 
 
         // Worker processes spawned by Eye (screensaver, whisper-ring, find-prompts, analyze-hack, slack-route)
@@ -739,6 +752,7 @@ internal partial class Program
                 "screen" => ScreenCommand(restArgs),
                 "clipboard" => ClipboardCommand(restArgs),
                 "claude-usage" => A11yClaudeUsage(),
+                "enc-test" => EncTestCommand(),
                 "suggest" => SuggestCommand(restArgs),
                 "gc" => GcCommand(restArgs),
                 "hotswap" => HotSwapCommand(restArgs),
@@ -926,7 +940,7 @@ internal partial class Program
                     "readiness", "uia-test", "form-dump", "toolbar-ocr", "titlebar", "validate",
                     "chart-analyze", "hts-stress", "tooltip-probe", "speak", "whisper", "newchat",
                     "analyze-hack", "screensaver", "whisper-ring", "prompt", "dashboard", "win-move",
-                    "screen", "clipboard", "claude-usage", "suggest", "gc", "hotswap", "tick",
+                    "screen", "clipboard", "claude-usage", "enc-test", "suggest", "gc", "hotswap", "tick",
                     "kiwoom", "com", "telegram", "stock-scan", "logcat", "grep", "grap",
                     "help", "--help", "-h", "mcp", "claude-detect", "noise", "capture",
                     "elevate", "webbot", "code", "vscode", "version", "--version"

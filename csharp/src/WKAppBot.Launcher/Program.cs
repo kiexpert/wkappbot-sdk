@@ -63,20 +63,41 @@ partial class Program
             errSw.AutoFlush = true;
         prof("Main() entered");
 
-        // ── Ensure UTF-8 console output (NativeAOT: app.manifest may not apply) ──
-        // Core always outputs UTF-8. Launcher transcodes if console can't do UTF-8.
-        if (GetConsoleOutputCP() != 65001)
+        // ── Console encoding ──────────────────────────────────────────────────────────────────
+        // Core runs as DETACHED_PROCESS → no console attached → Console.OutputEncoding
+        // falls back to system ACP (CP949 on Korean Windows), not UTF-8.
+        // So Core outputs CP949 bytes to the pipe.
+        //
+        // Passthrough policy:
+        //   CP949 CMD  → passthrough (CP949→CP949) ✓
+        //   UTF-8 terminal (CP65001, TERM, MSYSTEM, etc.) → Core outputs CP949 → need transcode CP949→UTF-8
+        //
+        // Do NOT call SetConsoleOutputCP — changes the terminal's CP, breaks host shell.
+        _consoleCodePage = (int)GetConsoleOutputCP();
         {
-            SetConsoleOutputCP(65001);
-            SetConsoleCP(65001);
+            bool isUtf8Term;
+            if (_consoleCodePage > 0)
+            {
+                // Real console attached: trust GetConsoleOutputCP() directly.
+                // WT_SESSION may be inherited by CMD subprocesses even after `chcp 949` — ignore env vars.
+                isUtf8Term = _consoleCodePage == 65001;
+            }
+            else
+            {
+                // No console (DETACHED_PROCESS / bash PTY): use env vars to detect UTF-8 shell.
+                static string? Env(string k) => Environment.GetEnvironmentVariable(k);
+                isUtf8Term = !string.IsNullOrEmpty(Env("TERM"))
+                    || !string.IsNullOrEmpty(Env("MSYSTEM"))
+                    || !string.IsNullOrEmpty(Env("TERM_PROGRAM"))
+                    || !string.IsNullOrEmpty(Env("WT_SESSION"));
+            }
+            // Core always outputs UTF-8. Transcode UTF-8→CP for non-UTF-8 terminals (e.g. CP949 CMD).
+            // UTF-8 terminals: passthrough.
+            // EyeCmdPipeClient uses _consoleCodePage to decide encoding; normalize to 65001 for UTF-8 mode.
+            _needsTranscode = !isUtf8Term;
+            if (isUtf8Term) _consoleCodePage = 65001;
         }
-        if (GetConsoleOutputCP() != 65001)
-        {
-            // SetConsoleOutputCP failed (restricted env) — enable transcoding in IOCP relay
-            _needsTranscode = true;
-            _consoleEncoding = System.Text.Encoding.GetEncoding((int)GetConsoleOutputCP());
-            prof($"UTF-8 codepage failed — transcoding to CP{GetConsoleOutputCP()}");
-        }
+        prof($"encoding-recovery: sysCP={GetConsoleOutputCP()} needsTranscode={_needsTranscode}");
 
         // ── Identity: who am I, who's my parent, what terminal am I in? ──
         try
@@ -194,8 +215,7 @@ partial class Program
 
         // ── FAST EXITS ────────────────────────────────────────────────────────────────────────────
         // Encoding is set by app.manifest activeCodePage=UTF-8 (OS load, no runtime API call needed).
-        // No Console.OutputEncoding/InputEncoding assignments in Launcher — avoids SetConsoleCP(65001)
-        // which initializes SMB-backed console kernel objects → ~27-35s TerminateProcess delay.
+        // No Console.OutputEncoding/InputEncoding assignments in Launcher — encoding set via manifest.
 
         // grap/grep with no args (or --help/-h): print help directly in Launcher — no Core needed.
         if (args.Length > 0 && args[0].ToLowerInvariant() is "grap" or "grep"
@@ -218,7 +238,7 @@ partial class Program
             return 1; // unreachable
         }
 
-        // Encoding: app.manifest activeCodePage=UTF-8 sets CP65001 at OS load (no runtime SetConsoleOutputCP → no SMB init → fast exit)
+        // Encoding: app.manifest activeCodePage=UTF-8 sets CP65001 at OS load.
 
         // --args-file <path>: read args from UTF-8 text file (one arg per line) to bypass
         // bash→PowerShell CP949/UTF-8 mismatch that corrupts Korean command-line args.
@@ -343,8 +363,7 @@ partial class Program
             if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code, eyeTimeoutMs, eyeTimeoutExit, firstOutputMs))
             {
                 prof("Eye pipe: delegated");
-                // TerminateSelf: avoid 27s CLR/ConPTY handle cleanup delay that keeps bash waiting.
-                // All output is already flushed by TryDelegate; hard-kill Launcher immediately.
+                // TerminateSelf: all output already flushed by TryDelegate; hard-kill Launcher immediately.
                 Console.Out.Flush();
                 Console.Error.Flush();
                 TerminateSelf((uint)code);
@@ -361,8 +380,8 @@ partial class Program
 
         prof($"→ RunCore cmd={cmd}");
 
-        // grap/grep with args: spawn Core via UseShellExecute=true (ShellExecuteEx) so bash
-        // doesn't wait 27s. ShellExecuteEx detaches from bash's ConPTY/job tracking → bash
+        // grap/grep with args: spawn Core via UseShellExecute=true (ShellExecuteEx).
+        // ShellExecuteEx detaches from bash's ConPTY/job tracking → bash
         // exits as soon as Launcher (wkappbot.exe) exits. Core runs in background.
         // Output relay: Core writes to WKAPPBOT_RELAY_FILE, signals .ready; Launcher reads+relays.
         // Follow mode (-f/--follow) runs normally (streaming, Ctrl+C to stop).
@@ -674,7 +693,7 @@ partial class Program
     }
 
     /// <summary>
-    /// grap/grep one-shot: spawn Core detached so bash doesn't wait for Core's 27s SMB cleanup.
+    /// grap/grep one-shot: spawn Core detached.
     /// Core writes output to relay file (WKAPPBOT_RELAY_FILE). Launcher polls for .ready sentinel
     /// (created by Core while still alive → immediately visible). Reads relay, exits fast.
     /// </summary>
@@ -701,7 +720,7 @@ partial class Program
             if (hProc == IntPtr.Zero)
             {
                 Prof($"detached spawn failed (err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}), fallback");
-                { int fb = RunCore(args); Console.Out.Flush(); Console.Error.Flush(); TerminateSelf((uint)fb); return fb; } // fallback (was: slow 27s)
+                { int fb = RunCore(args); Console.Out.Flush(); Console.Error.Flush(); TerminateSelf((uint)fb); return fb; } // fallback
             }
             Prof($"detached core spawned pid=?, polling .ready");
 
@@ -751,7 +770,8 @@ partial class Program
 
     /// <summary>True when console can't do UTF-8 — IOCP relay must transcode Core's UTF-8 output.</summary>
     static bool _needsTranscode;
-    static System.Text.Encoding? _consoleEncoding;
+    /// <summary>Console output code page (e.g. 949 for Korean CMD). Used by TranscodeStream + EyeCmdPipeClient.</summary>
+    internal static int _consoleCodePage;
 
     /// <summary>Resolve core exe path: --core override or default.</summary>
     static string ResolveCoreExe()
