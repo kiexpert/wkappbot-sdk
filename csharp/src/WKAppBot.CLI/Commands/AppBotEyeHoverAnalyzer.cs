@@ -51,7 +51,7 @@ internal partial class Program
         {
             var ts = DateTime.Now.ToString("HH:mm:ss.fff");
             var line = $"[{ts}] {message}";
-            Console.WriteLine(line); // still visible in Eye main log
+            Console.Error.WriteLine(line); // Eye tee captures stderr too
             var path = Path.Combine(GetEyeLogDir(), "eye-hack.log");
             File.AppendAllText(path, line + Environment.NewLine, Encoding.UTF8);
         }
