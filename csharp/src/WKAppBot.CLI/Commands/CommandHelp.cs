@@ -529,6 +529,17 @@ internal partial class Program
             Logs to eye-hack.log (consolidated).
             Eye spawns this automatically; can also run from console directly.
             """,
+
+        ["claude-usage"] = """
+            claude-usage
+            Show Claude API token usage: JSONL size + ctx% estimate.
+
+            ctx% = total JSONL size / ~20MB context limit.
+            Warns at 8MB, urgent at 10MB.
+
+            Also probes claude.ai/settings/usage via CDP for plan usage %
+            (fallback: UIA scrape of Claude Desktop).
+            """,
     };
 }
 
