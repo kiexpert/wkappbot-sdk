@@ -926,8 +926,35 @@ internal partial class Program
 
                         // Dy-tagged paths are experience-DB only — skip live UIA lookup
                         bool isDyTag = uiaPath?.StartsWith("Dy", StringComparison.Ordinal) == true;
+                        // "?" = unknown path from hack-hover → scope = root, then show available elements
+                        bool isUnknownPath = uiaPath != null &&
+                            uiaPath.Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries)
+                                   .All(s => s == "?");
                         if (!isDyTag)
                             scoped = GrapHelper.FindUiaScope(root, uiaPath);
+                        if (isUnknownPath && scoped != null)
+                        {
+                            Console.WriteLine($"[A11Y] Unknown path '?' — listing available elements for analysis:");
+                            TargetAmbiguityGuard.ShowUiaScopeMiss(root, hwnd, "?", action);
+                            // Also try element at current cursor position
+                            try
+                            {
+                                NativeMethods.GetCursorPos(out var curPt);
+                                using var uia2 = new UIA3Automation();
+                                var elAtPt = uia2.FromPoint(new System.Drawing.Point(curPt.X, curPt.Y));
+                                if (elAtPt != null)
+                                {
+                                    string ptCt = "?", ptAid = "", ptName = "";
+                                    try { ptCt = elAtPt.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                                    try { ptAid = elAtPt.Properties.AutomationId.ValueOrDefault ?? ""; } catch { }
+                                    try { ptName = elAtPt.Properties.Name.ValueOrDefault ?? ""; } catch { }
+                                    var ptTag = GrapHelper.FormatNodeTag(ptCt, ptAid);
+                                    var ptPath = GrapHelper.BuildAbsoluteTagPath(elAtPt, uia2.TreeWalkerFactory.GetRawViewWalker());
+                                    Console.WriteLine($"[A11Y] Element at cursor: {ptTag} \"{ptName}\" → #{ptPath}");
+                                }
+                            }
+                            catch { }
+                        }
                     }
 
                     if (scoped == null)
