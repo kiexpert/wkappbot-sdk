@@ -924,7 +924,10 @@ internal partial class Program
                             });
                         }
 
-                        scoped = GrapHelper.FindUiaScope(root, uiaPath);
+                        // Dy-tagged paths are experience-DB only — skip live UIA lookup
+                        bool isDyTag = uiaPath?.StartsWith("Dy", StringComparison.Ordinal) == true;
+                        if (!isDyTag)
+                            scoped = GrapHelper.FindUiaScope(root, uiaPath);
                     }
 
                     if (scoped == null)
@@ -969,6 +972,16 @@ internal partial class Program
                                 }
                             }
                             catch { }
+                        }
+                        // form_uia experience DB fallback: Dy-tagged elements from UIA scan
+                        if (!string.IsNullOrEmpty(uiaPath))
+                        {
+                            var fuResult = TryFormUiaExpDbAction(hwnd, uiaPath!, action);
+                            if (fuResult.HasValue)
+                            {
+                                if (fuResult.Value) ok++; else fail++;
+                                continue;
+                            }
                         }
                         Console.Error.WriteLine($"[A11Y] UIA scope not found: \"{uiaPath}\" in {tag}");
                         // Guard Layer 6: UIA scope miss
