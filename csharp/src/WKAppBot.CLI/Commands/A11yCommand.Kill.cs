@@ -77,6 +77,12 @@ internal partial class Program
                         && !targetPattern.Contains("wkappbot", StringComparison.OrdinalIgnoreCase))
                     {
                         var brief = cmdLine.Length > 120 ? cmdLine[..120] + "..." : cmdLine;
+                        // If the matching wkappbot-core is ourselves (or an ancestor), skip silently — expected.
+                        if (selfPids.Contains(p.Id))
+                        {
+                            skipped.Add($"[{p.Id}]{procName} (self-skip)");
+                            continue;
+                        }
                         Console.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (self-kill guard: pattern \"{targetPattern}\" matched own cmdLine)\n       cmd: {brief}");
                         skipped.Add($"[{p.Id}]{procName} (self-kill-guard)");
                         AutoRegisterBug(
