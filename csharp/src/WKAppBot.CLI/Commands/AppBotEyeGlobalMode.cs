@@ -85,6 +85,7 @@ internal partial class Program
     // _lastEyeRebumpCheck removed — rebump disabled (keep initial message position fixed)
     static DateTime _lastCcaAnalysis = DateTime.MinValue;
     static DateTime _lastZoomCleanup = DateTime.MinValue;
+    static DateTime _lastSkillAuditUtc = DateTime.MinValue;
 
     // ── CCA live analysis cache ──
 #pragma warning disable CS0414
@@ -1041,6 +1042,33 @@ internal partial class Program
 
                 // ── Drain Slack message file queue ──
                 DrainSlackQueue();
+            }
+
+            // ── Skill audit (once per day — detect stale source_refs, Slack alert) ──
+            if ((DateTime.UtcNow - _lastSkillAuditUtc).TotalHours >= 24)
+            {
+                _lastSkillAuditUtc = DateTime.UtcNow;
+                try
+                {
+                    var cwd = _cachedCards.FirstOrDefault(c => !string.IsNullOrEmpty(c.Cwd))?.Cwd
+                              ?? Environment.CurrentDirectory;
+                    var issues = RunSkillAuditSilent(cwd);
+                    if (issues.Count > 0 && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                    {
+                        var msg = $":books: *스킬 감사*: {issues.Count}개 스킬 source_refs 불일치 감지\n"
+                                + string.Join("\n", issues.Select(id => $"  • `wkappbot skill verify {id}`"))
+                                + "\n`wkappbot skill audit` 으로 상세 확인 후 수정해주세요";
+                        Task.Run(async () =>
+                        {
+                            try { await SlackSendViaApi(slackBotToken, slackChannel, msg, username: "앱봇아이"); }
+                            catch { }
+                        });
+                        Console.WriteLine($"[EYE] Skill audit: {issues.Count} stale skill(s) — Slack notified");
+                    }
+                    else if (issues.Count == 0)
+                        Console.WriteLine($"[EYE] Skill audit: all refs OK");
+                }
+                catch (Exception ex) { Console.WriteLine($"[EYE] Skill audit error: {ex.Message}"); }
             }
 
             // ── Stale zoom overlay cleanup (every 60s, kill zooms older than 60s) ──
