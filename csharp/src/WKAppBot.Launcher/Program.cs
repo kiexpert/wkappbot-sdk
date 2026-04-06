@@ -338,7 +338,10 @@ partial class Program
         // hack-* workers are long-running → bypass Eye pipe (would timeout)
         var isHackWorker = cmd == "a11y" && forwardArgs.Length > 1
             && forwardArgs[1].StartsWith("hack-", StringComparison.OrdinalIgnoreCase);
-        if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker
+        // skill contribute/delete writes to callerCwd/skills/ — must run Core with real CWD, not Eye's CWD
+        var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
+            && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
+        if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite
             && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {

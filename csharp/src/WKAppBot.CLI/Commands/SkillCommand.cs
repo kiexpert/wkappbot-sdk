@@ -420,9 +420,9 @@ internal partial class Program
 
     static string Slugify(string title)
     {
-        // Transliterate common CJK-adjacent latin runs, strip the rest
+        // Strip non-ASCII (CJK etc.) — caller must use --id for Korean-only titles
         var ascii = Regex.Replace(title.ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
-        return ascii.Length > 0 ? ascii : "skill";
+        return ascii; // empty string = caller must supply --id
     }
 
     static string BumpVersion(string? v)

@@ -169,6 +169,19 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
         }
         catch { }
 
+        // Available skills (project + HQ)
+        try
+        {
+            var skillLines = BuildSkillSummary(cards.FirstOrDefault()?.Cwd);
+            if (skillLines != null)
+            {
+                sb.AppendLine("## 등록된 스킬 (wkappbot skill show <id> 로 상세 조회):");
+                sb.Append(skillLines);
+                sb.AppendLine();
+            }
+        }
+        catch { }
+
         sb.AppendLine();
         sb.AppendLine($"세션: {Path.GetFileName(jsonlPath)} ({sizeMB:F1}/{limitMB}MB)");
         sb.AppendLine($"시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
@@ -177,6 +190,53 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
         sb.AppendLine("슬랙으로 인수인계 완료 알림 보내주세요: wkappbot slack send '새 세션에서 이어갑니다 🔄'");
 
         return sb.ToString().Trim();
+    }
+
+    // Returns a compact skill list (app-grouped) for handoff prompt, or null if no skills.
+    static string? BuildSkillSummary(string? cwd)
+    {
+        var sb = new StringBuilder();
+        var dirs = new List<string>();
+
+        // Project skills dir (callerCwd/skills/)
+        var projCwd = cwd ?? Environment.CurrentDirectory;
+        var projSkills = Path.Combine(projCwd, "skills");
+        if (Directory.Exists(projSkills)) dirs.Add(projSkills);
+
+        // HQ skills dir
+        var hqSkills = Path.Combine(DataDir, "skills");
+        if (Directory.Exists(hqSkills)) dirs.Add(hqSkills);
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var byApp = new SortedDictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var dir in dirs)
+        {
+            foreach (var f in Directory.GetFiles(dir, "*.skill.json", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    var text = File.ReadAllText(f);
+                    var doc = System.Text.Json.JsonDocument.Parse(text).RootElement;
+                    var id    = doc.TryGetProperty("id",    out var idEl)    ? idEl.GetString()    ?? "" : "";
+                    var app   = doc.TryGetProperty("app",   out var appEl)   ? appEl.GetString()   ?? "" : "";
+                    var title = doc.TryGetProperty("title", out var titleEl) ? titleEl.GetString() ?? "" : "";
+                    if (string.IsNullOrEmpty(id) || !seen.Add(id)) continue;
+                    if (!byApp.TryGetValue(app, out var list)) byApp[app] = list = [];
+                    list.Add($"  • {id} — {title}");
+                }
+                catch { }
+            }
+        }
+
+        if (byApp.Count == 0) return null;
+
+        foreach (var (app, items) in byApp)
+        {
+            sb.AppendLine($"[{app}]");
+            foreach (var item in items) sb.AppendLine(item);
+        }
+        return sb.ToString();
     }
 
     /// <summary>
