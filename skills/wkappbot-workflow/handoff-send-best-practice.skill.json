@@ -1,0 +1,25 @@
+{
+  "id": "handoff-send-best-practice",
+  "app": "wkappbot-workflow",
+  "title": "인수인계 잘 보내는 법",
+  "desc": "컨텍스트 8MB 넘으면 인수인계 준비. 후배 Claude가 맥락 없이 헤매지 않도록 핵심만 압축해서 전달. 길수록 좋은 게 아니라 정확할수록 좋다.",
+  "steps": [
+    "wkappbot claude-usage — ctx% 확인 (8MB 경고, 10MB 즉시 handoff)",
+    "wkappbot newchat '미완료 작업: X중. 다음 할 일: Y. 주의: Z' — 핵심만",
+    "인수인계 전 미완료 코드는 최소한 컴파일되게 정리 후 커밋",
+    "진행중인 삽질 내용 + 시도한 것 + 실패 이유 반드시 포함",
+    "중요 발견은 skill contribute 로 스킬화 후 handoff — 다음 세션 재발견 방지",
+    "★ 9.5MB 넘으면 Eye가 자동으로 스킬 기여 너지 전송",
+    "★ 10MB 넘으면 Eye가 자동 인수인계 실행 (newchat 자동 발동)"
+  ],
+  "tags": [
+    "workflow",
+    "handoff",
+    "context",
+    "session",
+    "token-saving"
+  ],
+  "author": "claude",
+  "created": "2026-04-07T03:30:00.0000000Z",
+  "version": "1.0"
+}
