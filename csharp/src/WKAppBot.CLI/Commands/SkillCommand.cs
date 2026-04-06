@@ -566,9 +566,30 @@ internal partial class Program
         return ascii; // empty string = caller must supply --id
     }
 
+    // Returns list of skill IDs with stale/missing source_refs. Used by Eye daily audit.
+    internal static List<string> RunSkillAuditSilent(string cwd)
+    {
+        var issues = new List<string>();
+        // temporarily override CallerCwd for dir resolution
+        var prev = EyeCmdPipeServer.CallerCwd.Value;
+        EyeCmdPipeServer.CallerCwd.Value = cwd;
+        try
+        {
+            foreach (var skill in LoadAllSkills())
+            {
+                if (skill.SourceRefs == null || skill.SourceRefs.Count == 0) continue;
+                var (_, missing, stale) = RunVerify(skill, verbose: false);
+                if (missing + stale > 0) issues.Add(skill.Id);
+            }
+        }
+        finally { EyeCmdPipeServer.CallerCwd.Value = prev; }
+        return issues;
+    }
+
     static string FormatAge(DateTime dt)
     {
         var age = DateTime.UtcNow - dt.ToUniversalTime();
+        if (age.TotalMinutes < 1) return "just now";
         if (age.TotalDays < 1)   return $"{(int)age.TotalHours}h ago";
         if (age.TotalDays < 30)  return $"{(int)age.TotalDays}d ago";
         if (age.TotalDays < 365) return $"{(int)(age.TotalDays / 30)}mo ago";
