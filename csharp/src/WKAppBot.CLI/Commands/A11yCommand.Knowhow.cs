@@ -126,4 +126,79 @@ internal partial class Program
         Console.Error.WriteLine("[A11Y] Async: wait, eval");
         return false;
     }
+
+    // ── form_uia experience DB fallback ──
+    // Looks up Dy-tagged elements from UIA scan saved by hack-hover.
+    // Returns true=success, false=fail, null=not found (caller tries next tier).
+    static bool? TryFormUiaExpDbAction(IntPtr hwnd, string uiaPath, string action)
+    {
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            string procName;
+            try { procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant(); }
+            catch { return null; }
+
+            var clsBuf = new System.Text.StringBuilder(256);
+            NativeMethods.GetClassNameW(hwnd, clsBuf, clsBuf.Capacity);
+            var winCls = clsBuf.ToString();
+            if (string.IsNullOrEmpty(winCls)) return null;
+
+            var formPath = Path.Combine(DataDir, "profiles", $"{procName}_exp",
+                $"form_uia_{winCls.Replace(" ", "_")}.json");
+            if (!File.Exists(formPath)) return null;
+
+            WKAppBot.Win32.Window.FormExperience? form;
+            try
+            {
+                form = System.Text.Json.JsonSerializer.Deserialize<WKAppBot.Win32.Window.FormExperience>(
+                    File.ReadAllText(formPath));
+            }
+            catch { return null; }
+            if (form == null || form.Controls.Count == 0) return null;
+
+            // Build a PatternMatcher for the requested grap
+            bool isWild = uiaPath.Contains('*') || uiaPath.Contains('?');
+            var matcher = isWild
+                ? WKAppBot.Win32.Accessibility.PatternMatcher.Create(uiaPath)
+                : null;
+
+            WKAppBot.Win32.Window.ControlExperience? best = null;
+            foreach (var ctrl in form.Controls)
+            {
+                var dyTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
+                    ctrl.ClassName ?? "Node", ctrl.Role, ctrl.ControlId, isDynamic: true);
+                bool hit = matcher != null
+                    ? matcher.IsMatch(dyTag)
+                    : dyTag.Contains(uiaPath, StringComparison.OrdinalIgnoreCase);
+                if (hit) { best = ctrl; break; }
+            }
+            if (best == null) return null;
+
+            NativeMethods.GetWindowRect(hwnd, out var wr);
+            int winW = wr.Right - wr.Left;
+            int winH = wr.Bottom - wr.Top;
+            int cx = wr.Left + (int)(best.RelativeX * winW) + best.Width / 2;
+            int cy = wr.Top  + (int)(best.RelativeY * winH) + best.Height / 2;
+
+            var dyLabel = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
+                best.ClassName ?? "Node", best.Role, best.ControlId, isDynamic: true);
+            Console.WriteLine($"[A11Y] form_uia hit: \"{uiaPath}\" → {dyLabel} ({cx},{cy})");
+
+            if (action is "click" or "invoke")
+            {
+                WKAppBot.Win32.Input.MouseInput.Click(cx, cy);
+                return true;
+            }
+            if (action is "find" or "inspect" or "read")
+            {
+                Console.WriteLine($"[A11Y] form_uia element: {dyLabel} rel=({best.RelativeX:F3},{best.RelativeY:F3}) size={best.Width}x{best.Height} screen=({cx},{cy})");
+                return true;
+            }
+            // Other actions: report coord but no action supported
+            Console.WriteLine($"[A11Y] form_uia: action '{action}' not supported for coordinate-only element");
+            return false;
+        }
+        catch { return null; }
+    }
 }
