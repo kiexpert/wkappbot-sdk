@@ -216,6 +216,14 @@ internal partial class Program
                     ? WKAppBot.Win32.Accessibility.GrapHelper.BuildAbsoluteTagPath(curEl, uia.TreeWalkerFactory.GetRawViewWalker())
                     : WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
 
+                // '?' tagPath = UIA completely blind → replace with temp coord-based name + force blind analysis
+                if (tagPath == "?")
+                {
+                    tagPath = elBounds.Width > 0
+                        ? $"Node_{elBounds.Width}x{elBounds.Height}@{elBounds.X},{elBounds.Y}"
+                        : $"Node@{pt.X},{pt.Y}";
+                }
+
                 var shortWin = $"{{hwnd:0x{bestHwnd.ToInt64():X},proc:'{proc}'}}";
                 var result = $"{shortWin}#{tagPath} {mark}";
 
@@ -635,7 +643,9 @@ internal partial class Program
 
                 // Blind = no UIA info OR no experience DB layout for this window
                 // → immediate hack (experience DB build, uncancellable)
-                bool uiaBlind = string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns);
+                // tagPath containing '@' = was '?' (coord-temp name) = fully UIA-blind
+                bool uiaBlind = string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns)
+                    || tagPath.Contains('@');
                 bool expMissing = false;
                 if (!uiaBlind) // UIA has info, but check experience DB for window layout
                 {
