@@ -210,7 +210,8 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
         if (Directory.Exists(hqSkills)) dirs.Add(hqSkills);
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var byApp = new SortedDictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        // skill records: (app, id, title, lastActivity)
+        var records = new List<(string app, string id, string title, DateTime lastActivity)>();
 
         foreach (var dir in dirs)
         {
@@ -220,23 +221,30 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
                 {
                     var text = File.ReadAllText(f);
                     var doc = System.Text.Json.JsonDocument.Parse(text).RootElement;
-                    var id    = doc.TryGetProperty("id",    out var idEl)    ? idEl.GetString()    ?? "" : "";
-                    var app   = doc.TryGetProperty("app",   out var appEl)   ? appEl.GetString()   ?? "" : "";
-                    var title = doc.TryGetProperty("title", out var titleEl) ? titleEl.GetString() ?? "" : "";
+                    var id      = doc.TryGetProperty("id",      out var idEl)  ? idEl.GetString()  ?? "" : "";
+                    var app     = doc.TryGetProperty("app",     out var appEl) ? appEl.GetString() ?? "" : "";
+                    var title   = doc.TryGetProperty("title",   out var tEl)   ? tEl.GetString()   ?? "" : "";
+                    var updated = doc.TryGetProperty("updated", out var uEl) && uEl.TryGetDateTime(out var ud) ? ud : (DateTime?)null;
+                    var created = doc.TryGetProperty("created", out var cEl) && cEl.TryGetDateTime(out var cd) ? cd : DateTime.MinValue;
                     if (string.IsNullOrEmpty(id) || !seen.Add(id)) continue;
-                    if (!byApp.TryGetValue(app, out var list)) byApp[app] = list = [];
-                    list.Add($"  • {id} — {title}");
+                    records.Add((app, id, title, updated ?? created));
                 }
                 catch { }
             }
         }
 
-        if (byApp.Count == 0) return null;
+        if (records.Count == 0) return null;
 
-        foreach (var (app, items) in byApp)
+        // Group by app, apps ordered by most recent skill, within app also most recent first
+        var byApp = records
+            .GroupBy(r => r.app, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Max(r => r.lastActivity));
+
+        foreach (var group in byApp)
         {
-            sb.AppendLine($"[{app}]");
-            foreach (var item in items) sb.AppendLine(item);
+            sb.AppendLine($"[{group.Key}]");
+            foreach (var r in group.OrderByDescending(x => x.lastActivity))
+                sb.AppendLine($"  • {r.id} — {r.title}");
         }
         return sb.ToString();
     }

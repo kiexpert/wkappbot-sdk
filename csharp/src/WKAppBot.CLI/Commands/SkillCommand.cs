@@ -64,20 +64,21 @@ internal partial class Program
 
         var byApp = all
             .GroupBy(s => s.App, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(g => g.Key);
+            .OrderByDescending(g => g.Max(s => s.LastActivity)); // app with most recent skill first
 
         int total = all.Count;
-        Console.WriteLine($"[SKILL] {total} skill(s){(appFilter != null ? $" in '{appFilter}'" : "")}:");
+        Console.WriteLine($"[SKILL] {total} skill(s){(appFilter != null ? $" in '{appFilter}'" : "")} — most recent first:");
         foreach (var group in byApp)
         {
             Console.WriteLine($"  [{group.Key}]");
-            foreach (var s in group.OrderBy(x => x.Title))
+            foreach (var s in group.OrderByDescending(x => x.LastActivity))
             {
                 var ver = s.Version != null ? $" v{s.Version}" : "";
                 var src = s.Source == SkillSource.Hq ? " [HQ]" : "";
                 var titleSlug = Slugify(s.Title);
                 var idPart = titleSlug != s.Id ? $" ({s.Id})" : "";
-                Console.WriteLine($"    • {s.Title}{idPart}{ver}{src} — {s.Desc}");
+                var age = FormatAge(s.LastActivity);
+                Console.WriteLine($"    • {s.Title}{idPart}{ver}{src} [{age}] — {s.Desc}");
             }
         }
 
@@ -237,6 +238,7 @@ internal partial class Program
             SourceRefs = refs.Count  > 0 ? refs  : existing?.SourceRefs,
             Author     = author ?? existing?.Author ?? "claude",
             Created    = existing?.Created ?? DateTime.UtcNow,
+            Updated    = DateTime.UtcNow,
             Version    = existing != null ? BumpVersion(existing.Version) : "1.0"
         };
 
@@ -564,6 +566,15 @@ internal partial class Program
         return ascii; // empty string = caller must supply --id
     }
 
+    static string FormatAge(DateTime dt)
+    {
+        var age = DateTime.UtcNow - dt.ToUniversalTime();
+        if (age.TotalDays < 1)   return $"{(int)age.TotalHours}h ago";
+        if (age.TotalDays < 30)  return $"{(int)age.TotalDays}d ago";
+        if (age.TotalDays < 365) return $"{(int)(age.TotalDays / 30)}mo ago";
+        return $"{(int)(age.TotalDays / 365)}y ago";
+    }
+
     static string BumpVersion(string? v)
     {
         if (string.IsNullOrEmpty(v)) return "1.1";
@@ -634,7 +645,11 @@ internal sealed class SkillRecord
     [JsonPropertyName("source_refs")] public List<SkillSourceRef>? SourceRefs { get; set; }
     [JsonPropertyName("author")]      public string? Author  { get; set; }
     [JsonPropertyName("created")]     public DateTime Created { get; set; } = DateTime.UtcNow;
+    [JsonPropertyName("updated")]     public DateTime? Updated { get; set; }
     [JsonPropertyName("version")]     public string? Version  { get; set; }
+
+    /// <summary>Most recent activity date — updated if set, otherwise created.</summary>
+    [JsonIgnore] public DateTime LastActivity => Updated ?? Created;
 
     [JsonIgnore] public SkillSource Source { get; set; } = SkillSource.Project;
 
