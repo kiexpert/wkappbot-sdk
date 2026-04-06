@@ -45,7 +45,7 @@ Usage:
                First exact match stops interactive actions fast.
                Arrays are for lookups; actions consume the highest-priority target.
                ';' = OR   # = scope drill-down
-               Ex: ""*메모장*#*파일*"" → Notepad's File menu
+               Ex: ""*Notepad*#*File*"" → Notepad's File menu
 
       a11y find ""*app*"" --depth 5       # MUD: look (Win32 + UIA children)
       a11y highlight ""*app*#*button*""   # visualize target with zoom overlay
@@ -120,7 +120,7 @@ Inspection:
       List visible windows in Z-order. --uia: also search UIA elements.
   inspect <grap>[#<uia-scope>] [--depth N] [--win32] [--filter <pattern>]
       Dump UIA tree of a window. # narrows to UIA element by name.
-      --filter: search A11Y elements. Ex: *영웅문*#*실시간계좌*
+      --filter: search A11Y elements. Ex: *App*#*Panel*
   win-click <window-title> <x> <y> [--uia]
       Click a coordinate inside a window + detect UIA element.
   focus [--title <text>] [--delay N] [--depth N] [--win32] [-b]
@@ -130,7 +130,7 @@ Inspection:
 
   tab-select <grap>[#<uia-scope>] --aid <id> [--list|--select <text>|--index N]
       Focusless tab switching via UIA SelectionItem pattern.
-      # scopes to specific form. Ex: *영웅문*#*실시간계좌* --aid 1000
+      # scopes to specific form. Ex: *App*#*Panel* --aid 1000
 
 Automation:
   click <window-title> <form-id> [button-text] [--combo N INDEX]
@@ -149,7 +149,7 @@ Testing & Analysis:
       Validate a YAML scenario file (syntax + structure check).
   uia-test <grap>[#<uia-scope>] [--invoke <name>]
       Systematic 7-phase MFC UIA pattern test with zoom overlay.
-      # narrows UIA root. Ex: *영웅문*#*실시간계좌* --invoke 예수금
+      # narrows UIA root. Ex: *App*#*Panel* --invoke BtnName
   chart-analyze <window-title|image.png> [--form <id>] [--candles N]
       Extract OHLC+volume from chart screenshots (3 strategies).
       --tooltip: Y-axis recalibration. --debug: overlay image.
@@ -182,8 +182,8 @@ Utility:
   ask gpt|gemini|claude ""question"" [file.png] [--slack] [--new-tab]
       Ask AI via CDP (focusless). Auto-closes blank tabs, validates URL.
   ask triad ""question"" [--debate [N]]
-      Parallel GPT + Gemini + Claude. --debate: 정반합 사회자 루프 (max 3 rounds, cross-prompting).
-      --debate N: N개 합의 도달 시 조기 종료. Without --debate: R0 only (one answer each).
+      Parallel GPT + Gemini + Claude. --debate: dialectic loop (max 3 rounds, cross-prompting).
+      --debate N: early exit at N consensus. Without --debate: R0 only (one answer each).
   agent gemini|gpt|claude|triad ""task"" [--max-steps N] [--fresh]
       Autonomous sub-agent loop with filesystem + web tools.
   agent checkpoint [--label ""text""]
@@ -252,7 +252,7 @@ Data Directory:
         if (args.Length == 0)
         {
             Console.WriteLine("Usage: wkappbot tick <tag> [status] [--find-host]");
-            Console.WriteLine("  e.g. wkappbot tick build \"CardCache 시스템 구현\"");
+            Console.WriteLine("  e.g. wkappbot tick build \"building feature X\"");
             Console.WriteLine("  --find-host: auto-attach to most recent Claude session card");
             return 1;
         }
