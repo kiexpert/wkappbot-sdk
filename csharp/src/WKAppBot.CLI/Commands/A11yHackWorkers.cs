@@ -185,33 +185,18 @@ internal partial class Program
                 var mark = verified ? "OK" : "MISS";
 
                 var elNodeTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
+                var rectStr = elBounds.Width > 0 ? $" {elBounds.Width}x{elBounds.Height}" : "";
                 var result = $"{fullGrap} <{elNodeTag}> {mark}";
 
-                // Console: compact for non-browser, full JSON5 for browser only
-                var json5Short = json5;
-                // Non-browser: strip domain/url (already filtered in BuildTargetJson5)
-                // Further compact: just hwnd + proc for readability
-                if (!json5.Contains("domain:"))
-                {
-                    NativeMethods.GetWindowThreadProcessId(hwnd, out uint cpid);
-                    string cproc; try { cproc = System.Diagnostics.Process.GetProcessById((int)cpid).ProcessName; } catch { cproc = "?"; }
-                    json5Short = $"{{hwnd:0x{hwnd.ToInt64():X8},proc:'{cproc}'}}";
-                }
-                var compactGrap = !string.IsNullOrEmpty(elLabel) ? $"{json5Short}#*{elLabel}*" : json5Short;
-
-                // Always output (0.1s interval), include mouse coords
                 var elMs = sw.ElapsedMilliseconds;
-                var richGrap = $"{{hwnd:0x{hwnd.ToInt64():X8},pid:{pid},proc:'{proc}'}}";
-                if (!string.IsNullOrEmpty(elLabel))
-                    richGrap += $"#*{elLabel}*";
 
                 bool changed = result != lastResult;
                 if (changed) lastResult = result;
-                bool grapChanged = richGrap != lastGrap;
-                lastGrap = richGrap;
+                bool grapChanged = fullGrap != lastGrap;
+                lastGrap = fullGrap;
                 if (RunningInEye && !changed) continue; // Eye: change-only
                 if (grapChanged) Console.WriteLine(); // different target pattern → new line
-                Console.Write($"{richGrap} <{elNodeTag}> [{mark}] {elMs}ms ({pt.X},{pt.Y})          \r");
+                Console.Write($"{fullGrap} // <{elNodeTag}>{rectStr} [{mark}] {elMs}ms          \r");
                 Console.Out.Flush();
 
                 // ── Live overlay: root window size, known nodes as dashed boxes ──
@@ -374,7 +359,7 @@ internal partial class Program
                 if (changed)
                 {
                     var ts2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                    var logLine = $"[{ts2}] [{mark}] <{elNodeTag}> ({pt.X},{pt.Y}) {elPatterns} -> {compactGrap}";
+                    var logLine = $"[{ts2}] {fullGrap} // <{elNodeTag}>{rectStr} [{mark}] {elMs}ms {elPatterns}";
                     try { File.AppendAllText(logPath, logLine + Environment.NewLine, Encoding.UTF8); } catch { }
                 }
 
@@ -397,7 +382,7 @@ internal partial class Program
                 if (changed)
                 {
                     if (!isBlind) _hackHoverAnalyzeCts?.Cancel(); // don't cancel blind hack
-                    var hackGrap = isBlind ? json5Short : compactGrap;
+                    var hackGrap = isBlind ? json5 : fullGrap;
                     var debounceStamp = ++_hackHoverDebounceSeq;
                     var analyzeCts = new CancellationTokenSource();
                     _hackHoverAnalyzeCts = analyzeCts;

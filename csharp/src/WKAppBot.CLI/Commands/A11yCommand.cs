@@ -34,7 +34,7 @@ internal partial class Program
                 var hits = WindowFinder.FindByTitle(focusGrap, true);
                 fsw.Stop();
                 var focusOk = hits.Any(h => h.Handle == gti.hwndFocus);
-                Console.WriteLine($"[FOCUS] {focusGrap} {(focusOk ? "OK" : "MISS")} {fsw.ElapsedMilliseconds}ms");
+                Console.WriteLine($"[FOCUS] {focusGrap} // [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
             }
         }
         catch { }
