@@ -242,9 +242,10 @@ internal partial class Program
                 var (pct, _, jsonlPath, fileSize) = GetContextInfoForCwdEx(card.Cwd);
                 var sizeMB = fileSize / (1024.0 * 1024.0);
                 const double ContextLimitMB = 20.0;
-                const double WarnStartMB = 10.0;   // 경고 시작 (10MB부터)
-                const double UrgentMB = 10.0;       // 긴급 (10MB 초과 → 인수인계)
-                if (sizeMB < WarnStartMB || jsonlPath == null) continue;
+                const double SkillNudgeMB  = 9.5;   // 스킬 기여 넛지
+                const double WarnStartMB   = 10.0;   // 경고 시작 (10MB부터)
+                const double UrgentMB      = 10.0;   // 긴급 (10MB 초과 → 인수인계)
+                if (sizeMB < SkillNudgeMB || jsonlPath == null) continue;
 
                 var cwdKey = card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
                 contextWarnedPcts.TryGetValue(cwdKey, out var prevWarned);
@@ -262,7 +263,21 @@ internal partial class Program
                 var cwdTag = AbbreviateCwd(card.Cwd);
                 contextWarnedPcts[cwdKey] = (curMB, jsonlPath);
 
-                if (sizeMB >= UrgentMB && !string.IsNullOrEmpty(slackBotToken))
+                if (sizeMB >= SkillNudgeMB && sizeMB < UrgentMB && !string.IsNullOrEmpty(slackBotToken))
+                {
+                    // 9.5MB~10MB: 인수인계 전 스킬 기여 넛지
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"[EYE] 💡 [{cwdTag}] Context {sizeMB:F1}MB — skill 기여 후 인수인계하세요");
+                    Console.ResetColor();
+                    try
+                    {
+                        var skillNudge = $"💡 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달! 인수인계 전에 이번 세션 노하우 하나를 스킬로 기여하세요:\\n\\nwkappbot skill contribute --app <앱> --title \\\"<제목>\\\" --desc \\\"<설명>\\\" [--steps \\\"s1|s2\\\"] [--tags \\\"t1,t2\\\"]\\n\\n그 다음: wkappbot newchat \\\"...\\\"";
+                        EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, skillNudge]);
+                        Console.WriteLine($"[EYE] 💡 [{cwdTag}] Skill nudge sent");
+                    }
+                    catch { /* best-effort */ }
+                }
+                else if (sizeMB >= UrgentMB && !string.IsNullOrEmpty(slackBotToken))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 즉시 인수인계하세요!");
