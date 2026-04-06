@@ -30,7 +30,11 @@ internal partial class Program
             if (NativeMethods.GetGUIThreadInfo(0, ref gti) && gti.hwndFocus != IntPtr.Zero)
             {
                 var focusGrap = WindowFinder.BuildTargetJson5(gti.hwndFocus);
-                Console.WriteLine($"[FOCUS] {focusGrap}");
+                var fsw = System.Diagnostics.Stopwatch.StartNew();
+                var hits = WindowFinder.FindByTitle(focusGrap, true);
+                fsw.Stop();
+                var focusOk = hits.Any(h => h.Handle == gti.hwndFocus);
+                Console.WriteLine($"[FOCUS] {focusGrap} {(focusOk ? "OK" : "MISS")} {fsw.ElapsedMilliseconds}ms");
             }
         }
         catch { }
