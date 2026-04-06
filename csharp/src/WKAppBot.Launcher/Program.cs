@@ -75,22 +75,14 @@ partial class Program
         // Do NOT call SetConsoleOutputCP — changes the terminal's CP, breaks host shell.
         _consoleCodePage = (int)GetConsoleOutputCP();
         {
-            bool isUtf8Term;
-            if (_consoleCodePage > 0)
-            {
-                // Real console attached: trust GetConsoleOutputCP() directly.
-                // WT_SESSION may be inherited by CMD subprocesses even after `chcp 949` — ignore env vars.
-                isUtf8Term = _consoleCodePage == 65001;
-            }
-            else
-            {
-                // No console (DETACHED_PROCESS / bash PTY): use env vars to detect UTF-8 shell.
-                static string? Env(string k) => Environment.GetEnvironmentVariable(k);
-                isUtf8Term = !string.IsNullOrEmpty(Env("TERM"))
-                    || !string.IsNullOrEmpty(Env("MSYSTEM"))
-                    || !string.IsNullOrEmpty(Env("TERM_PROGRAM"))
-                    || !string.IsNullOrEmpty(Env("WT_SESSION"));
-            }
+            // Git Bash PTY: GetConsoleOutputCP() returns 949 (Windows ACP) but expects UTF-8 output.
+            // Must check MSYSTEM/TERM/TERM_PROGRAM regardless of sysCP value.
+            // WT_SESSION intentionally excluded: inherited by CMD children even after `chcp 949`.
+            static string? Env(string k) => Environment.GetEnvironmentVariable(k);
+            bool isUtf8Term = _consoleCodePage == 65001
+                || !string.IsNullOrEmpty(Env("MSYSTEM"))
+                || !string.IsNullOrEmpty(Env("TERM"))
+                || !string.IsNullOrEmpty(Env("TERM_PROGRAM"));
             // Core always outputs UTF-8. Transcode UTF-8→CP for non-UTF-8 terminals (e.g. CP949 CMD).
             // UTF-8 terminals: passthrough.
             // EyeCmdPipeClient uses _consoleCodePage to decide encoding; normalize to 65001 for UTF-8 mode.

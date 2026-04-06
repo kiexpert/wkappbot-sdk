@@ -43,8 +43,9 @@ internal sealed class A11yHackOverlayWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false;
         ResizeMode = ResizeMode.NoResize;
-        Opacity = 0.5;
-        _canvas = new Canvas { Background = Brushes.Transparent, IsHitTestVisible = false };
+        // NOTE: DO NOT set Window.Opacity here — AllowsTransparency + Opacity<1 causes opaque-black
+        // background rendering bug on some display configurations. Control transparency per-element.
+        _canvas = new Canvas { Background = Brushes.Transparent, Opacity = 0.6, IsHitTestVisible = false };
         Content = _canvas;
     }
 
