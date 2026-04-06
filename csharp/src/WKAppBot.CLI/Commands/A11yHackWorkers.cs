@@ -140,7 +140,7 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 if (hwnd == IntPtr.Zero) continue;
 
-                // Use root window for grap/UIA (child hwnds often have no title / no UIA tree)
+                // Root window: for UIA tree access and proc name resolution
                 var rootHwndEarly = NativeMethods.GetAncestor(hwnd, 2 /* GA_ROOT */);
                 if (rootHwndEarly == IntPtr.Zero) rootHwndEarly = hwnd;
 
@@ -180,19 +180,34 @@ internal partial class Program
                 }
                 catch { }
 
+                // Best child hwnd: UIA NativeWindowHandle > WindowFromPoint child > root
+                // UIA element knows its exact backing Win32 window (WPF/Electron host, not generic parent)
+                var bestHwnd = hwnd;
+                if (curEl != null)
+                {
+                    try
+                    {
+                        var nwh = new IntPtr(curEl.Properties.NativeWindowHandle.ValueOrDefault);
+                        if (nwh != IntPtr.Zero && nwh != rootHwndEarly)
+                            bestHwnd = nwh; // most specific: the actual Win32 host of this UIA element
+                    }
+                    catch { }
+                }
+
                 if (elName.Length > 30) elName = elName[..30];
                 var elLabel = !string.IsNullOrEmpty(elAid) ? elAid : elName;
-                // Window grap: use root hwnd for title + json5 (child hwnds have empty titles)
-                var winTitle = NativeMethods.GetWindowTextW(rootHwndEarly);
+                // Window grap: title from bestHwnd (has title), fallback to root
+                var winTitle = NativeMethods.GetWindowTextW(bestHwnd);
+                if (string.IsNullOrEmpty(winTitle)) winTitle = NativeMethods.GetWindowTextW(rootHwndEarly);
                 if (winTitle.Length > 20) winTitle = winTitle[..20];
                 var winGrap = $"\"*{winTitle}*\"";
                 // Full grap with #scope for targeting
                 var fullGrap = !string.IsNullOrEmpty(elLabel) ? $"{winGrap}#*{elLabel}*" : winGrap;
 
-                // Verify against root hwnd
-                var json5 = WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(rootHwndEarly);
+                // Verify: bestHwnd first, fallback root
+                var json5 = WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(bestHwnd);
                 var verifyHits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(json5, true);
-                bool verified = verifyHits.Any(v => v.Handle == rootHwndEarly);
+                bool verified = verifyHits.Any(v => v.Handle == bestHwnd || v.Handle == rootHwndEarly);
                 var mark = verified ? "OK" : "MISS";
 
                 // Build tag path: walk parent chain → "Pane/Group_1th/Edit_1052"
@@ -201,7 +216,7 @@ internal partial class Program
                     ? WKAppBot.Win32.Accessibility.GrapHelper.BuildAbsoluteTagPath(curEl, uia.TreeWalkerFactory.GetRawViewWalker())
                     : WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
 
-                var shortWin = $"{{hwnd:0x{rootHwndEarly.ToInt64():X},proc:'{proc}'}}";
+                var shortWin = $"{{hwnd:0x{bestHwnd.ToInt64():X},proc:'{proc}'}}";
                 var result = $"{shortWin}#{tagPath} {mark}";
 
                 var elMs = sw.ElapsedMilliseconds;
