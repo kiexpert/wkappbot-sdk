@@ -186,6 +186,8 @@ internal partial class Program
 
                 var elNodeTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
                 var rectStr = elBounds.Width > 0 ? $" {elBounds.Width}x{elBounds.Height}" : "";
+                var nameAttr = !string.IsNullOrEmpty(elName) ? $" name=\"{elName}\"" : "";
+                var patAttr = !string.IsNullOrEmpty(elPatterns) ? $" [{elPatterns}]" : "";
                 var result = $"{fullGrap} <{elNodeTag}> {mark}";
 
                 var elMs = sw.ElapsedMilliseconds;
@@ -196,7 +198,7 @@ internal partial class Program
                 lastGrap = fullGrap;
                 if (RunningInEye && !changed) continue; // Eye: change-only
                 if (grapChanged) Console.WriteLine(); // different target pattern → new line
-                Console.Write($"{fullGrap} // <{elNodeTag}>{rectStr} [{mark}] {elMs}ms          \r");
+                Console.Write($"{fullGrap} // <{elNodeTag}>{rectStr}{nameAttr}{patAttr} [{mark}] {elMs}ms          \r");
                 Console.Out.Flush();
 
                 // ── Live overlay: root window size, known nodes as dashed boxes ──
