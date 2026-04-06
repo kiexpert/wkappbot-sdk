@@ -116,7 +116,24 @@ public static class GrapHelper
         }
         if (parts.Count == 0) return FormatNodeTag("?", null);
         parts.Reverse();
-        return string.Join("/", parts);
+        // Compress consecutive identical bare types: Group/Group/Group → Group//
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < parts.Count; i++)
+        {
+            if (i > 0) sb.Append('/');
+            sb.Append(parts[i]);
+            // Skip consecutive identical bare-type tags (no aid, no sibIdx suffix)
+            // "Group" == "Group" but "Group_1th" != "Group"
+            var baseType = parts[i].Contains('_') ? null : parts[i];
+            if (baseType != null)
+            {
+                int skip = 0;
+                while (i + 1 + skip < parts.Count && parts[i + 1 + skip] == baseType)
+                    skip++;
+                if (skip > 0) { sb.Append(new string('/', skip)); i += skip; }
+            }
+        }
+        return sb.ToString();
     }
 
     /// <summary>
