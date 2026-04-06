@@ -627,12 +627,58 @@ public static class GrapHelper
     {
         var matcher = PatternMatcher.Create(pattern);
 
+        // Fast path: plain literal (no wildcards/regex) → native UIA FindFirst, O(log n) vs BFS O(n)
+        if (!PatternMatcher.IsPattern(pattern))
+        {
+            var fast = TryNativeFastFind(root, pattern);
+            if (fast != null) return fast;
+        }
+
         // Pass 1: containers only (Window/Pane/Group/Tab/Document/Custom)
         var container = WalkFindByMatcher(root, matcher, maxDepth, depth: 0, containersOnly: true);
         if (container != null) return container;
 
         // Pass 2: any element (fallback for leaf elements like Button/Edit/TabItem)
         return WalkFindByMatcher(root, matcher, maxDepth, depth: 0, containersOnly: false);
+    }
+
+    // Ordinal suffix pattern: "1st","2nd","3rd","4th"..."10th" etc.
+    private static readonly System.Text.RegularExpressions.Regex _ordinalRx =
+        new(@"^\d+(st|nd|rd|th)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// Native UIA FindFirst fast-path for plain literal patterns.
+    /// Tries: exact Name → AID portion of "Type_aid" tag → exact AID.
+    /// Falls through returning null if nothing found (caller does BFS).
+    /// </summary>
+    private static AutomationElement? TryNativeFastFind(AutomationElement root, string pattern)
+    {
+        try
+        {
+            // Exact Name match
+            var byName = root.FindFirstDescendant(cf => cf.ByName(pattern));
+            if (byName != null) return byName;
+
+            // FormatNodeTag format: "Type_aid" → extract AID portion after first '_'
+            var uidx = pattern.IndexOf('_');
+            if (uidx > 0)
+            {
+                var aidPart = pattern[(uidx + 1)..];
+                // Skip ordinal suffixes like "1st", "2nd", "10th" (sibling-index only, no AID)
+                if (aidPart.Length > 3 && !_ordinalRx.IsMatch(aidPart))
+                {
+                    var byAidPart = root.FindFirstDescendant(cf => cf.ByAutomationId(aidPart));
+                    if (byAidPart != null) return byAidPart;
+                }
+            }
+
+            // Exact AID match with full pattern (e.g., bare AutomationId search)
+            var byAid = root.FindFirstDescendant(cf => cf.ByAutomationId(pattern));
+            if (byAid != null) return byAid;
+        }
+        catch { }
+        return null;
     }
 
     /// <summary>
