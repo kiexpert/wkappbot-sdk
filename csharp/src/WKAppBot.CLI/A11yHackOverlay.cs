@@ -356,14 +356,18 @@ internal sealed class A11yHackOverlayHost : IDisposable
     public void Update(IReadOnlyList<A11yHackOverlayBox> boxes)
         => Update(new A11yHackOverlayModel(boxes));
 
-    /// <summary>Move overlay to follow window position changes.</summary>
+    /// <summary>Move overlay to follow window position changes (screen pixel coords).</summary>
     public void Move(int screenX, int screenY)
     {
         _screenX = screenX;
         _screenY = screenY;
         _dispatcher?.BeginInvoke(() =>
         {
-            if (_window != null) { _window.Left = screenX; _window.Top = screenY; }
+            if (_window == null) return;
+            // Use SetWindowPos for pixel-accurate positioning (WPF Left/Top is DPI-logical → offset on scaled displays)
+            var hwnd = new WindowInteropHelper(_window).Handle;
+            if (hwnd != IntPtr.Zero)
+                SetWindowPos(hwnd, HWND_TOPMOST, screenX, screenY, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
         });
     }
 
@@ -442,6 +446,7 @@ internal sealed class A11yHackOverlayHost : IDisposable
 
     static readonly IntPtr HWND_TOPMOST = new(-1);
     const uint SWP_NOACTIVATE = 0x0010;
+    const uint SWP_NOSIZE = 0x0001;
 
     [DllImport("user32.dll")]
     static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
