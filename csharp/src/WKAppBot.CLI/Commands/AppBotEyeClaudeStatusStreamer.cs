@@ -271,7 +271,14 @@ internal partial class Program
                     Console.ResetColor();
                     try
                     {
-                        var skillNudge = $"💡 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달! 인수인계 전에 이번 세션 노하우 하나를 스킬로 기여하세요:\\n\\nwkappbot skill contribute --app <앱> --title \\\"<제목>\\\" --desc \\\"<설명>\\\" [--steps \\\"s1|s2\\\"] [--tags \\\"t1,t2\\\"]\\n\\n그 다음: wkappbot newchat \\\"...\\\"";
+                        var skillNudge = $"""
+                            💡 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!
+                            인수인계 전에 이번 세션 노하우 하나를 스킬로 기여하세요:
+
+                            wkappbot skill contribute --app <앱> --title "<제목>" --desc "<설명>" [--steps "s1|s2"] [--tags "t1,t2"]
+
+                            그 다음: wkappbot newchat "..."
+                            """;
                         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, skillNudge]);
                         Console.WriteLine($"[EYE] 💡 [{cwdTag}] Skill nudge sent");
                     }
