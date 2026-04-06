@@ -78,6 +78,12 @@ public static class GrapHelper
     }
 
     /// <summary>
+    /// Coordinate-based temp tag for UIA-blind elements: "NodeXY(cx,cy)".
+    /// Used when ControlType is completely inaccessible — center coords identify the element.
+    /// </summary>
+    public static string FormatNodeTag(int cx, int cy) => $"NodeXY({cx},{cy})";
+
+    /// <summary>
     /// Build absolute UIA tag path from element to window root.
     /// E.g. "Pane_1th/Document_2th/Edit_1052"
     /// Walks parent chain via TreeWalker, finds sibling index at each level by RuntimeId match.

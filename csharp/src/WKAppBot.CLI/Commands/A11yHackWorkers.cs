@@ -221,7 +221,7 @@ internal partial class Program
                 {
                     int nx = elBounds.Width > 0 ? elBounds.X + elBounds.Width / 2 : pt.X;
                     int ny = elBounds.Height > 0 ? elBounds.Y + elBounds.Height / 2 : pt.Y;
-                    tagPath = $"NodeXY({nx},{ny})";
+                    tagPath = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(nx, ny);
                 }
 
                 var shortWin = $"{{hwnd:0x{bestHwnd.ToInt64():X},proc:'{proc}'}}";
