@@ -312,29 +312,6 @@ internal partial class Program
 
         prof("OrphanGuard started");
 
-        // ── Hang diagnostics (always-on for fast-exit paths) ──────────────────────────────────
-        // Problem: `grap` (no args) sometimes takes 26s despite Main() logic completing in ~14ms.
-        // Approach: string step name + background watchdog + ProcessExit marker to pinpoint WHERE.
-        // Writes to stderr so it's visible regardless of stdout redirect.
-        string _diagStep = "init";
-        var _diagSw = System.Diagnostics.Stopwatch.StartNew();
-        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-        {
-            try { Console.Error.WriteLine($"[HANG-DIAG] ProcessExit: step={_diagStep} elapsed={_diagSw.ElapsedMilliseconds}ms"); } catch { }
-        };
-        var _diagThread = new Thread(() =>
-        {
-            // Fires only if process is still alive after threshold — normal fast exits won't see this.
-            Thread.Sleep(3_000);
-            try { Console.Error.WriteLine($"[HANG-DIAG] 3s: step={_diagStep} elapsed={_diagSw.ElapsedMilliseconds}ms"); } catch { }
-            Thread.Sleep(5_000);
-            try { Console.Error.WriteLine($"[HANG-DIAG] 8s: step={_diagStep} elapsed={_diagSw.ElapsedMilliseconds}ms"); } catch { }
-            Thread.Sleep(18_000);
-            try { Console.Error.WriteLine($"[HANG-DIAG] 26s: step={_diagStep} elapsed={_diagSw.ElapsedMilliseconds}ms"); } catch { }
-        }) { IsBackground = true, Name = "HangDiag" };
-        _diagThread.Start();
-        // ─────────────────────────────────────────────────────────────────────────────────────
-
         // Auto-log: tee all console output to file
         var exePath = Environment.ProcessPath ?? "wkappbot.exe";
         var exeName = Path.GetFileName(exePath);
@@ -342,7 +319,6 @@ internal partial class Program
         // Delay CreateDirectory until we know this isn't a fast-exit path (grap/grep).
         // Directory.CreateDirectory on W:/ (SMB) can leave pending kernel I/O that delays
         // TerminateProcess exit by ~27s (SMB cancel timeout). Logcat can create it if needed.
-        _diagStep = "alias-rewrite";
         var pid = Environment.ProcessId;
         bool _fastExitAfterCommand = false; // set when grap/grep alias → FastExit after logcat to skip DLL-detach 26s hang
 
@@ -366,13 +342,10 @@ internal partial class Program
             // --help or no-args: show alias-specific help (before rewrite)
             if (args.Length == 1 || args.Any(a => a is "--help" or "-h"))
             {
-                _diagStep = "PrintGrapHelp";
                 prof("PrintGrapHelp");
                 PrintGrapHelp(alias);
-                _diagStep = "stdout-flush";
                 prof("return 0");
                 Console.Out.Flush();
-                _diagStep = "FastExit";
                 FastExit(0); // TerminateProcess — skips loader-lock deadlock (~26s) from background symlink thread
                 return 0; // unreachable if FastExit works
             }
@@ -384,18 +357,15 @@ internal partial class Program
         // CreateDirectory + RotateOldLogs: skip for grap/grep fast-exit path — they call
         // TerminateProcess after logcat, and any file I/O on W:/ (SMB network drive) leaves
         // pending kernel I/O that blocks TerminateProcess for ~27s (SMB cancel timeout).
-        _diagStep = "logdir-create";
         if (!_fastExitAfterCommand)
         {
             Directory.CreateDirectory(logDir);
-            _diagStep = "rotateoldlogs-queue";
             ThreadPool.QueueUserWorkItem(_ => { try { RotateOldLogs(logDir, staleHours: 24); } catch { } });
             prof("RotateOldLogs queued (background)");
         }
 
         // Include command name in log filename for easy identification via ls
         // e.g. "wkappbot.exe.out-20260221_211427.eye.pid=36944.txt"
-        _diagStep = "logfile-name";
         var (cmdTag, oldSubDir) = ComputeCmdTagAndSubDir(args);
         var logFile = Path.Combine(logDir, $"{exeName}.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={pid}.log");
         // Track current command log path for auto-heal diagnostics (non-Eye mode only; Eye sets it in RunInEye)
@@ -403,7 +373,6 @@ internal partial class Program
 
         // Pipe mode: stdout is redirected (pipe/file) — suppress diagnostic output for ALL commands.
         // Must be captured before TeeWriter replaces Console.Out.
-        _diagStep = "pipe-mode-check";
         IsPipeMode = Console.IsOutputRedirected;
 
         // --sudo: re-launch with UAC elevation if not already admin.
@@ -477,14 +446,11 @@ internal partial class Program
         // Grep-mode: echo diagnostics to stderr so stdout contains only match lines (grep-compat).
         // Skip TeeWriter for grap/grep fast-exit: writing log file on W:/ (SMB) leaves kernel-level
         // pending I/O that blocks TerminateProcess (STILL_ACTIVE) for ~27s (SMB cancel timeout).
-        _diagStep = "tee-open";
         TeeTextWriter? tee = (RunningInEye || _fastExitAfterCommand) ? null : new TeeTextWriter(GrepModeActive ? Console.Error : Console.Out, logFile, oldSubDir: oldSubDir);
         // Wrap tee in ThreadRoutingWriter so EyeCmdPipeServer.Route() can redirect per-command output.
         // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
-        _diagStep = "tee-install";
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
         // Print log path early — so if the caller times out, they know where to tail the live log.
-        _diagStep = "launch-log";
         if (tee != null && !GrepModeActive)
             Console.Error.WriteLine($"[LOG] {logFile}");
         // LAUNCH identity: callerCwd + callerHwnd → logged by TeeWriter for post-mortem analysis
@@ -498,7 +464,6 @@ internal partial class Program
         // Core redirects Console.Out to that file. FastExit signals WKAPPBOT_RELAY_EVENT (EventWaitHandle)
         // after flushing — Launcher reads the file while Core is still alive (no 27s AV/SMB delay),
         // then signals WKAPPBOT_RELAY_READ_EVENT so Core can proceed to TerminateProcess.
-        _diagStep = "relay-setup";
         RelayFilePath = _fastExitAfterCommand ? Environment.GetEnvironmentVariable("WKAPPBOT_RELAY_FILE") : null;
         if (RelayFilePath != null)
         {
@@ -511,9 +476,7 @@ internal partial class Program
             }
             catch { RelayFilePath = null; /* fallback to normal stdout */ }
         }
-        _diagStep = "stdout-sync";
         if (_fastExitAfterCommand) SetupSyncStdout();
-        _diagStep = "dispatch-ready";
         prof("TeeWriter ready");
 
         // ── Crash handler: dump stack trace to log, DON'T move to old/ (crash evidence) ──
@@ -855,20 +818,14 @@ internal partial class Program
             catch { }
             // Write exit-file FIRST — before tee.Dispose() which may block on SMB I/O.
             // Launcher polls this file every 50ms and exits immediately when found.
-            _diagStep = "exitfile-write";
             if (!_fastExitAfterCommand)
                 WriteExitFile(exitCode);
 
-            _diagStep = "tee-restore";
             if (tee != null) Console.SetOut(tee.OriginalConsole);
-            _diagStep = "tee-dispose";
             tee?.Dispose(); // normal-exit atexit-style move to logs/old
-            _diagStep = "logsaved-write";
             if (tee != null) Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
-            _diagStep = "timer-dispose";
             timeoutTimer?.Dispose();
             // grap/grep path still uses FastExit (relay file + TerminateProcess).
-            _diagStep = "finally-done";
             if (_fastExitAfterCommand)
                 FastExit(exitCode);
         }
