@@ -145,14 +145,8 @@ internal partial class Program
                 var rootHwndEarly = NativeMethods.GetAncestor(hwnd, 2 /* GA_ROOT */);
                 if (rootHwndEarly == IntPtr.Zero) rootHwndEarly = hwnd;
 
-                // Drill into deepest real child at cursor (RealChildWindowFromPoint ignores transparent/disabled layers)
-                // Convert screen pt → client coords relative to root, then drill
-                {
-                    var clientPt = pt;
-                    NativeMethods.ScreenToClient(rootHwndEarly, ref clientPt);
-                    var deep = NativeMethods.RealChildWindowFromPoint(rootHwndEarly, clientPt);
-                    if (deep != IntPtr.Zero && deep != rootHwndEarly) hwnd = deep;
-                }
+                // Recursively drill to deepest child at cursor (RealChildWindowFromPoint is NOT recursive)
+                hwnd = DrillToDeepestChild(rootHwndEarly, pt);
 
                 // Mouse moved? → reset debounce + cancel running analysis (but not blind hack)
                 if (pt.X != lastMouseX || pt.Y != lastMouseY)
@@ -714,6 +708,24 @@ internal partial class Program
     /// Look up experience DB (form_uia_{winClass}.json) for the node closest to cursor/bounds.
     /// Returns DyTag string ("DyEdit_active", "DyGroup_3th", ...) or null if no match.
     /// </summary>
+    /// <summary>
+    /// Recursively drill from parent down to the deepest visible child window containing the screen point.
+    /// RealChildWindowFromPoint is NOT recursive — this calls it repeatedly until no deeper child exists.
+    /// </summary>
+    static IntPtr DrillToDeepestChild(IntPtr parent, POINT screenPt)
+    {
+        var current = parent;
+        for (int depth = 0; depth < 16; depth++)
+        {
+            var clientPt = screenPt;
+            NativeMethods.ScreenToClient(current, ref clientPt);
+            var child = NativeMethods.RealChildWindowFromPoint(current, clientPt);
+            if (child == IntPtr.Zero || child == current) break;
+            current = child;
+        }
+        return current;
+    }
+
     static string? TryLookupExpDbTag(IntPtr rootHwnd, string proc, POINT pt, System.Drawing.Rectangle elBounds)
     {
         try
