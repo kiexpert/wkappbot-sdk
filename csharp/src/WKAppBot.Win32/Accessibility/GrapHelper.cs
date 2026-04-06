@@ -71,6 +71,55 @@ public static class GrapHelper
     }
 
     /// <summary>
+    /// Build absolute UIA tag path from element to window root.
+    /// E.g. "Pane_1th/Document_2th/Edit_1052"
+    /// Walks parent chain via TreeWalker, finds sibling index at each level by RuntimeId match.
+    /// </summary>
+    public static string BuildAbsoluteTagPath(AutomationElement element, FlaUI.Core.ITreeWalker walker, int maxDepth = 10)
+    {
+        var parts = new List<string>();
+        var node = element;
+        for (int d = 0; d < maxDepth; d++)
+        {
+            string ct = "?", aid = "";
+            try { ct = node.ControlType.ToString(); } catch { }
+            try { aid = node.AutomationId ?? ""; } catch { }
+            if (ct == "Window") break;
+
+            int sibIdx = 0;
+            try
+            {
+                var parent = walker.GetParent(node);
+                if (parent != null)
+                {
+                    var rid = node.Properties.RuntimeId.ValueOrDefault;
+                    if (rid != null)
+                    {
+                        var siblings = parent.FindAllChildren();
+                        for (int si = 0; si < siblings.Length; si++)
+                        {
+                            try
+                            {
+                                var sRid = siblings[si].Properties.RuntimeId.ValueOrDefault;
+                                if (sRid != null && rid.SequenceEqual(sRid)) { sibIdx = si + 1; break; }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            parts.Add(FormatNodeTag(ct, aid, sibIdx));
+            try { node = walker.GetParent(node); } catch { break; }
+            if (node == null) break;
+        }
+        if (parts.Count == 0) return FormatNodeTag("?", null);
+        parts.Reverse();
+        return string.Join("/", parts);
+    }
+
+    /// <summary>
     /// Format a11y node label: "ControlType(AutomationId)" or "ControlType("Name")".
     /// Used everywhere a11y nodes are displayed: windows, inspect, find, read, etc.
     /// </summary>

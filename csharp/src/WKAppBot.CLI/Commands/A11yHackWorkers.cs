@@ -190,30 +190,10 @@ internal partial class Program
                 var mark = verified ? "OK" : "MISS";
 
                 // Build tag path: walk parent chain → "Pane/Group_1th/Edit_1052"
-                var elNodeTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
-                var pathParts = new List<string> { elNodeTag };
-                if (curEl != null)
-                {
-                    try
-                    {
-                        var walker = uia.TreeWalkerFactory.GetRawViewWalker();
-                        var p = curEl;
-                        for (int d = 0; d < 8; d++)
-                        {
-                            try { p = walker.GetParent(p); } catch { break; }
-                            if (p == null) break;
-                            string pCt = "?", pAid = "";
-                            try { pCt = p.ControlType.ToString(); } catch { }
-                            try { pAid = p.AutomationId ?? ""; } catch { }
-                            var pTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(pCt, pAid);
-                            if (pCt == "Window") break; // stop at window root
-                            pathParts.Add(pTag);
-                        }
-                    }
-                    catch { }
-                }
-                pathParts.Reverse();
-                var tagPath = string.Join("/", pathParts);
+                // Absolute tag path via shared helper
+                var tagPath = curEl != null
+                    ? WKAppBot.Win32.Accessibility.GrapHelper.BuildAbsoluteTagPath(curEl, uia.TreeWalkerFactory.GetRawViewWalker())
+                    : WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
 
                 var shortWin = $"{{hwnd:0x{hwnd.ToInt64():X},proc:'{proc}'}}";
                 var result = $"{shortWin}#{tagPath} {mark}";
