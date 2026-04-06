@@ -64,7 +64,14 @@ public static class GrapHelper
     public static string FormatNodeTag(string controlType, string? automationId, int siblingIndex = 0, bool isDynamic = false)
     {
         var prefix = isDynamic ? "Dy" : "";
-        var id = !string.IsNullOrWhiteSpace(automationId) ? automationId
+        var aid = automationId;
+        // Truncate long hyphenated IDs to first segment: "active-frame" → "active", UUID → first 8 chars
+        if (!string.IsNullOrWhiteSpace(aid))
+        {
+            var dashIdx = aid.IndexOf('-');
+            if (dashIdx > 0) aid = aid[..dashIdx];
+        }
+        var id = !string.IsNullOrWhiteSpace(aid) ? aid
                : siblingIndex > 0 ? $"{siblingIndex}th"
                : "";
         return string.IsNullOrEmpty(id) ? $"{prefix}{controlType}" : $"{prefix}{controlType}_{id}";

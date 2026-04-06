@@ -387,7 +387,20 @@ internal partial class Program
                             : double.MaxValue;
                         var lastText = ReadClotThoughtForCwd(vsCwd);
                         var lastLine = GetLastOutputLine(lastText);
-                        if (ageSec < 30 && !string.IsNullOrEmpty(lastLine))
+
+                        // Rate limit check: extract assistant portion only (after 🤖 marker)
+                        // to avoid false positives from user prompts containing error keywords.
+                        string? assistantPortion = null;
+                        if (!string.IsNullOrEmpty(lastText))
+                        {
+                            var botIdx = lastText.IndexOf("🤖", StringComparison.Ordinal);
+                            assistantPortion = botIdx >= 0 ? lastText[(botIdx + "🤖".Length)..] : lastText;
+                        }
+                        if (!string.IsNullOrEmpty(assistantPortion) && IsClaudeErrorText(assistantPortion, out var vsErrDesc))
+                        {
+                            claudeStatus = Tuple.Create("rate_limit", $"{vsErrDesc}: {lastLine}");
+                        }
+                        else if (ageSec < 30 && !string.IsNullOrEmpty(lastLine))
                         {
                             // Recent JSONL activity → executing
                             claudeStatus = Tuple.Create("executing", lastLine);

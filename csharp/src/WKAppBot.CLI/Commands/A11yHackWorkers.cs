@@ -288,15 +288,27 @@ internal partial class Program
                                                 {
                                                     var cr = el.BoundingRectangle;
                                                     if (cr.Width < 5 || cr.Height < 5) return;
-                                                    if (cr.X < rootWr.Left - 10 || cr.Y < rootWr.Top - 10) return;
+                                                    // Skip elements entirely outside root window
+                                                    if (cr.X + cr.Width < rootWr.Left || cr.Y + cr.Height < rootWr.Top ||
+                                                        cr.X > rootWr.Right + 10 || cr.Y > rootWr.Bottom + 10) return;
+                                                    // Skip near-fullsize elements (>90% of root) — wrapper layers
+                                                    var rootW2 = rootWr.Right - rootWr.Left;
+                                                    var rootH2 = rootWr.Bottom - rootWr.Top;
+                                                    if (rootW2 > 0 && rootH2 > 0 && cr.Width > rootW2 * 0.9 && cr.Height > rootH2 * 0.9) return;
+                                                    // Clamp to root bounds (elements partially outside → show visible part)
+                                                    double ox = cr.X - rootWr.Left, oy = cr.Y - rootWr.Top;
+                                                    double ow = cr.Width, oh = cr.Height;
+                                                    if (ox < 0) { ow += ox; ox = 0; }
+                                                    if (oy < 0) { oh += oy; oy = 0; }
+                                                    if (ox + ow > rootW2) ow = rootW2 - ox;
+                                                    if (oy + oh > rootH2) oh = rootH2 - oy;
+                                                    if (ow < 5 || oh < 5) return;
                                                     string ct = "?", aid = "";
                                                     try { ct = el.ControlType.ToString(); } catch { }
                                                     try { aid = el.AutomationId ?? ""; } catch { }
                                                     var tag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(ct, aid, sibIdx);
                                                     _hoverUiaBoxes.Add(new A11yHackOverlayBox(
-                                                        new System.Windows.Rect(
-                                                            cr.X - rootWr.Left, cr.Y - rootWr.Top,
-                                                            cr.Width, cr.Height),
+                                                        new System.Windows.Rect(ox, oy, ow, oh),
                                                         $"{tag} {(int)cr.Width}x{(int)cr.Height}", null, HackBoxRole.Known));
                                                 }
                                                 catch { }
