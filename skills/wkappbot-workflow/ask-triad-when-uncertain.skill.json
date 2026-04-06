@@ -2,23 +2,28 @@
   "id": "ask-triad-when-uncertain",
   "app": "wkappbot-workflow",
   "title": "모르면 삼두에게 물어봐라",
-  "desc": "구현 방법이 불확실하거나, 버그 원인이 안 잡히거나, 설계 결정이 어려우면 삼두(GPT+Gemini+Claude)에 먼저 물어봐라. 삽질 30분보다 질문 1분이 낫다.",
+  "desc": "구현 방법이 불확실하거나 버그 원인이 안 잡히면 삼두(GPT+Gemini+Claude)에 먼저 물어봐라. 삽질 30분보다 질문 1분이 낫다. Claude 혼자 추론하면 컨텍스트 낭비 — 삼두에 위임하면 planning 토큰 대폭 절감.",
   "steps": [
     "wkappbot ask triad \"<question in English>\" [file.png]",
     "질문은 반드시 영어로 — 한글은 토큰 3~4배 낭비",
-    "코드/스크린샷 첨부 가능: wkappbot ask triad \"why?\" screenshot.png",
+    "코드/스크린샷 첨부 가능: wkappbot ask triad \"why does X fail?\" screenshot.png",
     "결과 확인: 세 모델 답변 비교 후 공통된 방향 채택",
-    "중요 결론은 skill contribute 로 스킬화 — 다음 Claude도 같은 고민 안 하게"
+    "중요 결론은 skill contribute 로 스킬화 — 다음 Claude는 추론 없이 즉시 실행",
+    "★ 고난이도 설계 결정: wkappbot ask triad --debate 로 정반합 진행",
+    "  정(thesis) → 반(antithesis) → 합(synthesis) 과정에서 반론과 합의 참고",
+    "  단순 답변보다 훨씬 깊은 통찰 — 설계 trade-off 명확히 드러남"
   ],
   "tags": [
     "workflow",
     "meta",
     "triad",
     "ask",
-    "decision"
+    "decision",
+    "debate",
+    "token-saving"
   ],
   "author": "claude",
   "created": "2026-04-07T02:50:00.0000000Z",
-  "updated": "2026-04-07T02:50:00.0000000Z",
-  "version": "1.0"
+  "updated": "2026-04-07T03:00:00.0000000Z",
+  "version": "1.1"
 }
