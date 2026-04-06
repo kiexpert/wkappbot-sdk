@@ -14,6 +14,10 @@ using System.Runtime.InteropServices;
 /// </summary>
 internal static class AppBotPipe
 {
+    // Verbose: show CreateProcessW diagnostics on stderr (WKAPPBOT_PROFILE=1 or stderr redirected)
+    static readonly bool _verbose = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1"
+                                 || Console.IsErrorRedirected;
+
     // ── Structs ──────────────────────────────────────────────
 
     [StructLayout(LayoutKind.Sequential)]
@@ -104,14 +108,14 @@ internal static class AppBotPipe
             pi = default;
             return false;
         }
-        try { Console.Error.WriteLine($"[{caller}] CreateProcessW cwd=\"{cwd}\" cmd={Trunc(cmdStr, 80)} flags=0x{flags:X}"); } catch { }
+        if (_verbose) try { Console.Error.WriteLine($"[{caller}] CreateProcessW cwd=\"{cwd}\" cmd={Trunc(cmdStr, 80)} flags=0x{flags:X}"); } catch { }
         var ok = RawCreateProcessW(app, cmd, pa, ta, inh, flags, env, cwd, ref si, out pi);
         // Save error BEFORE any Console/IO calls that would reset Win32 last error
         lastError = ok ? 0 : Marshal.GetLastWin32Error();
         try
         {
-            if (ok) Console.Error.WriteLine($"[{caller}] CreateProcessW → pid={pi.dwProcessId}");
-            else    Console.Error.WriteLine($"[{caller}] CreateProcessW FAILED err={lastError}");
+            if (ok && _verbose) Console.Error.WriteLine($"[{caller}] CreateProcessW \u2192 pid={pi.dwProcessId}");
+            else if (!ok)       Console.Error.WriteLine($"[{caller}] CreateProcessW FAILED err={lastError}");
         }
         catch { }
         return ok;
