@@ -554,7 +554,31 @@ internal partial class Program
                                     }
                                     catch { }
                                 }
-                                boxes.AddRange(_hoverExpBoxes);
+                                // Filter: ±9 Cached entries closest to target box (Y-sorted index)
+                                if (_hoverExpBoxes.Count > 0)
+                                {
+                                    var targetBox = boxes.FirstOrDefault(b => b.Role == HackBoxRole.Target);
+                                    if (targetBox != null)
+                                    {
+                                        var sorted = _hoverExpBoxes
+                                            .OrderBy(b => b.Bounds.Y).ThenBy(b => b.Bounds.X).ToList();
+                                        var tcx = targetBox.Bounds.X + targetBox.Bounds.Width / 2;
+                                        var tcy = targetBox.Bounds.Y + targetBox.Bounds.Height / 2;
+                                        int bestIdx = 0; double bestDist = double.MaxValue;
+                                        for (int i = 0; i < sorted.Count; i++)
+                                        {
+                                            var b = sorted[i];
+                                            // Y-weighted distance: vertical proximity matters most
+                                            var d = Math.Abs(b.Bounds.Y + b.Bounds.Height / 2 - tcy)
+                                                  + Math.Abs(b.Bounds.X + b.Bounds.Width / 2 - tcx) * 0.1;
+                                            if (d < bestDist) { bestDist = d; bestIdx = i; }
+                                        }
+                                        const int ExpSpan = 9;
+                                        for (int i = Math.Max(0, bestIdx - ExpSpan);
+                                             i <= Math.Min(sorted.Count - 1, bestIdx + ExpSpan); i++)
+                                            boxes.Add(sorted[i]);
+                                    }
+                                }
 
                                 // Skip render if boxes unchanged (avoid flicker on FSW noise)
                                 var hash = string.Join("|", boxes.Select(b => $"{b.Bounds}{b.Label}{b.Role}"));

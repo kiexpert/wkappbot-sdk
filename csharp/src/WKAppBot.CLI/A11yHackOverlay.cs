@@ -111,43 +111,33 @@ internal sealed class A11yHackOverlayWindow : Window
             var role = box.Role;
             Brush stroke; double thick; Brush fill;
             DoubleCollection? dash; double rx, ry; Effect? fx;
+            // All roles: 1px stroke, no blur. Differentiation via color + alpha + dash only.
+            thick = 1.0; fill = Brushes.Transparent; fx = null; rx = ry = 0;
             switch (role)
             {
-                case HackBoxRole.Target:
-                    stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88));
-                    thick = 2.2; fill = Brushes.Transparent;
-                    dash = null; rx = ry = 3;
-                    fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 16, ShadowDepth = 0, Opacity = 0.8 };
+                case HackBoxRole.Target:    // 타겟 — 밝은 녹색 solid, 고불투명
+                    stroke = new SolidColorBrush(Color.FromArgb(230, 0x00, 0xFF, 0x88));
+                    dash = null;
                     break;
-                case HackBoxRole.Scope: // parent chain — 2x thick neon dashed
-                    stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88));
-                    thick = 2.4; fill = Brushes.Transparent;
-                    dash = new DoubleCollection { 4, 2 }; rx = ry = 2;
-                    fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 8, ShadowDepth = 0, Opacity = 0.4 };
+                case HackBoxRole.Scope:     // 부모 체인 — 녹색 중불투명 긴대시
+                    stroke = new SolidColorBrush(Color.FromArgb(140, 0x00, 0xFF, 0x88));
+                    dash = new DoubleCollection { 6, 3 };
                     break;
-                case HackBoxRole.Focus: // keyboard focus element — cyan solid glow
-                    stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
-                    thick = 2.2; fill = Brushes.Transparent;
-                    dash = null; rx = ry = 3;
-                    fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xBF, 0xFF), BlurRadius = 14, ShadowDepth = 0, Opacity = 0.7 };
+                case HackBoxRole.Focus:     // 키보드 포커스 — 하늘색 solid, 고불투명
+                    stroke = new SolidColorBrush(Color.FromArgb(220, 0x00, 0xBF, 0xFF));
+                    dash = null;
                     break;
-                case HackBoxRole.FocusChain: // keyboard focus parent chain — cyan dashed
-                    stroke = new SolidColorBrush(Color.FromRgb(0x00, 0xBF, 0xFF));
-                    thick = 1.8; fill = Brushes.Transparent;
-                    dash = new DoubleCollection { 4, 2 }; rx = ry = 2;
-                    fx = new DropShadowEffect { Color = Color.FromRgb(0x00, 0xBF, 0xFF), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.3 };
+                case HackBoxRole.FocusChain: // 포커스 체인 — 하늘색 중불투명 긴대시
+                    stroke = new SolidColorBrush(Color.FromArgb(110, 0x00, 0xBF, 0xFF));
+                    dash = new DoubleCollection { 6, 3 };
                     break;
-                case HackBoxRole.Cached: // experience DB hit — amber dashed, 10% alpha
-                    stroke = new SolidColorBrush(Color.FromArgb(25, 0xFF, 0xA5, 0x00));
-                    thick = 1.0; fill = Brushes.Transparent;
-                    dash = new DoubleCollection { 2, 2 }; rx = ry = 1;
-                    fx = null;
+                case HackBoxRole.Cached:    // 경험DB — 주황 저불투명 짧은대시
+                    stroke = new SolidColorBrush(Color.FromArgb(70, 0xFF, 0xA5, 0x00));
+                    dash = new DoubleCollection { 2, 3 };
                     break;
-                default: // Known — system a11y dashed green, 10% alpha border
-                    stroke = new SolidColorBrush(Color.FromArgb(25, 0x32, 0xCD, 0x32));
-                    thick = 1.2; fill = Brushes.Transparent;
-                    dash = new DoubleCollection { 3, 2 }; rx = ry = 1;
-                    fx = null;
+                default:                    // Known — 연두 저불투명 짧은대시
+                    stroke = new SolidColorBrush(Color.FromArgb(60, 0x00, 0xE0, 0x60));
+                    dash = new DoubleCollection { 2, 3 };
                     break;
             }
             var rect = new Rectangle
@@ -184,9 +174,7 @@ internal sealed class A11yHackOverlayWindow : Window
                         FontSize = role == HackBoxRole.Target ? 9 : 8,
                         FontWeight = role == HackBoxRole.Target ? FontWeights.Bold : FontWeights.Normal,
                     },
-                    Effect = role == HackBoxRole.Target
-                        ? new DropShadowEffect { Color = Color.FromRgb(0x00, 0xFF, 0x88), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.5 }
-                        : null,
+                    Effect = null,
                     IsHitTestVisible = false
                 };
                 labelBg.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
