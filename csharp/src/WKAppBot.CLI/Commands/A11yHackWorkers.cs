@@ -407,13 +407,14 @@ internal partial class Program
                                                         {
                                                             var cr = ch[ci].BoundingRectangle;
                                                             if (cr.Width < 5 || cr.Height < 5) continue;
-                                                            string ct2 = "?", aid2 = "";
+                                                            string ct2 = "Node", aid2 = ""; // "Node" → DyNode if type unreadable
                                                             try { ct2 = ch[ci].ControlType.ToString(); } catch { }
                                                             try { aid2 = ch[ci].AutomationId ?? ""; } catch { }
                                                             ctrls.Add(new WKAppBot.Win32.Window.ControlExperience
                                                             {
                                                                 ClassName = ct2,
-                                                                ControlId = ci + 1, // sibling index (1-based)
+                                                                Role = aid2,        // AutomationId (AID takes priority over sibling index in tag)
+                                                                ControlId = ci + 1, // sibling index (1-based, fallback when no AID)
                                                                 Width = (int)cr.Width,
                                                                 Height = (int)cr.Height,
                                                                 RelativeX = capturedRootW > 0 ? (cr.X - wr2.Left) / (double)capturedRootW : 0,
@@ -542,7 +543,7 @@ internal partial class Program
                                                         var cx = ctrl.RelativeX * rootW;
                                                         var cy = ctrl.RelativeY * rootH;
                                                         var tag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
-                                                            ctrl.ClassName ?? "?", null, ctrl.ControlId, isDynamic: true);
+                                                            ctrl.ClassName ?? "Node", ctrl.Role, ctrl.ControlId, isDynamic: true);
                                                         _hoverExpBoxes.Add(new A11yHackOverlayBox(
                                                             new System.Windows.Rect(cx, cy, ctrl.Width, ctrl.Height),
                                                             $"{tag} {ctrl.Width}x{ctrl.Height}", null, HackBoxRole.Cached));
