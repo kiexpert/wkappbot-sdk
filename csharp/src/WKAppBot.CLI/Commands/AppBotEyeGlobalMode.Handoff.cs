@@ -175,8 +175,10 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
             var skillLines = BuildSkillSummary(cards.FirstOrDefault()?.Cwd);
             if (skillLines != null)
             {
-                sb.AppendLine("## 등록된 스킬 (wkappbot skill show <id> 로 상세 조회):");
+                sb.AppendLine("## 📚 참고 스킬 (작업 중 아래 스킬들을 참고서로 활용하세요):");
+                sb.AppendLine("관련 작업 전에 `wkappbot skill show <id>` 로 상세 내용 먼저 확인하면 삽질 방지!");
                 sb.Append(skillLines);
+                sb.AppendLine("→ `wkappbot skill search <키워드>` 로 관련 스킬 검색 가능");
                 sb.AppendLine();
             }
         }
