@@ -1,5 +1,6 @@
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -30,9 +31,16 @@ internal static class EyeCmdPipeClient
         exitCode = 0;
         bool connected = false;
         var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut);
-        // Write pipe output to raw stdout as UTF-8 — same as Core subprocess (StandardOutputEncoding=UTF8).
-        // Console.WriteLine uses Console.OutputEncoding which may differ; raw stream is reliable.
-        var rawOut = new StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true };
+        // Eye pipe sends UTF-8 text. We decode it to Unicode strings via StreamReader,
+        // then re-encode to terminal CP via WideCharToMultiByte (NativeAOT-safe, no managed code pages).
+        // Encoding.GetEncoding(949) is NOT used — NativeAOT trims code page support; silent UTF-8
+        // fallback caused garbled Korean in CMD. Win32 WideCharToMultiByte has no such limitation.
+        var rawStdout = Console.OpenStandardOutput();
+        var cp = Program._consoleCodePage;
+        var lineEnd = "\r\n"u8.ToArray(); // Windows line ending as bytes
+        Action<string> writeLine = cp > 0 && cp != 65001
+            ? line => WriteLineW(rawStdout, line, cp, lineEnd)
+            : line => { var b = Encoding.UTF8.GetBytes(line + "\r\n"); rawStdout.Write(b, 0, b.Length); rawStdout.Flush(); };
         try
         {
             pipe.Connect(300); // 300ms: Eye either answers instantly or isn't running
@@ -95,7 +103,7 @@ internal static class EyeCmdPipeClient
                         int.TryParse(line.AsSpan(EndMarker.Length).Trim(), out exitCode);
                         break;
                     }
-                    rawOut.WriteLine(line);
+                    writeLine(line);
                 }
                 if (timedOut) exitCode = timeoutExitCode;
             }
@@ -121,4 +129,28 @@ internal static class EyeCmdPipeClient
     }
 
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+
+    // CharSet.Unicode: prevents char[] from being marshaled as ANSI bytes.
+    // Without it, Korean chars become '?' before Win32 sees them.
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "WideCharToMultiByte")]
+    static extern int WideCharToMultiByte(int codePage, uint dwFlags,
+        char[] lpWideCharStr, int cchWideChar,
+        byte[] lpMultiByteStr, int cbMultiByte,
+        nint lpDefaultChar, nint lpUsedDefaultChar);
+
+    static readonly byte[] _wcBuf = new byte[65536];
+    static readonly char[] _charBuf = new char[32768];
+
+    static void WriteLineW(Stream stdout, string line, int codePage, byte[] lineEnd)
+    {
+        // Encode string to target code page via Win32 WideCharToMultiByte.
+        // Works in NativeAOT — no managed Encoding stack required.
+        int len = line.Length;
+        if (len > _charBuf.Length) len = _charBuf.Length;
+        line.CopyTo(0, _charBuf, 0, len);
+        int n = WideCharToMultiByte(codePage, 0, _charBuf, len, _wcBuf, _wcBuf.Length, 0, 0);
+        if (n > 0) stdout.Write(_wcBuf, 0, n);
+        stdout.Write(lineEnd, 0, lineEnd.Length);
+        stdout.Flush();
+    }
 }
