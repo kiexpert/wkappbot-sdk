@@ -978,7 +978,7 @@ public static class WindowFinder
         // Trim " - Chrome / Chromium / Microsoft Edge" suffix
         title = title.Split(new[] { " - Chrome", " - Chromium", " - Microsoft Edge" },
                             StringSplitOptions.None)[0].Trim();
-        if (title.Length > 50) title = title[..50];
+        if (title.Length > 30) title = title[..30];
         title = title.Replace("'", "\\'");
         cls = (cls ?? "").Replace("'", "\\'");
         proc = (proc ?? "").Replace("'", "\\'");
