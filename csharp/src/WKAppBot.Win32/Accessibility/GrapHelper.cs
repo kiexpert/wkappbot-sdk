@@ -913,4 +913,202 @@ public static class GrapHelper
 
         return null;
     }
+
+    // ── FindNodeXY: screen coordinate → deepest UIA element ──
+
+    /// <summary>
+    /// Result of FindNodeXY: the deepest UIA element at screen (x, y) + parent chain info.
+    /// </summary>
+    public sealed class NodeXYResult
+    {
+        public AutomationElement Element { get; init; } = null!;
+        public string Tag { get; init; } = "";
+        public string AbsolutePath { get; init; } = "";
+        public System.Drawing.Rectangle Bounds { get; init; }
+        /// <summary>Caret rect in screen coords (from GetGUIThreadInfo). Empty if no caret.</summary>
+        public System.Drawing.Rectangle CaretRect { get; init; }
+        /// <summary>Selection bounding rects from UIA TextPattern (screen coords). Empty if no selection.</summary>
+        public System.Drawing.Rectangle[] SelectionRects { get; init; } = Array.Empty<System.Drawing.Rectangle>();
+        /// <summary>Union of all selection rects (screen coords). Empty if no selection.</summary>
+        public System.Drawing.Rectangle SelectionBounds { get; init; }
+        public IntPtr FocusHwnd { get; init; }
+    }
+
+    /// <summary>
+    /// Find the deepest UIA element containing screen point (x, y).
+    /// Uses UIA FromPoint for initial hit, then drills into children by bounds containment.
+    /// Also retrieves caret info via GetGUIThreadInfo.
+    /// </summary>
+    /// <param name="screenX">Screen X of the point (or left edge of rect to contain).</param>
+    /// <param name="screenY">Screen Y of the point (or top edge of rect to contain).</param>
+    /// <param name="containWidth">If > 0, find the deepest node that fully contains this rect width.</param>
+    /// <param name="containHeight">If > 0, find the deepest node that fully contains this rect height.</param>
+    public static NodeXYResult? FindNodeXY(int screenX, int screenY, UIA3Automation? uia = null,
+        int containWidth = 0, int containHeight = 0)
+    {
+        bool ownUia = uia == null;
+        try
+        {
+            uia ??= new UIA3Automation();
+            try
+            {
+                var hit = uia.FromPoint(new System.Drawing.Point(screenX, screenY));
+                if (hit == null) return null;
+
+                // Rect to contain (point or caret rect)
+                int rRight = screenX + Math.Max(0, containWidth);
+                int rBottom = screenY + Math.Max(0, containHeight);
+
+                // Drill down: find the smallest (deepest) child fully containing the rect
+                var best = hit;
+                for (int depth = 0; depth < 15; depth++)
+                {
+                    AutomationElement? deeper = null;
+                    double bestArea = double.MaxValue;
+                    try
+                    {
+                        var children = best.FindAllChildren();
+                        foreach (var c in children)
+                        {
+                            try
+                            {
+                                var cr = c.BoundingRectangle;
+                                if (cr.Width < 2 || cr.Height < 2) continue;
+                                // Must fully contain the rect
+                                if (screenX >= cr.X && rRight <= cr.X + cr.Width &&
+                                    screenY >= cr.Y && rBottom <= cr.Y + cr.Height)
+                                {
+                                    double area = cr.Width * cr.Height;
+                                    if (area < bestArea)
+                                    {
+                                        bestArea = area;
+                                        deeper = c;
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { break; }
+                    if (deeper == null) break;
+                    best = deeper;
+                }
+
+                // Build tag + absolute path
+                string ct = "?", aid = "";
+                try { ct = best.ControlType.ToString(); } catch { }
+                try { aid = best.AutomationId ?? ""; } catch { }
+                var tag = FormatNodeTag(ct, aid);
+                string absPath;
+                try { absPath = BuildAbsoluteTagPath(best, uia.TreeWalkerFactory.GetRawViewWalker()); } catch { absPath = tag; }
+                var bounds = best.BoundingRectangle;
+
+                // Caret info from GetGUIThreadInfo
+                var caretRect = System.Drawing.Rectangle.Empty;
+                IntPtr focusHwnd = IntPtr.Zero;
+                try
+                {
+                    var gti = new NativeMethods.GUITHREADINFO
+                    { cbSize = Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+                    if (NativeMethods.GetGUIThreadInfo(0, ref gti))
+                    {
+                        focusHwnd = gti.hwndFocus;
+                        if (gti.rcCaret.Right > gti.rcCaret.Left && gti.rcCaret.Bottom > gti.rcCaret.Top)
+                        {
+                            // rcCaret is client coords of hwndFocus → convert to screen
+                            var caretPt = new POINT { X = gti.rcCaret.Left, Y = gti.rcCaret.Top };
+                            NativeMethods.ClientToScreen(gti.hwndFocus, ref caretPt);
+                            caretRect = new System.Drawing.Rectangle(
+                                caretPt.X, caretPt.Y,
+                                gti.rcCaret.Right - gti.rcCaret.Left,
+                                gti.rcCaret.Bottom - gti.rcCaret.Top);
+                        }
+                    }
+                }
+                catch { }
+
+                return new NodeXYResult
+                {
+                    Element = best,
+                    Tag = tag,
+                    AbsolutePath = absPath,
+                    Bounds = bounds,
+                    CaretRect = caretRect,
+                    FocusHwnd = focusHwnd,
+                };
+            }
+            finally { if (ownUia) uia.Dispose(); }
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Find the UIA node at the current keyboard caret position.
+    /// Combines GetGUIThreadInfo (caret coords) + FindNodeXY (UIA drill-down).
+    /// Returns null if no caret is active.
+    /// </summary>
+    public static NodeXYResult? FindNodeAtCaret(UIA3Automation? uia = null)
+    {
+        bool ownUia = uia == null;
+        try
+        {
+            uia ??= new UIA3Automation();
+            var gti = new NativeMethods.GUITHREADINFO
+            { cbSize = Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+            if (!NativeMethods.GetGUIThreadInfo(0, ref gti)) return null;
+            if (gti.hwndFocus == IntPtr.Zero) return null;
+
+            // rcCaret is client coords → convert to screen
+            var pt = new POINT { X = gti.rcCaret.Left, Y = gti.rcCaret.Top };
+            NativeMethods.ClientToScreen(gti.hwndFocus, ref pt);
+            int caretW = gti.rcCaret.Right - gti.rcCaret.Left;
+            int caretH = gti.rcCaret.Bottom - gti.rcCaret.Top;
+
+            // Find node containing the caret
+            var result = FindNodeXY(pt.X, pt.Y, uia, containWidth: caretW, containHeight: caretH);
+            if (result == null) return null;
+
+            // Query TextPattern selection rects → union rect → re-find if selection is larger
+            var selRects = Array.Empty<System.Drawing.Rectangle>();
+            var selBounds = System.Drawing.Rectangle.Empty;
+            try
+            {
+                if (result.Element.Patterns.Text.IsSupported)
+                {
+                    var ranges = result.Element.Patterns.Text.Pattern.GetSelection();
+                    if (ranges is { Length: > 0 })
+                    {
+                        var brs = ranges[0].GetBoundingRectangles();
+                        if (brs is { Length: > 0 })
+                        {
+                            selRects = brs.Select(r => new System.Drawing.Rectangle(
+                                (int)r.X, (int)r.Y, (int)r.Width, (int)r.Height)).ToArray();
+                            // Union of all rects
+                            int minX = selRects.Min(r => r.X), minY = selRects.Min(r => r.Y);
+                            int maxX = selRects.Max(r => r.Right), maxY = selRects.Max(r => r.Bottom);
+                            selBounds = new System.Drawing.Rectangle(minX, minY, maxX - minX, maxY - minY);
+
+                            // Selection info is captured for callers but node search
+                            // always uses caret rect — most reliable anchor point.
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return new NodeXYResult
+            {
+                Element = result.Element,
+                Tag = result.Tag,
+                AbsolutePath = result.AbsolutePath,
+                Bounds = result.Bounds,
+                CaretRect = result.CaretRect,
+                SelectionRects = selRects,
+                SelectionBounds = selBounds,
+                FocusHwnd = result.FocusHwnd,
+            };
+        }
+        catch { return null; }
+        finally { if (ownUia && uia != null) uia.Dispose(); }
+    }
 }

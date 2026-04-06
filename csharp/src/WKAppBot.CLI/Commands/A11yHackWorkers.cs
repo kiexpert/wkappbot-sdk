@@ -358,8 +358,9 @@ internal partial class Program
                                                                 }
                                                                 catch { }
                                                             }
-                                                        // Add prev, self, next siblings
-                                                        for (int si = Math.Max(0, selfIdx - 1); si <= Math.Min(siblings.Length - 1, selfIdx + 1); si++)
+                                                        // Target level: ±10 siblings, upper chain: ±1
+                                                        int span = depth == 0 ? 9 : 1;
+                                                        for (int si = Math.Max(0, selfIdx - span); si <= Math.Min(siblings.Length - 1, selfIdx + span); si++)
                                                             AddUiaBox(siblings[si], si + 1);
                                                     }
                                                     catch { }
@@ -369,8 +370,153 @@ internal partial class Program
                                         }
                                     }
                                     catch { }
+
+                                    // Save full UIA tree as experience DB (async, non-blocking)
+                                    var expRootEl = grapChanged ? uia.FromHandle(rootHwnd) : null;
+                                    if (grapChanged && expRootEl != null)
+                                    {
+                                        var capturedRootEl = expRootEl;
+                                        var capturedProc = proc.ToLowerInvariant();
+                                        var capturedRootHwnd = rootHwnd;
+                                        var capturedRootW = rootW;
+                                        var capturedRootH = rootH;
+                                        var capturedShortWin = shortWin;
+                                        _ = Task.Run(() =>
+                                        {
+                                            try
+                                            {
+                                                var profDir = Path.Combine(DataDir, "profiles", $"{capturedProc}_exp");
+                                                Directory.CreateDirectory(profDir);
+                                                var clsBuf2 = new System.Text.StringBuilder(256);
+                                                NativeMethods.GetClassNameW(capturedRootHwnd, clsBuf2, clsBuf2.Capacity);
+                                                var winCls = clsBuf2.ToString();
+                                                if (string.IsNullOrEmpty(winCls)) winCls = "unknown";
+                                                var formPath = Path.Combine(profDir, $"form_uia_{winCls.Replace(" ", "_")}.json");
+                                                var ctrls = new List<WKAppBot.Win32.Window.ControlExperience>();
+                                                // Full descendant scan (up to 500 elements)
+                                                void ScanForExp(FlaUI.Core.AutomationElements.AutomationElement parent)
+                                                {
+                                                    if (ctrls.Count >= 500) return;
+                                                    FlaUI.Core.AutomationElements.AutomationElement[] ch;
+                                                    try { ch = parent.FindAllChildren(); } catch { return; }
+                                                    foreach (var c in ch)
+                                                    {
+                                                        if (ctrls.Count >= 500) return;
+                                                        try
+                                                        {
+                                                            var cr = c.BoundingRectangle;
+                                                            if (cr.Width < 5 || cr.Height < 5) continue;
+                                                            string ct2 = "?", aid2 = "";
+                                                            try { ct2 = c.ControlType.ToString(); } catch { }
+                                                            try { aid2 = c.AutomationId ?? ""; } catch { }
+                                                            var tag2 = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(ct2, aid2);
+                                                            NativeMethods.GetWindowRect(capturedRootHwnd, out var wr2);
+                                                            ctrls.Add(new WKAppBot.Win32.Window.ControlExperience
+                                                            {
+                                                                ClassName = tag2,
+                                                                Width = (int)cr.Width,
+                                                                Height = (int)cr.Height,
+                                                                RelativeX = capturedRootW > 0 ? (cr.X - wr2.Left) / (double)capturedRootW : 0,
+                                                                RelativeY = capturedRootH > 0 ? (cr.Y - wr2.Top) / (double)capturedRootH : 0,
+                                                            });
+                                                        }
+                                                        catch { }
+                                                        ScanForExp(c);
+                                                    }
+                                                }
+                                                ScanForExp(capturedRootEl);
+                                                if (ctrls.Count == 0) return;
+                                                var form = new WKAppBot.Win32.Window.FormExperience
+                                                {
+                                                    FormId = $"uia_{winCls}",
+                                                    FormName = capturedShortWin,
+                                                    UpdatedAt = DateTime.UtcNow,
+                                                    ScanCount = 1,
+                                                    Controls = ctrls,
+                                                };
+                                                if (File.Exists(formPath))
+                                                {
+                                                    try
+                                                    {
+                                                        var prev = System.Text.Json.JsonSerializer.Deserialize<WKAppBot.Win32.Window.FormExperience>(
+                                                            File.ReadAllText(formPath));
+                                                        if (prev != null)
+                                                        {
+                                                            form.LearnedAt = prev.LearnedAt;
+                                                            form.ScanCount = prev.ScanCount + 1;
+                                                        }
+                                                    }
+                                                    catch { }
+                                                }
+                                                File.WriteAllText(formPath,
+                                                    System.Text.Json.JsonSerializer.Serialize(form,
+                                                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                                            }
+                                            catch { }
+                                        });
+                                    }
                                 }
                                 boxes.AddRange(_hoverUiaBoxes);
+
+                                // ── Keyboard focus chain overlay ──
+                                try
+                                {
+                                    var focusEl = uia.FocusedElement();
+                                    if (focusEl != null)
+                                    {
+                                        int focusBoxCount = 0;
+                                        var walker2 = uia.TreeWalkerFactory.GetRawViewWalker();
+                                        var fNode = focusEl;
+                                        for (int fd = 0; fd < 10 && fNode != null; fd++)
+                                        {
+                                            try
+                                            {
+                                                var fr = fNode.BoundingRectangle;
+                                                if (fr.Width >= 5 && fr.Height >= 5)
+                                                {
+                                                    var rootW3 = rootWr.Right - rootWr.Left;
+                                                    var rootH3 = rootWr.Bottom - rootWr.Top;
+                                                    if (!(rootW3 > 0 && rootH3 > 0 && fr.Width > rootW3 * 0.9 && fr.Height > rootH3 * 0.9))
+                                                    {
+                                                        double fx2 = fr.X - rootWr.Left, fy2 = fr.Y - rootWr.Top;
+                                                        double fw2 = fr.Width, fh2 = fr.Height;
+                                                        if (fx2 < 0) { fw2 += fx2; fx2 = 0; }
+                                                        if (fy2 < 0) { fh2 += fy2; fy2 = 0; }
+                                                        if (fx2 + fw2 > rootW3) fw2 = rootW3 - fx2;
+                                                        if (fy2 + fh2 > rootH3) fh2 = rootH3 - fy2;
+                                                        if (fw2 >= 5 && fh2 >= 5)
+                                                        {
+                                                            string fCt = "?", fAid = "";
+                                                            try { fCt = fNode.ControlType.ToString(); } catch { }
+                                                            try { fAid = fNode.AutomationId ?? ""; } catch { }
+                                                            var fTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(fCt, fAid, fd);
+                                                            var role = fd == 0 ? HackBoxRole.Focus : HackBoxRole.FocusChain;
+                                                            boxes.Add(new A11yHackOverlayBox(
+                                                                new System.Windows.Rect(fx2, fy2, fw2, fh2),
+                                                                fd == 0 ? $"KB:{fTag}" : fTag, null, role));
+                                                            focusBoxCount++;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            catch { }
+                                            try { fNode = walker2.GetParent(fNode); } catch { fNode = null; }
+                                            if (fNode != null)
+                                            {
+                                                string pCt2 = "?";
+                                                try { pCt2 = fNode.ControlType.ToString(); } catch { }
+                                                if (pCt2 == "Window") break;
+                                            }
+                                        }
+                                        if (focusBoxCount == 0 && !RunningInEye)
+                                        {
+                                            string fDbg = "?";
+                                            try { fDbg = $"{focusEl.ControlType}|{focusEl.Name}|{focusEl.BoundingRectangle}"; } catch { }
+                                            Log($"[FOCUS-DBG] 0 boxes — el={fDbg} rootWr={rootWr.Left},{rootWr.Top},{rootWr.Right},{rootWr.Bottom}");
+                                        }
+                                    }
+                                }
+                                catch (Exception fex) { if (!RunningInEye) Log($"[FOCUS-DBG] ex={fex.Message}"); }
 
                                 // ── Experience DB overlay: Cached boxes from form_*.json ──
                                 if (grapChanged || expRefresh || proc != _lastExpProc)
