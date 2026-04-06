@@ -22,10 +22,12 @@ internal partial class Program
         int parentPid = 0;
         int.TryParse(Environment.GetEnvironmentVariable("WKAPPBOT_PARENT_PID"), out parentPid);
         int timeoutSec = 0;
-        for (int i = 0; i < args.Length - 1; i++)
+        bool renderAll = false;
+        for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--parent-pid" && int.TryParse(args[i + 1], out var pp)) parentPid = pp;
-            if (args[i] == "--timeout" && int.TryParse(args[i + 1], out var ts)) timeoutSec = ts;
+            if (args[i] == "--render-all") renderAll = true;
+            if (i + 1 < args.Length && args[i] == "--parent-pid" && int.TryParse(args[i + 1], out var pp)) parentPid = pp;
+            if (i + 1 < args.Length && args[i] == "--timeout" && int.TryParse(args[i + 1], out var ts)) timeoutSec = ts;
         }
 
         var logPath = Path.Combine(
@@ -278,36 +280,80 @@ internal partial class Program
                                         var rootEl = uia.FromHandle(rootHwnd);
                                         if (rootEl != null)
                                         {
-                                            // Recursive scan with sibling index tracking
-                                            void ScanChildren(FlaUI.Core.AutomationElements.AutomationElement parent)
+                                            // Helper: add one element as Known box
+                                            void AddUiaBox(FlaUI.Core.AutomationElements.AutomationElement el, int sibIdx)
                                             {
                                                 if (_hoverUiaBoxes.Count >= 500) return;
-                                                FlaUI.Core.AutomationElements.AutomationElement[] children;
-                                                try { children = parent.FindAllChildren(); } catch { return; }
-                                                for (int ci = 0; ci < children.Length; ci++)
+                                                try
                                                 {
-                                                    if (_hoverUiaBoxes.Count >= 500) break;
-                                                    var ch = children[ci];
+                                                    var cr = el.BoundingRectangle;
+                                                    if (cr.Width < 5 || cr.Height < 5) return;
+                                                    if (cr.X < rootWr.Left - 10 || cr.Y < rootWr.Top - 10) return;
+                                                    string ct = "?", aid = "";
+                                                    try { ct = el.ControlType.ToString(); } catch { }
+                                                    try { aid = el.AutomationId ?? ""; } catch { }
+                                                    var tag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(ct, aid, sibIdx);
+                                                    _hoverUiaBoxes.Add(new A11yHackOverlayBox(
+                                                        new System.Windows.Rect(
+                                                            cr.X - rootWr.Left, cr.Y - rootWr.Top,
+                                                            cr.Width, cr.Height),
+                                                        $"{tag} {(int)cr.Width}x{(int)cr.Height}", null, HackBoxRole.Known));
+                                                }
+                                                catch { }
+                                            }
+
+                                            if (renderAll)
+                                            {
+                                                // Full recursive scan
+                                                void ScanAll(FlaUI.Core.AutomationElements.AutomationElement parent)
+                                                {
+                                                    if (_hoverUiaBoxes.Count >= 500) return;
+                                                    FlaUI.Core.AutomationElements.AutomationElement[] children;
+                                                    try { children = parent.FindAllChildren(); } catch { return; }
+                                                    for (int ci = 0; ci < children.Length; ci++)
+                                                    {
+                                                        AddUiaBox(children[ci], ci + 1);
+                                                        ScanAll(children[ci]);
+                                                    }
+                                                }
+                                                ScanAll(rootEl);
+                                            }
+                                            else if (curEl != null)
+                                            {
+                                                // Default: target chain + prev/next siblings at each level
+                                                var walker = uia.TreeWalkerFactory.GetRawViewWalker();
+                                                var chain = curEl;
+                                                for (int depth = 0; depth < 10 && chain != null; depth++)
+                                                {
+                                                    var parent = walker.GetParent(chain);
+                                                    if (parent == null) break;
+                                                    string pCt = "?";
+                                                    try { pCt = parent.ControlType.ToString(); } catch { }
+                                                    if (pCt == "Window" && depth > 0) break;
+
                                                     try
                                                     {
-                                                        var cr = ch.BoundingRectangle;
-                                                        if (cr.Width < 5 || cr.Height < 5) { ScanChildren(ch); continue; }
-                                                        if (cr.X < rootWr.Left - 10 || cr.Y < rootWr.Top - 10) { ScanChildren(ch); continue; }
-                                                        string cCt = "?", cAid = "";
-                                                        try { cCt = ch.ControlType.ToString(); } catch { }
-                                                        try { cAid = ch.AutomationId ?? ""; } catch { }
-                                                        var cTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(cCt, cAid, ci + 1);
-                                                        _hoverUiaBoxes.Add(new A11yHackOverlayBox(
-                                                            new System.Windows.Rect(
-                                                                cr.X - rootWr.Left, cr.Y - rootWr.Top,
-                                                                cr.Width, cr.Height),
-                                                            $"{cTag} {(int)cr.Width}x{(int)cr.Height}", null, HackBoxRole.Known));
+                                                        var siblings = parent.FindAllChildren();
+                                                        var rid = chain.Properties.RuntimeId.ValueOrDefault;
+                                                        int selfIdx = -1;
+                                                        if (rid != null)
+                                                            for (int si = 0; si < siblings.Length; si++)
+                                                            {
+                                                                try
+                                                                {
+                                                                    var sRid = siblings[si].Properties.RuntimeId.ValueOrDefault;
+                                                                    if (sRid != null && rid.SequenceEqual(sRid)) { selfIdx = si; break; }
+                                                                }
+                                                                catch { }
+                                                            }
+                                                        // Add prev, self, next siblings
+                                                        for (int si = Math.Max(0, selfIdx - 1); si <= Math.Min(siblings.Length - 1, selfIdx + 1); si++)
+                                                            AddUiaBox(siblings[si], si + 1);
                                                     }
                                                     catch { }
-                                                    ScanChildren(ch);
+                                                    chain = parent;
                                                 }
                                             }
-                                            ScanChildren(rootEl);
                                         }
                                     }
                                     catch { }
