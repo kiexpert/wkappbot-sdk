@@ -606,4 +606,26 @@ Data Directory:
         }
         catch { }
     }
+
+    /// <summary>
+    /// enc-test — outputs known Korean text + hex bytes for encoding diagnosis.
+    /// Core has activeCodePage UTF-8, so pipe bytes are always UTF-8.
+    /// Launcher must transcode to terminal CP if not UTF-8 (e.g. CP949 CMD).
+    /// </summary>
+    static int EncTestCommand()
+    {
+        var testStr = "가나다라마바사아자차카타파하";
+        var utf8Bytes = System.Text.Encoding.UTF8.GetBytes(testStr);
+        var cp949Bytes = System.Text.Encoding.GetEncoding(949).GetBytes(testStr);
+
+        Console.WriteLine($"[ENC-TEST] text={testStr}");
+        Console.WriteLine($"[ENC-TEST] UTF-8 hex: {string.Join(" ", utf8Bytes.Select(b => b.ToString("X2")))}");
+        Console.WriteLine($"[ENC-TEST] CP949 hex: {string.Join(" ", cp949Bytes.Select(b => b.ToString("X2")))}");
+        Console.WriteLine($"[ENC-TEST] Console.OutputEncoding={Console.OutputEncoding.CodePage} GetConsoleOutputCP={EncTestGetConsoleOutputCP()}");
+        Console.WriteLine("[ENC-TEST] done");
+        return 0;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false, EntryPoint = "GetConsoleOutputCP")]
+    static extern uint EncTestGetConsoleOutputCP();
 }
