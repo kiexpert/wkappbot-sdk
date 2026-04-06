@@ -40,6 +40,8 @@ internal partial class Program
             "install"    => SkillInstallCommand(args.Skip(1).ToArray()),
             "export"     => SkillExportCommand(args.Skip(1).ToArray()),
             "import"     => SkillImportCommand(args.Skip(1).ToArray()),
+            "verify"     => SkillVerifyCommand(args.Skip(1).ToArray()),
+            "audit"      => SkillAuditCommand(args.Skip(1).ToArray()),
             "--help" or "-h" or "help" => SkillUsage(),
             var s => Error($"Unknown skill sub-command: {s}")
         };
@@ -112,6 +114,17 @@ internal partial class Program
             for (int i = 0; i < skill.Steps.Count; i++)
                 Console.WriteLine($"    {i + 1}. {skill.Steps[i]}");
         }
+        if (skill.SourceRefs?.Count > 0)
+        {
+            Console.WriteLine("  Refs   :");
+            foreach (var r in skill.SourceRefs)
+            {
+                var suffix = r.Line.HasValue ? $":{r.Line}" : "";
+                var pat = !string.IsNullOrEmpty(r.Pattern) ? $" → \"{r.Pattern}\"" : "";
+                var note = !string.IsNullOrEmpty(r.Note) ? $" ({r.Note})" : "";
+                Console.WriteLine($"    {r.File}{suffix}{pat}{note}");
+            }
+        }
         if (!string.IsNullOrEmpty(skill.Author))
             Console.WriteLine($"  Author : {skill.Author}");
         Console.WriteLine($"  Created: {skill.Created:yyyy-MM-dd}  Version: {skill.Version ?? "1.0"}");
@@ -165,6 +178,7 @@ internal partial class Program
         string? app = null, title = null, desc = null, author = null, id = null;
         var steps = new List<string>();
         var tags = new List<string>();
+        var refs = new List<SkillSourceRef>();
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -177,6 +191,19 @@ internal partial class Program
                 case "--id"     when i + 1 < args.Length: id     = args[++i]; break;
                 case "--steps"  when i + 1 < args.Length: steps.AddRange(args[++i].Split('|')); break;
                 case "--tags"   when i + 1 < args.Length: tags.AddRange(args[++i].Split(',')); break;
+                // --refs "file.cs:42:pattern|file2.cs::pattern2"
+                case "--refs"   when i + 1 < args.Length:
+                    foreach (var r in args[++i].Split('|'))
+                    {
+                        var parts = r.Split(':', 3);
+                        refs.Add(new SkillSourceRef
+                        {
+                            File    = parts[0],
+                            Line    = parts.Length > 1 && int.TryParse(parts[1], out int ln) ? ln : null,
+                            Pattern = parts.Length > 2 && !string.IsNullOrEmpty(parts[2]) ? parts[2] : null
+                        });
+                    }
+                    break;
             }
         }
 
@@ -201,15 +228,16 @@ internal partial class Program
         var existing = File.Exists(path) ? SkillRecord.Load(path) : null;
         var skill = new SkillRecord
         {
-            Id      = slug,
-            App     = app,
-            Title   = title,
-            Desc    = desc,
-            Steps   = steps.Count > 0 ? steps : existing?.Steps ?? [],
-            Tags    = tags.Count  > 0 ? tags  : existing?.Tags  ?? [],
-            Author  = author ?? existing?.Author ?? "claude",
-            Created = existing?.Created ?? DateTime.UtcNow,
-            Version = existing != null ? BumpVersion(existing.Version) : "1.0"
+            Id         = slug,
+            App        = app,
+            Title      = title,
+            Desc       = desc,
+            Steps      = steps.Count > 0 ? steps : existing?.Steps ?? [],
+            Tags       = tags.Count  > 0 ? tags  : existing?.Tags  ?? [],
+            SourceRefs = refs.Count  > 0 ? refs  : existing?.SourceRefs,
+            Author     = author ?? existing?.Author ?? "claude",
+            Created    = existing?.Created ?? DateTime.UtcNow,
+            Version    = existing != null ? BumpVersion(existing.Version) : "1.0"
         };
 
         skill.Save(path);
@@ -377,6 +405,117 @@ internal partial class Program
         return 0;
     }
 
+    // ── Verify ────────────────────────────────────────────────────────────────
+
+    static int SkillVerifyCommand(string[] args)
+    {
+        if (args.Length == 0) { Console.WriteLine("Usage: wkappbot skill verify <id>"); return 1; }
+        var skill = FindSkill(args[0]);
+        if (skill == null) { Console.WriteLine($"[SKILL] Not found: {args[0]}"); return 1; }
+        var (ok, missing, stale) = RunVerify(skill, verbose: true);
+        return (missing + stale > 0) ? 1 : 0;
+    }
+
+    // ── Audit ─────────────────────────────────────────────────────────────────
+
+    static int SkillAuditCommand(string[] args)
+    {
+        string? appFilter = null;
+        for (int i = 0; i < args.Length; i++)
+            if (args[i] == "--app" && i + 1 < args.Length) appFilter = args[++i];
+
+        var skills = LoadAllSkills(appFilter);
+        if (skills.Count == 0) { Console.WriteLine("[SKILL] No skills to audit."); return 0; }
+
+        int totalOk = 0, totalIssues = 0, noRefs = 0;
+        var issueIds = new List<string>();
+
+        Console.WriteLine($"[SKILL] Auditing {skills.Count} skill(s)...");
+        foreach (var skill in skills.OrderBy(s => s.App).ThenBy(s => s.Id))
+        {
+            if (skill.SourceRefs == null || skill.SourceRefs.Count == 0) { noRefs++; continue; }
+            var (ok, missing, stale) = RunVerify(skill, verbose: false);
+            if (missing + stale > 0)
+            {
+                Console.WriteLine($"  ⚠ [{skill.App}] {skill.Id}:");
+                RunVerify(skill, verbose: true);
+                issueIds.Add(skill.Id);
+                totalIssues++;
+            }
+            else totalOk++;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"[SKILL] Audit: {totalOk} ok, {totalIssues} stale/missing, {noRefs} without refs");
+        if (issueIds.Count > 0)
+        {
+            Console.WriteLine("  → Fix: wkappbot skill show <id>  then  wkappbot skill contribute ...");
+            foreach (var id in issueIds) Console.WriteLine($"    wkappbot skill show {id}");
+        }
+        return totalIssues > 0 ? 1 : 0;
+    }
+
+    // Returns (ok, missing, stale). When verbose=true prints per-ref status.
+    static (int ok, int missing, int stale) RunVerify(SkillRecord skill, bool verbose)
+    {
+        if (skill.SourceRefs == null || skill.SourceRefs.Count == 0)
+        {
+            if (verbose) Console.WriteLine($"[SKILL] {skill.Id}: no source_refs (nothing to verify)");
+            return (0, 0, 0);
+        }
+
+        var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+        int ok = 0, missing = 0, stale = 0;
+
+        foreach (var r in skill.SourceRefs)
+        {
+            var absPath = Path.IsPathRooted(r.File) ? r.File : Path.Combine(cwd, r.File);
+            if (!File.Exists(absPath))
+            {
+                if (verbose) Console.WriteLine($"    ❌ FILE MISSING: {r.File}");
+                missing++; continue;
+            }
+            if (string.IsNullOrEmpty(r.Pattern))
+            {
+                if (verbose) Console.WriteLine($"    ✅ {r.File} — file exists");
+                ok++; continue;
+            }
+
+            string[] lines;
+            try { lines = File.ReadAllLines(absPath); }
+            catch { missing++; continue; }
+
+            int foundLine = -1;
+            for (int i = 0; i < lines.Length; i++)
+                if (lines[i].Contains(r.Pattern, StringComparison.Ordinal)) { foundLine = i + 1; break; }
+
+            if (foundLine > 0)
+            {
+                if (verbose) Console.WriteLine($"    ✅ {r.File}:{foundLine} — \"{r.Pattern}\"");
+                ok++;
+            }
+            else
+            {
+                if (verbose)
+                {
+                    Console.WriteLine($"    ⚠ PATTERN NOT FOUND: \"{r.Pattern}\" in {r.File}");
+                    if (r.Line.HasValue)
+                    {
+                        int start = Math.Max(0, r.Line.Value - 2);
+                        int count = Math.Min(5, lines.Length - start);
+                        Console.WriteLine($"    (was line {r.Line}, now reads:)");
+                        foreach (var l in lines.Skip(start).Take(count)) Console.WriteLine($"      | {l.TrimEnd()}");
+                    }
+                }
+                stale++;
+            }
+        }
+
+        if (verbose && missing + stale == 0)
+            Console.WriteLine($"[SKILL] {skill.Id}: ✅ all {ok} ref(s) OK");
+        return (ok, missing, stale);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     // Loads from project dir + hq dir, deduplicating by id (project wins)
@@ -451,14 +590,21 @@ internal partial class Program
         Console.WriteLine("  install [--app X] [--force]       Copy project skills → HQ (on deploy)");
         Console.WriteLine("  export [--app X] [--out f.zip]    Export project skills to zip");
         Console.WriteLine("  import <file.zip>                 Import skills into project dir");
+        Console.WriteLine("  verify <id>                       Check if source_refs still match code");
+        Console.WriteLine("  audit [--app X]                   Audit all skills for stale/missing refs");
+        Console.WriteLine();
+        Console.WriteLine("  --refs \"file:line:pattern|...\"   Source code anchor for self-heal verify");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  wkappbot skill list");
+        Console.WriteLine("  wkappbot skill audit");
+        Console.WriteLine("  wkappbot skill verify chatgpt-blank-false-positive-guard");
         Console.WriteLine("  wkappbot skill search retry");
         Console.WriteLine("  wkappbot skill show cdp-eval-taskcancel-retry");
         Console.WriteLine("  wkappbot skill contribute --app wkappbot-webbot \\");
         Console.WriteLine("    --title \"CDP EvalAsync Retry\" --desc \"retry on cancel/timeout\" \\");
-        Console.WriteLine("    --steps \"catch TaskCanceledException|500ms backoff\" --tags \"cdp,retry\"");
+        Console.WriteLine("    --steps \"catch TaskCanceledException|500ms backoff\" --tags \"cdp,retry\" \\");
+        Console.WriteLine("    --refs \"csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs::TaskCanceledException\"");
         Console.WriteLine("  wkappbot skill install           # deploy to HQ after publish");
         Console.WriteLine("  wkappbot skill delete test-skill");
         return 0;
@@ -469,17 +615,26 @@ internal partial class Program
 
 internal enum SkillSource { Project, Hq }
 
+internal sealed class SkillSourceRef
+{
+    [JsonPropertyName("file")]    public string  File    { get; set; } = "";
+    [JsonPropertyName("line")]    public int?    Line    { get; set; }
+    [JsonPropertyName("pattern")] public string? Pattern { get; set; }
+    [JsonPropertyName("note")]    public string? Note    { get; set; }
+}
+
 internal sealed class SkillRecord
 {
-    [JsonPropertyName("id")]      public string Id      { get; set; } = "";
-    [JsonPropertyName("app")]     public string App     { get; set; } = "";
-    [JsonPropertyName("title")]   public string Title   { get; set; } = "";
-    [JsonPropertyName("desc")]    public string Desc    { get; set; } = "";
-    [JsonPropertyName("steps")]   public List<string> Steps { get; set; } = [];
-    [JsonPropertyName("tags")]    public List<string> Tags  { get; set; } = [];
-    [JsonPropertyName("author")]  public string? Author  { get; set; }
-    [JsonPropertyName("created")] public DateTime Created { get; set; } = DateTime.UtcNow;
-    [JsonPropertyName("version")] public string? Version  { get; set; }
+    [JsonPropertyName("id")]          public string Id      { get; set; } = "";
+    [JsonPropertyName("app")]         public string App     { get; set; } = "";
+    [JsonPropertyName("title")]       public string Title   { get; set; } = "";
+    [JsonPropertyName("desc")]        public string Desc    { get; set; } = "";
+    [JsonPropertyName("steps")]       public List<string> Steps { get; set; } = [];
+    [JsonPropertyName("tags")]        public List<string> Tags  { get; set; } = [];
+    [JsonPropertyName("source_refs")] public List<SkillSourceRef>? SourceRefs { get; set; }
+    [JsonPropertyName("author")]      public string? Author  { get; set; }
+    [JsonPropertyName("created")]     public DateTime Created { get; set; } = DateTime.UtcNow;
+    [JsonPropertyName("version")]     public string? Version  { get; set; }
 
     [JsonIgnore] public SkillSource Source { get; set; } = SkillSource.Project;
 
