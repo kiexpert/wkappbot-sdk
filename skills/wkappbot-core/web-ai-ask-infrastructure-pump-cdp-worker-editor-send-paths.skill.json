@@ -1,0 +1,17 @@
+{
+  "id": "web-ai-ask-infrastructure-pump-cdp-worker-editor-send-paths",
+  "app": "wkappbot-core",
+  "title": "Web AI Ask Infrastructure: Pump, CDP Worker, Editor Send Paths",
+  "desc": "Architecture of the page-side JS pump worker and C# orchestration layer for sending prompts to web AI (Claude/GPT/Gemini). Each AI has a different editor type and send path.",
+  "steps": [
+    "1. [PUMP ARCHITECTURE] window.__wkAskPump is a singleton JS object injected into each AI tab via CDP Runtime.evaluate. It runs a setInterval(500ms) ticker per editor selector. Content hash tracked per tick: change -\u003E reset ticks; stable for 2 ticks (1s) -\u003E trySend(). C# side: CdpPromptPump.cs wraps append\u002Barm\u002Bwatchdog."
+  ],
+  "tags": [
+    "ask"
+  ],
+  "source_refs": null,
+  "author": "claude",
+  "created": "2026-04-07T11:33:24.677194Z",
+  "updated": "2026-04-07T11:33:24.6772154Z",
+  "version": "1.0"
+}
