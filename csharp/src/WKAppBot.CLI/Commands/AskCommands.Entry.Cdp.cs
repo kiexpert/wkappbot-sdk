@@ -332,6 +332,21 @@ internal partial class Program
                 if (!string.IsNullOrWhiteSpace(preferredHost) && !string.IsNullOrWhiteSpace(targetTag))
                 {
                     resolvedId = await GetOrCreateSandboxedTabAsync(cdp, port, targetTag, preferredHost);
+
+                    // Sandbox path bypasses EnsureCorrectWindowAsync — manually position window to ExpectedBounds.
+                    // Without this, Chrome opens wherever it defaults (wrong position / wrong monitor).
+                    if (resolvedId != null)
+                    {
+                        var (expX, expY, expW, expH) = CdpClient.ExpectedBounds;
+                        var wb = await cdp.GetWindowForTargetAsync(resolvedId);
+                        if (wb != null)
+                        {
+                            await cdp.SetWindowBoundsAsync(wb.Value.windowId, expX, expY, expW, expH);
+                            Console.ForegroundColor = ConsoleColor.DarkGray;
+                            Console.WriteLine($"[ASK] Window positioned: ({expX},{expY}) {expW}×{expH}");
+                            Console.ResetColor();
+                        }
+                    }
                 }
                 else
                 {
