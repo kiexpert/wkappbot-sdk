@@ -67,16 +67,18 @@ internal partial class Program
         }
         catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] error: {ex.Message}"); }
 
+        // Compact grap: no title/url, cls only for non-browser
+        var compactGrap = BuildCompactWinGrap(hwnd);
         // Skip abs path if root is a Window (path would be "?") or resolution failed
         var validAbsPath = (absTagPath.Length > 0 && absTagPath != "?") ? absTagPath : "";
-        var fullGrap = string.IsNullOrEmpty(validAbsPath) ? windowGrap : $"{windowGrap}#{validAbsPath}";
+        var fullGrap = string.IsNullOrEmpty(validAbsPath) ? compactGrap : $"{compactGrap}#{validAbsPath}";
 
         // Verify the grap resolves to the correct hwnd → [OK] or [?]
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string verifyMark = "?";
         try
         {
-            var verifyHits = WindowFinder.FindByTitle(windowGrap, true);
+            var verifyHits = WindowFinder.FindByTitle(compactGrap, true);
             verifyMark = verifyHits.Any(v => v.Handle == hwnd) ? "OK" : "MISS";
         }
         catch { }

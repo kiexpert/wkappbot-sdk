@@ -231,14 +231,7 @@ internal partial class Program
                     }
                 }
 
-                var clsBuf2 = new System.Text.StringBuilder(256);
-                NativeMethods.GetClassNameW(bestHwnd, clsBuf2, clsBuf2.Capacity);
-                var winCls2 = clsBuf2.ToString();
-                // WPF: "HwndWrapper[DefaultDomain;;GUID]" → "HwndWrapper[WPF]" (GUID changes every run)
-                if (winCls2.StartsWith("HwndWrapper[", StringComparison.Ordinal))
-                    winCls2 = "HwndWrapper[WPF]";
-                var shortWin = $"{{hwnd:0x{bestHwnd.ToInt64():X},proc:'{proc}',cls:'{winCls2}'}}";
-
+                var shortWin = BuildCompactWinGrap(bestHwnd);
 
                 var result = $"{shortWin}#{tagPath} {mark}";
 
@@ -252,7 +245,7 @@ internal partial class Program
                 lastGrap = shortWin;
                 if (RunningInEye && !changed) continue; // Eye: change-only
                 if (grapChanged) Console.WriteLine(); // different target pattern → new line
-                Console.Write($"{shortWin}#{tagPath} [{mark}] {elMs}ms          \r");
+                Console.Write($"\"{shortWin}#{tagPath}\" [{mark}] {elMs}ms          \r");
                 Console.Out.Flush();
 
                 // ── Live overlay: root window size, known nodes as dashed boxes ──
