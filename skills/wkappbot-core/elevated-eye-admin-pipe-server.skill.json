@@ -1,0 +1,34 @@
+{
+  "id": "elevated-eye-admin-pipe-server",
+  "app": "wkappbot-core",
+  "title": "Elevated Eye Admin Named Pipe Server Loop",
+  "desc": "Smart admin pipe server. Triad design: length-prefixed JSON, MaxAllowedServerInstances, UIPI pipe security, IsBusy hot-swap guard. StopAcceptingAndWaitForDrain: 30s cap.",
+  "steps": [
+    "1. NamedPipeServerStreamAcl.Create AuthUser=ReadWrite Admin=FullControl",
+    "2. WaitForConnectionAsync Task.Run HandleClient Interlocked counter",
+    "3. HandleClient ReadAsync EyeProxyRequest ExecuteCommand WriteAsync response",
+    "4. IsBusy guard hot-swap deferral",
+    "5. __eye_tick__ special returns cached state",
+    "6. StopAcceptingAndWaitForDrain 30s cap was 5min"
+  ],
+  "tags": [
+    "eye",
+    "admin",
+    "pipe",
+    "hot-swap",
+    "elevated",
+    "named-pipe"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/ElevatedEyeProxy.cs",
+      "line": null,
+      "pattern": "ElevatedEyeServer",
+      "note": null
+    }
+  ],
+  "author": "claude",
+  "created": "2026-04-07T06:44:24.2717424Z",
+  "updated": "2026-04-07T06:45:17.2858786Z",
+  "version": "1.2"
+}
