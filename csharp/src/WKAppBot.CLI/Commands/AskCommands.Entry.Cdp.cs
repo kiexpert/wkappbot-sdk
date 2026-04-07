@@ -412,6 +412,8 @@ internal partial class Program
                     _lastFocusTheftStack = stack;
                     LogError("BUG-AUTO", focusEx);
                     _lastFocusTheftStack = null;
+                    // Immediately restore user focus (fire-and-forget retry)
+                    _ = Task.Run(() => RestoreFocusWithRetryAsync((IntPtr)prevFg, $"cdp-theft:{method}", cdp));
                 };
 
                 // JS errors → Slack thread (빠른 버그 추적)
