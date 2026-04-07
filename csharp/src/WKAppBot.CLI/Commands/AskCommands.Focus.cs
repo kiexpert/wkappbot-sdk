@@ -174,6 +174,8 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"[ASK:FOCUS] RESTORE FAILED @ {step} after {attempt} attempts ({timeoutMs}ms timeout)");
             Console.ResetColor();
+            // Unrecoverable: mechanical restore exhausted — report to Slack for human awareness
+            AutoBugReport($"focus-steal unrecoverable @ {step}: prevFg=0x{prevFg:X8} stuck on 0x{NativeMethods.GetForegroundWindow():X8} after {attempt} attempts");
         }
 
         return restored;
@@ -246,6 +248,27 @@ internal partial class Program
                 Console.WriteLine($"[AAR:CDP] Chrome window not found for {action}");
                 return (false, prevFg, null);
             }
+
+            // ── InputReadiness.Probe(): fires OnProbeSuccess (auto-hack/zoom), sets ReadinessCalled flag ──
+            // SkipBlockerCheck/SkipKnowhow/SkipZoom: Chrome is not a Win32 form; CDP zoom handled below.
+            // AutoApproveYield: CDP actions are AI-initiated, no user yield required.
+            // WaitForUserIfBusy=false: same reason. FocusStealer-ask prop check (above) handles the one
+            // case where we DO need user confirmation.
+            try
+            {
+                var readiness = CreateInputReadiness();
+                readiness.Probe(new WKAppBot.Win32.Input.InputReadinessRequest
+                {
+                    TargetHwnd = chromeHwnd,
+                    IntendedAction = action,
+                    SkipBlockerCheck = true,
+                    SkipKnowhow = true,
+                    SkipZoom = true,
+                    AutoApproveYield = true,
+                    WaitForUserIfBusy = false,
+                });
+            }
+            catch { } // best-effort: Probe failure must not block CDP operation
 
             // Magnifier on exact CSS element position (or Chrome window as fallback)
             zoom = !string.IsNullOrEmpty(cssSelector)

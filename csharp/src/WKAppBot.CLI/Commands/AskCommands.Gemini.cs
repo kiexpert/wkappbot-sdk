@@ -260,6 +260,15 @@ internal partial class Program
                 using var questionLock = ChromeTabLock.Acquire("Gemini");
                 if (questionLock == null) return (false, (string?)null);
 
+                // Re-capture prevFg here: persona inject / post-persona wait may have taken 30s+
+                // during which user may have switched windows. Refresh so we restore to the right window.
+                var prevFgNow = NativeMethods.GetForegroundWindow();
+                if (prevFgNow != IntPtr.Zero && prevFgNow != prevFgGemini)
+                {
+                    Console.WriteLine($"[ASK:FOCUS] prevFg updated after persona phase: 0x{prevFgGemini:X8} -> 0x{prevFgNow:X8}");
+                    prevFgGemini = prevFgNow;
+                }
+
                 // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Gemini", prevFgHint: prevFgGemini);
 
