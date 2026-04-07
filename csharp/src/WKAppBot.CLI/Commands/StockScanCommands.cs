@@ -58,7 +58,7 @@ Options:
             return 0;
         }
 
-        Console.WriteLine($"[STOCK] Scanning mode={mode}, top={topN}");
+        Console.Error.WriteLine($"[STOCK] Scanning mode={mode}, top={topN}");
 
         // Connect to existing WebBot Chrome
         CdpClient cdp;
@@ -80,7 +80,7 @@ Options:
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[STOCK] ERROR: Cannot connect to WebBot Chrome (port {port}): {ex.Message}");
+            Console.Error.WriteLine($"[STOCK] ERROR: Cannot connect to WebBot Chrome (port {port}): {ex.Message}");
             Console.WriteLine("[STOCK] Run 'wkappbot web open <url>' first to launch WebBot.");
             Console.ResetColor();
             return 1;
@@ -147,7 +147,7 @@ Options:
                 var path = outputPath ?? Path.Combine(DataDir, "output", "stock_scan.json");
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 File.WriteAllText(path, json);
-                Console.WriteLine($"[STOCK] JSON saved: {path}");
+                Console.Error.WriteLine($"[STOCK] JSON saved: {path}");
             }
 
             // Slack notification
@@ -297,7 +297,7 @@ Options:
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[STOCK] Slack send failed: {ex.Message}");
+            Console.Error.WriteLine($"[STOCK] Slack send failed: {ex.Message}");
         }
     }
 }

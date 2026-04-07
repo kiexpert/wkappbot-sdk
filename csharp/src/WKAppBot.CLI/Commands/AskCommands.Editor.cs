@@ -70,7 +70,7 @@ internal partial class Program
                     return el.textContent.length > 0 ? 'OK' : 'EMPTY';
                 })()
                 """);
-            Console.WriteLine($"[ASK] Tier2-DomFocus: {result}");
+            Console.Error.WriteLine($"[ASK] Tier2-DomFocus: {result}");
             return result == "OK";
         }
         catch (Exception ex)

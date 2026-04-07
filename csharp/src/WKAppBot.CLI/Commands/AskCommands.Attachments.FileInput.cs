@@ -20,7 +20,7 @@ internal partial class Program
         var fileName = Path.GetFileName(filePath);
         var absPath = Path.GetFullPath(filePath);
         var fileSize = new FileInfo(absPath).Length;
-        Console.WriteLine($"[ASK] Attaching file: {fileName} ({fileSize / 1024}KB)");
+        Console.Error.WriteLine($"[ASK] Attaching file: {fileName} ({fileSize / 1024}KB)");
 
         try
         {
@@ -34,7 +34,7 @@ internal partial class Program
             var chooserOk = await cdp.SetFileViaChooserAsync(absPath, timeoutMs: 6000);
             if (chooserOk)
             {
-                Console.WriteLine($"[ASK] File attached via chooser: {fileName}");
+                Console.Error.WriteLine($"[ASK] File attached via chooser: {fileName}");
                 await Task.Delay(1500);
                 return true;
             }
@@ -56,7 +56,7 @@ internal partial class Program
             finally { cdp.EnableFocusTheftMonitoring = prevFocusMonitor; }
             if (uiaOk)
             {
-                Console.WriteLine($"[ASK] File attached via UIA dialog: {fileName}");
+                Console.Error.WriteLine($"[ASK] File attached via UIA dialog: {fileName}");
                 await Task.Delay(2000);
                 return true;
             }
@@ -105,14 +105,14 @@ internal partial class Program
                     } catch(e) { return 'ERR:' + e.message; }
                 })()
                 """);
-            Console.WriteLine($"[ASK] Drop event: {dropResult}");
+            Console.Error.WriteLine($"[ASK] Drop event: {dropResult}");
 
             if (dropResult == "DROPPED")
             {
                 await Task.Delay(1500);
                 if (await CheckFileAttached(cdp))
                 {
-                    Console.WriteLine($"[ASK] File attached via drop: {fileName}");
+                    Console.Error.WriteLine($"[ASK] File attached via drop: {fileName}");
                     return true;
                 }
             }
@@ -120,11 +120,11 @@ internal partial class Program
             // Tier 3: If text file, just append content inline as code block
             if (fileSize < 50_000 && IsTextFile(ext))
             {
-                Console.WriteLine($"[ASK] Falling back to inline text for: {fileName}");
+                Console.Error.WriteLine($"[ASK] Falling back to inline text for: {fileName}");
                 return false; // caller will handle
             }
 
-            Console.WriteLine($"[ASK] All attachment methods failed for: {fileName}");
+            Console.Error.WriteLine($"[ASK] All attachment methods failed for: {fileName}");
             return false;
         }
         catch (Exception ex)
@@ -152,7 +152,7 @@ internal partial class Program
             var nodeIds = queryResult?["nodeIds"]?.AsArray();
             if (nodeIds == null || nodeIds.Count == 0) return false;
 
-            Console.WriteLine($"[ASK] Tier 1: {nodeIds.Count} hidden file input(s) found");
+            Console.Error.WriteLine($"[ASK] Tier 1: {nodeIds.Count} hidden file input(s) found");
             foreach (var nodeIdVal in nodeIds)
             {
                 var nodeId = nodeIdVal?.GetValue<int>() ?? 0;
@@ -180,7 +180,7 @@ internal partial class Program
                     await Task.Delay(2000);
                     if (await CheckFileAttached(cdp))
                     {
-                        Console.WriteLine($"[ASK] Tier 1: file attached via hidden input: {fileName}");
+                        Console.Error.WriteLine($"[ASK] Tier 1: file attached via hidden input: {fileName}");
                         return true;
                     }
                 }
@@ -235,7 +235,7 @@ internal partial class Program
 
                 if (result.StartsWith("CLICKED:", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine($"[ASK] Duplicate notice dismissed ({result})");
+                    Console.Error.WriteLine($"[ASK] Duplicate notice dismissed ({result})");
                     await Task.Delay(200);
                     continue;
                 }
@@ -294,9 +294,9 @@ internal partial class Program
 
                 // [STEP 1] Trusted click on upload button
                 var prevFg1 = NativeMethods.GetForegroundWindow();
-                Console.WriteLine($"[ASK:FOCUS] pre-upload-btn-click fg={prevFg1:X8}");
+                Console.Error.WriteLine($"[ASK:FOCUS] pre-upload-btn-click fg={prevFg1:X8}");
                 await CdpTrustedClick(cdp, bx, by);
-                Console.WriteLine($"[ASK] UIA dialog: upload btn trusted click at ({bx},{by})");
+                Console.Error.WriteLine($"[ASK] UIA dialog: upload btn trusted click at ({bx},{by})");
                 await Task.Delay(1500);
                 LogRestoreFocus(prevFg1, "trusted-click-upload-btn", cdp);
 
@@ -314,13 +314,13 @@ internal partial class Program
                         return 'NO_ITEM';
                     })()
                 """);
-                Console.WriteLine($"[ASK] UIA dialog: menu={menuRect}");
+                Console.Error.WriteLine($"[ASK] UIA dialog: menu={menuRect}");
                 if (menuRect == "NO_ITEM")
                 {
                     var existingD = FindFileOpenDialog();
                     if (existingD != IntPtr.Zero)
                     {
-                        Console.WriteLine($"[ASK] UIA dialog: OS dialog already open hwnd={existingD:X} (from prev tier)");
+                        Console.Error.WriteLine($"[ASK] UIA dialog: OS dialog already open hwnd={existingD:X} (from prev tier)");
                         existingDialog = existingD;
                     }
                     else return false;
@@ -334,21 +334,21 @@ internal partial class Program
 
                     // [STEP 2] Trusted click on menu item
                     var prevFg2 = NativeMethods.GetForegroundWindow();
-                    Console.WriteLine($"[ASK:FOCUS] pre-menu-item-click fg={prevFg2:X8}");
+                    Console.Error.WriteLine($"[ASK:FOCUS] pre-menu-item-click fg={prevFg2:X8}");
                     await CdpTrustedClick(cdp, mx, my);
-                    Console.WriteLine($"[ASK] UIA dialog: menu item trusted click at ({mx},{my})");
+                    Console.Error.WriteLine($"[ASK] UIA dialog: menu item trusted click at ({mx},{my})");
                     await Task.Delay(200);
                     LogRestoreFocus(prevFg2, "trusted-click-menu-item", cdp);
                 }
             }
             else
             {
-                Console.WriteLine($"[ASK] UIA dialog: reusing existing dialog hwnd={existingDialog:X}");
+                Console.Error.WriteLine($"[ASK] UIA dialog: reusing existing dialog hwnd={existingDialog:X}");
             }
 
             // [STEP 3] Capture prevFg before dialog wait
             var prevFg3 = NativeMethods.GetForegroundWindow();
-            Console.WriteLine($"[ASK:FOCUS] pre-dialog-wait fg={prevFg3:X8}");
+            Console.Error.WriteLine($"[ASK:FOCUS] pre-dialog-wait fg={prevFg3:X8}");
 
             // Wait for OS file dialog to appear
             IntPtr dialogHwnd = IntPtr.Zero;
@@ -364,7 +364,7 @@ internal partial class Program
                 Console.WriteLine("[ASK] UIA dialog: no file dialog found");
                 return false;
             }
-            Console.WriteLine($"[ASK] UIA dialog: found hwnd={dialogHwnd:X}");
+            Console.Error.WriteLine($"[ASK] UIA dialog: found hwnd={dialogHwnd:X}");
             LogRestoreFocus(prevFg3, "file-dialog-appeared", cdp);
 
             // Step 4: Find the filename edit via Win32
@@ -401,12 +401,12 @@ internal partial class Program
             }
 
             NativeMethods.SendMessageW(editHwnd, 0x000C /*WM_SETTEXT*/, IntPtr.Zero, absPath);
-            Console.WriteLine($"[ASK] UIA dialog: path set via WM_SETTEXT");
+            Console.Error.WriteLine($"[ASK] UIA dialog: path set via WM_SETTEXT");
             await Task.Delay(300);
 
             // Step 5: Click "열기" button
             var prevFg4 = NativeMethods.GetForegroundWindow();
-            Console.WriteLine($"[ASK:FOCUS] pre-open-btn-click fg={prevFg4:X8}");
+            Console.Error.WriteLine($"[ASK:FOCUS] pre-open-btn-click fg={prevFg4:X8}");
             var openBtnHwnd = NativeMethods.FindWindowExW(dialogHwnd, IntPtr.Zero, "Button", null);
             if (openBtnHwnd != IntPtr.Zero)
             {
@@ -429,7 +429,7 @@ internal partial class Program
                     Console.WriteLine("[ASK] UIA dialog: dialog closed OK");
                     await Task.Delay(500);
                     var restoreFg = originalUserFg != IntPtr.Zero ? originalUserFg : prevFg4;
-                    Console.WriteLine($"[ASK:FOCUS] post-dialog: restoring to original fg={restoreFg:X8}");
+                    Console.Error.WriteLine($"[ASK:FOCUS] post-dialog: restoring to original fg={restoreFg:X8}");
                     NativeMethods.SmartSetForegroundWindow(restoreFg);
                     await Task.Delay(1000);
                     return true;

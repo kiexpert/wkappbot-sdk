@@ -32,7 +32,7 @@ internal partial class Program
             var lockAge = File.Exists(lockFile) ? DateTime.UtcNow - File.GetLastWriteTimeUtc(lockFile) : TimeSpan.MaxValue;
             if (lockAge.TotalSeconds < 30)
             {
-                Console.WriteLine($"[NEWCHAT] SKIPPED ??another newchat ran {lockAge.TotalSeconds:F0}s ago (cooldown 30s)");
+                Console.Error.WriteLine($"[NEWCHAT] SKIPPED ??another newchat ran {lockAge.TotalSeconds:F0}s ago (cooldown 30s)");
                 return 0;
             }
             File.WriteAllText(lockFile, $"{DateTime.UtcNow:O} pid={Environment.ProcessId}");
@@ -47,7 +47,7 @@ internal partial class Program
         {
             if (!File.Exists(filePath))
             {
-                Console.WriteLine($"[ERROR] File not found: {filePath}");
+                Console.Error.WriteLine($"[ERROR] File not found: {filePath}");
                 return 1;
             }
             text = File.ReadAllText(filePath).Trim();
@@ -105,17 +105,17 @@ Then immediately:
 
             text = text + "\n\n---\n" + policy;
             AgentPolicy.RegeneratePolicyFile();
-            Console.WriteLine($"[NEWCHAT] Policy injected ({policy.Length} chars) + file regenerated");
+            Console.Error.WriteLine($"[NEWCHAT] Policy injected ({policy.Length} chars) + file regenerated");
         }
 
-        Console.WriteLine($"[NEWCHAT] Prompt: {(text.Length > 80 ? text[..77] + "..." : text)} ({text.Length} chars)");
+        Console.Error.WriteLine($"[NEWCHAT] Prompt: {(text.Length > 80 ? text[..77] + "..." : text)} ({text.Length} chars)");
 
         using var promptHelper = new ClaudePromptHelper();
         var currentPrompt = promptHelper.FindPrompt(Environment.CurrentDirectory);
         if (currentPrompt != null && !ClaudePromptHelper.IsVsCodeHostType(currentPrompt.HostType))
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[NEWCHAT] ERROR: host \"{currentPrompt.HostType}\" is not supported");
+            Console.Error.WriteLine($"[NEWCHAT] ERROR: host \"{currentPrompt.HostType}\" is not supported");
             Console.WriteLine("[NEWCHAT] Only VS Code extensions are supported: vscode-claudecode, vscode-codex");
             Console.ResetColor();
             return 1;
@@ -155,7 +155,7 @@ Then immediately:
         });
         if (editEl == null) return Error("[NEWCHAT] [Edit] 'Message input' not found ??Claude Code panel open?");
 
-        Console.WriteLine($"[NEWCHAT] Found: [Edit] \"{editEl.Name}\" at ({editEl.BoundingRectangle.X},{editEl.BoundingRectangle.Y})");
+        Console.Error.WriteLine($"[NEWCHAT] Found: [Edit] \"{editEl.Name}\" at ({editEl.BoundingRectangle.X},{editEl.BoundingRectangle.Y})");
 
         // Guard: if input field already has real user input, abort to avoid overwriting.
         // Placeholder text detection:
@@ -177,12 +177,12 @@ Then immediately:
                     if (!string.IsNullOrEmpty(helpText))
                     {
                         isPlaceholder = string.Equals(existing.Trim(), helpText.Trim(), StringComparison.OrdinalIgnoreCase);
-                        Console.WriteLine($"[NEWCHAT] HelpText: \"{helpText}\" ??{(isPlaceholder ? "IS placeholder" : "different from value")}");
+                        Console.Error.WriteLine($"[NEWCHAT] HelpText: \"{helpText}\" ??{(isPlaceholder ? "IS placeholder" : "different from value")}");
                     }
                 }
                 catch { }
 
-                Console.WriteLine($"[NEWCHAT] Input field value: \"{existing.Replace("\n","\\n")}\" ({existing.Length} chars){(isPlaceholder ? " [placeholder]" : "")}");
+                Console.Error.WriteLine($"[NEWCHAT] Input field value: \"{existing.Replace("\n","\\n")}\" ({existing.Length} chars){(isPlaceholder ? " [placeholder]" : "")}");
 
                 // Focusless placeholder probe: type 'a' via WM_CHAR, check if existing text disappears
                 // If it does ??was placeholder (not real user input). Then clear 'a'.
@@ -207,11 +207,11 @@ Then immediately:
                             {
                                 // Existing text gone ??was placeholder!
                                 isPlaceholder = true;
-                                Console.WriteLine($"[NEWCHAT] Focusless probe: '{existing[..Math.Min(20, existing.Length)]}' disappeared after typing -> placeholder");
+                                Console.Error.WriteLine($"[NEWCHAT] Focusless probe: '{existing[..Math.Min(20, existing.Length)]}' disappeared after typing -> placeholder");
                             }
                             else
                             {
-                                Console.WriteLine($"[NEWCHAT] Focusless probe: text persisted ??real user input");
+                                Console.Error.WriteLine($"[NEWCHAT] Focusless probe: text persisted ??real user input");
                             }
                             // Clean up: select all + delete (regardless)
                             // Cleanup: backspace to remove the probe space
@@ -219,13 +219,13 @@ Then immediately:
                             // Just clear via Ctrl+A,Delete later in the normal flow
                         }
                     }
-                    catch (Exception ex) { Console.WriteLine($"[NEWCHAT] Probe error: {ex.Message}"); }
+                    catch (Exception ex) { Console.Error.WriteLine($"[NEWCHAT] Probe error: {ex.Message}"); }
                 }
 
                 if (!isPlaceholder && (existing.Length > 30 || existing.Contains('\n')))
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[NEWCHAT] Input field has pending text ({existing.Length} chars) ??aborting to avoid overwriting user input");
+                    Console.Error.WriteLine($"[NEWCHAT] Input field has pending text ({existing.Length} chars) ??aborting to avoid overwriting user input");
                     Console.ResetColor();
                     return Error("[NEWCHAT] Input not empty ??user may be typing");
                 }
@@ -346,7 +346,7 @@ Then immediately:
                 KeyboardInput.TypeText(ch.ToString());
                 Thread.Sleep(50); // delay for menu to react per keystroke
             }
-            Console.WriteLine($"[NEWCHAT] Typed '{command}' via keyboard");
+            Console.Error.WriteLine($"[NEWCHAT] Typed '{command}' via keyboard");
 
             // Wait for autocomplete menu to appear and settle
             Thread.Sleep(800);
@@ -358,7 +358,7 @@ Then immediately:
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[NEWCHAT] TypeSlashCommand failed: {ex.Message}");
+            Console.Error.WriteLine($"[NEWCHAT] TypeSlashCommand failed: {ex.Message}");
             return false;
         }
     }
@@ -385,7 +385,7 @@ Then immediately:
                 if (insertMethod == null)
                     throw new InvalidOperationException("FlaUI 4.0: InsertTextAtSelection not in IText2Pattern");
                 insertMethod.Invoke(tp2.Pattern, new object[] { text });
-                Console.WriteLine($"[NEWCHAT] TP2 InsertTextAtSelection OK ({text.Length} chars, focusless!)");
+                Console.Error.WriteLine($"[NEWCHAT] TP2 InsertTextAtSelection OK ({text.Length} chars, focusless!)");
 
                 // Submit via renderer WM_KEYDOWN Enter (no focus steal needed)
                 var rendHwnd = NativeMethods.FindWindowExW(hwnd, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
@@ -412,7 +412,7 @@ Then immediately:
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[NEWCHAT] TP2: {ex.Message} ??fallback to focus-steal");
+            Console.Error.WriteLine($"[NEWCHAT] TP2: {ex.Message} ??fallback to focus-steal");
         }
 
         // === Fallback: focus-steal paste + Enter ===
@@ -436,7 +436,7 @@ Then immediately:
             ClaudePromptHelper.SetClipboardTextPublic(text);
             Thread.Sleep(50);
             KeyboardInput.Hotkey(new[] { "ctrl", "v" });
-            Console.WriteLine($"[NEWCHAT] Clipboard paste OK ({text.Length} chars)");
+            Console.Error.WriteLine($"[NEWCHAT] Clipboard paste OK ({text.Length} chars)");
             Thread.Sleep(500); // let React/Svelte process the input event
 
             // Submit with Enter
@@ -446,7 +446,7 @@ Then immediately:
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[NEWCHAT] SetValueAndSubmit failed: {ex.Message}");
+            Console.Error.WriteLine($"[NEWCHAT] SetValueAndSubmit failed: {ex.Message}");
             return false;
         }
     }
@@ -538,13 +538,13 @@ Then immediately:
             var ancestorMatch = candidates.Where(c => ancestorCodePids.Contains(c.pid)).ToList();
             if (ancestorMatch.Count == 1)
             {
-                Console.WriteLine($"[NEWCHAT] Ancestor match (PID={ancestorMatch[0].pid}): \"{ancestorMatch[0].title}\"");
+                Console.Error.WriteLine($"[NEWCHAT] Ancestor match (PID={ancestorMatch[0].pid}): \"{ancestorMatch[0].title}\"");
                 return ancestorMatch[0].hWnd;
             }
             if (ancestorMatch.Count > 1)
             {
                 // Multiple windows for same Code process (split editors) ??use CWD to disambiguate
-                Console.WriteLine($"[NEWCHAT] {ancestorMatch.Count} ancestor windows ??disambiguating by CWD...");
+                Console.Error.WriteLine($"[NEWCHAT] {ancestorMatch.Count} ancestor windows ??disambiguating by CWD...");
                 candidates = ancestorMatch; // narrow scope for CWD check below
             }
         }
@@ -570,20 +570,20 @@ Then immediately:
                 if (cwdMatches.Count == 1 && ancestorCodePids.Count > 0 && !ancestorCodePids.Contains(cwdMatches[0].pid))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[NEWCHAT] ERROR: CWD match \"{folderName}\" ??\"{cwdMatches[0].title}\" but PID={cwdMatches[0].pid} is NOT an ancestor ??refusing to target wrong window.");
+                    Console.Error.WriteLine($"[NEWCHAT] ERROR: CWD match \"{folderName}\" ??\"{cwdMatches[0].title}\" but PID={cwdMatches[0].pid} is NOT an ancestor ??refusing to target wrong window.");
                     Console.ResetColor();
                     return IntPtr.Zero;
                 }
 
                 if (cwdMatches.Count == 1)
                 {
-                    Console.WriteLine($"[NEWCHAT] CWD match \"{folderName}\" (from path): \"{cwdMatches[0].title}\"");
+                    Console.Error.WriteLine($"[NEWCHAT] CWD match \"{folderName}\" (from path): \"{cwdMatches[0].title}\"");
                     return cwdMatches[0].hWnd;
                 }
                 if (cwdMatches.Count > 1)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[NEWCHAT] ERROR: {cwdMatches.Count} VS Code windows match \"{folderName}\" ??ambiguous, aborting.");
+                    Console.Error.WriteLine($"[NEWCHAT] ERROR: {cwdMatches.Count} VS Code windows match \"{folderName}\" ??ambiguous, aborting.");
                     foreach (var m in cwdMatches) Console.WriteLine($"    hwnd=0x{m.hWnd:X} \"{m.title}\"");
                     Console.ResetColor();
                     return IntPtr.Zero;
@@ -595,7 +595,7 @@ Then immediately:
 
         // ── No match ??error (never guess) ──
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"[NEWCHAT] ERROR: No VS Code window matches CWD \"{cwdFolder}\" (ancestor PID lookup also failed).");
+        Console.Error.WriteLine($"[NEWCHAT] ERROR: No VS Code window matches CWD \"{cwdFolder}\" (ancestor PID lookup also failed).");
         Console.WriteLine("  Available VS Code windows:");
         foreach (var c in candidates) Console.WriteLine($"    hwnd=0x{c.hWnd:X} pid={c.pid} \"{c.title}\"");
         Console.ResetColor();

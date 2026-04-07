@@ -58,7 +58,7 @@ internal partial class Program
             if (subDirs.Length > 0)
             {
                 Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.WriteLine($"[GC] Scanning {Path.GetFileName(root)}/ ({subDirs.Length} folders):");
+                Console.Error.WriteLine($"[GC] Scanning {Path.GetFileName(root)}/ ({subDirs.Length} folders):");
                 Console.ResetColor();
                 foreach (var d in subDirs)
                 {
@@ -97,7 +97,7 @@ internal partial class Program
                 if (deleted > 0)
                 {
                     var action = dryRun ? "→ recycle" : "recycled";
-                    Console.WriteLine($"[GC] {folderName}/: {action} {deleted} file(s), {bytes / 1024.0:F0}KB (>{days}d)");
+                    Console.Error.WriteLine($"[GC] {folderName}/: {action} {deleted} file(s), {bytes / 1024.0:F0}KB (>{days}d)");
                 }
                 totalDeleted += deleted;
                 totalBytes += bytes;
@@ -122,7 +122,7 @@ internal partial class Program
                             totalDeleted++;
                             if (!dryRun)
                                 FileSystem.DeleteFile(file, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                            Console.WriteLine($"[GC] {fi.Name}: {(dryRun ? "→ recycle" : "recycled")} {fi.Length / 1024.0:F0}KB");
+                            Console.Error.WriteLine($"[GC] {fi.Name}: {(dryRun ? "→ recycle" : "recycled")} {fi.Length / 1024.0:F0}KB");
                         }
                     }
                 }
@@ -135,7 +135,7 @@ internal partial class Program
         else
         {
             var action = dryRun ? "would free" : "freed";
-            Console.WriteLine($"[GC] Total: {totalDeleted} file(s), {action} {totalBytes / 1024.0:F0}KB");
+            Console.Error.WriteLine($"[GC] Total: {totalDeleted} file(s), {action} {totalBytes / 1024.0:F0}KB");
         }
 
         return 0;

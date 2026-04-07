@@ -31,7 +31,7 @@ internal partial class Program
             return 1;
         }
 
-        Console.WriteLine($"[HOTSWAP] Target: {targetExe}");
+        Console.Error.WriteLine($"[HOTSWAP] Target: {targetExe}");
         var result = TryRenameSwap(targetExe, "HOTSWAP");
 
         switch (result)

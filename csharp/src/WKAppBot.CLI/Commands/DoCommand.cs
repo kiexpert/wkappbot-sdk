@@ -37,7 +37,7 @@ Examples:
         if (handlerMgr.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.DarkCyan;
-            Console.WriteLine($"[BLOCK] {handlerMgr}");
+            Console.Error.WriteLine($"[BLOCK] {handlerMgr}");
             Console.ResetColor();
         }
 
@@ -153,7 +153,7 @@ Examples:
             return 1;
         }
         Console.WriteLine($"Form: [{targetForm.FormId}] {targetForm.FormName}");
-        Console.WriteLine($"[A11Y] form={targetForm.FormId} name='{targetForm.FormName}' role=MDIForm");
+        Console.Error.WriteLine($"[A11Y] form={targetForm.FormId} name='{targetForm.FormName}' role=MDIForm");
 
         // Show past failure history + knowhow for this form (if any)
         if (expDb != null)
@@ -477,7 +477,7 @@ Examples:
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.Write("  Foreground: ");
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine($"[{fgInfo.ClassName}] \"{fgInfo.Title}\" ({fgInfo.Rect.Width}x{fgInfo.Rect.Height})");
+            Console.Error.WriteLine($"[{fgInfo.ClassName}] \"{fgInfo.Title}\" ({fgInfo.Rect.Width}x{fgInfo.Rect.Height})");
             Console.ResetColor();
 
             if (postFgHwnd != win.Handle)

@@ -26,11 +26,11 @@ internal partial class Program
             var port = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)pid);
             if (port <= 0)
             {
-                Console.WriteLine($"[A11Y] No CDP port found for PID {pid}");
+                Console.Error.WriteLine($"[A11Y] No CDP port found for PID {pid}");
                 return null; // CDP not available
             }
 
-            Console.WriteLine($"[A11Y] Telepathy! CDP port={port}, selector=\"{cssSelector}\"");
+            Console.Error.WriteLine($"[A11Y] Telepathy! CDP port={port}, selector=\"{cssSelector}\"");
 
             using var cdp = new WKAppBot.WebBot.CdpClient();
             cdp.ConnectAsync(port).GetAwaiter().GetResult();
@@ -52,7 +52,7 @@ internal partial class Program
                 {
                     if (tab.Url.Contains(cssSelector, StringComparison.OrdinalIgnoreCase))
                     {
-                        Console.WriteLine($"[A11Y] Tab matched by URL hint: \"{cssSelector}\" → {tab.Url[..Math.Min(60, tab.Url.Length)]}");
+                        Console.Error.WriteLine($"[A11Y] Tab matched by URL hint: \"{cssSelector}\" → {tab.Url[..Math.Min(60, tab.Url.Length)]}");
                         if (tab.Id != cdp.TargetId)
                             cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
                         tabFound = true;
@@ -91,7 +91,7 @@ internal partial class Program
                 try
                 {
                     var jsResult = cdp.EvalAsync(evalJs).GetAwaiter().GetResult();
-                    Console.WriteLine($"[A11Y] --eval-js result: {jsResult}");
+                    Console.Error.WriteLine($"[A11Y] --eval-js result: {jsResult}");
                 }
                 catch (Exception jsEx)
                 {
@@ -139,7 +139,7 @@ internal partial class Program
                 _ => CdpEvalAction(cdp, cssSelector, action)
             };
 
-            Console.WriteLine($"[A11Y] CDP {action} → {(result ? "OK" : "FAIL")}");
+            Console.Error.WriteLine($"[A11Y] CDP {action} → {(result ? "OK" : "FAIL")}");
 
             // --speak: TTS for CDP results too
             if (speak && result && (action == "read" || action == "find"))
@@ -167,7 +167,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[A11Y] CDP fallback error: {ex.Message}");
+            Console.Error.WriteLine($"[A11Y] CDP fallback error: {ex.Message}");
             return null; // Fall through to UIA
         }
     }
@@ -255,7 +255,7 @@ internal partial class Program
 
         var best = matches[0];
         if (matches.Count > 1)
-            Console.WriteLine($"[A11Y] type --hotkey CDP — {matches.Count} matches, best: '{best.Label}'");
+            Console.Error.WriteLine($"[A11Y] type --hotkey CDP — {matches.Count} matches, best: '{best.Label}'");
 
         // accesskey 우선, 없으면 aria-keyshortcuts 첫 번째
         if (!string.IsNullOrEmpty(best.Accesskey))
@@ -305,7 +305,7 @@ internal partial class Program
                     {
                         if (tab.Id != cdp.TargetId)
                         {
-                            Console.WriteLine($"[A11Y] --eval-js: tab found by hint '{hint}' → '{tab.Title}'");
+                            Console.Error.WriteLine($"[A11Y] --eval-js: tab found by hint '{hint}' → '{tab.Title}'");
                             cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
                         }
                         return;
@@ -326,7 +326,7 @@ internal partial class Program
                         {
                             if (tab.Id != cdp.TargetId)
                             {
-                                Console.WriteLine($"[A11Y] --eval-js: tab found by window title '{windowTitle}' → '{tab.Title}'");
+                                Console.Error.WriteLine($"[A11Y] --eval-js: tab found by window title '{windowTitle}' → '{tab.Title}'");
                                 cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
                             }
                             return;
@@ -338,11 +338,11 @@ internal partial class Program
             // No match — log active tab and stay on it
             var active = tabs.FirstOrDefault(t => t.Id == cdp.TargetId) ?? tabs.FirstOrDefault();
             if (active != null)
-                Console.WriteLine($"[A11Y] --eval-js: no tab match, using active tab '{active.Title}'");
+                Console.Error.WriteLine($"[A11Y] --eval-js: no tab match, using active tab '{active.Title}'");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[A11Y] --eval-js: tab-find failed ({ex.Message}), using current tab");
+            Console.Error.WriteLine($"[A11Y] --eval-js: tab-find failed ({ex.Message}), using current tab");
         }
     }
 
@@ -382,7 +382,7 @@ internal partial class Program
         {
             var state = cdp.EvalAsync("document.readyState").GetAwaiter().GetResult();
             if (state is "complete" or "interactive") break;
-            Console.WriteLine($"[A11Y] read --eval-js: waiting for page load (readyState={state})...");
+            Console.Error.WriteLine($"[A11Y] read --eval-js: waiting for page load (readyState={state})...");
             Thread.Sleep(Math.Min(intervalMs, 300));
         }
 
@@ -405,8 +405,8 @@ internal partial class Program
             // ── null = streaming done signal: return previous result ──
             if (result == null && lastResult != null)
             {
-                Console.WriteLine($"[A11Y] read --eval-js: null signal → streaming done");
-                Console.WriteLine($"[A11Y] read --eval-js: {lastResult}");
+                Console.Error.WriteLine($"[A11Y] read --eval-js: null signal → streaming done");
+                Console.Error.WriteLine($"[A11Y] read --eval-js: {lastResult}");
                 return true;
             }
 
@@ -416,7 +416,7 @@ internal partial class Program
                 if (stableCount >= stableThreshold)
                 {
                     // Result stabilized — done
-                    Console.WriteLine($"[A11Y] read --eval-js: {result}");
+                    Console.Error.WriteLine($"[A11Y] read --eval-js: {result}");
                     return result != null;
                 }
             }
@@ -429,13 +429,13 @@ internal partial class Program
                     // (when interval is default 500ms, just return first result for speed)
                     if (intervalMs >= 500 && timeoutMs <= 10000)
                     {
-                        Console.WriteLine($"[A11Y] read --eval-js: {result}");
+                        Console.Error.WriteLine($"[A11Y] read --eval-js: {result}");
                         return result != null;
                     }
                 }
                 else
                 {
-                    Console.WriteLine($"[A11Y] read --eval-js: streaming... ({result?.Length ?? 0} chars)");
+                    Console.Error.WriteLine($"[A11Y] read --eval-js: streaming... ({result?.Length ?? 0} chars)");
                 }
                 lastResult = result;
                 stableCount = 1;
@@ -450,7 +450,7 @@ internal partial class Program
             Console.Error.WriteLine($"[A11Y] read --eval-js: timeout {timeoutMs}ms, returning last result");
             Console.ResetColor();
         }
-        Console.WriteLine($"[A11Y] read --eval-js: {lastResult}");
+        Console.Error.WriteLine($"[A11Y] read --eval-js: {lastResult}");
         return lastResult != null;
     }
 
@@ -466,16 +466,16 @@ internal partial class Program
         if (result == "NOT_FOUND")
         {
             // Fallback: selector is domain hint, not CSS — read page summary instead
-            Console.WriteLine($"[A11Y] CDP element not found: {selector} — falling back to page read");
+            Console.Error.WriteLine($"[A11Y] CDP element not found: {selector} — falling back to page read");
             var page = cdp.ReadPageAsync().GetAwaiter().GetResult();
             if (!string.IsNullOrEmpty(page))
             {
-                Console.WriteLine($"[A11Y] CDP page: {page}");
+                Console.Error.WriteLine($"[A11Y] CDP page: {page}");
                 return true;
             }
             return false;
         }
-        Console.WriteLine($"[A11Y] CDP read: {result}");
+        Console.Error.WriteLine($"[A11Y] CDP read: {result}");
         return true;
     }
 
@@ -529,7 +529,7 @@ internal partial class Program
                 return Error($"File not found: {filePath}");
             var bytes = File.ReadAllBytes(filePath);
             var unicode = enc.GetString(bytes);
-            Console.WriteLine($"[FILE-READ] {filePath} ({enc.WebName}, {bytes.Length} bytes → {unicode.Length} chars)");
+            Console.Error.WriteLine($"[FILE-READ] {filePath} ({enc.WebName}, {bytes.Length} bytes → {unicode.Length} chars)");
             Console.WriteLine(unicode);
             return 0;
         }

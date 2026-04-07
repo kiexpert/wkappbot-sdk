@@ -107,7 +107,7 @@ internal partial class Program
                     if (controls > 0)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine($"[CAPTURE] 경험DB 학습: {forms} forms, {controls} controls, {screenshots} new screenshots (profile={profileMatch.Value.name})");
+                        Console.Error.WriteLine($"[CAPTURE] 경험DB 학습: {forms} forms, {controls} controls, {screenshots} new screenshots (profile={profileMatch.Value.name})");
                         Console.ResetColor();
                     }
                 }

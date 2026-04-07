@@ -65,9 +65,9 @@ internal partial class Program
             return Error($"Slices dir not found: {inDir}");
 
         var files = Directory.GetFiles(inDir, "*.mp3").OrderBy(f => f).ToArray();
-        Console.WriteLine($"[INDEX] Input : {inDir}");
-        Console.WriteLine($"[INDEX] Output: {outDir}");
-        Console.WriteLine($"[INDEX] Files : {files.Length}  move={move} dry-run={dryRun}");
+        Console.Error.WriteLine($"[INDEX] Input : {inDir}");
+        Console.Error.WriteLine($"[INDEX] Output: {outDir}");
+        Console.Error.WriteLine($"[INDEX] Files : {files.Length}  move={move} dry-run={dryRun}");
 
         int ok = 0, skipped = 0, trashed = 0, errors = 0;
 
@@ -85,7 +85,7 @@ internal partial class Program
                 if (syllables.Count == 0)
                 {
                     skipped++;
-                    Console.WriteLine($"[INDEX] SKIP  {name} (no voiced frame)");
+                    Console.Error.WriteLine($"[INDEX] SKIP  {name} (no voiced frame)");
                     continue;
                 }
 
@@ -93,7 +93,7 @@ internal partial class Program
                 if (totalVoiced < MinVoicedFrames)
                 {
                     trashed++;
-                    Console.WriteLine($"[INDEX] TRASH {name} ({totalVoiced} frames < {MinVoicedFrames})");
+                    Console.Error.WriteLine($"[INDEX] TRASH {name} ({totalVoiced} frames < {MinVoicedFrames})");
                     if (!dryRun)
                         FileSystem.DeleteFile(mp3, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                     continue;
@@ -115,7 +115,7 @@ internal partial class Program
                 }
 
                 ok++;
-                Console.WriteLine($"[INDEX] {pathStr}/  {word}  ← {name}  ({syllables.Count} syllables)");
+                Console.Error.WriteLine($"[INDEX] {pathStr}/  {word}  ← {name}  ({syllables.Count} syllables)");
 
                 if (!dryRun)
                 {
@@ -129,12 +129,12 @@ internal partial class Program
             catch (Exception ex)
             {
                 errors++;
-                Console.WriteLine($"[INDEX] ERROR {Path.GetFileName(mp3)}: {ex.Message}");
+                Console.Error.WriteLine($"[INDEX] ERROR {Path.GetFileName(mp3)}: {ex.Message}");
             }
         }
 
         Console.WriteLine($"\n[INDEX] Done — ok={ok} trashed={trashed} skipped={skipped} errors={errors}");
-        Console.WriteLine($"[INDEX] DB   : {outDir}");
+        Console.Error.WriteLine($"[INDEX] DB   : {outDir}");
         return errors > 0 ? 1 : 0;
     }
 

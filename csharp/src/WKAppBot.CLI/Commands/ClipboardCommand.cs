@@ -197,7 +197,7 @@ internal partial class Program
                             if (SetClipboardData(cfHtml, hMemHtml) == IntPtr.Zero)
                                 GlobalFree(hMemHtml);
                             else
-                                Console.WriteLine($"[CLIPBOARD] CF_HTML set ({cfHtmlBytes.Length} bytes)");
+                                Console.Error.WriteLine($"[CLIPBOARD] CF_HTML set ({cfHtmlBytes.Length} bytes)");
                         }
                         else
                             GlobalFree(hMemHtml);
@@ -205,7 +205,7 @@ internal partial class Program
                 }
             }
 
-            Console.WriteLine($"[CLIPBOARD] wrote {text.Length} chars{(asHtml ? " (HTML+text)" : "")}");
+            Console.Error.WriteLine($"[CLIPBOARD] wrote {text.Length} chars{(asHtml ? " (HTML+text)" : "")}");
             return 0;
         }
         finally
@@ -316,7 +316,7 @@ internal partial class Program
                 return 1;
             }
 
-            Console.WriteLine($"[CLIPBOARD] {resolved.Length} file(s) copied:");
+            Console.Error.WriteLine($"[CLIPBOARD] {resolved.Length} file(s) copied:");
             foreach (var f in resolved)
                 Console.WriteLine($"  {f}");
             return 0;

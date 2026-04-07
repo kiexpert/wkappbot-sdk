@@ -18,12 +18,12 @@ internal partial class Program
             var name = el.Properties.Name.ValueOrDefault ?? "";
             var type = "?";
             try { type = el.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-            Console.WriteLine($"[A11Y] focus — UIA SetFocus → [{type}] \"{name}\"");
+            Console.Error.WriteLine($"[A11Y] focus — UIA SetFocus → [{type}] \"{name}\"");
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[A11Y] focus — UIA SetFocus failed: {ex.Message}, trying Win32");
+            Console.Error.WriteLine($"[A11Y] focus — UIA SetFocus failed: {ex.Message}, trying Win32");
         }
 
         // Tier 2: Win32 SetFocus on element hwnd
@@ -31,7 +31,7 @@ internal partial class Program
         if (elHwnd != IntPtr.Zero)
         {
             NativeMethods.SetFocus(elHwnd);
-            Console.WriteLine($"[A11Y] focus — Win32 SetFocus 0x{elHwnd:X8}");
+            Console.Error.WriteLine($"[A11Y] focus — Win32 SetFocus 0x{elHwnd:X8}");
             return true;
         }
 
@@ -90,10 +90,10 @@ internal partial class Program
                     var res = (int)(long)NativeMethods.SendMessageW(ctrlHwnd, msg, (IntPtr)(-1), itemName);
                     if (res != CB_ERR)
                     {
-                        Console.WriteLine($"[A11Y] select — Win32 {(msg == CB_SELECTSTRING ? "CB" : "LB")}_SELECTSTRING '{itemName}'");
+                        Console.Error.WriteLine($"[A11Y] select — Win32 {(msg == CB_SELECTSTRING ? "CB" : "LB")}_SELECTSTRING '{itemName}'");
                         return true;
                     }
-                    Console.WriteLine($"[A11Y] select — Win32 {(msg == CB_SELECTSTRING ? "CB" : "LB")}_SELECTSTRING '{itemName}' not found");
+                    Console.Error.WriteLine($"[A11Y] select — Win32 {(msg == CB_SELECTSTRING ? "CB" : "LB")}_SELECTSTRING '{itemName}' not found");
                 }
             }
         }

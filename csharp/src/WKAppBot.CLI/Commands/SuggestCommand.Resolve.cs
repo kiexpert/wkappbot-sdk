@@ -81,7 +81,7 @@ internal partial class Program
             return 1;
         }
 
-        Console.WriteLine($"[RESOLVE] Evidence: {evidenceFile} ({new FileInfo(evidenceFile).Length} bytes)");
+        Console.Error.WriteLine($"[RESOLVE] Evidence: {evidenceFile} ({new FileInfo(evidenceFile).Length} bytes)");
 
         // Pre-load resolve target to check for merge record's affectedCommands
         string[]? mergeAffectedCmds = null;
@@ -112,7 +112,7 @@ internal partial class Program
                                 if (cmds?.Length > 0)
                                 {
                                     mergeAffectedCmds = cmds!;
-                                    Console.WriteLine($"[RESOLVE] Merge affectedCommands: [{string.Join(", ", mergeAffectedCmds)}] -- using for CMD guard");
+                                    Console.Error.WriteLine($"[RESOLVE] Merge affectedCommands: [{string.Join(", ", mergeAffectedCmds)}] -- using for CMD guard");
                                 }
                             }
                             // Non-merge: extract mentioned commands from suggest text
@@ -127,7 +127,7 @@ internal partial class Program
                                 if (mentioned.Length > 0)
                                 {
                                     mergeAffectedCmds = mentioned;
-                                    Console.WriteLine($"[RESOLVE] Suggest mentions commands: [{string.Join(", ", mentioned)}] -- using for CMD guard");
+                                    Console.Error.WriteLine($"[RESOLVE] Suggest mentions commands: [{string.Join(", ", mentioned)}] -- using for CMD guard");
                                 }
                             }
                             break;
@@ -252,7 +252,7 @@ internal partial class Program
         };
         if (shell != null)
         {
-            Console.WriteLine($"[RESOLVE] Running evidence script ({ext} -> {shell.Split(' ')[0]})...");
+            Console.Error.WriteLine($"[RESOLVE] Running evidence script ({ext} -> {shell.Split(' ')[0]})...");
             try
             {
                 var resolvedShell = shell;
@@ -408,7 +408,7 @@ internal partial class Program
             }
         }
         else
-            Console.WriteLine($"[RESOLVE] Non-executable evidence ({ext}) -- skip execution, upload only");
+            Console.Error.WriteLine($"[RESOLVE] Non-executable evidence ({ext}) -- skip execution, upload only");
 
         // Regression test (merge affectedCommands determines test folder)
         if (RunRegressionTests(evidenceFile, mergeAffectedCmds) != 0) return 1;
@@ -461,7 +461,7 @@ internal partial class Program
         var from = matchEntry["from"]?.GetValue<string>() ?? "unknown";
         var preview = entryText.Split('\n')[0];
         if (preview.Length > 80) preview = preview[..80] + "...";
-        Console.WriteLine($"[RESOLVE] Found: [{from}] {preview}");
+        Console.Error.WriteLine($"[RESOLVE] Found: [{from}] {preview}");
 
         var resolvedObj = new Dictionary<string, object?>
         {
@@ -481,7 +481,7 @@ internal partial class Program
         File.AppendAllText(historyPath, resolvedJson + Environment.NewLine);
         lines.RemoveAt(matchIdx);
         File.WriteAllLines(jsonlPath, lines);
-        Console.WriteLine($"[RESOLVE] Moved to history: {note}");
+        Console.Error.WriteLine($"[RESOLVE] Moved to history: {note}");
 
         // Copy evidence to experience DB (always filename-based path for consistency with help examples)
         try
@@ -506,7 +506,7 @@ internal partial class Program
                 }
             }
             File.Copy(evidenceFile, destPath, overwrite: true);
-            Console.WriteLine($"[RESOLVE] Evidence -> experience/tests/{cmd}/{subcmd}/{destName}");
+            Console.Error.WriteLine($"[RESOLVE] Evidence -> experience/tests/{cmd}/{subcmd}/{destName}");
 
             var manifestPath2 = Path.Combine(testsDir, ".manifest");
             var realName = Path.GetFileName(evidenceFile);
@@ -523,7 +523,7 @@ internal partial class Program
         {
             var recoveryZip = CreateResolveRecoveryZip(hqDir, tsPrefix, evidenceFile);
             if (!string.IsNullOrWhiteSpace(recoveryZip))
-                Console.WriteLine($"[RESOLVE] Recovery ZIP: {recoveryZip}");
+                Console.Error.WriteLine($"[RESOLVE] Recovery ZIP: {recoveryZip}");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[RESOLVE] Recovery ZIP failed: {ex.Message}"); }
 
@@ -539,14 +539,14 @@ internal partial class Program
                 var resolverName = GetSuggestBypassUsername();
                 var (textOk, _) = SlackSendViaApi(botToken, channel, replyText,
                     threadTs: slackTs, username: resolverName, replyBroadcast: true).GetAwaiter().GetResult();
-                if (textOk) Console.WriteLine($"[RESOLVE] Slack reply sent to thread {slackTs}");
+                if (textOk) Console.Error.WriteLine($"[RESOLVE] Slack reply sent to thread {slackTs}");
                 else Console.Error.WriteLine($"[RESOLVE] Slack reply failed");
 
                 try
                 {
                     SlackUploadFileAsync(botToken, channel, evidenceFile,
                         title: Path.GetFileName(evidenceFile), threadTs: slackTs).GetAwaiter().GetResult();
-                    Console.WriteLine($"[RESOLVE] Evidence uploaded to thread");
+                    Console.Error.WriteLine($"[RESOLVE] Evidence uploaded to thread");
                 }
                 catch (Exception ex) { Console.Error.WriteLine($"[RESOLVE] Evidence upload failed: {ex.Message}"); }
             }
@@ -805,14 +805,14 @@ internal partial class Program
             if (failed == 0)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[REGRESSION] All {passed} regression test(s) passed");
+                Console.Error.WriteLine($"[REGRESSION] All {passed} regression test(s) passed");
                 Console.ResetColor();
                 return 0;
             }
             else
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[REGRESSION] {failed}/{scripts.Length} regression test(s) FAILED -- resolve BLOCKED");
+                Console.Error.WriteLine($"[REGRESSION] {failed}/{scripts.Length} regression test(s) FAILED -- resolve BLOCKED");
                 Console.ResetColor();
                 Console.WriteLine($"  Fix the regression in code, or edit the failing test if the check is outdated.");
                 Console.WriteLine($"  Edit commands:");
@@ -907,7 +907,7 @@ internal partial class Program
                 tag    = "bug-auto",
             });
             File.AppendAllText(suggPath, entry + "\n");
-            Console.WriteLine($"[BUG-AUTO] registered: {prefix}...");
+            Console.Error.WriteLine($"[BUG-AUTO] registered: {prefix}...");
         }
         catch { }
     }

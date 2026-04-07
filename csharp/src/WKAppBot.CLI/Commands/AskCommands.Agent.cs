@@ -21,7 +21,7 @@ internal partial class Program
                       : "";
             var id = AgentFileTracker.Checkpoint(label);
             if (id == 0) Console.WriteLine("[AGENT] Checkpoint skipped (no git workspace).");
-            else Console.WriteLine($"[AGENT] Checkpoint {id} saved.");
+            else Console.Error.WriteLine($"[AGENT] Checkpoint {id} saved.");
             return 0;
         }
 
@@ -41,7 +41,7 @@ internal partial class Program
 
             if (doApply)
             {
-                Console.WriteLine($"[AGENT] Applying patch: {patch}");
+                Console.Error.WriteLine($"[AGENT] Applying patch: {patch}");
                 var gitRoot = Path.GetDirectoryName(patch) ?? Directory.GetCurrentDirectory();
                 var psi2 = new System.Diagnostics.ProcessStartInfo("git", $"apply \"{patch}\"")
                     { UseShellExecute = false, WorkingDirectory = gitRoot };
@@ -180,22 +180,22 @@ internal partial class Program
         if (!string.IsNullOrEmpty(injectJsonl) && File.Exists(injectJsonl))
         {
             _agentInjectJsonl.Value = injectJsonl;
-            Console.WriteLine($"[AGENT] Inject JSONL: {injectJsonl}");
+            Console.Error.WriteLine($"[AGENT] Inject JSONL: {injectJsonl}");
         }
         // --live-md: real-time MD output in VS Code (replaces JSONL for visual feedback)
         if (!string.IsNullOrEmpty(liveMdPath))
         {
             _agentLiveMdPath.Value = liveMdPath;
-            Console.WriteLine($"[AGENT] Live MD: {liveMdPath}");
+            Console.Error.WriteLine($"[AGENT] Live MD: {liveMdPath}");
         }
 
-        Console.WriteLine($"[AGENT] {ai.ToUpperInvariant()} | tag={targetTag} | steps={loopMaxSteps} | timeout={timeoutSec}s | retry={loopRetry} | parallel={loopMaxParallel}");
+        Console.Error.WriteLine($"[AGENT] {ai.ToUpperInvariant()} | tag={targetTag} | steps={loopMaxSteps} | timeout={timeoutSec}s | retry={loopRetry} | parallel={loopMaxParallel}");
         if (!string.IsNullOrWhiteSpace(modelHint))
-            Console.WriteLine($"[AGENT] Model hint: {modelHint}");
+            Console.Error.WriteLine($"[AGENT] Model hint: {modelHint}");
         if (verifyDelayMs > 0)
-            Console.WriteLine($"[AGENT] Verify delay: {verifyDelayMs}ms");
+            Console.Error.WriteLine($"[AGENT] Verify delay: {verifyDelayMs}ms");
         if (attachFiles.Count > 0)
-            Console.WriteLine($"[AGENT] Attaching {attachFiles.Count} file(s): {string.Join(", ", attachFiles.Select(Path.GetFileName))}");
+            Console.Error.WriteLine($"[AGENT] Attaching {attachFiles.Count} file(s): {string.Join(", ", attachFiles.Select(Path.GetFileName))}");
 
         // triad agent: run all three in parallel with prefixes
         if (ai is "triad" or "all")
@@ -217,7 +217,7 @@ internal partial class Program
             };
             Task.WaitAll(tasks);
             var results = tasks.Select(t => t.Result).ToArray();
-            Console.WriteLine($"[AGENT] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+            Console.Error.WriteLine($"[AGENT] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
             // ── 정반합 사회자 (--debate 시에만) ──
             if (debateMode && results.Count(r => r == 0) >= 2)

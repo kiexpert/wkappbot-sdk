@@ -26,7 +26,7 @@ internal partial class Program
         var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("chatgpt.com", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"[ASK:LOOP] GPT tab drifted to {currentUrl[..Math.Min(80, currentUrl.Length)]} -> navigating back to chatgpt.com");
+            Console.Error.WriteLine($"[ASK:LOOP] GPT tab drifted to {currentUrl[..Math.Min(80, currentUrl.Length)]} -> navigating back to chatgpt.com");
             await cdp.NavigateAsync("https://chatgpt.com/");
             await Task.Delay(3000);
             currentUrl = await cdp.GetUrlAsync() ?? "";
@@ -53,7 +53,7 @@ internal partial class Program
         prevLastFingerprint = await cdp.EvalAsync(
             "(() => { var els = document.querySelectorAll('[data-message-author-role=\"assistant\"]');" +
             " return els.length > 0 ? (els[els.length-1].textContent?.substring(0,80) ?? '') : ''; })()") ?? string.Empty;
-        Console.WriteLine($"[ASK] Pre-send baseline: turns={prevTurns} tail=[{prevLastFingerprint[..Math.Min(50, prevLastFingerprint.Length)]}]");
+        Console.Error.WriteLine($"[ASK] Pre-send baseline: turns={prevTurns} tail=[{prevLastFingerprint[..Math.Min(50, prevLastFingerprint.Length)]}]");
 
         // TODO-10: Capture prevFg just before input (after lock, after any tab-switch ops).
         var prevFgGpt = NativeMethods.GetForegroundWindow();
@@ -72,7 +72,7 @@ internal partial class Program
         // Verify what's actually in the editor
         var editorRaw = await cdp.GetEditorContentAsync(editorSel);
         var editorContent = editorRaw.Length > 80 ? editorRaw[..80] : editorRaw;
-        Console.WriteLine($"[ASK] After insert: {(inserted ? "OK" : "FAIL")}, editor=[{editorContent}]");
+        Console.Error.WriteLine($"[ASK] After insert: {(inserted ? "OK" : "FAIL")}, editor=[{editorContent}]");
         if (!inserted)
         {
             // Tier 2: DOM.focus (Chrome-internal, no OS focus) + execCommand/DOM mutation
@@ -100,7 +100,7 @@ internal partial class Program
                     })()
                     """) ?? "NOT_FOUND";
                 if (btnState == "ENABLED") break;
-                Console.WriteLine($"[ASK] Send button: {btnState}, waiting...");
+                Console.Error.WriteLine($"[ASK] Send button: {btnState}, waiting...");
                 await Task.Delay(1000);
             }
         }
@@ -197,7 +197,7 @@ internal partial class Program
 
         // Check editor after send; it should be empty on success.
         var afterSend = (await cdp.GetTextLengthAsync(editorSel)).ToString();
-        Console.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={prevTurns})");
+        Console.Error.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={prevTurns})");
         await cdp.MarkPromptDispatchAsync(editorSel, "chatgpt", sendResult);
         if (returnAfterSend)
         {
@@ -253,7 +253,7 @@ internal partial class Program
                 responseStarted = true;
                 askSession?.MarkRunning();
                 Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
-                Console.WriteLine($"[ASK] Response detected: {detectResult}");
+                Console.Error.WriteLine($"[ASK] Response detected: {detectResult}");
                 chatLock.Release("first-byte");
                 RegisterWaitingTab("chatgpt", cdp);
                 await HandoffTabToPeer("chatgpt");
@@ -261,7 +261,7 @@ internal partial class Program
             }
 
             if (sw.Elapsed.TotalSeconds > 3)
-                Console.WriteLine($"[ASK] Waiting for response... ({detectResult}, {sw.Elapsed.TotalSeconds:F0}s)");
+                Console.Error.WriteLine($"[ASK] Waiting for response... ({detectResult}, {sw.Elapsed.TotalSeconds:F0}s)");
         }
         if (!responseStarted)
         {
@@ -359,7 +359,7 @@ internal partial class Program
                 && !isThinkingState && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 1.0)
             {
                 if (liveHeaderPrinted) Console.WriteLine();
-                Console.WriteLine($"[ASK] Flush idle 1s -- early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                Console.Error.WriteLine($"[ASK] Flush idle 1s -- early done ({sw.Elapsed.TotalSeconds:F0}s)");
                 break;
             }
 
@@ -415,7 +415,7 @@ internal partial class Program
                         "return 'NO_AB';" +
                         "})()") ?? "NO_AB";
                     if (abChoice != "NO_AB")
-                        Console.WriteLine($"[ASK] GPT A/B comparison detected -> auto-selected first ({abChoice})");
+                        Console.Error.WriteLine($"[ASK] GPT A/B comparison detected -> auto-selected first ({abChoice})");
                 }
                 catch { }
 
@@ -423,9 +423,9 @@ internal partial class Program
                 var finalImages = await DetectAndDownloadImages(cdp, knownImageUrls, "gpt");
                 savedImages.AddRange(finalImages);
                 if (liveHeaderPrinted) Console.WriteLine(); // newline after streamed text
-                Console.WriteLine($"[ASK] Streaming complete ({sw.Elapsed.TotalSeconds:F0}s)");
+                Console.Error.WriteLine($"[ASK] Streaming complete ({sw.Elapsed.TotalSeconds:F0}s)");
                 if (savedImages.Count > 0)
-                    Console.WriteLine($"[ASK] Downloaded {savedImages.Count} generated image(s)");
+                    Console.Error.WriteLine($"[ASK] Downloaded {savedImages.Count} generated image(s)");
                 break;
             }
 
@@ -435,7 +435,7 @@ internal partial class Program
             {
                 blankPageCount++;
                 int blankLimit = sw.Elapsed.TotalSeconds < 30 ? 20 : 3; // GPT stays blank while navigating to /c/UUID
-                Console.WriteLine($"[ASK] Page blank/navigating ({blankPageCount}/{blankLimit}), {sw.Elapsed.TotalSeconds:F0}s");
+                Console.Error.WriteLine($"[ASK] Page blank/navigating ({blankPageCount}/{blankLimit}), {sw.Elapsed.TotalSeconds:F0}s");
                 if (blankPageCount >= blankLimit)
                 {
                     Console.WriteLine("[ASK] Page unresponsive -> aborting poll");
@@ -477,7 +477,7 @@ internal partial class Program
             if (sw.Elapsed.TotalSeconds > timeoutSec * 0.8 && streamExtensions < maxExtensions)
             {
                 streamExtensions++;
-                Console.WriteLine($"[ASK] Still {(isThinking ? "thinking" : "streaming")}, extending timeout... (ext #{streamExtensions})");
+                Console.Error.WriteLine($"[ASK] Still {(isThinking ? "thinking" : "streaming")}, extending timeout... (ext #{streamExtensions})");
                 // ext #1: the window may be hidden or minimized, so try recovery.
                 if (streamExtensions == 1)
                     await TryRecoverChatGptTabAsync(cdp, $"thinking ext#{streamExtensions}");
@@ -543,7 +543,7 @@ internal partial class Program
 
         if (!string.IsNullOrEmpty(finalText))
         {
-            Console.WriteLine($"[ASK] Response ({finalText.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
+            Console.Error.WriteLine($"[ASK] Response ({finalText.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
 
             // Done; hand off the tab to a peer if still waiting.
             await HandoffTabToPeer("chatgpt");

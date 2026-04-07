@@ -25,7 +25,7 @@ internal partial class Program
         bool needsUia = !string.IsNullOrEmpty(uiaPath);
         var modeStr = waitNot ? "disappear" : "appear";
         var condStr = condition != null ? $", condition=\"{condition}\"" : "";
-        Console.WriteLine($"[A11Y] wait — polling for \"{grap}\" to {modeStr} (timeout={timeoutMs}ms, interval={intervalMs}ms{condStr})");
+        Console.Error.WriteLine($"[A11Y] wait — polling for \"{grap}\" to {modeStr} (timeout={timeoutMs}ms, interval={intervalMs}ms{condStr})");
 
         // CDP web wait: if grap contains CSS selector patterns
         bool isCdpWait = grap.Contains("#") && firstSegPatterns.Any(p =>
@@ -103,7 +103,7 @@ internal partial class Program
             {
                 if (!found)
                 {
-                    Console.WriteLine($"[A11Y] wait --not — element gone after {sw.ElapsedMilliseconds}ms");
+                    Console.Error.WriteLine($"[A11Y] wait --not — element gone after {sw.ElapsedMilliseconds}ms");
                     return 0;
                 }
             }
@@ -111,7 +111,7 @@ internal partial class Program
             {
                 if (found)
                 {
-                    Console.WriteLine($"[A11Y] wait — found after {sw.ElapsedMilliseconds}ms: {foundInfo}");
+                    Console.Error.WriteLine($"[A11Y] wait — found after {sw.ElapsedMilliseconds}ms: {foundInfo}");
                     return 0;
                 }
             }
@@ -180,7 +180,7 @@ internal partial class Program
             }
 
             var result = cdp.EvalAsync(jsExpression).GetAwaiter().GetResult();
-            Console.WriteLine($"[A11Y] eval result: {result}");
+            Console.Error.WriteLine($"[A11Y] eval result: {result}");
             return true;
         }
         catch (Exception ex)

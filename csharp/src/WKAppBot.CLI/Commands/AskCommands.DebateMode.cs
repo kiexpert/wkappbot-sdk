@@ -50,7 +50,7 @@ internal partial class Program
             {
                 var cdp = EnsureCdpConnection(preferredHost: hosts[ai], newTab: false,
                     targetTag: $"debate-{ai}-{DateTime.UtcNow:HHmmss}");
-                if (cdp == null) { Console.WriteLine($"[정반합:{ai}] CDP connection failed"); return; }
+                if (cdp == null) { Console.Error.WriteLine($"[정반합:{ai}] CDP connection failed"); return; }
 
                 var prompt = $"{debatePersona}\n\nYour role: {roles[ai]}\n\nQuestion: {question}";
                 var response = await DebateSendAndPoll(cdp, ai, prompt, editorSels[ai], timeoutSec);
@@ -216,7 +216,7 @@ internal partial class Program
         await cdp.InsertContentEditableAsync(editorSel, prompt);
         await Task.Delay(300);
         await cdp.SendPromptAsync(editorSel);
-        Console.WriteLine($"[정반합:{ai}] Sent ({prompt.Length} chars, preCount={preCount})");
+        Console.Error.WriteLine($"[정반합:{ai}] Sent ({prompt.Length} chars, preCount={preCount})");
 
         // Poll for response (use preCount as baseline to find NEW response only)
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -279,7 +279,7 @@ internal partial class Program
                 stableCount++;
                 if (stableCount >= 3)
                 {
-                    Console.WriteLine($"[정반합:{ai}] Response stable ({text.Length} chars)");
+                    Console.Error.WriteLine($"[정반합:{ai}] Response stable ({text.Length} chars)");
                     return text;
                 }
             }
@@ -304,7 +304,7 @@ internal partial class Program
                 if (isDone == "1")
                 {
                     await Task.Delay(1000);
-                    Console.WriteLine($"[정반합:{ai}] Done ({text.Length} chars)");
+                    Console.Error.WriteLine($"[정반합:{ai}] Done ({text.Length} chars)");
                     return text; // use already-captured text (not re-fetch that might fail)
                 }
             }

@@ -127,7 +127,7 @@ internal partial class Program
         p.BeginErrorReadLine();
         _runRegistry[runId] = entry;
 
-        Console.WriteLine($"[RUN] start run_id={runId}  pid={p.Id}  cmd={entry.Cmd}");
+        Console.Error.WriteLine($"[RUN] start run_id={runId}  pid={p.Id}  cmd={entry.Cmd}");
         var pipeLine = string.IsNullOrWhiteSpace(askControlPipeName) ? "" : $"\nask_control_pipe: {askControlPipeName}";
         return (0, $"run_id: {runId}\nstatus: running\npid: {p.Id}\ncmd: {entry.Cmd}{pipeLine}", "");
     }
@@ -145,7 +145,7 @@ internal partial class Program
             using var writer = new StreamWriter(client, new UTF8Encoding(false)) { AutoFlush = true };
             writer.Write(payload);
             var preview = payload.Replace("\r", "\\r").Replace("\n", "\\n");
-            Console.WriteLine($"[RUN] ask-ctrl -> {entry.Id}  data={preview}");
+            Console.Error.WriteLine($"[RUN] ask-ctrl -> {entry.Id}  data={preview}");
             return true;
         }
         catch (Exception ex)
@@ -167,7 +167,7 @@ internal partial class Program
             entry.Process.StandardInput.Write(stdin);
             entry.Process.StandardInput.Flush();
             var preview = stdin.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\u0003", "^C");
-            Console.WriteLine($"[RUN] stdin → {runId}  data={preview}");
+            Console.Error.WriteLine($"[RUN] stdin → {runId}  data={preview}");
             return (0, $"stdin → {runId} ({stdin.Length} chars: {preview})", "");
         }
         catch (Exception ex) { return (1, "", $"stdin inject failed: {ex.Message}"); }
@@ -185,7 +185,7 @@ internal partial class Program
         }
 
         if (!string.IsNullOrWhiteSpace(entry.AskControlPipeName) && !string.IsNullOrWhiteSpace(pipeError))
-            Console.WriteLine($"[RUN] ask-ctrl fallback -> stdin ({pipeError})");
+            Console.Error.WriteLine($"[RUN] ask-ctrl fallback -> stdin ({pipeError})");
 
         return RunStdin(runId, text);
     }
@@ -269,7 +269,7 @@ internal partial class Program
             if (!entry.Process.HasExited)
                 entry.Process.Kill(entireProcessTree: true);
             _runRegistry.TryRemove(runId, out _);
-            Console.WriteLine($"[RUN] cancel run_id={runId}");
+            Console.Error.WriteLine($"[RUN] cancel run_id={runId}");
             return (0, $"cancelled: {runId}", "");
         }
         catch (Exception ex) { return (1, "", $"cancel failed: {ex.Message}"); }

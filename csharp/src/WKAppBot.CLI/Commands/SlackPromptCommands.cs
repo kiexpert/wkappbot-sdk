@@ -30,7 +30,7 @@ internal partial class Program
             return 0;
         }
 
-        Console.WriteLine($"[SLACK] {lines.Length} message(s) in inbox:");
+        Console.Error.WriteLine($"[SLACK] {lines.Length} message(s) in inbox:");
         foreach (var line in lines)
         {
             try
@@ -218,7 +218,7 @@ internal partial class Program
         var threadNote = hasTargetThread ? " (in-thread)" : "";
         if (ok)
         {
-            Console.WriteLine($"[SLACK] Replied to #{channel}{threadNote}: {replyText.Split('\n')[0]}");
+            Console.Error.WriteLine($"[SLACK] Replied to #{channel}{threadNote}: {replyText.Split('\n')[0]}");
             // Upload files in the same thread
             var uploadThreadTs = threadTs ?? postedTs;
             foreach (var fp in filePaths)
@@ -268,9 +268,9 @@ internal partial class Program
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[SLACK] Found prompt: {prompt.HostType} ({prompt.ProcessName})");
-        Console.WriteLine($"[SLACK]   Window: {prompt.WindowTitle}");
-        Console.WriteLine($"[SLACK]   Rect: ({prompt.PromptRect.X},{prompt.PromptRect.Y} {prompt.PromptRect.Width}x{prompt.PromptRect.Height})");
+        Console.Error.WriteLine($"[SLACK] Found prompt: {prompt.HostType} ({prompt.ProcessName})");
+        Console.Error.WriteLine($"[SLACK]   Window: {prompt.WindowTitle}");
+        Console.Error.WriteLine($"[SLACK]   Rect: ({prompt.PromptRect.X},{prompt.PromptRect.Y} {prompt.PromptRect.Width}x{prompt.PromptRect.Height})");
         Console.ResetColor();
 
         if (!watchMode)
@@ -280,7 +280,7 @@ internal partial class Program
         }
 
         // Watch mode: continuously poll inbox
-        Console.WriteLine($"[SLACK] Watch mode: polling inbox every {intervalSec}s (Ctrl+C to stop)");
+        Console.Error.WriteLine($"[SLACK] Watch mode: polling inbox every {intervalSec}s (Ctrl+C to stop)");
 
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) =>
@@ -319,7 +319,7 @@ internal partial class Program
 
         if (lines.Length == 0) return 0;
 
-        Console.WriteLine($"[SLACK] {lines.Length} message(s) to forward to Claude prompt");
+        Console.Error.WriteLine($"[SLACK] {lines.Length} message(s) to forward to Claude prompt");
 
         foreach (var line in lines)
         {
@@ -339,7 +339,7 @@ internal partial class Program
                 var promptText = $"{text}\n\n(Slack @{user} → {replyCmd})";
 
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[SLACK] >> Typing into prompt: {promptText}");
+                Console.Error.WriteLine($"[SLACK] >> Typing into prompt: {promptText}");
                 Console.ResetColor();
 
                 // Re-find prompt each time (window may have moved)
@@ -363,7 +363,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SLACK] Error processing inbox message: {ex.Message}");
+                Console.Error.WriteLine($"[SLACK] Error processing inbox message: {ex.Message}");
             }
         }
 
@@ -407,9 +407,9 @@ internal partial class Program
 
         var lastTs = LoadLastTs(channel);
         if (lastTs != null)
-            Console.WriteLine($"[SLACK] Fetching messages after ts={lastTs}");
+            Console.Error.WriteLine($"[SLACK] Fetching messages after ts={lastTs}");
         else
-            Console.WriteLine($"[SLACK] No bookmark — fetching last {limit} messages");
+            Console.Error.WriteLine($"[SLACK] No bookmark — fetching last {limit} messages");
 
         var messages = SlackFetchHistoryAsync(botToken, channel, lastTs, limit).GetAwaiter().GetResult();
 
@@ -422,7 +422,7 @@ internal partial class Program
         // Get bot user ID to filter own messages
         var botUserId = SlackGetBotUserId(botToken);
 
-        Console.WriteLine($"[SLACK] {messages.Count} message(s) fetched:");
+        Console.Error.WriteLine($"[SLACK] {messages.Count} message(s) fetched:");
 
         // Messages come newest-first from API, reverse to chronological order
         messages.Reverse();
@@ -496,11 +496,11 @@ internal partial class Program
         if (newestTs != null)
         {
             SaveLastTs(channel, newestTs);
-            Console.WriteLine($"[SLACK] Bookmark updated: ts={newestTs}");
+            Console.Error.WriteLine($"[SLACK] Bookmark updated: ts={newestTs}");
         }
 
         if (forwarded > 0)
-            Console.WriteLine($"[SLACK] {forwarded} @mention(s) forwarded");
+            Console.Error.WriteLine($"[SLACK] {forwarded} @mention(s) forwarded");
         else
             Console.WriteLine("[SLACK] No @mentions to forward");
 
@@ -522,7 +522,7 @@ internal partial class Program
         // ISO date/datetime → Unix epoch
         if (DateTime.TryParse(s, null, System.Globalization.DateTimeStyles.AssumeLocal, out var dt))
             return ((DateTimeOffset)dt).ToUnixTimeSeconds().ToString();
-        Console.WriteLine($"[SLACK] --oldest/--latest: cannot parse '{s}' as timestamp");
+        Console.Error.WriteLine($"[SLACK] --oldest/--latest: cannot parse '{s}' as timestamp");
         return null;
     }
 
@@ -548,7 +548,7 @@ internal partial class Program
 
         if (json?["ok"]?.GetValue<bool>() != true)
         {
-            Console.WriteLine($"[SLACK] conversations.history failed: {json?["error"]}");
+            Console.Error.WriteLine($"[SLACK] conversations.history failed: {json?["error"]}");
             return new List<JsonNode>();
         }
 
@@ -577,7 +577,7 @@ internal partial class Program
 
         if (json?["ok"]?.GetValue<bool>() != true)
         {
-            Console.WriteLine($"[SLACK] conversations.replies failed: {json?["error"]}");
+            Console.Error.WriteLine($"[SLACK] conversations.replies failed: {json?["error"]}");
             return new List<JsonNode>();
         }
 
@@ -674,14 +674,14 @@ internal partial class Program
                 var parentTs = probe.FirstOrDefault()?["thread_ts"]?.GetValue<string>();
                 if (parentTs != null && parentTs != threadTs)
                 {
-                    Console.WriteLine($"[SLACK] ts={threadTs} is a reply → parent={parentTs}");
+                    Console.Error.WriteLine($"[SLACK] ts={threadTs} is a reply → parent={parentTs}");
                     threadTs = parentTs;
                     messages = Task.Run(async () =>
                         await SlackFetchRepliesAsync(botToken, channel, threadTs, limit))
                         .GetAwaiter().GetResult();
                 }
             }
-            Console.WriteLine($"[SLACK] Thread ts={threadTs}:");
+            Console.Error.WriteLine($"[SLACK] Thread ts={threadTs}:");
         }
         else
         {

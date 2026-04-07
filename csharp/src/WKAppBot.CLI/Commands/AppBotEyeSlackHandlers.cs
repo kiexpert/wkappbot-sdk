@@ -30,7 +30,7 @@ internal partial class Program
         Directory.CreateDirectory(SlackQueueDir);
         var path = Path.Combine(SlackQueueDir, $"{safeId}.json");
         File.WriteAllText(path, routeJson);
-        Console.WriteLine($"[EYE][SLACK][QUEUE] +{safeId}");
+        Console.Error.WriteLine($"[EYE][SLACK][QUEUE] +{safeId}");
     }
 
     /// <summary>
@@ -72,11 +72,11 @@ internal partial class Program
                 if (proc == null) { Console.Error.WriteLine("[EYE] Queue drain: Spawn returned null"); return; }
 
                 // Relay worker stdout/stderr to Eye's own log (non-blocking reads)
-                var outTask = Task.Run(() => { try { while (proc.StdOut?.ReadLine() is string l) Console.WriteLine($"[ROUTE] {l}"); } catch { } });
+                var outTask = Task.Run(() => { try { while (proc.StdOut?.ReadLine() is string l) Console.Error.WriteLine($"[ROUTE] {l}"); } catch { } });
                 var errTask = Task.Run(() => { try { while (proc.StdErr?.ReadLine() is string l) Console.Error.WriteLine($"[ROUTE] {l}"); } catch { } });
                 proc.WaitForExit(60000);
                 Task.WhenAll(outTask, errTask).Wait(5000);
-                Console.WriteLine($"[EYE][QUEUE] drain done exit={proc.ExitCode}");
+                Console.Error.WriteLine($"[EYE][QUEUE] drain done exit={proc.ExitCode}");
                 proc.Dispose();
             }
             catch (Exception ex) { Console.Error.WriteLine($"[EYE] Queue drain error: {ex.Message}"); }
@@ -140,18 +140,18 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(appbotDir) || IsSystemOrInstallDirectory(appbotDir)) return;
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[EYE][SLACK] 앱봇 창 없음 — VS Code 스폰: {appbotDir}");
+        Console.Error.WriteLine($"[EYE][SLACK] 앱봇 창 없음 — VS Code 스폰: {appbotDir}");
         Console.ResetColor();
 
         try { AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo("code.exe", $"\"{appbotDir}\"") { UseShellExecute = false, CreateNoWindow = true }, appbotDir, "EYE-CODE"); }
-        catch (Exception ex) { Console.WriteLine($"[EYE][SLACK] VS Code 스폰 실패: {ex.Message}"); return; }
+        catch (Exception ex) { Console.Error.WriteLine($"[EYE][SLACK] VS Code 스폰 실패: {ex.Message}"); return; }
 
         if (string.IsNullOrWhiteSpace(pendingMessage)) return;
 
         // Route through MCP: prompt send handles finding the window + typing + submitting
         // --after 5s gives VS Code time to start; --when-idle 3s auto-approves focus steal
         var cwdFolder = Path.GetFileName(Environment.CurrentDirectory) ?? "";
-        Console.WriteLine($"[EYE][SLACK] VS Code 대기 메시지 MCP 전달 예약: {pendingMessage[..Math.Min(60, pendingMessage.Length)]}...");
+        Console.Error.WriteLine($"[EYE][SLACK] VS Code 대기 메시지 MCP 전달 예약: {pendingMessage[..Math.Min(60, pendingMessage.Length)]}...");
         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdFolder, pendingMessage, "--after", "5s", "--timeout", "30s"]);
     }
 
@@ -180,7 +180,7 @@ internal partial class Program
         if (myPrompts.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[EYE][SLACK] FindMyPrompts: CWD \"{cwdFolder}\" → {myPrompts.Count} match(es) (broadcast to all in workspace)");
+            Console.Error.WriteLine($"[EYE][SLACK] FindMyPrompts: CWD \"{cwdFolder}\" → {myPrompts.Count} match(es) (broadcast to all in workspace)");
             Console.ResetColor();
             return myPrompts;
         }
@@ -192,14 +192,14 @@ internal partial class Program
             if (cached != null)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[EYE][SLACK] FindMyPrompts: no CWD title match for \"{cwdFolder}\", using cached appbot hwnd 0x{_cachedAppbotOwnHwnd:X}");
+                Console.Error.WriteLine($"[EYE][SLACK] FindMyPrompts: no CWD title match for \"{cwdFolder}\", using cached appbot hwnd 0x{_cachedAppbotOwnHwnd:X}");
                 Console.ResetColor();
                 return new List<ClaudePromptHelper.PromptInfo> { cached };
             }
         }
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[EYE][SLACK] FindMyPrompts: no CWD match for \"{cwdFolder}\" in {allPrompts.Count} prompts — returning empty (let caller pick fallback)");
+        Console.Error.WriteLine($"[EYE][SLACK] FindMyPrompts: no CWD match for \"{cwdFolder}\" in {allPrompts.Count} prompts — returning empty (let caller pick fallback)");
         Console.ResetColor();
         return new List<ClaudePromptHelper.PromptInfo>();
     }
@@ -228,7 +228,7 @@ internal partial class Program
             var own = ResolveWorkspaceScopedPrompts(promptHelper);
             if (own.Count > 0)
             {
-                Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no authors found, broadcast to {own.Count} workspace prompt(s)");
+                Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: no authors found, broadcast to {own.Count} workspace prompt(s)");
                 return own;
             }
             Console.WriteLine("[EYE][SLACK] FindPromptsForThread: no authors found, fallback to all prompts");
@@ -238,7 +238,7 @@ internal partial class Program
         var hostTarget = ResolveAuthorHostTarget(allAuthors);
         var cwdTags = ExtractAuthorWorkspaceTags(allAuthors);
 
-        Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: owner=\"{owner ?? "(none)"}\" recent={recentAuthors.Count} hostTarget={hostTarget} tags=[{string.Join(", ", cwdTags)}]");
+        Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: owner=\"{owner ?? "(none)"}\" recent={recentAuthors.Count} hostTarget={hostTarget} tags=[{string.Join(", ", cwdTags)}]");
 
         // cwdTags.Count == 0 means bot username has no [CWD] tag (e.g. "클롣" with no workspace).
         // In that case we route only to own workspace, NOT all prompts.
@@ -246,12 +246,12 @@ internal partial class Program
         {
             var ownOnly = ResolveWorkspaceScopedPrompts(promptHelper);
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no CWD tag in authors [{string.Join(", ", allAuthors)}] → own workspace only ({ownOnly.Count})");
+            Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: no CWD tag in authors [{string.Join(", ", allAuthors)}] → own workspace only ({ownOnly.Count})");
             Console.ResetColor();
             return ownOnly;
         }
 
-        Console.WriteLine($"[EYE][SLACK] PromptCandidates: total={allPrompts.Count}");
+        Console.Error.WriteLine($"[EYE][SLACK] PromptCandidates: total={allPrompts.Count}");
         foreach (var p in allPrompts)
         {
             var hostMatch = MatchesHostTarget(p, hostTarget);
@@ -274,7 +274,7 @@ internal partial class Program
         if (matched.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: {matched.Count}/{allPrompts.Count} prompts matched (authors: {string.Join(", ", allAuthors)})");
+            Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: {matched.Count}/{allPrompts.Count} prompts matched (authors: {string.Join(", ", allAuthors)})");
             Console.ResetColor();
             return matched;
         }
@@ -282,10 +282,10 @@ internal partial class Program
         var myFallback = ResolveWorkspaceScopedPrompts(promptHelper);
         if (myFallback.Count > 0)
         {
-            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no match for [{string.Join(", ", allAuthors)}], broadcast to {myFallback.Count} workspace prompt(s)");
+            Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: no match for [{string.Join(", ", allAuthors)}], broadcast to {myFallback.Count} workspace prompt(s)");
             return myFallback;
         }
-        Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no prompt match for authors [{string.Join(", ", allAuthors)}], skip routing");
+        Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: no prompt match for authors [{string.Join(", ", allAuthors)}], skip routing");
         return new List<ClaudePromptHelper.PromptInfo>();
     }
 
@@ -445,7 +445,7 @@ internal partial class Program
                 .FirstOrDefault(p => p.WindowHandle == directHwnd);
             if (directPrompt != null)
             {
-                Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: direct hwnd=0x{directHwnd:X} for threadTs={threadTs}");
+                Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: direct hwnd=0x{directHwnd:X} for threadTs={threadTs}");
                 return new List<ClaudePromptHelper.PromptInfo> { directPrompt };
             }
         }
@@ -482,7 +482,7 @@ internal partial class Program
         {
             if (!botUsernames.Contains(ownBotUsername))
             {
-                Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: skip thread {threadTs} (owner mismatch: expected \"{ownBotUsername}\", found [{string.Join(", ", botUsernames)}])");
+                Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: skip thread {threadTs} (owner mismatch: expected \"{ownBotUsername}\", found [{string.Join(", ", botUsernames)}])");
                 return new List<ClaudePromptHelper.PromptInfo>();
             }
             botUsernames = new HashSet<string>(new[] { ownBotUsername }, StringComparer.OrdinalIgnoreCase);
@@ -495,10 +495,10 @@ internal partial class Program
             var myPrompt = ResolveWorkspaceScopedPrompt(promptHelper);
             if (myPrompt != null)
             {
-                Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no bot usernames — delivering to own CWD window only");
+                Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: no bot usernames — delivering to own CWD window only");
                 return new List<ClaudePromptHelper.PromptInfo> { myPrompt };
             }
-            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no bot usernames, own CWD not found — sending to all");
+            Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: no bot usernames, own CWD not found — sending to all");
             return new List<ClaudePromptHelper.PromptInfo>();
         }
 
@@ -528,7 +528,7 @@ internal partial class Program
         foreach (var p in allPrompts)
         {
             var titleToSearch = GetPromptSearchableTitle(p);
-            Console.WriteLine($"[EYE][SLACK] title-match: 0x{p.WindowHandle:X} host={p.HostType} folder=\"{titleToSearch}\" cwds=[{string.Join(", ", cwdNames)}]");
+            Console.Error.WriteLine($"[EYE][SLACK] title-match: 0x{p.WindowHandle:X} host={p.HostType} folder=\"{titleToSearch}\" cwds=[{string.Join(", ", cwdNames)}]");
             foreach (var cwd in cwdNames)
             {
                 if (titleToSearch.Contains(cwd, StringComparison.OrdinalIgnoreCase))
@@ -542,7 +542,7 @@ internal partial class Program
         if (matched.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: {matched.Count}/{allPrompts.Count} prompts matched (usernames: {string.Join(", ", botUsernames)})");
+            Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: {matched.Count}/{allPrompts.Count} prompts matched (usernames: {string.Join(", ", botUsernames)})");
             Console.ResetColor();
             return matched;
         }
@@ -551,10 +551,10 @@ internal partial class Program
         var myFallback = ResolveWorkspaceScopedPrompts(promptHelper);
         if (myFallback.Count > 0)
         {
-            Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no match for [{string.Join(", ", botUsernames)}] — broadcast to {myFallback.Count} workspace prompt(s)");
+            Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: no match for [{string.Join(", ", botUsernames)}] — broadcast to {myFallback.Count} workspace prompt(s)");
             return myFallback;
         }
-        Console.WriteLine($"[EYE][SLACK] FindPromptsForThread: no prompt match for usernames [{string.Join(", ", botUsernames)}], skip routing");
+        Console.Error.WriteLine($"[EYE][SLACK] FindPromptsForThread: no prompt match for usernames [{string.Join(", ", botUsernames)}], skip routing");
         return new List<ClaudePromptHelper.PromptInfo>();
     }
 
@@ -835,7 +835,7 @@ internal partial class Program
         foreach (var threadTs in savedAcks.Keys)
             activeThreads.Add(threadTs);
         if (savedAcks.Count > 0)
-            Console.WriteLine($"[EYE][SLACK] Restored {savedAcks.Count} active thread(s) from pending_acks.json");
+            Console.Error.WriteLine($"[EYE][SLACK] Restored {savedAcks.Count} active thread(s) from pending_acks.json");
 
         // Track "전달했습니다" ack messages per thread → delete when Claude responds via this bot
         // Key: threadTs, Value: (channel, ackMessageTs)
@@ -876,7 +876,7 @@ internal partial class Program
             }
             catch { }
         }
-        Console.WriteLine($"[EYE][SLACK] prompt_not_found_to_channel={(promptNotFoundAlsoToChannel ? "ON" : "OFF")}");
+        Console.Error.WriteLine($"[EYE][SLACK] prompt_not_found_to_channel={(promptNotFoundAlsoToChannel ? "ON" : "OFF")}");
 
         void SendPromptNotFound(string ch, string text, string? threadTs, string originTs)
         {
@@ -947,7 +947,7 @@ internal partial class Program
             }
             else
             {
-                Console.WriteLine($"[EYE][SLACK] Ack send failed, preserving previous ack (thread={threadKey})");
+                Console.Error.WriteLine($"[EYE][SLACK] Ack send failed, preserving previous ack (thread={threadKey})");
             }
         }
 
@@ -956,7 +956,7 @@ internal partial class Program
         {
             var cleanText = System.Text.RegularExpressions.Regex.Replace(
                 msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
-            Console.WriteLine($"[EYE][SLACK] @mention from {msg.User}: {cleanText}");
+            Console.Error.WriteLine($"[EYE][SLACK] @mention from {msg.User}: {cleanText}");
 
             // Track this thread so ALL follow-up messages come through
             var threadKey = msg.ThreadTs ?? msg.Timestamp;
@@ -967,7 +967,7 @@ internal partial class Program
             if (!string.IsNullOrEmpty(statusTs) && msg.ThreadTs == statusTs && resetStatusStreaming != null)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[EYE][SLACK] Status thread @mention → next status will be new channel message");
+                Console.Error.WriteLine($"[EYE][SLACK] Status thread @mention → next status will be new channel message");
                 Console.ResetColor();
                 resetStatusStreaming();
             }
@@ -979,7 +979,7 @@ internal partial class Program
                 if (IsPlanApprovalKeyword(cleanText))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"[EYE] Plan APPROVED via Slack by {msg.User}");
+                    Console.Error.WriteLine($"[EYE] Plan APPROVED via Slack by {msg.User}");
                     Console.ResetColor();
 
                     var approved = ClickApproveButton(GetClaudeHwnd());
@@ -993,7 +993,7 @@ internal partial class Program
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[EYE] Plan feedback via Slack: {cleanText}");
+                    Console.Error.WriteLine($"[EYE] Plan feedback via Slack: {cleanText}");
                     Console.ResetColor();
 
                     var feedbackOk = TypePlanFeedback(GetClaudeHwnd(), cleanText);
@@ -1013,7 +1013,7 @@ internal partial class Program
                 if (IsPlanApprovalKeyword(cleanText)) // "승인", "ㄱㄱ", "ㅇㅇ" etc
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"[EYE] Permission APPROVED via Slack by {msg.User}");
+                    Console.Error.WriteLine($"[EYE] Permission APPROVED via Slack by {msg.User}");
                     Console.ResetColor();
 
                     var permButtons = GetPermissionButtons(GetClaudeHwnd());
@@ -1044,7 +1044,7 @@ internal partial class Program
                 var ackThread = msg.ThreadTs ?? msg.Timestamp;
                 handledByMention.Add(msg.Timestamp); // dedup: OnMessage won't re-forward
 
-                Console.WriteLine($"[EYE][SLACK] @mention → spawn slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
+                Console.Error.WriteLine($"[EYE][SLACK] @mention → spawn slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
                 var mentionPromptNames = new Dictionary<string, string>();
                 foreach (var p in allMentionPrompts)
                 {
@@ -1074,7 +1074,7 @@ internal partial class Program
                     : mentionShortNames.Count > 1 ? string.Join("+", mentionShortNames.Select(n => n.Split('[').LastOrDefault()?.TrimEnd(']') ?? n))
                     : botUsername ?? "클롣";
                 var mentionResults = new List<DeliveryResult> { new DeliveryResult(mentionShortName, true) };
-                Console.WriteLine($"[EYE][SLACK] >> Mention broadcast: {mentionSent}/{allMentionPrompts.Count} prompts");
+                Console.Error.WriteLine($"[EYE][SLACK] >> Mention broadcast: {mentionSent}/{allMentionPrompts.Count} prompts");
 
                 SendAndTrackAck(msg.Channel, ackThread, mentionSent, allMentionPrompts.Count, mentionResults);
             }
@@ -1133,7 +1133,7 @@ internal partial class Program
                     {
                         var diagPath = Path.Combine(DataDir, "logs", $"prompt_diag_{DateTime.Now:yyyyMMdd_HHmmss}.log");
                         File.WriteAllText(diagPath, $"{statusInfo}\n{diagDetail}\n받은 메시지: {cleanText}");
-                        Console.WriteLine($"[EYE] Diagnosis saved: {diagPath}");
+                        Console.Error.WriteLine($"[EYE] Diagnosis saved: {diagPath}");
                     }
                     catch { }
 
@@ -1162,11 +1162,11 @@ internal partial class Program
             if (!string.IsNullOrEmpty(msg.Username) && !string.IsNullOrEmpty(botUsername)
                 && !msg.Username.Equals(botUsername, StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"[EYE][SLACK] Ack preserved: reply from \"{msg.Username}\" ≠ \"{botUsername}\"");
+                Console.Error.WriteLine($"[EYE][SLACK] Ack preserved: reply from \"{msg.Username}\" ≠ \"{botUsername}\"");
                 return;
             }
             DeletePendingAck(msg.ThreadTs);
-            Console.WriteLine($"[EYE][SLACK] Deleted ack in thread {msg.ThreadTs} (bot replied)");
+            Console.Error.WriteLine($"[EYE][SLACK] Deleted ack in thread {msg.ThreadTs} (bot replied)");
         };
 
         // Handle channel messages (thread reply forwarding + keyword monitoring + plan approval)
@@ -1180,14 +1180,14 @@ internal partial class Program
             {
 
             // Debug: log thread info for diagnosis
-            Console.WriteLine($"[EYE][SLACK] MSG from={msg.User} ch={msg.Channel} thread={msg.ThreadTs ?? "(none)"} text={msg.Text[..Math.Min(msg.Text.Length, 40)]}");
+            Console.Error.WriteLine($"[EYE][SLACK] MSG from={msg.User} ch={msg.Channel} thread={msg.ThreadTs ?? "(none)"} text={msg.Text[..Math.Min(msg.Text.Length, 40)]}");
 
             // ── Status message thread reply → force new channel message for next status update ──
             var statusTs = getStatusStreamingTs?.Invoke();
             if (!string.IsNullOrEmpty(statusTs) && msg.ThreadTs == statusTs && resetStatusStreaming != null)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[EYE][SLACK] Status thread reply detected → next status will be new channel message");
+                Console.Error.WriteLine($"[EYE][SLACK] Status thread reply detected → next status will be new channel message");
                 Console.ResetColor();
                 resetStatusStreaming();
                 // Don't return — continue to forward the message to Claude prompt as well
@@ -1203,7 +1203,7 @@ internal partial class Program
                 if (IsPlanApprovalKeyword(cleanText))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"[EYE] Plan APPROVED via Slack thread by {msg.User}");
+                    Console.Error.WriteLine($"[EYE] Plan APPROVED via Slack thread by {msg.User}");
                     Console.ResetColor();
 
                     var approved = ClickApproveButton(GetClaudeHwnd());
@@ -1217,7 +1217,7 @@ internal partial class Program
                 else if (cleanText.Length > 0)
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[EYE] Plan feedback via Slack thread: {cleanText}");
+                    Console.Error.WriteLine($"[EYE] Plan feedback via Slack thread: {cleanText}");
                     Console.ResetColor();
 
                     var feedbackOk = TypePlanFeedback(GetClaudeHwnd(), cleanText);
@@ -1240,7 +1240,7 @@ internal partial class Program
                 if (IsPlanApprovalKeyword(cleanPerm))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"[EYE] Permission APPROVED via Slack thread by {msg.User}");
+                    Console.Error.WriteLine($"[EYE] Permission APPROVED via Slack thread by {msg.User}");
                     Console.ResetColor();
 
                     var permBtns = GetPermissionButtons(GetClaudeHwnd());
@@ -1266,12 +1266,12 @@ internal partial class Program
             // ── Dedup: already forwarded by OnMention → skip ──
             if (handledByMention.Remove(msg.Timestamp))
             {
-                Console.WriteLine($"[EYE][SLACK] DEDUP skip (already by OnMention): {msg.Text[..Math.Min(msg.Text.Length, 30)]}");
+                Console.Error.WriteLine($"[EYE][SLACK] DEDUP skip (already by OnMention): {msg.Text[..Math.Min(msg.Text.Length, 30)]}");
                 return;
             }
 
             // ── Dispatch to route worker (separate process → memory isolation) ──
-            Console.WriteLine($"[EYE][SLACK] → spawn slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
+            Console.Error.WriteLine($"[EYE][SLACK] → spawn slack route: {msg.Text[..Math.Min(msg.Text.Length, 40)]}");
             // Build per-prompt display name map for routing (hwnd → display name)
             var promptNames = new Dictionary<string, string>();
             foreach (var p in FindAllPromptsViaMcp())
@@ -1302,7 +1302,7 @@ internal partial class Program
             // Skip bot's own reactions
             if (rx.User == slack.BotUserId) return;
 
-            Console.WriteLine($"[EYE][SLACK] Reaction :{rx.Reaction}: by {rx.User} on {rx.ItemTs}");
+            Console.Error.WriteLine($"[EYE][SLACK] Reaction :{rx.Reaction}: by {rx.User} on {rx.ItemTs}");
 
             // ✅ reaction on suggest message → auto-resolve (willkim approval = no test guard needed)
             var rxSuggestCfg = LoadSlackConfig();
@@ -1329,7 +1329,7 @@ internal partial class Program
                                     var ts = node?["ts"]?.GetValue<string>() ?? "";
                                     var text = node?["text"]?.GetValue<string>() ?? "";
                                     var preview = text.Length > 60 ? text[..60] + "..." : text;
-                                    Console.WriteLine($"[EYE] ✅ reaction → auto-resolve: {preview}");
+                                    Console.Error.WriteLine($"[EYE] ✅ reaction → auto-resolve: {preview}");
 
                                     // Post resolve reply to Slack (no test guard — willkim approved via reaction)
                                     var rxBotToken = rxSuggestCfg?["bot_token"]?.GetValue<string>();
@@ -1354,7 +1354,7 @@ internal partial class Program
                                     var remaining = lines.Where(l => l != line).ToArray();
                                     File.WriteAllLines(jsonlPath, remaining);
 
-                                    Console.WriteLine($"[EYE] ✅ resolve done: {ts}");
+                                    Console.Error.WriteLine($"[EYE] ✅ resolve done: {ts}");
                                     break;
                                 }
                             }
@@ -1412,7 +1412,7 @@ internal partial class Program
     internal static void ExecuteScheduleItem(ScheduleItem item, string? slackBotToken, string? slackChannel)
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[SCHEDULE] Executing: {item.Id} ({item.Type})");
+        Console.Error.WriteLine($"[SCHEDULE] Executing: {item.Id} ({item.Type})");
         Console.ResetColor();
 
         try
@@ -1430,7 +1430,7 @@ internal partial class Program
                 var stderr = proc.StdErr!.ReadToEnd();
                 proc.WaitForExit(30_000);
                 var output = (stdout + stderr).Trim();
-                Console.WriteLine($"[SCHEDULE:CMD] exit={proc.ExitCode} output={output.Length}ch");
+                Console.Error.WriteLine($"[SCHEDULE:CMD] exit={proc.ExitCode} output={output.Length}ch");
                 ScheduleManager.UpdateStatus(item.Id, proc.ExitCode == 0 ? "done" : "failed", output.Length > 0 ? output[..Math.Min(200, output.Length)] : null);
                 if (item.NotifySlack)
                     ScheduleNotifySlack(slackBotToken, slackChannel,
@@ -1486,7 +1486,7 @@ internal partial class Program
                 ScheduleManager.AdvanceRecurring(item.Id);
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[SCHEDULE] Done: {item.Id}");
+            Console.Error.WriteLine($"[SCHEDULE] Done: {item.Id}");
             Console.ResetColor();
 
             if (item.NotifySlack)
@@ -1497,7 +1497,7 @@ internal partial class Program
         {
             ScheduleManager.UpdateStatus(item.Id, "failed", ex.Message);
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[SCHEDULE] Failed: {item.Id} — {ex.Message}");
+            Console.Error.WriteLine($"[SCHEDULE] Failed: {item.Id} — {ex.Message}");
             Console.ResetColor();
             ScheduleNotifySlack(slackBotToken, slackChannel,
                 $":x: 스케줄 실패 ({item.Id}): {ex.Message}");

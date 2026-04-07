@@ -45,7 +45,7 @@ internal partial class Program
         try { ocr = new SimpleOcrAnalyzer(); }
         catch (Exception ex)
         {
-            Console.WriteLine($"[OCR] unavailable (skipping): {ex.GetType().Name}: {ex.Message}");
+            Console.Error.WriteLine($"[OCR] unavailable (skipping): {ex.GetType().Name}: {ex.Message}");
             return;
         }
 

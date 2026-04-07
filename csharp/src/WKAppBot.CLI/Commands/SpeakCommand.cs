@@ -94,7 +94,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SPEAK] --target 윈도우 탐색 실패: {ex.Message}");
+                Console.Error.WriteLine($"[SPEAK] --target 윈도우 탐색 실패: {ex.Message}");
             }
         }
 
@@ -113,14 +113,14 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SPEAK] TTS 실패: {ex.Message}");
+            Console.Error.WriteLine($"[SPEAK] TTS 실패: {ex.Message}");
         }
         try { File.Delete(tmpFile); } catch { }
 
         if (overlayThread.IsAlive)
             overlayThread.Join();
 
-        Console.WriteLine($"[SPEAK] {text}");
+        Console.Error.WriteLine($"[SPEAK] {text}");
         return 0;
     }
 
@@ -236,7 +236,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SPEAK] Overlay failed: {ex.Message}");
+                Console.Error.WriteLine($"[SPEAK] Overlay failed: {ex.Message}");
             }
         });
         thread.SetApartmentState(ApartmentState.STA);

@@ -26,7 +26,7 @@ internal partial class Program
         var prefix = $"http://+:{port}/";
         var localUrl = $"http://localhost:{port}/";
 
-        Console.WriteLine($"[DASH] Starting dashboard on port {port}...");
+        Console.Error.WriteLine($"[DASH] Starting dashboard on port {port}...");
 
         HttpListener? listener = null;
         try
@@ -58,7 +58,7 @@ internal partial class Program
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[DASH] Dashboard ready: {localUrl}");
+        Console.Error.WriteLine($"[DASH] Dashboard ready: {localUrl}");
         Console.ResetColor();
 
         // Show LAN IPs for phone access
@@ -71,7 +71,7 @@ internal partial class Program
                 {
                     if (addr.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
                         && !IPAddress.IsLoopback(addr.Address))
-                        Console.WriteLine($"[DASH] Phone: http://{addr.Address}:{port}/");
+                        Console.Error.WriteLine($"[DASH] Phone: http://{addr.Address}:{port}/");
                 }
             }
         }

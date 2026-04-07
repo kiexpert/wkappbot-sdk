@@ -106,26 +106,26 @@ internal partial class Program
         var memSuffix = deltaMB != 0 ? $" mem={wsMB}MB({(deltaMB >= 0 ? "+" : "")}{deltaMB}) peak={_peakWorkingSetMB}MB" : "";
 
         var ctxSuffix = _lastContextPct >= 0 ? $" ctx={_lastContextPct}%" : "";
-        Console.WriteLine($"[EYE_TICK] mode={mode} tick={swTick.ElapsedMilliseconds}ms(read={tickRead}ms,parse={tickParse}ms,activity=0ms) " +
+        Console.Error.WriteLine($"[EYE_TICK] mode={mode} tick={swTick.ElapsedMilliseconds}ms(read={tickRead}ms,parse={tickParse}ms,activity=0ms) " +
                           $"prompt={swPrompt.ElapsedMilliseconds}ms(stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms) " +
                           $"schedule={swSchedule.ElapsedMilliseconds}ms total={swTotal.ElapsedMilliseconds}ms{memSuffix}{ctxSuffix}");
-        Console.WriteLine($"[EYE_TICK] hint promptLine={_lastPromptLineIndex} tickLine={_lastEyeTickLineIndex}");
+        Console.Error.WriteLine($"[EYE_TICK] hint promptLine={_lastPromptLineIndex} tickLine={_lastEyeTickLineIndex}");
 
         var execIdle = (DateTime.UtcNow - _lastTickActivityUtc).TotalSeconds;
         var aiIdle = (DateTime.UtcNow - _lastAiActivityUtc).TotalSeconds;
         var cooldown = _lastAutoGogoUtc == DateTime.MinValue ? 9999 : (DateTime.UtcNow - _lastAutoGogoUtc).TotalSeconds;
         var armed = execIdle >= 60 && aiIdle >= 60 && cooldown >= 600;
-        Console.WriteLine($"[EYE_GUARD] armed={(armed ? 1 : 0)} execIdle={execIdle:F0}s aiIdle={aiIdle:F0}s cooldown={cooldown:F0}s");
+        Console.Error.WriteLine($"[EYE_GUARD] armed={(armed ? 1 : 0)} execIdle={execIdle:F0}s aiIdle={aiIdle:F0}s cooldown={cooldown:F0}s");
 
         var latestAge = -1.0;
         if (latest != null && DateTime.TryParse(latest.Ts, out var ts))
             latestAge = (DateTime.UtcNow - ts.ToUniversalTime()).TotalSeconds;
         var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastKeepAwakeUtc).TotalSeconds;
-        Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
+        Console.Error.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
 
         var (qPending, qProc) = GetSlackQueueStats();
         if (qPending > 0 || qProc > 0)
-            Console.WriteLine($"[EYE_QUEUE] pending={qPending} processing={qProc}{(_slackRetiring ? " retiring" : "")}");
+            Console.Error.WriteLine($"[EYE_QUEUE] pending={qPending} processing={qProc}{(_slackRetiring ? " retiring" : "")}");
 
         TryGuardLgOverlay("[EYE_TICK][GUARD]");
 

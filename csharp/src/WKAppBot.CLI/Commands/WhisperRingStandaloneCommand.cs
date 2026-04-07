@@ -18,7 +18,7 @@ internal partial class Program
         int ppid = 0;
         int.TryParse(Environment.GetEnvironmentVariable("WKAPPBOT_PARENT_PID"), out ppid);
 
-        Console.WriteLine($"[WHISPER-RING] Standalone (parent={ppid}, pos=({ringX},{ringY}))");
+        Console.Error.WriteLine($"[WHISPER-RING] Standalone (parent={ppid}, pos=({ringX},{ringY}))");
 
         // Run on dedicated STA thread with WPF message pump
         var thread = new Thread(() => RunWhisperRingSta(ringX, ringY, ppid));
@@ -125,7 +125,7 @@ internal partial class Program
                 timer.Start();
             }
 
-            Console.WriteLine($"[WHISPER-RING] Started (stt={sttOk})");
+            Console.Error.WriteLine($"[WHISPER-RING] Started (stt={sttOk})");
             window.Show();
             System.Windows.Threading.Dispatcher.Run(); // WPF message pump
         }

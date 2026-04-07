@@ -78,7 +78,7 @@ Subcommands:
             try
             {
                 var proc = Process.GetProcessById(existingPid);
-                Console.WriteLine($"[KIWOOM] Proxy already running (PID={existingPid}, name={proc.ProcessName})");
+                Console.Error.WriteLine($"[KIWOOM] Proxy already running (PID={existingPid}, name={proc.ProcessName})");
                 return 0;
             }
             catch { /* process gone, stale PID file */ }
@@ -88,14 +88,14 @@ Subcommands:
         if (!File.Exists(KiwoomProxyExe))
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[KIWOOM] Proxy EXE not found: {KiwoomProxyExe}");
+            Console.Error.WriteLine($"[KIWOOM] Proxy EXE not found: {KiwoomProxyExe}");
             Console.ResetColor();
             Console.WriteLine("[KIWOOM] Build with: dotnet publish WKAppBot.KiwoomProxy.csproj -c Release -r win-x86 --self-contained");
             return 1;
         }
 
         // Launch proxy process (hidden console)
-        Console.WriteLine($"[KIWOOM] Starting proxy: {KiwoomProxyExe}");
+        Console.Error.WriteLine($"[KIWOOM] Starting proxy: {KiwoomProxyExe}");
         var psi = new ProcessStartInfo
         {
             FileName = KiwoomProxyExe,
@@ -123,7 +123,7 @@ Subcommands:
         _ = Task.Run(() => ForwardOutput(process.StandardError, "[KIWOOM-PROXY-ERR]"));
 
         // Wait briefly for pipe to become available
-        Console.WriteLine($"[KIWOOM] Proxy started (PID={process.Id}), waiting for pipe...");
+        Console.Error.WriteLine($"[KIWOOM] Proxy started (PID={process.Id}), waiting for pipe...");
         for (int i = 0; i < 30; i++) // up to 3 seconds
         {
             Thread.Sleep(100);
@@ -154,18 +154,18 @@ Subcommands:
         try
         {
             var proc = Process.GetProcessById(pid);
-            Console.WriteLine($"[KIWOOM] Stopping proxy (PID={pid})...");
+            Console.Error.WriteLine($"[KIWOOM] Stopping proxy (PID={pid})...");
             proc.Kill();
             proc.WaitForExit(5000);
             Console.WriteLine("[KIWOOM] Proxy stopped");
         }
         catch (ArgumentException)
         {
-            Console.WriteLine($"[KIWOOM] Process {pid} not found (already stopped?)");
+            Console.Error.WriteLine($"[KIWOOM] Process {pid} not found (already stopped?)");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[KIWOOM] Stop error: {ex.Message}");
+            Console.Error.WriteLine($"[KIWOOM] Stop error: {ex.Message}");
         }
 
         // Clean up PID file
@@ -264,13 +264,13 @@ Subcommands:
         if (resp.Error != null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[KIWOOM] CommConnect failed: {resp.Error}");
+            Console.Error.WriteLine($"[KIWOOM] CommConnect failed: {resp.Error}");
             Console.ResetColor();
             return 1;
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[KIWOOM] CommConnect() → {resp.Result} ({sw.ElapsedMilliseconds}ms)");
+        Console.Error.WriteLine($"[KIWOOM] CommConnect() → {resp.Result} ({sw.ElapsedMilliseconds}ms)");
         Console.ResetColor();
         Console.WriteLine("[KIWOOM] Waiting for OnEventConnect event... (login dialog will appear)");
         Console.WriteLine("[KIWOOM] Use 'wkappbot kiwoom status' to check connection state after login");
@@ -292,7 +292,7 @@ Subcommands:
             }
         }
 
-        Console.WriteLine($"[KIWOOM] Bootstrap start (timeout={timeoutSec}s)...");
+        Console.Error.WriteLine($"[KIWOOM] Bootstrap start (timeout={timeoutSec}s)...");
         if (setupMode)
             PrintKiwoomLoginSetupGuide();
 
@@ -312,14 +312,14 @@ Subcommands:
         while (!connected && attempts < 3 && DateTime.UtcNow < deadline)
         {
             attempts++;
-            Console.WriteLine($"[KIWOOM][STATE] Connecting attempt {attempts}/3...");
+            Console.Error.WriteLine($"[KIWOOM][STATE] Connecting attempt {attempts}/3...");
 
             var loginResp = SendPipeRequest("CommConnect");
             if (loginResp.Error != null)
             {
                 lastError = loginResp.Error;
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[KIWOOM] CommConnect attempt {attempts} failed: {loginResp.Error}");
+                Console.Error.WriteLine($"[KIWOOM] CommConnect attempt {attempts} failed: {loginResp.Error}");
                 Console.ResetColor();
 
                 // Backoff before retry (1s, 2s, 4s)
@@ -349,7 +349,7 @@ Subcommands:
             if (!connected)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[KIWOOM] Still disconnected after attempt {attempts}");
+                Console.Error.WriteLine($"[KIWOOM] Still disconnected after attempt {attempts}");
                 Console.ResetColor();
             }
         }
@@ -360,7 +360,7 @@ Subcommands:
             Console.WriteLine("[KIWOOM][STATE] Failed (disconnected)");
             Console.ResetColor();
             if (!string.IsNullOrWhiteSpace(lastError))
-                Console.WriteLine($"[KIWOOM] Last error: {lastError}");
+                Console.Error.WriteLine($"[KIWOOM] Last error: {lastError}");
             Console.WriteLine("[KIWOOM] Hint: check login window/update popup and retry.");
             PrintKiwoomLoginSetupGuide();
             return 1;
@@ -373,24 +373,24 @@ Subcommands:
         // Print account list
         var accResp = SendPipeRequest("GetLoginInfo", "ACCNO");
         if (accResp.Error != null)
-            Console.WriteLine($"[KIWOOM] GetLoginInfo(ACCNO) failed: {accResp.Error}");
+            Console.Error.WriteLine($"[KIWOOM] GetLoginInfo(ACCNO) failed: {accResp.Error}");
         else
-            Console.WriteLine($"[KIWOOM] ACCNO: {FormatResult(accResp.Result)}");
+            Console.Error.WriteLine($"[KIWOOM] ACCNO: {FormatResult(accResp.Result)}");
 
         var userResp = SendPipeRequest("GetLoginInfo", "USER_ID");
         if (userResp.Error == null)
-            Console.WriteLine($"[KIWOOM] USER_ID: {FormatResult(userResp.Result)}");
+            Console.Error.WriteLine($"[KIWOOM] USER_ID: {FormatResult(userResp.Result)}");
 
         var cntResp = SendPipeRequest("GetLoginInfo", "ACCOUNT_CNT");
         if (cntResp.Error == null)
-            Console.WriteLine($"[KIWOOM] ACCOUNT_CNT: {FormatResult(cntResp.Result)}");
+            Console.Error.WriteLine($"[KIWOOM] ACCOUNT_CNT: {FormatResult(cntResp.Result)}");
 
         if (showAccountWindow)
         {
             var showResp = SendPipeRequest("KOA_Functions", "ShowAccountWindow", "");
             if (showResp.Error != null)
             {
-                Console.WriteLine($"[KIWOOM] ShowAccountWindow failed: {showResp.Error}");
+                Console.Error.WriteLine($"[KIWOOM] ShowAccountWindow failed: {showResp.Error}");
                 Console.WriteLine("[KIWOOM] Hint: if update/login popup is open, finish that first then retry --setup.");
             }
             else
@@ -460,7 +460,7 @@ Subcommands:
 
         if (!EnsureProxy()) return 1;
 
-        Console.WriteLine($"[KIWOOM] Calling {method}({string.Join(", ", paramStrings)})...");
+        Console.Error.WriteLine($"[KIWOOM] Calling {method}({string.Join(", ", paramStrings)})...");
         var sw = Stopwatch.StartNew();
         var resp = SendPipeRequest(method, paramObjects);
         sw.Stop();
@@ -468,13 +468,13 @@ Subcommands:
         if (resp.Error != null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[KIWOOM] {method} failed: {resp.Error} ({sw.ElapsedMilliseconds}ms)");
+            Console.Error.WriteLine($"[KIWOOM] {method} failed: {resp.Error} ({sw.ElapsedMilliseconds}ms)");
             Console.ResetColor();
             return 1;
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[KIWOOM] {method} → {FormatResult(resp.Result)} ({sw.ElapsedMilliseconds}ms)");
+        Console.Error.WriteLine($"[KIWOOM] {method} → {FormatResult(resp.Result)} ({sw.ElapsedMilliseconds}ms)");
         Console.ResetColor();
         return 0;
     }
@@ -516,19 +516,19 @@ Subcommands:
         // 1. SetInputValue for each input
         foreach (var (key, val) in inputs)
         {
-            Console.WriteLine($"[KIWOOM] SetInputValue(\"{key}\", \"{val}\")");
+            Console.Error.WriteLine($"[KIWOOM] SetInputValue(\"{key}\", \"{val}\")");
             var setResp = SendPipeRequest("SetInputValue", key, val);
             if (setResp.Error != null)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[KIWOOM] SetInputValue failed: {setResp.Error}");
+                Console.Error.WriteLine($"[KIWOOM] SetInputValue failed: {setResp.Error}");
                 Console.ResetColor();
                 return 1;
             }
         }
 
         // 2. CommRqData
-        Console.WriteLine($"[KIWOOM] CommRqData(\"{rqName}\", \"{trCode}\", 0, \"{screenNo}\")");
+        Console.Error.WriteLine($"[KIWOOM] CommRqData(\"{rqName}\", \"{trCode}\", 0, \"{screenNo}\")");
         var sw = Stopwatch.StartNew();
         var resp = SendPipeRequest("CommRqData", rqName, trCode, 0, screenNo);
         sw.Stop();
@@ -536,13 +536,13 @@ Subcommands:
         if (resp.Error != null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[KIWOOM] CommRqData failed: {resp.Error} ({sw.ElapsedMilliseconds}ms)");
+            Console.Error.WriteLine($"[KIWOOM] CommRqData failed: {resp.Error} ({sw.ElapsedMilliseconds}ms)");
             Console.ResetColor();
             return 1;
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[KIWOOM] CommRqData → {resp.Result} ({sw.ElapsedMilliseconds}ms)");
+        Console.Error.WriteLine($"[KIWOOM] CommRqData → {resp.Result} ({sw.ElapsedMilliseconds}ms)");
         Console.ResetColor();
         Console.WriteLine("[KIWOOM] TR response will arrive via OnReceiveTrData event");
 
@@ -583,19 +583,19 @@ Subcommands:
 
         if (!EnsureProxy()) return 1;
 
-        Console.WriteLine($"[KIWOOM] SetRealReg(\"{screenNo}\", \"{codes}\", \"{fids}\", {opt})");
+        Console.Error.WriteLine($"[KIWOOM] SetRealReg(\"{screenNo}\", \"{codes}\", \"{fids}\", {opt})");
         var resp = SendPipeRequest("SetRealReg", screenNo, codes, fids, opt);
 
         if (resp.Error != null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[KIWOOM] SetRealReg failed: {resp.Error}");
+            Console.Error.WriteLine($"[KIWOOM] SetRealReg failed: {resp.Error}");
             Console.ResetColor();
             return 1;
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[KIWOOM] SetRealReg → {resp.Result}");
+        Console.Error.WriteLine($"[KIWOOM] SetRealReg → {resp.Result}");
         Console.ResetColor();
         Console.WriteLine("[KIWOOM] Real-time data will arrive via OnReceiveRealData event");
         return 0;
@@ -622,7 +622,7 @@ Subcommands:
         File.AppendAllText(knowhowPath, entry);
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[KIWOOM] Knowhow recorded → {knowhowPath}");
+        Console.Error.WriteLine($"[KIWOOM] Knowhow recorded → {knowhowPath}");
         Console.ResetColor();
         return 0;
     }
@@ -918,7 +918,7 @@ Subcommands:
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[KIWOOM] TR ExpDB save error: {ex.Message}");
+            Console.Error.WriteLine($"[KIWOOM] TR ExpDB save error: {ex.Message}");
         }
     }
 

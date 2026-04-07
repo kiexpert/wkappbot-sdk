@@ -96,7 +96,7 @@ static class ElevatedEyeServer
 
     public static async Task ListenAsync(CancellationToken ct)
     {
-        Console.WriteLine($"[EYE:PIPE] Eye pipe listening on \\\\.\\pipe\\{PipeName}");
+        Console.Error.WriteLine($"[EYE:PIPE] Eye pipe listening on \\\\.\\pipe\\{PipeName}");
 
         while (!ct.IsCancellationRequested)
         {
@@ -130,7 +130,7 @@ static class ElevatedEyeServer
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EYE:PIPE] Pipe error: {ex.Message}");
+                Console.Error.WriteLine($"[EYE:PIPE] Pipe error: {ex.Message}");
             }
             finally
             {
@@ -152,7 +152,7 @@ static class ElevatedEyeServer
                 var req = await EyeProxyWire.ReadAsync<EyeProxyRequest>(pipe, ct);
                 if (req == null) break;
 
-                Console.WriteLine($"[EYE:ADMIN] Exec: {req.Command} {string.Join(" ", req.Args)}");
+                Console.Error.WriteLine($"[EYE:ADMIN] Exec: {req.Command} {string.Join(" ", req.Args)}");
 
                 var resp = await ExecuteCommand(req);
                 await EyeProxyWire.WriteAsync(pipe, resp, ct);
@@ -161,7 +161,7 @@ static class ElevatedEyeServer
             catch (IOException) { break; }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EYE:ADMIN] Handler error: {ex.Message}");
+                Console.Error.WriteLine($"[EYE:ADMIN] Handler error: {ex.Message}");
             }
         }
 
@@ -264,7 +264,7 @@ static class ElevatedEyeClient
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ELEVATION] Proxy communication error ({ex.GetType().Name}): {ex.Message}");
+            Console.Error.WriteLine($"[ELEVATION] Proxy communication error ({ex.GetType().Name}): {ex.Message}");
             return null;
         }
     }
@@ -285,7 +285,7 @@ static class ElevatedEyeClient
         if (!string.IsNullOrEmpty(resp.Error))
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[ELEVATION] Proxy error: {resp.Error}");
+            Console.Error.WriteLine($"[ELEVATION] Proxy error: {resp.Error}");
             Console.ResetColor();
         }
 
@@ -361,13 +361,13 @@ static class ElevationHelper
         if (className.Contains("wkappbot", StringComparison.OrdinalIgnoreCase))
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"[ELEVATION] Target is wkappbot process (class={className}) — skipping proxy delegation");
+            Console.Error.WriteLine($"[ELEVATION] Target is wkappbot process (class={className}) — skipping proxy delegation");
             Console.ResetColor();
             return (false, 0);
         }
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[ELEVATION] Target (pid={pid}) is elevated — requires admin proxy");
+        Console.Error.WriteLine($"[ELEVATION] Target (pid={pid}) is elevated — requires admin proxy");
         Console.ResetColor();
 
         // Strategy 1: try existing Elevated Eye proxy
@@ -494,7 +494,7 @@ static class ElevationHelper
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ELEVATION] Failed to launch elevated Eye: {ex.Message}");
+            Console.Error.WriteLine($"[ELEVATION] Failed to launch elevated Eye: {ex.Message}");
             return false;
         }
     }

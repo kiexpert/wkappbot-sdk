@@ -55,8 +55,8 @@ internal partial class Program
             jsonlFiles.Add(f);
         }
 
-        Console.WriteLine($"[SLICE] Output: {outDir}");
-        Console.WriteLine($"[SLICE] Processing {jsonlFiles.Count} JSONL file(s), min-dur={minDurMs}ms");
+        Console.Error.WriteLine($"[SLICE] Output: {outDir}");
+        Console.Error.WriteLine($"[SLICE] Processing {jsonlFiles.Count} JSONL file(s), min-dur={minDurMs}ms");
 
         int totalWords = 0, sliced = 0, skipped = 0, errors = 0;
         int seq = 1;
@@ -66,7 +66,7 @@ internal partial class Program
 
         foreach (var jsonlPath in jsonlFiles)
         {
-            Console.WriteLine($"[SLICE] {Path.GetFileName(jsonlPath)}");
+            Console.Error.WriteLine($"[SLICE] {Path.GetFileName(jsonlPath)}");
             var lines = File.ReadAllLines(jsonlPath);
 
             foreach (var line in lines)
@@ -116,19 +116,19 @@ internal partial class Program
                     if (result == 0)
                     {
                         sliced++;
-                        Console.WriteLine($"[SLICE] [{seq - 1:D4}] {word} ({durMs}ms) → {Path.GetFileName(outFile)}");
+                        Console.Error.WriteLine($"[SLICE] [{seq - 1:D4}] {word} ({durMs}ms) → {Path.GetFileName(outFile)}");
                     }
                     else
                     {
                         errors++;
-                        Console.WriteLine($"[SLICE] FAIL [{seq - 1:D4}] {word} — ffmpeg exit={result}");
+                        Console.Error.WriteLine($"[SLICE] FAIL [{seq - 1:D4}] {word} — ffmpeg exit={result}");
                     }
                 }
             }
         }
 
         Console.WriteLine($"\n[SLICE] Done — sliced={sliced} skipped={skipped} errors={errors} total_words={totalWords}");
-        Console.WriteLine($"[SLICE] Output: {outDir}");
+        Console.Error.WriteLine($"[SLICE] Output: {outDir}");
         return errors > 0 ? 1 : 0;
     }
 
@@ -154,7 +154,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SLICE] ffmpeg error: {ex.Message}");
+            Console.Error.WriteLine($"[SLICE] ffmpeg error: {ex.Message}");
             return -1;
         }
     }

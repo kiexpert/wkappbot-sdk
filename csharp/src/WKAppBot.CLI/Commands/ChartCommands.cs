@@ -187,8 +187,8 @@ internal partial class Program
             // Get window rect for pixel-to-screen coordinate mapping
             NativeMethods.GetWindowRect(capturedHwnd, out var winRect);
 
-            Console.WriteLine($"[TOOLTIP] Window hWnd=0x{capturedHwnd:X8} PID={capturedPid}");
-            Console.WriteLine($"[TOOLTIP] Window rect: ({winRect.Left},{winRect.Top}) - ({winRect.Right},{winRect.Bottom})");
+            Console.Error.WriteLine($"[TOOLTIP] Window hWnd=0x{capturedHwnd:X8} PID={capturedPid}");
+            Console.Error.WriteLine($"[TOOLTIP] Window rect: ({winRect.Left},{winRect.Top}) - ({winRect.Right},{winRect.Bottom})");
 
             var calibrator = new TooltipCalibrator
             {

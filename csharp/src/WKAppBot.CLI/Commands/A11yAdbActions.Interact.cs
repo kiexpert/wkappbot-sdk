@@ -34,7 +34,7 @@ internal partial class Program
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
 
-        Console.WriteLine($"[ADB] Node: {node.SearchKey}");
+        Console.Error.WriteLine($"[ADB] Node: {node.SearchKey}");
         Console.WriteLine($"  class:        {node.ClassName}");
         Console.WriteLine($"  text:         {node.Text}");
         Console.WriteLine($"  content-desc: {node.ContentDesc}");
@@ -81,7 +81,7 @@ internal partial class Program
         if (node == null) return 1;
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[ADB] Highlight: {node.SearchKey}");
+        Console.Error.WriteLine($"[ADB] Highlight: {node.SearchKey}");
         Console.ResetColor();
         Console.WriteLine($"  bounds: {node.BoundsString}");
         Console.WriteLine($"  center: ({node.CenterX},{node.CenterY})");
@@ -535,7 +535,7 @@ internal partial class Program
         }
 
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"[ADB] eval: {cmd}");
+        Console.Error.WriteLine($"[ADB] eval: {cmd}");
         Console.ResetColor();
 
         var r = adb.ShellRaw(cmd, serial, 30000);
@@ -726,7 +726,7 @@ internal partial class Program
         if (taskId == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[ADB] Task not found for package '{pkg}'");
+            Console.Error.WriteLine($"[ADB] Task not found for package '{pkg}'");
             Console.ResetColor();
             return 1;
         }
@@ -777,7 +777,7 @@ internal partial class Program
         if (taskId == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[ADB] Task not found for package '{pkg}'");
+            Console.Error.WriteLine($"[ADB] Task not found for package '{pkg}'");
             Console.ResetColor();
             return 1;
         }
@@ -809,7 +809,7 @@ internal partial class Program
     static int AdbWindowStub(string action)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[ADB] '{action}' is not supported on Android (apps are fullscreen)");
+        Console.Error.WriteLine($"[ADB] '{action}' is not supported on Android (apps are fullscreen)");
         Console.ResetColor();
         return 0; // Not an error — just no-op
     }

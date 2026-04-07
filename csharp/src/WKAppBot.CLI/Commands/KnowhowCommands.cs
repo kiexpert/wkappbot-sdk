@@ -142,13 +142,13 @@ internal partial class Program
             if (knowhow != null)
             {
                 var profileName = Path.GetFileName(expDir).Replace("_exp", "");
-                Console.WriteLine($"[KNOWHOW] Profile: {profileName}");
+                Console.Error.WriteLine($"[KNOWHOW] Profile: {profileName}");
                 Console.WriteLine(knowhow);
                 return 0;
             }
         }
 
-        Console.WriteLine($"[KNOWHOW] No knowhow found for form={formId}" +
+        Console.Error.WriteLine($"[KNOWHOW] No knowhow found for form={formId}" +
             (cid.HasValue ? $" cid={cid}" : ""));
         return 0;
     }
@@ -228,7 +228,7 @@ internal partial class Program
         if (knowhow != null)
             Console.WriteLine(knowhow);
         else
-            Console.WriteLine($"[KNOWHOW] No web knowhow found for {domain}" +
+            Console.Error.WriteLine($"[KNOWHOW] No web knowhow found for {domain}" +
                 (selector != null ? $" selector={selector}" : ""));
 
         return 0;
@@ -252,7 +252,7 @@ internal partial class Program
             return 0;
         }
 
-        Console.WriteLine($"[KNOWHOW] {domains.Count} domain(s) with web knowhow:");
+        Console.Error.WriteLine($"[KNOWHOW] {domains.Count} domain(s) with web knowhow:");
         foreach (var d in domains)
             Console.WriteLine($"  {d}");
 

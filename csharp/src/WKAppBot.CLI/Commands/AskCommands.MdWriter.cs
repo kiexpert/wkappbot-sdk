@@ -142,12 +142,12 @@ internal partial class Program
             if (File.Exists(mdPath) && new FileInfo(mdPath).Length > 100)
             {
                 File.AppendAllText(mdPath, "\n---\n## Final Summary\n\n" + sb.ToString(), Encoding.UTF8);
-                Console.WriteLine($"[ASK:MD] Appended final summary to existing: {mdPath}");
+                Console.Error.WriteLine($"[ASK:MD] Appended final summary to existing: {mdPath}");
             }
             else
             {
                 File.WriteAllText(mdPath, sb.ToString(), Encoding.UTF8);
-                Console.WriteLine($"[ASK:MD] {mdPath}");
+                Console.Error.WriteLine($"[ASK:MD] {mdPath}");
             }
             // Open in VS Code for immediate review
             try { AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo { FileName = "code", Arguments = $"\"{mdPath}\"", UseShellExecute = false, CreateNoWindow = true }, Environment.CurrentDirectory, "ASK-MD"); } catch { }

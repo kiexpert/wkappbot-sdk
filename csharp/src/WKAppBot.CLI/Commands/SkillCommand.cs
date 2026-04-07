@@ -68,7 +68,7 @@ internal partial class Program
             .OrderByDescending(g => g.Max(s => s.LastActivity)); // app with most recent skill first
 
         int total = all.Count;
-        Console.WriteLine($"[SKILL] {total} skill(s){(appFilter != null ? $" in '{appFilter}'" : "")} — most recent first:");
+        Console.Error.WriteLine($"[SKILL] {total} skill(s){(appFilter != null ? $" in '{appFilter}'" : "")} — most recent first:");
         foreach (var group in byApp)
         {
             Console.WriteLine($"  [{group.Key}]");
@@ -99,12 +99,12 @@ internal partial class Program
         var skill = FindSkill(args[0]);
         if (skill == null)
         {
-            Console.WriteLine($"[SKILL] Not found: {args[0]}");
+            Console.Error.WriteLine($"[SKILL] Not found: {args[0]}");
             Console.WriteLine("  Hint: wkappbot skill list  or  wkappbot skill search <keyword>");
             return 1;
         }
 
-        Console.WriteLine($"[SKILL] {skill.Title}");
+        Console.Error.WriteLine($"[SKILL] {skill.Title}");
         Console.WriteLine($"  ID     : {skill.Id}");
         Console.WriteLine($"  App    : {skill.App}");
         Console.WriteLine($"  Desc   : {skill.Desc}");
@@ -162,11 +162,11 @@ internal partial class Program
 
         if (hits.Count == 0)
         {
-            Console.WriteLine($"[SKILL] No results for: {string.Join(" ", keywords)}");
+            Console.Error.WriteLine($"[SKILL] No results for: {string.Join(" ", keywords)}");
             return 0;
         }
 
-        Console.WriteLine($"[SKILL] {hits.Count} match(es):");
+        Console.Error.WriteLine($"[SKILL] {hits.Count} match(es):");
         foreach (var s in hits)
             Console.WriteLine($"  [{s.App}] {s.Id} — {s.Title}");
         Console.WriteLine($"\n  Use: wkappbot skill show <id>");
@@ -245,7 +245,7 @@ internal partial class Program
 
         skill.Save(path);
         var action = existing != null ? "Updated" : "Created";
-        Console.WriteLine($"[SKILL] {action}: [{app}] {title} (id={slug}, v{skill.Version})");
+        Console.Error.WriteLine($"[SKILL] {action}: [{app}] {title} (id={slug}, v{skill.Version})");
         return 0;
     }
 
@@ -299,7 +299,7 @@ internal partial class Program
 
         if (skill == null || skillPath == null)
         {
-            Console.WriteLine($"[SKILL] Not found in project skills: {id}");
+            Console.Error.WriteLine($"[SKILL] Not found in project skills: {id}");
             Console.WriteLine("  Hint: 'skill edit' only works for project skills, not HQ-only.");
             Console.WriteLine("  To edit an HQ skill, first copy it: wkappbot skill contribute --app X --title ... --id " + id);
             return 1;
@@ -313,7 +313,7 @@ internal partial class Program
         skill.Version = BumpVersion(skill.Version);
 
         skill.Save(skillPath);
-        Console.WriteLine($"[SKILL] Updated: [{skill.App}] {skill.Title} (id={skill.Id}, v{skill.Version})");
+        Console.Error.WriteLine($"[SKILL] Updated: [{skill.App}] {skill.Title} (id={skill.Id}, v{skill.Version})");
         return 0;
     }
 
@@ -339,11 +339,11 @@ internal partial class Program
             var s = SkillRecord.Load(f);
             if (s == null || !s.Id.Equals(id, StringComparison.OrdinalIgnoreCase)) continue;
             File.Delete(f);
-            Console.WriteLine($"[SKILL] Deleted: [{s.App}] {s.Title} ({id})");
+            Console.Error.WriteLine($"[SKILL] Deleted: [{s.App}] {s.Title} ({id})");
             return 0;
         }
 
-        Console.WriteLine($"[SKILL] Not found in project skills: {id}");
+        Console.Error.WriteLine($"[SKILL] Not found in project skills: {id}");
         return 1;
     }
 
@@ -385,10 +385,10 @@ internal partial class Program
             Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
             File.Copy(f, dest, overwrite: true);
             copied++;
-            Console.WriteLine($"[SKILL] Installed: {rel}");
+            Console.Error.WriteLine($"[SKILL] Installed: {rel}");
         }
 
-        Console.WriteLine($"[SKILL] Install done: {copied} installed, {skipped} skipped (already up-to-date).");
+        Console.Error.WriteLine($"[SKILL] Install done: {copied} installed, {skipped} skipped (already up-to-date).");
         return 0;
     }
 
@@ -440,7 +440,7 @@ internal partial class Program
             count++;
         }
 
-        Console.WriteLine($"[SKILL] Exported {count} skill(s) → {outPath}");
+        Console.Error.WriteLine($"[SKILL] Exported {count} skill(s) → {outPath}");
         return 0;
     }
 
@@ -457,7 +457,7 @@ internal partial class Program
         var zipPath = args[0];
         if (!File.Exists(zipPath))
         {
-            Console.WriteLine($"[SKILL] File not found: {zipPath}");
+            Console.Error.WriteLine($"[SKILL] File not found: {zipPath}");
             return 1;
         }
 
@@ -472,7 +472,7 @@ internal partial class Program
             count++;
         }
 
-        Console.WriteLine($"[SKILL] Imported {count} skill(s) from {zipPath}");
+        Console.Error.WriteLine($"[SKILL] Imported {count} skill(s) from {zipPath}");
         return 0;
     }
 
@@ -482,7 +482,7 @@ internal partial class Program
     {
         if (args.Length == 0) { Console.WriteLine("Usage: wkappbot skill verify <id>"); return 1; }
         var skill = FindSkill(args[0]);
-        if (skill == null) { Console.WriteLine($"[SKILL] Not found: {args[0]}"); return 1; }
+        if (skill == null) { Console.Error.WriteLine($"[SKILL] Not found: {args[0]}"); return 1; }
         var (ok, missing, stale) = RunVerify(skill, verbose: true);
         return (missing + stale > 0) ? 1 : 0;
     }
@@ -501,7 +501,7 @@ internal partial class Program
         int totalOk = 0, totalIssues = 0, noRefs = 0;
         var issueIds = new List<string>();
 
-        Console.WriteLine($"[SKILL] Auditing {skills.Count} skill(s)...");
+        Console.Error.WriteLine($"[SKILL] Auditing {skills.Count} skill(s)...");
         foreach (var skill in skills.OrderBy(s => s.App).ThenBy(s => s.Id))
         {
             if (skill.SourceRefs == null || skill.SourceRefs.Count == 0) { noRefs++; continue; }
@@ -517,7 +517,7 @@ internal partial class Program
         }
 
         Console.WriteLine();
-        Console.WriteLine($"[SKILL] Audit: {totalOk} ok, {totalIssues} stale/missing, {noRefs} without refs");
+        Console.Error.WriteLine($"[SKILL] Audit: {totalOk} ok, {totalIssues} stale/missing, {noRefs} without refs");
         if (issueIds.Count > 0)
         {
             Console.WriteLine("  → Fix: wkappbot skill show <id>  then  wkappbot skill contribute ...");
@@ -531,7 +531,7 @@ internal partial class Program
     {
         if (skill.SourceRefs == null || skill.SourceRefs.Count == 0)
         {
-            if (verbose) Console.WriteLine($"[SKILL] {skill.Id}: no source_refs (nothing to verify)");
+            if (verbose) Console.Error.WriteLine($"[SKILL] {skill.Id}: no source_refs (nothing to verify)");
             return (0, 0, 0);
         }
 
@@ -583,7 +583,7 @@ internal partial class Program
         }
 
         if (verbose && missing + stale == 0)
-            Console.WriteLine($"[SKILL] {skill.Id}: ✅ all {ok} ref(s) OK");
+            Console.Error.WriteLine($"[SKILL] {skill.Id}: ✅ all {ok} ref(s) OK");
         return (ok, missing, stale);
     }
 

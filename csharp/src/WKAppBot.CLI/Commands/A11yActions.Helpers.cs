@@ -102,7 +102,7 @@ internal partial class Program
             if (targetIL > currentIL)
             {
                 string ilName(uint il) => il switch { 0x1000 => "Low", 0x2000 => "Medium", 0x3000 => "High", 0x4000 => "System", _ => $"0x{il:X}" };
-                Console.WriteLine($"[A11Y] UIPI: target={ilName(targetIL)} > current={ilName(currentIL)} → PostMessage tiers skipped");
+                Console.Error.WriteLine($"[A11Y] UIPI: target={ilName(targetIL)} > current={ilName(currentIL)} → PostMessage tiers skipped");
                 return true;
             }
         }
@@ -139,7 +139,7 @@ internal partial class Program
                             {
                                 var tabName = parent.Properties.Name.ValueOrDefault ?? "(unnamed)";
                                 selPat.Pattern.Select();
-                                Console.WriteLine($"[A11Y] tab activated: \"{tabName}\"");
+                                Console.Error.WriteLine($"[A11Y] tab activated: \"{tabName}\"");
                                 Thread.Sleep(200);
                                 return true;
                             }

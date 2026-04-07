@@ -116,7 +116,7 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
                 ? Program.GetPromptDisplayInfo(callerHwnd.Value).displayName
                 : null;
             var callerInfo = callerName != null ? $"\n[요청자] {callerName}" : "";
-            Console.WriteLine($"[READINESS] cmd={actionArgs}{callerInfo}{stackInfo}");
+            Console.Error.WriteLine($"[READINESS] cmd={actionArgs}{callerInfo}{stackInfo}");
             var (approved, focusAcquired, deniedByUser) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
                 positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs + callerInfo + stackInfo);
             if (deniedByUser)

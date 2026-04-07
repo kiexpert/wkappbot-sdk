@@ -82,7 +82,7 @@ internal partial class Program
             var channel  = config?["channel"]?.GetValue<string>();
             if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return;
             var (ok, _, _) = SlackUpdateMessageAsync(botToken, channel, msgTs, text).GetAwaiter().GetResult();
-            if (!ok) Console.WriteLine($"[SLACK] SlackUpdateThreadMessage failed for ts={msgTs}");
+            if (!ok) Console.Error.WriteLine($"[SLACK] SlackUpdateThreadMessage failed for ts={msgTs}");
         }
         catch { }
     }
@@ -197,7 +197,7 @@ internal partial class Program
     {
         var sysMsg = $"[SYSTEM] Format error: your response must begin with [A{qid}] on its own line. " +
                      $"Restate your full answer starting with exactly \"[A{qid}]\" and nothing before it.";
-        Console.WriteLine($"[REEDUCATE] Q{qid}: [A{qid}] 마커 없음 → 재교육 메시지 주입...");
+        Console.Error.WriteLine($"[REEDUCATE] Q{qid}: [A{qid}] 마커 없음 → 재교육 메시지 주입...");
 
         // ClearEditorAsync timeout here was the root cause of GPT session resets (suggest #19).
         // On failure: skip reeducate injection, fall back to reading existing page response.
@@ -209,7 +209,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[REEDUCATE] Q{qid}: ClearEditor 실패 ({ex.GetType().Name}) → 페이지 응답 읽기로 복구");
+            Console.Error.WriteLine($"[REEDUCATE] Q{qid}: ClearEditor 실패 ({ex.GetType().Name}) → 페이지 응답 읽기로 복구");
         }
 
         if (!clearOk)
@@ -219,7 +219,7 @@ internal partial class Program
         var inserted = await cdp.InsertContentEditableAsync(editorSel, sysMsg);
         if (!inserted)
         {
-            Console.WriteLine($"[REEDUCATE] Q{qid}: 에디터 입력 실패");
+            Console.Error.WriteLine($"[REEDUCATE] Q{qid}: 에디터 입력 실패");
             return null;
         }
         await Task.Delay(200);
@@ -280,15 +280,15 @@ internal partial class Program
             var resp = await cdp.EvalAsync(js);
             if (string.IsNullOrWhiteSpace(resp))
             {
-                Console.WriteLine($"[REEDUCATE] Q{qid}: [{context}] 응답 DOM 읽기 실패");
+                Console.Error.WriteLine($"[REEDUCATE] Q{qid}: [{context}] 응답 DOM 읽기 실패");
                 return null;
             }
-            Console.WriteLine($"[REEDUCATE] Q{qid}: [{context}] 응답 수신 ({resp.Length}자)");
+            Console.Error.WriteLine($"[REEDUCATE] Q{qid}: [{context}] 응답 수신 ({resp.Length}자)");
             return resp;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[REEDUCATE] Q{qid}: [{context}] DOM 읽기 실패 ({ex.GetType().Name})");
+            Console.Error.WriteLine($"[REEDUCATE] Q{qid}: [{context}] DOM 읽기 실패 ({ex.GetType().Name})");
             return null;
         }
     }
@@ -317,12 +317,12 @@ internal partial class Program
                     blocks = ParseAnswerBlocks(retryResponse);
                     if (blocks.Count > 0)
                     {
-                        Console.WriteLine($"[REEDUCATE] Q{qid}: 재교육 성공 — {blocks.Count}개 블록 파싱됨");
+                        Console.Error.WriteLine($"[REEDUCATE] Q{qid}: 재교육 성공 — {blocks.Count}개 블록 파싱됨");
                         response = retryResponse;
                     }
                     else
                     {
-                        Console.WriteLine($"[REEDUCATE] Q{qid}: 재교육 후에도 [An] 없음 — 스킵");
+                        Console.Error.WriteLine($"[REEDUCATE] Q{qid}: 재교육 후에도 [An] 없음 — 스킵");
                     }
                 }
             }
@@ -347,7 +347,7 @@ internal partial class Program
                 SlackSendViaApi(botToken, channel, $"*[{label}]* {truncated}",
                     threadTs: threadTs, username: GetSendReplyUsername())
                     .GetAwaiter().GetResult();
-                Console.WriteLine($"[ASK] Slack A{blockQid} 전송 ({answer.Length}자)");
+                Console.Error.WriteLine($"[ASK] Slack A{blockQid} 전송 ({answer.Length}자)");
             }
         }
         catch { /* best effort */ }
@@ -520,7 +520,7 @@ internal partial class Program
                     SlackSendViaApi(botToken, channel, sep,
                         threadTs: existingTs, username: GetSendReplyUsername())
                         .GetAwaiter().GetResult();
-                    Console.WriteLine($"[ASK] Per-page Slack thread reused: {existingTs} ({sandboxKey})");
+                    Console.Error.WriteLine($"[ASK] Per-page Slack thread reused: {existingTs} ({sandboxKey})");
                     return existingTs;
                 }
             }
@@ -601,7 +601,7 @@ internal partial class Program
             }
             else
             {
-                Console.WriteLine($"[{mode}] 탭 없음 ({regKey}) — Slack 전송만 합니다.");
+                Console.Error.WriteLine($"[{mode}] 탭 없음 ({regKey}) — Slack 전송만 합니다.");
             }
         }
 
@@ -623,13 +623,13 @@ internal partial class Program
 
         if (string.IsNullOrEmpty(threadTs))
         {
-            Console.WriteLine($"[{mode}] Slack 쓰레드 없음 ({threadLabel}). ask/agent 먼저 실행하세요.");
+            Console.Error.WriteLine($"[{mode}] Slack 쓰레드 없음 ({threadLabel}). ask/agent 먼저 실행하세요.");
             return cdpOk ? 0 : 1;
         }
 
         if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
         {
-            Console.WriteLine($"[{mode}] Slack config 없음 — CDP만 동작");
+            Console.Error.WriteLine($"[{mode}] Slack config 없음 — CDP만 동작");
             return cdpOk ? 0 : 1;
         }
 
@@ -663,7 +663,7 @@ internal partial class Program
             var switched = await cdp.SwitchToTargetAsync(targetId, 9222);
             if (!switched)
             {
-                Console.WriteLine($"[{mode}] CDP: 탭 전환 실패 (targetId={targetId[..Math.Min(8, targetId.Length)]})");
+                Console.Error.WriteLine($"[{mode}] CDP: 탭 전환 실패 (targetId={targetId[..Math.Min(8, targetId.Length)]})");
                 return false;
             }
 
@@ -678,7 +678,7 @@ internal partial class Program
                     var vis = await cdp.EvalAsync($"(()=>{{var b=document.querySelector('{esc}');return b&&b.offsetParent!==null?'1':'0'}})()");
                     if (vis == "1")
                     {
-                        Console.WriteLine($"[{mode}] AI 응답 중단 → 즉시 주입");
+                        Console.Error.WriteLine($"[{mode}] AI 응답 중단 → 즉시 주입");
                         await cdp.ClickStopButtonAsync();
                         await Task.Delay(300); // brief settle
                         break;
@@ -698,7 +698,7 @@ internal partial class Program
                         if (vis == "1") { generating = true; break; }
                     }
                     if (!generating) break;
-                    if (w == 0) Console.WriteLine($"[{mode}] AI 응답 중 — 완료 대기 (최대 15s)...");
+                    if (w == 0) Console.Error.WriteLine($"[{mode}] AI 응답 중 — 완료 대기 (최대 15s)...");
                     await Task.Delay(500);
                 }
             }
@@ -714,7 +714,7 @@ internal partial class Program
             }
             if (editorSel == null)
             {
-                Console.WriteLine($"[{mode}] CDP: 에디터 없음");
+                Console.Error.WriteLine($"[{mode}] CDP: 에디터 없음");
                 return false;
             }
 
@@ -724,12 +724,12 @@ internal partial class Program
             var inserted = await cdp.InsertContentEditableAsync(editorSel, msg);
             if (!inserted)
             {
-                Console.WriteLine($"[{mode}] CDP: 텍스트 입력 실패");
+                Console.Error.WriteLine($"[{mode}] CDP: 텍스트 입력 실패");
                 return false;
             }
             await Task.Delay(200);
             await cdp.SendPromptAsync(editorSel);
-            Console.WriteLine($"[{mode}] CDP: {host} 탭에 주입 완료");
+            Console.Error.WriteLine($"[{mode}] CDP: {host} 탭에 주입 완료");
 
             if (interrupt)
             {
@@ -774,7 +774,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{mode}] CDP 오류: {ex.Message}");
+            Console.Error.WriteLine($"[{mode}] CDP 오류: {ex.Message}");
             return false;
         }
         finally
@@ -791,7 +791,7 @@ internal partial class Program
     {
         var key = threadKey ?? BuildSandboxKey("ask", ai);
         AgentStopFlagCreate(key);
-        Console.WriteLine($"[TERMINATE] 중단 플래그 생성 → {key}");
+        Console.Error.WriteLine($"[TERMINATE] 중단 플래그 생성 → {key}");
 
         // Also click stop button in CDP tab (immediate effect while loop waits)
         var entry = AskTargetRegistry.GetEntry(key);
@@ -805,7 +805,7 @@ internal partial class Program
                     await cdp.ConnectAsync(9222, timeoutMs: 3000);
                     await cdp.SwitchToTargetAsync(entry.TargetId, 9222);
                     var result = await cdp.ClickStopButtonAsync();
-                    Console.WriteLine($"[TERMINATE] CDP stop: {result}");
+                    Console.Error.WriteLine($"[TERMINATE] CDP stop: {result}");
                     cdp.Dispose();
                 }
                 catch { /* best effort */ }
@@ -851,7 +851,7 @@ internal partial class Program
                 pos += chunkSize;
                 part++;
             }
-            Console.WriteLine($"[ASK] Reported to Slack (thread {ts}, {part - 1} part(s))");
+            Console.Error.WriteLine($"[ASK] Reported to Slack (thread {ts}, {part - 1} part(s))");
         }
         catch (Exception ex)
         {

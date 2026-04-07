@@ -56,7 +56,7 @@ Options:
             if (matches.Count == 0)
                 return Error($"Window not found: \"{grap}\"");
             targetHwnd = matches[0].Handle;
-            Console.WriteLine($"[READINESS] grap match: 0x{targetHwnd:X} \"{matches[0].Title}\" [{matches[0].ClassName}]");
+            Console.Error.WriteLine($"[READINESS] grap match: 0x{targetHwnd:X} \"{matches[0].Title}\" [{matches[0].ClassName}]");
         }
         else
         {
@@ -66,23 +66,23 @@ Options:
 
             var title = WindowFinder.GetWindowText(targetHwnd);
             var cls = WindowFinder.GetClassName(targetHwnd);
-            Console.WriteLine($"[READINESS] foreground: 0x{targetHwnd:X} \"{title}\" [{cls}]");
+            Console.Error.WriteLine($"[READINESS] foreground: 0x{targetHwnd:X} \"{title}\" [{cls}]");
         }
         swStep.Stop();
-        Console.WriteLine($"[PROF] FindTarget={swStep.ElapsedMilliseconds}ms");
+        Console.Error.WriteLine($"[PROF] FindTarget={swStep.ElapsedMilliseconds}ms");
         Console.Out.Flush();
 
         // ── Step 2: Create InputReadiness ──
         swStep.Restart();
         var readiness = CreateInputReadiness();
         swStep.Stop();
-        Console.WriteLine($"[PROF] CreateReadiness={swStep.ElapsedMilliseconds}ms");
+        Console.Error.WriteLine($"[PROF] CreateReadiness={swStep.ElapsedMilliseconds}ms");
         Console.Out.Flush();
 
         if (pointMode)
         {
             // ── ProbeAtPoint mode ──
-            Console.WriteLine($"[READINESS] ProbeAtPoint ({pointX},{pointY})");
+            Console.Error.WriteLine($"[READINESS] ProbeAtPoint ({pointX},{pointY})");
             Console.Out.Flush();
 
             swStep.Restart();
@@ -93,14 +93,14 @@ Options:
                 TargetHwnd = targetHwnd,
             });
             swStep.Stop();
-            Console.WriteLine($"[PROF] ProbeAtPoint={swStep.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"[PROF] ProbeAtPoint={swStep.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
             // Print classification result
             Console.ForegroundColor = pointReport.FocuslessClicked ? ConsoleColor.Green
                 : pointReport.NeedsPhysicalClick ? ConsoleColor.Yellow
                 : ConsoleColor.Red;
-            Console.WriteLine($"[READINESS] Result: {pointReport.Classification} " +
+            Console.Error.WriteLine($"[READINESS] Result: {pointReport.Classification} " +
                 $"focusless={pointReport.FocuslessClicked} physical={pointReport.NeedsPhysicalClick} " +
                 $"stolen={pointReport.ForegroundStolen}");
             Console.ResetColor();
@@ -120,13 +120,13 @@ Options:
                 SkipZoom = false, // 돋보기 항상 표시 (글로벌 옵션으로만 숨김 가능)
             });
             swStep.Stop();
-            Console.WriteLine($"[PROF] Probe={swStep.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"[PROF] Probe={swStep.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
             InputReadiness.PrintReport(report);
 
             swTotal.Stop();
-            Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
             // 돋보기에 결과 표시 — BeginFadeOut이 포그라운드 스레드로 승격하므로

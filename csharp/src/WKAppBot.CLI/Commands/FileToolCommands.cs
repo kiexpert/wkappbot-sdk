@@ -161,7 +161,7 @@ internal partial class Program
             File.Copy(path, bakPath, overwrite: true);
             File.SetCreationTime(bakPath, File.GetCreationTime(path));
             File.SetLastWriteTime(bakPath, File.GetLastWriteTime(path));
-            Console.WriteLine($"[{tag}] backup -> {bakPath}");
+            Console.Error.WriteLine($"[{tag}] backup -> {bakPath}");
 
             MigrateLegacyBackups(Path.GetDirectoryName(path)!, bakDir);
             return true;

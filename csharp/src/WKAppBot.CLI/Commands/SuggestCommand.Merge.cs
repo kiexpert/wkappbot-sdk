@@ -91,7 +91,7 @@ internal partial class Program
         if (affectedCmdsRaw == null) missing.Add("--affected-cmds");
         if (missing.Count > 0)
         {
-            Console.WriteLine($"[MERGE] Missing required argument(s): {string.Join(", ", missing)}");
+            Console.Error.WriteLine($"[MERGE] Missing required argument(s): {string.Join(", ", missing)}");
             Console.WriteLine("  Run 'wkappbot suggest merge --help' for usage.");
             return 1;
         }
@@ -140,7 +140,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MERGE] Invalid --all-matching regex: {ex.Message}");
+                Console.Error.WriteLine($"[MERGE] Invalid --all-matching regex: {ex.Message}");
                 return 1;
             }
         }
@@ -165,7 +165,7 @@ internal partial class Program
             if (coreCmds.Count > 1)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[MERGE] Matched suggestions have different core commands:");
+                Console.Error.WriteLine($"[MERGE] Matched suggestions have different core commands:");
                 foreach (var c in coreCmds) Console.WriteLine($"     * {c}");
                 Console.WriteLine("  Merge requires all suggestions to share the same command context.");
                 Console.WriteLine("  Use --all-matching with a tighter pattern, or add --force to override.");
@@ -174,7 +174,7 @@ internal partial class Program
             }
         }
 
-        Console.WriteLine($"[MERGE] Merging {matched.Count} suggestion(s) -> \"{title}\"");
+        Console.Error.WriteLine($"[MERGE] Merging {matched.Count} suggestion(s) -> \"{title}\"");
 
         // -- Compute time range & frequency --
         var timestamps = matched
@@ -245,12 +245,12 @@ internal partial class Program
         {
             foreach (var idx in matchedIdxs.OrderByDescending(i => i))
                 lines.RemoveAt(idx);
-            Console.WriteLine($"[MERGE] Removed {matchedIdxs.Count} original entries from active list");
+            Console.Error.WriteLine($"[MERGE] Removed {matchedIdxs.Count} original entries from active list");
         }
 
         lines.Add(mergeJson);
         File.WriteAllLines(jsonlPath, lines);
-        Console.WriteLine($"[MERGE] Saved (priority={priority}, risk={recurrenceRisk}, freq={frequencyPerHour}/hr, est={estimatedWork ?? "??"})");
+        Console.Error.WriteLine($"[MERGE] Saved (priority={priority}, risk={recurrenceRisk}, freq={frequencyPerHour}/hr, est={estimatedWork ?? "??"})");
 
         // -- Slack notification --
         var slackCfg  = LoadSlackConfig();
@@ -279,7 +279,7 @@ internal partial class Program
                 obj["slack_ts"] = (object?)newTs;
                 lines[^1] = JsonSerializer.Serialize(obj);
                 File.WriteAllLines(jsonlPath, lines);
-                Console.WriteLine($"[MERGE] Slack sent (ts={newTs})");
+                Console.Error.WriteLine($"[MERGE] Slack sent (ts={newTs})");
             }
             else Console.Error.WriteLine("[MERGE] Slack send failed");
         }

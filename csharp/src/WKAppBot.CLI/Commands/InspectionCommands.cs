@@ -87,7 +87,7 @@ internal partial class Program
             var readiness = CreateInputReadiness();
             var blockerInfo = readiness.DetectBlocker(mainWin.Handle);
             if (blockerInfo != null)
-                Console.WriteLine($"[BLOCK] Blocker detected: \"{blockerInfo.Title}\" (class={blockerInfo.ClassName}, hwnd=0x{blockerInfo.Handle.ToInt64():X8})");
+                Console.Error.WriteLine($"[BLOCK] Blocker detected: \"{blockerInfo.Title}\" (class={blockerInfo.ClassName}, hwnd=0x{blockerInfo.Handle.ToInt64():X8})");
         }
         catch { /* best effort */ }
 
@@ -261,7 +261,7 @@ internal partial class Program
                 user = NativeMethods.GetGuiResources(hProc, GR_USEROBJECTS);
                 NativeMethods.CloseHandle(hProc);
             }
-            Console.WriteLine($"[PROCESS] pid={procPid} {proc.ProcessName}  Priv={privMB:F1}MB  WS={wsMB:F1}MB  handles={handles}  threads={threads}  GDI={gdi}  USER={user}");
+            Console.Error.WriteLine($"[PROCESS] pid={procPid} {proc.ProcessName}  Priv={privMB:F1}MB  WS={wsMB:F1}MB  handles={handles}  threads={threads}  GDI={gdi}  USER={user}");
         }
         catch { /* best effort — skip if access denied */ }
 
@@ -274,7 +274,7 @@ internal partial class Program
             var readiness = CreateInputReadiness();
             var blockerInfo = readiness.DetectBlocker(inspectHandle);
             if (blockerInfo != null)
-                Console.WriteLine($"[BLOCK] Blocker detected: \"{blockerInfo.Title}\" (class={blockerInfo.ClassName}, hwnd=0x{blockerInfo.Handle.ToInt64():X8})");
+                Console.Error.WriteLine($"[BLOCK] Blocker detected: \"{blockerInfo.Title}\" (class={blockerInfo.ClassName}, hwnd=0x{blockerInfo.Handle.ToInt64():X8})");
         }
         catch { /* best effort */ }
 
@@ -553,12 +553,12 @@ internal partial class Program
                 var type = (seg.ControlType ?? "?").PadRight(12);
                 Console.WriteLine($"  [{type}] \"{seg.Text}\"  @({cx},{cy})");
             }
-            Console.WriteLine($"[DYN-A11Y] Cached {segments.Count} element(s) for hwnd=0x{hWnd:X}");
+            Console.Error.WriteLine($"[DYN-A11Y] Cached {segments.Count} element(s) for hwnd=0x{hWnd:X}");
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.DarkRed;
-            Console.WriteLine($"[DYN-A11Y] Failed: {ex.Message}");
+            Console.Error.WriteLine($"[DYN-A11Y] Failed: {ex.Message}");
             Console.ResetColor();
         }
     }

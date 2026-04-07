@@ -584,7 +584,7 @@ Examples:
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.Write("  📢 New foreground window: ");
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine($"[{popupInfo.ClassName}] \"{popupInfo.Title}\" ({popupInfo.Rect.Width}x{popupInfo.Rect.Height})");
+                Console.Error.WriteLine($"[{popupInfo.ClassName}] \"{popupInfo.Title}\" ({popupInfo.Rect.Width}x{popupInfo.Rect.Height})");
                 Console.ResetColor();
                 ReadDialogContents(postFgHwnd);
                 anyReaction = true;

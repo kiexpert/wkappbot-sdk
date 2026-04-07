@@ -23,13 +23,13 @@ internal partial class Program
     static void LogError(string tag, Exception ex)
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"[{tag}] Error: {ex.Message}");
+        Console.Error.WriteLine($"[{tag}] Error: {ex.Message}");
         Console.ResetColor();
         if (ex.StackTrace != null)
         {
             var firstFrame = ex.StackTrace.TrimStart();
             if (firstFrame.Length > 300) firstFrame = firstFrame[..300] + "...";
-            Console.WriteLine($"[{tag}] at {firstFrame}");
+            Console.Error.WriteLine($"[{tag}] at {firstFrame}");
         }
 
         // Capture a11y hot focus chain (non-blocking, best-effort)
@@ -51,7 +51,7 @@ internal partial class Program
                     var ctlClass = GetClassNameHelper(snap.FocusedCtl);
                     hotLine += $"\n  focus=0x{snap.FocusedCtl:X} \"{ctlTitle}\" ({ctlClass})";
                 }
-                Console.WriteLine($"[{tag}] HotLine: {hotLine}");
+                Console.Error.WriteLine($"[{tag}] HotLine: {hotLine}");
             }
         }
         catch { /* UIA/Win32 may fail — non-critical */ }
@@ -87,7 +87,7 @@ internal partial class Program
     static void LogWarning(string tag, string context, Exception ex)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[{tag}] {context}: {ex.Message}");
+        Console.Error.WriteLine($"[{tag}] {context}: {ex.Message}");
         Console.ResetColor();
     }
 
@@ -214,9 +214,9 @@ internal partial class Program
         }
 
         if (attachFiles.Count > 0)
-            Console.WriteLine($"[ASK] Attaching {attachFiles.Count} file(s): {string.Join(", ", attachFiles.Select(Path.GetFileName))}");
+            Console.Error.WriteLine($"[ASK] Attaching {attachFiles.Count} file(s): {string.Join(", ", attachFiles.Select(Path.GetFileName))}");
         if (!string.IsNullOrWhiteSpace(modelHint))
-            Console.WriteLine($"[ASK] Model hint: {modelHint}");
+            Console.Error.WriteLine($"[ASK] Model hint: {modelHint}");
         if (noWait && loopMode)
         {
             Console.WriteLine("[ASK] --no-wait enabled: loop mode is ignored for this request.");
@@ -331,10 +331,10 @@ Examples:
                     _slackSessionThreadTs.Value = ts;
                     // Persist for --intercept (훈수두기)
                     try { Directory.CreateDirectory(Path.Combine(DataDir, "runtime")); File.WriteAllText(Path.Combine(DataDir, "runtime", "last_triad_ts.txt"), ts); } catch { }
-                    Console.WriteLine($"[TRIAD] Unified Slack thread: {ts}");
-                    Console.WriteLine($"[TRIAD] Join: wkappbot slack reply \"your opinion\" --msg {ts}");
-                    Console.WriteLine($"[TRIAD:THREAD_TS] {ts}");
-                    Console.WriteLine($"[TRIAD] 훈수두기: wkappbot ask triad --intercept \"훈수내용\"");
+                    Console.Error.WriteLine($"[TRIAD] Unified Slack thread: {ts}");
+                    Console.Error.WriteLine($"[TRIAD] Join: wkappbot slack reply \"your opinion\" --msg {ts}");
+                    Console.Error.WriteLine($"[TRIAD:THREAD_TS] {ts}");
+                    Console.Error.WriteLine($"[TRIAD] 훈수두기: wkappbot ask triad --intercept \"훈수내용\"");
                 }
             }
         }
@@ -356,7 +356,7 @@ Examples:
         if (loopMode) hints.Add("🔧 tools ON (dry-run — use agent cmd for writes)");
         else hints.Add("tools OFF — add --use-tools");
         var debateHint = $" ({string.Join(" | ", hints)})";
-        Console.WriteLine($"[{modeLabel}] Game {gameId}: Launching Gemini + GPT + Claude in parallel...{debateHint}");
+        Console.Error.WriteLine($"[{modeLabel}] Game {gameId}: Launching Gemini + GPT + Claude in parallel...{debateHint}");
 
         // ── Shared context for recovery (in-memory + JSONL files) ────────────────────────
         // Session folder: {DataDir}/triad/{yyyyMMdd_HHmmss} — one folder per triad run.
@@ -365,14 +365,14 @@ Examples:
         var sessionDir = Path.Combine(DataDir, "triad", sessionId);
         var ctx = new TriadSharedContext(question, sessionDir);
         _triadLastSessionDir = sessionDir;
-        Console.WriteLine($"[TRIAD] Session dir: {sessionDir}");
+        Console.Error.WriteLine($"[TRIAD] Session dir: {sessionDir}");
 
         // ── Live MD minutes: auto-generate debate transcript ──
         ctx.InitLiveMinutes(question);
         _activeTriadCtx = ctx; // enable MD recording for all SlackPostToThread calls
         if (ctx.MdPath != null)
         {
-            Console.WriteLine($"[TRIAD] Live MD: {ctx.MdPath}");
+            Console.Error.WriteLine($"[TRIAD] Live MD: {ctx.MdPath}");
             // Open in VS Code for real-time preview
             try { AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo { FileName = "code", Arguments = $"\"{ctx.MdPath}\"", UseShellExecute = false, CreateNoWindow = true }, Environment.CurrentDirectory, "ASK-CODE"); } catch { }
         }
@@ -419,7 +419,7 @@ Examples:
                         ctx.InjectToSingle(peerAi, nudge);
                         SlackPostToThread($"📩 *[DM→{peerAi}]* {nudge}", "🦉 Moderator");
                     }
-                    Console.WriteLine($"[{modeLabel}] {AiDisplayName(doneAi)} done → moderator nudging {pending.Count} remaining");
+                    Console.Error.WriteLine($"[{modeLabel}] {AiDisplayName(doneAi)} done → moderator nudging {pending.Count} remaining");
                     SlackPostToThread($"⏰ *{AiDisplayName(doneAi)}* finished! Moderator: wrap up, {pending.Count} AI(s) remaining.", "🦉 Moderator");
 
                     // Follow-up after 1 second
@@ -435,7 +435,7 @@ Examples:
                 }
             }
         }
-        Console.WriteLine($"[{modeLabel}] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+        Console.Error.WriteLine($"[{modeLabel}] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
         // ── 정반합 사회자 루프 (--debate 플래그 시에만) ──
         if (debateMode && !noWait && results.Count(r => r == 0) >= 2)
@@ -456,7 +456,7 @@ Examples:
                         $"Please answer the ACTUAL question directly. Do not explore tools or help menus.";
                     ctx.InjectToSingle(ai, redirect);
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[정반합] {ai} off-topic detected (keyword overlap {overlap}/{qKeywords.Count} = {ratio:P0}) → redirect sent");
+                    Console.Error.WriteLine($"[정반합] {ai} off-topic detected (keyword overlap {overlap}/{qKeywords.Count} = {ratio:P0}) → redirect sent");
                     Console.ResetColor();
                     SlackPostToThread($"⚠️ *[Moderator→{ai}]* Off-topic detected! Redirect sent.", "🦉 Moderator");
                 }
@@ -464,7 +464,7 @@ Examples:
 
             // R0 done → enable moderator for debate rounds
             ctx.ModeratorEnabled = true;
-            Console.WriteLine($"[정반합] R0 complete. Cross-prompting ON. Moderator starting R1...");
+            Console.Error.WriteLine($"[정반합] R0 complete. Cross-prompting ON. Moderator starting R1...");
             SlackPostToThread("═══ *R0 자유 답변 완료! 정반합 게임 시작!* ═══\n📋 DEBATE_JSON + STANCE 포맷으로 응답해주세요.", "🦉 Moderator");
             SlackPostToThread($"📋 *Debate Rules:*\n```\n{BuildDebateOnlyPersona()}\n```", "🦉 Moderator");
             try { RunDebateLoop(question, timeoutSec, ctx); }
@@ -498,7 +498,7 @@ Examples:
             psi.ArgumentList.Add("--after");
             psi.ArgumentList.Add("5s");
             AppBotPipe.StartTracked(psi, callerCwd, "TRIAD-PROMPT");
-            Console.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) → {cwdTag}");
+            Console.Error.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) → {cwdTag}");
         }
         catch (Exception ex) { LogWarning("TRIAD", "Reminder schedule error", ex); }
         if (!string.IsNullOrEmpty(threadTs))
@@ -518,7 +518,7 @@ Examples:
             var resolved = GrapHelper.ResolveFullGrap(browserGrap, automation);
             if (resolved == null || resolved.Value.error != null)
             {
-                Console.WriteLine($"[ASK] GrapHelper: browser not found ({browserGrap})");
+                Console.Error.WriteLine($"[ASK] GrapHelper: browser not found ({browserGrap})");
                 return false;
             }
 
@@ -526,13 +526,13 @@ Examples:
             var tab = GrapHelper.FindByNameOrAid(root, tabPattern);
             if (tab == null)
             {
-                Console.WriteLine($"[ASK] GrapHelper: tab \"{tabPattern}\" not found");
+                Console.Error.WriteLine($"[ASK] GrapHelper: tab \"{tabPattern}\" not found");
                 return false;
             }
 
             if (!GrapHelper.IsTabItem(tab))
             {
-                Console.WriteLine($"[ASK] GrapHelper: \"{tabPattern}\" matched but not a TabItem (already active?)");
+                Console.Error.WriteLine($"[ASK] GrapHelper: \"{tabPattern}\" matched but not a TabItem (already active?)");
                 return true;
             }
 

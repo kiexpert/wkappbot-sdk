@@ -54,7 +54,7 @@ internal partial class Program
                 return 'ce=' + ce + ' pm=' + pm + ' ta=' + ta + ' textbox=' + rb;
             })()
             """) ?? "unknown";
-        Console.WriteLine($"[ASK] Claude editor not found (selector chain exhausted) | dom: {diag}");
+        Console.Error.WriteLine($"[ASK] Claude editor not found (selector chain exhausted) | dom: {diag}");
         return null;
     }
 
@@ -83,7 +83,7 @@ internal partial class Program
                 })()
                 """);
             if (taResult == "OK") return true;
-            Console.WriteLine($"[ASK] Textarea native setter result: {taResult}, trying Input.insertText...");
+            Console.Error.WriteLine($"[ASK] Textarea native setter result: {taResult}, trying Input.insertText...");
             await cdp.FocusAsync(selector);
             await Task.Delay(100);
             await cdp.SendAsync("Input.insertText", new JsonObject { ["text"] = text });
@@ -108,7 +108,7 @@ internal partial class Program
         if (result == "OK") return true;
 
         // Fallback: CDP Input.insertText
-        Console.WriteLine($"[ASK] ClipboardEvent paste result: {result}, trying Input.insertText...");
+        Console.Error.WriteLine($"[ASK] ClipboardEvent paste result: {result}, trying Input.insertText...");
         await cdp.FocusAsync(selector);
         await Task.Delay(100);
         await cdp.SendAsync("Input.insertText", new JsonObject { ["text"] = text });
@@ -131,9 +131,9 @@ internal partial class Program
     static int AskClaude(string question, bool slackReport = true, int timeoutSec = 30, bool newTab = false, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
-        Console.WriteLine($"[ASK] Claude: {question}");
+        Console.Error.WriteLine($"[ASK] Claude: {question}");
         if (!string.IsNullOrWhiteSpace(modelHint))
-            Console.WriteLine($"[ASK] Claude model hint: {modelHint}");
+            Console.Error.WriteLine($"[ASK] Claude model hint: {modelHint}");
 
         PulseStep.Init("ask-claude");
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "claude");
@@ -143,8 +143,8 @@ internal partial class Program
             var qid = AskTargetRegistry.AssignNextQid(targetTag);
             _currentQid.Value = qid;
             question = $"[Q{qid}] {question}\n[REPLY: A{qid}]";
-            Console.WriteLine($"[ASK] Claude Q{qid} 할당됨 (tab={targetTag[..Math.Min(16, targetTag.Length)]})");
-            Console.WriteLine($"[ASK] 훈수두기: wkappbot ask claude --intercept \"내용\" --qid {qid}");
+            Console.Error.WriteLine($"[ASK] Claude Q{qid} 할당됨 (tab={targetTag[..Math.Min(16, targetTag.Length)]})");
+            Console.Error.WriteLine($"[ASK] 훈수두기: wkappbot ask claude --intercept \"내용\" --qid {qid}");
         }
         var cdp = EnsureCdpConnection(preferredHost: "claude.ai", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
@@ -174,7 +174,7 @@ internal partial class Program
                 // ── Phase 1: Navigate ──
                 PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
-                Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
+                Console.Error.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("claude.ai"))
                 {
                     Console.WriteLine(newSession ? "[ASK] New session --navigating to fresh Claude..." : "[ASK] Navigating to Claude...");
@@ -183,7 +183,7 @@ internal partial class Program
                 }
                 else
                 {
-                    Console.WriteLine($"[ASK] Reusing Claude session");
+                    Console.Error.WriteLine($"[ASK] Reusing Claude session");
                 }
 
                 // NOTE: BringToFront removed --steals OS focus. CDP works on background tabs.
@@ -199,17 +199,17 @@ internal partial class Program
                 _currentAskEditorSel.Value = editorSel;
                 capturedEditorSel = editorSel;
                 PulseStep.Mark("editor-found");
-                Console.WriteLine($"[ASK] Editor found: {editorSel}");
+                Console.Error.WriteLine($"[ASK] Editor found: {editorSel}");
                 askSession.BindStreamingContext(editorSel);
 
                 // ── Phase 3: Check existing turns ──
                 int existingTurns = await CountClaudeTurns(cdp);
                 if (existingTurns > 0)
-                    Console.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
+                    Console.Error.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
 
                 var hasLoopPersonaState = await HasLoopPersonaStateAsync(cdp, "claude");
                 var effectiveLoopPersona = !_suppressLoopPersona.Value && (loopMode || hasLoopPersonaState);
-                Console.WriteLine($"[ASK] Loop persona state: {(hasLoopPersonaState ? "present" : "missing")}");
+                Console.Error.WriteLine($"[ASK] Loop persona state: {(hasLoopPersonaState ? "present" : "missing")}");
                 if (!loopMode && hasLoopPersonaState)
                     Console.WriteLine("[ASK] Loop marker found; MCP guidance will be included for fresh session persona.");
 
@@ -232,7 +232,7 @@ internal partial class Program
                     else
                     {
                         bool ready = (personaResp ?? "").Contains("READY", StringComparison.OrdinalIgnoreCase);
-                        Console.WriteLine($"[ASK] Persona: {(ready ? "READY" : personaResp?.Substring(0, Math.Min(50, personaResp.Length)))}");
+                        Console.Error.WriteLine($"[ASK] Persona: {(ready ? "READY" : personaResp?.Substring(0, Math.Min(50, personaResp.Length)))}");
                         if (IsClaudeLimitResponse(personaResp))
                         {
                             Console.WriteLine("[ASK] Claude limit detected during persona. Fast-fail.");
@@ -245,7 +245,7 @@ internal partial class Program
                         if (effectiveLoopPersona && (personaResp ?? "").Contains("[APPBOT_TOOL_CALL_BEGIN]")
                             && ParseAllLoopToolCalls(personaResp!).Count > 0)
                         {
-                            Console.WriteLine($"[ASK] Persona continuation has tool call ({personaResp!.Length} chars) --skipping question send");
+                            Console.Error.WriteLine($"[ASK] Persona continuation has tool call ({personaResp!.Length} chars) --skipping question send");
                             return (true, personaResp);
                         }
                     }
@@ -280,7 +280,7 @@ internal partial class Program
                 var inserted = await InsertTextClaudeProseMirror(cdp, editorSel, question);
                 var editorRaw = await cdp.GetEditorContentAsync(editorSel);
                 var editorContent = editorRaw.Length > 80 ? editorRaw[..80] : editorRaw;
-                Console.WriteLine($"[ASK] After insert: {(inserted ? "OK" : "FAIL")}, editor=[{editorContent}]");
+                Console.Error.WriteLine($"[ASK] After insert: {(inserted ? "OK" : "FAIL")}, editor=[{editorContent}]");
                 if (!inserted)
                 {
                     zoom?.ShowFail("insert failed");
@@ -356,7 +356,7 @@ internal partial class Program
                 LogRestoreFocus(prevFg, "after-send-Claude", cdp);
 
                 var afterSend = (await cdp.GetTextLengthAsync(editorSel)).ToString();
-                Console.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={preSendTurns})");
+                Console.Error.WriteLine($"[ASK] Sent! (send={sendResult}, editorLen={afterSend}, prevTurns={preSendTurns})");
                 await cdp.MarkPromptDispatchAsync(editorSel, "claude", sendResult);
                 askSession.MarkQueued(sendResult);
                 if (noWait)
@@ -418,13 +418,13 @@ internal partial class Program
                         responseStarted = true;
                         askSession.MarkRunning();
                         cdp.SetBotOverlayStreaming(true); // continuous pulse while streaming
-                        Console.WriteLine($"[ASK] Response detected: {detectResult}");
+                        Console.Error.WriteLine($"[ASK] Response detected: {detectResult}");
                         chatLock.Release("first-byte");
                         break;
                     }
 
                     if (sw.Elapsed.TotalSeconds > 3)
-                        Console.WriteLine($"[ASK] Waiting for response... ({detectResult}, {sw.Elapsed.TotalSeconds:F0}s)");
+                        Console.Error.WriteLine($"[ASK] Waiting for response... ({detectResult}, {sw.Elapsed.TotalSeconds:F0}s)");
                 }
                 if (!responseStarted)
                 {
@@ -503,7 +503,7 @@ internal partial class Program
                             && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 10.0)
                         {
                             if (liveHeaderPrinted) Console.WriteLine();
-                            Console.WriteLine($"[ASK] Flush idle 10s --early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                            Console.Error.WriteLine($"[ASK] Flush idle 10s --early done ({sw.Elapsed.TotalSeconds:F0}s)");
                             cdp.SetBotOverlayStreaming(false);
                             askSession.MarkDone(text);
                             return (true, text);
@@ -512,7 +512,7 @@ internal partial class Program
                         if (state == "DONE")
                         {
                             if (liveHeaderPrinted) Console.WriteLine();
-                            Console.WriteLine($"[ASK] Response complete ({len} chars, {sw.Elapsed.TotalSeconds:F0}s)");
+                            Console.Error.WriteLine($"[ASK] Response complete ({len} chars, {sw.Elapsed.TotalSeconds:F0}s)");
                             cdp.SetBotOverlayStreaming(false);
                             askSession.MarkDone(text);
                             return (true, text);
@@ -520,7 +520,7 @@ internal partial class Program
                     }
                     catch
                     {
-                        Console.WriteLine($"[ASK] Poll parse error: {pollResult[..Math.Min(80, pollResult.Length)]}");
+                        Console.Error.WriteLine($"[ASK] Poll parse error: {pollResult[..Math.Min(80, pollResult.Length)]}");
                     }
                 }
 
@@ -534,7 +534,7 @@ internal partial class Program
                     })()
                     """) ?? "";
                 if (liveHeaderPrinted) Console.WriteLine();
-                Console.WriteLine($"[ASK] Timeout ({timeoutSec}s) --partial response ({finalText.Length} chars)");
+                Console.Error.WriteLine($"[ASK] Timeout ({timeoutSec}s) --partial response ({finalText.Length} chars)");
                 askSession.MarkTimedOut(finalText);
                 return (finalText.Length > 0, finalText.Length > 0 ? finalText : null);
             }

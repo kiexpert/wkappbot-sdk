@@ -50,7 +50,7 @@ internal partial class Program
             _geminiHandoffFiredAt[cwd] = now;
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[FALLBACK] Claude error in {AbbreviateCwd(cwd)}: {errorText}");
+            Console.Error.WriteLine($"[FALLBACK] Claude error in {AbbreviateCwd(cwd)}: {errorText}");
             Console.ResetColor();
 
             var cwdCapture = cwd;
@@ -283,7 +283,7 @@ internal partial class Program
             sb.AppendLine("3. Continue where Claude left off");
 
             File.WriteAllText(sessionFile, sb.ToString(), new UTF8Encoding(false));
-            Console.WriteLine($"[FALLBACK] Session file: {sessionFile}");
+            Console.Error.WriteLine($"[FALLBACK] Session file: {sessionFile}");
 
             // ── 2. Create live MD + open in VS Code (replaces JSONL inject) ──
             var agentId = $"appbot-{cwdTag}";
@@ -303,7 +303,7 @@ internal partial class Program
             var args = $"agent {fallbackModel} \"{EscapeCmdArg(question)}\" \"{sessionFile}\" --agent-id {agentId}{liveMdArg}";
 
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[FALLBACK] Launching {fallbackModel} agent (id={agentId}, reason={errorReason})...");
+            Console.Error.WriteLine($"[FALLBACK] Launching {fallbackModel} agent (id={agentId}, reason={errorReason})...");
             Console.ResetColor();
 
             AppBotPipe.Spawn(corePath, args, cwd, caller: "EYE-GEMINI-FALLBACK");

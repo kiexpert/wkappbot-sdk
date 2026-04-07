@@ -65,7 +65,7 @@ internal partial class Program
         var deadline   = timeout > TimeSpan.Zero ? DateTime.UtcNow.Add(timeout) : DateTime.MaxValue;
         int totalBatch = 0, totalMoved = 0;
         if (timeout > TimeSpan.Zero)
-            Console.WriteLine($"[STUDY] Loop mode — timeout={timeout}, batch={batchSize}, engine={engine}");
+            Console.Error.WriteLine($"[STUDY] Loop mode — timeout={timeout}, batch={batchSize}, engine={engine}");
 
         while (!cts.IsCancellationRequested)
         {
@@ -77,7 +77,7 @@ internal partial class Program
                 break;
             }
             if (timeout > TimeSpan.Zero)
-                Console.WriteLine($"[STUDY] Remaining: {(int)remaining.TotalMinutes}m{remaining.Seconds:D2}s");
+                Console.Error.WriteLine($"[STUDY] Remaining: {(int)remaining.TotalMinutes}m{remaining.Seconds:D2}s");
 
             // ── Collect files ──
             var mp3Files = CollectMp3Files(wavDir, batchSize);
@@ -94,15 +94,15 @@ internal partial class Program
                 break;
             }
 
-            Console.WriteLine($"[STUDY] Batch #{totalBatch + 1}: {mp3Files.Count} files");
+            Console.Error.WriteLine($"[STUDY] Batch #{totalBatch + 1}: {mp3Files.Count} files");
             foreach (var f in mp3Files)
                 Console.WriteLine($"  {Path.GetRelativePath(wavDir, f)}");
 
             // ── STT re-labeling (offline) ──
-            Console.WriteLine($"[STUDY] STT re-labeling...");
+            Console.Error.WriteLine($"[STUDY] STT re-labeling...");
             var sttLabels = SttRelabelFiles(mp3Files);
             int sttOk = sttLabels.Values.Count(v => !string.IsNullOrEmpty(v.Text));
-            Console.WriteLine($"[STUDY] STT recognized {sttOk}/{mp3Files.Count}");
+            Console.Error.WriteLine($"[STUDY] STT recognized {sttOk}/{mp3Files.Count}");
 
             // ── Concat → batch MP3 (size-capped: select files by cumulative size) ──
             const long MaxBatchBytes  = 2 * 1024 * 1024; // 2MB total — safe for Gemini
@@ -120,7 +120,7 @@ internal partial class Program
                     cumSize += sz;
                 }
                 if (skipped > 0 || capped.Count < mp3Files.Count)
-                    Console.WriteLine($"[STUDY] Size cap: {mp3Files.Count} → {capped.Count} files ({cumSize / 1024}KB, skipped_large={skipped})");
+                    Console.Error.WriteLine($"[STUDY] Size cap: {mp3Files.Count} → {capped.Count} files ({cumSize / 1024}KB, skipped_large={skipped})");
                 if (capped.Count == 0)
                 {
                     Console.WriteLine("[STUDY] All files oversized — skipping batch.");
@@ -136,11 +136,11 @@ internal partial class Program
                 Console.WriteLine("[STUDY] Failed to concat MP3 files — skipping batch.");
                 break;
             }
-            Console.WriteLine($"[STUDY] Batch file: {new FileInfo(batchFile).Length / 1024}KB, {segmentMap.Count} segments");
+            Console.Error.WriteLine($"[STUDY] Batch file: {new FileInfo(batchFile).Length / 1024}KB, {segmentMap.Count} segments");
 
             // ── Prompt ──
             var prompt = BuildKaraokePrompt(segmentMap);
-            Console.WriteLine($"[STUDY] Prompt: {prompt.Length} chars");
+            Console.Error.WriteLine($"[STUDY] Prompt: {prompt.Length} chars");
 
             if (dryRun)
             {
@@ -166,14 +166,14 @@ internal partial class Program
 
             foreach (var (tierName, fresh, closeTab) in tiers)
             {
-                Console.WriteLine($"[STUDY] Tier [{tierName}] → {engine}...");
+                Console.Error.WriteLine($"[STUDY] Tier [{tierName}] → {engine}...");
 
                 if (closeTab)
                 {
                     // Close existing Gemini tab to force completely fresh state
                     try
                     {
-                        Console.WriteLine($"[STUDY] Closing existing {engine} tab...");
+                        Console.Error.WriteLine($"[STUDY] Closing existing {engine} tab...");
                         A11yCommand(["close", $"*Chrome*#{engine}*", "--force"]);
                         Thread.Sleep(2000);
                     }
@@ -184,21 +184,21 @@ internal partial class Program
                 if (success && !string.IsNullOrWhiteSpace(response))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"[STUDY] Tier [{tierName}] SUCCESS — {response.Length} chars");
+                    Console.Error.WriteLine($"[STUDY] Tier [{tierName}] SUCCESS — {response.Length} chars");
                     Console.ResetColor();
                     break;
                 }
 
                 failReason = tierName;
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[STUDY] Tier [{tierName}] FAILED — trying next tier...");
+                Console.Error.WriteLine($"[STUDY] Tier [{tierName}] FAILED — trying next tier...");
                 Console.ResetColor();
                 Thread.Sleep(1000);
             }
 
             if (!success || string.IsNullOrWhiteSpace(response))
             {
-                Console.WriteLine($"[STUDY] All tiers exhausted — keeping batch file for retry.");
+                Console.Error.WriteLine($"[STUDY] All tiers exhausted — keeping batch file for retry.");
                 // Notify via Slack with failure details
                 try
                 {
@@ -220,7 +220,7 @@ internal partial class Program
                 catch { }
                 if (timeout == TimeSpan.Zero) break; else continue;
             }
-            Console.WriteLine($"[STUDY] Response: {response.Length} chars");
+            Console.Error.WriteLine($"[STUDY] Response: {response.Length} chars");
 
             // ── Parse (retry with fresh tab if response looks like UI artifact) ──
             var studyResults = ParseStudyResponse(response, segmentMap);
@@ -244,7 +244,7 @@ internal partial class Program
                 if (timeout == TimeSpan.Zero) break;
                 continue; // loop mode: skip bad batch and try next
             }
-            Console.WriteLine($"[STUDY] Parsed {studyResults.Count} segments");
+            Console.Error.WriteLine($"[STUDY] Parsed {studyResults.Count} segments");
 
             // ── Move to label folders ──
             int moved = 0, quarantined = 0;
@@ -329,12 +329,12 @@ internal partial class Program
                 }
                 DropCompanionJson(destPath, result, sttLabels);
             }
-            Console.WriteLine($"[STUDY] Moved {moved}/{studyResults.Count}  quarantined={quarantined}");
+            Console.Error.WriteLine($"[STUDY] Moved {moved}/{studyResults.Count}  quarantined={quarantined}");
             totalMoved += moved;
 
             // ── Phoneme map + self-heal ──
             int mapped = BuildPhonemeMap(basePath, studyResults);
-            if (mapped > 0) Console.WriteLine($"[STUDY] Phoneme map: {mapped} new entries");
+            if (mapped > 0) Console.Error.WriteLine($"[STUDY] Phoneme map: {mapped} new entries");
             SaveStudyResults(basePath, studyResults);
             SelfHeal(basePath, wavDir);
 
@@ -369,7 +369,7 @@ internal partial class Program
                 int purged = 0;
                 foreach (var f in Directory.GetFiles(micDir2, "*.mp3"))
                     if (new FileInfo(f).Length == 0) { try { File.Delete(f); purged++; } catch { } }
-                if (purged > 0) Console.WriteLine($"[STUDY] Purged {purged} empty mic files");
+                if (purged > 0) Console.Error.WriteLine($"[STUDY] Purged {purged} empty mic files");
             }
 
             // ── Delete empty subdirectories ──
@@ -387,13 +387,13 @@ internal partial class Program
                 }
                 catch { }
             }
-            if (emptyDirs > 0) Console.WriteLine($"[STUDY] Removed {emptyDirs} empty folder(s)");
+            if (emptyDirs > 0) Console.Error.WriteLine($"[STUDY] Removed {emptyDirs} empty folder(s)");
 
             totalBatch++;
             if (timeout == TimeSpan.Zero) break; // single-shot mode — done after one batch
         }
 
-        Console.WriteLine($"[STUDY] Done — {totalBatch} batch(es), {totalMoved} files moved total");
+        Console.Error.WriteLine($"[STUDY] Done — {totalBatch} batch(es), {totalMoved} files moved total");
         return 0;
     }
 
@@ -493,7 +493,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[STUDY] Skip {Path.GetFileName(files[i])}: {ex.Message}");
+                    Console.Error.WriteLine($"[STUDY] Skip {Path.GetFileName(files[i])}: {ex.Message}");
                 }
             }
 
@@ -501,7 +501,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[STUDY] Concat failed: {ex.Message}");
+            Console.Error.WriteLine($"[STUDY] Concat failed: {ex.Message}");
             return null;
         }
     }
@@ -599,7 +599,7 @@ internal partial class Program
                 if (freshSession)
                     askArgs.Add("--new-session"); // clear stale tab context on retry
 
-                Console.WriteLine($"[STUDY] Calling: ask {engine} <{askArgs.Count - 2} lines> {Path.GetFileName(audioFile)} --timeout 120 --target-tag {engine}-whisper{(freshSession ? " --new-session" : "")}");
+                Console.Error.WriteLine($"[STUDY] Calling: ask {engine} <{askArgs.Count - 2} lines> {Path.GetFileName(audioFile)} --timeout 120 --target-tag {engine}-whisper{(freshSession ? " --new-session" : "")}");
                 _suppressSlackSession.Value = true; // internal sub-call — no Slack channel noise
                 AskCommand(askArgs.ToArray());
             }
@@ -698,7 +698,7 @@ internal partial class Program
             Console.WriteLine("[STT] No speech recognizer available");
             return results;
         }
-        Console.WriteLine($"[STT] Using: {chosen.Description} ({chosen.Culture.Name})");
+        Console.Error.WriteLine($"[STT] Using: {chosen.Description} ({chosen.Culture.Name})");
 
         for (int fi = 0; fi < mp3Files.Count; fi++)
         {
@@ -859,11 +859,11 @@ internal partial class Program
                     try
                     {
                         arr = JsonSerializer.Deserialize<JsonArray>(repaired);
-                        Console.WriteLine($"[STUDY] JSON repaired: truncated at char {lastClose}, recovered {arr?.Count ?? 0} segment(s)");
+                        Console.Error.WriteLine($"[STUDY] JSON repaired: truncated at char {lastClose}, recovered {arr?.Count ?? 0} segment(s)");
                     }
                     catch (Exception ex2)
                     {
-                        Console.WriteLine($"[STUDY] JSON parse error: {ex2.Message}");
+                        Console.Error.WriteLine($"[STUDY] JSON parse error: {ex2.Message}");
                     }
                 }
             }
@@ -920,7 +920,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[STUDY] JSON parse error: {ex.Message}");
+            Console.Error.WriteLine($"[STUDY] JSON parse error: {ex.Message}");
             return null;
         }
     }
@@ -935,7 +935,7 @@ internal partial class Program
         {
             writer.WriteLine(JsonSerializer.Serialize(r, opts));
         }
-        Console.WriteLine($"[STUDY] Results saved to {jsonlPath}");
+        Console.Error.WriteLine($"[STUDY] Results saved to {jsonlPath}");
     }
 
     /// <summary>Save raw response for debugging.</summary>
@@ -949,7 +949,7 @@ internal partial class Program
         sb.AppendLine("\n=== Raw Response ===");
         sb.AppendLine(response);
         File.WriteAllText(rawPath, sb.ToString());
-        Console.WriteLine($"[STUDY] Raw response saved to {rawPath}");
+        Console.Error.WriteLine($"[STUDY] Raw response saved to {rawPath}");
     }
 
     /// <summary>Sanitize STT text for embedding in filename (short, filesystem-safe).</summary>
@@ -1025,7 +1025,7 @@ internal partial class Program
         }
 
         var files = Directory.GetFiles(wavDir, "*.mp3");
-        Console.WriteLine($"[PRUNE] Scanning {files.Length} files in _unknown/ (min-tokens={minTokens}, max-unique={maxUnique}{(dryRun ? ", DRY-RUN" : "")})");
+        Console.Error.WriteLine($"[PRUNE] Scanning {files.Length} files in _unknown/ (min-tokens={minTokens}, max-unique={maxUnique}{(dryRun ? ", DRY-RUN" : "")})");
 
         int deleted = 0, kept = 0;
         foreach (var f in files)
@@ -1058,7 +1058,7 @@ internal partial class Program
                 kept++;
         }
 
-        Console.WriteLine($"[PRUNE] Done — {(dryRun ? "would delete" : "deleted")} {deleted}, kept {kept}");
+        Console.Error.WriteLine($"[PRUNE] Done — {(dryRun ? "would delete" : "deleted")} {deleted}, kept {kept}");
         return 0;
     }
 
@@ -1244,7 +1244,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[STUDY] Phoneme map error: {ex.Message}");
+            Console.Error.WriteLine($"[STUDY] Phoneme map error: {ex.Message}");
         }
         return count;
     }
@@ -1401,11 +1401,11 @@ internal partial class Program
             }
 
             if (conflicts > 0 || requeued > 0 || noiseMigrated > 0 || rePromoted > 0)
-                Console.WriteLine($"[HEAL] conflicts={conflicts} requeued={requeued} noise={noiseMigrated} canonical={canonical.Count} quarantine_requeue={rePromoted}");
+                Console.Error.WriteLine($"[HEAL] conflicts={conflicts} requeued={requeued} noise={noiseMigrated} canonical={canonical.Count} quarantine_requeue={rePromoted}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[HEAL] Error: {ex.Message}");
+            Console.Error.WriteLine($"[HEAL] Error: {ex.Message}");
         }
     }
 

@@ -165,7 +165,7 @@ internal partial class Program
                 {
                     var cwdTag = AbbreviateCwd(card.Cwd);
                     var label = string.IsNullOrEmpty(cwdTag) ? $"{card.ParentName}:{pid}" : $"[{cwdTag}] {card.ParentName}:{pid}";
-                    Console.WriteLine($"[DEAD_CARD] {label} — process gone");
+                    Console.Error.WriteLine($"[DEAD_CARD] {label} — process gone");
                     _cardHealthCache[pid] = "dead";
                     // Zombie cleanup attempt (no-op if already gone)
                     try { Process.GetProcessById(pid).Kill(); } catch { }
@@ -198,11 +198,11 @@ internal partial class Program
             {
                 var cwdTag = AbbreviateCwd(card.Cwd);
                 var label = string.IsNullOrEmpty(cwdTag) ? $"{card.ParentName}:{pid}" : $"[{cwdTag}] {card.ParentName}:{pid}";
-                Console.WriteLine($"[SLOW_CARD] {label} — WM_NULL={responseMs}ms (건강{healthPct}%)");
+                Console.Error.WriteLine($"[SLOW_CARD] {label} — WM_NULL={responseMs}ms (건강{healthPct}%)");
             }
             else if (health != "불량" && prevHealth == "불량")
             {
-                Console.WriteLine($"[HEALTH] {card.ParentName}:{pid} recovered → {responseMs}ms (건강{healthPct}%)");
+                Console.Error.WriteLine($"[HEALTH] {card.ParentName}:{pid} recovered → {responseMs}ms (건강{healthPct}%)");
             }
 
             // Annotate card for display (show health% if not perfect)
@@ -249,7 +249,7 @@ internal partial class Program
                     p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
                     ClaudePromptHelper.IsVsCodeHostType(p.HostType));
                 if (sw.ElapsedMilliseconds > 50)
-                    Console.WriteLine($"[EYE] FindAllPrompts(MCP): {sw.ElapsedMilliseconds}ms ({allPrompts.Count} prompts)");
+                    Console.Error.WriteLine($"[EYE] FindAllPrompts(MCP): {sw.ElapsedMilliseconds}ms ({allPrompts.Count} prompts)");
             }
             foreach (var p in allPrompts)
             {

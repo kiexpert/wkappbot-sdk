@@ -61,7 +61,7 @@ internal partial class Program
         const string sep = "──────────────────────────────────────────────────────────────────────";
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine(sep);
-        Console.WriteLine($"[NODE:BEFORE] action={action}");
+        Console.Error.WriteLine($"[NODE:BEFORE] action={action}");
         Console.ResetColor();
         PrintNodeDetail(el, hwnd, "  ");
         PrintAncestorChain(el, "  ");
@@ -81,7 +81,7 @@ internal partial class Program
         const string sep = "──────────────────────────────────────────────────────────────────────";
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine(sep);
-        Console.WriteLine($"[NODE:AFTER]  action={action}  result={(ok ? "OK ✓" : "FAIL ✗")}  elapsed={ms}ms");
+        Console.Error.WriteLine($"[NODE:AFTER]  action={action}  result={(ok ? "OK ✓" : "FAIL ✗")}  elapsed={ms}ms");
         Console.ResetColor();
 
         var after = CaptureNodeState(el);
@@ -127,7 +127,7 @@ internal partial class Program
         const string sep = "──────────────────────────────────────────────────────────────────────";
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(sep);
-        Console.WriteLine($"[MID-INPUT:ABORT] reason={reason}  context={context}");
+        Console.Error.WriteLine($"[MID-INPUT:ABORT] reason={reason}  context={context}");
         Console.ResetColor();
 
         // Win32 수준: 포그라운드 윈도우 vs 의도한 핸들

@@ -38,12 +38,12 @@ internal partial class Program
             var resp = http.Send(req);
             var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
-            Console.WriteLine($"[FETCH] {url}");
-            Console.WriteLine($"[FETCH] {(int)resp.StatusCode} {resp.StatusCode} | Content-Type: {resp.Content.Headers.ContentType}");
+            Console.Error.WriteLine($"[FETCH] {url}");
+            Console.Error.WriteLine($"[FETCH] {(int)resp.StatusCode} {resp.StatusCode} | Content-Type: {resp.Content.Headers.ContentType}");
 
             if (body.Length > maxChars)
             {
-                Console.WriteLine($"[FETCH] Truncated to {maxChars:N0} chars (total: {body.Length:N0})");
+                Console.Error.WriteLine($"[FETCH] Truncated to {maxChars:N0} chars (total: {body.Length:N0})");
                 body = body[..maxChars];
             }
 
@@ -80,7 +80,7 @@ internal partial class Program
         try
         {
             var searchUrl = $"https://www.google.com/search?q={Uri.EscapeDataString(query)}&num={Math.Min(limit, 20)}";
-            Console.WriteLine($"[SEARCH] \"{query}\" → {searchUrl}");
+            Console.Error.WriteLine($"[SEARCH] \"{query}\" → {searchUrl}");
 
             // Pass searchUrl as navigateUrl: EnsureCorrectWindowAsync will use a dedicated
             // web tab (not an AI chat tab) and navigate it to searchUrl directly.
@@ -140,7 +140,7 @@ internal partial class Program
                 return 0;
             }
 
-            Console.WriteLine($"[SEARCH] {results.Count} result(s)");
+            Console.Error.WriteLine($"[SEARCH] {results.Count} result(s)");
             var sb = new System.Text.StringBuilder();
             for (int i = 0; i < results.Count; i++)
             {
@@ -193,7 +193,7 @@ internal partial class Program
             // Pass url as navigateUrl: ensures a dedicated web tab, never steals an AI chat tab
             var cdp = ConnectCdp(port, withBar: false, navigateUrl: url);
 
-            Console.WriteLine($"[READ] Navigating: {url}");
+            Console.Error.WriteLine($"[READ] Navigating: {url}");
             cdp.NavigateAsync(url).GetAwaiter().GetResult();
 
             // Wait for main content via promise
@@ -219,12 +219,12 @@ internal partial class Program
                 text = System.Text.Json.JsonSerializer.Deserialize<string>(text) ?? "";
 
             var title = cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "";
-            Console.WriteLine($"[READ] {title}");
-            Console.WriteLine($"[READ] {text.Length:N0} chars");
+            Console.Error.WriteLine($"[READ] {title}");
+            Console.Error.WriteLine($"[READ] {text.Length:N0} chars");
 
             if (text.Length > maxChars)
             {
-                Console.WriteLine($"[READ] Truncated to {maxChars:N0} chars");
+                Console.Error.WriteLine($"[READ] Truncated to {maxChars:N0} chars");
                 text = text[..maxChars];
             }
 
@@ -289,7 +289,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SEARCH] UIA fallback error: {ex.Message}");
+            Console.Error.WriteLine($"[SEARCH] UIA fallback error: {ex.Message}");
         }
         return results;
     }

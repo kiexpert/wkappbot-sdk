@@ -259,7 +259,7 @@ internal partial class Program
             rp.Line($"step5: → {dispName} 0x{pi.WindowHandle:X} host={pi.HostType}");
             if (isDryRun)
             {
-                Console.WriteLine($"[DRY-RUN] would deliver to: {dispName} (0x{pi.WindowHandle:X} {pi.HostType})");
+                Console.Error.WriteLine($"[DRY-RUN] would deliver to: {dispName} (0x{pi.WindowHandle:X} {pi.HostType})");
                 results.Add(new DeliveryResult(dispName, true));
                 sent++;
                 continue;
@@ -286,7 +286,7 @@ internal partial class Program
 
         if (isDryRun)
         {
-            Console.WriteLine($"[DRY-RUN] routing complete: {sent}/{targets.Count} target(s)");
+            Console.Error.WriteLine($"[DRY-RUN] routing complete: {sent}/{targets.Count} target(s)");
             rp.Finish("dry-run done");
             return 0;
         }
@@ -343,7 +343,7 @@ internal partial class Program
         }
         else
         {
-            Console.WriteLine($"[ROUTE] Ack send failed (thread={threadKey})");
+            Console.Error.WriteLine($"[ROUTE] Ack send failed (thread={threadKey})");
         }
     }
 
@@ -362,7 +362,7 @@ internal partial class Program
         }
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[ROUTE-FLUSH] Processing {dueItems.Count} due item(s)");
+        Console.Error.WriteLine($"[ROUTE-FLUSH] Processing {dueItems.Count} due item(s)");
         Console.ResetColor();
 
         foreach (var item in dueItems)

@@ -180,7 +180,7 @@ internal partial class Program
                 // Fall through to physical click
                 zoom?.UpdateStatus("포커스리스 불가 → 물리클릭...");
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"[WIN] Focusless unavailable ({pointReport.ResolvedDetail}) → fallback to physical click");
+                Console.Error.WriteLine($"[WIN] Focusless unavailable ({pointReport.ResolvedDetail}) → fallback to physical click");
                 Console.ResetColor();
             }
             catch (Exception ex)
@@ -192,7 +192,7 @@ internal partial class Program
                 }
                 zoom?.UpdateStatus($"ProbeAtPoint 오류 → 물리클릭...");
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"[WIN] ProbeAtPoint error ({ex.GetType().Name}) → fallback to physical click");
+                Console.Error.WriteLine($"[WIN] ProbeAtPoint error ({ex.GetType().Name}) → fallback to physical click");
                 Console.ResetColor();
             }
         }

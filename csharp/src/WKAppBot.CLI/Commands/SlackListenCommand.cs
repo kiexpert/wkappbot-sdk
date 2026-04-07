@@ -119,7 +119,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[SLACK] AI mode unavailable: {ex.Message}");
+                    Console.Error.WriteLine($"[SLACK] AI mode unavailable: {ex.Message}");
                     Console.WriteLine("[SLACK] Falling back to echo mode");
                 }
             }
@@ -145,13 +145,13 @@ internal partial class Program
             if (prompts.Count > 0)
             {
                 if (promptMissStreak >= 3)
-                    Console.WriteLine($"[SLACK] Prompt recovered after {promptMissStreak} miss(es): {prompts.Count} target(s)");
+                    Console.Error.WriteLine($"[SLACK] Prompt recovered after {promptMissStreak} miss(es): {prompts.Count} target(s)");
                 promptMissStreak = 0;
                 return prompts;
             }
 
             promptMissStreak++;
-            Console.WriteLine($"[SLACK] Prompt miss streak={promptMissStreak}");
+            Console.Error.WriteLine($"[SLACK] Prompt miss streak={promptMissStreak}");
             if (promptMissStreak < 3) return new List<ClaudePromptHelper.PromptInfo>();
 
             try
@@ -160,7 +160,7 @@ internal partial class Program
                 if (cwdPrompt != null)
                 {
                     promptMissStreak = 0;
-                    Console.WriteLine($"[SLACK] Prompt recovery succeeded (cwd): {cwdPrompt.HostType}");
+                    Console.Error.WriteLine($"[SLACK] Prompt recovery succeeded (cwd): {cwdPrompt.HostType}");
                     return new List<ClaudePromptHelper.PromptInfo> { cwdPrompt };
                 }
 
@@ -175,7 +175,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SLACK] Prompt recovery error: {ex.Message}");
+                Console.Error.WriteLine($"[SLACK] Prompt recovery error: {ex.Message}");
             }
 
             return new List<ClaudePromptHelper.PromptInfo>();
@@ -197,8 +197,8 @@ internal partial class Program
         if (startupPrompts.Count > 0)
         {
             var promptInfo = startupPrompts[0];
-            Console.WriteLine($"[SLACK] Prompt: {promptInfo.HostType} — {promptInfo.WindowTitle}");
-            Console.WriteLine($"[SLACK]   Rect: ({promptInfo.PromptRect.X},{promptInfo.PromptRect.Y} {promptInfo.PromptRect.Width}x{promptInfo.PromptRect.Height})");
+            Console.Error.WriteLine($"[SLACK] Prompt: {promptInfo.HostType} — {promptInfo.WindowTitle}");
+            Console.Error.WriteLine($"[SLACK]   Rect: ({promptInfo.PromptRect.X},{promptInfo.PromptRect.Y} {promptInfo.PromptRect.Width}x{promptInfo.PromptRect.Height})");
         }
         else
         {
@@ -212,8 +212,8 @@ internal partial class Program
         if (ai != null) modeStr.Add("AI");
         if (webBotMode) modeStr.Add(claudeMode ? "Claude" : "WebBot");
         var modeSuffix = $" + {string.Join(" + ", modeStr)}";
-        Console.WriteLine($"[SLACK] Instance: [{instanceName}]");
-        Console.WriteLine($"[SLACK] Starting Socket Mode listener{modeSuffix}...");
+        Console.Error.WriteLine($"[SLACK] Instance: [{instanceName}]");
+        Console.Error.WriteLine($"[SLACK] Starting Socket Mode listener{modeSuffix}...");
         Console.WriteLine("[SLACK] Press Ctrl+C to stop");
 
         using var slack = new SlackSocketClient();
@@ -256,7 +256,7 @@ internal partial class Program
                     {
                         ownMessageTimestamps.Add(sentTs);
                         activeThreads.Add(sentTs);
-                        Console.WriteLine($"[SLACK] Startup announcement sent (ts={sentTs})");
+                        Console.Error.WriteLine($"[SLACK] Startup announcement sent (ts={sentTs})");
                     }
                 }
                 else
@@ -268,7 +268,7 @@ internal partial class Program
         // Handle @mentions — always reply in-thread
         slack.OnMention += (msg) =>
         {
-            Console.WriteLine($"[SLACK] << @mention from {msg.User}: {msg.Text}");
+            Console.Error.WriteLine($"[SLACK] << @mention from {msg.User}: {msg.Text}");
 
             // Track last processed timestamp for catch-up
             SaveLastTs(msg.Channel, msg.Timestamp);
@@ -300,7 +300,7 @@ internal partial class Program
                 var replyHint = SlackReplySuffix(msg.User, threadKey, $"#{msg.Channel}");
                 if (!promptText.Contains("--msg", StringComparison.OrdinalIgnoreCase))
                     promptText = $"{cleanText}\n\n{replyHint}";
-                Console.WriteLine($"[SLACK] >> Typing into Claude prompt...");
+                Console.Error.WriteLine($"[SLACK] >> Typing into Claude prompt...");
 
                 var targets = ResolvePromptsWithRecovery();
                 if (targets.Count > 0)
@@ -311,7 +311,7 @@ internal partial class Program
                         promptHelper.TypeAndSubmit(target, promptText);
                         sent++;
                     }
-                    Console.WriteLine($"[SLACK] >> Sent to {sent}/{targets.Count} prompt(s)");
+                    Console.Error.WriteLine($"[SLACK] >> Sent to {sent}/{targets.Count} prompt(s)");
                 }
                 else
                 {
@@ -332,7 +332,7 @@ internal partial class Program
 
                 streamingThreadReplies.Enqueue((msg.User, msg.Text ?? "", msg.ThreadTs));
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[SLACK] Streaming msg got reply from {msg.User} -> will relocate");
+                Console.Error.WriteLine($"[SLACK] Streaming msg got reply from {msg.User} -> will relocate");
                 Console.ResetColor();
 
                 // Track this thread for future conversation
@@ -347,7 +347,7 @@ internal partial class Program
             {
                 streamingThreadReplies.Enqueue((msg.User, "__channel_msg__", statusTsForCapture));
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[SLACK] Channel msg from {msg.User} -> relocating status to bottom");
+                Console.Error.WriteLine($"[SLACK] Channel msg from {msg.User} -> relocating status to bottom");
                 Console.ResetColor();
                 // Don't return — continue processing (ping, keywords, etc.)
             }
@@ -359,7 +359,7 @@ internal partial class Program
                 if (trimmed == "핑" || trimmed == "ping")
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[SLACK] << ping from {msg.User}");
+                    Console.Error.WriteLine($"[SLACK] << ping from {msg.User}");
                     Console.ResetColor();
                     SaveLastTs(msg.Channel, msg.Timestamp);
 
@@ -374,7 +374,7 @@ internal partial class Program
                         // Track our own response so thread replies come to US
                         ownMessageTimestamps.Add(sentTs);
                         activeThreads.Add(sentTs);
-                        Console.WriteLine($"[SLACK] >> pong sent (ts={sentTs})");
+                        Console.Error.WriteLine($"[SLACK] >> pong sent (ts={sentTs})");
                     }
                     return;
                 }
@@ -388,7 +388,7 @@ internal partial class Program
                 {
                     activeThreads.Add(msg.ThreadTs);
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine($"[SLACK] Auto-tracking thread on bot's message (ts={msg.ThreadTs})");
+                    Console.Error.WriteLine($"[SLACK] Auto-tracking thread on bot's message (ts={msg.ThreadTs})");
                     Console.ResetColor();
                 }
             }
@@ -408,7 +408,7 @@ internal partial class Program
                         activeThreads.Remove(msg.ThreadTs);
                         ownMessageTimestamps.Remove(msg.ThreadTs);
                         Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.WriteLine($"[SLACK] << thread stopped by {msg.User} (ts={msg.ThreadTs})");
+                        Console.Error.WriteLine($"[SLACK] << thread stopped by {msg.User} (ts={msg.ThreadTs})");
                         Console.ResetColor();
                         // Send farewell in-thread
                         SlackSendViaApi(botToken!, msg.Channel, "알겠습니다~ 이 쓰레드에서 물러납니다!", msg.ThreadTs)
@@ -417,7 +417,7 @@ internal partial class Program
                     }
                 }
 
-                Console.WriteLine($"[SLACK] << thread reply from {msg.User}: {msg.Text}");
+                Console.Error.WriteLine($"[SLACK] << thread reply from {msg.User}: {msg.Text}");
                 SaveLastTs(msg.Channel, msg.Timestamp);
                 SaveReplyContext(msg.Channel, msg.ThreadTs!);
 
@@ -445,7 +445,7 @@ internal partial class Program
                     var replyHint = SlackReplySuffix(msg.User, replyThread, $"#{msg.Channel} thread");
                     if (!promptText.Contains("--msg", StringComparison.OrdinalIgnoreCase))
                         promptText = $"{cleanText}{threadContext}\n\n{replyHint}";
-                    Console.WriteLine($"[SLACK] >> Typing thread reply into Claude prompt...");
+                    Console.Error.WriteLine($"[SLACK] >> Typing thread reply into Claude prompt...");
 
                     var targets = ResolvePromptsWithRecovery();
                     if (targets.Count > 0)
@@ -456,7 +456,7 @@ internal partial class Program
                             promptHelper.TypeAndSubmit(target, promptText);
                             sent++;
                         }
-                        Console.WriteLine($"[SLACK] >> Sent thread reply to {sent}/{targets.Count} prompt(s)");
+                        Console.Error.WriteLine($"[SLACK] >> Sent thread reply to {sent}/{targets.Count} prompt(s)");
                     }
                     else
                     {
@@ -475,7 +475,7 @@ internal partial class Program
                 if (matchedKeyword != null)
                 {
                     Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.WriteLine($"[SLACK] << keyword hit \"{matchedKeyword}\" from {msg.User}: {msg.Text}");
+                    Console.Error.WriteLine($"[SLACK] << keyword hit \"{matchedKeyword}\" from {msg.User}: {msg.Text}");
                     Console.ResetColor();
                     SaveLastTs(msg.Channel, msg.Timestamp);
 
@@ -494,7 +494,7 @@ internal partial class Program
                         var replyHint = SlackReplySuffix(msg.User, threadKey, $"keyword:{matchedKeyword} #{msg.Channel}");
                         if (!promptText.Contains("--msg", StringComparison.OrdinalIgnoreCase))
                             promptText = $"{cleanText}\n\n{replyHint}";
-                        Console.WriteLine($"[SLACK] >> Typing keyword match into Claude prompt...");
+                        Console.Error.WriteLine($"[SLACK] >> Typing keyword match into Claude prompt...");
 
                         var targets = ResolvePromptsWithRecovery();
                         if (targets.Count > 0)
@@ -505,7 +505,7 @@ internal partial class Program
                                 promptHelper.TypeAndSubmit(target, promptText);
                                 sent++;
                             }
-                            Console.WriteLine($"[SLACK] >> Sent keyword match to {sent}/{targets.Count} prompt(s)");
+                            Console.Error.WriteLine($"[SLACK] >> Sent keyword match to {sent}/{targets.Count} prompt(s)");
                         }
                         else
                         {
@@ -516,7 +516,7 @@ internal partial class Program
                 }
             }
 
-            Console.WriteLine($"[SLACK] msg [{msg.Channel}] {msg.User}: {msg.Text}");
+            Console.Error.WriteLine($"[SLACK] msg [{msg.Channel}] {msg.User}: {msg.Text}");
         };
 
         // Keep display awake while daemon is running (prevent lock screen)
@@ -590,7 +590,7 @@ internal partial class Program
                             if (newTime != currentExeTime)
                             {
                                 // Someone replaced our EXE while we were renamed — restart
-                                Console.WriteLine($"[SLACK] Hot-reload: EXE updated ({currentExeTime:HH:mm:ss} → {newTime:HH:mm:ss})");
+                                Console.Error.WriteLine($"[SLACK] Hot-reload: EXE updated ({currentExeTime:HH:mm:ss} → {newTime:HH:mm:ss})");
                                 hotReload = true;
                                 break;
                             }
@@ -610,7 +610,7 @@ internal partial class Program
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[SLACK] Hot-reload check error: {ex.Message}");
+                        Console.Error.WriteLine($"[SLACK] Hot-reload check error: {ex.Message}");
                     }
                 }
 
@@ -641,7 +641,7 @@ internal partial class Program
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"[SLACK] WebBot monitor error: {ex.Message}");
+                            Console.Error.WriteLine($"[SLACK] WebBot monitor error: {ex.Message}");
                         }
                     }
                 }
@@ -689,7 +689,7 @@ internal partial class Program
         // Hot-reload: restart self with same arguments
         if (hotReload)
         {
-            Console.WriteLine($"[SLACK] Hot-reload: restarting {currentExePath}...");
+            Console.Error.WriteLine($"[SLACK] Hot-reload: restarting {currentExePath}...");
             try
             {
                 var cmdArgs = Environment.GetCommandLineArgs();
@@ -709,7 +709,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SLACK] Hot-reload restart failed: {ex.Message}");
+                Console.Error.WriteLine($"[SLACK] Hot-reload restart failed: {ex.Message}");
             }
         }
 
@@ -722,7 +722,7 @@ internal partial class Program
         // Check if already running
         if (IsSlackListenerRunning(out int existingPid))
         {
-            Console.WriteLine($"[SLACK] Listener already running (PID={existingPid})");
+            Console.Error.WriteLine($"[SLACK] Listener already running (PID={existingPid})");
             return 0;
         }
 
@@ -782,10 +782,10 @@ internal partial class Program
         Thread.Sleep(3000);
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[SLACK] Listener started in background (PID={process.Id})");
+        Console.Error.WriteLine($"[SLACK] Listener started in background (PID={process.Id})");
         Console.ResetColor();
-        Console.WriteLine($"[SLACK] Log: {logFile}");
-        Console.WriteLine($"[SLACK] Stop: wkappbot slack stop");
+        Console.Error.WriteLine($"[SLACK] Log: {logFile}");
+        Console.Error.WriteLine($"[SLACK] Stop: wkappbot slack stop");
 
         // Show first few lines of log (open with shared read to avoid lock conflict)
         try

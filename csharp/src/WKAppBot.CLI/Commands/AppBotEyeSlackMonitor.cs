@@ -37,14 +37,14 @@ internal partial class Program
                 return;
             }
             swStep.Stop();
-            Console.WriteLine($"[PROF:SLACK] LoadConfig={swStep.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"[PROF:SLACK] LoadConfig={swStep.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
             // ── Slack Step 2: auth.test (get bot user ID) — HTTP call ──
             swStep.Restart();
             var botUserId = SlackGetBotUserId(botToken);
             swStep.Stop();
-            Console.WriteLine($"[PROF:SLACK] auth.test={swStep.ElapsedMilliseconds}ms (botUserId={botUserId ?? "null"})");
+            Console.Error.WriteLine($"[PROF:SLACK] auth.test={swStep.ElapsedMilliseconds}ms (botUserId={botUserId ?? "null"})");
             Console.Out.Flush();
 
             // ── Slack Step 3: LoadLastTs ──
@@ -55,7 +55,7 @@ internal partial class Program
                 double.TryParse(lastTs, System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out lastTsDouble);
             swStep.Stop();
-            Console.WriteLine($"[PROF:SLACK] LoadLastTs={swStep.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"[PROF:SLACK] LoadLastTs={swStep.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
             // ── Slack Step 4: conversations.history — HTTP call ──
@@ -63,7 +63,7 @@ internal partial class Program
             var messages = SlackFetchHistoryAsync(botToken, channel, limit: 20)
                 .GetAwaiter().GetResult();
             swStep.Stop();
-            Console.WriteLine($"[PROF:SLACK] conversations.history={swStep.ElapsedMilliseconds}ms (msgs={messages.Count})");
+            Console.Error.WriteLine($"[PROF:SLACK] conversations.history={swStep.ElapsedMilliseconds}ms (msgs={messages.Count})");
             Console.Out.Flush();
 
             if (messages.Count == 0)
@@ -77,7 +77,7 @@ internal partial class Program
             swStep.Restart();
             WKAppBot.Win32.Native.ScreenReaderMode.Enable();
             swStep.Stop();
-            Console.WriteLine($"[PROF:SLACK] ScreenReaderBroadcast={swStep.ElapsedMilliseconds}ms (enabled={WKAppBot.Win32.Native.ScreenReaderMode.IsEnabled})");
+            Console.Error.WriteLine($"[PROF:SLACK] ScreenReaderBroadcast={swStep.ElapsedMilliseconds}ms (enabled={WKAppBot.Win32.Native.ScreenReaderMode.IsEnabled})");
             Console.Out.Flush();
 
             // ClaudePromptHelper removed — all UIA goes through MCP subprocess
@@ -115,7 +115,7 @@ internal partial class Program
                 newMsgs.Add((user, text, msgTs));
             }
             swStep.Stop();
-            Console.WriteLine($"[PROF:SLACK] FilterMessages={swStep.ElapsedMilliseconds}ms (new={newMsgs.Count})");
+            Console.Error.WriteLine($"[PROF:SLACK] FilterMessages={swStep.ElapsedMilliseconds}ms (new={newMsgs.Count})");
             Console.Out.Flush();
 
             if (newMsgs.Count == 0)
@@ -125,20 +125,20 @@ internal partial class Program
                 swStep.Restart();
                 EyeTickCheckThreadReplies(messages, botToken, channel, botUserId);
                 swStep.Stop();
-                Console.WriteLine($"[PROF:SLACK] ThreadReplies={swStep.ElapsedMilliseconds}ms");
+                Console.Error.WriteLine($"[PROF:SLACK] ThreadReplies={swStep.ElapsedMilliseconds}ms");
                 Console.Out.Flush();
                 return;
             }
 
             newMsgs.Reverse();
-            Console.WriteLine($"[EYE_TICK] slack={newMsgs.Count} new message(s) — forwarding to AI prompt...");
+            Console.Error.WriteLine($"[EYE_TICK] slack={newMsgs.Count} new message(s) — forwarding to AI prompt...");
             Console.Out.Flush();
 
             // ── Slack Step 7: FindPrompt (UIA tree walk) ──
             swStep.Restart();
             var promptInfo = FindSlackPreferredPromptViaMcp();
             swStep.Stop();
-            Console.WriteLine($"[PROF:SLACK] FindPrompt={swStep.ElapsedMilliseconds}ms (found={promptInfo != null}, host={promptInfo?.HostType ?? "n/a"})");
+            Console.Error.WriteLine($"[PROF:SLACK] FindPrompt={swStep.ElapsedMilliseconds}ms (found={promptInfo != null}, host={promptInfo?.HostType ?? "n/a"})");
             Console.Out.Flush();
             if (promptInfo == null)
             {
@@ -161,7 +161,7 @@ internal partial class Program
                 swStep.Restart();
                 var fresh = FindSlackPreferredPromptViaMcp();
                 swStep.Stop();
-                Console.WriteLine($"[PROF:SLACK] Re-FindPrompt={swStep.ElapsedMilliseconds}ms");
+                Console.Error.WriteLine($"[PROF:SLACK] Re-FindPrompt={swStep.ElapsedMilliseconds}ms");
                 Console.Out.Flush();
                 if (fresh == null)
                 {
@@ -170,18 +170,18 @@ internal partial class Program
                     break;
                 }
 
-                Console.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → {fresh.HostType} prompt");
+                Console.Error.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → {fresh.HostType} prompt");
                 Console.Out.Flush();
                 swStep.Restart();
                 var ok = TypeAndSubmitViaMcp(fresh, promptText);
                 swStep.Stop();
-                Console.WriteLine($"[PROF:SLACK] TypeAndSubmit={swStep.ElapsedMilliseconds}ms (ok={ok})");
+                Console.Error.WriteLine($"[PROF:SLACK] TypeAndSubmit={swStep.ElapsedMilliseconds}ms (ok={ok})");
                 Console.Out.Flush();
                 if (ok)
                 {
                     forwarded++;
                     latestTs = msgTs;
-                    Console.WriteLine($"[EYE_TICK] [DELIVERED] Slack @{user}: {cleanText}");
+                    Console.Error.WriteLine($"[EYE_TICK] [DELIVERED] Slack @{user}: {cleanText}");
 
                     try
                     {
@@ -190,7 +190,7 @@ internal partial class Program
                         var (ackOk, ackTs) = SlackSendViaApi(botToken, channel, ackText, msgTs, username: "앱봇아이")
                             .GetAwaiter().GetResult();
                         swStep.Stop();
-                        Console.WriteLine($"[PROF:SLACK] AckSend={swStep.ElapsedMilliseconds}ms (ok={ackOk})");
+                        Console.Error.WriteLine($"[PROF:SLACK] AckSend={swStep.ElapsedMilliseconds}ms (ok={ackOk})");
                         Console.Out.Flush();
                         if (ackOk && ackTs != null)
                             SavePendingAck(msgTs, channel, ackTs);
@@ -202,7 +202,7 @@ internal partial class Program
                 }
                 else
                 {
-                    Console.WriteLine($"[EYE_TICK] WARNING: TypeAndSubmit failed for @{user}");
+                    Console.Error.WriteLine($"[EYE_TICK] WARNING: TypeAndSubmit failed for @{user}");
                     Console.Out.Flush();
                 }
             }
@@ -210,20 +210,20 @@ internal partial class Program
             if (latestTs != null)
             {
                 SaveLastTs(channel, latestTs);
-                Console.WriteLine($"[EYE_TICK] slack forwarded={forwarded}/{newMsgs.Count} — lastTs updated");
+                Console.Error.WriteLine($"[EYE_TICK] slack forwarded={forwarded}/{newMsgs.Count} — lastTs updated");
             }
 
             // ── Thread reply detection ──
             swStep.Restart();
             EyeTickCheckThreadReplies(messages, botToken, channel, botUserId);
             swStep.Stop();
-            Console.WriteLine($"[PROF:SLACK] ThreadReplies={swStep.ElapsedMilliseconds}ms");
-            Console.WriteLine($"[PROF:SLACK] SlackTotal={swSlack.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"[PROF:SLACK] ThreadReplies={swStep.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"[PROF:SLACK] SlackTotal={swSlack.ElapsedMilliseconds}ms");
             Console.Out.Flush();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE_TICK] slack error: {ex.Message}");
+            Console.Error.WriteLine($"[EYE_TICK] slack error: {ex.Message}");
             Console.Out.Flush();
         }
     }
@@ -336,13 +336,13 @@ internal partial class Program
                         return;
                     }
 
-                    Console.WriteLine($"[EYE_TICK] [FORWARD] Thread @{rUser} → {fresh.HostType} prompt");
+                    Console.Error.WriteLine($"[EYE_TICK] [FORWARD] Thread @{rUser} → {fresh.HostType} prompt");
                     var ok = TypeAndSubmitViaMcp(fresh, promptText);
                     if (ok)
                     {
                         threadReplies++;
                         latestReplyTs = rTs;
-                        Console.WriteLine($"[EYE_TICK] [DELIVERED] Thread @{rUser}: {cleanReply}");
+                        Console.Error.WriteLine($"[EYE_TICK] [DELIVERED] Thread @{rUser}: {cleanReply}");
 
                         // Send "전달했습니다" ack — deleted when slack reply is sent
                         try
@@ -365,11 +365,11 @@ internal partial class Program
             }
 
             if (threadReplies > 0)
-                Console.WriteLine($"[EYE_TICK] thread_replies={threadReplies} forwarded");
+                Console.Error.WriteLine($"[EYE_TICK] thread_replies={threadReplies} forwarded");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE_TICK] thread check error: {ex.Message}");
+            Console.Error.WriteLine($"[EYE_TICK] thread check error: {ex.Message}");
         }
     }
 

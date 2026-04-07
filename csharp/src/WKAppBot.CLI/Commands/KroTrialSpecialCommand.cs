@@ -27,7 +27,7 @@ internal partial class Program
         if (File.Exists(bakPath))
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"[KRO-TRIAL] history found: {bakPath}");
+            Console.Error.WriteLine($"[KRO-TRIAL] history found: {bakPath}");
             Console.ResetColor();
         }
 
@@ -46,7 +46,7 @@ internal partial class Program
             Console.ResetColor();
         }
 
-        Console.WriteLine($"[KRO-TRIAL] delegating to real input command (date={yyyymmdd})");
+        Console.Error.WriteLine($"[KRO-TRIAL] delegating to real input command (date={yyyymmdd})");
         return InputCommand(inputArgs);
     }
 

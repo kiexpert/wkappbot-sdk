@@ -136,20 +136,20 @@ internal partial class Program
         var id = ScheduleManager.Add(item);
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[SCHEDULE] Added: {id} ({item.Type})");
+        Console.Error.WriteLine($"[SCHEDULE] Added: {id} ({item.Type})");
         Console.ResetColor();
 
         if (!string.IsNullOrEmpty(item.ExecuteAt) && DateTime.TryParse(item.ExecuteAt, out var dt))
-            Console.WriteLine($"[SCHEDULE] Execute at: {dt:yyyy-MM-dd HH:mm}");
+            Console.Error.WriteLine($"[SCHEDULE] Execute at: {dt:yyyy-MM-dd HH:mm}");
         if (item.Type == "on_limit_reset")
             Console.WriteLine("[SCHEDULE] Trigger: rate limit reset detected by AppBotEye");
         if (!string.IsNullOrEmpty(item.Interval))
-            Console.WriteLine($"[SCHEDULE] Interval: {item.Interval}");
+            Console.Error.WriteLine($"[SCHEDULE] Interval: {item.Interval}");
 
         var promptPreview = item.Command ?? item.Prompt ?? $"(file: {item.PromptFile})";
         if (promptPreview.Length > 60) promptPreview = promptPreview[..57] + "...";
-        Console.WriteLine($"[SCHEDULE] Prompt: {promptPreview}");
-        Console.WriteLine($"[SCHEDULE] File: {ScheduleManager.FilePath}");
+        Console.Error.WriteLine($"[SCHEDULE] Prompt: {promptPreview}");
+        Console.Error.WriteLine($"[SCHEDULE] File: {ScheduleManager.FilePath}");
 
         // Register with Windows Task Scheduler for once/recurring — survives Eye kill
         if (item.Type is "once" or "recurring" && !string.IsNullOrEmpty(item.ExecuteAt)
@@ -176,9 +176,9 @@ internal partial class Program
             using var p = AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo(
                 "schtasks.exe", schtasksArgs) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true }, Environment.CurrentDirectory, "SCHEDULE")!;
             p.WaitForExit(5000);
-            Console.WriteLine($"[SCHEDULE] schtasks registered: {taskName} at {executeAt:HH:mm}");
+            Console.Error.WriteLine($"[SCHEDULE] schtasks registered: {taskName} at {executeAt:HH:mm}");
         }
-        catch (Exception ex) { Console.WriteLine($"[SCHEDULE] schtasks register failed: {ex.Message}"); }
+        catch (Exception ex) { Console.Error.WriteLine($"[SCHEDULE] schtasks register failed: {ex.Message}"); }
     }
 
     /// <summary>Delete Windows Task Scheduler entry for this schedule item.</summary>
@@ -234,11 +234,11 @@ internal partial class Program
         if (file.Schedules.Count == 0)
         {
             Console.WriteLine("[SCHEDULE] No schedules");
-            Console.WriteLine($"[SCHEDULE] File: {ScheduleManager.FilePath}");
+            Console.Error.WriteLine($"[SCHEDULE] File: {ScheduleManager.FilePath}");
             return 0;
         }
 
-        Console.WriteLine($"[SCHEDULE] {file.Schedules.Count} schedule(s):");
+        Console.Error.WriteLine($"[SCHEDULE] {file.Schedules.Count} schedule(s):");
         Console.WriteLine();
 
         foreach (var s in file.Schedules)
@@ -279,7 +279,7 @@ internal partial class Program
         }
 
         Console.WriteLine();
-        Console.WriteLine($"[SCHEDULE] File: {ScheduleManager.FilePath}");
+        Console.Error.WriteLine($"[SCHEDULE] File: {ScheduleManager.FilePath}");
         return 0;
     }
 
@@ -293,13 +293,13 @@ internal partial class Program
         {
             DeleteSchtask(id);
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[SCHEDULE] Removed: {id}");
+            Console.Error.WriteLine($"[SCHEDULE] Removed: {id}");
             Console.ResetColor();
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[SCHEDULE] Not found: {id}");
+            Console.Error.WriteLine($"[SCHEDULE] Not found: {id}");
             Console.ResetColor();
         }
         return 0;
@@ -310,7 +310,7 @@ internal partial class Program
         bool onlyPending = args.Contains("--pending");
         var count = ScheduleManager.Clear(onlyPending);
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[SCHEDULE] Cleared {count} schedule(s){(onlyPending ? " (pending only)" : "")}");
+        Console.Error.WriteLine($"[SCHEDULE] Cleared {count} schedule(s){(onlyPending ? " (pending only)" : "")}");
         Console.ResetColor();
         return 0;
     }

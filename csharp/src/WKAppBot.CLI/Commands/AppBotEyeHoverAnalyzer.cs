@@ -373,17 +373,17 @@ internal partial class Program
                 if (ccaReply != null)
                 {
                     _mouseCcaReplyTs = ccaReply["ts"]?.GetValue<string>();
-                    Console.WriteLine($"[ANALYSIS] Reusing existing CCABot reply ts={_mouseCcaReplyTs}");
+                    Console.Error.WriteLine($"[ANALYSIS] Reusing existing CCABot reply ts={_mouseCcaReplyTs}");
                 }
                 else
                 {
                     var (ok1, ts1) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "Analyzing...",
                         threadTs: _eyeStatusTs, username: "CCABot");
                     if (ok1 && ts1 != null) _mouseCcaReplyTs = ts1;
-                    Console.WriteLine($"[ANALYSIS] Created new CCABot reply ts={_mouseCcaReplyTs}");
+                    Console.Error.WriteLine($"[ANALYSIS] Created new CCABot reply ts={_mouseCcaReplyTs}");
                 }
 
-                Console.WriteLine($"[ANALYSIS] Replies ready: mouse={_mouseCcaReplyTs != null}");
+                Console.Error.WriteLine($"[ANALYSIS] Replies ready: mouse={_mouseCcaReplyTs != null}");
             }
             catch { }
         }
@@ -512,7 +512,7 @@ internal partial class Program
                     y = pt.Y,
                     headline = serverResult.Split('\n')[0]
                 });
-                Console.WriteLine($"[ANALYSIS] mouse: {serverResult.Split('\n')[0]}");
+                Console.Error.WriteLine($"[ANALYSIS] mouse: {serverResult.Split('\n')[0]}");
                 TryLaunchLiveA11yHack(grapPath, "mouse", serverResult.Split('\n')[0]);
                 } // end if (doMouse)
 
@@ -533,7 +533,7 @@ internal partial class Program
                             if (focusHeadline != _lastFocusChainResult)
                             {
                                 _lastFocusChainResult = focusHeadline;
-                                Console.WriteLine($"[ANALYSIS] focus: {focusHeadline}");
+                                Console.Error.WriteLine($"[ANALYSIS] focus: {focusHeadline}");
                                 TryLaunchLiveA11yHack(fGrap, "focus", focusHeadline);
                             }
                         }
@@ -542,7 +542,7 @@ internal partial class Program
                 catch { }
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception ex) { Console.WriteLine($"[ANALYSIS] Error: {ex.Message}"); }
+            catch (Exception ex) { Console.Error.WriteLine($"[ANALYSIS] Error: {ex.Message}"); }
         }
 
         // Cleanup server process
@@ -557,7 +557,7 @@ internal partial class Program
     /// </summary>
     internal static void RestoreHoverReplyTs(string? mouseTs, string? _)
     {
-        if (mouseTs != null) { _mouseCcaReplyTs = mouseTs; Console.WriteLine($"[EYE] Restored mouse CCA reply ts={mouseTs}"); }
+        if (mouseTs != null) { _mouseCcaReplyTs = mouseTs; Console.Error.WriteLine($"[EYE] Restored mouse CCA reply ts={mouseTs}"); }
     }
 
     // Track uploaded snippet message ts for delete→reupload cycle

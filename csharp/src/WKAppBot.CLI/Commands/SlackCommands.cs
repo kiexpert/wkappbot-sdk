@@ -77,7 +77,7 @@ internal partial class Program
         if (IsSlackListenerRunning(out int pid))
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[SLACK] Listener is RUNNING (PID={pid})");
+            Console.Error.WriteLine($"[SLACK] Listener is RUNNING (PID={pid})");
             Console.ResetColor();
         }
         else
@@ -103,7 +103,7 @@ internal partial class Program
             var proc = Process.GetProcessById(pid);
 
             // Phase 1: graceful — write stop signal file, wait up to 10s
-            Console.WriteLine($"[SLACK] Sending stop signal to PID={pid}...");
+            Console.Error.WriteLine($"[SLACK] Sending stop signal to PID={pid}...");
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(SlackStopSignalFile)!);
@@ -113,20 +113,20 @@ internal partial class Program
 
             if (proc.WaitForExit(10_000))
             {
-                Console.WriteLine($"[SLACK] Listener stopped gracefully (PID={pid})");
+                Console.Error.WriteLine($"[SLACK] Listener stopped gracefully (PID={pid})");
                 DeletePidFile();
                 return 0;
             }
 
             // Phase 2: force kill
-            Console.WriteLine($"[SLACK] Graceful timeout — force killing PID={pid}...");
+            Console.Error.WriteLine($"[SLACK] Graceful timeout — force killing PID={pid}...");
             proc.Kill(entireProcessTree: true);
             proc.WaitForExit(3000);
-            Console.WriteLine($"[SLACK] Listener killed (PID={pid})");
+            Console.Error.WriteLine($"[SLACK] Listener killed (PID={pid})");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SLACK] Failed to stop PID={pid}: {ex.Message}");
+            Console.Error.WriteLine($"[SLACK] Failed to stop PID={pid}: {ex.Message}");
         }
 
         try { File.Delete(SlackStopSignalFile); } catch { }
@@ -225,7 +225,7 @@ internal partial class Program
         // Bash history expansion escapes ! to \! even in single quotes — undo it
         message = message.Replace("\\!", "!");
         var _firstLine = message.Split('\n')[0];
-        Console.WriteLine($"[SLACK-DBG] send len={message.Length} lines={message.Split('\n').Length} isStatus={IsStatusEmoji(message)} firstLine={_firstLine[..Math.Min(_firstLine.Length, 60)]}");
+        Console.Error.WriteLine($"[SLACK-DBG] send len={message.Length} lines={message.Split('\n').Length} isStatus={IsStatusEmoji(message)} firstLine={_firstLine[..Math.Min(_firstLine.Length, 60)]}");
 
 
         var config = LoadSlackConfig();
@@ -243,12 +243,12 @@ internal partial class Program
         var senderName = GetSendReplyUsername(printDecision: true);
         if (dryRun)
         {
-            Console.WriteLine($"[SLACK] DRY-RUN bot-name={senderName} cwd={EyeCmdPipeServer.CallerCwd.Value}");
-            Console.WriteLine($"[SLACK] DRY-RUN message-lines={message.Split('\n').Length} files={filePaths.Count}");
+            Console.Error.WriteLine($"[SLACK] DRY-RUN bot-name={senderName} cwd={EyeCmdPipeServer.CallerCwd.Value}");
+            Console.Error.WriteLine($"[SLACK] DRY-RUN message-lines={message.Split('\n').Length} files={filePaths.Count}");
             if (!string.IsNullOrWhiteSpace(message))
-                Console.WriteLine($"[SLACK] DRY-RUN preview: {message.Replace("\r", "\\r").Replace("\n", "\\n")}");
+                Console.Error.WriteLine($"[SLACK] DRY-RUN preview: {message.Replace("\r", "\\r").Replace("\n", "\\n")}");
             foreach (var fp in filePaths)
-                Console.WriteLine($"[SLACK] DRY-RUN upload: {fp}");
+                Console.Error.WriteLine($"[SLACK] DRY-RUN upload: {fp}");
             return 0;
         }
 
@@ -261,7 +261,7 @@ internal partial class Program
                 return 1;
             }
             threadTs = ts;
-            Console.WriteLine($"[SLACK] Sent: {message.Split('\n')[0]}{(ts != null ? " (+thread)" : "")}");
+            Console.Error.WriteLine($"[SLACK] Sent: {message.Split('\n')[0]}{(ts != null ? " (+thread)" : "")}");
             if (GetCustomSlackIcon(EyeCmdPipeServer.CallerCwd.Value) == null)
                 Console.WriteLine("[SLACK] 💡 Tip: 프로필 이모찌 커스텀 → {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
         }
@@ -317,7 +317,7 @@ internal partial class Program
             var chunks = ChunkText(overflow, 3900);
             foreach (var chunk in chunks)
                 SlackSendViaApi(botToken, channel, chunk, threadTs: ts, username: username).GetAwaiter().GetResult();
-            Console.WriteLine($"[SLACK] Thread: {overflow.Split('\n').Length} lines → {chunks.Count} chunk(s)");
+            Console.Error.WriteLine($"[SLACK] Thread: {overflow.Split('\n').Length} lines → {chunks.Count} chunk(s)");
         }
         return (true, ts);
     }
@@ -372,11 +372,11 @@ internal partial class Program
             var team = json?["team"]?.GetValue<string>();
             var user = json?["user"]?.GetValue<string>();
             var userId = json?["user_id"]?.GetValue<string>();
-            Console.WriteLine($"[SLACK] auth.test OK — team={team}, bot={user} ({userId})");
+            Console.Error.WriteLine($"[SLACK] auth.test OK — team={team}, bot={user} ({userId})");
         }
         else
         {
-            Console.WriteLine($"[SLACK] auth.test FAILED: {json?["error"]}");
+            Console.Error.WriteLine($"[SLACK] auth.test FAILED: {json?["error"]}");
             return 1;
         }
 
@@ -464,7 +464,7 @@ internal partial class Program
         if (!ok)
         {
             var error = json?["error"]?.GetValue<string>() ?? "";
-            Console.WriteLine($"[SLACK] API error: {error}");
+            Console.Error.WriteLine($"[SLACK] API error: {error}");
 
             // ── message_limit fallback: merge into existing message (thread replies only) ──
             // Channel messages: no merge — orphan cleanup handles spam instead
@@ -491,7 +491,7 @@ internal partial class Program
                         var (updOk, _, _) = await SlackUpdateMessageAsync(botToken, channel, appendTs, combined);
                         if (updOk)
                         {
-                            Console.WriteLine($"[SLACK] message_limit → appended to {appendTs} ({username}, {combined.Length}ch)");
+                            Console.Error.WriteLine($"[SLACK] message_limit → appended to {appendTs} ({username}, {combined.Length}ch)");
                             return (true, appendTs);
                         }
                     }
@@ -589,7 +589,7 @@ internal partial class Program
                     foreach (var ts in toDelete)
                     {
                         await SlackDeleteMessageAsync(botToken, channel, ts, guardThreadStarter: false, skipLastMsgProtection: true);
-                        Console.WriteLine($"[EYE] Deleted old status ts={ts}");
+                        Console.Error.WriteLine($"[EYE] Deleted old status ts={ts}");
                     }
                 });
             }
@@ -707,7 +707,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SLACK] response_url error: {ex.Message}");
+            Console.Error.WriteLine($"[SLACK] response_url error: {ex.Message}");
         }
     }
 
@@ -742,7 +742,7 @@ internal partial class Program
         var ok = json?["ok"]?.GetValue<bool>() ?? false;
 
         if (!ok)
-            Console.WriteLine($"[SLACK] Block API error: {json?["error"]}");
+            Console.Error.WriteLine($"[SLACK] Block API error: {json?["error"]}");
 
         var messageTs = json?["ts"]?.GetValue<string>();
         return (ok, messageTs);
@@ -933,7 +933,7 @@ internal partial class Program
         var ok = json?["ok"]?.GetValue<bool>() ?? false;
 
         if (!ok)
-            Console.WriteLine($"[SLACK] Schedule error: {json?["error"]}");
+            Console.Error.WriteLine($"[SLACK] Schedule error: {json?["error"]}");
 
         var scheduledId = json?["scheduled_message_id"]?.GetValue<string>();
         return (ok, scheduledId);
@@ -973,7 +973,7 @@ internal partial class Program
                 duration = TimeSpan.FromHours(amount);
             else
             {
-                Console.WriteLine($"[SLACK] Invalid duration: {value} (use 5m, 1h, 30s)");
+                Console.Error.WriteLine($"[SLACK] Invalid duration: {value} (use 5m, 1h, 30s)");
                 return 1;
             }
             postAt = DateTimeOffset.Now.Add(duration);
@@ -990,13 +990,13 @@ internal partial class Program
             }
             else
             {
-                Console.WriteLine($"[SLACK] Invalid time: {value} (use HH:mm like 14:30)");
+                Console.Error.WriteLine($"[SLACK] Invalid time: {value} (use HH:mm like 14:30)");
                 return 1;
             }
         }
         else
         {
-            Console.WriteLine($"[SLACK] Unknown flag: {flag} (use --in or --at)");
+            Console.Error.WriteLine($"[SLACK] Unknown flag: {flag} (use --in or --at)");
             return 1;
         }
 
@@ -1019,9 +1019,9 @@ internal partial class Program
         {
             var localTime = postAt.ToLocalTime().ToString("HH:mm:ss");
             var delta = postAt - DateTimeOffset.Now;
-            Console.WriteLine($"[SLACK] Scheduled: \"{message}\"");
-            Console.WriteLine($"[SLACK] Delivery: {localTime} ({delta.TotalMinutes:F0}분 후)");
-            Console.WriteLine($"[SLACK] ID: {scheduledId}");
+            Console.Error.WriteLine($"[SLACK] Scheduled: \"{message}\"");
+            Console.Error.WriteLine($"[SLACK] Delivery: {localTime} ({delta.TotalMinutes:F0}분 후)");
+            Console.Error.WriteLine($"[SLACK] ID: {scheduledId}");
         }
         else
             Console.WriteLine("[SLACK] Failed to schedule message");
@@ -1034,7 +1034,7 @@ internal partial class Program
         if (!File.Exists(SlackConfigPath))
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[SLACK] Config not found: {SlackConfigPath}");
+            Console.Error.WriteLine($"[SLACK] Config not found: {SlackConfigPath}");
             Console.ResetColor();
             Console.WriteLine();
             Console.WriteLine("Slack setup required — create the config file with these fields:");
@@ -1087,7 +1087,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SLACK] Failed to write inbox: {ex.Message}");
+            Console.Error.WriteLine($"[SLACK] Failed to write inbox: {ex.Message}");
         }
     }
 
@@ -1175,7 +1175,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SLACK] >> Accept keystroke failed: {ex.Message}");
+            Console.Error.WriteLine($"[SLACK] >> Accept keystroke failed: {ex.Message}");
             SlackSendViaApi(botToken, channel, $"수락 전송 실패: {ex.Message}", threadTs, username: BotUsername)
                 .GetAwaiter().GetResult();
         }
@@ -1229,7 +1229,7 @@ internal partial class Program
                         _displayNameCache[kv.Key] = displayName;
                 }
             }
-            Console.WriteLine($"[SLACK] Loaded {_displayNameCache.Count} known_users from config");
+            Console.Error.WriteLine($"[SLACK] Loaded {_displayNameCache.Count} known_users from config");
         }
         catch { }
     }
@@ -1326,7 +1326,7 @@ internal partial class Program
             if (args[i] == "--keep" && i + 1 < args.Length && int.TryParse(args[i + 1], out var k)) { keep = k; i++; }
         }
 
-        Console.WriteLine($"[SLACK:GC] keep={keep} per-author dry-run={dryRun}");
+        Console.Error.WriteLine($"[SLACK:GC] keep={keep} per-author dry-run={dryRun}");
 
         // Fetch recent channel history (up to 100 messages)
         List<JsonNode> allBotMsgs;
@@ -1339,14 +1339,14 @@ internal partial class Program
                           .GetAwaiter().GetResult();
             var json = JsonSerializer.Deserialize<JsonNode>(resp);
             if (json?["ok"]?.GetValue<bool>() != true)
-            { Console.WriteLine($"[SLACK:GC] history error: {json?["error"]}"); return 1; }
+            { Console.Error.WriteLine($"[SLACK:GC] history error: {json?["error"]}"); return 1; }
             // Bot messages with custom username (app-posted)
             allBotMsgs = (json["messages"]?.AsArray() ?? [])
                 .Where(m => m != null && !string.IsNullOrEmpty(m["username"]?.GetValue<string>()))
                 .Select(m => m!)
                 .ToList();
         }
-        catch (Exception ex) { Console.WriteLine($"[SLACK:GC] fetch error: {ex.Message}"); return 1; }
+        catch (Exception ex) { Console.Error.WriteLine($"[SLACK:GC] fetch error: {ex.Message}"); return 1; }
 
         // Build keep set: latest `keep` ts per author (Slack returns newest-first)
         var keepSet = new HashSet<string>();
@@ -1354,11 +1354,11 @@ internal partial class Program
         {
             var kept = grp.Take(keep).Select(m => m["ts"]?.GetValue<string>()).Where(t => t != null).ToList();
             foreach (var t in kept) keepSet.Add(t!);
-            Console.WriteLine($"[SLACK:GC] \"{grp.Key}\": {grp.Count()} msgs → keeping {kept.Count}");
+            Console.Error.WriteLine($"[SLACK:GC] \"{grp.Key}\": {grp.Count()} msgs → keeping {kept.Count}");
         }
 
         var toDelete = allBotMsgs.Where(m => !keepSet.Contains(m["ts"]?.GetValue<string>() ?? "")).ToList();
-        Console.WriteLine($"[SLACK:GC] {allBotMsgs.Count} bot msgs total → {toDelete.Count} to delete");
+        Console.Error.WriteLine($"[SLACK:GC] {allBotMsgs.Count} bot msgs total → {toDelete.Count} to delete");
         if (toDelete.Count == 0) { Console.WriteLine("[SLACK:GC] Nothing to delete."); return 0; }
         int deleted = 0, skipped = 0;
 
@@ -1411,7 +1411,7 @@ internal partial class Program
             Thread.Sleep(300);
         }
 
-        Console.WriteLine($"[SLACK:GC] Done — deleted={deleted} skipped={skipped}");
+        Console.Error.WriteLine($"[SLACK:GC] Done — deleted={deleted} skipped={skipped}");
         return 0;
     }
 

@@ -34,7 +34,7 @@ internal partial class Program
                 var hits = WindowFinder.FindByTitle(focusGrap, true);
                 fsw.Stop();
                 var focusOk = hits.Any(h => h.Handle == gti.hwndFocus);
-                Console.WriteLine($"[FOCUS] {focusGrap} // [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
+                Console.Error.WriteLine($"[FOCUS] {focusGrap} // [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
             }
         }
         catch { }
@@ -350,7 +350,7 @@ internal partial class Program
                 var tmpFile = Path.Combine(Path.GetTempPath(), $"{safeName}.txt");
                 File.WriteAllText(tmpFile, textContent, System.Text.Encoding.UTF8);
                 files.Insert(0, tmpFile);
-                Console.WriteLine($"[CLIPBOARD] text → {tmpFile}");
+                Console.Error.WriteLine($"[CLIPBOARD] text → {tmpFile}");
                 Console.WriteLine($"  preview: {textContent.Replace(Environment.NewLine, " | ")}");
                 return ClipboardWriteFiles(files.ToArray());
             }
@@ -465,7 +465,7 @@ internal partial class Program
             {
                 if (windowAncs.Contains(w.Handle))
                 {
-                    Console.WriteLine($"[GUARD] window-ancestor-protected (hwnd=0x{w.Handle:X}): \"{w.Title}\" — use --allow-ancestors to override");
+                    Console.Error.WriteLine($"[GUARD] window-ancestor-protected (hwnd=0x{w.Handle:X}): \"{w.Title}\" — use --allow-ancestors to override");
                     return true;
                 }
                 return false;
@@ -486,7 +486,7 @@ internal partial class Program
             var idleStr = idleMs >= 60000 ? $"{idleMs / 60000}m {idleMs / 1000 % 60}s"
                         : idleMs >= 1000  ? $"{idleMs / 1000.0:F1}s"
                         :                   $"{idleMs}ms";
-            Console.WriteLine($"[IDLE] user input {idleStr} ago");
+            Console.Error.WriteLine($"[IDLE] user input {idleStr} ago");
         }
 
         // ═══ STEP 3: Select targets ═══
@@ -529,7 +529,7 @@ internal partial class Program
             {
                 var w = allWindows[idx];
                 var marker = targets.Contains(w) ? ">" : " ";
-                Console.WriteLine($"[A11Y] {marker} #{idx + 1} {SearchKey(w)}");
+                Console.Error.WriteLine($"[A11Y] {marker} #{idx + 1} {SearchKey(w)}");
             }
         }
         else
@@ -540,7 +540,7 @@ internal partial class Program
         // ── JSON5 TARGET: usable as grap pattern in any command ──
         Console.ForegroundColor = ConsoleColor.Cyan;
         foreach (var t in targets)
-            Console.WriteLine($"[A11Y] TARGET: {WindowFinder.BuildTargetJson5(t.Handle)}");
+            Console.Error.WriteLine($"[A11Y] TARGET: {WindowFinder.BuildTargetJson5(t.Handle)}");
         Console.ResetColor();
 
         // ═══ STEP 4.5: Guard Layer 2+3 — modal alert + focused leaf ═══
@@ -565,7 +565,7 @@ internal partial class Program
         {
             Console.Error.WriteLine($"[A11Y] UIPI block: cannot traverse UIA on elevated target without admin rights");
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[A11Y] Target is admin (pid={_targetPid}) — elevation required for #scope access");
+            Console.Error.WriteLine($"[A11Y] Target is admin (pid={_targetPid}) — elevation required for #scope access");
             Console.ResetColor();
             return 1;
         }
@@ -593,7 +593,7 @@ internal partial class Program
                         .ToList();
                     if (pages.Count == 0) continue;
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[A11Y] Browser has {pages.Count} tab(s) — specify which to close with #hint:");
+                    Console.Error.WriteLine($"[A11Y] Browser has {pages.Count} tab(s) — specify which to close with #hint:");
                     Console.ResetColor();
                     foreach (var tab in pages)
                     {
@@ -645,7 +645,7 @@ internal partial class Program
                         if (tabId == null) continue;
                         http.GetStringAsync($"http://127.0.0.1:{cdpPort}/json/close/{tabId}").GetAwaiter().GetResult();
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"[A11Y] tab closed [{cdpPort}]: \"{tabTitle}\" ({tabUrl[..Math.Min(70, tabUrl.Length)]})");
+                        Console.Error.WriteLine($"[A11Y] tab closed [{cdpPort}]: \"{tabTitle}\" ({tabUrl[..Math.Min(70, tabUrl.Length)]})");
                         Console.ResetColor();
                         totalClosed++;
                     }
@@ -654,7 +654,7 @@ internal partial class Program
             }
             if (totalClosed > 0)
             {
-                Console.WriteLine($"[A11Y] Done: {totalClosed} tab(s) closed");
+                Console.Error.WriteLine($"[A11Y] Done: {totalClosed} tab(s) closed");
                 return 0;
             }
             // No CDP tab found — error, do NOT fall through to window close!
@@ -746,14 +746,14 @@ internal partial class Program
                     IntendedAction = action,
                 });
                 if (probeReport.UserYieldConfirmed)
-                    Console.WriteLine($"[A11Y] yield confirmed for {action}");
+                    Console.Error.WriteLine($"[A11Y] yield confirmed for {action}");
 
                 // ── Blocker retarget: 팝업이 타겟을 가리면 팝업으로 리타겟 ──
                 if (probeReport.ActiveBlocker != null)
                 {
                     var blocker = probeReport.ActiveBlocker;
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[A11Y] ⚠ RETARGET: [{blocker.ClassName}] \"{blocker.Title}\" blocking {tag}");
+                    Console.Error.WriteLine($"[A11Y] ⚠ RETARGET: [{blocker.ClassName}] \"{blocker.Title}\" blocking {tag}");
                     Console.ResetColor();
                     hwnd = blocker.Handle;
                     title = blocker.Title;
@@ -779,7 +779,7 @@ internal partial class Program
                     var jsPort = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)jsPid);
                     if (jsPort > 0)
                     {
-                        Console.WriteLine($"[A11Y] --eval-js: CDP port={jsPort} detected, JS-first tier");
+                        Console.Error.WriteLine($"[A11Y] --eval-js: CDP port={jsPort} detected, JS-first tier");
                         try
                         {
                             using var jsCdp = new WKAppBot.WebBot.CdpClient();
@@ -788,7 +788,7 @@ internal partial class Program
                             CdpSwitchToTabByHint(jsCdp, jsPort, hwnd, uiaPath, readOnly: true);
                             var jsResult = jsCdp.EvalAsync(evalJs).GetAwaiter().GetResult();
                             Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine($"[A11Y] --eval-js OK: {jsResult}");
+                            Console.Error.WriteLine($"[A11Y] --eval-js OK: {jsResult}");
                             Console.ResetColor();
                             ok++;
                             continue; // JS succeeded — skip UIA/Win32
@@ -817,7 +817,7 @@ internal partial class Program
                         continue;
                     }
                     // CDP not available → fall through to UIA (knock on the door)
-                    Console.WriteLine($"[A11Y] No CDP — falling through to UIA");
+                    Console.Error.WriteLine($"[A11Y] No CDP — falling through to UIA");
                 }
 
                 AutomationElement root;
@@ -857,7 +857,7 @@ internal partial class Program
                                     string melAid = ""; try { melAid = mel.Properties.AutomationId.ValueOrDefault ?? ""; } catch { }
                                     string melName = ""; try { melName = mel.Properties.Name.ValueOrDefault ?? ""; } catch { }
                                     var melTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(melType, melAid, mi + 1);
-                                    Console.WriteLine($"[A11Y]   #{mi + 1} {melTag} \"{mtxt}\" cov={mcov:P0}");
+                                    Console.Error.WriteLine($"[A11Y]   #{mi + 1} {melTag} \"{mtxt}\" cov={mcov:P0}");
                                 }
                             }
                             int elNth = 1;
@@ -906,7 +906,7 @@ internal partial class Program
                                         var mr3 = WKAppBot.Vision.CcaUiaFusedMatcher.Match(regions3, uias3);
                                         WKAppBot.Vision.CcaUiaFusedMatcher.SaveToExperienceDb(
                                             DataDir + "/experience", proc3, cls3, mr3);
-                                        Console.WriteLine($"[A11Y] Parallel CCA: {WKAppBot.Vision.CcaUiaFusedMatcher.Summarize(mr3)}");
+                                        Console.Error.WriteLine($"[A11Y] Parallel CCA: {WKAppBot.Vision.CcaUiaFusedMatcher.Summarize(mr3)}");
                                     }
                                 }
                                 catch { }
@@ -924,7 +924,7 @@ internal partial class Program
                             scoped = GrapHelper.FindUiaScope(root, uiaPath);
                         if (isUnknownPath && scoped != null)
                         {
-                            Console.WriteLine($"[A11Y] Unknown path '?' — listing available elements for analysis:");
+                            Console.Error.WriteLine($"[A11Y] Unknown path '?' — listing available elements for analysis:");
                             TargetAmbiguityGuard.ShowUiaScopeMiss(root, hwnd, "?", action);
                             // Also try element at current cursor position
                             try
@@ -940,7 +940,7 @@ internal partial class Program
                                     try { ptName = elAtPt.Properties.Name.ValueOrDefault ?? ""; } catch { }
                                     var ptTag = GrapHelper.FormatNodeTag(ptCt, ptAid);
                                     var ptPath = GrapHelper.BuildAbsoluteTagPath(elAtPt, uia2.TreeWalkerFactory.GetRawViewWalker());
-                                    Console.WriteLine($"[A11Y] Element at cursor: {ptTag} \"{ptName}\" → #{ptPath}");
+                                    Console.Error.WriteLine($"[A11Y] Element at cursor: {ptTag} \"{ptName}\" → #{ptPath}");
                                 }
                             }
                             catch { }
@@ -952,7 +952,7 @@ internal partial class Program
                         // UIA failed → try CDP telepathy as fallback (only if process has CDP port)
                         if (!isCssPattern && !string.IsNullOrEmpty(uiaPath) && hasCdpPort)
                         {
-                            Console.WriteLine($"[A11Y] UIA scope failed, trying CDP telepathy with \"{uiaPath}\"");
+                            Console.Error.WriteLine($"[A11Y] UIA scope failed, trying CDP telepathy with \"{uiaPath}\"");
                             var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak, hotkey, evalJs, timeoutMs, intervalMs);
                             if (cdpResult != null)
                             {
@@ -974,14 +974,14 @@ internal partial class Program
                                     DataDir + "/experience", expProc, expCls, uiaPath);
                                 if (expBounds.Width > 0 && expScore > 0.3)
                                 {
-                                    Console.WriteLine($"[A11Y] Experience DB hit: \"{uiaPath}\" → ({expBounds.X},{expBounds.Y} {expBounds.Width}x{expBounds.Height}) score={expScore:F2}");
+                                    Console.Error.WriteLine($"[A11Y] Experience DB hit: \"{uiaPath}\" → ({expBounds.X},{expBounds.Y} {expBounds.Width}x{expBounds.Height}) score={expScore:F2}");
                                     // Use experience bounds for click/invoke actions
                                     if (action is "click" or "invoke")
                                     {
                                         NativeMethods.GetWindowRect(hwnd, out var wr3);
                                         int cx = wr3.Left + expBounds.X + expBounds.Width / 2;
                                         int cy = wr3.Top + expBounds.Y + expBounds.Height / 2;
-                                        Console.WriteLine($"[A11Y] Experience click at ({cx},{cy})");
+                                        Console.Error.WriteLine($"[A11Y] Experience click at ({cx},{cy})");
                                         WKAppBot.Win32.Input.MouseInput.Click(cx, cy);
                                         ok++;
                                         continue;
@@ -1018,7 +1018,7 @@ internal partial class Program
                 try { var r = root.Properties.BoundingRectangle.ValueOrDefault; elBounds = new(r.X, r.Y, r.Width, r.Height); elRectStr = $" rect=({r.X},{r.Y} {r.Width}x{r.Height})"; } catch { }
 
                 var elNodeTag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
-                Console.WriteLine($"[A11Y] element: <{elNodeTag}>{elRectStr} in {tag}");
+                Console.Error.WriteLine($"[A11Y] element: <{elNodeTag}>{elRectStr} in {tag}");
 
                 // ── OCR gap analysis: detect missing text in element rect ──
                 // Applies to all elements wider than one character (~14px)
@@ -1097,14 +1097,14 @@ internal partial class Program
                                 if (gapCollector.Add(capturedBounds, displayText, elAid, out var cached1))
                                 {
                                     Console.ForegroundColor = ConsoleColor.DarkCyan;
-                                    Console.WriteLine($"[A11Y] Acquiring target context... \"{displayText}\"");
+                                    Console.Error.WriteLine($"[A11Y] Acquiring target context... \"{displayText}\"");
                                     Console.ResetColor();
                                 }
                                 else if (cached1 != null)
                                 {
                                     elName = cached1;
                                     Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.WriteLine($"[A11Y] Cache hit → \"{cached1}\"");
+                                    Console.Error.WriteLine($"[A11Y] Cache hit → \"{cached1}\"");
                                     Console.ResetColor();
                                 }
                             }
@@ -1113,7 +1113,7 @@ internal partial class Program
                                 // Full OCR success on blind node
                                 elName = string.Join(" ", sortedWords.Select(w => w.Text));
                                 Console.ForegroundColor = ConsoleColor.Yellow;
-                                Console.WriteLine($"[A11Y] OCR → \"{elName}\"");
+                                Console.Error.WriteLine($"[A11Y] OCR → \"{elName}\"");
                                 Console.ResetColor();
                             }
                         }
@@ -1125,14 +1125,14 @@ internal partial class Program
                             if (gapCollector.Add(capturedBounds, null, elAid, out var cached2))
                             {
                                 Console.ForegroundColor = ConsoleColor.DarkCyan;
-                                Console.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
+                                Console.Error.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
                                 Console.ResetColor();
                             }
                             else if (cached2 != null)
                             {
                                 elName = cached2;
                                 Console.ForegroundColor = ConsoleColor.Green;
-                                Console.WriteLine($"[A11Y] Cache hit → \"{cached2}\"");
+                                Console.Error.WriteLine($"[A11Y] Cache hit → \"{cached2}\"");
                                 Console.ResetColor();
                             }
                         }
@@ -1159,7 +1159,7 @@ internal partial class Program
                         if (gapCollector.HasGaps && string.IsNullOrWhiteSpace(elName) && string.IsNullOrWhiteSpace(elAid))
                         {
                             Console.ForegroundColor = ConsoleColor.Magenta;
-                            Console.WriteLine($"[A11Y] Auto-hack: {gapCollector.Count} blind segment(s) — checking cache...");
+                            Console.Error.WriteLine($"[A11Y] Auto-hack: {gapCollector.Count} blind segment(s) — checking cache...");
                             Console.ResetColor();
                             // Cache lookup by pixel hash (instant — no Vision call)
                             if (elBounds.HasValue)
@@ -1175,7 +1175,7 @@ internal partial class Program
                                     {
                                         elName = cacheHit;
                                         Console.ForegroundColor = ConsoleColor.Green;
-                                        Console.WriteLine($"[A11Y] Hack cache hit → \"{elName}\"");
+                                        Console.Error.WriteLine($"[A11Y] Hack cache hit → \"{elName}\"");
                                         Console.ResetColor();
                                     }
                                 }
@@ -1196,7 +1196,7 @@ internal partial class Program
                 {
                     var blockerInfo = readiness.DetectBlocker(hwnd);
                     if (blockerInfo != null)
-                        Console.WriteLine($"[BLOCK] Blocker detected: \"{blockerInfo.Title}\" (class={blockerInfo.ClassName}, hwnd=0x{blockerInfo.Handle.ToInt64():X8})");
+                        Console.Error.WriteLine($"[BLOCK] Blocker detected: \"{blockerInfo.Title}\" (class={blockerInfo.ClassName}, hwnd=0x{blockerInfo.Handle.ToInt64():X8})");
                 }
 
                 // ── AAR: element-level readiness check ──
@@ -1214,7 +1214,7 @@ internal partial class Program
                     if (aarResult != aarTarget)
                     {
                         // Retarget: AAR found a popup/modal — switch root
-                        Console.WriteLine($"[A11Y] AAR retarget: \"{aarResult.DisplayName}\"");
+                        Console.Error.WriteLine($"[A11Y] AAR retarget: \"{aarResult.DisplayName}\"");
                         if (aarResult is UiaActionTarget retargetUia)
                             root = retargetUia.Element;
                     }
@@ -1292,7 +1292,7 @@ internal partial class Program
                     {
                         var targetDesc = root?.Name ?? grap ?? "?";
                         Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.WriteLine($"[DRY-RUN] Would execute: a11y {action} {targetDesc}");
+                        Console.Error.WriteLine($"[DRY-RUN] Would execute: a11y {action} {targetDesc}");
                         Console.ResetColor();
                         success = true; // report success without side effects
                         break;
@@ -1319,11 +1319,11 @@ internal partial class Program
                     };
                     swIter.Stop();
                     if (countN > 1)
-                        Console.WriteLine($"[A11Y] [{ci+1}/{countN}] {(success?"ok":"FAIL")} {swIter.ElapsedMilliseconds}ms");
+                        Console.Error.WriteLine($"[A11Y] [{ci+1}/{countN}] {(success?"ok":"FAIL")} {swIter.ElapsedMilliseconds}ms");
                 }
                 swTotal.Stop();
                 if (countN > 1)
-                    Console.WriteLine($"[A11Y] stress: {countN} iters, total={swTotal.ElapsedMilliseconds}ms, avg={swTotal.ElapsedMilliseconds/countN}ms, rate={countN*1000.0/swTotal.ElapsedMilliseconds:F1}/s");
+                    Console.Error.WriteLine($"[A11Y] stress: {countN} iters, total={swTotal.ElapsedMilliseconds}ms, avg={swTotal.ElapsedMilliseconds/countN}ms, rate={countN*1000.0/swTotal.ElapsedMilliseconds:F1}/s");
 
                 // ── 입력위치확보 해제: 상태 diff 출력 (AFTER) + callback 해제 ──
                 Win32.Input.KeyboardInput.OnMidInputAbort = null;
@@ -1397,7 +1397,7 @@ internal partial class Program
                         var retHwnd = retUia.NativeHandle is IntPtr h ? h : IntPtr.Zero;
                         if (retHwnd != IntPtr.Zero)
                         {
-                            Console.WriteLine($"[A11Y] AAR: closing child popup \"{aarResult.DisplayName}\" first");
+                            Console.Error.WriteLine($"[A11Y] AAR: closing child popup \"{aarResult.DisplayName}\" first");
                             NativeMethods.SendMessageTimeoutW(retHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 3000, out _);
                             Thread.Sleep(500);
                         }
@@ -1412,7 +1412,7 @@ internal partial class Program
                 if (_dryRunMode.Value && action is not ("focus" or "eval"))
                 {
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"[DRY-RUN] Would execute: a11y {action} \"{title}\"");
+                    Console.Error.WriteLine($"[DRY-RUN] Would execute: a11y {action} \"{title}\"");
                     Console.ResetColor();
                     success = true;
                 }
@@ -1458,7 +1458,7 @@ internal partial class Program
                     if (nextBlocker == null) break;
 
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[A11Y] ⚠ REPEAT {rep + 1}: [{nextBlocker.ClassName}] \"{nextBlocker.Title}\"");
+                    Console.Error.WriteLine($"[A11Y] ⚠ REPEAT {rep + 1}: [{nextBlocker.ClassName}] \"{nextBlocker.Title}\"");
                     Console.ResetColor();
 
                     // Re-execute same action on the new blocker
@@ -1501,7 +1501,7 @@ internal partial class Program
         if (gapCollector.HasGaps)
         {
             Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($"[A11Y] {gapCollector.Count} gap region(s) collected — building composite for Vision API...");
+            Console.Error.WriteLine($"[A11Y] {gapCollector.Count} gap region(s) collected — building composite for Vision API...");
             Console.ResetColor();
             try
             {
@@ -1523,7 +1523,7 @@ internal partial class Program
                     }
                     var promptPath = Path.Combine(gapDir, $"gap_{ts}.prompt.txt");
                     File.WriteAllText(promptPath, prompt);
-                    Console.WriteLine($"[A11Y] Gap triple composite saved: {gapDir} ({totalKB}KB total, {gapCollector.Count} regions x3 variants)");
+                    Console.Error.WriteLine($"[A11Y] Gap triple composite saved: {gapDir} ({totalKB}KB total, {gapCollector.Count} regions x3 variants)");
                 }
             }
             catch (Exception ex)
@@ -1533,7 +1533,7 @@ internal partial class Program
         }
         gapCollector.Dispose();
 
-        Console.WriteLine($"[A11Y] Done: {ok} ok, {fail} fail (total {targets.Count})");
+        Console.Error.WriteLine($"[A11Y] Done: {ok} ok, {fail} fail (total {targets.Count})");
         return fail > 0 ? 1 : 0;
     }
 }

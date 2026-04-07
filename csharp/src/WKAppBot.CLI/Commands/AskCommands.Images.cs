@@ -144,11 +144,11 @@ internal partial class Program
                     if (!canvasB64.StartsWith("ERR:") && canvasB64.Length > 100)
                     {
                         bytes = Convert.FromBase64String(canvasB64);
-                        Console.WriteLine($"[ASK] Image captured via canvas ({w}x{h})");
+                        Console.Error.WriteLine($"[ASK] Image captured via canvas ({w}x{h})");
                     }
                     else if (canvasB64.StartsWith("ERR:"))
                     {
-                        Console.WriteLine($"[ASK] Canvas failed: {canvasB64}");
+                        Console.Error.WriteLine($"[ASK] Canvas failed: {canvasB64}");
                     }
 
                     // ???? Tier 2: data: URL direct extract ????
@@ -223,7 +223,7 @@ internal partial class Program
                                 var rh = rect.GetProperty("h").GetDouble();
                                 var dpr = rect.TryGetProperty("dpr", out var dprEl) ? dprEl.GetDouble() : 1.0;
 
-                                Console.WriteLine($"[ASK] Screenshot clip: x={rx:F0} y={ry:F0} w={rw:F0} h={rh:F0} dpr={dpr}");
+                                Console.Error.WriteLine($"[ASK] Screenshot clip: x={rx:F0} y={ry:F0} w={rw:F0} h={rh:F0} dpr={dpr}");
                                 var ssResult = await cdp.SendAsync("Page.captureScreenshot", new JsonObject
                                 {
                                     ["format"] = "png",
@@ -239,14 +239,14 @@ internal partial class Program
                                 {
                                     bytes = Convert.FromBase64String(ssB64);
                                     w = (int)(rw * dpr); h = (int)(rh * dpr);
-                                    Console.WriteLine($"[ASK] Image captured via screenshot ({w}x{h}, dpr={dpr:F1})");
+                                    Console.Error.WriteLine($"[ASK] Image captured via screenshot ({w}x{h}, dpr={dpr:F1})");
                                 }
                             }
                         }
                         catch (Exception ssEx)
                         {
-                            Console.WriteLine($"[ASK] Screenshot fallback failed: {ssEx.GetType().Name}: {ssEx.Message}");
-                            Console.WriteLine($"[ASK] Screenshot stack: {ssEx.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
+                            Console.Error.WriteLine($"[ASK] Screenshot fallback failed: {ssEx.GetType().Name}: {ssEx.Message}");
+                            Console.Error.WriteLine($"[ASK] Screenshot stack: {ssEx.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
                         }
                     }
 
@@ -262,12 +262,12 @@ internal partial class Program
                         File.WriteAllBytes(filePath, bytes);
                         saved.Add(filePath);
                         Console.WriteLine();
-                        Console.WriteLine($"[image:{fileName} ({w}x{h}, {bytes.Length / 1024}KB)]");
+                        Console.Error.WriteLine($"[image:{fileName} ({w}x{h}, {bytes.Length / 1024}KB)]");
                         Console.Out.Flush();
                     }
                     else
                     {
-                        Console.WriteLine($"[ASK] Image download empty/small for: {src.Substring(0, Math.Min(80, src.Length))}");
+                        Console.Error.WriteLine($"[ASK] Image download empty/small for: {src.Substring(0, Math.Min(80, src.Length))}");
                     }
                 }
                 catch (Exception ex)

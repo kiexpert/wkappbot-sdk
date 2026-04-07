@@ -41,7 +41,7 @@ internal partial class Program
         var unknownDir = Path.Combine(basePath, "wav", "_unknown");
         var wavDir     = Path.Combine(basePath, "wav");
 
-        Console.WriteLine($"[CLEAN] threshold={threshold}% voice frames, dry-run={dryRun}");
+        Console.Error.WriteLine($"[CLEAN] threshold={threshold}% voice frames, dry-run={dryRun}");
 
         int trashed = 0, kept = 0, movedToUnknown = 0, errors = 0;
 
@@ -53,7 +53,7 @@ internal partial class Program
                 .OrderBy(f => f)
                 .ToArray();
 
-            Console.WriteLine($"[CLEAN] _unknown/: {files.Length} untagged files");
+            Console.Error.WriteLine($"[CLEAN] _unknown/: {files.Length} untagged files");
 
             foreach (var mp3 in files)
             {
@@ -65,12 +65,12 @@ internal partial class Program
                     if (voicePct >= threshold)
                     {
                         kept++;
-                        Console.WriteLine($"[CLEAN] KEEP  {name} ({voicePct:F0}% voice, {durationMs}ms)");
+                        Console.Error.WriteLine($"[CLEAN] KEEP  {name} ({voicePct:F0}% voice, {durationMs}ms)");
                     }
                     else
                     {
                         trashed++;
-                        Console.WriteLine($"[CLEAN] TRASH {name} ({voicePct:F0}% voice, {durationMs}ms)");
+                        Console.Error.WriteLine($"[CLEAN] TRASH {name} ({voicePct:F0}% voice, {durationMs}ms)");
                         if (!dryRun)
                             FileSystem.DeleteFile(mp3, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                     }
@@ -78,7 +78,7 @@ internal partial class Program
                 catch (Exception ex)
                 {
                     errors++;
-                    Console.WriteLine($"[CLEAN] ERROR {Path.GetFileName(mp3)}: {ex.Message}");
+                    Console.Error.WriteLine($"[CLEAN] ERROR {Path.GetFileName(mp3)}: {ex.Message}");
                 }
             }
         }
@@ -91,7 +91,7 @@ internal partial class Program
                 .OrderBy(f => f)
                 .ToArray();
 
-            Console.WriteLine($"[CLEAN] wav/: {files.Length} untagged files");
+            Console.Error.WriteLine($"[CLEAN] wav/: {files.Length} untagged files");
             Directory.CreateDirectory(unknownDir);
 
             foreach (var mp3 in files)
@@ -105,14 +105,14 @@ internal partial class Program
                     {
                         movedToUnknown++;
                         var dest = Path.Combine(unknownDir, name);
-                        Console.WriteLine($"[CLEAN] →_unknown {name} ({voicePct:F0}% voice)");
+                        Console.Error.WriteLine($"[CLEAN] →_unknown {name} ({voicePct:F0}% voice)");
                         if (!dryRun && !File.Exists(dest))
                             File.Move(mp3, dest);
                     }
                     else
                     {
                         trashed++;
-                        Console.WriteLine($"[CLEAN] TRASH {name} ({voicePct:F0}% voice, {durationMs}ms)");
+                        Console.Error.WriteLine($"[CLEAN] TRASH {name} ({voicePct:F0}% voice, {durationMs}ms)");
                         if (!dryRun)
                             FileSystem.DeleteFile(mp3, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                     }
@@ -120,7 +120,7 @@ internal partial class Program
                 catch (Exception ex)
                 {
                     errors++;
-                    Console.WriteLine($"[CLEAN] ERROR {Path.GetFileName(mp3)}: {ex.Message}");
+                    Console.Error.WriteLine($"[CLEAN] ERROR {Path.GetFileName(mp3)}: {ex.Message}");
                 }
             }
         }
