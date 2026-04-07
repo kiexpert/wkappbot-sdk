@@ -84,6 +84,9 @@ public sealed partial class CdpClient
     /// Uses ChromePid to find the exact Chrome instance connected via CDP.
     /// Falls back to first visible Chrome_WidgetWin_1 if PID not available.
     /// </summary>
+
+    // Reuse shared browser list from TabManagement for minimize guard.
+
     private IntPtr FindChromeMainWindow()
     {
         IntPtr found = IntPtr.Zero;
@@ -103,8 +106,19 @@ public sealed partial class CdpClient
 
             // Match by PID — REQUIRED to avoid hitting VS Code or other Electron apps
             GetWindowThreadProcessId(hwnd, out var pid);
-            if (targetPid > 0 && pid != targetPid) return true; // wrong Chrome instance
-            if (targetPid == 0) return true; // PID unknown → refuse to guess (could be VS Code)
+            if (targetPid > 0 && pid != targetPid) return true; // wrong process
+            if (targetPid == 0) return true; // PID unknown → refuse to guess
+
+            // Final safety: reject non-browser Electron apps (VS Code, Slack, Discord…).
+            // DetectCdpPort can mistakenly pick up VS Code's Chromium DevTools endpoint,
+            // setting ChromePid to VS Code's PID → this check prevents VS Code minimize.
+            if (!IsBrowserProcess((int)pid))
+            {
+                try { using var p2 = System.Diagnostics.Process.GetProcessById((int)pid);
+                      Console.Error.WriteLine($"[CDP:MINIMIZE] BLOCKED — '{p2.ProcessName}' is not a browser (hwnd=0x{hwnd:X8})"); }
+                catch { }
+                return true; // skip
+            }
 
             found = hwnd;
             return false; // stop
@@ -330,7 +344,9 @@ public sealed partial class CdpClient
 
     /// <summary>Set Chrome window bounds via CDP Browser.setWindowBounds.
     /// Two-step: restore from minimized first (Chrome ignores bounds while minimized),
-    /// then apply position/size. Caller should re-minimize after if needed.</summary>
+    /// then apply position/size. Also syncs Win32 WINDOWPLACEMENT.rcNormalPosition so
+    /// taskbar-click restore lands at the correct position (not a stale/off-screen spot).
+    /// Caller should re-minimize after if needed.</summary>
     public async Task<bool> SetWindowBoundsAsync(int windowId, int left, int top, int width, int height)
     {
         try
@@ -358,6 +374,20 @@ public sealed partial class CdpClient
                 }
             });
             Console.Error.WriteLine($"[CDP:BOUNDS] wid={windowId} restore={restoreMs}ms bounds={sw.ElapsedMilliseconds}ms -> ({left},{top} {width}x{height})");
+
+            // Sync Win32 WINDOWPLACEMENT.rcNormalPosition so taskbar-click restore
+            // goes to the expected position (CDP bounds and Win32 placement are independent).
+            var hwnd = FindChromeMainWindow();
+            if (hwnd != IntPtr.Zero)
+            {
+                var wp = new WINDOWPLACEMENT { length = 44 };
+                if (GetWindowPlacement(hwnd, ref wp))
+                {
+                    wp.rcNormalPosition = new System.Drawing.Rectangle(left, top, left + width, top + height);
+                    SetWindowPlacement(hwnd, ref wp);
+                }
+            }
+
             return true;
         }
         catch { return false; }

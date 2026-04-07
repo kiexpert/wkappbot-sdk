@@ -146,6 +146,25 @@ public sealed partial class CdpClient
     /// <summary>Known CDP ports to probe (common defaults).</summary>
     private static readonly int[] KnownCdpPorts = [9222, 9223, 9224, 9225, 9229];
 
+    /// <summary>
+    /// Returns true if the given PID belongs to a known browser process.
+    /// Prevents Electron apps (VS Code, Slack…) from being treated as browsers
+    /// even when they expose a CDP endpoint (DevTools).
+    /// </summary>
+    public static bool IsBrowserProcess(int pid)
+    {
+        try
+        {
+            using var p = System.Diagnostics.Process.GetProcessById(pid);
+            return _knownBrowserProcessNames.Contains(p.ProcessName);
+        }
+        catch { return false; }
+    }
+
+    private static readonly System.Collections.Generic.HashSet<string> _knownBrowserProcessNames =
+        new(System.StringComparer.OrdinalIgnoreCase)
+        { "chrome", "chromium", "msedge", "brave", "opera", "vivaldi", "whale", "arc" };
+
     public static int DetectCdpPort(int processId)
     {
         // Strategy: check known ports via netstat → match to target PID
@@ -373,16 +392,21 @@ public sealed partial class CdpClient
     /// <summary>
     /// Switch this CdpClient to a different page target (disconnect + reconnect).
     /// The port is needed to look up the new target's WebSocket URL from /json.
+    /// skipMinimize: true for read-only actions (read/find/inspect) — avoids minimizing the browser window.
     /// </summary>
-    public async Task<bool> SwitchToTargetAsync(string targetId, int port)
+    public async Task<bool> SwitchToTargetAsync(string targetId, int port, bool skipMinimize = false)
     {
         // Minimize Chrome before switching tab — prevents OS focus fight during tab switch.
         // Chrome processes tab changes internally fine while minimized.
         // Poll windowState=minimized instead of fixed 80ms delay.
-        var preWb = await GetWindowForTargetAsync();
-        MinimizeChrome();
-        if (preWb != null)
-            await WaitForWindowStateAsync(preWb.Value.windowId, "minimized", timeoutMs: 1000);
+        // Skip for read-only operations (no focus steal risk).
+        if (!skipMinimize)
+        {
+            var preWb = await GetWindowForTargetAsync();
+            MinimizeChrome();
+            if (preWb != null)
+                await WaitForWindowStateAsync(preWb.Value.windowId, "minimized", timeoutMs: 1000);
+        }
 
         // Find new target's WebSocket URL
         string? wsUrl = null;
