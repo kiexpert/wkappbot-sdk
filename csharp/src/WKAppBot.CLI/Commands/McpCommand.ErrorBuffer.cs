@@ -90,22 +90,30 @@ internal partial class Program
             public ErrorCapture(TextWriter inner) => _inner = inner;
             public override Encoding Encoding => _inner.Encoding;
 
+            static readonly System.Text.RegularExpressions.Regex _errorPattern =
+                new(@"error|fail|exception|오류|에러",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                    System.Text.RegularExpressions.RegexOptions.Compiled);
+
+            static bool IsErrorLike(string msg) => _errorPattern.IsMatch(msg);
+
             void EmitEntry(string msg)
             {
                 var relMs = Environment.TickCount64 - _baseT;
                 Entries.Add((relMs, msg));
-                if (!_passthrough)
+                if (!_passthrough && IsErrorLike(msg))
                 {
-                    // First error — switch to passthrough: flush all buffered entries immediately
+                    // Error-like message detected — switch to passthrough: flush all buffered entries
                     _passthrough = true;
                     foreach (var (t, m) in Entries)
                         _inner.WriteLine($"[+{t / 1000.0:F1}s] {m}");
+                    _inner.Flush();
                 }
-                else
+                else if (_passthrough)
                 {
                     _inner.WriteLine($"[+{relMs / 1000.0:F1}s] {msg}");
+                    _inner.Flush();
                 }
-                _inner.Flush();
             }
 
             public override void WriteLine(string? value)
