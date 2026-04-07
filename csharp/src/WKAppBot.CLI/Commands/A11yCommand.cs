@@ -414,7 +414,7 @@ internal partial class Program
         {
             bool dryRun = args.Any(a => a == "--dry-run");
             string? argFilter = GetArgValue(args, "--arg"); // cmdline substring filter
-            return A11yKillByPattern(grap, allowAncestors, dryRun, argFilter);
+            return A11yKillByPattern(grap, allowAncestors, dryRun, argFilter, nthRaw);
         }
 
         var elementActions = new HashSet<string> {
@@ -771,17 +771,26 @@ internal partial class Program
                 if (string.IsNullOrEmpty(uiaPath) && action is "read" or "find" or "inspect")
                 {
                     NativeMethods.GetWindowThreadProcessId(hwnd, out uint tabPid);
-                    var tabPort = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)tabPid);
-                    if (tabPort > 0)
+                    if (WKAppBot.WebBot.CdpClient.IsBrowserProcess((int)tabPid))
                     {
-                        success = CdpListTabs(tabPort, tag);
-                        if (success) ok++; else fail++;
-                        continue;
+                        var tabPort = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)tabPid);
+                        if (tabPort > 0)
+                        {
+                            success = CdpListTabs(tabPort, tag);
+                            if (success) ok++; else fail++;
+                            continue;
+                        }
                     }
                 }
 
+                // Pre-check: only attempt ANY CDP path if process has --remote-debugging-port open.
+                // Prevents VS Code / non-CDP browsers from eval JS, telepathy, or minimize entirely.
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint cdpPrePid);
+                bool hasCdpPort = WKAppBot.WebBot.CdpClient.IsBrowserProcess((int)cdpPrePid)
+                               && WKAppBot.WebBot.CdpClient.DetectCdpPort((int)cdpPrePid) > 0;
+
                 // ── --eval-js: JS-first tier — try CDP eval before UIA/Win32 on ANY window ──
-                if (!string.IsNullOrEmpty(evalJs) && !GrapHelper.LooksLikeCssSelector(uiaPath ?? ""))
+                if (!string.IsNullOrEmpty(evalJs) && !GrapHelper.LooksLikeCssSelector(uiaPath ?? "") && hasCdpPort)
                 {
                     NativeMethods.GetWindowThreadProcessId(hwnd, out uint jsPid);
                     var jsPort = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)jsPid);
@@ -807,16 +816,12 @@ internal partial class Program
                             // Fall through to UIA/Win32
                         }
                     }
-                    else
-                    {
-                        Console.Error.WriteLine($"[A11Y] --eval-js: no CDP port for PID {jsPid} → UIA/Win32 fallback");
-                    }
                 }
 
                 // ── CDP Telepathy: if CSS pattern, try CDP first on ANY browser ──
                 bool isCssPattern = !string.IsNullOrEmpty(uiaPath) && GrapHelper.LooksLikeCssSelector(uiaPath);
 
-                if (isCssPattern)
+                if (isCssPattern && hasCdpPort)
                 {
                     // Telepathy: try CDP on any process that has a debugging port
                     var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak, hotkey, evalJs, timeoutMs, intervalMs);
@@ -959,8 +964,8 @@ internal partial class Program
 
                     if (scoped == null)
                     {
-                        // UIA failed → try CDP telepathy as fallback (any browser with CDP port)
-                        if (!isCssPattern && !string.IsNullOrEmpty(uiaPath))
+                        // UIA failed → try CDP telepathy as fallback (only if process has CDP port)
+                        if (!isCssPattern && !string.IsNullOrEmpty(uiaPath) && hasCdpPort)
                         {
                             Console.WriteLine($"[A11Y] UIA scope failed, trying CDP telepathy with \"{uiaPath}\"");
                             var cdpResult = TryWebViewCdpAction(hwnd, action, uiaPath!, text, rangeValue, scrollDir, scrollAmount, findDepth, speak, hotkey, evalJs, timeoutMs, intervalMs);
