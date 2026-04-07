@@ -51,11 +51,11 @@ internal partial class Program
                 if (!string.IsNullOrWhiteSpace(ipc.Prompt))
                     Console.WriteLine($"[EYE_TICK] recent={ipc.Prompt}");
                 foreach (var plan in ipc.Plans)
-                    Console.WriteLine($"[EYE_PLAN] —:— {plan}");
-                if (ipc.Plans.Length > 3) Console.WriteLine($"[EYE_PLAN] —:— 그 외 {ipc.Plans.Length - 3}건...");
+                    Console.WriteLine($"[EYE_PLAN] -> {plan}");
+                if (ipc.Plans.Length > 3) Console.WriteLine($"[EYE_PLAN] -> +{ipc.Plans.Length - 3} more...");
                 Console.WriteLine($"[EYE_GUARD] armed={(ipc.GuardArmed ? 1 : 0)} execIdle={ipc.ExecIdleSec:F0}s aiIdle={ipc.AiIdleSec:F0}s cooldown={ipc.CooldownSec:F0}s");
                 Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipc.KeepAwakeAgeSec < 0 ? "n/a" : ipc.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipc.PromptSource} latestTickAge={(ipc.LatestTickAgeSec < 0 ? "n/a" : ipc.LatestTickAgeSec.ToString("F0") + "s")}");
-                Console.WriteLine($"[EYE_TICK] ── card display ──");
+                Console.WriteLine($"[EYE_TICK] -- card display --");
                 foreach (var line in ipc.Summary.Split('\n'))
                     Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
                 Console.Out.Flush();
@@ -154,9 +154,9 @@ internal partial class Program
             if (plans.Count > 0)
             {
                 for (int i = 0; i < plans.Count; i++)
-                    Console.WriteLine($"[EYE_PLAN] —:— {plans[i]}");
+                    Console.WriteLine($"[EYE_PLAN] -> {plans[i]}");
                 if (_lastPlanItemsCache.Count > plans.Count)
-                    Console.WriteLine($"[EYE_PLAN] —:— 그 외 {_lastPlanItemsCache.Count - plans.Count}건...");
+                    Console.WriteLine($"[EYE_PLAN] -> +{_lastPlanItemsCache.Count - plans.Count} more...");
             }
 
             var execIdle = (DateTime.UtcNow - _lastTickActivityUtc).TotalSeconds;
@@ -171,7 +171,7 @@ internal partial class Program
             var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastKeepAwakeUtc).TotalSeconds;
             Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
 
-            Console.WriteLine($"[EYE_TICK] ── card display ──");
+            Console.WriteLine($"[EYE_TICK] -- card display --");
             foreach (var line in summary.Split('\n'))
                 Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
             Console.Out.Flush();
