@@ -336,6 +336,7 @@ internal partial class Program
         Console.WriteLine();
         Console.WriteLine($"File: {ScheduleManager.FilePath}");
         Console.WriteLine("AppBotEye polls this file and executes pending schedules automatically.");
+        PrintRelatedSkills("schedule");
         return 1;
     }
 }

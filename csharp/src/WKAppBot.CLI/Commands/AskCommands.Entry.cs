@@ -281,6 +281,7 @@ Examples:
   wkappbot ask gpt ""Review the code"" main.cs test.log
   wkappbot ask gemini ""Start a new analysis session"" --new-session
 ");
+        PrintRelatedSkills("ask");
         return 1;
     }
 

@@ -38,6 +38,7 @@ internal partial class Program
         }
 
         Console.WriteLine(text.TrimStart('\n'));
+        PrintRelatedSkills(command);
         return true;
     }
 

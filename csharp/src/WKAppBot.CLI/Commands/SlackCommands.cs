@@ -1462,6 +1462,7 @@ internal partial class Program
         Console.WriteLine($"Config: {SlackConfigPath}");
         Console.WriteLine();
         Console.WriteLine("💡 Tip: 봇 프로필 이모찌/사진 커스텀 → {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
+        PrintRelatedSkills("slack");
         return 1;
     }
 }
