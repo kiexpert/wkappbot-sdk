@@ -53,7 +53,7 @@ internal sealed class AppBotEyeOverlay : Window
     private double _scrollPauseCount;
     private bool _scrollingDown = true;
 
-    public AppBotEyeOverlay(int width = 320, int height = 220)
+    public AppBotEyeOverlay(int width = 320, int height = 220, bool isElevated = false)
     {
         // Window properties -- semi-transparent overlay
         Title = "WK AppBot Eye";
@@ -72,7 +72,9 @@ internal sealed class AppBotEyeOverlay : Window
         var root = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(0xDD, 0x1A, 0x1A, 0x2E)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(0x4F, 0xC3, 0xF7)), // cyan
+            BorderBrush = new SolidColorBrush(isElevated
+                ? Color.FromRgb(0xFF, 0x8C, 0x00)   // amber — admin Eye
+                : Color.FromRgb(0x4F, 0xC3, 0xF7)), // cyan — normal Eye
             BorderThickness = new Thickness(1.5),
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(0),
@@ -472,11 +474,11 @@ internal sealed class AppBotEyeHost : IDisposable
 
     /// <summary>Start the overlay window on a dedicated STA thread.</summary>
     /// <param name="ownerHwnd">Optional parent window handle (e.g. Claude Desktop) -- overlay follows it.</param>
-    public void Start(int width = 320, int height = 220, int x = -1, int y = -1, IntPtr ownerHwnd = default)
+    public void Start(int width = 320, int height = 220, int x = -1, int y = -1, IntPtr ownerHwnd = default, bool isElevated = false)
     {
         _uiThread = new Thread(() =>
         {
-            _window = new AppBotEyeOverlay(width, height);
+            _window = new AppBotEyeOverlay(width, height, isElevated);
 
             // Position: default to bottom-right, above the prompt area
             if (x >= 0 && y >= 0)
