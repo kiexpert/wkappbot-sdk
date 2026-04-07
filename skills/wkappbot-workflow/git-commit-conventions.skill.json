@@ -1,0 +1,24 @@
+{
+  "id": "git-commit-conventions",
+  "app": "wkappbot-workflow",
+  "title": "Git Commit Conventions",
+  "desc": "Commit message rules for this repo. English only — Korean wastes 2-3x tokens in git history.",
+  "steps": [
+    "Language: English only — no Korean in commit title or body",
+    "Format: '<type>: <what changed and why>' — one line title under 72 chars",
+    "Types: feat / fix / refactor / test / docs / bump / chore",
+    "Body: bullet points for non-obvious details only — skip if title is self-contained",
+    "NO file listings ('- TeeTextWriter.cs, Program.cs') — describe intent, not files",
+    "Co-Authored-By line: always append 'Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>'",
+    "★ Bad: 'feat: TeeWriter, Program, EyeProxy 수정' / Good: 'fix: --sudo no longer spawns console window'"
+  ],
+  "tags": [
+    "workflow",
+    "git",
+    "commit",
+    "convention"
+  ],
+  "author": "claude",
+  "created": "2026-04-07T03:20:00.0000000Z",
+  "version": "1.0"
+}
