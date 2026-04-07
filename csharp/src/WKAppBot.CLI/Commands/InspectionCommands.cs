@@ -186,6 +186,7 @@ internal partial class Program
         string rawTitle = args[0];
         int depth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 5;
         bool win32Mode = args.Contains("--win32");
+        bool pathsMode = args.Contains("--paths");
         string? filter = GetArgValue(args, "--filter");
 
         // Split at first '#': before = Win32 path (/), after = UIA scope (/ and # equivalent)
@@ -279,7 +280,28 @@ internal partial class Program
 
         Console.WriteLine();
 
-        if (win32Mode)
+        if (pathsMode)
+        {
+            // --paths: flat list of absolute UIA paths — each line is a grap-ready #Node1/Node2/Button4
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"── UIA Paths (depth={depth}) ──");
+            Console.ResetColor();
+            using var uia = new UiaLocator();
+            AutomationElement pathRoot;
+            if (!string.IsNullOrEmpty(uiaScopePath))
+            {
+                var uiaRoot = uia.Automation.FromHandle(inspectHandle);
+                var scopedRoot = GrapHelper.FindUiaScope(uiaRoot, uiaScopePath);
+                if (scopedRoot == null) return Error($"UIA scope not found: \"{uiaScopePath}\"");
+                pathRoot = scopedRoot;
+            }
+            else
+            {
+                pathRoot = uia.Automation.FromHandle(inspectHandle);
+            }
+            uia.DumpPaths(pathRoot, maxDepth: depth, writer: Console.Out);
+        }
+        else if (win32Mode)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine($"── Win32 Window Tree (depth={depth}) ──");

@@ -1242,6 +1242,51 @@ public sealed partial class UiaLocator : IDisposable
     }
 
     /// <summary>
+    /// Dump all elements as flat absolute paths: #Type_Aid/Type_Aid/...
+    /// Each line is a grap-ready path from the root element (Window excluded).
+    /// </summary>
+    public void DumpPaths(AutomationElement root, int maxDepth = 12, int maxElements = 2000, System.IO.TextWriter? writer = null)
+    {
+        writer ??= Console.Out;
+        var timeout = DateTime.UtcNow.AddSeconds(20);
+        var pathParts = new List<string>();
+        DumpPathsRecursive(root, pathParts, writer, 0, maxDepth, ref maxElements, timeout, skipRoot: true);
+    }
+
+    private void DumpPathsRecursive(AutomationElement el, List<string> parts, System.IO.TextWriter writer,
+        int depth, int maxDepth, ref int remaining, DateTime timeout, bool skipRoot = false)
+    {
+        if (remaining <= 0 || DateTime.UtcNow > timeout) return;
+
+        string ct, aid, name;
+        try { ct = el.ControlType.ToString(); } catch { ct = "?"; }
+        try { aid = el.AutomationId ?? ""; } catch { aid = ""; }
+        try { name = el.Name ?? ""; } catch { name = ""; }
+
+        // Skip the root Window node itself (it's already in the hwnd part)
+        if (!skipRoot)
+        {
+            var tag = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(ct, aid);
+            parts.Add(tag);
+            writer.WriteLine($"#/{string.Join("/", parts)}");
+            remaining--;
+        }
+
+        if (depth >= maxDepth) { if (!skipRoot) parts.RemoveAt(parts.Count - 1); return; }
+
+        AutomationElement[] children;
+        try { children = el.FindAllChildren(); } catch { if (!skipRoot) parts.RemoveAt(parts.Count - 1); return; }
+
+        foreach (var child in children)
+        {
+            if (remaining <= 0 || DateTime.UtcNow > timeout) break;
+            DumpPathsRecursive(child, parts, writer, depth + 1, maxDepth, ref remaining, timeout);
+        }
+
+        if (!skipRoot) parts.RemoveAt(parts.Count - 1);
+    }
+
+    /// <summary>
     /// Dump the UI tree filtered by a pattern.
     /// Searches the ENTIRE tree (ignoring depth limit for the search phase).
     /// When a matching element is found, dumps its ancestry path + subtree up to subtreeDepth.
