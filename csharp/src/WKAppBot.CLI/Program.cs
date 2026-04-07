@@ -384,43 +384,59 @@ internal partial class Program
             if (!IsElevated())
             {
                 bool isEyeRelaunch = args.Length > 0 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
+
                 if (isEyeRelaunch)
                 {
-                    // Kill existing Eye so admin Eye can acquire the alive mutex.
-                    // Eye가 어드민이면 파이프 경유 모든 명령이 어드민 컨텍스트 → 개별 --수두 불필요.
+                    // eye --sudo: stop current Eye so admin Eye can grab the mutex, then launch via runas.
+                    // Admin Eye = full daemon, not just proxy — no choice but runas here.
                     Console.WriteLine("[SUDO] Stopping current Eye before admin re-launch...");
                     foreach (var proc in System.Diagnostics.Process.GetProcessesByName("wkappbot-core"))
                     {
-                        try
-                        {
-                            if (proc.Id == System.Environment.ProcessId) continue;
-                            proc.Kill(entireProcessTree: false);
-                        }
+                        try { if (proc.Id != System.Environment.ProcessId) proc.Kill(entireProcessTree: false); }
                         catch { }
                     }
-                    System.Threading.Thread.Sleep(1500); // 뮤텍스 해제 대기
+                    System.Threading.Thread.Sleep(1500);
                     Console.WriteLine("[SUDO] Eye stopped — launching admin Eye...");
+
+                    var quotedArgs2 = string.Join(" ", args.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = Environment.ProcessPath ?? exePath,
+                            Arguments = quotedArgs2,
+                            Verb = "runas",
+                            UseShellExecute = true,
+                            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                        });
+                        return 0; // Eye는 데몬 — 기다리지 않음
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"[SUDO] UAC cancelled or failed: {ex.Message}");
+                        return 1;
+                    }
                 }
 
-                var quotedArgs = string.Join(" ", args.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
-                var psi = new System.Diagnostics.ProcessStartInfo
+                // Non-eye --sudo: route via admin Eye proxy (no new window!).
+                // Ensure admin Eye is running first, then delegate via pipe.
+                Console.WriteLine("[SUDO] Routing via admin Eye proxy (no new window)...");
+                if (!ElevatedEyeClient.IsAvailable())
                 {
-                    FileName        = Environment.ProcessPath ?? exePath,
-                    Arguments       = quotedArgs,
-                    Verb            = "runas",      // UAC prompt
-                    UseShellExecute = true,
-                };
-                try
-                {
-                    var elevated = System.Diagnostics.Process.Start(psi);
-                    if (!isEyeRelaunch) elevated?.WaitForExit(); // Eye는 데몬 — 기다리지 않음
-                    return elevated?.ExitCode ?? 0;
+                    if (!ElevationHelper.LaunchElevatedEye())
+                    {
+                        Console.Error.WriteLine("[SUDO] Failed to launch admin Eye proxy");
+                        return 1;
+                    }
                 }
-                catch (Exception ex)
+
+                var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray());
+                if (exit == -1)
                 {
-                    Console.Error.WriteLine($"[SUDO] UAC cancelled or failed: {ex.Message}");
+                    Console.Error.WriteLine("[SUDO] Admin Eye proxy communication failed");
                     return 1;
                 }
+                return exit;
             }
             // Already elevated — proceed normally (flag already stripped)
         }
