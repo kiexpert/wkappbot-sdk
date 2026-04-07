@@ -14,6 +14,8 @@
     "KILL: a11y kill \"pattern[/ancestor]\" — process kill by grap",
     "SCOPE: a11y click \"*App*#*Panel*#*Button*\" — # drills into UIA subtree",
     "WEB: a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"",
+    "WEB --eval-js tab-find: no #scope → auto-find tab by window title. a11y read \"*Chrome*\" --eval-js \"document.title\" (finds matching tab)",
+    "WEB --eval-js ambiguous: if target is unclear, eval falls back to tab-find by hint→title priority. 'a11y eval' / 'web eval' are DEPRECATED (scheduled removal, AutoRegisterBug on use)",
     "ANDROID: a11y click \"adb://device#*element*\" — ADB bridge",
     "FLAGS: --nth 2 / --all / --force / --timeout N / --speak"
   ],

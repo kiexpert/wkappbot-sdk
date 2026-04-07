@@ -801,6 +801,8 @@ internal partial class Program
                         {
                             using var jsCdp = new WKAppBot.WebBot.CdpClient();
                             jsCdp.ConnectAsync(jsPort).GetAwaiter().GetResult();
+                            // Tab-find: switch to matching tab before eval (no #scope = use hint or window title)
+                            CdpSwitchToTabByHint(jsCdp, jsPort, hwnd, uiaPath, readOnly: true);
                             var jsResult = jsCdp.EvalAsync(evalJs).GetAwaiter().GetResult();
                             Console.ForegroundColor = ConsoleColor.Green;
                             Console.WriteLine($"[A11Y] --eval-js OK: {jsResult}");
