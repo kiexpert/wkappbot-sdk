@@ -113,6 +113,8 @@ internal partial class Program
     static volatile bool _fswPromptDirty;
     static volatile string? _fswPromptChangedFile; // last changed file name for filtering
     static volatile bool _fswExeDirty; // hot-swap: exe binary changed
+    static volatile bool _pendingSwapWhileAdmin; // hot-swap deferred — admin proxy was busy
+    static string? _lastFailedSwapStamp; // mtime stamp of a previously-failed swap — skip until newer binary
     internal static volatile bool _eyeShutdownRequested; // graceful shutdown via CMD pipe (eye shutdown)
     static volatile bool _slackRetiring; // hot-swap retiring: stop DrainSlackQueue, keep EnqueueSlackRoute
 #pragma warning disable CS0169
@@ -1267,14 +1269,39 @@ internal partial class Program
 
             // ── Hot-swap: FSW-driven instant detection + blue-green restart ──
             // FSW flag checked every frame (~100ms) — no 5s polling delay
+            // Re-trigger pending swap once admin proxy is no longer busy (MCP pattern)
+            if (_pendingSwapWhileAdmin && !ElevatedEyeServer.IsBusy)
+            {
+                _pendingSwapWhileAdmin = false;
+                _fswExeDirty = true;
+                Console.WriteLine("[EYE:HOT-SWAP] Admin proxy idle — resuming deferred swap");
+            }
             if (_fswExeDirty && exeStartTime != DateTime.MinValue)
             {
+                // Defer swap if admin proxy is handling a request (MCP admin-first pattern)
+                if (ElevatedEyeServer.IsBusy)
+                {
+                    _fswExeDirty = false;
+                    _pendingSwapWhileAdmin = true;
+                    Console.WriteLine("[EYE:HOT-SWAP] Admin proxy busy — deferring swap");
+                    goto AfterHotSwap;
+                }
                 _fswExeDirty = false; // consume flag
                 try
                 {
+                    // Same-stamp guard: skip if this binary already failed once (MCP pattern)
+                    var currentStamp = File.Exists(exePath)
+                        ? File.GetLastWriteTimeUtc(exePath).Ticks.ToString() : null;
+                    if (currentStamp != null && currentStamp == _lastFailedSwapStamp)
+                    {
+                        Console.WriteLine($"[EYE:HOT-SWAP] Previously-failed stamp ({currentStamp}) — waiting for newer binary");
+                        goto AfterHotSwap;
+                    }
+
                     var swapResult = TryRenameSwap(exePath, "EYE:HOT-SWAP");
                     if (swapResult == HotSwapResult.Swapped)
                     {
+                        _lastFailedSwapStamp = null; // clear on success
                         _slackRetiring = true; // stop draining queue — new Eye will take over
                         EyeCmdPipeServer.StopAccepting(); // stop accepting new pipe connections immediately
                         EnsureEyeGuardianForWindow(host.GetWindowHandle()); // re-launch guardian for new Eye
@@ -1284,6 +1311,7 @@ internal partial class Program
                     else if (swapResult == HotSwapResult.NoNewExe && File.GetLastWriteTimeUtc(exePath) != exeStartTime)
                     {
                         // Direct overwrite (exe wasn't locked) — timestamp changed
+                        _lastFailedSwapStamp = null;
                         EyeColor(ConsoleColor.Magenta);
                         Console.WriteLine("[EYE:HOT-SWAP] EXE timestamp changed — binary updated!");
                         EyeResetColor();
@@ -1293,10 +1321,17 @@ internal partial class Program
                         hotReloadTriggered = true;
                         break;
                     }
-                    // Identical/Failed: continue main loop (no restart needed)
+                    else if (swapResult == HotSwapResult.Failed)
+                    {
+                        // Record failed stamp — don't retry until a newer binary arrives
+                        _lastFailedSwapStamp = currentStamp;
+                        Console.WriteLine($"[EYE:HOT-SWAP] Swap failed — recording stamp {currentStamp}");
+                    }
+                    // Identical: continue main loop (no restart needed)
                 }
                 catch { }
             }
+            AfterHotSwap:;
 
             // ── Slack socket health check (~every 10 min = 6000 frames @ 100ms) ──
             if (frameCount % 6000 == 0 && frameCount > 0 && slackClient != null)

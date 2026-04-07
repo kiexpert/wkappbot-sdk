@@ -90,6 +90,10 @@ static class ElevatedEyeServer
 {
     public const string PipeName = "wkappbot_elevated";
 
+    /// <summary>True while at least one admin command is being executed — hot-swap must defer.</summary>
+    public static bool IsBusy => _activeClients > 0;
+    static volatile int _activeClients;
+
     public static async Task ListenAsync(CancellationToken ct)
     {
         Console.WriteLine($"[EYE:PIPE] Eye pipe listening on \\\\.\\pipe\\{PipeName}");
@@ -116,7 +120,12 @@ static class ElevatedEyeServer
                 await pipe.WaitForConnectionAsync(ct);
                 var connectedPipe = pipe;
                 pipe = null; // ownership transferred
-                _ = Task.Run(() => HandleClient(connectedPipe, ct), ct);
+                Interlocked.Increment(ref _activeClients);
+                _ = Task.Run(async () =>
+                {
+                    try { await HandleClient(connectedPipe, ct); }
+                    finally { Interlocked.Decrement(ref _activeClients); }
+                }, ct);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
