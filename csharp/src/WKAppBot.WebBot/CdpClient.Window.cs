@@ -258,10 +258,15 @@ public sealed partial class CdpClient
     #__wkbot_overlay{{
       position:fixed;inset:0;pointer-events:none;z-index:2147483647;
       border:3px solid {hexColor};box-sizing:border-box;opacity:0;
-      transition:opacity 0.15s;
     }}
-    #__wkbot_overlay.tick{{opacity:0.85;}}
-    @keyframes __wkbot_fade{{0%{{opacity:0.85;}}100%{{opacity:0;}}}}
+    @keyframes __wkbot_fade{{0%{{opacity:0.9;}}100%{{opacity:0;}}}}
+    @keyframes __wkbot_pulse{{
+      0%,100%{{opacity:0.7;border-width:3px;}}
+      50%{{opacity:0.25;border-width:6px;}}
+    }}
+    #__wkbot_overlay.streaming{{
+      animation:__wkbot_pulse 0.9s ease-in-out infinite!important;
+    }}
   `;
   document.head.appendChild(s);
   var d=document.createElement('div');
@@ -269,10 +274,16 @@ public sealed partial class CdpClient
   document.body.appendChild(d);
   window.__wkBotTick=function(){{
     var el=document.getElementById('__wkbot_overlay');
-    if(!el)return;
+    if(!el||el.classList.contains('streaming'))return;
     el.style.animation='none';
-    el.offsetHeight; // reflow
+    el.offsetHeight;
     el.style.animation='__wkbot_fade 0.6s ease-out forwards';
+  }};
+  window.__wkBotStreaming=function(on){{
+    var el=document.getElementById('__wkbot_overlay');
+    if(!el)return;
+    if(on){{el.classList.add('streaming');el.style.animation='';}}
+    else{{el.classList.remove('streaming');el.style.animation='none';el.offsetHeight;el.style.animation='__wkbot_fade 0.4s ease-out forwards';}}
   }};
 }})()";
         try { await EvalAsync(css); } catch { }
@@ -288,6 +299,19 @@ public sealed partial class CdpClient
         _ = Task.Run(async () =>
         {
             try { await EvalAsync("window.__wkBotTick?.()"); } catch { }
+        });
+    }
+
+    /// <summary>
+    /// Switch overlay to continuous pulse (streaming=true) or back to tick-on-demand (false).
+    /// Call when AI response streaming starts/ends to show live activity animation.
+    /// </summary>
+    public void SetBotOverlayStreaming(bool streaming)
+    {
+        if (!_overlayInjected) return;
+        _ = Task.Run(async () =>
+        {
+            try { await EvalAsync($"window.__wkBotStreaming?.({(streaming ? "true" : "false")})"); } catch { }
         });
     }
 
