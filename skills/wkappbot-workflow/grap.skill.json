@@ -2,7 +2,7 @@
   "id": "grap",
   "app": "wkappbot-workflow",
   "title": "grap \u2014 UI Element Address System (Window \u002B UIA Scope \u002B Web \u002B ADB)",
-  "desc": "grap = glob/regex/OR(;)/#UIA-scope/{JSON5} \u2014 universal element address. # TARGET output includes verified absolute UIA tag path (Doc_RootWebArea/Gro_main/Edi_msg) \u002B [OK] marker.",
+  "desc": "GRAP = Grab Accessible Pattern \u2014 JSON5-extended universal UI element address. {JSON5-window}#AbsTagPath: identifies any Win32/UIA/web/Android element. a11y find outputs verified \u0027# TARGET \u0022grap\u0022 [OK] Nms\u0027 for direct copy-paste targeting.",
   "steps": [
     "[WHAT-IS-GRAP] grap = UI address. Before \u0027#\u0027 = which window. After \u0027#\u0027 = which UIA element inside.\nThree-tier: Win32 window \u2192 UIA subtree \u2192 web content (CDP).\na11y find \u003Cgrap\u003E outputs verified \u0027# TARGET ...\u0027 to stdout \u2014 paste directly as next command.\nOFFICIAL FORMAT: # TARGET \u0022compactGrap#absTagPath\u0022 [OK] Nms  WindowTitle",
     "[WINDOW-PATTERNS] Before \u0027#\u0027 \u2014 addressing a top-level window:\n  Substring:   \u0027ChatGPT\u0027                    contains, case-insensitive\n  Wildcard:    \u0027*\uBA54\uBAA8\uC7A5*\u0027                      * = any chars\n  OR(;):       \u0027*\uBA54\uBAA8\uC7A5*;*\uACC4\uC0B0\uAE30*\u0027           matches either\n  JSON5:       {title:\u0027Claude\u0027,proc:\u0027chrome\u0027}  AND logic\n  HWND direct: {hwnd:0x010B084A}             instant lookup\n  HWND bracket:[0012061C]                    inspect/windows output format\n  Regex:       regex:^\uC601\uC6C5\uBB38                    prefix required",
@@ -52,6 +52,6 @@
   ],
   "author": "claude",
   "created": "2026-04-07T17:09:18.1082073Z",
-  "updated": "2026-04-07T18:47:47.6483079Z",
-  "version": "1.5"
+  "updated": "2026-04-07T18:48:25.07483Z",
+  "version": "1.7"
 }
