@@ -7,18 +7,19 @@
     "0. [RULE] ALL skill steps/desc/tags must be English only -- token efficiency.",
     "1. [MANDATORY] ALL focus restore paths go through InputReadiness.Probe() -- OnProbeSuccess fires zoom\u002Bauto-hack. Standalone ForceForegroundWindow without InputReadiness FORBIDDEN (except RestoreFocusWithRetryAsync inner loop).",
     "2. [MANDATORY] Restore trigger = end of each ask/CDP action only. Watchdog = monitor\u002Bnotify only, no restore.",
-    "3. [INVESTIGATION PROCEDURE] When focus theft suspected: (a) which ask action was running (insert/send/attach/wait), (b) which CDP method it calls (Page.bringToFront/Browser.setWindowBounds/Runtime.evaluate\u002B.focus()), (c) IsFocusStealingMethod() covers it?, (d) pre-minimize SW=8 not 6?, (e) post-restore applied?, (f) OnFocusTheft callback restores focus?",
-    "4. [CDP FOCUS-STEALING METHODS] Page.bringToFront, Target.activateTarget (no-op), Browser.setWindowBounds, Runtime.evaluate\u002B.focus(). Gatekeepers: IsFocusStealingMethod() \u002B IsFocusRiskExpression() in CdpClient.FocusRiskWatchdog.cs. Pre-minimize MUST use SW_SHOWMINNOACTIVE(8) not SW_MINIMIZE(6).",
-    "5. [KNOWN INSTABILITY] bringToFront: Chrome SetForegroundWindow fires async after CDP response. setWindowBounds restore: Chrome may activate before WaitForWindowStateAsync confirms. Runtime.evaluate: JS .focus() bypasses IsFocusStealingMethod entirely.",
-    "6. [DONE] SendAsync pre-minimize: SW_MINIMIZE(6) -\u003E SW_SHOWMINNOACTIVE(8) (CdpClient.cs)",
-    "7. [DONE] BringToFrontAsync pre-minimize: same SW fix (CdpClient.Actions.cs)",
-    "8. [DONE] SendAsync post-theft: SetForegroundWindow -\u003E ForceForegroundWindow (CdpClient.cs)",
-    "9. [DONE] OnFocusTheft callback: was log-only, now fires RestoreFocusWithRetryAsync (AskCommands.Entry.Cdp.cs)",
-    "10. [DONE] AutoBugReport fires via ActionApi.OnFocusStealer (RestoreFocusWithRetryAsync)",
-    "11. [DONE] DismissDialogAsync: added \uB3D9\uC758 \u002B called after file-attach \u002B before insert",
-    "12. [TODO] FireAutoHeal on 5s restore timeout",
-    "13. [TODO] EnsureCdpReadyAsync: CreateInputReadiness()\u002BProbe(AutoApproveYield:true)",
-    "14. [TODO] prevFg re-capture between phases (persona/attach/send)"
+    "3. [FOCUSLESS PATTERN] Standard pattern for any CDP call that can steal focus: (a) check if already active (document.visibilityState=visible) -\u003E skip minimize dance, (b) SW_SHOWMINNOACTIVE(8) to iconify, (c) WaitForWindowStateAsync(\u0027minimized\u0027) -- poll not fixed delay, (d) fire CDP call, (e) RestoreChromeNoActivate (SW_SHOWNOACTIVATE=4), (f) WaitForWindowStateAsync(\u0027normal\u0027) -- poll not fixed delay. Example: BringToFrontAsync and SwitchToTargetAsync both follow this exact pattern.",
+    "4. [INVESTIGATION PROCEDURE] When focus theft suspected: (a) which ask action was running, (b) which CDP method it calls, (c) IsFocusStealingMethod() covers it?, (d) pre-minimize uses SW=8 not 6?, (e) WaitForWindowState used (not fixed delay)?, (f) RestoreChromeNoActivate after?, (g) OnFocusTheft callback restores?",
+    "5. [CDP FOCUS-STEALING METHODS] Page.bringToFront, Target.activateTarget (no-op), Browser.setWindowBounds, Runtime.evaluate\u002B.focus(). Gatekeepers: IsFocusStealingMethod() \u002B IsFocusRiskExpression() in CdpClient.FocusRiskWatchdog.cs.",
+    "6. [KNOWN INSTABILITY] Runtime.evaluate: JS .focus() bypasses IsFocusStealingMethod. setWindowBounds: Chrome may activate before WaitForWindowState confirms.",
+    "7. [DONE] SendAsync pre-minimize: SW_MINIMIZE(6) -\u003E SW_SHOWMINNOACTIVE(8)",
+    "8. [DONE] BringToFrontAsync: SW(6)-\u003ESW(8) \u002B fixed delays -\u003E WaitForWindowStateAsync",
+    "9. [DONE] SendAsync post-theft: SetForegroundWindow -\u003E ForceForegroundWindow",
+    "10. [DONE] OnFocusTheft callback: log-only -\u003E RestoreFocusWithRetryAsync",
+    "11. [DONE] AutoBugReport via ActionApi.OnFocusStealer",
+    "12. [DONE] DismissDialogAsync: added \uB3D9\uC758 \u002B called after file-attach \u002B before insert",
+    "13. [TODO] FireAutoHeal on 5s restore timeout",
+    "14. [TODO] EnsureCdpReadyAsync: CreateInputReadiness()\u002BProbe(AutoApproveYield:true)",
+    "15. [TODO] prevFg re-capture between phases (persona/attach/send)"
   ],
   "tags": [
     "focus",
@@ -34,43 +35,14 @@
     "priority",
     "inputreadiness",
     "living-doc",
-    "investigation"
+    "investigation",
+    "focusless-pattern"
   ],
   "source_refs": [
     {
-      "file": "csharp/src/WKAppBot.WebBot/CdpClient.cs",
-      "line": 324,
-      "pattern": "SW_SHOWMINNOACTIVE",
-      "note": null
-    },
-    {
-      "file": "ForceForegroundWindow",
-      "line": null,
-      "pattern": null,
-      "note": null
-    },
-    {
       "file": "csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs",
-      "line": 727,
+      "line": null,
       "pattern": "BringToFrontAsync",
-      "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.WebBot/CdpClient.FocusRiskWatchdog.cs",
-      "line": null,
-      "pattern": "IsFocusRiskMethod",
-      "note": null
-    },
-    {
-      "file": "IsFocusRiskExpression",
-      "line": null,
-      "pattern": null,
-      "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.WebBot/CdpClient.Window.cs",
-      "line": null,
-      "pattern": "ForceForegroundWindow",
       "note": null
     },
     {
@@ -86,6 +58,36 @@
       "note": null
     },
     {
+      "file": "EmulateActiveTabAsync",
+      "line": null,
+      "pattern": null,
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.cs",
+      "line": 324,
+      "pattern": "SW_SHOWMINNOACTIVE",
+      "note": null
+    },
+    {
+      "file": "ForceForegroundWindow",
+      "line": null,
+      "pattern": null,
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.FocusRiskWatchdog.cs",
+      "line": null,
+      "pattern": "IsFocusRiskMethod",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.Window.cs",
+      "line": null,
+      "pattern": "RestoreChromeNoActivate",
+      "note": null
+    },
+    {
       "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Entry.Cdp.cs",
       "line": null,
       "pattern": "OnFocusTheft",
@@ -94,13 +96,7 @@
     {
       "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Focus.cs",
       "line": null,
-      "pattern": "StartFocusWatchdog",
-      "note": null
-    },
-    {
-      "file": "RestoreFocusWithRetryAsync",
-      "line": null,
-      "pattern": null,
+      "pattern": "RestoreFocusWithRetryAsync",
       "note": null
     },
     {
@@ -108,22 +104,10 @@
       "line": 603,
       "pattern": "DismissDialogAsync",
       "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.CLI/Commands/A11yActions.AutoHeal.cs",
-      "line": null,
-      "pattern": "FireAutoHeal",
-      "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.Win32/Input/InputReadiness.cs",
-      "line": null,
-      "pattern": "Probe",
-      "note": null
     }
   ],
   "author": "claude",
   "created": "2026-04-07T08:50:15.2810138Z",
-  "updated": "2026-04-07T09:16:00.6506337Z",
-  "version": "1.9"
+  "updated": "2026-04-07T09:23:09.3371661Z",
+  "version": "1.10"
 }
