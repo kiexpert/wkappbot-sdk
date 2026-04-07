@@ -272,6 +272,17 @@ internal partial class Program
                 {
                     await AttachFilesViaCdp(cdp, attachFiles, editorSel, prevFgGemini, AskAttachmentPump, "gemini");
                     PulseStep.Mark("files-attached");
+                    // Dismiss consent popup that Gemini shows after file attach (e.g. "이미지 및 파일에서 콘텐츠 생성")
+                    var dismissResult = await cdp.DismissDialogAsync();
+                    if (dismissResult != "NONE")
+                        Console.WriteLine($"[ASK] Post-attach dialog dismissed: {dismissResult}");
+                }
+
+                // Dismiss any pre-send dialog (consent popup may appear without file attach too)
+                {
+                    var dismissResult = await cdp.DismissDialogAsync();
+                    if (dismissResult != "NONE")
+                        Console.WriteLine($"[ASK] Pre-send dialog dismissed: {dismissResult}");
                 }
 
                 // Tier 1: focusless insert (a11y-first)
