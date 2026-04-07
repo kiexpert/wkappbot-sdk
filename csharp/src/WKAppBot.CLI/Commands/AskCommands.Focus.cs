@@ -15,6 +15,170 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
+    // ── Focus Watchdog: background loop monitors focus throughout a CDP ask operation ──
+    // Started before input, stopped when ask completes. Retries indefinitely until restored.
+    static CancellationTokenSource? _focusWatchdogCts;
+
+    static IDisposable StartFocusWatchdog(IntPtr prevFg, CdpClient cdp, string context)
+    {
+        _focusWatchdogCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _focusWatchdogCts = cts;
+        bool notifiedOnce = false;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                while (!cts.Token.IsCancellationRequested)
+                {
+                    await Task.Delay(200, cts.Token);
+                    var cur = NativeMethods.GetForegroundWindow();
+                    if (cur == prevFg) { notifiedOnce = false; continue; }
+
+                    // Only act if Chrome stole it (not user switching)
+                    var chromeHwnd = cdp.GetChromeWindowHandle();
+                    if (chromeHwnd == IntPtr.Zero) continue;
+                    NativeMethods.GetWindowThreadProcessId(cur, out uint curPid);
+                    NativeMethods.GetWindowThreadProcessId(chromeHwnd, out uint chromePid);
+                    if (curPid != chromePid) continue; // user switched
+
+                    if (!notifiedOnce)
+                    {
+                        notifiedOnce = true;
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"[FOCUS-WD] Chrome stole focus @ {context} -- restoring...");
+                        Console.ResetColor();
+                        try
+                        {
+                            string thiefName = "chrome";
+                            try { thiefName = System.Diagnostics.Process.GetProcessById((int)curPid).ProcessName; } catch { }
+                            FocuslessWarningOverlay.Show(prevFg, $"focus stolen by {thiefName} @ {context}", thiefName);
+                        }
+                        catch { }
+                    }
+
+                    NativeMethods.ForceForegroundWindow(prevFg);
+                    if (NativeMethods.GetForegroundWindow() == prevFg)
+                    {
+                        Console.WriteLine($"[FOCUS-WD] restored @ {context}");
+                        notifiedOnce = false;
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { Console.WriteLine($"[FOCUS-WD] error: {ex.Message}"); }
+        });
+
+        return new ActionDisposable(() => cts.Cancel());
+    }
+
+    sealed class ActionDisposable(Action onDispose) : IDisposable
+    {
+        public void Dispose() => onDispose();
+    }
+
+    /// <summary>
+    /// Restore focus with retry loop — keeps trying until GetForegroundWindow()==prevFg or timeout.
+    /// Shows focusless notification on first detection. IME + cursor also restored on success.
+    /// </summary>
+    static async Task<bool> RestoreFocusWithRetryAsync(IntPtr prevFg, string step, CdpClient? cdp,
+        int retryIntervalMs = 150, int timeoutMs = 5000)
+    {
+        if (prevFg == IntPtr.Zero) return false;
+        var cur = NativeMethods.GetForegroundWindow();
+        if (cur == prevFg) { Console.WriteLine($"[ASK:FOCUS] ok @ {step}"); return false; }
+
+        // Only act if Chrome stole it
+        if (cdp != null)
+        {
+            var chromeHwnd = cdp.GetChromeWindowHandle();
+            if (chromeHwnd != IntPtr.Zero)
+            {
+                NativeMethods.GetWindowThreadProcessId(cur, out uint curPid);
+                NativeMethods.GetWindowThreadProcessId(chromeHwnd, out uint chromePid);
+                if (curPid != chromePid)
+                {
+                    Console.WriteLine($"[ASK:FOCUS] user-switch @ {step}: now={cur:X8} (not Chrome)");
+                    return false;
+                }
+            }
+        }
+
+        // Snapshot IME + cursor before any restore attempt
+        uint imeConv = 0, imeSent = 0;
+        try
+        {
+            var himc = NativeMethods.ImmGetContext(prevFg);
+            if (himc != IntPtr.Zero)
+            {
+                NativeMethods.ImmGetConversionStatus(himc, out imeConv, out imeSent);
+                NativeMethods.ImmReleaseContext(prevFg, himc);
+            }
+        }
+        catch { }
+        NativeMethods.GetCursorPos(out var cursorSnap);
+
+        // Knowhow + focusless notification (once)
+        ActionApi.OnFocusStealer?.Invoke(cur, $"ask-{step}");
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(cur, out uint thiefPid);
+            string thiefName = "chrome";
+            try { thiefName = System.Diagnostics.Process.GetProcessById((int)thiefPid).ProcessName; } catch { }
+            FocuslessWarningOverlay.Show(prevFg, $"STOLEN @ {step} by {thiefName}(0x{cur:X8}) -- restoring", thiefName);
+        }
+        catch { }
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"[ASK:FOCUS] STOLEN @ {step}: was={prevFg:X8} now={cur:X8} -- retrying...");
+        Console.ResetColor();
+
+        // Retry loop until restored or timeout
+        var sw = Stopwatch.StartNew();
+        int attempt = 0;
+        bool restored = false;
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            attempt++;
+            NativeMethods.ForceForegroundWindow(prevFg);
+            await Task.Delay(retryIntervalMs);
+            if (NativeMethods.GetForegroundWindow() == prevFg) { restored = true; break; }
+            if (attempt % 10 == 0)
+                Console.WriteLine($"[ASK:FOCUS] still retrying @ {step} attempt={attempt} elapsed={sw.ElapsedMilliseconds}ms");
+        }
+
+        if (restored)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"[ASK:FOCUS] restored @ {step} after {attempt} attempt(s) ({sw.ElapsedMilliseconds}ms)");
+            Console.ResetColor();
+            // Restore IME
+            try
+            {
+                var himc2 = NativeMethods.ImmGetContext(prevFg);
+                if (himc2 != IntPtr.Zero)
+                {
+                    NativeMethods.ImmSetConversionStatus(himc2, imeConv, imeSent);
+                    NativeMethods.ImmReleaseContext(prevFg, himc2);
+                }
+            }
+            catch { }
+            // Restore cursor
+            NativeMethods.GetCursorPos(out var cursorNow);
+            if (Math.Abs(cursorNow.X - cursorSnap.X) > 4 || Math.Abs(cursorNow.Y - cursorSnap.Y) > 4)
+                NativeMethods.SetCursorPos(cursorSnap.X, cursorSnap.Y);
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[ASK:FOCUS] RESTORE FAILED @ {step} after {attempt} attempts ({timeoutMs}ms timeout)");
+            Console.ResetColor();
+        }
+
+        return restored;
+    }
+
     static async Task<(bool ready, IntPtr prevFg, ClickZoomHelper? zoom)> EnsureCdpReadyAsync(
         CdpClient cdp, string action, string? cssSelector = null, string? label = null, IntPtr prevFgHint = default)
     {
@@ -127,7 +291,6 @@ internal partial class Program
 
         if (curFg == prevFg)
         {
-            // No steal — clear the prop so next ask doesn't require approval unnecessarily
             if (chromeHwnd != IntPtr.Zero)
                 try { NativeMethods.RemovePropW(chromeHwnd, $"{ActionApi.FocusStealerPropPrefix}ask"); } catch { }
             return;
@@ -139,19 +302,15 @@ internal partial class Program
 
         if (curPid == chromePid)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[AAR:CDP:FOCUS] Chrome stole focus during {action}! Restoring...");
-            Console.ResetColor();
-            NativeMethods.ForceForegroundWindow(prevFg); // AttachThreadInput restore
-            ActionApi.OnFocusStealer?.Invoke(chromeHwnd, $"ask-{action}");
+            // Kick off async retry restore (fire-and-forget from sync context)
+            Task.Run(() => RestoreFocusWithRetryAsync(prevFg, $"guard-{action}", cdp));
         }
     }
 
     /// <summary>
-    /// Log focus state and restore to prevFg if changed (any thief, not just Chrome).
-    /// Also restores IME conversion state + mouse cursor if stolen.
-    /// Fires ActionApi.OnFocusStealer callback ??knowhow recording + overlay.
-    /// Returns true if focus was stolen (and restored).
+    /// Sync wrapper: fire-and-forget RestoreFocusWithRetryAsync.
+    /// Returns true if theft was detected (Chrome stole focus), false if focus was OK or user-switched.
+    /// IME/cursor restore, overlay, and OnFocusStealer callback all handled inside RestoreFocusWithRetryAsync.
     /// </summary>
     static bool LogRestoreFocus(IntPtr prevFg, string step, CdpClient? cdp = null)
     {
@@ -162,83 +321,8 @@ internal partial class Program
             Console.WriteLine($"[ASK:FOCUS] ok @ {step} fg={cur:X8}");
             return false;
         }
-
-        // Only treat as focus theft if Chrome process stole focus (not user switching naturally)
-        if (cdp != null)
-        {
-            var chromeHwnd = cdp.GetChromeWindowHandle();
-            if (chromeHwnd != IntPtr.Zero)
-            {
-                NativeMethods.GetWindowThreadProcessId(cur, out uint curPid);
-                NativeMethods.GetWindowThreadProcessId(chromeHwnd, out uint chromePid);
-                if (curPid != chromePid)
-                {
-                    // User switched to a non-Chrome window — not a bug
-                    Console.WriteLine($"[ASK:FOCUS] user-switch @ {step}: was={prevFg:X8} now={cur:X8} (not Chrome)");
-                    return false;
-                }
-            }
-        }
-
-        // ── Snapshot IME state of prevFg (per-window context, readable even when not foreground)
-        uint imeConv = 0, imeSent = 0;
-        try
-        {
-            var himc = NativeMethods.ImmGetContext(prevFg);
-            if (himc != IntPtr.Zero)
-            {
-                NativeMethods.ImmGetConversionStatus(himc, out imeConv, out imeSent);
-                NativeMethods.ImmReleaseContext(prevFg, himc);
-            }
-        }
-        catch { }
-
-        // ── Snapshot cursor position before restore (will be restored after focus steal)
-        NativeMethods.GetCursorPos(out var cursorSnap);
-
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[ASK:FOCUS] ??STOLEN @ {step}: was={prevFg:X8} now={cur:X8} ??restoring");
-        Console.ResetColor();
-
-        // ── Knowhow recording on the thief (Chrome) -- stamps WKAppBot_FocusStealer-ask-{step}
-        ActionApi.OnFocusStealer?.Invoke(cur, $"ask-{step}");
-        // Also stamp a generic "ask" marker ??EnsureCdpReadyAsync detects it ??forces yield popup next run
-        // FocusStealer prop NOT stamped — SW_SHOWNOACTIVATE prevents repeat steals; avoid false-positive overlays
-
-        NativeMethods.ForceForegroundWindow(prevFg); // AttachThreadInput restore
-
-        // ── Alert on MY window (prevFg) -- user sees exactly when/where Gemini stole focus
-        try
-        {
-            NativeMethods.GetWindowThreadProcessId(cur, out uint thiefPid);
-            string thiefName = "unknown";
-            try { thiefName = System.Diagnostics.Process.GetProcessById((int)thiefPid).ProcessName; } catch { }
-            FocuslessWarningOverlay.Show(prevFg, $"@ {step} focus stolen by {thiefName}(0x{cur:X8})", thiefName);
-        }
-        catch { }
-
-        // ── Restore IME conversion state (Chrome resets to English; we put Korean back)
-        try
-        {
-            var himc2 = NativeMethods.ImmGetContext(prevFg);
-            if (himc2 != IntPtr.Zero)
-            {
-                NativeMethods.ImmSetConversionStatus(himc2, imeConv, imeSent);
-                NativeMethods.ImmReleaseContext(prevFg, himc2);
-                Console.WriteLine($"[ASK:FOCUS] IME restored conv=0x{imeConv:X} sent=0x{imeSent:X}");
-            }
-        }
-        catch { }
-
-        // ── Restore cursor if moved during steal (>4px threshold)
-        NativeMethods.GetCursorPos(out var cursorNow);
-        int cdx = Math.Abs(cursorNow.X - cursorSnap.X), cdy = Math.Abs(cursorNow.Y - cursorSnap.Y);
-        if (cdx > 4 || cdy > 4)
-        {
-            NativeMethods.SetCursorPos(cursorSnap.X, cursorSnap.Y);
-            Console.WriteLine($"[ASK:FOCUS] Cursor restored ({cursorSnap.X},{cursorSnap.Y}) ?({cdx},{cdy})");
-        }
-
+        // Fire-and-forget retry restore (handles Chrome-PID check, IME, cursor, overlay, OnFocusStealer)
+        _ = Task.Run(() => RestoreFocusWithRetryAsync(prevFg, step, cdp));
         return true;
     }
 

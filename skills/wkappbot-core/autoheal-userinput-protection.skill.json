@@ -1,0 +1,76 @@
+{
+  "id": "autoheal-userinput-protection",
+  "app": "wkappbot-core",
+  "title": "AutoHeal - User Input Protection: Focus Theft Detection \u0026 Auto-Recovery",
+  "desc": "Multi-layer system protecting user focus from CDP/Chrome theft during ask operations. Layers: (1) prevFgHint early capture before EnsureCdpConnection, (2) SW_SHOWMINNOACTIVE(8) not SW_MINIMIZE(6) to avoid activating next window, (3) ForceForegroundWindow(AttachThreadInput) replacing silent-fail SetForegroundWindowRaw, (4) StartFocusWatchdog 200ms background loop during entire ask op, (5) RestoreFocusWithRetryAsync retry loop (150ms / 5s timeout) per step, (6) FocuslessWarningOverlay \u002B ActionApi.OnFocusStealer prop stamp. Root cause gaps: AutoHeal never fires for CDP theft (side-effect not failure); SetForegroundWindowRaw blocked by Windows foreground lock; prevFg stale when captured after tab switch; no retry on restore failure.",
+  "steps": [
+    "1. prevFgGemini = GetForegroundWindow() BEFORE EnsureCdpConnection (not after tab switch)",
+    "2. EnsureCdpReadyAsync(prevFgHint) -- passes hint so EnsureCdp uses correct pre-switch prevFg",
+    "3. StartFocusWatchdog(prevFg, cdp) -- 200ms poll, Chrome-PID filter, ForceForegroundWindow per tick",
+    "4. GuardCdpFocusTheft after each insert step -- Task.Run RestoreFocusWithRetryAsync fire-and-forget",
+    "5. LogRestoreFocus at send/complete checkpoints -- delegates to RestoreFocusWithRetryAsync",
+    "6. RestoreFocusWithRetryAsync: snapshot IME\u002Bcursor, retry loop until restored, restore IME\u002Bcursor on success",
+    "7. ForceForegroundWindow: BringWindowToTop \u002B SetForegroundWindow \u002B AttachThreadInput fallback",
+    "8. ActionApi.OnFocusStealer stamp on Chrome \u002B FocuslessWarningOverlay notification without focus steal",
+    "9. FocusStealer-ask prop in EnsureCdpReadyAsync triggers yield popup on next run"
+  ],
+  "tags": [
+    "focus",
+    "ask",
+    "cdp",
+    "autoheal",
+    "userinput",
+    "focus-theft",
+    "watchdog",
+    "gemini",
+    "chrome"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Focus.cs",
+      "line": null,
+      "pattern": "StartFocusWatchdog",
+      "note": null
+    },
+    {
+      "file": "RestoreFocusWithRetryAsync",
+      "line": null,
+      "pattern": null,
+      "note": null
+    },
+    {
+      "file": "GuardCdpFocusTheft",
+      "line": null,
+      "pattern": null,
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Gemini.cs",
+      "line": 52,
+      "pattern": "prevFgGemini",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.Window.cs",
+      "line": null,
+      "pattern": "ForceForegroundWindow",
+      "note": null
+    },
+    {
+      "file": "AttachThreadInput",
+      "line": null,
+      "pattern": null,
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs",
+      "line": null,
+      "pattern": "SW_SHOWMINNOACTIVE",
+      "note": null
+    }
+  ],
+  "author": "claude",
+  "created": "2026-04-07T08:50:15.2810138Z",
+  "updated": "2026-04-07T08:50:15.2810519Z",
+  "version": "1.0"
+}

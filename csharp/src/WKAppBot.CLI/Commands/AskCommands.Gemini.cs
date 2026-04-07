@@ -263,6 +263,9 @@ internal partial class Program
                 // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Gemini", prevFgHint: prevFgGemini);
 
+                // ── Focus watchdog: monitors throughout entire send+wait phase ──
+                using var focusWatchdog = StartFocusWatchdog(prevFg, cdp, "gemini-send");
+
                 // ── File attachments (before text) ──
                 // Pass prevFgGemini so native file dialog tier can restore original user focus after close
                 if (attachFiles?.Count > 0)
