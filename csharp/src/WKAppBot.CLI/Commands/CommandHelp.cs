@@ -1,10 +1,10 @@
-﻿// CommandHelp.cs ??Per-command --help descriptions for future Claude instances.
+﻿// CommandHelp.cs -- Per-command --help descriptions for future Claude instances.
 // Usage: wkappbot <command> --help  |  wkappbot <command> <subcommand> --help
-//        wkappbot <command> [<subcommand>] --regression  ??help + run stored test scripts
+//        wkappbot <command> [<subcommand>] --regression  -- help + run stored test scripts
 //
 // STRUCTURE NOTE: Currently a manual dictionary.
 // FUTURE: Replace with [Command] / [SubCommand] / [Description] attributes on
-//   handler methods + Reflection scan ??code changes auto-expose in --help.
+//   handler methods + Reflection scan -- code changes auto-expose in --help.
 //   See: suggestions.jsonl "Reflection-based --help auto-generation
 
 namespace WKAppBot.CLI;
@@ -236,7 +236,7 @@ internal partial class Program
     {
         ["a11y"] = """
             a11y <action> <grap>[#uia-scope] [options]
-            Universal accessibility control ??UIA ??Win32 ??SendInput 3-tier fallback.
+            Universal accessibility control: UIA -> Win32 -> SendInput 3-tier fallback.
 
             Actions: close  minimize  maximize  restore  focus  move  resize
                      read  find  highlight  invoke  click  toggle  expand  collapse
@@ -283,26 +283,26 @@ internal partial class Program
               route --file <path>                 single message route (test use)
               route '<json>'                      inline JSON route (test use)
 
-            ??RULE: Always reply to Slack messages IN SLACK via `slack reply --msg <ts>`.
+            RULE: Always reply to Slack messages IN SLACK via `slack reply --msg <ts>`.
               Answering only in the Claude Code prompt is NOT acceptable.
-            ??`slack route` is an internal Eye command ??do NOT call manually unless testing.
+            NOTE: `slack route` is an internal Eye command -- do NOT call manually unless testing.
             """,
 
         ["suggest"] = "suggest [subcommand]\n"
-            + "AI suggestion management ??propose ??review ??resolve workflow.\n\n"
+            + "AI suggestion management: propose / review / resolve workflow.\n\n"
             + "Subcommands:\n"
             + "  (no args)         submit a suggestion (opens editor or reads stdin)\n"
             + "  list              show active (unresolved) suggestions\n"
-            + "  resolve <ts>      mark resolved (REQUIRES evidence script ??see below!)\n"
+            + "  resolve <ts>      mark resolved (REQUIRES evidence script -- see below!)\n"
             + "  repost            re-send suggestions to Slack if ts missing\n\n"
-            + "??RESOLVE GUARD ??mandatory test evidence required:\n"
+            + "RESOLVE GUARD -- mandatory test evidence required:\n"
             + "  wkappbot suggest resolve <ts> \"note\"\n"
             + "    --i-completed-<cmd>-<subcmd>-willkim-allowed-this-script <test.sh|test.ps1|test.cmd>\n\n"
             + "  Evidence filename must match: test-{cmd}-{subcmd}-*.<sh|ps1|cmd>\n"
             + "  Script must: reference the command, exit 0 (all tests pass)\n"
-            + "  Failure ??resolve BLOCKED (fix the test or the code first)\n\n"
+            + "  Failure -> resolve BLOCKED (fix the test or the code first)\n\n"
             + "  Regression: ALL previously stored scripts in experience/tests/{cmd}/{subcmd}/\n"
-            + "  are re-run on each resolve. If any fail ??blocked.\n\n"
+            + "  are re-run on each resolve. If any fail -> blocked.\n\n"
             + "evidence_file is saved to history so you can trace what was tested.\n\n"
             + "Examples:\n"
             + "  wkappbot suggest resolve 2026-03-17T05 \"fixed logcat --dbg race\"\n"
@@ -310,20 +310,20 @@ internal partial class Program
 
         ["eye"] = """
             eye [options]
-            WK AppBot Eye ??persistent Slack daemon + status overlay.
+            WK AppBot Eye -- persistent Slack daemon + status overlay.
             Runs as background process, auto-spawned by most commands.
 
             Key behaviors:
-              ??Receives Slack messages ??queues to slack_queue/ ??routes to Claude
-              ??Posts Eye status card to Slack (context%, current task, cwd)
-              ??Auto-deletes stale idle messages on restart (spam prevention)
-              ??Hot-swap: detects .new.exe ??transparent swap, no restart needed
+              - Receives Slack messages -> queues to slack_queue/ -> routes to Claude
+              - Posts Eye status card to Slack (context%, current task, cwd)
+              - Auto-deletes stale idle messages on restart (spam prevention)
+              - Hot-swap: detects .new.exe -> transparent swap, no restart needed
 
             eye tick           one-shot status check (ctx%, cards, queue stats)
             eye --interval N   loop interval in ms (default: 100)
 
-            ??Do NOT spawn Eye directly ??let normal commands trigger it.
-            ??eye tick does NOT spawn Eye (by design).
+            NOTE: Do NOT spawn Eye directly -- let normal commands trigger it.
+            NOTE: eye tick does NOT spawn Eye (by design).
 
             Queue: wkappbot.hq/runtime/slack_queue/*.json
               Each received Slack message = one file, drain every 1s.
@@ -332,7 +332,7 @@ internal partial class Program
 
         ["slack route"] = """
             slack route --queue | --file <path> | '<json>'
-            Internal Eye command ??routes a Slack message to a Claude prompt window.
+            Internal Eye command -- routes a Slack message to a Claude prompt window.
 
             --queue       drain all *.json in slack_queue/ serially (Eye spawns this)
             --file <path> process single JSON file (kept for test scripts)
@@ -340,7 +340,7 @@ internal partial class Program
 
             JSON fields: text, user, ts, threadTs, channel, eyeCwd, botUsername, promptNames
 
-            ??This is an INTERNAL command spawned by Eye ??do not call manually in production.
+            NOTE: Internal command spawned by Eye -- do not call manually in production.
               For testing: slack route --file test-msg.json
             """,
 
@@ -349,7 +349,7 @@ internal partial class Program
             Stream or search wkappbot logs. grep-style argument order.
 
             First arg = content regex (';' = OR). Remaining = file globs (default: *.log).
-            Path segment ';' OR: "logs/媛;????*.log" expands to 3 patterns.
+            Path segment ';' OR: "logs/媛;<name>*.log" expands to 3 patterns.
 
             Key options:
               --hq            include wkappbot.hq/logs (finished logs live here)
@@ -376,7 +376,7 @@ internal partial class Program
               open <path>[:line[:col]]
                   Smart open in responsible VS Code window, then goto line/column.
               read <path> [--offset N] [--limit N] [--encoding 949|utf-16]
-                  Read with line numbers. .pdf ??auto-routes to read-pdf.
+                  Read with line numbers. .pdf -> auto-routes to read-pdf.
                   Aliases: --path/--file, --start/--end/--count, --no-line-numbers.
               write <path> [--encoding N] (--stdin | --text "..." | --file <src>) [--append]
                   Auto backup ON. Aliases: --path, --content, --source-file, --dry-run.
@@ -388,13 +388,13 @@ internal partial class Program
                   Regex search. ';' OR in --path: "W:/A;B" expands.
                   Aliases: --pattern/--query, --root, --file.
               glob <pattern> [--path <dir>]
-                  ** glob. ??ALWAYS use **/ prefix: "**/*.cs" not "*.cs".
+                  ** glob. NOTE: ALWAYS use **/ prefix: "**/*.cs" not "*.cs".
                   Alias: --pattern.
 
             Aliases: file-open, file-read, file-edit, file-grep, file-glob (hyphenated)
-            wkedit.exe ??busybox symlink ??file edit auto-routing
+            wkedit.exe -- busybox symlink -- file edit auto-routing
 
-            ??CP949 source files: some WKAppBot sources have Korean in CP949.
+            NOTE: CP949 source files -- some WKAppBot sources have Korean in CP949.
               Check encoding before editing! Corruption = unrecoverable.
             """,
 
@@ -420,9 +420,9 @@ internal partial class Program
             ask gpt|gemini|claude (agent mode):
               Autonomous sub-agent loop with tools.
 
-            ??Always ask in ENGLISH ??Korean = 3-4x token waste.
-            ??CDP requires Chrome/Edge open with target AI tab.
-            ??Result artifact = chat text only (CDP eval DOM read for full content).
+            NOTE: Always ask in ENGLISH -- Korean = 3-4x token waste.
+            NOTE: CDP requires Chrome/Edge open with target AI tab.
+            NOTE: Result artifact = chat text only (CDP eval DOM read for full content).
             """,
 
         ["newchat"] = """
@@ -430,10 +430,10 @@ internal partial class Program
             Open new Claude Desktop chat + submit prompt (all focusless UIA).
 
             Use for session handoff when context reaches 90%+.
-            Prompt is typed via WM_CHAR (focusless) ??no focus steal.
+            Prompt is typed via WM_CHAR (focusless) -- no focus steal.
 
-            ??Large prompts: use --file to avoid shell escaping issues.
-            ??Claude Desktop must be open and visible.
+            NOTE: Large prompts: use --file to avoid shell escaping issues.
+            NOTE: Claude Desktop must be open and visible.
             """,
 
         ["schedule"] = """
@@ -450,27 +450,27 @@ internal partial class Program
 
         ["agent"] = """
             agent gemini|gpt|claude|triad "<task>" [--max-steps N] [--fresh]
-            Autonomous sub-agent loop: think ??act ??observe, with tools.
+            Autonomous sub-agent loop: think -> act -> observe, with tools.
 
             agent checkpoint [--label "text"]
               Snapshot all tracked files before risky changes.
 
             agent dump-patch [--out file.patch]
-              git diff + per-checkpoint diffs ??unified patch file.
+              git diff + per-checkpoint diffs -> unified patch file.
 
             agent session-status / session-clear
               Show or reset tracked files + checkpoints.
 
-            ??checkpoint BEFORE any compile or destructive change.
-            ??Restore: git apply --reverse agent-patch-*.patch
+            NOTE: checkpoint BEFORE any compile or destructive change.
+            NOTE: Restore: git apply --reverse agent-patch-*.patch
             """,
 
-        ["help"] = "Global meta-options ??work on ANY command, ANY position in args.\n\n"
+        ["help"] = "Global meta-options -- work on ANY command, ANY position in args.\n\n"
             + "--help / -h\n"
             + "  Print command description, subcommands, key options, examples.\n"
             + "  wkappbot <cmd> --help\n"
             + "  wkappbot <cmd> <subcmd> --help\n"
-            + "  Looks up CommandHelpMap ??prints focused entry ??exits 0.\n\n"
+            + "  Looks up CommandHelpMap -> prints focused entry -> exits 0.\n\n"
             + "--regression\n"
             + "  Print --help THEN run all stored test scripts for this command/subcommand.\n"
             + "  wkappbot <cmd> [<subcmd>] --regression\n"
