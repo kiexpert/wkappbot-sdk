@@ -35,6 +35,7 @@ internal partial class Program
                 fsw.Stop();
                 var focusOk = hits.Any(h => h.Handle == gti.hwndFocus);
                 Console.Error.WriteLine($"[FOCUS] {focusGrap} // [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
+                Console.WriteLine($"# FOCUS {focusGrap}");
             }
         }
         catch { }
@@ -540,7 +541,11 @@ internal partial class Program
         // ── JSON5 TARGET: usable as grap pattern in any command ──
         Console.ForegroundColor = ConsoleColor.Cyan;
         foreach (var t in targets)
-            Console.Error.WriteLine($"[A11Y] TARGET: {WindowFinder.BuildTargetJson5(t.Handle)}");
+        {
+            var tGrap = WindowFinder.BuildTargetJson5(t.Handle);
+            Console.Error.WriteLine($"[A11Y] TARGET: {tGrap}");
+            Console.WriteLine($"# TARGET {tGrap}");
+        }
         Console.ResetColor();
 
         // ═══ STEP 4.5: Guard Layer 2+3 — modal alert + focused leaf ═══
