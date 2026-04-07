@@ -14,7 +14,7 @@ partial class Program
     /// <summary>
     /// Spawn Core with CreateNoWindow=true and stdin piped (no ConPTY inheritance).
     /// stdout/stderr are NOT redirected — Core writes directly to Launcher's terminal handles.
-    /// This avoids both: the ~27s ConPTY bash wait AND the unreliable pipe relay mechanism.
+    /// This avoids ConPTY handle inheritance and unreliable pipe relay.
     /// </summary>
     static int RunCoreNoConPty(string[] args)
     {
@@ -30,7 +30,7 @@ partial class Program
                 {
                     FileName = core,
                     UseShellExecute       = false,
-                    CreateNoWindow        = true,  // no ConPTY handle → bash won't wait 27s
+                    CreateNoWindow        = true,  // no ConPTY handle inheritance
                     RedirectStandardInput = true,  // pipe stdin → Core holds no ConPTY stdin
                     RedirectStandardOutput = false, // Core writes directly to Launcher's stdout handle
                     RedirectStandardError  = false, // Core writes directly to Launcher's stderr handle
@@ -94,8 +94,7 @@ partial class Program
             string? relayFilePath = null;
             if (useStdoutRelay && !followMode)
             {
-                // Use C:\Temp\ instead of GetTempPath() — AppData\Local\Temp has 28s visibility delay
-                // when Core's SMB handles are being cleaned up after TerminateProcess.
+                // Use C:\Temp\ instead of GetTempPath() for reliable fast visibility.
                 relayFilePath = System.IO.Directory.Exists(@"C:\Temp")
                     ? $@"C:\Temp\wkappbot-relay-{Environment.ProcessId}.txt"
                     : System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"wkappbot-relay-{Environment.ProcessId}.txt");
@@ -171,11 +170,14 @@ partial class Program
             {
                 // stdin already closed above.
                 // Relay Core's stdout and stderr to Launcher's stdout/stderr in background.
-                // DO NOT set Console.OutputEncoding here — that calls SetConsoleOutputCP(65001),
-                // initializing SMB-backed console kernel objects. TerminateSelf after that = ~27s.
-                // Instead, write bytes directly to the underlying stdout stream (bypasses encoding).
-                var stdoutStream = Console.OpenStandardOutput();
-                var stderrStream = Console.OpenStandardError();
+                // Write bytes directly to the underlying stdout stream.
+                // If terminal is CP949 (Korean CMD), wrap with TranscodeStream: UTF-8 → CP949 on the fly.
+                var rawStdout = Console.OpenStandardOutput();
+                var rawStderr = Console.OpenStandardError();
+                Stream stdoutStream = _needsTranscode
+                    ? new TranscodeStream(rawStdout, _consoleCodePage)
+                    : rawStdout;
+                var stderrStream = rawStderr; // stderr is ASCII diagnostics; no transcode needed
                 var stdoutRelay = System.Threading.Tasks.Task.Run(() =>
                 {
                     try
@@ -217,22 +219,22 @@ partial class Program
                 // Wait for relay to flush all output before Launcher exits
                 System.Threading.Tasks.Task.WhenAll(stdoutRelay, stderrRelay).Wait(500);
                 stdoutStream.Flush();
+                rawStdout.Flush();
                 _lDiagStep = "TerminateSelf";
                 TerminateSelf(0);
                 return 0; // unreachable
             }
 
             // Stdout-relay path (grap/grep with args):
-            // Fast path: named pipe (if set up above) — Core closes pipe BEFORE TerminateProcess.
-            //   Launcher gets EOF at ~20ms, outputs content, exits fast. 27s cleanup in background.
-            // Fallback: relay file (WKAPPBOT_RELAY_FILE) — visible after ~27s (proc object signaled).
+            // Fast path: named pipe — Core closes pipe early, Launcher gets EOF quickly.
+            // Fallback: relay file (WKAPPBOT_RELAY_FILE).
             // Follow mode: Core output goes directly to the terminal (Ctrl+C to stop).
             if (useStdoutRelay)
             {
                 if (relayFilePath != null)
                 {
                     // File-based fast path: poll for .ready (Core creates it BEFORE TerminateProcess).
-                    // File created by live process → visible to GetFileAttributesW immediately (no 27s delay).
+                    // File created by live process → visible to GetFileAttributesW immediately.
                     var readyPath = relayFilePath + ".ready";
                     var ackPath   = relayFilePath + ".ack";
                     Prof($"relay: polling .ready path={readyPath}");
@@ -275,7 +277,9 @@ partial class Program
                 {
                     // Follow mode: relay stdout+stderr in background, wait for Ctrl+C / natural exit.
                     Prof("relay-follow: Core running (Ctrl+C to stop)");
-                    var fStdout = Console.OpenStandardOutput();
+                    Stream fStdout = _needsTranscode
+                        ? new TranscodeStream(Console.OpenStandardOutput(), _consoleCodePage)
+                        : Console.OpenStandardOutput();
                     var fStderr = Console.OpenStandardError();
                     var fOut = System.Threading.Tasks.Task.Run(() => {
                         try { var b = new byte[4096]; int n;
@@ -294,7 +298,7 @@ partial class Program
 
             // Normal path: relay Core's stdout/stderr to Launcher's stdout/stderr in real-time.
             // Sentinel \0UIT on stderr (control signal) → TerminateSelf immediately.
-            // Core's ~30s SMB console cleanup runs in background; bash gets control back right away.
+            // Sentinel \0UIT on stderr → TerminateSelf; bash gets control back right away.
             var _stderr = Console.OpenStandardError();
             var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
             _ = System.Threading.Tasks.Task.Run(() =>
@@ -320,7 +324,9 @@ partial class Program
                 }
                 catch { }
             });
-            var _stdout = Console.OpenStandardOutput();
+            Stream _stdout = _needsTranscode
+                ? new TranscodeStream(Console.OpenStandardOutput(), _consoleCodePage)
+                : Console.OpenStandardOutput();
             int effectiveTimeoutMs = timeoutSec > 0 ? timeoutSec * 1000 : 0;
             var relayBuf = new byte[65536];
             int coreExitFromRelay = -1;
@@ -351,8 +357,7 @@ partial class Program
             int coreExitCode = proc.ExitCode;
             Console.Out.Flush();
             Console.Error.Flush();
-            // TerminateSelf: avoid 27s CLR/ConPTY handle cleanup delay after Core exits.
-            // Core's output is already written (inherited handles); hard-kill Launcher immediately.
+            // TerminateSelf: Core's output already written (inherited handles); hard-kill Launcher immediately.
             TerminateSelf((uint)coreExitCode);
             return coreExitCode; // unreachable
         }
