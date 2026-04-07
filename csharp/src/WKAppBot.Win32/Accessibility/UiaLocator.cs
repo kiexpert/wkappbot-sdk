@@ -1638,6 +1638,10 @@ public sealed partial class UiaLocator : IDisposable
         catch { return ""; }
     }
 
+    /// <summary>Build absolute UIA tag path using this locator's automation instance.</summary>
+    public string GetAbsoluteTagPath(AutomationElement el, int maxDepth = 15)
+        => GrapHelper.BuildAbsoluteTagPath(el, _automation.TreeWalkerFactory.GetRawViewWalker(), maxDepth);
+
     public void Dispose()
     {
         _automation.Dispose();

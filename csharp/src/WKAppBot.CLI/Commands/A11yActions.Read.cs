@@ -54,15 +54,45 @@ internal partial class Program
     // stderr: diagnostic/processing info ([DIAG:find])
     static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth)
     {
+        // ── # TARGET: window grap + absolute UIA tag path (copy-paste ready) ──
+        // Printed here (not in A11yCommand) so the full scope path can be included.
+        var windowGrap = WindowFinder.BuildTargetJson5(hwnd);
+        string absTagPath = "";
+        FocusedElementInfo? focInfo = null;
+        try
+        {
+            using var loc = new UiaLocator();
+            absTagPath = loc.GetAbsoluteTagPath(root);
+            focInfo    = loc.GetFocusedElementInfo();
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] error: {ex.Message}"); }
+
+        // Skip abs path if root is a Window (path would be "?") or resolution failed
+        var validAbsPath = (absTagPath.Length > 0 && absTagPath != "?") ? absTagPath : "";
+        var fullGrap = string.IsNullOrEmpty(validAbsPath) ? windowGrap : $"{windowGrap}#{validAbsPath}";
+
+        // Verify the grap resolves to the correct hwnd → [OK] or [?]
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        string verifyMark = "?";
+        try
+        {
+            var verifyHits = WindowFinder.FindByTitle(windowGrap, true);
+            verifyMark = verifyHits.Any(v => v.Handle == hwnd) ? "OK" : "MISS";
+        }
+        catch { }
+        sw.Stop();
+
+        // title as // comment — copy-paste safe (grap parser ignores // onwards)
+        var comments = new List<string>();
+        try { var t = root.Properties.Name.ValueOrDefault ?? ""; if (!string.IsNullOrEmpty(t)) comments.Add(t); } catch { }
+        var commentSuffix = comments.Count > 0 ? $"  // {string.Join(" | ", comments)}" : "";
+        Console.WriteLine($"# TARGET {fullGrap} [{verifyMark}] {sw.ElapsedMilliseconds}ms{commentSuffix}");
+
         // ── CURSOR ──────────────────────────────────────────────────
         Console.WriteLine("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-        FocusedElementInfo? focInfo = null;
-        try { using var loc = new UiaLocator(); focInfo = loc.GetFocusedElementInfo(); }
-        catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] focus error: {ex.Message}"); }
-
         bool cursorIsBlocking = false;
-        if (focInfo != null)
+        if (focInfo != null)  // focInfo computed above alongside absTagPath
         {
             var curTag = GrapHelper.FormatNodeLabel(focInfo.ControlType, focInfo.AutomationId, focInfo.Name);
             Console.WriteLine($"  {curTag}");
@@ -102,11 +132,8 @@ internal partial class Program
         System.Drawing.Rectangle? targetRect = null;
         try { var r = root.Properties.BoundingRectangle.ValueOrDefault; if (r.Width > 0) targetRect = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
         var targetTag = GrapHelper.FormatNodeLabel(targetType, targetAid, targetName, rect: targetRect, actions: patterns);
-        // scope hint: usable UIA scope to re-address this element
-        var scopeHint = !string.IsNullOrEmpty(targetAid) ? $"#{targetAid}"
-                      : !string.IsNullOrEmpty(targetName) ? $"#*{targetName}*"
-                      : "";
-        Console.WriteLine(scopeHint.Length > 0 ? $"  {targetTag}  →  {scopeHint}" : $"  {targetTag}");
+        // abs path shown above in # TARGET line; just show node tag here
+        Console.WriteLine($"  {targetTag}");
 
         // parent + siblings
         try

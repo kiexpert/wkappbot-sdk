@@ -543,10 +543,11 @@ internal partial class Program
         foreach (var t in targets)
         {
             var tGrap = WindowFinder.BuildTargetJson5(t.Handle);
-            // append UIA scope so the full line is copy-pasteable as a complete grap
             var uiaSuffix = !string.IsNullOrEmpty(uiaPath) ? $"#{uiaPath}" : "";
             Console.Error.WriteLine($"[A11Y] TARGET: {tGrap}{uiaSuffix}");
-            Console.WriteLine($"# TARGET {tGrap}{uiaSuffix}");
+            // For "find": # TARGET is printed by A11yFind with full abs tag path
+            if (action != "find")
+                Console.WriteLine($"# TARGET {tGrap}{uiaSuffix}");
         }
         Console.ResetColor();
 
