@@ -199,7 +199,22 @@ internal partial class Program
                      $"Restate your full answer starting with exactly \"[A{qid}]\" and nothing before it.";
         Console.WriteLine($"[REEDUCATE] Q{qid}: [A{qid}] 마커 없음 → 재교육 메시지 주입...");
 
-        await cdp.ClearEditorAsync(editorSel);
+        // ClearEditorAsync timeout here was the root cause of GPT session resets (suggest #19).
+        // On failure: skip reeducate injection, fall back to reading existing page response.
+        bool clearOk = false;
+        try
+        {
+            await cdp.ClearEditorAsync(editorSel);
+            clearOk = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[REEDUCATE] Q{qid}: ClearEditor 실패 ({ex.GetType().Name}) → 페이지 응답 읽기로 복구");
+        }
+
+        if (!clearOk)
+            return await ReEducateReadPageAsync(cdp, host, qid, "clear-failed");
+
         await Task.Delay(100);
         var inserted = await cdp.InsertContentEditableAsync(editorSel, sysMsg);
         if (!inserted)
@@ -219,8 +234,12 @@ internal partial class Program
             foreach (var s in stopSels)
             {
                 var esc = s.Replace("'", "\\'");
-                var vis = await cdp.EvalAsync($"(()=>{{var b=document.querySelector('{esc}');return b&&b.offsetParent!==null?'1':'0'}})()");
-                if (vis == "1") { started = true; break; }
+                try
+                {
+                    var vis = await cdp.EvalAsync($"(()=>{{var b=document.querySelector('{esc}');return b&&b.offsetParent!==null?'1':'0'}})()");
+                    if (vis == "1") { started = true; break; }
+                }
+                catch { break; } // EvalAsync timeout → stop polling
             }
             if (started) break;
         }
@@ -233,26 +252,45 @@ internal partial class Program
             foreach (var s in stopSels)
             {
                 var esc = s.Replace("'", "\\'");
-                var vis = await cdp.EvalAsync($"(()=>{{var b=document.querySelector('{esc}');return b&&b.offsetParent!==null?'1':'0'}})()");
-                if (vis == "1") { still = true; break; }
+                try
+                {
+                    var vis = await cdp.EvalAsync($"(()=>{{var b=document.querySelector('{esc}');return b&&b.offsetParent!==null?'1':'0'}})()");
+                    if (vis == "1") { still = true; break; }
+                }
+                catch { break; } // EvalAsync timeout → assume done, break
             }
             if (!still) break;
         }
 
-        // Read the latest AI response from DOM using registry selectors
+        return await ReEducateReadPageAsync(cdp, host, qid, "reeducate");
+    }
+
+    /// <summary>
+    /// Recovery path: read the last AI response from DOM.
+    /// Used both as the normal reeducate response read and as fallback when CDP fails mid-flow.
+    /// Keeps 정반합 session alive without triggering a fresh-tab reset.
+    /// </summary>
+    static async Task<string?> ReEducateReadPageAsync(WKAppBot.WebBot.CdpClient cdp, string host, int qid, string context)
+    {
         var msgSels = WKAppBot.WebBot.CdpSelectorRegistry.Get(host, "message");
-        // Build JS that tries each selector and returns innerText of last matched element
         var selsJson = string.Join(",", msgSels.Select(s => $"'{WKAppBot.WebBot.CdpClient.Esc(s)}'"));
         var js = $"(()=>{{var sels=[{selsJson}];for(var i=0;i<sels.length;i++){{var els=document.querySelectorAll(sels[i]);if(els.length>0)return els[els.length-1].innerText||'';}}return '';}})()";
-
-        var newResponse = await cdp.EvalAsync(js);
-        if (string.IsNullOrWhiteSpace(newResponse))
+        try
         {
-            Console.WriteLine($"[REEDUCATE] Q{qid}: 응답 DOM 읽기 실패");
+            var resp = await cdp.EvalAsync(js);
+            if (string.IsNullOrWhiteSpace(resp))
+            {
+                Console.WriteLine($"[REEDUCATE] Q{qid}: [{context}] 응답 DOM 읽기 실패");
+                return null;
+            }
+            Console.WriteLine($"[REEDUCATE] Q{qid}: [{context}] 응답 수신 ({resp.Length}자)");
+            return resp;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[REEDUCATE] Q{qid}: [{context}] DOM 읽기 실패 ({ex.GetType().Name})");
             return null;
         }
-        Console.WriteLine($"[REEDUCATE] Q{qid}: 재교육 응답 수신 ({newResponse.Length}자)");
-        return newResponse;
     }
 
     /// <summary>
