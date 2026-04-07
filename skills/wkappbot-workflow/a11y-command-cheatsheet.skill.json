@@ -1,27 +1,54 @@
 {
   "id": "a11y-command-cheatsheet",
   "app": "wkappbot-workflow",
-  "title": "a11y — 24-Action UI Automation Cheatsheet",
-  "desc": "wkappbot a11y is the primary automation command. 3-tier fallback: UIA→Win32→SendInput (native) or CSS→CDP→UIA (web). grap = glob/regex/OR/UIA-scope/JSON5 target syntax.",
+  "title": "a11y — AI Eyes & Hands: 24-Action UI Automation Cheatsheet",
+  "desc": "AI is fundamentally a blind person with no hands. wkappbot a11y gives it sight (inspect/find/ocr/screenshot) and touch (click/type/invoke/scroll). 3-tier native fallback: UIA→Win32→SendInput. Web: CSS→CDP→UIA. grap = the universal target language: glob/OR/scope/CSS/JSON5/hwnd/adb.",
   "steps": [
-    "DISCOVER: a11y windows | a11y inspect \"*App*\" --depth 5 | a11y find \"*pattern*\"",
-    "WINDOW OPS: a11y focus/minimize/maximize/restore/close/move/resize \"*App*\"",
-    "CLICK: a11y click|invoke|toggle|expand|collapse|select|scroll \"*grap*\"",
-    "TYPE text: a11y type \"*edit*\" \"hello\" — UIA Value→WM_CHAR→LegacyIA→SendKeys",
-    "TYPE hotkey: a11y type \"*app*\" \"File/Save\" --hotkey — menu path dispatch",
-    "READ: a11y read \"*element*\" — returns Name/Value/Text",
-    "WAIT: a11y wait \"*element*\" --condition visible --timeout 30",
-    "KILL: a11y kill \"pattern[/ancestor]\" — process kill by grap",
-    "SCOPE: a11y click \"*App*#*Panel*#*Button*\" — # drills into UIA subtree",
-    "WEB: a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"",
-    "WEB --eval-js tab-find: no #scope → auto-find tab by window title. a11y read \"*Chrome*\" --eval-js \"document.title\" (finds matching tab)",
-    "WEB --eval-js ambiguous: if target is unclear, eval falls back to tab-find by hint→title priority. 'a11y eval' / 'web eval' are DEPRECATED (scheduled removal, AutoRegisterBug on use)",
-    "ANDROID: a11y click \"adb://device#*element*\" — ADB bridge",
-    "FLAGS: --nth 2 / --all / --force / --timeout N / --speak"
+    "━━ PHILOSOPHY ━━ AI = blind + no hands. a11y = the sensory bridge. Sight: inspect/find/ocr/screenshot. Touch: click/type/invoke/toggle/scroll. Without a11y, AI can only read files and call APIs — it cannot interact with any running app.",
+
+    "━━ ARCHITECTURE ━━ Native 3-tier: [T1] UIA patterns (focusless, fastest) → [T2] Win32 messages (PostMessage, focusless) → [T3] SendInput (physical, requires focus+readiness). Web 3-tier: [W1] CSS→CDP direct → [W2] CDP telepathy (browser auto-detected) → [W3] UIA fallback.",
+
+    "━━ GRAP SYNTAX ━━ Window part (before #): '*App*' wildcard | '*메모장*;*Notepad*' OR(;) | {title:'Chrome',domain:'claude.ai'} JSON5 | '*hwnd=001A0F2C*' handle | 'regex:note.*' regex | 'pid:1234' process. UIA scope (after #): '#*Panel*#*Button*' chain-drill | '#regex:btn_\\d+' | '#{aid:\"ok\",type:\"Button\"}' JSON5.",
+
+    "━━ CSS AUTO-ROUTE ━━ If #scope starts with '.', '[', contains '>', '~', '+', ':', or is an HTML tag → auto-routed to CDP (no UIA). Examples: '*Chrome*#button.send', '*Chrome*#input[type=text]', '*Chrome*#div>span'. Wildcards (* ?) force UIA Name matching instead.",
+
+    "━━ 24 ACTIONS ━━ [DISCOVER] windows|inspect|find|screenshot|ocr — read the world without touching. [WINDOW] focus|minimize|maximize|restore|close|move(--x --y)|resize(--w --h) — control app layout. [ELEMENT] click|invoke|toggle|expand|collapse|select|scroll|type|set-value|set-range|read|wait|clipboard — interact with controls.",
+
+    "━━ ACTION TIERS ━━ invoke: UIA InvokePattern(focusless)→BM_CLICK→WM_LBUTTON. type: UIA Value→WM_CHAR→LegacyIA→SendKeys (add --hotkey for menu-path dispatch: 'File/Save'). toggle/select/expand/collapse: UIA patterns (focusless). click: physical coords (needs focus). scroll: UIA ScrollPattern (focusless).",
+
+    "━━ UIA NODE TYPES ━━ Containers (use as scope): Window, Pane, Group, Tab, Document, RootWebArea, Custom. Leaf controls: Button, CheckBox, RadioButton, Edit, ComboBox, ListItem, TreeItem, MenuItem, DataItem, Text, Hyperlink, Slider, Spinner, ProgressBar, StatusBar, Image. ControlType appears in inspect output — use AutomationId or Name for grap.",
+
+    "━━ DISCOVER COMMANDS ━━ 'a11y windows' — list all visible windows. 'a11y inspect \"*App*\" --depth 5' — dump UIA tree (depth 1-10). 'a11y find \"*App*#*pattern*\"' — search tree for element. 'a11y screenshot \"*App*\"' — capture window. 'a11y ocr \"*App*\"' — extract text via OCR. ALWAYS run inspect before automating an unfamiliar app.",
+
+    "━━ TYPE MODES ━━ Normal: 'a11y type \"*Edit*\" \"hello world\"' — UIA Value→WM_CHAR→SendKeys chain. Hotkey/menu: 'a11y type \"*App*\" \"File/Save\" --hotkey' — scans accesskey+aria-keyshortcuts+menu labels, dispatches focuslessly. CJK auto-detected → CDP Input.insertText (bypasses IME issues). IMM32 Tier2: AttachThreadInput+ImmSetCompositionString for MFC.",
+
+    "━━ WEB / CDP ━━ Browser auto-detected via CDP port. Tab-find priority: [1] URL hint (scope contains 'http','localhost',':') [2] window title match. 'a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"' — with scope. 'a11y read \"*Chrome*\" --eval-js \"document.title\"' — no scope → auto tab-find by window title. Tab portal: '*Chrome*#ChatGPT#input.prompt' → switches Chrome tab to ChatGPT then targets CSS.",
+
+    "━━ --eval-js ━━ Pre-action JS hook: runs BEFORE the main action (e.g., remove disabled). For read/find it IS the action. 'a11y click \"*Chrome*#button.submit\" --eval-js \"el.disabled=false\"' (pre-hook). 'a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.querySelector(\\'h1\\').textContent\"' (read-as-JS). CDP EvalAsync: 3 retries, 500ms/1000ms backoff. 'a11y eval' and 'web eval' are DEPRECATED (scheduled removal).",
+
+    "━━ KEY FLAGS ━━ --nth N: pick Nth match (ranges: '2~4','3~','~3','1,3~'). --all: apply to all matches. --force: hard-kill on close. --speak: TTS read result. --condition 'text': wait until text present. --not: wait until text absent. --timeout N: ms (default 10000). --interval N: poll ms (default 500). --depth N: UIA tree depth (default 3). --hotkey: menu/label dispatch mode. --eval-js 'js': CDP pre-hook JS.",
+
+    "━━ AAR (Action-Aware Readiness) ━━ Runs automatically before interactive actions. Stage0: screen-lock check. Stage1: minimized window → SW_SHOWNOACTIVATE restore. Stage2: DetectBlocker() — modal/overlay auto-dismiss attempt; blocked → policy (block or warn). Stage2.5: 2-shot stability probe (100ms). Stage3: stale element re-fetch. Stage4: action-specific validation (Enabled/Visible/!ReadOnly for type/set-value). Returns null=block, same=proceed, different=retarget(popup found).",
+
+    "━━ AMBIGUITY GUARD (6 layers) ━━ L1: multiple windows matched → JSON5 list + verification hints. L2: modal blocking target → auto-list alert buttons. L3: focused/leaf node → show parent chain + grap. L4: Win32 child not found → list sibling windows. L5: element action with no #scope → list root children + focus chain. L6: UIA scope not found → list available elements. READ the guard output — it gives you the corrected grap to copy-paste.",
+
+    "━━ FOCUSLESS-FIRST PRINCIPLE ━━ Always prefer UIA patterns (T1/T2) over SendInput (T3). UIA Invoke/Value/Toggle/Select/Scroll = NO focus needed. Only type --hotkey and physical click need focus. WPF overlays use SW_SHOWNOACTIVATE(4). Before any SendInput: InputReadiness.Probe() checks user idle time — auto-yields if user is typing.",
+
+    "━━ ANDROID ━━ 'a11y click \"adb://Fold5/*heromts*#해외잔고\"' — ADB bridge. Scheme: adb://<device-serial>/<package-grap>#<uia-scope>. Wildcard device: 'adb://*pkg*#el'. Inner/outer display: auto-detected. Same grap syntax, same 3-tier fallback (ADB accessibility service).",
+
+    "━━ QUICK PATTERNS ━━ Find element: 'a11y inspect \"*App*\" --depth 3' then look at AutomationId/Name. Click button: 'a11y invoke \"*App*#*OK*\"' (focusless). Type text: 'a11y type \"*App*#*Input*\" \"text\"'. Read value: 'a11y read \"*App*#*Result*\"'. Wait for element: 'a11y wait \"*App*#*Status*\" --condition \"완료\" --timeout 30000'. Web DOM read: 'a11y read \"*Chrome*#site.com\" --eval-js \"document.body.innerText.substring(0,500)\"'.",
+
+    "━━ TROUBLESHOOTING ━━ 'No window found' → wrong grap, try 'a11y windows' first. 'UIA scope not found' → read L6 guard output for available elements. 'Action blocked by modal' → read L2 output, dismiss modal first. All tiers fail (MFC/owner-drawn) → 'wkappbot a11y hack \"*App*\"' triggers OCR+Vision fallback + dyn_r{row}c{col} dynamic IDs. CDP eval fails → check if --eval-js target has correct #scope tab hint.",
+
+    "━━ VETERAN: FALLBACK INTERNALS ━━ T1 hollow-stub detection: WM_NULL baseline → InvokePattern latency > baseline+2ms = hollow. T2 MFC: EM_SETSEL/WM_SETTEXT fail on CMaskEditEx → use WM_CHAR PostMessage (TranslateMessage auto-generates WM_CHAR). T3 Flutter: PostMessage WM_LBUTTON → 300ms → pixel-diff >2% → physical click fallback. FLUTTERVIEW: Tier0 PostMessage bypass (skips UIA entirely). TypeViaIme: AttachThreadInput+ImmSetCompositionString+CPS_COMPLETE (MFC composition input).",
+
+    "━━ VETERAN: CDP INTERNALS ━━ IsBrowserProcess(): Chrome/Edge/Brave/Firefox only — Electron apps (VS Code) excluded. DetectCdpPort(): scans process cmdline for --remote-debugging-port. SwitchToTargetAsync(): URL→title priority, skipMinimize for read-only. Runtime.enable with retry (4x exponential backoff). EvalAsync: 3 retries, DETACHED_PROCESS flag prevents ConPTY LPC deadlock. Targetless eval ('a11y eval'/'web eval') → AutoRegisterBug tracking + DEPRECATED warning.",
+
+    "━━ VETERAN: EXPERIENCE DB ━━ Per-process/class knowhow cache: 'wkappbot.hq/experience/{proc}/{class}/knowhow-{action}.md'. RecordTierSuccess() auto-saves winning tier. LoadKnowhow() prefetches hints for next run. OcrCorrectionDb: pixel-hash→correct-text mapping (self-learning). DYN-A11Y: CCA segmentation→OCR→Vision API for owner-drawn controls → dyn_r{row}c{col} dynamic IDs cached in experience DB."
   ],
-  "tags": ["a11y", "uia", "win32", "automation", "grap", "reference"],
+  "tags": ["a11y", "uia", "win32", "cdp", "automation", "grap", "fallback", "reference", "cheatsheet"],
   "author": "claude",
   "created": "2026-04-07T13:00:00.0000000Z",
-  "updated": "2026-04-07T13:00:00.0000000Z",
-  "version": "1.0"
+  "updated": "2026-04-07T22:30:00.0000000Z",
+  "version": "2.0"
 }
