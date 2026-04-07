@@ -35,7 +35,7 @@ internal partial class Program
                 fsw.Stop();
                 var focusOk = hits.Any(h => h.Handle == gti.hwndFocus);
                 Console.Error.WriteLine($"[FOCUS] {focusGrap} // [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
-                Console.WriteLine($"# FOCUS {focusGrap}");
+                Console.WriteLine(Ansi.Dim($"# FOCUS {focusGrap}"));
             }
         }
         catch { }
@@ -234,6 +234,12 @@ internal partial class Program
 
         var action = args[0].ToLowerInvariant();
         var grap = args[1];
+        // @name alias expansion — resolves before any grap parsing
+        if (grap.StartsWith('@'))
+        {
+            grap = GrapAliasStore.Expand(grap, out var healNote);
+            if (healNote != null) Console.Error.WriteLine(healNote);
+        }
         bool all = args.Any(a => a == "--all");
         bool force = args.Any(a => a == "--force");
         // --allow-ancestors: bypass ancestor process guard for ALL interactive actions.
@@ -547,7 +553,7 @@ internal partial class Program
             Console.Error.WriteLine($"[A11Y] TARGET: {tGrap}{uiaSuffix}");
             // For "find": # TARGET is printed by A11yFind with full abs tag path
             if (action != "find")
-                Console.WriteLine($"# TARGET {tGrap}{uiaSuffix}");
+                Console.WriteLine(Ansi.TargetLine($"# TARGET {tGrap}{uiaSuffix}"));
         }
         Console.ResetColor();
 

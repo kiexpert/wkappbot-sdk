@@ -155,6 +155,16 @@ internal partial class Program
         // By exiting before any console setup, cleanup is <200ms.
         // Help/usage text is ASCII-only so no encoding setup is needed.
         {
+            // grap alias sub-commands: save/list/show/remove/verify → GrapAliasCommand (not grep)
+            if (args.Length >= 2 && args[0].ToLowerInvariant() == "grap"
+                && args[1].ToLowerInvariant() is "save" or "list" or "show" or "remove" or "rm"
+                    or "delete" or "del" or "verify")
+            {
+                try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
+                Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+                return GrapAliasCommand(args[1..]);
+            }
+
             // grap/grep help: no args or --help/-h
             if (args.Length > 0 && args[0].ToLowerInvariant() is "grap" or "grep"
                 && (args.Length == 1 || args.Any(a => a is "--help" or "-h")))

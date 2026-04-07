@@ -242,7 +242,7 @@ internal partial class Program
                 var (pct, _, jsonlPath, fileSize) = GetContextInfoForCwdEx(card.Cwd);
                 var sizeMB = fileSize / (1024.0 * 1024.0);
                 const double ContextLimitMB = 20.0;
-                const double SkillNudgeMB  = 9.5;   // 스킬 기여 넛지
+                const double SkillNudgeMB  = 9.9;   // 스킬 기여 넛지
                 const double UrgentMB      = 10.0;   // 긴급 (10MB 초과 → 인수인계)
                 if (sizeMB < SkillNudgeMB || jsonlPath == null) continue;
 

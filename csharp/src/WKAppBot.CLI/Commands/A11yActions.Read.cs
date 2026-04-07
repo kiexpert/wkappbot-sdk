@@ -87,10 +87,10 @@ internal partial class Program
         // Window title as meta — NOT element name (can be full text content)
         var winTitle = NativeMethods.GetWindowTextW(hwnd);
         var metaSuffix = !string.IsNullOrEmpty(winTitle) ? $"  {winTitle}" : "";
-        Console.WriteLine($"# TARGET \"{fullGrap}\" [{verifyMark}] {sw.ElapsedMilliseconds}ms{metaSuffix}");
+        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{metaSuffix}"));
 
         // ── CURSOR ──────────────────────────────────────────────────
-        Console.WriteLine("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        Console.WriteLine(Ansi.Header("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
 
         bool cursorIsBlocking = false;
         if (focInfo != null)  // focInfo computed above alongside absTagPath
@@ -123,7 +123,7 @@ internal partial class Program
         }
 
         // ── TARGET ──────────────────────────────────────────────────
-        Console.WriteLine("━━━ TARGET ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        Console.WriteLine(Ansi.Header("━━━ TARGET ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
 
         var targetName = root.Properties.Name.ValueOrDefault ?? "";
         var targetAid  = root.Properties.AutomationId.ValueOrDefault ?? "";
@@ -165,13 +165,13 @@ internal partial class Program
         // Only emit when there's something actionable — skip ✓ (noise)
         if (cursorIsBlocking)
         {
-            Console.WriteLine("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            Console.WriteLine("  ⚠ cursor in Dialog — verify target is reachable");
+            Console.WriteLine(Ansi.Header("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+            Console.WriteLine(Ansi.Yellow("  ⚠ cursor in Dialog — verify target is reachable"));
         }
         else if (focInfo == null)
         {
-            Console.WriteLine("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            Console.WriteLine("  ? focus unknown");
+            Console.WriteLine(Ansi.Header("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+            Console.WriteLine(Ansi.Dim("  ? focus unknown"));
         }
 
         // Win32 children → stderr only

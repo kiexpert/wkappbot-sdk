@@ -1,16 +1,16 @@
 {
   "id": "handoff-send-best-practice",
   "app": "wkappbot-workflow",
-  "title": "인수인계 잘 보내는 법",
-  "desc": "컨텍스트 8MB 넘으면 인수인계 준비. 후배 Claude가 맥락 없이 헤매지 않도록 핵심만 압축해서 전달. 길수록 좋은 게 아니라 정확할수록 좋다.",
+  "title": "handoff send best practice",
+  "desc": "\uCEE8\uD14D\uC2A4\uD2B8 8MB \uB118\uC73C\uBA74 \uC778\uC218\uC778\uACC4 \uC900\uBE44. \uD6C4\uBC30 Claude\uAC00 \uB9E5\uB77D \uC5C6\uC774 \uD5E4\uB9E4\uC9C0 \uC54A\uB3C4\uB85D \uD575\uC2EC\uB9CC \uC555\uCD95\uD574\uC11C \uC804\uB2EC. \uAE38\uC218\uB85D \uC88B\uC740 \uAC8C \uC544\uB2C8\uB77C \uC815\uD655\uD560\uC218\uB85D \uC88B\uB2E4.",
   "steps": [
-    "wkappbot claude-usage — ctx% 확인 (8MB 경고, 10MB 즉시 handoff)",
-    "wkappbot newchat '미완료 작업: X중. 다음 할 일: Y. 주의: Z' — 핵심만",
-    "인수인계 전 미완료 코드는 최소한 컴파일되게 정리 후 커밋",
-    "진행중인 삽질 내용 + 시도한 것 + 실패 이유 반드시 포함",
-    "중요 발견은 skill contribute 로 스킬화 후 handoff — 다음 세션 재발견 방지",
-    "★ 9.5MB 넘으면 Eye가 자동으로 스킬 기여 너지 전송",
-    "★ 10MB 넘으면 Eye가 자동 인수인계 실행 (newchat 자동 발동)"
+    "wkappbot claude-usage \u2014 ctx% \uD655\uC778 (8MB \uACBD\uACE0, 10MB \uC989\uC2DC handoff)",
+    "wkappbot newchat \u0027\uBBF8\uC644\uB8CC \uC791\uC5C5: X\uC911. \uB2E4\uC74C \uD560 \uC77C: Y. \uC8FC\uC758: Z\u0027 \u2014 \uD575\uC2EC\uB9CC",
+    "\uC778\uC218\uC778\uACC4 \uC804 \uBBF8\uC644\uB8CC \uCF54\uB4DC\uB294 \uCD5C\uC18C\uD55C \uCEF4\uD30C\uC77C\uB418\uAC8C \uC815\uB9AC \uD6C4 \uCEE4\uBC0B",
+    "\uC9C4\uD589\uC911\uC778 \uC0BD\uC9C8 \uB0B4\uC6A9 \u002B \uC2DC\uB3C4\uD55C \uAC83 \u002B \uC2E4\uD328 \uC774\uC720 \uBC18\uB4DC\uC2DC \uD3EC\uD568",
+    "\uC911\uC694 \uBC1C\uACAC\uC740 skill contribute \uB85C \uC2A4\uD0AC\uD654 \uD6C4 handoff \u2014 \uB2E4\uC74C \uC138\uC158 \uC7AC\uBC1C\uACAC \uBC29\uC9C0",
+    "\u2605 9.9MB \uB118\uC73C\uBA74 Eye\uAC00 \uC790\uB3D9\uC73C\uB85C \uC2A4\uD0AC \uAE30\uC5EC \uB108\uC9C0 \uC804\uC1A1",
+    "\u2605 10MB \uB118\uC73C\uBA74 Eye\uAC00 \uC790\uB3D9 \uC778\uC218\uC778\uACC4 \uC2E4\uD589 (newchat \uC790\uB3D9 \uBC1C\uB3D9)"
   ],
   "tags": [
     "workflow",
@@ -19,7 +19,9 @@
     "session",
     "token-saving"
   ],
+  "source_refs": null,
   "author": "claude",
-  "created": "2026-04-07T03:30:00.0000000Z",
-  "version": "1.0"
+  "created": "2026-04-07T03:30:00Z",
+  "updated": "2026-04-07T19:16:48.1738784Z",
+  "version": "1.2"
 }
