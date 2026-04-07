@@ -28,6 +28,13 @@
 ### Source File Size
 ~400줄/파일 권장. **WKAppBot 코드에만 적용** (고객 코드 리팩터 금지!)
 
+### 스킬 작성 규칙
+- **스킬 생성/수정은 반드시 `wkappbot skill contribute` / `wkappbot skill edit` 사용**
+- `.skill.json` 파일을 Edit/Write/wkedit 도구로 직접 수정 **절대 금지**
+  - 이유: `|`가 step 구분자라 내용이 쪼개짐, 버전 bump 누락, 인코딩 오염
+  - step 내용에 `|` 사용 금지 — 줄바꿈(newline) 대신 사용
+- 스킬 생성 후 반드시 `wkappbot skill show <id>` 로 결과 검증
+
 ### 금지사항
 - Eye 직접 spawn / 클롣 전달 차단 옵션 / Eye 안 띄우는 옵션 — 전부 금지
 - 유저에게 프롬프트에서만 질문 금지 (슬랙 동시 발송 필수)
@@ -67,6 +74,18 @@ Eye ↔ MCP 워커(Core) JSON-RPC over pipe. a11y/UIA를 별도 프로세스로 
 ### Self-Healing DYN-A11Y
 UIA 없는 MFC owner-drawn → CCA 세그멘테이션 → OCR 3중 교차검증 → Gemini Vision 추론
 → `dyn_r{row}c{col}` 동적 ID + Experience DB 캐시 + CCA 파라미터 자동 튜닝
+
+### v5.11.74~100 (2026-04-08, Session 6)
+- **stdout noise elimination**: 124 Commands/*.cs 파일 `Console.WriteLine($"[` → stderr 일괄 치환 (wkedit bulk)
+- **ClickZoomHelper**: `[ZOOM:]` Console.Write → Console.Error.Write (전부 stderr)
+- **a11y find 출력 재구성**:
+  - 첫 줄 `# FOCUS {json5}` + `# TARGET {json5}` stdout (복붙용)
+  - CURSOR 섹션: 연속 동일 unnamed 노드 run-length encode (`<Group> x7`)
+  - TARGET 섹션: 헤더 grap 중복 제거
+- **BuildTargetJson5 필드 순서**: `hwnd,pid,proc,domain,title,...` (proc/domain 앞으로)
+- **ErrorScope**: error-pattern 즉시 passthrough, ErrorDetected 플래그, exit-0+error → -9999
+- **스킬 추가**: `grap` (10-step UI 주소체계 가이드), `wkedit` v1.1 (bulk transaction edit)
+- **스킬 규칙**: `.skill.json` 직접 수정 금지 — `skill contribute/edit` 명령 필수
 
 ### v5.11 신규 (2026-04-05)
 - **TargetAmbiguityGuard 6-Layer**: AI를 위한 타겟 모호성 감지 + 자동 안내 시스템
@@ -163,9 +182,12 @@ wkappbot <cmd> --help / --regression
 | OR | `"*메모장*;*계산기*"` |
 | #UIA스코프 | `"영웅문#실시간계좌"` |
 | 탭포털 | `"Chrome#ChatGPT#모델"` |
-| JSON5 | `{title:'Claude',domain:'claude.ai'}` |
-| hwnd | `"*hwnd=001A0F2C*"` |
+| JSON5 | `{proc:'chrome',domain:'chatgpt.com',title:'Claude'}` |
+| hwnd 직접 | `{hwnd:0x010B084A}` |
 | adb | `"adb://Fold5/*heromts*#해외잔고"` |
+
+→ 자세한 grap 문법: `wkappbot skill show grap`
+→ `a11y find <grap>` stdout 첫 줄 `# TARGET {...}` 복붙하면 바로 사용 가능
 
 ---
 
