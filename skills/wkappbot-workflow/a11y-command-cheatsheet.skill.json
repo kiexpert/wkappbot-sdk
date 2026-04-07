@@ -2,53 +2,39 @@
   "id": "a11y-command-cheatsheet",
   "app": "wkappbot-workflow",
   "title": "a11y — AI Eyes & Hands: 24-Action UI Automation Cheatsheet",
-  "desc": "AI is fundamentally a blind person with no hands. wkappbot a11y gives it sight (inspect/find/ocr/screenshot) and touch (click/type/invoke/scroll). 3-tier native fallback: UIA→Win32→SendInput. Web: CSS→CDP→UIA. grap = the universal target language: glob/OR/scope/CSS/JSON5/hwnd/adb.",
+  "desc": "AI is a blind person with no hands. wkappbot a11y gives it sight (inspect/find/ocr/screenshot) and touch (click/type/invoke/scroll). 3-tier native fallback: UIA→Win32→SendInput. Web: CSS→CDP→UIA. grap = universal target language.",
   "steps": [
-    "━━ PHILOSOPHY ━━ AI = blind + no hands. a11y = the sensory bridge. Sight: inspect/find/ocr/screenshot. Touch: click/type/invoke/toggle/scroll. Without a11y, AI can only read files and call APIs — it cannot interact with any running app.",
-
-    "━━ ARCHITECTURE ━━ Native 3-tier: [T1] UIA patterns (focusless, fastest) → [T2] Win32 messages (PostMessage, focusless) → [T3] SendInput (physical, requires focus+readiness). Web 3-tier: [W1] CSS→CDP direct → [W2] CDP telepathy (browser auto-detected) → [W3] UIA fallback.",
-
-    "━━ GRAP SYNTAX ━━ Window part (before #): '*App*' wildcard | '*메모장*;*Notepad*' OR(;) | {title:'Chrome',domain:'claude.ai'} JSON5 | '*hwnd=001A0F2C*' handle | 'regex:note.*' regex | 'pid:1234' process. UIA scope (after #): '#*Panel*#*Button*' chain-drill | '#regex:btn_\\d+' | '#{aid:\"ok\",type:\"Button\"}' JSON5.",
-
-    "━━ CSS AUTO-ROUTE ━━ If #scope starts with '.', '[', contains '>', '~', '+', ':', or is an HTML tag → auto-routed to CDP (no UIA). Examples: '*Chrome*#button.send', '*Chrome*#input[type=text]', '*Chrome*#div>span'. Wildcards (* ?) force UIA Name matching instead.",
-
-    "━━ 24 ACTIONS ━━ [DISCOVER] windows|inspect|find|screenshot|ocr — read the world without touching. [WINDOW] focus|minimize|maximize|restore|close|move(--x --y)|resize(--w --h) — control app layout. [ELEMENT] click|invoke|toggle|expand|collapse|select|scroll|type|set-value|set-range|read|wait|clipboard — interact with controls.",
-
-    "━━ ACTION TIERS ━━ invoke: UIA InvokePattern(focusless)→BM_CLICK→WM_LBUTTON. type: UIA Value→WM_CHAR→LegacyIA→SendKeys (add --hotkey for menu-path dispatch: 'File/Save'). toggle/select/expand/collapse: UIA patterns (focusless). click: physical coords (needs focus). scroll: UIA ScrollPattern (focusless).",
-
-    "━━ UIA NODE TYPES ━━ Containers (use as scope): Window, Pane, Group, Tab, Document, RootWebArea, Custom. Leaf controls: Button, CheckBox, RadioButton, Edit, ComboBox, ListItem, TreeItem, MenuItem, DataItem, Text, Hyperlink, Slider, Spinner, ProgressBar, StatusBar, Image. ControlType appears in inspect output — use AutomationId or Name for grap.",
-
-    "━━ DISCOVER COMMANDS ━━ 'a11y windows' — list all visible windows. 'a11y inspect \"*App*\" --depth 5' — dump UIA tree (depth 1-10). 'a11y find \"*App*#*pattern*\"' — search tree for element. 'a11y screenshot \"*App*\"' — capture window. 'a11y ocr \"*App*\"' — extract text via OCR. ALWAYS run inspect before automating an unfamiliar app.",
-
-    "━━ TYPE MODES ━━ Normal: 'a11y type \"*Edit*\" \"hello world\"' — UIA Value→WM_CHAR→SendKeys chain. Hotkey/menu: 'a11y type \"*App*\" \"File/Save\" --hotkey' — scans accesskey+aria-keyshortcuts+menu labels, dispatches focuslessly. CJK auto-detected → CDP Input.insertText (bypasses IME issues). IMM32 Tier2: AttachThreadInput+ImmSetCompositionString for MFC.",
-
-    "━━ WEB / CDP ━━ Browser auto-detected via CDP port. Tab-find priority: [1] URL hint (scope contains 'http','localhost',':') [2] window title match. 'a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"' — with scope. 'a11y read \"*Chrome*\" --eval-js \"document.title\"' — no scope → auto tab-find by window title. Tab portal: '*Chrome*#ChatGPT#input.prompt' → switches Chrome tab to ChatGPT then targets CSS.",
-
-    "━━ --eval-js ━━ Pre-action JS hook: runs BEFORE the main action (e.g., remove disabled). For read/find it IS the action. 'a11y click \"*Chrome*#button.submit\" --eval-js \"el.disabled=false\"' (pre-hook). 'a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.querySelector(\\'h1\\').textContent\"' (read-as-JS). CDP EvalAsync: 3 retries, 500ms/1000ms backoff. 'a11y eval' and 'web eval' are DEPRECATED (scheduled removal).",
-
-    "━━ KEY FLAGS ━━ --nth N: pick Nth match (ranges: '2~4','3~','~3','1,3~'). --all: apply to all matches. --force: hard-kill on close. --speak: TTS read result. --condition 'text': wait until text present. --not: wait until text absent. --timeout N: ms (default 10000). --interval N: poll ms (default 500). --depth N: UIA tree depth (default 3). --hotkey: menu/label dispatch mode. --eval-js 'js': CDP pre-hook JS.",
-
-    "━━ AAR (Action-Aware Readiness) ━━ Runs automatically before interactive actions. Stage0: screen-lock check. Stage1: minimized window → SW_SHOWNOACTIVATE restore. Stage2: DetectBlocker() — modal/overlay auto-dismiss attempt; blocked → policy (block or warn). Stage2.5: 2-shot stability probe (100ms). Stage3: stale element re-fetch. Stage4: action-specific validation (Enabled/Visible/!ReadOnly for type/set-value). Returns null=block, same=proceed, different=retarget(popup found).",
-
-    "━━ AMBIGUITY GUARD (6 layers) ━━ L1: multiple windows matched → JSON5 list + verification hints. L2: modal blocking target → auto-list alert buttons. L3: focused/leaf node → show parent chain + grap. L4: Win32 child not found → list sibling windows. L5: element action with no #scope → list root children + focus chain. L6: UIA scope not found → list available elements. READ the guard output — it gives you the corrected grap to copy-paste.",
-
-    "━━ FOCUSLESS-FIRST PRINCIPLE ━━ Always prefer UIA patterns (T1/T2) over SendInput (T3). UIA Invoke/Value/Toggle/Select/Scroll = NO focus needed. Only type --hotkey and physical click need focus. WPF overlays use SW_SHOWNOACTIVATE(4). Before any SendInput: InputReadiness.Probe() checks user idle time — auto-yields if user is typing.",
-
-    "━━ ANDROID ━━ 'a11y click \"adb://Fold5/*heromts*#해외잔고\"' — ADB bridge. Scheme: adb://<device-serial>/<package-grap>#<uia-scope>. Wildcard device: 'adb://*pkg*#el'. Inner/outer display: auto-detected. Same grap syntax, same 3-tier fallback (ADB accessibility service).",
-
-    "━━ QUICK PATTERNS ━━ Find element: 'a11y inspect \"*App*\" --depth 3' then look at AutomationId/Name. Click button: 'a11y invoke \"*App*#*OK*\"' (focusless). Type text: 'a11y type \"*App*#*Input*\" \"text\"'. Read value: 'a11y read \"*App*#*Result*\"'. Wait for element: 'a11y wait \"*App*#*Status*\" --condition \"완료\" --timeout 30000'. Web DOM read: 'a11y read \"*Chrome*#site.com\" --eval-js \"document.body.innerText.substring(0,500)\"'.",
-
-    "━━ TROUBLESHOOTING ━━ 'No window found' → wrong grap, try 'a11y windows' first. 'UIA scope not found' → read L6 guard output for available elements. 'Action blocked by modal' → read L2 output, dismiss modal first. All tiers fail (MFC/owner-drawn) → 'wkappbot a11y hack \"*App*\"' triggers OCR+Vision fallback + dyn_r{row}c{col} dynamic IDs. CDP eval fails → check if --eval-js target has correct #scope tab hint.",
-
-    "━━ VETERAN: FALLBACK INTERNALS ━━ T1 hollow-stub detection: WM_NULL baseline → InvokePattern latency > baseline+2ms = hollow. T2 MFC: EM_SETSEL/WM_SETTEXT fail on CMaskEditEx → use WM_CHAR PostMessage (TranslateMessage auto-generates WM_CHAR). T3 Flutter: PostMessage WM_LBUTTON → 300ms → pixel-diff >2% → physical click fallback. FLUTTERVIEW: Tier0 PostMessage bypass (skips UIA entirely). TypeViaIme: AttachThreadInput+ImmSetCompositionString+CPS_COMPLETE (MFC composition input).",
-
-    "━━ VETERAN: CDP INTERNALS ━━ IsBrowserProcess(): Chrome/Edge/Brave/Firefox only — Electron apps (VS Code) excluded. DetectCdpPort(): scans process cmdline for --remote-debugging-port. SwitchToTargetAsync(): URL→title priority, skipMinimize for read-only. Runtime.enable with retry (4x exponential backoff). EvalAsync: 3 retries, DETACHED_PROCESS flag prevents ConPTY LPC deadlock. Targetless eval ('a11y eval'/'web eval') → AutoRegisterBug tracking + DEPRECATED warning.",
-
-    "━━ VETERAN: EXPERIENCE DB ━━ Per-process/class knowhow cache: 'wkappbot.hq/experience/{proc}/{class}/knowhow-{action}.md'. RecordTierSuccess() auto-saves winning tier. LoadKnowhow() prefetches hints for next run. OcrCorrectionDb: pixel-hash→correct-text mapping (self-learning). DYN-A11Y: CCA segmentation→OCR→Vision API for owner-drawn controls → dyn_r{row}c{col} dynamic IDs cached in experience DB."
+    "[PHILOSOPHY] AI = blind person with no hands. a11y = sensory bridge to the running OS. Sight: inspect/find/ocr/screenshot. Touch: click/type/invoke/toggle/scroll. Without a11y, AI can only read files and call APIs — it cannot see or touch any running app.",
+    "[FALLBACK-NATIVE] 3 tiers, auto-escalate: T1=UIA patterns (focusless, fastest) → T2=Win32 PostMessage (focusless) → T3=SendInput physical (needs focus+readiness). T1 covers: invoke, toggle, select, expand, collapse, set-value, scroll, type(WM_CHAR). T3 only for: hotkey, physical click.",
+    "[FALLBACK-WEB] Browser auto-detected via CDP port. W1=CSS selector→CDP direct. W2=CDP telepathy (any browser HWND). W3=UIA fallback. CSS auto-routed when #scope starts with '.','[', contains '>','~','+',':', or is an HTML tag name. Wildcards(*?) force UIA Name instead.",
+    "[GRAP-WINDOW] Pattern before #: '*App*' wildcard | '*메모장*;*Notepad*' OR(;) | {title:'Chrome',domain:'claude.ai'} JSON5-AND | '*hwnd=001A0F2C*' exact handle | 'pid:1234' process | 'regex:note.*' regex. Matching: Contains by default, case-insensitive.",
+    "[GRAP-SCOPE] Pattern after # = UIA subtree drill. '*App*#*Panel*#*Button*' = chain drill (each # = one UIA level deeper). '#button.send' = CSS auto-routed to CDP. '#{aid:\"ok\",type:\"Button\"}' JSON5-AND on UIA props. '#regex:btn_\\d+'. Multiple # levels chain: win#scope1#scope2.",
+    "[GRAP-TABPORTAL] Tab portal: '*Chrome*#ChatGPT#input.prompt' → Chrome window → switch to ChatGPT tab (SelectionItem.Select, focusless!) → target CSS inside. Works with Edge/Brave too. For web-only targeting: '*Chrome*#chatgpt.com#button.send' (URL hint → tab match → CSS).",
+    "[ACTIONS-DISCOVER] inspect \"*App*\" --depth 5 (UIA tree dump, depth 1-10). windows (list all visible). find \"*App*#*pattern*\" (search tree). screenshot \"*App*\" (capture). ocr \"*App*\" (extract text). RULE: always run inspect before automating an unfamiliar app.",
+    "[ACTIONS-WINDOW] focus/minimize/maximize/restore/close \"*App*\". move \"*App*\" --x N --y N. resize \"*App*\" --w N --h N. close on browser: requires #tabHint to prevent accidental browser close (guard). --force: WM_CLOSE then Process.Kill.",
+    "[ACTIONS-ELEMENT] invoke(UIA InvokePattern→BM_CLICK→WM_LBUTTON). click(physical coords). toggle(UIA TogglePattern). expand/collapse(UIA ExpandCollapse). select(UIA SelectionItem). scroll --direction up|down|left|right --amount small|large. read(Name/Value/Text). wait --condition 'text' --not --timeout N.",
+    "[ACTIONS-TYPE] Normal: 'a11y type \"*Edit*\" \"hello\"' → UIA Value→WM_CHAR→LegacyIA→SendKeys chain (focusless tiers first). Hotkey/menu: '--hotkey' flag → scans accesskey+aria-keyshortcuts+menu labels → dispatches focuslessly (e.g. 'File/Save'). CJK auto-detected → CDP Input.insertText (bypasses IME). set-value = UIA Value direct. set-range --value N = UIA RangeValue.",
+    "[ACTIONS-CLIPBOARD] clipboard-read (Unicode+CP949). clipboard-write \"text\" [file.png] — mixed text+files. clipboard-write supports [file:name] inline markers (same as slack send). clipboard = help.",
+    "[EVAL-JS] --eval-js \"js\" runs BEFORE the main action (pre-hook: e.g. remove disabled). For read/find it IS the action. No #scope → CdpSwitchToTabByHint (Priority1: URL hint, Priority2: window title). 'a11y read \"*Chrome*\" --eval-js \"document.title\"' auto-finds tab. 'a11y click \"*Chrome*#btn.send\" --eval-js \"el.disabled=false\"' pre-hook. 'a11y eval' + 'web eval' = DEPRECATED, scheduled for removal (AutoRegisterBug on use).",
+    "[FLAGS] --nth N|range('2~4','3~','~3','1,3~'): pick specific match. --all: apply to all matches. --depth N: UIA tree depth (default 3). --speak: TTS read result. --condition 'text'/--not: wait for text presence/absence. --timeout N: ms (default 10000). --interval N: poll ms (default 500). --force: hard kill. --hotkey: menu/label dispatch. --allow-ancestors: bypass window-hierarchy guard.",
+    "[AAR] Action-Aware Readiness runs automatically before interactive actions. S0: screen-lock check. S1: minimized window → SW_SHOWNOACTIVATE restore. S2: DetectBlocker — modal/overlay auto-dismiss; blocked → policy. S2.5: 100ms 2-shot stability probe. S3: stale element re-fetch. S4: action-specific (Enabled/Visible/!ReadOnly for type/set-value). Returns null=block, same=proceed, different=retarget(popup).",
+    "[AMBIGUITY-GUARD] 6 layers, auto-triggered on failure — READ the output and use the suggested grap. L1: multi-window → JSON5+verify hints. L2: modal blocking → auto-list alert buttons. L3: focused/leaf node → parent chain+grap. L4: Win32 child missing → sibling windows. L5: no #scope on element action → root children+focus chain. L6: UIA scope miss → available elements list.",
+    "[ANDROID] adb://<device>/<pkg-grap>#<scope>. 'a11y click \"adb://Fold5/*heromts*#해외잔고\"'. Wildcard device: 'adb://*heromts*#el'. Inner display: 'adb://SM-F946N/*heromts*#계좌 --outer'. Same grap syntax, same 3-tier fallback via ADB accessibility service.",
+    "[QUICK-REF] Discover: 'a11y inspect \"*App*\" --depth 3'. Click button: 'a11y invoke \"*App*#*OK*\"' (focusless). Type: 'a11y type \"*App*#*Edit*\" \"text\"'. Read: 'a11y read \"*App*#*Result*\"'. Wait: 'a11y wait \"*App*#*Status*\" --condition \"완료\" --timeout 30000'. Web read: 'a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.body.innerText.substring(0,500)\"'.",
+    "[TROUBLESHOOT] 'No window found' → check 'a11y windows', fix grap pattern. 'UIA scope not found' → L6 guard lists available. 'Modal blocking' → L2 guard, dismiss first. All tiers fail (MFC/owner-drawn) → 'a11y hack \"*App*\"' triggers OCR+Vision+DYN dynamic IDs. CDP eval wrong tab → add #scope URL hint. Stale hwnd → element moved, re-run inspect.",
+    "[VETERAN-TIERS] T1 hollow-stub: WM_NULL baseline → InvokePattern latency >baseline+2ms = stub, skip to T2. T2 MFC: EM_SETSEL/WM_SETTEXT fail on CMaskEditEx → WM_CHAR only (TranslateMessage auto-generates WM_CHAR, never EM_SETTEXT = double input). T3 Flutter: PostMessage WM_LBUTTON → 300ms pixel-diff >2% → physical fallback. FLUTTERVIEW: Tier0 PostMessage bypass. TypeViaIme: AttachThreadInput+ImmSetCompositionString+CPS_COMPLETE.",
+    "[VETERAN-CDP] IsBrowserProcess(): Chrome/Edge/Brave/Firefox only — non-browser Electron (VS Code) excluded. SwitchToTargetAsync: URL→title priority, skipMinimize for read-only. Runtime.enable: 4x exponential backoff. EvalAsync: 3 retries (500ms/1000ms). Targetless eval = undefined behavior (wrong tab/frame silent failure) — always provide #scope.",
+    "[VETERAN-EXPDB] Per-process/class knowhow cache: wkappbot.hq/experience/{proc}/{class}/knowhow-{action}.md. RecordTierSuccess() auto-saves winning tier. LoadKnowhow() prefetches hints. OcrCorrectionDb: pixel-hash→correct-text self-learning dict. DYN-A11Y: CCA segmentation→OCR→Vision API for owner-drawn → dyn_r{row}c{col} dynamic IDs cached in experience DB."
+  ],
+  "refs": [
+    "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs → action routing, grap parsing, fallback tiers",
+    "csharp/src/WKAppBot.CLI/Commands/A11yCommand.Cdp.cs → CDP routing, CdpSwitchToTabByHint, tab-find",
+    "csharp/src/WKAppBot.CLI/Commands/A11yCommand.AmbiguityGuard.cs → 6-layer guard",
+    "csharp/src/WKAppBot.CLI/Commands/A11yActions.*.cs → per-action implementation"
   ],
   "tags": ["a11y", "uia", "win32", "cdp", "automation", "grap", "fallback", "reference", "cheatsheet"],
   "author": "claude",
   "created": "2026-04-07T13:00:00.0000000Z",
-  "updated": "2026-04-07T22:30:00.0000000Z",
-  "version": "2.0"
+  "updated": "2026-04-07T22:50:00.0000000Z",
+  "version": "2.1"
 }
