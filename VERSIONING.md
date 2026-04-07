@@ -34,6 +34,12 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
+`5.12` — bumped at 2026-04-07 (multi-browser CDP port scan 9222-9230, 스킬 시스템 self-healing verify/audit, 샌드박스 경로 window positioning 누락 수정, newchat/handoff 스킬 프롬프트 주입)
+
+## Previous versions
+
+`5.11` — bumped at 2026-04-05 (TargetAmbiguityGuard 6-Layer, CDP state-based polling, hack-hover 라이브 오버레이, TypeViaIme focusless 입력, auto-hack 프로세스 격리, pump watchdog 강화)
+
 `5.10` — bumped at 2026-04-04 (Eye 100ms 파이프타임아웃, TryRenameSwap 공용화, OcrCorrectionDb 자기학습, suggest show/resolve 안전장치, CDP minimize 과잉제거+Runtime.enable 재시도, 로그 라우팅 수정, 인코딩 오염감시)
 
 ## Previous versions
