@@ -207,6 +207,90 @@ public sealed partial class CdpClient
     private const int SW_SHOWNOACTIVATE = 4;   // Show at previous size/position without activating
     private const int SW_SHOWMINNOACTIVE = 7;  // Show minimized without activating
 
+    // ── Bot window decoration ──────────────────────────────────────────────────
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
+    private const int DWMWA_BORDER_COLOR = 34; // Windows 11 only
+
+    // COLORREF = 0x00BBGGRR
+    private static int ToCOLORREF(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
+    private static readonly int COLORREF_DEFAULT = unchecked((int)0xFFFFFFFF); // DWMWA_COLOR_DEFAULT
+
+    /// <summary>
+    /// Set the DWM window border color (Windows 11+). Pass null to restore default.
+    /// Color tuple: (R, G, B). Non-blocking, best-effort.
+    /// </summary>
+    public void SetDwmBorderColor((byte R, byte G, byte B)? color)
+    {
+        var hwnd = FindChromeMainWindow();
+        if (hwnd == IntPtr.Zero) return;
+        try
+        {
+            var col = color.HasValue ? ToCOLORREF(color.Value.R, color.Value.G, color.Value.B) : COLORREF_DEFAULT;
+            DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, ref col, sizeof(int));
+        }
+        catch { /* Windows 10 or earlier -- no-op */ }
+    }
+
+    private bool _overlayInjected;
+
+    /// <summary>
+    /// Inject a thin fixed-position CSS overlay into the page that pulses on each bot tick.
+    /// Call TickBotOverlayAsync() on each CDP command to animate it.
+    /// Call SetBotOverlayAsync(false) to remove.
+    /// </summary>
+    public async Task SetBotOverlayAsync(bool show, string hexColor = "#ff6600")
+    {
+        if (!show)
+        {
+            _overlayInjected = false;
+            try { await EvalAsync("(()=>{var el=document.getElementById('__wkbot_overlay');if(el)el.remove();})()"); } catch { }
+            return;
+        }
+        _overlayInjected = true;
+        var css = $@"
+(()=>{{
+  if(document.getElementById('__wkbot_overlay'))return;
+  var s=document.createElement('style');
+  s.id='__wkbot_overlay_css';
+  s.textContent=`
+    #__wkbot_overlay{{
+      position:fixed;inset:0;pointer-events:none;z-index:2147483647;
+      border:3px solid {hexColor};box-sizing:border-box;opacity:0;
+      transition:opacity 0.15s;
+    }}
+    #__wkbot_overlay.tick{{opacity:0.85;}}
+    @keyframes __wkbot_fade{{0%{{opacity:0.85;}}100%{{opacity:0;}}}}
+  `;
+  document.head.appendChild(s);
+  var d=document.createElement('div');
+  d.id='__wkbot_overlay';
+  document.body.appendChild(d);
+  window.__wkBotTick=function(){{
+    var el=document.getElementById('__wkbot_overlay');
+    if(!el)return;
+    el.style.animation='none';
+    el.offsetHeight; // reflow
+    el.style.animation='__wkbot_fade 0.6s ease-out forwards';
+  }};
+}})()";
+        try { await EvalAsync(css); } catch { }
+    }
+
+    /// <summary>
+    /// Trigger one animation tick on the bot overlay (call on each CDP command).
+    /// Fire-and-forget: does NOT await to avoid adding latency.
+    /// </summary>
+    public void TickBotOverlay()
+    {
+        if (!_overlayInjected) return;
+        _ = Task.Run(async () =>
+        {
+            try { await EvalAsync("window.__wkBotTick?.()"); } catch { }
+        });
+    }
+
     /// <summary>
     /// Set files on a file input element (e.g., for file upload).
     /// Uses CDP DOM.setFileInputFiles to programmatically set files without opening a file dialog.

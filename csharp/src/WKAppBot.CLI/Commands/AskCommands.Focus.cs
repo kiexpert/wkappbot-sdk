@@ -293,13 +293,12 @@ internal partial class Program
             if (action is "input-cdp" or "send" or "type")
             {
                 cdp.RestoreChromeNoActivate();
-                // TODO-13: Emulate tab focused at CDP level (Emulation.setFocusEmulationEnabled).
-                // Chrome accepts input events as if focused without OS foreground --SW(8) dance becomes optional.
                 await cdp.EmulateActiveTabAsync();
-                // TODO-11: Inject JS focus-lock monkey-patch (once per tab) and lock before input.
-                // Prevents JS .focus() / window.focus() from stealing OS foreground during CDP send.
                 await cdp.InjectFocusLockScriptAsync();
                 await cdp.SetFocusLockAsync(true);
+                // Visual: DWM border (orange) + CSS pulse overlay to mark this as a bot-controlled window
+                cdp.SetDwmBorderColor((255, 120, 30));
+                await cdp.SetBotOverlayAsync(true, "#ff781e");
             }
 
             Console.WriteLine($"[AAR:CDP] Ready: {action}");
@@ -339,6 +338,9 @@ internal partial class Program
         }
         // Unlock JS focus() so page resumes normal keyboard navigation after send
         _ = cdp.SetFocusLockAsync(false);
+        // Remove bot decoration after send completes
+        cdp.SetDwmBorderColor(null);
+        _ = cdp.SetBotOverlayAsync(false);
     }
 
     /// <summary>
