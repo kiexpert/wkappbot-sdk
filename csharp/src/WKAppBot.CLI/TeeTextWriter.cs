@@ -38,6 +38,8 @@ public sealed class TeeTextWriter : TextWriter
     public bool IsPipeBroken => _pipeBroken;
 
     private readonly string _oldSubDir; // e.g. "newchat", "inspect", "web-github.com"
+    private readonly long _startMs = Environment.TickCount64;
+    private readonly long _startCpuMs;
 
     public TeeTextWriter(TextWriter console, string logPath, bool moveToOldOnDispose = true, string oldSubDir = "")
     {
@@ -46,6 +48,7 @@ public sealed class TeeTextWriter : TextWriter
         _oldSubDir = oldSubDir;
         _logPath = logPath;
         _lastFlushTicks = Environment.TickCount64 * TimeSpan.TicksPerMillisecond;
+        try { _startCpuMs = (long)System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime.TotalMilliseconds; } catch { }
 
         var dir = Path.GetDirectoryName(logPath);
         if (!string.IsNullOrEmpty(dir))
@@ -243,6 +246,31 @@ public sealed class TeeTextWriter : TextWriter
         _moveToOldOnDispose = false; // prevent Dispose from moving
     }
 
+    [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(
+        IntPtr hProcess, int processInformationClass,
+        ref ProcessBasicInformation processInformation,
+        int processInformationLength, out int returnLength);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct ProcessBasicInformation
+    {
+        public IntPtr Reserved1, PebBaseAddress;
+        public IntPtr Reserved2_0, Reserved2_1;
+        public IntPtr UniqueProcessId, InheritedFromUniqueProcessId;
+    }
+
+    private static int GetParentPid()
+    {
+        try
+        {
+            var pbi = new ProcessBasicInformation();
+            NtQueryInformationProcess(System.Diagnostics.Process.GetCurrentProcess().Handle, 0, ref pbi, System.Runtime.InteropServices.Marshal.SizeOf(pbi), out _);
+            return pbi.InheritedFromUniqueProcessId.ToInt32();
+        }
+        catch { return 0; }
+    }
+
     // Noise tags to skip when building per-field last-value map
     private static readonly System.Collections.Generic.HashSet<string> _noiseTags =
         new(System.StringComparer.OrdinalIgnoreCase)
@@ -255,7 +283,7 @@ public sealed class TeeTextWriter : TextWriter
     /// Scan the log file and collect the last output line per [TAG],
     /// then append a JSON record { ts, exit, cmd, log, fields:{TAG:lastLine} } to errors.jsonl.
     /// </summary>
-    private static void TryAppendErrorRecord(string logPath, int exitCode)
+    private static void TryAppendErrorRecord(string logPath, int exitCode, long durMs, long startCpuMs)
     {
         try
         {
@@ -290,12 +318,50 @@ public sealed class TeeTextWriter : TextWriter
             var cmd = Environment.CommandLine;
             if (cmd.Length > 300) cmd = cmd[..300];
 
+            // Collect resource usage at exit
+            long memMb = 0; long cpuMs = 0; int threads = 0;
+            try
+            {
+                var proc = System.Diagnostics.Process.GetCurrentProcess();
+                proc.Refresh();
+                memMb   = proc.WorkingSet64 / 1024 / 1024;
+                cpuMs   = (long)proc.TotalProcessorTime.TotalMilliseconds - startCpuMs;
+                threads = proc.Threads.Count;
+            }
+            catch { }
+
+            // Caller process info
+            string callerProc = ""; string callerTitle = "";
+            try
+            {
+                var parentId = GetParentPid();
+                if (parentId > 0)
+                {
+                    var parent = System.Diagnostics.Process.GetProcessById(parentId);
+                    callerProc = parent.ProcessName;
+                    try { callerTitle = parent.MainWindowTitle; } catch { }
+                }
+            }
+            catch { }
+
+            // Eye-pipe vs direct-core execution
+            bool viaEye = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WKAPPBOT_EYE_PIPE"));
+
             var record = System.Text.Json.JsonSerializer.Serialize(new
             {
-                ts     = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-                exit   = exitCode,
+                ts          = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                exit        = exitCode,
+                dur_ms      = durMs,
+                mem_mb      = memMb,
+                cpu_ms      = cpuMs,
+                threads,
+                ver         = typeof(TeeTextWriter).Assembly.GetName().Version?.ToString(3) ?? "",
+                via_eye     = viaEye,
+                cwd         = Environment.CurrentDirectory,
+                caller_proc = callerProc,
+                caller_title= callerTitle.Length > 80 ? callerTitle[..80] : callerTitle,
                 cmd,
-                log    = Path.GetFileName(logPath),
+                log         = Path.GetFileName(logPath),
                 fields,
             });
             File.AppendAllText(errorsFile, record + Environment.NewLine, Encoding.UTF8);
@@ -358,7 +424,7 @@ public sealed class TeeTextWriter : TextWriter
 
                 // Append one-line error summary to errors.jsonl (exit≠0 only)
                 if (ExitCode != 0)
-                    TryAppendErrorRecord(_logPath, ExitCode);
+                    TryAppendErrorRecord(_logPath, ExitCode, Environment.TickCount64 - _startMs, _startCpuMs);
             }
         }
         base.Dispose(disposing);
