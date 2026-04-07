@@ -2,20 +2,20 @@
   "id": "autoheal-userinput-protection",
   "app": "wkappbot-core",
   "title": "AutoHeal - User Input Protection: Focus Theft Detection \u0026 Auto-Recovery",
-  "desc": "Multi-layer system protecting user focus from CDP/Chrome theft during ask operations. Layers: (1) prevFgHint early capture before EnsureCdpConnection, (2) SW_SHOWMINNOACTIVE(8) not SW_MINIMIZE(6), (3) ForceForegroundWindow(AttachThreadInput) replacing silent-fail SetForegroundWindowRaw, (4) StartFocusWatchdog 200ms monitor-only during entire ask op, (5) RestoreFocusWithRetryAsync at each action boundary, (6) FocuslessWarningOverlay \u002B ActionApi.OnFocusStealer prop stamp. MANDATORY: focus restoration MUST integrate with InputReadiness (\uC785\uB825\uC704\uCE58\uD655\uBCF4\uAE30) -- do NOT implement standalone restore without going through InputReadiness pipeline. InputReadiness owns the user-yield decision; bypass is FORBIDDEN. RESTORE TRIGGER: end of each ask/CDP action boundary only. CRITICAL GAP: after 5s restore timeout, system gives up silently.",
+  "desc": "Multi-layer system protecting user focus from CDP/Chrome theft during ask operations. Layers: (1) prevFgHint early capture before EnsureCdpConnection, (2) SW_SHOWMINNOACTIVE(8) not SW_MINIMIZE(6), (3) ForceForegroundWindow(AttachThreadInput) replacing silent-fail SetForegroundWindowRaw, (4) StartFocusWatchdog 200ms monitor-only during entire ask op, (5) RestoreFocusWithRetryAsync at each action boundary, (6) FocuslessWarningOverlay \u002B ActionApi.OnFocusStealer prop stamp. MANDATORY: all restore paths must go through InputReadiness pipeline -- standalone ForceForegroundWindow without InputReadiness is FORBIDDEN. LIVING DOCUMENT: update this skill as each focus-theft incident is investigated and resolved.",
   "steps": [
-    "0. [MANDATORY] ALL focus restore paths MUST go through InputReadiness pipeline: (a) call InputReadiness.Probe() before restore attempt, (b) respect AutoApproveYield decision, (c) fire OnProbeSuccess so auto-hack and zoom activate on target window. Standalone ForceForegroundWindow without InputReadiness is FORBIDDEN except inside RestoreFocusWithRetryAsync inner loop.",
-    "1. [MANDATORY] EnsureCdpReadyAsync must call InputReadiness.Probe() -- current manual substitute (KeyboardInput.IsInputLockedByOther \u002B FocusStealer prop check) does NOT fire OnProbeSuccess. Fix: CreateInputReadiness() \u002B Probe(AutoApproveYield:true) before zoom and restore.",
-    "2. prevFgGemini = GetForegroundWindow() BEFORE EnsureCdpConnection (not after tab switch)",
-    "3. EnsureCdpReadyAsync(prevFgHint) -- passes hint so EnsureCdp uses correct pre-switch prevFg",
-    "4. StartFocusWatchdog(prevFg, cdp) -- 200ms MONITOR ONLY: detect \u002B notify via FocuslessWarningOverlay, do NOT restore (restore is action-boundary responsibility)",
-    "5. After insert-text ends: GuardCdpFocusTheft -\u003E InputReadiness.Probe() -\u003E RestoreFocusWithRetryAsync",
-    "6. After file-attach ends: LogRestoreFocus -\u003E InputReadiness.Probe() -\u003E RestoreFocusWithRetryAsync",
-    "7. After send ends: LogRestoreFocus -\u003E InputReadiness.Probe() -\u003E RestoreFocusWithRetryAsync",
-    "8. After wait-response ends: LogRestoreFocus -\u003E InputReadiness.Probe() -\u003E RestoreFocusWithRetryAsync",
-    "9. RestoreFocusWithRetryAsync: snapshot IME\u002Bcursor -\u003E ForceForegroundWindow loop -\u003E OnFocusStealer(AutoBugReport\u002Boverlay) -\u003E restore IME\u002Bcursor on success",
-    "10. [TODO-P2] FireAutoHeal on restore timeout: 5s exhausted -\u003E AutoBugReport(unrecoverable) \u002B FireAutoHeal(focus-theft, chromeHwnd)",
-    "11. [TODO-P3] prevFg re-capture between phases (persona inject / file attach / question send)"
+    "0. [MANDATORY] ALL focus restore paths go through InputReadiness.Probe() -- OnProbeSuccess fires zoom\u002Bauto-hack. Standalone ForceForegroundWindow without InputReadiness FORBIDDEN (except RestoreFocusWithRetryAsync inner loop).",
+    "1. [MANDATORY] Restore trigger = end of each ask/CDP action only (insert/send/attach/wait-response). Watchdog = monitor\u002Bnotify only, no restore.",
+    "2. prevFgGemini = GetForegroundWindow() BEFORE EnsureCdpConnection",
+    "3. EnsureCdpReadyAsync(prevFgHint) -- correct pre-switch prevFg",
+    "4. StartFocusWatchdog 200ms -- detect\u002BFocuslessWarningOverlay only",
+    "5. Action boundary restore: GuardCdpFocusTheft / LogRestoreFocus -\u003E InputReadiness.Probe() -\u003E RestoreFocusWithRetryAsync",
+    "6. RestoreFocusWithRetryAsync: IME\u002Bcursor snapshot -\u003E ForceForegroundWindow loop -\u003E OnFocusStealer(AutoBugReport\u002Boverlay) -\u003E restore on success",
+    "7. [DONE] AutoBugReport fires via ActionApi.OnFocusStealer",
+    "8. [TODO] FireAutoHeal on 5s restore timeout: AutoBugReport(unrecoverable) \u002B FireAutoHeal(focus-theft, chromeHwnd)",
+    "9. [TODO] EnsureCdpReadyAsync: replace manual substitute with CreateInputReadiness()\u002BProbe(AutoApproveYield:true)",
+    "10. [TODO] prevFg re-capture between phases (persona/attach/send)",
+    "11. [TODO] DismissDialogAsync: add \uB3D9\uC758 to button text match \u002B call before send (not only during response poll). Gemini file-attach consent popup blocks editor before send -- currently only dismissed during response polling (CdpClient.AiHelpers.cs:715)"
   ],
   "tags": [
     "focus",
@@ -29,7 +29,8 @@
     "chrome",
     "todo",
     "priority",
-    "inputreadiness"
+    "inputreadiness",
+    "living-doc"
   ],
   "source_refs": [
     {
@@ -93,14 +94,14 @@
       "note": null
     },
     {
-      "file": "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
-      "line": null,
-      "pattern": "CreateInputReadiness",
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.AiHelpers.cs",
+      "line": 715,
+      "pattern": "DismissDialogAsync",
       "note": null
     }
   ],
   "author": "claude",
   "created": "2026-04-07T08:50:15.2810138Z",
-  "updated": "2026-04-07T08:59:26.4254329Z",
-  "version": "1.4"
+  "updated": "2026-04-07T09:01:51.1067216Z",
+  "version": "1.5"
 }
