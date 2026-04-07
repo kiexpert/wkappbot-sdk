@@ -211,9 +211,13 @@ public sealed partial class CdpClient
             "var root=(window.__wkAskPump||(window.__wkAskPump={}));" +
             "if(!root.states)root.states={};" +
             "if(!root.trySend)root.trySend=function(selector){" +
-                "var st=root.states[selector];if(st&&st.locked)return 'LOCKED';" +
+                // BUG-2: isSending guard prevents double-send during CDP round-trip delay
+                "var st=root.states[selector];if(st&&(st.locked||st.isSending))return st.isSending?'SENDING':'LOCKED';" +
                 "var el=document.querySelector(selector);if(!el)return 'NO_EDITOR';" +
                 "var txt=((el.value||el.innerText||el.textContent||'')).trim();if(!txt)return 'EMPTY';" +
+                // BUG-1: ProseMirror empty state = only <br class="ProseMirror-trailingBreak"> in single <p>
+                "var pmBr=el.querySelector('br.ProseMirror-trailingBreak');" +
+                "if(pmBr){var pmPs=el.querySelectorAll('p');if(pmPs.length===1&&pmPs[0].childNodes.length<=1)return 'EMPTY';}" +
                 "try{el.focus();}catch(_e){}" +
                 "var form=el.closest('form');if(form&&typeof form.requestSubmit==='function'){" +
                     "try{form.requestSubmit();return 'FORM_SUBMIT';}catch(_e){}" +
@@ -228,14 +232,17 @@ public sealed partial class CdpClient
                     "el.dispatchEvent(kd);el.dispatchEvent(ku);return 'KEY_ENTER';" +
                 "}catch(_e){}" +
                 // ProseMirror and similar editors ignore JS KeyboardEvent -- signal C# to fire CDP Enter
-                "st.readyToSend=true;return 'CDP_SIGNAL';" +
+                // BUG-2: set isSending=true to block re-entry until C# confirms send (CheckPumpReadyAsync clears it)
+                "st.isSending=true;st.readyToSend=true;return 'CDP_SIGNAL';" +
             "};" +
-            "var st=root.states[sel]||(root.states[sel]={interval:0,lastResult:'',locked:false,ticks:0,lastHash:0});" +
+            "var st=root.states[sel]||(root.states[sel]={interval:0,lastResult:'',locked:false,ticks:0,lastHash:0,isSending:false,readyToSend:false});" +
+            // BUG-3: Always reset stability counters on re-arm so stale ticks don't cause premature trySend
+            "st.ticks=0;st.lastHash=0;" +
             // Simple hash function for content change detection
             "if(!root.hash)root.hash=function(s){var h=0;for(var i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0;return h;};" +
             // Start periodic tick if not already running (single setInterval per editor)
             "if(!st.interval){st.interval=setInterval(function(){" +
-                "var cur=root.states[sel];if(!cur||cur.locked)return;" +
+                "var cur=root.states[sel];if(!cur||cur.locked||cur.isSending)return;" +
                 "var el=document.querySelector(sel);if(!el)return;" +
                 "var txt=((el.value||el.innerText||el.textContent||'')).trim();" +
                 "if(!txt){cur.ticks=0;cur.lastHash=0;return;}" + // empty → reset
@@ -392,7 +399,7 @@ public sealed partial class CdpClient
             "var sel='" + esc + "';" +
             "var root=window.__wkAskPump;if(!root||!root.states)return '0';" +
             "var st=root.states[sel];if(!st||!st.readyToSend)return '0';" +
-            "st.readyToSend=false;" + // clear flag
+            "st.readyToSend=false;st.isSending=false;" + // clear both flags — C# has taken over
             "return '1';" +
             "})()");
         return result == "1";
