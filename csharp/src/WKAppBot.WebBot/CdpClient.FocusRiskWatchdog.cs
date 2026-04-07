@@ -129,6 +129,9 @@ public sealed partial class CdpClient
     {
         if (_focusLockInjected) return;
         _focusLockInjected = true;
+        // Claude triad insight: hard block breaks IME composition in contenteditable editors.
+        // When locked: allow focus() only when document.activeElement is body/null (IME recovery case).
+        // This preserves Korean/Japanese IME state during CDP Input.dispatchKeyEvent sequences.
         const string script = """
             (function() {
                 if (window.__appbot_focus_guard_installed) return;
@@ -137,15 +140,19 @@ public sealed partial class CdpClient
                 const _origFocus = HTMLElement.prototype.focus;
                 HTMLElement.prototype.focus = function(opts) {
                     if (window.__appbot_lock_focus) {
-                        // Preserve DOM focus state (scroll/selection) without OS activation
-                        _origFocus.call(this, { preventScroll: true });
+                        // Allow focus only when activeElement is gone (IME recovery) -- prevents OS activation
+                        var active = document.activeElement;
+                        if (!active || active === document.body) {
+                            _origFocus.call(this, opts);
+                        }
+                        // All other focus() calls during lock: silently ignored (no OS foreground)
                         return;
                     }
                     _origFocus.call(this, opts);
                 };
                 const _origWinFocus = window.focus;
                 window.focus = function() {
-                    if (window.__appbot_lock_focus) return;
+                    if (window.__appbot_lock_focus) return; // window.focus() always blocked when locked
                     _origWinFocus && _origWinFocus.call(window);
                 };
             })();
