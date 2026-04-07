@@ -1,0 +1,42 @@
+{
+  "id": "wkedit-encoding-safe-regex-bulk-edit-with-backup-undo",
+  "app": "wkappbot-workflow",
+  "title": "wkedit \u2014 Encoding-Safe Regex Bulk Edit with Backup \u0026 Undo",
+  "desc": "wkappbot file edit supports regex substitution, auto .bak/ backup, undo, and encoding-safe transactions. Use this instead of sed/awk or manual multi-file edits \u2014 saves tokens, prevents CP949 corruption.",
+  "steps": [
+    "[WHEN-TO-USE] Prefer wkedit for: (1) regex bulk substitution across a file, (2) multi-occurrence replace, (3) any edit on CP949/EUC-KR files. Avoid sed/awk \u2014 they ignore encoding and corrupt Korean source. Avoid Python one-liners \u2014 they waste tokens and miss edge cases.",
+
+    "[BASIC] wkappbot file edit '<old>' '<new>' <path> [--replace-all]\n  Literal substitution. Fails if old not found (safe by default).\n  --replace-all: replace every occurrence in the file.\n  Backup auto-created at Commands/.bak/<filename>.bak-<timestamp>.txt",
+
+    "[REGEX] wkappbot file edit '<.NET-regex>' '<replacement>' <path> --replace-all --regex\n  old_string is a .NET regex. new_string may use $1/$2 capture groups.\n  Example: 'Console\\.WriteLine\\(\\$\"\\[' -> 'Console.Error.WriteLine($\"['\n  NOTE: Escape parens/dots in the pattern (shell + .NET double-escaping needed).\n  TIP: test pattern with `wkappbot file grep '<regex>' --path <dir>` first.",
+
+    "[MULTI-FILE] Pass multiple paths after the new_string — wkedit processes all in one call:\n  wkappbot file edit '<old>' '<new>' file1.cs file2.cs file3.cs --replace-all --regex\n  GOTCHA: if ANY file has zero matches, the whole batch fails with 'validation failed'.\n  SOLUTION: pre-filter with grep -rl first:\n    files=$(grep -rl '<literal>' <dir> --include='*.cs' | tr '\\n' ' ')\n    wkappbot file edit '<regex>' '<new>' $files --replace-all --regex",
+
+    "[BULK-PATTERN] Real-world bulk refactor (124 files, 1353 replacements, ~2s):\n  # Step 1: find files with the pattern\n  files=$(grep -rl 'Console\\.WriteLine(\\$\"\\[' ./Commands/ --include='*.cs' | tr '\\n' ' ')\n  # Step 2: apply regex substitution to all at once\n  wkappbot file edit 'Console\\.WriteLine\\(\\$\"\\[' 'Console.Error.WriteLine($\"[' $files --replace-all --regex\n  # Output: '[file edit] 124/124 file(s) edited'\n  This is the recommended approach for cross-file refactors.",
+
+    "[DRY-RUN] Add --dry-run to preview without writing:\n  wkappbot file edit '<old>' '<new>' <path> --replace-all --regex --dry-run\n  Shows the diff context but does NOT write the file.\n  CAUTION: dry-run output still shows 'backup \u2192 ...' lines \u2014 those are NOT created.",
+
+    "[UNDO] wkappbot file edit --undo <path>\n  Restores from the most recent .bak/ backup.\n  Backups accumulate in Commands/.bak/ \u2014 safe to gitignore or clean periodically.\n  TIP: commit a safepoint before large bulk edits so git revert is also available.",
+
+    "[ENCODING] wkedit auto-detects UTF-8 vs CP949. Never use sed/awk on WKAppBot sources.\n  Some Commands/*.cs files have Korean comments \u2014 always let wkedit handle encoding.\n  For forced encoding: --encoding 949 or --encoding utf-8.\n  Post-edit sanity: `wkappbot file grep '\\uFFFD' --path <dir>` checks for corruption.",
+
+    "[TIPS-FROM-USE]\n  \u2713 Batch > loop: passing 124 files in one call is ~2s. Shell loop (per-file) would be minutes.\n  \u2713 grep -rl filter is mandatory for multi-file \u2014 wkedit rejects files with zero matches.\n  \u2713 .NET regex escaping: escape ( ) . inside single-quotes for shell, AND for .NET.\n     Shell sees: Console\\.WriteLine\\(\\$\"\\[\n     .NET sees:  Console\\.WriteLine\\(\\$\"\\[\n  \u2713 --regex + $1 capture: 'Console\\.(Write)Line' \u2192 'Console.Error.$1Line' works.\n  \u2713 Backup files go to .bak/ subdir \u2014 safe to gitignore. Do NOT git add .bak/ accidentally.\n  \u2713 Check count before running: `grep -rn '<pattern>' <dir> | wc -l` \u2014 know what you're changing.\n  \u2713 Safepoint commit before bulk edit = stress-free refactoring."
+  ],
+  "tags": [
+    "wkedit",
+    "file-edit",
+    "regex",
+    "bulk",
+    "refactor",
+    "encoding",
+    "backup",
+    "undo",
+    "transaction",
+    "multi-file"
+  ],
+  "source_refs": null,
+  "author": "claude",
+  "created": "2026-04-07T16:16:02.995056Z",
+  "updated": "2026-04-08T01:50:00.000000Z",
+  "version": "1.1"
+}
