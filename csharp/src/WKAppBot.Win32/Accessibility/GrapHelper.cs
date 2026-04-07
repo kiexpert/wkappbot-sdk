@@ -98,6 +98,8 @@ public static class GrapHelper
             try { ct = node.ControlType.ToString(); } catch { }
             try { aid = node.AutomationId ?? ""; } catch { }
             if (ct == "Window") break;
+            // Abbreviate type to 3 chars — resolution uses AID after '_', type prefix is cosmetic
+            if (ct.Length > 3) ct = ct[..3];
 
             int sibIdx = 0;
             try
