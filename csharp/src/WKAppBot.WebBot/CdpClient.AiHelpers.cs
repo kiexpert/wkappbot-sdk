@@ -227,7 +227,8 @@ public sealed partial class CdpClient
                     "var ku=new KeyboardEvent('keyup',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true});" +
                     "el.dispatchEvent(kd);el.dispatchEvent(ku);return 'KEY_ENTER';" +
                 "}catch(_e){}" +
-                "return 'NO_SEND_PATH';" +
+                // ProseMirror and similar editors ignore JS KeyboardEvent -- signal C# to fire CDP Enter
+                "st.readyToSend=true;return 'CDP_SIGNAL';" +
             "};" +
             "var st=root.states[sel]||(root.states[sel]={interval:0,lastResult:'',locked:false,ticks:0,lastHash:0});" +
             // Simple hash function for content change detection
@@ -239,10 +240,15 @@ public sealed partial class CdpClient
                 "var txt=((el.value||el.innerText||el.textContent||'')).trim();" +
                 "if(!txt){cur.ticks=0;cur.lastHash=0;return;}" + // empty → reset
                 "var h=root.hash(txt);" +
-                "if(h!==cur.lastHash){cur.ticks=0;cur.lastHash=h;return;}" + // content changed → reset ticks
+                "if(h!==cur.lastHash){cur.ticks=0;cur.lastHash=h;" +
+                    "console.debug('[PUMP] content changed len='+txt.length+' sel='+sel);" +
+                    "return;}" + // content changed → reset ticks
                 "cur.ticks++;" + // content stable → count up
+                "console.debug('[PUMP] stable tick='+cur.ticks+' len='+txt.length+' sel='+sel);" +
                 "if(cur.ticks>=2){" + // 2 ticks × 500ms = 1s of STABLE content
-                    "cur.lastResult=root.trySend(sel);cur.ticks=0;cur.lastHash=0;" +
+                    "cur.lastResult=root.trySend(sel);" +
+                    "console.debug('[PUMP] trySend result='+cur.lastResult+' sel='+sel);" +
+                    "cur.ticks=0;cur.lastHash=0;" +
                 "}" +
             "}, 500);}" + // 500ms tick
             "return 'ARMED';" +
@@ -372,6 +378,24 @@ public sealed partial class CdpClient
             "if(st)st.ticks=0;" + // reset so interval doesn't re-fire
             "return root.trySend(sel);" +
             "})()") ?? "NO_PUMP";
+    }
+
+    /// <summary>
+    /// Check if JS pump set CDP_SIGNAL (ProseMirror/editors that ignore JS KeyboardEvent).
+    /// Returns true and clears the flag -- caller should fire CDP Enter immediately.
+    /// </summary>
+    public async Task<bool> CheckPumpReadyAsync(string selector)
+    {
+        var esc = Esc(selector);
+        var result = await EvalAsync(
+            "(()=>{" +
+            "var sel='" + esc + "';" +
+            "var root=window.__wkAskPump;if(!root||!root.states)return '0';" +
+            "var st=root.states[sel];if(!st||!st.readyToSend)return '0';" +
+            "st.readyToSend=false;" + // clear flag
+            "return '1';" +
+            "})()");
+        return result == "1";
     }
 
     public async Task<string> CancelPromptPumpAsync(string selector, bool clearEditor = true)

@@ -67,6 +67,24 @@ internal sealed class CdpPromptPump : IDisposable
         var armed = await cdp.ArmPromptPumpAsync(editorSelector, idleMs: 1000);
         Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: {(armed ? "armed" : "arm-failed")}");
 
+        // CDP_SIGNAL poller: JS pump sets readyToSend when JS KeyboardEvent won't work (ProseMirror).
+        // Poll every 300ms for up to 4s; on signal, fire CDP Enter (same as Claude.cs Tier 1).
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                for (int i = 0; i < 13; i++) // 13 × 300ms = ~4s
+                {
+                    await Task.Delay(300);
+                    if (!await cdp.CheckPumpReadyAsync(editorSelector)) continue;
+                    Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: CDP_SIGNAL → firing CDP Enter");
+                    await cdp.SendPromptAsync(editorSelector);
+                    return;
+                }
+            }
+            catch { }
+        });
+
         // Submit watchdog: 5s after LAST append, check if editor still has content
         // Two-phase: check at 3s and 5s — if content decreased between checks, submission is in progress
         int myWatchdog;
