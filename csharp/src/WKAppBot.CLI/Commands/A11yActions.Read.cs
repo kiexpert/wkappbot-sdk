@@ -54,12 +54,6 @@ internal partial class Program
     // stderr: diagnostic/processing info ([DIAG:find])
     static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth)
     {
-        // ── Header: target grap as title ────────────────────────────
-        string headerGrap = "";
-        try { headerGrap = GrapHelper.BuildGrapExpression(hwnd, root); } catch { }
-        if (!string.IsNullOrEmpty(headerGrap))
-            Console.WriteLine($"# {headerGrap}");
-
         // ── CURSOR ──────────────────────────────────────────────────
         Console.WriteLine("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
@@ -105,18 +99,14 @@ internal partial class Program
         var targetType = "?"; try { targetType = root.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
         var patterns   = GetSupportedPatternNames(root);
 
-        var targetTag = GrapHelper.FormatNodeLabel(targetType, targetAid, targetName, actions: patterns);
-        Console.WriteLine($"  {targetTag}");
-
-        // grap already shown in header — skip duplicate
-
-        try
-        {
-            var r = root.Properties.BoundingRectangle.ValueOrDefault;
-            if (r.Width > 0)
-                Console.WriteLine($"  rect: ({(int)r.X},{(int)r.Y}) {(int)r.Width}x{(int)r.Height}");
-        }
-        catch { }
+        System.Drawing.Rectangle? targetRect = null;
+        try { var r = root.Properties.BoundingRectangle.ValueOrDefault; if (r.Width > 0) targetRect = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
+        var targetTag = GrapHelper.FormatNodeLabel(targetType, targetAid, targetName, rect: targetRect, actions: patterns);
+        // scope hint: usable UIA scope to re-address this element
+        var scopeHint = !string.IsNullOrEmpty(targetAid) ? $"#{targetAid}"
+                      : !string.IsNullOrEmpty(targetName) ? $"#*{targetName}*"
+                      : "";
+        Console.WriteLine(scopeHint.Length > 0 ? $"  {targetTag}  →  {scopeHint}" : $"  {targetTag}");
 
         // parent + siblings
         try
@@ -144,13 +134,17 @@ internal partial class Program
         catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] parent/siblings error: {ex.Message}"); }
 
         // ── VERDICT ─────────────────────────────────────────────────
-        Console.WriteLine("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        // Only emit when there's something actionable — skip ✓ (noise)
         if (cursorIsBlocking)
+        {
+            Console.WriteLine("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             Console.WriteLine("  ⚠ cursor in Dialog — verify target is reachable");
+        }
         else if (focInfo == null)
+        {
+            Console.WriteLine("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             Console.WriteLine("  ? focus unknown");
-        else
-            Console.WriteLine("  ✓ cursor accessible");
+        }
 
         // Win32 children → stderr only
         var win32Children = WindowFinder.GetChildrenZOrder(hwnd);

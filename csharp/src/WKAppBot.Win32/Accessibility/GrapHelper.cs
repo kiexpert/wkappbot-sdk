@@ -154,51 +154,55 @@ public static class GrapHelper
     /// Used everywhere a11y nodes are displayed: windows, inspect, find, read, etc.
     /// </summary>
     /// <summary>String-based overload for pre-extracted info (ElementAtPointInfo etc.)</summary>
+    /// <summary>
+    /// Canonical tag format: &lt;TypeIdOrName attrs&gt;
+    ///   automationId present → &lt;ButtonOK&gt;
+    ///   name only            → &lt;Button'확인'&gt;
+    ///   neither              → &lt;Button2&gt; (siblingIndex)
+    ///   attrs: ltwh=x,y,w,h  actions="Invoke,..."  text="..."
+    /// </summary>
     public static string FormatNodeLabel(string controlType, string? automationId, string? name,
-        int siblingIndex = 0, System.Drawing.Rectangle? rect = null, List<string>? actions = null)
+        int siblingIndex = 0, System.Drawing.Rectangle? rect = null, List<string>? actions = null, string? text = null)
     {
         var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
-        var id = !string.IsNullOrEmpty(automationId) ? automationId
-               : !string.IsNullOrEmpty(name) ? (name.Length > 20 ? name[..17] + "..." : name)
-               : "";
-        // XML tag: <Type{N}id attrs> — skip N if id is present (id is already unique)
-        var numPart = (!string.IsNullOrEmpty(automationId) || !string.IsNullOrEmpty(id)) ? "" : idx;
-        if (string.IsNullOrEmpty(id)) numPart = idx; // no id → always show number
-        else numPart = ""; // has id → skip number
+        // name uses single-quote wrapper so it's visually distinct from automationId
+        string id;
+        if (!string.IsNullOrEmpty(automationId)) id = automationId;
+        else if (!string.IsNullOrEmpty(name))    id = $"'{name}'";
+        else                                     id = "";
+        // XML tag: <Type{N}id attrs> — N only when no id
+        var numPart = string.IsNullOrEmpty(id) ? idx : "";
         var tag = $"{controlType}{numPart}{id}";
-        var attrs = new List<string>(3);
+        var attrs = new List<string>(4);
         if (rect.HasValue) attrs.Add($"ltwh={rect.Value.X},{rect.Value.Y},{rect.Value.Width},{rect.Value.Height}");
         if (actions != null && actions.Count > 0) attrs.Add($"actions=\"{string.Join(",", actions)}\"");
+        if (text != null)
+        {
+            var escaped = text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
+            if (escaped.Length > 50) escaped = escaped[..47] + "...";
+            attrs.Add($"text=\"{escaped}\"");
+        }
         return attrs.Count > 0 ? $"<{tag} {string.Join(" ", attrs)}>" : $"<{tag}>";
     }
 
+    /// <summary>AutomationElement overload — delegates to canonical string overload.</summary>
     public static string FormatNodeLabel(AutomationElement el, int siblingIndex = 0, bool includeRect = false, bool includeText = false)
     {
-        var ct = el.Properties.ControlType.ValueOrDefault;
+        var ct  = el.Properties.ControlType.ValueOrDefault.ToString();
         var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
         var name = el.Properties.Name.ValueOrDefault ?? "";
         System.Drawing.Rectangle? rect = null;
         if (includeRect)
             try { var r = el.Properties.BoundingRectangle.ValueOrDefault; rect = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
-        // XML tag: <Type{N}id ltwh=... text="...">
-        var attrs = new List<string>(3);
-        if (rect.HasValue) attrs.Add($"ltwh={(int)rect.Value.X},{(int)rect.Value.Y},{(int)rect.Value.Width},{(int)rect.Value.Height}");
+        string? text = null;
         if (includeText)
         {
-            var text = "";
+            text = "";
             try { text = el.Patterns.Value.PatternOrDefault?.Value.ValueOrDefault ?? ""; } catch { }
             if (string.IsNullOrEmpty(text)) text = name;
-            if (text.Length > 0)
-            {
-                var escaped = text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
-                if (escaped.Length > 50) escaped = escaped[..47] + "...";
-                attrs.Add($"text=\"{escaped}\"");
-            }
+            if (string.IsNullOrEmpty(text)) text = null;
         }
-        var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
-        var id = aid.Length > 0 ? aid : (name.Length > 20 ? name[..17] + "..." : name);
-        var tag = $"{ct}{idx}{id}";
-        return attrs.Count > 0 ? $"<{tag} {string.Join(" ", attrs)}>" : $"<{tag}>";
+        return FormatNodeLabel(ct, aid, name, siblingIndex, rect, null, text);
     }
 
     /// <summary>
