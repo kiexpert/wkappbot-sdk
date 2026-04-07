@@ -75,6 +75,21 @@ Eye ↔ MCP 워커(Core) JSON-RPC over pipe. a11y/UIA를 별도 프로세스로 
 UIA 없는 MFC owner-drawn → CCA 세그멘테이션 → OCR 3중 교차검증 → Gemini Vision 추론
 → `dyn_r{row}c{col}` 동적 ID + Experience DB 캐시 + CCA 파라미터 자동 튜닝
 
+### v5.11.101+ (2026-04-08, Session 7)
+- **# TARGET 출력 완전 재설계** (copy-paste-ready grap):
+  - `# TARGET "{compactGrap}#{absTagPath}" [OK] Nms  WindowTitle`
+  - `BuildAbsoluteTagPath`: UIA type 3자 약칭 (`Document→Doc`, `Group→Gro`, `Edit→Edi`)
+  - `BuildCompactWinGrap`: title/url 제거, 브라우저→domain(no cls), 나머지→cls 유지
+  - `[OK]/[MISS]` 검증 + 타이밍 ms 표시
+  - window title → meta suffix (element Name 아닌 Win32 GetWindowTextW)
+  - hack-hover 동일 포맷 적용 + `BuildCompactWinGrap` 공통 함수
+- **FormatNodeLabel 통일**: AutomationElement 오버로드 → string 오버로드 완전 위임
+  - name에 단따옴표 래핑 `<Button'확인'>`, 17자 truncation 제거
+  - UIA scope 접근 가능 시 TARGET 태그 오른쪽에 `→ #scope` 힌트
+  - rect `ltwh=` attr 포함; VERDICT ✓ 억제 (⚠/? 만 출력)
+- **KNOWHOW/ShowKnowhowBroadcast/ShowKnowhowHint** → 전부 stderr
+- **UiaLocator.GetAbsoluteTagPath()** 추가 (automation tree walker 노출)
+
 ### v5.11.74~100 (2026-04-08, Session 6)
 - **stdout noise elimination**: 124 Commands/*.cs 파일 `Console.WriteLine($"[` → stderr 일괄 치환 (wkedit bulk)
 - **ClickZoomHelper**: `[ZOOM:]` Console.Write → Console.Error.Write (전부 stderr)
