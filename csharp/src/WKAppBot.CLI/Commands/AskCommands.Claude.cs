@@ -459,7 +459,7 @@ internal partial class Program
                             var text = last.textContent;
                             var streaming = last.getAttribute('data-is-streaming');
                             var state = streaming === 'true' ? 'STREAMING' : 'DONE';
-                            return JSON.stringify({state: state, len: text.length, text: text.substring(0, 3000)});
+                            return JSON.stringify({state: state, len: text.length, text: text.substring(0, 50000)});
                         })()
                         """) ?? "{}";
 
@@ -497,12 +497,13 @@ internal partial class Program
                             Console.Write($" [RUNNING {sw.Elapsed.TotalSeconds:F0}s]"); Console.Out.Flush();
                         }
 
-                        // Early-exit: flush idle 1s --don't wait for DONE attribute
+                        // Early-exit: only when STREAMING is idle for 10s (section pauses < 3s)
+                        // 1s was too aggressive — caused partial MD captures on long responses
                         if (lastFlushedLen > 50 && state == "STREAMING"
-                            && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 1.0)
+                            && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 10.0)
                         {
                             if (liveHeaderPrinted) Console.WriteLine();
-                            Console.WriteLine($"[ASK] Flush idle 1s --early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                            Console.WriteLine($"[ASK] Flush idle 10s --early done ({sw.Elapsed.TotalSeconds:F0}s)");
                             cdp.SetBotOverlayStreaming(false);
                             askSession.MarkDone(text);
                             return (true, text);
@@ -529,7 +530,7 @@ internal partial class Program
                     (() => {
                         var msgs = document.querySelectorAll('[data-is-streaming]');
                         var last = msgs.length > {{preStreamingCount}} ? msgs[msgs.length - 1] : null;
-                        return last ? last.textContent.substring(0, 3000) : '';
+                        return last ? last.textContent.substring(0, 50000) : '';
                     })()
                     """) ?? "";
                 if (liveHeaderPrinted) Console.WriteLine();

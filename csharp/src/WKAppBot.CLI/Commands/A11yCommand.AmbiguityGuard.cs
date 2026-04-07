@@ -279,11 +279,7 @@ internal partial class Program
                     {
                         var label = !string.IsNullOrEmpty(dAid) ? dAid : dName;
                         if (label.Length > 40) label = label[..40];
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.Write($"[A11Y] LEAF: {dType}(\"{label}\")");
-                        if (patterns.Count > 0) Console.Write($" [{string.Join(",", patterns)}]");
-                        Console.WriteLine();
-                        Console.ResetColor();
+                        Console.Error.WriteLine($"[A11Y] LEAF: {dType}(\"{label}\"){(patterns.Count > 0 ? $" [{string.Join(",", patterns)}]" : "")}");
                         if (!string.IsNullOrEmpty(label))
                         {
                             var leafJson5 = WindowFinder.BuildTargetJson5(targetHwnd);

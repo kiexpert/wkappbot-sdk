@@ -1006,12 +1006,13 @@ internal partial class Program
                         if (eyeOk && eyeTs != null)
                         {
                             _eyeStatusTs = eyeTs;
-                            // Post card summary as first thread reply
-                            if (summary.Length > 0)
-                            {
-                                var (replyOk, replyTs) = SlackSendViaApi(slackBotToken, slackChannel, "```\n" + summary + "\n```", threadTs: eyeTs, username: "앱봇아이").GetAwaiter().GetResult();
-                                if (replyOk && replyTs != null) _eyeSummaryReplyTs = replyTs;
-                            }
+                            // Always post card placeholder as first thread reply [0]
+                            // — guarantees CCABot always lands at [1], not [0]
+                            var cardContent = summary.Length > 0
+                                ? "```\n" + summary + "\n```"
+                                : "_(loading...)_";
+                            var (replyOk, replyTs) = SlackSendViaApi(slackBotToken, slackChannel, cardContent, threadTs: eyeTs, username: "앱봇아이").GetAwaiter().GetResult();
+                            if (replyOk && replyTs != null) _eyeSummaryReplyTs = replyTs;
                         }
                     }
                 }

@@ -368,15 +368,19 @@ internal partial class Program
                     .Where(r => r?["ts"]?.GetValue<string>() != _eyeStatusTs)
                     .ToList();
 
-                // Reply #2 (mouse CCA)
-                var r2 = children?.Count > 1 ? children[1] : null;
-                if (r2?["username"]?.GetValue<string>() == "CCABot")
-                    _mouseCcaReplyTs = r2["ts"]?.GetValue<string>();
+                // Mouse CCA reply: find by username (position-independent)
+                var ccaReply = children?.FirstOrDefault(r => r?["username"]?.GetValue<string>() == "CCABot");
+                if (ccaReply != null)
+                {
+                    _mouseCcaReplyTs = ccaReply["ts"]?.GetValue<string>();
+                    Console.WriteLine($"[ANALYSIS] Reusing existing CCABot reply ts={_mouseCcaReplyTs}");
+                }
                 else
                 {
                     var (ok1, ts1) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "Analyzing...",
                         threadTs: _eyeStatusTs, username: "CCABot");
                     if (ok1 && ts1 != null) _mouseCcaReplyTs = ts1;
+                    Console.WriteLine($"[ANALYSIS] Created new CCABot reply ts={_mouseCcaReplyTs}");
                 }
 
                 Console.WriteLine($"[ANALYSIS] Replies ready: mouse={_mouseCcaReplyTs != null}");

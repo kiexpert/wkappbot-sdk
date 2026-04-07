@@ -1,17 +1,18 @@
 {
   "id": "triad-ask-simultaneous-q-debate-tool-loop-agent-mode",
   "app": "wkappbot-core",
-  "title": "Triad Ask: Simultaneous Q, 정반합 Debate, Tool Loop, Agent Mode, Session Recovery",
+  "title": "Triad Ask: Simultaneous Q, \uC815\uBC18\uD569 Debate, Tool Loop, Agent Mode, Session Recovery",
   "desc": "Usage patterns for the 3-AI triad system (Gemini/GPT/Claude): parallel questioning, thesis-antithesis-synthesis debate, AppBot tool-call loop, full agent mode, and session recovery when CDP fails mid-debate.",
   "steps": [
-    "1. [SIMULTANEOUS Q] wkappbot ask triad \"<question>\" -- all 3 AIs answer in parallel on the same Slack thread. Best for: broad gap analysis, design review, architectural decisions. Share full context (skill content, code snippets, version info) in the question. TIP: Include 'C# project, not Python' + Chrome/Blink version to prevent Gemini tool-call headscratch. TIP: After receiving answers, send a Slack reply with your own synthesis -- forces you to process + creates audit trail.",
-    "2. [FOLLOW-UP 정반합] Send another triad question on the SAME thread: wkappbot ask triad \"<follow-up>\" --msg <thread_ts>. The AIs see each other's prior answers and debate. Best for: validating proposed fixes, drilling into unresolved points, testing new code. Multiple rounds possible -- each round adds synthesis layer. Thread TS printed as [TRIAD:THREAD_TS] in log.",
-    "3. [TARGETED SINGLE-AI] wkappbot ask claude/gemini/gpt \"<question>\" -- one AI only. Faster + cheaper than full triad. Best for: domain-specific questions (claude for Chrome/Blink internals, gemini for practical JS patterns, gpt for structured analysis/security review). Use --msg <ts> to continue same thread as a triad for cross-pollination.",
-    "4. [TOOL-CALL LOOP] Gemini can call AppBot tools (file read/grep/glob/a11y eval) mid-response. Triggered when Gemini response contains [APPBOT_TOOL_CALL_BEGIN]{...}[APPBOT_TOOL_CALL_END]. Result injected back. Loop repeats until Gemini stops calling tools. Useful for: Gemini autonomously exploring the codebase to answer its own questions. GPT and Claude do not currently support tool-call loop.",
-    "5. [AGENT MODE] wkappbot agent triad \"<task>\" -- full autonomous agent: AIs plan, call tools, verify, iterate. Highest cost/depth. For: complex multi-step investigations. Each AI can independently read files, run commands, and share discoveries with peers via PushDiscovery. Shared context: TriadSharedContext.PushDiscovery(ai, discovery) -> other AIs receive at next idle point.",
-    "6. [DEBATE MECHANICS] Round 1: each AI answers independently. Moderator DM nudges slow AIs. Cross-prompts: Gemini sends cross-prompt to Claude/GPT after responding (via CDP pump). Round 2+: moderator injects synthesis questions targeting disagreements. [REEDUCATE]: if AI omits [An] marker, system injects correction message. Session recovery: if CDP fails during reeducate, system reads existing DOM response instead of resetting (see step 8). [TRIAD:THREAD_TS] in log = Slack thread TS for follow-up.",
-    "7. [SELF-IMPROVING LOOP] Bug detected during triad -> suggest filed automatically (BUG-AUTO) -> ask triad/single-AI for domain analysis -> triad dialectic -> code fix -> skill update -> suggest resolve with evidence. Proven: BUG-1/2/3 pump bugs found by triad, fixed, validated via follow-up 정반합 in same session.",
-    "8. [SESSION RECOVERY — 정반합 continuity] When CDP fails mid-reeducate (e.g. ClearEditorAsync timeout): system falls back to reading existing DOM response via ReEducateReadPageAsync instead of triggering fresh-tab navigation. This keeps the debate session alive. Recovery order: (1) ClearEditor fails -> skip injection, read current page DOM -> return existing AI response; (2) Stop-button polling EvalAsync timeout -> break wait loop, proceed to DOM read; (3) Final DOM read fails -> return null (skip block, debate continues). Source: AskCommands.Slack.cs ReEducateAsync + ReEducateReadPageAsync. PATTERN: for session summary handoff at end of session, use wkappbot ask gpt/claude 'session summary...' then save response to file -> wkappbot newchat --file summary.md. If response times out, CDP-read full page + save as text file as fallback."
+    "[SIMULTANEOUS Q] wkappbot ask triad \u0022\u003Cquestion\u003E\u0022 -- all 3 AIs answer in parallel on the same Slack thread. Best for: broad gap analysis, design review, architectural decisions. Share full context (skill content, code snippets, version info) in the question. TIP: Include \u0027C# project, not Python\u0027 \u002B Chrome/Blink version to prevent Gemini tool-call headscratch. TIP: After receiving answers, send a Slack reply with your own synthesis -- forces you to process \u002B creates audit trail.",
+    "[FOLLOW-UP \uC815\uBC18\uD569] Send another triad question on the SAME thread: wkappbot ask triad \u0022\u003Cfollow-up\u003E\u0022 --msg \u003Cthread_ts\u003E. The AIs see each other\u0027s prior answers and debate. Best for: validating proposed fixes, drilling into unresolved points, testing new code. Multiple rounds possible -- each round adds synthesis layer. Thread TS printed as [TRIAD:THREAD_TS] in log.",
+    "[TARGETED SINGLE-AI] wkappbot ask claude/gemini/gpt \u0022\u003Cquestion\u003E\u0022 -- one AI only. Faster \u002B cheaper than full triad. Best for: domain-specific questions (claude for Chrome/Blink internals, gemini for practical JS patterns, gpt for structured analysis/security review). Use --msg \u003Cts\u003E to continue same thread as a triad for cross-pollination.",
+    "[TOOL-CALL LOOP] Gemini can call AppBot tools (file read/grep/glob/a11y eval) mid-response. Triggered when Gemini response contains [APPBOT_TOOL_CALL_BEGIN]{...}[APPBOT_TOOL_CALL_END]. Result injected back. Loop repeats until Gemini stops calling tools. Useful for: Gemini autonomously exploring the codebase to answer its own questions. GPT and Claude do not currently support tool-call loop.",
+    "[AGENT MODE] wkappbot agent triad \u0022\u003Ctask\u003E\u0022 -- full autonomous agent: AIs plan, call tools, verify, iterate. Highest cost/depth. For: complex multi-step investigations. Each AI can independently read files, run commands, and share discoveries with peers via PushDiscovery. Shared context: TriadSharedContext.PushDiscovery(ai, discovery) -\u003E other AIs receive at next idle point.",
+    "[DEBATE MECHANICS] Round 1: each AI answers independently. Moderator DM nudges slow AIs. Cross-prompts: Gemini sends cross-prompt to Claude/GPT after responding (via CDP pump). Round 2\u002B: moderator injects synthesis questions targeting disagreements. [REEDUCATE]: if AI omits [An] marker, system injects correction message. Session recovery: if CDP fails during reeducate, system reads existing DOM response instead of resetting (see step 8). [TRIAD:THREAD_TS] in log = Slack thread TS for follow-up.",
+    "[SELF-IMPROVING LOOP] Bug detected during triad -\u003E suggest filed automatically (BUG-AUTO) -\u003E ask triad/single-AI for domain analysis -\u003E triad dialectic -\u003E code fix -\u003E skill update -\u003E suggest resolve with evidence. Proven: BUG-1/2/3 pump bugs found by triad, fixed, validated via follow-up \uC815\uBC18\uD569 in same session.",
+    "[SESSION RECOVERY \u2014 \uC815\uBC18\uD569 continuity] When CDP fails mid-reeducate (e.g. ClearEditorAsync timeout): system falls back to reading existing DOM response via ReEducateReadPageAsync instead of triggering fresh-tab navigation. This keeps the debate session alive. Recovery order: (1) ClearEditor fails -\u003E skip injection, read current page DOM -\u003E return existing AI response; (2) Stop-button polling EvalAsync timeout -\u003E break wait loop, proceed to DOM read; (3) Final DOM read fails -\u003E return null (skip block, debate continues). Source: AskCommands.Slack.cs ReEducateAsync \u002B ReEducateReadPageAsync. PATTERN: for session summary handoff at end of session, use wkappbot ask gpt/claude \u0027session summary...\u0027 then save response to file -\u003E wkappbot newchat --file summary.md. If response times out, CDP-read full page \u002B save as text file as fallback.",
+    "[LIVE STREAMING \u2014 MD \u002B Slack] Every ask/triad session streams live to TWO outputs simultaneously. (1) MD file: .wkappbot/ask/{timestamp}-{id}.md in caller CWD \u2014 appended in real-time as each AI responds. Readable by Claude Code IDE (open file to watch debate unfold). Format: ## AI (HH:MM) header \u002B response body \u002B Slack quote block. (2) Slack thread: each AI reply posted/updated in the designated thread. CAUTION: debate creates many replies fast \u2014 always use edit-in-place (update existing msg) not new posts per round, or Slack free plan 90-day message cap will be exhausted within days (lesson learned: triad \uC815\uBC18\uD569 posted raw new replies each round \u2192 workspace burned through limit in days \u2192 forced workspace recreation)."
   ],
   "tags": [
     "triad",
@@ -23,24 +24,26 @@
     "reeducate",
     "living-doc",
     "self-improving",
-    "정반합"
+    "\uC815\uBC18\uD569",
+    "md-streaming",
+    "slack-streaming"
   ],
   "source_refs": [
     {
       "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Slack.cs",
       "line": null,
-      "pattern": "ReEducateAsync",
-      "note": "Reeducate + session recovery (ReEducateReadPageAsync)"
+      "pattern": null,
+      "note": null
     },
     {
       "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.DebateRunner.cs",
       "line": null,
-      "pattern": "SendPendingCrossPromptAsync",
-      "note": "Cross-prompt delivery after AI response"
+      "pattern": null,
+      "note": null
     }
   ],
   "author": "claude",
   "created": "2026-04-07T11:32:52.6409906Z",
-  "updated": "2026-04-07T21:15:00.0000000Z",
-  "version": "1.1"
+  "updated": "2026-04-07T14:39:00.4972725Z",
+  "version": "1.2"
 }

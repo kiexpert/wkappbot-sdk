@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using WKAppBot.Core.Runner;
 using WKAppBot.WebBot;
 using WKAppBot.Win32.Window;
@@ -25,8 +24,8 @@ internal partial class Program
 
         // Auto-launch AppBotEye for all CDP commands (not just "open")
         // "open" handles it internally, help/status don't need it
-        if (sub != "open" && sub != "--help" && sub != "-h" && sub != "help" && sub != "status"
-            && sub != "fetch" && sub != "search" && sub != "read")
+        if (sub != "open" && sub != "--help" && sub != "-h" && sub != "help"
+            && sub != "status" && sub != "fetch" && sub != "search" && sub != "read")
         {
             // Parse port from args (--port N pattern)
             int mvPort = 9222;
@@ -36,36 +35,47 @@ internal partial class Program
             LaunchAppBotEyeIfNeeded(mvPort);
         }
 
+        // Removed (use a11y instead): eval, click, dblclick, type, text, screenshot, wait, check, select, restore/show
+        // Migration: a11y <action> "*Chrome*#<css-selector>" — CSS auto-routed to CDP
         return sub switch
         {
             "open" => WebOpenCommand(restArgs),
             "tabs" => WebTabsCommand(restArgs),
-            "eval" => WebEvalCommand(restArgs),
-            "click" => WebClickCommand(restArgs),
-            "dblclick" or "double-click" => WebDblClickCommand(restArgs),
-            "type" => WebTypeCommand(restArgs),
-            "text" => WebGetTextCommand(restArgs),
-            "screenshot" => WebScreenshotCommand(restArgs),
             "capture" => WebCaptureCommand(restArgs),
             "navigate" or "nav" => WebNavigateCommand(restArgs),
-            "wait" => WebWaitCommand(restArgs),
-            "check" => WebCheckCommand(restArgs),
-            "select" => WebSelectCommand(restArgs),
             "html" => WebHtmlCommand(restArgs),
             "url" => WebUrlCommand(restArgs),
             "title" => WebTitleCommand(restArgs),
             "close" => WebCloseCommand(restArgs),
             "status" => WebStatusCommand(restArgs),
-            "restore" or "show" => WebRestoreCommand(restArgs),
             "run" => WebRunCommand(restArgs),
             "file"   => WebFileInputCommand(restArgs),
             "fetch"  => WebFetchCommand(restArgs),
             "search" => WebSearchCommand(restArgs),
             "read"   => WebReadCommand(restArgs),
             "--help" or "-h" or "help" => WebUsage(),
+            "eval" or "click" or "dblclick" or "double-click" or "type" or "text"
+                or "screenshot" or "wait" or "check" or "select" or "restore" or "show"
+                => Error($"[WEB] 'web {sub}' removed — use a11y instead:\n"
+                       + $"  a11y {MapRemovedWebCmd(sub)} \"*Chrome*#<css-selector>\" [args]\n"
+                       + $"  CSS selectors auto-routed to CDP (no --port needed)"),
             _ => Error($"Unknown web subcommand: {sub}")
         };
     }
+
+    static string MapRemovedWebCmd(string sub) => sub switch
+    {
+        "click" or "dblclick" or "double-click" => "click",
+        "type" => "type",
+        "text" => "read",
+        "screenshot" => "screenshot",
+        "wait" => "wait",
+        "check" => "click",
+        "select" => "select",
+        "restore" or "show" => "restore",
+        "eval" => "read --eval-js",
+        _ => sub
+    };
 
     static int WebUsage()
     {
@@ -78,14 +88,11 @@ Usage:
 Session Management:
   open [url] [--port N] [--headless] [--no-launch] [--browser] [--no-minimize] [--show]
       Open Chrome with CDP and navigate to URL.
-      App mode is DEFAULT — clean window without address bar/tabs.
       --port N: CDP port (default: 9222)
       --headless: Run Chrome headless (no visible window)
       --no-launch: Connect to already-running Chrome (don't launch)
       --browser: Normal Chrome UI with address bar/tabs (for debugging)
       --no-minimize / --show: Keep Chrome window visible (default: minimize)
-  restore / show [--port N]
-      Restore minimized Chrome window (UIA Window pattern → Win32 fallback).
   close [--port N]
       Disconnect from Chrome (does not close the browser).
   status [--port N]
@@ -96,46 +103,39 @@ Navigation:
   url [--port N]               Get current page URL.
   title [--port N]             Get current page title.
 
-Page Interaction:
-  click <css-selector> [--port N]
-      Click an element by CSS selector.
-  type <css-selector> <text> [--port N]
-      Type text into an input element.
-  text <css-selector> [--port N]
-      Get text content of an element.
-  check <css-selector> [true|false] [--port N]
-      Set checkbox checked state.
-  select <css-selector> <value-or-text> [--port N]
-      Select an option in a <select> element.
-  wait <css-selector> [--timeout N] [--port N]
-      Wait for an element to appear (polling).
-
-JavaScript:
-  eval <expression> [--port N]
-      Evaluate JavaScript and print the result.
+Removed — use a11y instead (CSS auto-routed to CDP):
+  click <css>      →  a11y click ""*Chrome*#<css>""
+  type <css> <txt> →  a11y type  ""*Chrome*#<css>"" ""text""
+  text <css>       →  a11y read  ""*Chrome*#<css>""
+  screenshot       →  a11y screenshot ""*Chrome*""
+  wait <css>       →  a11y wait  ""*Chrome*#<css>""
+  check/select     →  a11y click/select ""*Chrome*#<css>""
+  restore/show     →  a11y restore ""*Chrome*""
+  eval <js>        →  a11y read  ""*Chrome*"" --eval-js ""<js>""
 
 Output:
-  screenshot [-o output.png] [--port N]
-      Capture page screenshot as PNG (CDP — page content only).
   capture [-o output.png] [--port N]
       Capture Chrome window including title bar (Win32 PrintWindow).
   html [<url>] [-o out.html] [--port N]
       Get full page HTML source. If <url> given, navigates to it first (sandbox tab).
 
-Batch:
-  run <steps-file.txt> [--port N] [--delay N]
-      Run a batch of web commands from a file.
-      Each line is a web subcommand (e.g., ""click #btn"", ""type #name hello"").
-
 Tab Discovery:
   tabs [--port N]
       List all Chrome tabs (title + URL).
 
+Batch:
+  run <steps-file.txt> [--port N] [--delay N]
+      Run a batch of web commands from a file.
+      Each line is a web subcommand (open/navigate/html/capture/url/title/close).
+
+Fetch / Search:
+  fetch <url> [--max-chars N]   HTTP GET + extract text content.
+  search <query> [--limit N]    Web search.
+  read <url> [--max-chars N]    Article reader (main content extraction).
+
 Options:
-  --port N     CDP port (default: 9222)
-  --tab <pat>  Find tab by URL/title pattern (* wildcard). No match = error (no blank tab).
-  --timeout N  Timeout in ms for wait commands (default: 5000)
-  -o <file>    Output file path (for screenshot/html)
+  --port N   CDP port (default: 9222)
+  -o <file>  Output file path (for capture/html)
 ");
         PrintRelatedSkills("web");
         return 0;
@@ -430,106 +430,6 @@ Options:
         return 0;
     }
 
-    // ── Helper: get web element screen rect for zoom overlay ────
-
-    /// <summary>
-    /// Get a web element's bounding rectangle in physical screen coordinates.
-    /// Strategy: CDP getBoundingClientRect (CSS px) + Win32 ClientToScreen on
-    /// Chrome_RenderWidgetHostHWND (the actual viewport window) + devicePixelRatio.
-    /// Returns null if element not found or not visible. Non-critical — never throws.
-    /// </summary>
-    static Rectangle? GetWebElementScreenRect(CdpClient cdp, string selector)
-    {
-        try
-        {
-            var escaped = selector.Replace("\\", "\\\\").Replace("'", "\\'");
-
-            // Step 1: Get element's viewport-relative rect + DPI via CDP
-            var json = cdp.EvalAsync($$"""
-                (() => {
-                    const el = document.querySelector('{{escaped}}');
-                    if (!el) return null;
-                    el.scrollIntoView({ block:'center', inline:'center' });
-                    const r = el.getBoundingClientRect();
-                    if (!r || r.width <= 0 || r.height <= 0) return null;
-                    return JSON.stringify({
-                        left: r.left, top: r.top, width: r.width, height: r.height,
-                        dpr: window.devicePixelRatio || 1
-                    });
-                })()
-                """).GetAwaiter().GetResult();
-
-            if (string.IsNullOrEmpty(json)) return null;
-            var node = JsonNode.Parse(json);
-            if (node == null) return null;
-
-            double cssLeft = node["left"]!.GetValue<double>();
-            double cssTop = node["top"]!.GetValue<double>();
-            double cssWidth = node["width"]!.GetValue<double>();
-            double cssHeight = node["height"]!.GetValue<double>();
-            double dpr = node["dpr"]!.GetValue<double>();
-
-            // Step 2: Find Chrome_RenderWidgetHostHWND — the actual web viewport window
-            var chromeHwnd = cdp.GetChromeWindowHandle();
-            if (chromeHwnd == IntPtr.Zero) return null;
-
-            IntPtr renderHwnd = IntPtr.Zero;
-            NativeMethods.EnumChildWindows(chromeHwnd, (hwnd, _) =>
-            {
-                var sb = new System.Text.StringBuilder(256);
-                NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
-                if (sb.ToString() == "Chrome_RenderWidgetHostHWND")
-                {
-                    renderHwnd = hwnd;
-                    return false; // stop
-                }
-                return true; // continue
-            }, IntPtr.Zero);
-
-            // Fallback: use main Chrome window if render widget not found
-            var targetHwnd = renderHwnd != IntPtr.Zero ? renderHwnd : chromeHwnd;
-
-            // Step 3: ClientToScreen on the viewport window → physical pixel origin
-            var origin = new POINT(0, 0);
-            NativeMethods.ClientToScreen(targetHwnd, ref origin);
-
-            // Step 4: Convert CSS pixels to physical pixels and add viewport origin
-            int screenX = origin.X + (int)Math.Round(cssLeft * dpr);
-            int screenY = origin.Y + (int)Math.Round(cssTop * dpr);
-            int width = (int)Math.Round(cssWidth * dpr);
-            int height = (int)Math.Round(cssHeight * dpr);
-
-            // Sanity check — element must be within visible screen area
-            if (width <= 0 || height <= 0 || screenX < -100 || screenY < -100) return null;
-
-            return new Rectangle(screenX, screenY, width, height);
-        }
-        catch { return null; }
-    }
-
-    /// <summary>
-    /// Begin zoom overlay for a web element. Returns disposable zoom helper (or null).
-    /// Chrome window handle used as formHandle for PrintWindow clip region capture.
-    /// </summary>
-    static ClickZoomHelper? BeginWebZoom(CdpClient cdp, string selector, string action, string label)
-    {
-        try
-        {
-            var rect = GetWebElementScreenRect(cdp, selector);
-            if (rect == null) return null;
-
-            var chromeHwnd = cdp.GetChromeWindowHandle();
-            if (chromeHwnd == IntPtr.Zero) return null;
-
-            // 3-mode auto-selection handles it:
-            // - Foreground + large → HighlightBox (border only, user can see directly)
-            // - Foreground + small → 3x Magnifier
-            // - Obscured → 1:1 Relay
-            return ClickZoomHelper.BeginFromRect(rect.Value, chromeHwnd, action, label);
-        }
-        catch { return null; }
-    }
-
     // ── open ─────────────────────────────────────────────────────
     // ★ IMPORTANT: App mode (--app) is the DEFAULT and MUST stay that way!
     //   - App mode creates an isolated Chrome window: no address bar, no tabs, no extensions
@@ -692,265 +592,6 @@ Options:
         return 0;
     }
 
-    // ── eval ─────────────────────────────────────────────────────
-
-    static int WebEvalCommand(string[] args)
-    {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Error.WriteLine("[DEPRECATED] 'web eval' is scheduled for removal — use a11y action with --eval-js instead.");
-        Console.Error.WriteLine("  a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"");
-        Console.Error.WriteLine("  a11y read \"*Chrome*\" --eval-js \"document.title\"   (tab auto-found when no #scope given)");
-        Console.Error.WriteLine("  CDP helpers: GetUrlAsync, GetTitleAsync, FocusAsync, JsClickAsync, QueryCountAsync");
-        Console.ResetColor();
-        AutoRegisterBug($"[USAGE-DEPRECATED] web eval used — scheduled for removal. args={string.Join(" ", args.Take(3))}");
-
-        if (args.Length == 0)
-            return Error("Usage: wkappbot web eval [tab-pattern] <expression> [--port N] [--tab <pattern>]");
-
-        int port = GetPort(args);
-        var tabArg = GetArgValue(args, "--tab");
-
-        // Collect non-flag args (skip --port N, --tab N)
-        var nonFlagArgs = new List<string>();
-        for (int i = 0; i < args.Length; i++)
-        {
-            if (args[i] == "--port" || args[i] == "--tab") { i++; continue; }
-            if (args[i].StartsWith("--")) continue;
-            nonFlagArgs.Add(args[i]);
-        }
-
-        // If 2+ non-flag args and first looks like a tab hint (not a JS expression), treat it as tab pattern.
-        // Accepts: plain names (chatgpt), URL-like (chatgpt.com), domain paths (claude.ai/chat)
-        // Rejects: JS expressions containing (, ), =, [, ], {, }, >, <, !, space, ;
-        static bool LooksLikeTabHint(string s) =>
-            s.IndexOfAny(new[] { '(', ')', '=', '[', ']', '{', '}', '>', '<', '!', ' ', ';' }) < 0;
-
-        string expression;
-        if (nonFlagArgs.Count >= 2 && tabArg == null && LooksLikeTabHint(nonFlagArgs[0]))
-        {
-            tabArg = nonFlagArgs[0];
-            expression = string.Join(" ", nonFlagArgs.Skip(1));
-        }
-        else
-        {
-            expression = string.Join(" ", nonFlagArgs);
-        }
-
-        // Build effective args with --tab if auto-detected
-        var effectiveArgs = new List<string>(args);
-        if (tabArg != null && !args.Contains("--tab"))
-        {
-            effectiveArgs.Add("--tab");
-            effectiveArgs.Add(tabArg);
-        }
-
-        var cdpOrNull = ConnectCdpWithTab(effectiveArgs.ToArray());
-        if (cdpOrNull == null)
-        {
-            // Tab-find: show available tabs when no match
-            Console.Error.WriteLine($"[WEB] Tab hint '{tabArg}' not found. Available tabs:");
-            var listPort = GetPort(args);
-            try
-            {
-                using var listCdp = new CdpClient();
-                listCdp.ConnectAsync(listPort).GetAwaiter().GetResult();
-                var listTabs = listCdp.ListTabsAsync(listPort).GetAwaiter().GetResult();
-                for (int i = 0; i < listTabs.Count; i++)
-                    Console.Error.WriteLine($"  [{i + 1}] {listTabs[i].Title[..Math.Min(listTabs[i].Title.Length, 60)]}  ({listTabs[i].Url[..Math.Min(listTabs[i].Url.Length, 60)]})");
-                Console.Error.WriteLine($"  Use --tab <hint> to target a specific tab.");
-            }
-            catch { }
-            return 1;
-        }
-        using var cdp = cdpOrNull;
-
-        // Log which tab we connected to (especially helpful when no --tab was specified)
-        if (string.IsNullOrEmpty(tabArg))
-        {
-            try
-            {
-                var activeTitle = cdp.GetTitleAsync().GetAwaiter().GetResult();
-                Console.WriteLine($"[WEB] eval: connected to tab '{activeTitle}' (use --tab <hint> for a specific tab)");
-            }
-            catch { }
-        }
-
-        // Auto-detect async expressions (async () => ...) and await the Promise
-        bool isAsync = expression.TrimStart().StartsWith("(async") || expression.TrimStart().StartsWith("async");
-        var result = cdp.EvalAsync(expression, awaitPromise: isAsync).GetAwaiter().GetResult();
-        Console.WriteLine($"[WEB] eval: {result}");
-
-        return 0;
-    }
-
-    // ── click ────────────────────────────────────────────────────
-
-    static int WebClickCommand(string[] args)
-    {
-        if (args.Length == 0)
-            return Error("Usage: wkappbot web click <css-selector> [--port N]");
-
-        int port = GetPort(args);
-        string selector = args[0];
-
-        using var cdp = ConnectCdp(port);
-
-        Console.Write($"[WEB] Click '{selector}'... ");
-        cdp.SetStatusRunningAsync($"Click: {selector}").GetAwaiter().GetResult();
-
-        // ── Zoom overlay ──
-        using var zoom = BeginWebZoom(cdp, selector, "web_click", selector);
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        try
-        {
-            cdp.ClickAsync(selector).GetAwaiter().GetResult();
-            cdp.UpdateStatusAsync($"Click: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("OK");
-            Console.ResetColor();
-            zoom?.ShowPass($"Click OK ({sw.ElapsedMilliseconds}ms)");
-        }
-        catch (Exception ex)
-        {
-            zoom?.ShowFail(ex.Message);
-            throw;
-        }
-
-        // ── ActionState IPC ──
-        try { ActionState.Write(new ActionState { Source = "web", ElementName = selector, ActionName = "click", ActionDetail = $"Click: {selector}", Status = "pass" }); } catch { }
-
-        return 0;
-    }
-
-    // ── dblclick ────────────────────────────────────────────────
-
-    static int WebDblClickCommand(string[] args)
-    {
-        if (args.Length < 1)
-            return Error("Usage: wkappbot web dblclick <css-selector> [--port N]");
-
-        int port = GetPort(args);
-        string selector = args[0];
-
-        using var cdp = ConnectCdp(port);
-
-        Console.Write($"[WEB] Double-click '{selector}'... ");
-        cdp.SetStatusRunningAsync($"DblClick: {selector}").GetAwaiter().GetResult();
-
-        // ── Zoom overlay ──
-        using var zoom = BeginWebZoom(cdp, selector, "web_dblclick", selector);
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        try
-        {
-            cdp.DoubleClickAsync(selector).GetAwaiter().GetResult();
-            cdp.UpdateStatusAsync($"DblClick: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("OK");
-            Console.ResetColor();
-            zoom?.ShowPass($"DblClick OK ({sw.ElapsedMilliseconds}ms)");
-        }
-        catch (Exception ex)
-        {
-            zoom?.ShowFail(ex.Message);
-            throw;
-        }
-
-        // ── ActionState IPC ──
-        try { ActionState.Write(new ActionState { Source = "web", ElementName = selector, ActionName = "dblclick", ActionDetail = $"DblClick: {selector}", Status = "pass" }); } catch { }
-
-        return 0;
-    }
-
-    // ── type ─────────────────────────────────────────────────────
-
-    static int WebTypeCommand(string[] args)
-    {
-        if (args.Length < 2)
-            return Error("Usage: wkappbot web type <css-selector> <text> [--port N]");
-
-        int port = GetPort(args);
-        string selector = args[0];
-        // Join remaining args before --port as the text
-        var textArgs = args.Skip(1).TakeWhile(a => a != "--port").ToArray();
-        string text = string.Join(" ", textArgs);
-
-        using var cdp = ConnectCdp(port);
-
-        Console.Write($"[WEB] Type '{text}' into '{selector}'... ");
-        cdp.SetStatusRunningAsync($"Type: '{text}' -> {selector}").GetAwaiter().GetResult();
-
-        // ── Zoom overlay ──
-        using var zoom = BeginWebZoom(cdp, selector, "web_type", selector);
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        try
-        {
-            cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
-            cdp.UpdateStatusAsync($"Type: {selector} OK", elapsedMs: (int)sw.ElapsedMilliseconds).GetAwaiter().GetResult();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("OK");
-            Console.ResetColor();
-            zoom?.ShowPass($"Type OK ({sw.ElapsedMilliseconds}ms)");
-        }
-        catch (Exception ex)
-        {
-            zoom?.ShowFail(ex.Message);
-            throw;
-        }
-
-        // ── ActionState IPC ──
-        try { ActionState.Write(new ActionState { Source = "web", ElementName = selector, ActionName = "type_text", ActionDetail = $"Type: \"{text}\" → {selector}", Status = "pass" }); } catch { }
-
-        return 0;
-    }
-
-    // ── text ─────────────────────────────────────────────────────
-
-    static int WebGetTextCommand(string[] args)
-    {
-        if (args.Length == 0)
-            return Error("Usage: wkappbot web text <css-selector> [--port N]");
-
-        int port = GetPort(args);
-        string selector = args[0];
-
-        using var cdp = ConnectCdp(port);
-
-        var text = cdp.GetTextAsync(selector).GetAwaiter().GetResult();
-        Console.WriteLine($"[WEB] text('{selector}'): {text}");
-
-        return 0;
-    }
-
-    // ── screenshot ───────────────────────────────────────────────
-
-    static int WebScreenshotCommand(string[] args)
-    {
-        int port = GetPort(args);
-        string output = GetArgValue(args, "-o")
-            ?? Path.Combine(DataDir, "output", $"web_screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-
-        var cdpOrNull = ConnectCdpWithTab(args);
-        if (cdpOrNull == null) return 1;
-        using var cdp = cdpOrNull;
-
-        Console.Write($"[WEB] Screenshot... ");
-        var png = cdp.ScreenshotAsync().GetAwaiter().GetResult();
-
-        var dir = Path.GetDirectoryName(output);
-        if (dir != null && !Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
-
-        File.WriteAllBytes(output, png);
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"Saved ({png.Length:N0} bytes)");
-        Console.ResetColor();
-        Console.WriteLine($"[WEB] File: {output}");
-
-        return 0;
-    }
 
     // ── capture (Win32 window — includes title bar) ─────────────
 
@@ -994,108 +635,6 @@ Options:
         Console.ResetColor();
         Console.WriteLine($"[WEB] File: {output}");
         bmp.Dispose();
-
-        return 0;
-    }
-
-    // ── wait ─────────────────────────────────────────────────────
-
-    static int WebWaitCommand(string[] args)
-    {
-        if (args.Length == 0)
-            return Error("Usage: wkappbot web wait <css-selector> [--timeout N] [--port N]");
-
-        int port = GetPort(args);
-        string selector = args[0];
-        int timeout = int.TryParse(GetArgValue(args, "--timeout"), out var t) ? t : 5000;
-
-        using var cdp = ConnectCdp(port);
-
-        Console.Write($"[WEB] Waiting for '{selector}' (timeout={timeout}ms)... ");
-        var found = cdp.WaitForElementAsync(selector, timeout).GetAwaiter().GetResult();
-
-        if (found)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("Found");
-            Console.ResetColor();
-            return 0;
-        }
-        else
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("NOT FOUND (timeout)");
-            Console.ResetColor();
-            return 1;
-        }
-    }
-
-    // ── check (checkbox) ─────────────────────────────────────────
-
-    static int WebCheckCommand(string[] args)
-    {
-        if (args.Length < 1)
-            return Error("Usage: wkappbot web check <css-selector> [true|false] [--port N]");
-
-        int port = GetPort(args);
-        string selector = args[0];
-        bool check = args.Length > 1 && args[1] != "--port" ? bool.Parse(args[1]) : true;
-
-        using var cdp = ConnectCdp(port);
-
-        Console.Write($"[WEB] SetChecked '{selector}' = {check}... ");
-
-        // ── Zoom overlay ──
-        using var zoom = BeginWebZoom(cdp, selector, "web_check", selector);
-
-        try
-        {
-            cdp.SetCheckedAsync(selector, check).GetAwaiter().GetResult();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("OK");
-            Console.ResetColor();
-            zoom?.ShowPass($"Check={check} OK");
-        }
-        catch (Exception ex)
-        {
-            zoom?.ShowFail(ex.Message);
-            throw;
-        }
-
-        return 0;
-    }
-
-    // ── select ───────────────────────────────────────────────────
-
-    static int WebSelectCommand(string[] args)
-    {
-        if (args.Length < 2)
-            return Error("Usage: wkappbot web select <css-selector> <value-or-text> [--port N]");
-
-        int port = GetPort(args);
-        string selector = args[0];
-        string value = string.Join(" ", args.Skip(1).TakeWhile(a => a != "--port"));
-
-        using var cdp = ConnectCdp(port);
-
-        Console.Write($"[WEB] Select '{selector}' = '{value}'... ");
-
-        // ── Zoom overlay ──
-        using var zoom = BeginWebZoom(cdp, selector, "web_select", selector);
-
-        try
-        {
-            cdp.SelectAsync(selector, value).GetAwaiter().GetResult();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("OK");
-            Console.ResetColor();
-            zoom?.ShowPass($"Select='{value}' OK");
-        }
-        catch (Exception ex)
-        {
-            zoom?.ShowFail(ex.Message);
-            throw;
-        }
 
         return 0;
     }
@@ -1177,90 +716,6 @@ Options:
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"[WEB] Not connected or already closed: {ex.Message}");
             Console.ResetColor();
-        }
-
-        return 0;
-    }
-
-    // ── restore/show ──────────────────────────────────────────────
-
-    static int WebRestoreCommand(string[] args)
-    {
-        // Restore (un-minimize) the Chrome WebBot window — Accessibility compatible
-        // Uses UIA Window pattern first (focusless!), falls back to Win32 ShowWindow
-        int port = GetPort(args);
-
-        try
-        {
-            // Find Chrome window by title pattern
-            var windows = WindowFinder.FindByTitle("WKWebBot");
-            if (windows.Count == 0)
-                windows = WindowFinder.FindByTitle("Chrome");
-            if (windows.Count == 0)
-                return Error("[WEB] Chrome window not found");
-
-            var win = windows[0];
-            bool restored = false;
-
-            // Try UIA Window pattern first (Accessibility compatible, focusless!)
-            try
-            {
-                using var automation = new FlaUI.UIA3.UIA3Automation();
-                var uiaEl = automation.FromHandle(win.Handle);
-                if (uiaEl != null)
-                {
-                    var windowPattern = uiaEl.Patterns.Window.PatternOrDefault;
-                    if (windowPattern != null)
-                    {
-                        var state = windowPattern.WindowVisualState.Value;
-                        if (state == FlaUI.Core.Definitions.WindowVisualState.Minimized)
-                        {
-                            windowPattern.SetWindowVisualState(FlaUI.Core.Definitions.WindowVisualState.Normal);
-                            Thread.Sleep(200);
-                            restored = true;
-                            Console.ForegroundColor = ConsoleColor.Green;
-                            Console.Write("[WEB] Restored via UIA Window pattern ");
-                            Console.ResetColor();
-                        }
-                        else
-                        {
-                            Console.ForegroundColor = ConsoleColor.DarkGray;
-                            Console.Write($"[WEB] Already visible (state={state}) ");
-                            Console.ResetColor();
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // UIA failed, fall back to Win32
-            }
-
-            // Fallback: Win32 ShowWindow(SW_RESTORE)
-            if (!restored && NativeMethods.IsIconic(win.Handle))
-            {
-                NativeMethods.ShowWindow(win.Handle, 9 /*SW_RESTORE*/);
-                Thread.Sleep(200);
-                restored = true;
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write("[WEB] Restored via ShowWindow ");
-                Console.ResetColor();
-            }
-
-            // Bring to foreground
-            NativeMethods.SmartSetForegroundWindow(win.Handle);
-            Thread.Sleep(100);
-
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"→ [{win.Handle:X8}] \"{win.Title}\" ({win.Rect.Width}x{win.Rect.Height})");
-            Console.ResetColor();
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[WEB] Restore failed: {ex.Message}");
-            Console.ResetColor();
-            return 1;
         }
 
         return 0;
@@ -1411,24 +866,17 @@ Options:
 
                 int result = sub switch
                 {
-                    "open" => WebOpenCommand(subRest),
-                    "eval" => WebEvalCommand(subRest),
-                    "click" => WebClickCommand(subRest),
-                    "dblclick" or "double-click" => WebDblClickCommand(subRest),
-                    "type" => WebTypeCommand(subRest),
-                    "text" => WebGetTextCommand(subRest),
-                    "screenshot" => WebScreenshotCommand(subRest),
-                    "capture" => WebCaptureCommand(subRest),
+                    "open"          => WebOpenCommand(subRest),
+                    "capture"       => WebCaptureCommand(subRest),
                     "navigate" or "nav" => WebNavigateCommand(subRest),
-                    "wait" => WebWaitCommand(subRest),
-                    "check" => WebCheckCommand(subRest),
-                    "select" => WebSelectCommand(subRest),
-                    "html" => WebHtmlCommand(subRest),
-                    "url" => WebUrlCommand(subRest),
-                    "title" => WebTitleCommand(subRest),
-                    "close" => WebCloseCommand(subRest),
-                    "status" => WebStatusCommand(subRest),
-                    "restore" or "show" => WebRestoreCommand(subRest),
+                    "html"          => WebHtmlCommand(subRest),
+                    "url"           => WebUrlCommand(subRest),
+                    "title"         => WebTitleCommand(subRest),
+                    "close"         => WebCloseCommand(subRest),
+                    "status"        => WebStatusCommand(subRest),
+                    "eval" or "click" or "dblclick" or "double-click" or "type" or "text"
+                        or "screenshot" or "wait" or "check" or "select" or "restore" or "show"
+                        => Error($"[WEB] 'web {sub}' removed — use a11y in your script: a11y {MapRemovedWebCmd(sub)} \"*Chrome*#<css>\""),
                     _ => Error($"Unknown step: {sub}")
                 };
 
