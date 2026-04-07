@@ -90,7 +90,7 @@ internal sealed class XRayHelper : IDisposable
 
         if (helper._affected.Count == 0) return null;
 
-        Console.Write($"[XRAY] {helper._affected.Count} window(s) ghosted ");
+        Console.Error.Write($"[XRAY] {helper._affected.Count} window(s) ghosted ");
         return helper;
     }
 
@@ -128,7 +128,7 @@ internal sealed class XRayHelper : IDisposable
         }
 
         if (_affected.Count > 0)
-            Console.Write($"[XRAY] {_affected.Count} window(s) restored ");
+            Console.Error.Write($"[XRAY] {_affected.Count} window(s) restored ");
     }
 
     /// <summary>
@@ -155,7 +155,7 @@ internal sealed class XRayHelper : IDisposable
         }, IntPtr.Zero);
 
         if (restored > 0)
-            Console.WriteLine($"[XRAY] RestoreAll: {restored} leaked window(s) recovered");
+            Console.Error.WriteLine($"[XRAY] RestoreAll: {restored} leaked window(s) recovered");
         return restored;
     }
 }
