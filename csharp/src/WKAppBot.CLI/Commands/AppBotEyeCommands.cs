@@ -735,6 +735,9 @@ internal partial class Program
         // Acquire Eye-alive mutex for this process's lifetime ??signals to callers that Eye is running.
         // Elevated Eye skips mutex ??runs alongside normal Eye (admin proxy only, not full Eye).
         bool isElevatedArg = args.Any(a => a == "--elevated");
+
+        // --elevated: runas creates a console window even with WindowStyle.Hidden ??hide ASAP
+        if (isElevatedArg) TryHideConsoleWindow();
         PulseStep.Mark("mutex-check");
         if (!isElevatedArg)
         {
@@ -778,6 +781,18 @@ internal partial class Program
             EyeColor(ConsoleColor.Yellow);
             Console.WriteLine("[EYE] Running as ADMIN ??elevated proxy pipe will be available");
             EyeResetColor();
+        }
+
+        // --elevated arg: lightweight proxy mode — skip full Eye (WPF/MCP/Slack/watchdog).
+        // Just start the admin pipe server immediately and wait. Pipe available in <50ms.
+        if (isElevatedArg)
+        {
+            Console.WriteLine("[EYE:ADMIN] Elevated proxy mode — pipe server starting (no WPF/MCP/Slack)");
+            PulseStep.Mark("elevated-proxy-only");
+            var proxyCts = new CancellationTokenSource();
+            Console.CancelKeyPress += (_, e) => { e.Cancel = true; proxyCts.Cancel(); };
+            ElevatedEyeServer.ListenAsync(proxyCts.Token).GetAwaiter().GetResult();
+            return 0;
         }
 
         // Hot-swap blue-green: --replace-pid <pid> ??close old Eye after first render
