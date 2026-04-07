@@ -1,25 +1,27 @@
 {
   "id": "autoheal-userinput-protection",
   "app": "wkappbot-core",
-  "title": "AutoHeal - User Input Protection: Focus Theft Detection \u0026 Auto-Recovery",
-  "desc": "[RULE] Skill content MUST be in English -- Korean uses 2-3x tokens. Multi-layer system protecting user focus from CDP/Chrome theft during ask operations. LIVING DOCUMENT: update as each incident is investigated and resolved. MANDATORY: all restore paths through InputReadiness pipeline. RESTORE TRIGGER: end of each ask/CDP action boundary only. Watchdog = monitor\u002Bnotify only.",
+  "title": "AutoHeal - User Input Protection: Focusless-First \u002B Focus Theft Recovery",
+  "desc": "[RULE] Skill content MUST be in English -- Korean uses 2-3x tokens. PHILOSOPHY: focusless-first is the PRIMARY goal -- if every CDP step is truly focusless, focus theft never occurs and all recovery machinery becomes unnecessary safety net only. Recovery (watchdog/retry/ForceForegroundWindow) is the FALLBACK, not the solution. LIVING DOCUMENT: update as each incident is investigated and resolved.",
   "steps": [
     "0. [RULE] ALL skill steps/desc/tags must be English only -- token efficiency.",
-    "1. [MANDATORY] ALL focus restore paths go through InputReadiness.Probe() -- OnProbeSuccess fires zoom\u002Bauto-hack. Standalone ForceForegroundWindow without InputReadiness FORBIDDEN (except RestoreFocusWithRetryAsync inner loop).",
+    "1. [PHILOSOPHY] Focusless-first: design every CDP action so it never needs OS foreground. Recovery is safety net only -- if focusless is correct, theft never happens. Priority: (1) make action focusless, (2) add recovery as backstop.",
     "2. [MANDATORY] Restore trigger = end of each ask/CDP action only. Watchdog = monitor\u002Bnotify only, no restore.",
-    "3. [FOCUSLESS PATTERN] Standard pattern for any CDP call that can steal focus: (a) check if already active (document.visibilityState=visible) -\u003E skip minimize dance, (b) SW_SHOWMINNOACTIVE(8) to iconify, (c) WaitForWindowStateAsync(\u0027minimized\u0027) -- poll not fixed delay, (d) fire CDP call, (e) RestoreChromeNoActivate (SW_SHOWNOACTIVATE=4), (f) WaitForWindowStateAsync(\u0027normal\u0027) -- poll not fixed delay. Example: BringToFrontAsync and SwitchToTargetAsync both follow this exact pattern.",
-    "4. [INVESTIGATION PROCEDURE] When focus theft suspected: (a) which ask action was running, (b) which CDP method it calls, (c) IsFocusStealingMethod() covers it?, (d) pre-minimize uses SW=8 not 6?, (e) WaitForWindowState used (not fixed delay)?, (f) RestoreChromeNoActivate after?, (g) OnFocusTheft callback restores?",
-    "5. [CDP FOCUS-STEALING METHODS] Page.bringToFront, Target.activateTarget (no-op), Browser.setWindowBounds, Runtime.evaluate\u002B.focus(). Gatekeepers: IsFocusStealingMethod() \u002B IsFocusRiskExpression() in CdpClient.FocusRiskWatchdog.cs.",
-    "6. [KNOWN INSTABILITY] Runtime.evaluate: JS .focus() bypasses IsFocusStealingMethod. setWindowBounds: Chrome may activate before WaitForWindowState confirms.",
-    "7. [DONE] SendAsync pre-minimize: SW_MINIMIZE(6) -\u003E SW_SHOWMINNOACTIVE(8)",
-    "8. [DONE] BringToFrontAsync: SW(6)-\u003ESW(8) \u002B fixed delays -\u003E WaitForWindowStateAsync",
-    "9. [DONE] SendAsync post-theft: SetForegroundWindow -\u003E ForceForegroundWindow",
-    "10. [DONE] OnFocusTheft callback: log-only -\u003E RestoreFocusWithRetryAsync",
-    "11. [DONE] AutoBugReport via ActionApi.OnFocusStealer",
-    "12. [DONE] DismissDialogAsync: added \uB3D9\uC758 \u002B called after file-attach \u002B before insert",
-    "13. [TODO] FireAutoHeal on 5s restore timeout",
-    "14. [TODO] EnsureCdpReadyAsync: CreateInputReadiness()\u002BProbe(AutoApproveYield:true)",
-    "15. [TODO] prevFg re-capture between phases (persona/attach/send)"
+    "3. [MANDATORY] ALL focus restore paths go through InputReadiness.Probe() -- OnProbeSuccess fires zoom\u002Bauto-hack.",
+    "4. [FOCUSLESS PATTERN] For any CDP call that can steal focus: (a) check already active (document.visibilityState=visible) -\u003E skip, (b) SW_SHOWMINNOACTIVE(8) iconify, (c) WaitForWindowStateAsync(\u0027minimized\u0027) NOT fixed delay, (d) fire CDP call, (e) RestoreChromeNoActivate SW_SHOWNOACTIVATE(4), (f) WaitForWindowStateAsync(\u0027normal\u0027) NOT fixed delay. Ref: SwitchToTargetAsync (complete), BringToFrontAsync (complete).",
+    "5. [INVESTIGATION PROCEDURE] When focus theft occurs: (a) which action, (b) which CDP method, (c) IsFocusStealingMethod() covers it?, (d) SW=8 not 6?, (e) WaitForWindowState not fixed delay?, (f) RestoreChromeNoActivate after?, (g) OnFocusTheft restores?",
+    "6. [CDP FOCUS-STEALING METHODS] Page.bringToFront, Target.activateTarget (no-op), Browser.setWindowBounds, Runtime.evaluate\u002B.focus(). Gatekeepers: IsFocusStealingMethod()\u002BIsFocusRiskExpression() in CdpClient.FocusRiskWatchdog.cs.",
+    "7. [KNOWN RESIDUAL RISK] Runtime.evaluate: JS .focus() inside page bypasses all CDP-level guards -- only recovery layer catches this.",
+    "8. [DONE] SendAsync pre-minimize: SW(6)-\u003ESW(8)",
+    "9. [DONE] BringToFrontAsync: SW(6)-\u003ESW(8) \u002B fixed delays -\u003E WaitForWindowStateAsync",
+    "10. [DONE] SendAsync post-theft: SetForegroundWindow -\u003E ForceForegroundWindow",
+    "11. [DONE] OnFocusTheft callback: log-only -\u003E RestoreFocusWithRetryAsync",
+    "12. [DONE] AutoBugReport via ActionApi.OnFocusStealer",
+    "13. [DONE] DismissDialogAsync: \uB3D9\uC758 added \u002B called after file-attach \u002B before insert",
+    "14. [TODO] FireAutoHeal on 5s restore timeout",
+    "15. [TODO] EnsureCdpReadyAsync: CreateInputReadiness()\u002BProbe(AutoApproveYield:true)",
+    "16. [TODO] prevFg re-capture between phases (persona/attach/send)",
+    "17. [TODO] Audit remaining CDP callers for focusless pattern compliance"
   ],
   "tags": [
     "focus",
@@ -32,11 +34,10 @@
     "gemini",
     "chrome",
     "todo",
-    "priority",
+    "focusless-first",
     "inputreadiness",
     "living-doc",
-    "investigation",
-    "focusless-pattern"
+    "investigation"
   ],
   "source_refs": [
     {
@@ -46,27 +47,27 @@
       "note": null
     },
     {
-      "file": "WaitForWindowStateAsync",
-      "line": null,
-      "pattern": null,
-      "note": null
-    },
-    {
       "file": "csharp/src/WKAppBot.WebBot/CdpClient.TabManagement.cs",
       "line": null,
       "pattern": "SwitchToTargetAsync",
       "note": null
     },
     {
-      "file": "EmulateActiveTabAsync",
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.Window.cs",
+      "line": null,
+      "pattern": "WaitForWindowStateAsync",
+      "note": null
+    },
+    {
+      "file": "RestoreChromeNoActivate",
       "line": null,
       "pattern": null,
       "note": null
     },
     {
       "file": "csharp/src/WKAppBot.WebBot/CdpClient.cs",
-      "line": 324,
-      "pattern": "SW_SHOWMINNOACTIVE",
+      "line": null,
+      "pattern": "IsFocusStealingMethod",
       "note": null
     },
     {
@@ -78,19 +79,7 @@
     {
       "file": "csharp/src/WKAppBot.WebBot/CdpClient.FocusRiskWatchdog.cs",
       "line": null,
-      "pattern": "IsFocusRiskMethod",
-      "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.WebBot/CdpClient.Window.cs",
-      "line": null,
-      "pattern": "RestoreChromeNoActivate",
-      "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Entry.Cdp.cs",
-      "line": null,
-      "pattern": "OnFocusTheft",
+      "pattern": "IsFocusRiskExpression",
       "note": null
     },
     {
@@ -100,14 +89,14 @@
       "note": null
     },
     {
-      "file": "csharp/src/WKAppBot.WebBot/CdpClient.AiHelpers.cs",
-      "line": 603,
-      "pattern": "DismissDialogAsync",
+      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Entry.Cdp.cs",
+      "line": null,
+      "pattern": "OnFocusTheft",
       "note": null
     }
   ],
   "author": "claude",
   "created": "2026-04-07T08:50:15.2810138Z",
-  "updated": "2026-04-07T09:23:09.3371661Z",
-  "version": "1.10"
+  "updated": "2026-04-07T09:23:45.1842281Z",
+  "version": "1.11"
 }
