@@ -2,19 +2,20 @@
   "id": "autoheal-userinput-protection",
   "app": "wkappbot-core",
   "title": "AutoHeal - User Input Protection: Focusless-First \u002B Focus Theft Recovery",
-  "desc": "[RULE] Skill content MUST be in English -- Korean uses 2-3x tokens. PHILOSOPHY: focusless-first is the PRIMARY goal. Recovery is safety net only. SELF-REPORTING: when theft is detected, OnFocusTheft auto-classifies (guarded-race vs unguarded-gap) and files suggest via AutoBugReport. LIVING DOCUMENT: check suggest list periodically and resolve incoming CDP theft reports.",
+  "desc": "[RULE] Skill content MUST be in English -- Korean uses 2-3x tokens. PHILOSOPHY: focusless-first is the PRIMARY goal. Recovery is safety net only. SELF-IMPROVING: bugs auto-report via suggest, triad dialectic resolves gaps, skill accumulates knowhow. LIVING DOCUMENT: check suggest list periodically.",
   "steps": [
     "0. [RULE] ALL skill steps/desc/tags must be English only -- token efficiency.",
     "1. [PHILOSOPHY] Focusless-first: every CDP action should never need OS foreground. Recovery = safety net. Priority: (1) focusless design, (2) recovery as backstop.",
     "2. [MANDATORY] Restore trigger = end of each ask/CDP action only. Watchdog = monitor\u002Bnotify only.",
     "3. [MANDATORY] ALL restore paths go through InputReadiness.Probe(SkipBlocker/Knowhow/Zoom=true, AutoApproveYield=true).",
     "4. [FOCUSLESS PATTERN] (a) check visibilityState=visible-\u003Eskip, (b) SW_SHOWMINNOACTIVE(8), (c) WaitForWindowStateAsync(\u0027minimized\u0027), (d) CDP call, (e) RestoreChromeNoActivate SW(4), (f) WaitForWindowStateAsync(\u0027normal\u0027). Ref: SwitchToTargetAsync, BringToFrontAsync.",
-    "5. [DEVICE INSERTION = SELF-REPORTING] Insert AutoBugReport at every theft detection point. OnFocusTheft classifies: UNGUARDED (method not in IsFocusStealingMethod -\u003E add focusless pattern) vs RACE (guarded but WaitForWindowStateAsync coverage incomplete). Each detection files a suggest automatically -- no manual audit.",
-    "6. [OPERATIONAL] Log files to check: runtime/cdp-focus-risk.jsonl (per-method focus risk log), runtime/cdp-minimize-watchdog.jsonl (minimize state tracking). Periodic actions: wkappbot suggest list -\u003E review CDP theft reports -\u003E apply focusless pattern fix -\u003E resolve with evidence script.",
-    "7. [INVESTIGATION] When theft occurs check: (a) which action, (b) CDP method, (c) IsFocusStealingMethod()?, (d) SW=8?, (e) WaitForWindowState not fixed delay?, (f) OnFocusTheft restores?",
-    "8. [DONE] SW(6)-\u003ESW(8) everywhere. BringToFrontAsync: WaitForWindowStateAsync. OnFocusTheft: ForceForegroundWindow\u002BRestoreFocusWithRetryAsync\u002BAutoBugReport suggest.",
-    "9. [DONE] EnsureCdpReadyAsync: InputReadiness.Probe(). RestoreFocusWithRetryAsync: AutoBugReport on 5s timeout.",
-    "10. [DONE] EnsureWindowReady: ForceForegroundWindow. AskGemini: prevFg re-capture after persona. DismissDialogAsync: \uB3D9\uC758."
+    "5. [DEVICE INSERTION = SELF-REPORTING] Insert AutoBugReport at every theft detection point. OnFocusTheft classifies UNGUARDED vs RACE and files suggest automatically.",
+    "6. [SELF-IMPROVING LOOP] Bug detected -\u003E suggest filed -\u003E wkappbot ask triad (share skill content \u002B ask for analysis) -\u003E triad dialectic (thesis/antithesis/synthesis) -\u003E code fix -\u003E skill update -\u003E suggest resolve with evidence script. Triad learns from skill history; skill accumulates triad insights. Loop repeats.",
+    "7. [OPERATIONAL] Logs: runtime/cdp-focus-risk.jsonl, runtime/cdp-minimize-watchdog.jsonl. Periodic: wkappbot suggest list -\u003E review CDP theft reports -\u003E ask triad if unclear -\u003E fix -\u003E resolve.",
+    "8. [INVESTIGATION] When theft: (a) which action, (b) CDP method, (c) IsFocusStealingMethod()?, (d) SW=8?, (e) WaitForWindowState not delay?, (f) OnFocusTheft restores?",
+    "9. [DONE] SW(6)-\u003ESW(8). BringToFrontAsync WaitForWindowStateAsync. OnFocusTheft ForceForeground\u002BRestoreRetry\u002BAutoBugReport. InputReadiness.Probe. AutoBugReport 5s timeout. EnsureWindowReady ForceForeground. AskGemini prevFg re-capture. DismissDialogAsync \uB3D9\uC758.",
+    "10. [TODO] GPT/Claude ask flows: same prevFgHint\u002BStartFocusWatchdog pattern not yet applied",
+    "11. [TODO] Runtime.evaluate JS .focus() bypass: largest residual risk -- IsFocusRiskExpression detects but does not block"
   ],
   "tags": [
     "focus",
@@ -27,6 +28,8 @@
     "inputreadiness",
     "living-doc",
     "self-reporting",
+    "self-improving",
+    "triad",
     "suggest",
     "operational"
   ],
@@ -38,21 +41,9 @@
       "note": null
     },
     {
-      "file": "AutoBugReport",
-      "line": null,
-      "pattern": null,
-      "note": null
-    },
-    {
       "file": "csharp/src/WKAppBot.WebBot/CdpClient.FocusRiskWatchdog.cs",
       "line": null,
-      "pattern": "IsFocusRiskMethod",
-      "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.WebBot/CdpClient.MinimizeWatchdog.cs",
-      "line": null,
-      "pattern": "ScheduleMinimizeDump",
+      "pattern": "IsFocusRiskExpression",
       "note": null
     },
     {
@@ -72,10 +63,16 @@
       "line": null,
       "pattern": "RestoreFocusWithRetryAsync",
       "note": null
+    },
+    {
+      "file": "EnsureCdpReadyAsync",
+      "line": null,
+      "pattern": null,
+      "note": null
     }
   ],
   "author": "claude",
   "created": "2026-04-07T08:50:15.2810138Z",
-  "updated": "2026-04-07T09:33:05.7486361Z",
-  "version": "1.14"
+  "updated": "2026-04-07T09:37:35.8233958Z",
+  "version": "1.15"
 }
