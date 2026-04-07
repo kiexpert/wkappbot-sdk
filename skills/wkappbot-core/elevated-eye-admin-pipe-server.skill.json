@@ -1,8 +1,8 @@
 {
   "id": "elevated-eye-admin-pipe-server",
   "app": "wkappbot-core",
-  "title": "Elevated Eye Admin Named Pipe Server Loop",
-  "desc": "Smart admin pipe server. Triad design: length-prefixed JSON, MaxAllowedServerInstances, UIPI pipe security, IsBusy hot-swap guard. StopAcceptingAndWaitForDrain: 30s cap.",
+  "title": "Run Admin Commands Without UAC Prompt — Elevated Eye Pipe Server",
+  "desc": "Named pipe server (wkappbot_elevated) inside Eye for running admin commands. Triad-tested: length-prefixed JSON, MaxAllowedServerInstances for gap-free hot-swap, UIPI-aware ACL (AuthUser+Admin), IsBusy guard defers hot-swap while active, __eye_tick__ returns cached state, 30s drain cap.",
   "steps": [
     "1. NamedPipeServerStreamAcl.Create AuthUser=ReadWrite Admin=FullControl",
     "2. WaitForConnectionAsync Task.Run HandleClient Interlocked counter",
