@@ -488,15 +488,18 @@ internal partial class Program
 
         ["web"] = """
             web open [url] [--port N] [--headless] [--no-launch]
-            web eval "<js>" [--port N]
             web navigate <url> [--port N]
             web tabs [--port N]
-            web read <url> [--max-chars N]
-            web fetch <url> [--max-chars N]
-            web search <query> [--limit N]
+            web html [<url>] [-o out.html] [--port N]
+            web capture [-o out.png] [--port N]
+            web url [--port N]  /  web title [--port N]
+            web close [--port N]  /  web status [--port N]
+            web fetch <url>  /  web search <query>  /  web read <url>
+            web run <steps-file.txt> [--port N]
 
-            Chrome CDP integration: launch, connect, navigate, evaluate JS.
-            Default port: 9222. Auto-launches Chrome if not running.
+            Removed (use a11y instead — CSS auto-routed to CDP):
+              web click/type/text/screenshot/wait/check/select/restore/eval
+              → a11y <action> "*Chrome*#<css-selector>"
             """,
 
         ["windows"] = """

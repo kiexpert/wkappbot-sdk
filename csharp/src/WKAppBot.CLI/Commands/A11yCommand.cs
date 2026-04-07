@@ -501,9 +501,7 @@ internal partial class Program
             targets = parsed;
             if (isInteractiveAction && targets.Count > 1)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[A11Y] WARN: --nth {nthRaw} matched {targets.Count} candidates; acting on highest-priority one only");
-                Console.ResetColor();
+                Console.Error.WriteLine($"[A11Y] WARN: --nth {nthRaw} matched {targets.Count} candidates; acting on highest-priority one only");
                 targets = [targets[0]];
             }
         }
@@ -536,7 +534,7 @@ internal partial class Program
         }
         else
         {
-            Console.WriteLine($"[A11Y] matched: {SearchKey(targets[0])}");
+            Console.Error.WriteLine($"[A11Y] matched: {SearchKey(targets[0])}");
         }
 
         // ── JSON5 TARGET: usable as grap pattern in any command ──
