@@ -16,9 +16,11 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     static async Task<(bool ready, IntPtr prevFg, ClickZoomHelper? zoom)> EnsureCdpReadyAsync(
-        CdpClient cdp, string action, string? cssSelector = null, string? label = null)
+        CdpClient cdp, string action, string? cssSelector = null, string? label = null, IntPtr prevFgHint = default)
     {
-        var prevFg = NativeMethods.GetForegroundWindow();
+        // Use caller-supplied prevFg if available (captures focus before any CDP tab-switch ops).
+        // Falling back to GetForegroundWindow() here would miss focus stolen during tab switch.
+        var prevFg = prevFgHint != IntPtr.Zero ? prevFgHint : NativeMethods.GetForegroundWindow();
         ClickZoomHelper? zoom = null;
         try
         {
