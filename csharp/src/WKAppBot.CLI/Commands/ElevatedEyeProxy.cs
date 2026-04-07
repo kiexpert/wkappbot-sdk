@@ -471,7 +471,7 @@ static class ElevationHelper
                 Thread.Sleep(250);
                 if (ElevatedEyeClient.IsAvailable())
                 {
-                    Thread.Sleep(50); // brief settle — server enters WaitForConnectionAsync
+                    Thread.Sleep(200); // settle — give server time to enter WaitForConnectionAsync
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine("[ELEVATION] Elevated Eye proxy is ready!");
                     Console.ResetColor();
