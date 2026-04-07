@@ -296,9 +296,11 @@ internal partial class Program
                 await cdp.EmulateActiveTabAsync();
                 await cdp.InjectFocusLockScriptAsync();
                 await cdp.SetFocusLockAsync(true);
-                // Visual: DWM border (orange) + CSS pulse overlay to mark this as a bot-controlled window
-                cdp.SetDwmBorderColor((255, 120, 30));
-                await cdp.SetBotOverlayAsync(true, "#ff781e");
+                // Visual: DWM border + CSS overlay, color-coded per AI host
+                var (dwmColor, hexColor) = GetBotColors(label);
+                cdp.SetDwmBorderColor(dwmColor);
+                await cdp.SetBotOverlayAsync(true, hexColor);
+                _ = cdp.SetBotTitlePrefixAsync(label ?? "WKBot");
             }
 
             Console.WriteLine($"[AAR:CDP] Ready: {action}");
@@ -341,6 +343,7 @@ internal partial class Program
         // Remove bot decoration after send completes
         cdp.SetDwmBorderColor(null);
         _ = cdp.SetBotOverlayAsync(false);
+        _ = cdp.RestoreWindowTitleAsync();
     }
 
     /// <summary>
@@ -481,6 +484,18 @@ internal partial class Program
 
         return result;
     }
+
+    /// <summary>
+    /// Per-AI color coding for DWM border + CSS overlay.
+    /// Claude=orange, GPT=green, Gemini=blue, default=orange.
+    /// </summary>
+    static ((byte R, byte G, byte B) dwm, string hex) GetBotColors(string? label) =>
+        label switch
+        {
+            "ChatGPT" or "GPT" => ((16, 163, 127), "#10A37F"),
+            "Gemini"           => ((66, 133, 244), "#4285F4"),
+            _                  => ((255, 120, 30),  "#ff781e"), // Claude / default
+        };
 
     static bool IsTextFile(string ext) => ext is ".txt" or ".log" or ".md" or ".cs" or ".js"
         or ".ts" or ".py" or ".java" or ".json" or ".yaml" or ".yml" or ".xml" or ".html"
