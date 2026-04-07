@@ -42,6 +42,7 @@ internal sealed class AppBotEyeOverlay : Window
     private DispatcherTimer? _scrollTimer; // auto-scroll timer
     private IntPtr _chromeHwnd;
     private double _scrollOffset; // current scroll Y offset
+    private Border? _rootBorder; // held for dynamic border color changes
     private bool _needsScroll; // text exceeds visible area
 
     private const double ActiveOpacity = 0.85;
@@ -69,7 +70,7 @@ internal sealed class AppBotEyeOverlay : Window
         Opacity = ActiveOpacity;
 
         // Build visual tree programmatically (no XAML needed)
-        var root = new Border
+        _rootBorder = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(0xDD, 0x1A, 0x1A, 0x2E)),
             BorderBrush = new SolidColorBrush(isElevated
@@ -80,6 +81,7 @@ internal sealed class AppBotEyeOverlay : Window
             Padding = new Thickness(0),
             ClipToBounds = true,
         };
+        var root = _rootBorder;
 
         var mainGrid = new Grid();
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(22) });  // header
@@ -328,6 +330,15 @@ internal sealed class AppBotEyeOverlay : Window
         _chromeHwnd = hwnd;
     }
 
+    /// <summary>Dynamically update border color — amber when admin proxy is available, cyan otherwise.</summary>
+    public void SetElevatedBorder(bool elevated)
+    {
+        if (_rootBorder == null) return;
+        _rootBorder.BorderBrush = new SolidColorBrush(elevated
+            ? Color.FromRgb(0xFF, 0x8C, 0x00)   // amber
+            : Color.FromRgb(0x4F, 0xC3, 0xF7)); // cyan
+    }
+
     // -- Click image: restore Chrome window --
 
     private void OnImageClick(object sender, MouseButtonEventArgs e)
@@ -564,6 +575,12 @@ internal sealed class AppBotEyeHost : IDisposable
     public void SetChromeHwnd(IntPtr hwnd)
     {
         _dispatcher?.BeginInvoke(() => _window?.SetChromeHwnd(hwnd));
+    }
+
+    /// <summary>Update border color based on admin proxy availability.</summary>
+    public void SetElevatedBorder(bool elevated)
+    {
+        _dispatcher?.BeginInvoke(() => _window?.SetElevatedBorder(elevated));
     }
 
     public void Dispose()
