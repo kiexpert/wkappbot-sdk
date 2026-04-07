@@ -49,102 +49,132 @@ internal partial class Program
         return true;
     }
 
-    // -- Find: list Win32 child windows + UIA children tree (MUD game "look" command) --
+    // -- Find: CURSOR → TARGET → VERDICT structured output --
+    // stdout: clean result sections only
+    // stderr: diagnostic/processing info ([DIAG:find])
     static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth)
     {
-        bool hasOutput = false;
+        // ── CURSOR ──────────────────────────────────────────────────
+        Console.WriteLine("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-        // Part 1: Win32 child windows
-        var win32Children = WindowFinder.GetChildrenZOrder(hwnd);
-        if (win32Children.Count > 0)
+        FocusedElementInfo? focInfo = null;
+        try { using var loc = new UiaLocator(); focInfo = loc.GetFocusedElementInfo(); }
+        catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] focus error: {ex.Message}"); }
+
+        bool cursorIsBlocking = false;
+        if (focInfo != null)
         {
-            hasOutput = true;
-            Console.WriteLine($"[A11Y] Win32 children ({win32Children.Count}):");
-            foreach (var child in win32Children)
+            var curTag = GrapHelper.FormatNodeLabel(focInfo.ControlType, focInfo.AutomationId, focInfo.Name);
+            Console.WriteLine($"  {curTag}");
+            foreach (var (pType, pName) in focInfo.ParentChain)
             {
-                var r = child.Rect;
-                var w = r.Right - r.Left;
-                var h = r.Bottom - r.Top;
-                var vis = NativeMethods.IsWindowVisible(child.Handle) ? "" : " [hidden]";
-                Console.WriteLine($"[A11Y]   [{child.ClassName}] \"{child.Title}\" hwnd={child.Handle:X8} cid={child.ControlId} {w}x{h}{vis}");
+                if (string.IsNullOrEmpty(pType)) continue;
+                var pTag = GrapHelper.FormatNodeLabel(pType, "", pName);
+                Console.WriteLine($"    ← {pTag}");
+                if (pType == "Dialog") cursorIsBlocking = true;
             }
         }
+        else
+        {
+            Console.WriteLine("  (no focused element)");
+        }
 
-        // Part 2: UIA children tree
+        // ── TARGET ──────────────────────────────────────────────────
+        Console.WriteLine("━━━ TARGET ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        var targetName = root.Properties.Name.ValueOrDefault ?? "";
+        var targetAid  = root.Properties.AutomationId.ValueOrDefault ?? "";
+        var targetType = "?"; try { targetType = root.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+        var patterns   = GetSupportedPatternNames(root);
+
+        var targetTag = GrapHelper.FormatNodeLabel(targetType, targetAid, targetName, actions: patterns);
+        Console.WriteLine($"  {targetTag}");
+
+        string targetGrap = "";
+        try { targetGrap = GrapHelper.BuildGrapExpression(hwnd, root); } catch { }
+        if (!string.IsNullOrEmpty(targetGrap))
+            Console.WriteLine($"  grap: {targetGrap}");
+
         try
         {
-            var children = root.FindAllChildren();
-            if (children.Length > 0)
+            var r = root.Properties.BoundingRectangle.ValueOrDefault;
+            if (r.Width > 0)
+                Console.WriteLine($"  rect: ({(int)r.X},{(int)r.Y}) {(int)r.Width}x{(int)r.Height}");
+        }
+        catch { }
+
+        // parent + siblings
+        try
+        {
+            var parent = root.Parent;
+            if (parent != null)
             {
-                hasOutput = true;
-                Console.WriteLine($"[A11Y] UIA children ({children.Length}):");
-                foreach (var child in children)
+                Console.WriteLine($"  parent: {GrapHelper.FormatNodeLabel(parent)}");
+
+                var siblings = parent.FindAllChildren()
+                    .Where(c => {
+                        try { return !(c.Properties.Name.ValueOrDefault == targetName
+                                    && c.Properties.AutomationId.ValueOrDefault == targetAid); }
+                        catch { return true; }
+                    })
+                    .Take(8).ToList();
+
+                if (siblings.Count > 0)
                 {
-                    DumpUiaElement(child, 1, depth);
+                    var sibTags = siblings.Select(s => GrapHelper.FormatNodeLabel(s));
+                    Console.WriteLine($"  siblings: {string.Join(" · ", sibTags)}");
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] parent/siblings error: {ex.Message}"); }
+
+        // ── VERDICT ─────────────────────────────────────────────────
+        Console.WriteLine("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        if (cursorIsBlocking)
+            Console.WriteLine("  ⚠ cursor in Dialog — verify target is reachable");
+        else if (focInfo == null)
+            Console.WriteLine("  ? focus unknown");
+        else
+            Console.WriteLine("  ✓ cursor accessible");
+
+        // Win32 children → stderr only
+        var win32Children = WindowFinder.GetChildrenZOrder(hwnd);
+        if (win32Children.Count > 0)
         {
-            Console.Error.WriteLine($"[A11Y] UIA tree error: {ex.Message}");
+            Console.Error.WriteLine($"[DIAG:find] Win32 children ({win32Children.Count}):");
+            foreach (var child in win32Children)
+            {
+                var cr = child.Rect;
+                var cw = cr.Right - cr.Left;
+                var ch = cr.Bottom - cr.Top;
+                var vis = NativeMethods.IsWindowVisible(child.Handle) ? "" : " [hidden]";
+                Console.Error.WriteLine($"[DIAG:find]   [{child.ClassName}] \"{child.Title}\" hwnd={child.Handle:X8} cid={child.ControlId} {cw}x{ch}{vis}");
+            }
         }
 
-        if (!hasOutput)
-            Console.WriteLine("[A11Y] find — no children found");
-
-        return hasOutput;
+        return true;
     }
 
     /// <summary>
-    /// Recursively dump UIA element with detail: Type, Name, AutomationId, Rect, Patterns.
+    /// Recursively dump UIA element tree to stderr (diagnostic use only).
     /// </summary>
     static void DumpUiaElement(AutomationElement el, int level, int maxDepth)
     {
         if (level > maxDepth) return;
-
         var indent = new string(' ', level * 2);
         try
         {
-            var name = el.Properties.Name.ValueOrDefault ?? "";
-            var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
-            var type = "?";
-            try { type = el.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-
-            // BoundingRect
-            System.Drawing.Rectangle? rect = null;
-            try
-            {
-                var r = el.Properties.BoundingRectangle.ValueOrDefault;
-                if (r.Width > 0)
-                    rect = new System.Drawing.Rectangle((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height);
-            }
-            catch { }
-
-            // Supported patterns (compact)
             var patterns = GetSupportedPatternNames(el);
-            var patStr = patterns.Count > 0 ? $" ({string.Join(",", patterns)})" : "";
-
-            // NativeWindowHandle
+            var tag = GrapHelper.FormatNodeLabel(el, includeRect: false);
             var nhStr = "";
             var nh = GetElementHwnd(el);
-            if (nh != IntPtr.Zero)
-                nhStr = $" hwnd={nh:X8}";
-
-            var tag = GrapHelper.FormatNodeLabel(type, aid, name, rect: rect, actions: patterns);
-            Console.WriteLine($"[A11Y] {indent}{tag}{nhStr}{patStr}");
-
-            // Recurse children
+            if (nh != IntPtr.Zero) nhStr = $" hwnd={nh:X8}";
+            var patStr = patterns.Count > 0 ? $" ({string.Join(",", patterns)})" : "";
+            Console.Error.WriteLine($"[DIAG:uia] {indent}{tag}{nhStr}{patStr}");
             if (level < maxDepth)
-            {
-                try
-                {
-                    foreach (var child in el.FindAllChildren())
-                        DumpUiaElement(child, level + 1, maxDepth);
-                }
-                catch { }
-            }
+                try { foreach (var child in el.FindAllChildren()) DumpUiaElement(child, level + 1, maxDepth); } catch { }
         }
-        catch { /* COM timeout on some elements */ }
+        catch { }
     }
 
     /// <summary>Get compact list of supported UIA pattern names.</summary>

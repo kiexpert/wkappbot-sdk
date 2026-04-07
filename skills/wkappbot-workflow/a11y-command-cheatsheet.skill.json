@@ -11,6 +11,8 @@
     "[GRAP-SCOPE] Pattern after # = UIA subtree drill. '*App*#*Panel*#*Button*' = chain drill (each # = one UIA level deeper). '#button.send' = CSS auto-routed to CDP. '#{aid:\"ok\",type:\"Button\"}' JSON5-AND on UIA props. '#regex:btn_\\d+'. Multiple # levels chain: win#scope1#scope2.",
     "[GRAP-TABPORTAL] Tab portal: '*Chrome*#ChatGPT#input.prompt' → Chrome window → switch to ChatGPT tab (SelectionItem.Select, focusless!) → target CSS inside. Works with Edge/Brave too. For web-only targeting: '*Chrome*#chatgpt.com#button.send' (URL hint → tab match → CSS).",
     "[ACTIONS-DISCOVER] inspect \"*App*\" --depth 5 (UIA tree dump, depth 1-10). windows (list all visible). find \"*App*#*pattern*\" (search tree). screenshot \"*App*\" (capture). ocr \"*App*\" (extract text). RULE: always run inspect before automating an unfamiliar app.",
+    "[NODE-TAG] a11y element tag format: <TypeIdOrName attrs>. Examples: <ButtonOK> (AutomationId=OK), <Button\"확인\"> (Name=확인, no id), <Edit1inputBox ltwh=10,20,200,30 actions=\"Value,Invoke\"> (index+id+rect+patterns). FormatNodeLabel() used everywhere (find/inspect/windows/read output). Sibling index (1,2...) appended only when no id/name available.",
+    "[FIND-OUTPUT] 'a11y find' output has 3 sections (stdout only; processing logs → stderr [DIAG:find]). ━━━ CURSOR: focused element tag + full parent chain (← per level up to Window root) — read this FIRST to check if cursor is trapped in a Dialog. ━━━ TARGET: matched element tag + grap expression + rect + parent tag + sibling tags. ━━━ VERDICT: ✓ cursor accessible | ⚠ cursor in Dialog (target may be blocked) | ? focus unknown. If VERDICT=⚠, dismiss the Dialog before acting on TARGET.",
     "[ACTIONS-WINDOW] focus/minimize/maximize/restore/close \"*App*\". move \"*App*\" --x N --y N. resize \"*App*\" --w N --h N. close on browser: requires #tabHint to prevent accidental browser close (guard). --force: WM_CLOSE then Process.Kill.",
     "[ACTIONS-ELEMENT] invoke(UIA InvokePattern→BM_CLICK→WM_LBUTTON). click(physical coords). toggle(UIA TogglePattern). expand/collapse(UIA ExpandCollapse). select(UIA SelectionItem). scroll --direction up|down|left|right --amount small|large. read(Name/Value/Text). wait --condition 'text' --not --timeout N.",
     "[ACTIONS-TYPE] Normal: 'a11y type \"*Edit*\" \"hello\"' → UIA Value→WM_CHAR→LegacyIA→SendKeys chain (focusless tiers first). Hotkey/menu: '--hotkey' flag → scans accesskey+aria-keyshortcuts+menu labels → dispatches focuslessly (e.g. 'File/Save'). CJK auto-detected → CDP Input.insertText (bypasses IME). set-value = UIA Value direct. set-range --value N = UIA RangeValue.",
@@ -36,5 +38,5 @@
   "author": "claude",
   "created": "2026-04-07T13:00:00.0000000Z",
   "updated": "2026-04-07T22:50:00.0000000Z",
-  "version": "2.1"
+  "version": "2.2"
 }
