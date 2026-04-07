@@ -614,6 +614,7 @@ public sealed partial class CdpClient
                     if (txt.includes('ok') || txt.includes('got it') || txt.includes('i understand')
                         || txt.includes('confirm') || txt.includes('agree') || txt.includes('continue')
                         || txt.includes('\uc911\uc9c0') || txt.includes('\uc815\uc9c0') || txt.includes('계속')
+                        || txt.includes('\ub3d9\uc758') // 동의
                         || btn.classList.contains('primary') || btn.classList.contains('mat-primary')) {
                         btn.click(); return 'DISMISSED:' + txt;
                     }
