@@ -246,6 +246,22 @@ public sealed class TeeTextWriter : TextWriter
         _moveToOldOnDispose = false; // prevent Dispose from moving
     }
 
+    public static volatile bool _focusTheftDetected = false;
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern IntPtr WinApi_GetConsoleWindow();
+
+    private static bool NativeMethods_IsAdmin()
+    {
+        try
+        {
+            using var id = System.Security.Principal.WindowsIdentity.GetCurrent();
+            return new System.Security.Principal.WindowsPrincipal(id)
+                .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        }
+        catch { return false; }
+    }
+
     [System.Runtime.InteropServices.DllImport("ntdll.dll")]
     private static extern int NtQueryInformationProcess(
         IntPtr hProcess, int processInformationClass,
@@ -347,6 +363,15 @@ public sealed class TeeTextWriter : TextWriter
             // Eye-pipe vs direct-core execution
             bool viaEye = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WKAPPBOT_EYE_PIPE"));
 
+            // Console window presence (unexpected console = elevation side-effect bug)
+            bool hasConsole = WinApi_GetConsoleWindow() != IntPtr.Zero;
+
+            // Focus theft detected during this session
+            bool focusStolen = _focusTheftDetected;
+
+            // Elevation context
+            bool isAdmin = NativeMethods_IsAdmin();
+
             var record = System.Text.Json.JsonSerializer.Serialize(new
             {
                 ts          = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
@@ -360,8 +385,11 @@ public sealed class TeeTextWriter : TextWriter
                 cwd         = Environment.CurrentDirectory,
                 caller_proc = callerProc,
                 caller_title= callerTitle.Length > 80 ? callerTitle[..80] : callerTitle,
+                has_console  = hasConsole,
+                focus_stolen = focusStolen,
+                is_admin     = isAdmin,
                 cmd,
-                log         = Path.GetFileName(logPath),
+                log          = Path.GetFileName(logPath),
                 fields,
             });
             File.AppendAllText(errorsFile, record + Environment.NewLine, Encoding.UTF8);

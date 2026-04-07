@@ -403,6 +403,7 @@ internal partial class Program
 
                 cdp.OnFocusTheft = (method, prevFg, curFg) =>
                 {
+                    TeeTextWriter._focusTheftDetected = true;
                     // Capture real call stack for diagnostics (not just "no stack")
                     var stack = new System.Diagnostics.StackTrace(true).ToString();
                     var focusEx = new InvalidOperationException(
