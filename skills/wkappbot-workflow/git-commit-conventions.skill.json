@@ -7,10 +7,28 @@
     "Language: English only — no Korean in commit title or body",
     "Format: '<type>: <what changed and why>' — one line title under 72 chars",
     "Types: feat / fix / refactor / test / docs / bump / chore",
+    "  feat     = new user-visible capability",
+    "  fix      = bug fix (describe symptom, not file name)",
+    "  refactor = restructuring with no behavior change",
+    "  test     = test additions or corrections",
+    "  docs     = documentation only (CLAUDE.md, README, comments)",
+    "  bump     = version bump (always 3 files: AssemblyVersion, WKAppBot.csproj, HelpAndAliases)",
+    "  chore    = build/tooling/CI, no production code change",
     "Body: bullet points for non-obvious details only — skip if title is self-contained",
-    "NO file listings ('- TeeTextWriter.cs, Program.cs') — describe intent, not files",
+    "  - Use '- ' bullets, not numbered lists",
+    "  - Explain WHY, not WHAT (the diff already shows what)",
+    "  - Max 5 bullets; if more needed, consider splitting the commit",
+    "NO file listings — never list changed files in title or body",
+    "  Bad:  'fix: TeeTextWriter.cs, Program.cs, EyeProxy.cs 수정'",
+    "  Good: 'fix: --sudo no longer spawns a visible console window'",
     "Co-Authored-By line: always append 'Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>'",
-    "★ Bad: 'feat: TeeWriter, Program, EyeProxy 수정' / Good: 'fix: --sudo no longer spawns console window'"
+    "Examples:",
+    "  feat: multi-browser CDP port scan auto-routes ask to correct Chrome instance",
+    "  fix: elevated Eye proxy drops OperationCanceledException on rapid reconnect",
+    "  fix: webbot window position wrong when sandbox path creates new tab",
+    "  refactor: split TeeTextWriter error record into per-tag last-value map",
+    "  bump: v5.11 → v5.12 (WebBot multi-port scan + errors.jsonl healing log)",
+    "  chore: add git commit conventions skill"
   ],
   "tags": [
     "workflow",
@@ -20,5 +38,5 @@
   ],
   "author": "claude",
   "created": "2026-04-07T03:20:00.0000000Z",
-  "version": "1.0"
+  "version": "1.1"
 }
