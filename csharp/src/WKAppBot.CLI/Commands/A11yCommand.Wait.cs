@@ -133,14 +133,16 @@ internal partial class Program
     static bool DeprecatedEval(IntPtr hwnd, string tag, string jsExpression, string? tabHint)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Error.WriteLine("[DEPRECATED] 'a11y eval' will be removed — target is ambiguous.");
-        Console.Error.WriteLine("  Use --eval-js with any a11y action:");
+        Console.Error.WriteLine("[DEPRECATED] 'a11y eval' is scheduled for removal — target is ambiguous.");
+        Console.Error.WriteLine("  Use --eval-js with any a11y action (tab auto-found when no #scope given):");
         Console.Error.WriteLine("    a11y read  \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"");
+        Console.Error.WriteLine("    a11y read  \"*Chrome*\" --eval-js \"document.title\"   (tab found by window title)");
         Console.Error.WriteLine("    a11y click \"*Chrome*#gemini.google.com/button.send\" --eval-js \"el.disabled=false\"");
         Console.Error.WriteLine("  Available CDP helpers (via CdpClient):");
         Console.Error.WriteLine("    GetUrlAsync, GetTitleAsync, FocusAsync, GetTextLengthAsync,");
         Console.Error.WriteLine("    IsHiddenAsync, GetTabStateAsync, QueryCountAsync, JsClickAsync");
         Console.ResetColor();
+        AutoRegisterBug($"[USAGE-DEPRECATED] a11y eval used — scheduled for removal. tag={tag} hint={tabHint ?? "none"} expr={jsExpression[..Math.Min(60, jsExpression.Length)]}");
         return A11yEvalJs(hwnd, tag, jsExpression, tabHint);
     }
 

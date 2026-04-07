@@ -279,6 +279,73 @@ internal partial class Program
         return true;
     }
 
+    /// <summary>
+    /// Switch CDP to the best matching tab before eval.
+    /// Priority 1: hint looks like URL/domain → match by tab URL.
+    /// Priority 2: window title from hwnd → match by tab title.
+    /// No-op (stays on current tab) if no match found.
+    /// </summary>
+    static void CdpSwitchToTabByHint(WKAppBot.WebBot.CdpClient cdp, int port, IntPtr hwnd, string? hint, bool readOnly = true)
+    {
+        try
+        {
+            var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
+
+            // Priority 1: hint looks like URL/domain → match by tab URL
+            bool hintIsUrl = !string.IsNullOrEmpty(hint) &&
+                (hint.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+                 || hint.Contains("http", StringComparison.OrdinalIgnoreCase)
+                 || hint.Contains('.') || hint.Contains(':'));
+            if (hintIsUrl)
+            {
+                foreach (var tab in tabs)
+                {
+                    if (tab.Url.Contains(hint!, StringComparison.OrdinalIgnoreCase)
+                        || tab.Title.Contains(hint!, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (tab.Id != cdp.TargetId)
+                        {
+                            Console.WriteLine($"[A11Y] --eval-js: tab found by hint '{hint}' → '{tab.Title}'");
+                            cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
+                        }
+                        return;
+                    }
+                }
+            }
+
+            // Priority 2: window title from hwnd → match by tab title
+            if (hwnd != IntPtr.Zero)
+            {
+                var windowTitle = WKAppBot.Win32.Window.WindowFinder.GetWindowText(hwnd);
+                if (!string.IsNullOrEmpty(windowTitle))
+                {
+                    foreach (var tab in tabs)
+                    {
+                        if (tab.Title.Contains(windowTitle, StringComparison.OrdinalIgnoreCase)
+                            || windowTitle.Contains(tab.Title, StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (tab.Id != cdp.TargetId)
+                            {
+                                Console.WriteLine($"[A11Y] --eval-js: tab found by window title '{windowTitle}' → '{tab.Title}'");
+                                cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // No match — log active tab and stay on it
+            var active = tabs.FirstOrDefault(t => t.Id == cdp.TargetId) ?? tabs.FirstOrDefault();
+            if (active != null)
+                Console.WriteLine($"[A11Y] --eval-js: no tab match, using active tab '{active.Title}'");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[A11Y] --eval-js: tab-find failed ({ex.Message}), using current tab");
+        }
+    }
+
     /// <summary>List all CDP tabs for a browser target (when no #scope specified).</summary>
     static bool CdpListTabs(int port, string tag)
     {

@@ -697,10 +697,12 @@ Options:
     static int WebEvalCommand(string[] args)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Error.WriteLine("[DEPRECATED] 'web eval' will be removed — use a11y action with --eval-js instead.");
+        Console.Error.WriteLine("[DEPRECATED] 'web eval' is scheduled for removal — use a11y action with --eval-js instead.");
         Console.Error.WriteLine("  a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"");
+        Console.Error.WriteLine("  a11y read \"*Chrome*\" --eval-js \"document.title\"   (tab auto-found when no #scope given)");
         Console.Error.WriteLine("  CDP helpers: GetUrlAsync, GetTitleAsync, FocusAsync, JsClickAsync, QueryCountAsync");
         Console.ResetColor();
+        AutoRegisterBug($"[USAGE-DEPRECATED] web eval used — scheduled for removal. args={string.Join(" ", args.Take(3))}");
 
         if (args.Length == 0)
             return Error("Usage: wkappbot web eval [tab-pattern] <expression> [--port N] [--tab <pattern>]");
@@ -717,11 +719,14 @@ Options:
             nonFlagArgs.Add(args[i]);
         }
 
-        // If 2+ non-flag args and first doesn't look like JS, treat it as tab pattern
+        // If 2+ non-flag args and first looks like a tab hint (not a JS expression), treat it as tab pattern.
+        // Accepts: plain names (chatgpt), URL-like (chatgpt.com), domain paths (claude.ai/chat)
+        // Rejects: JS expressions containing (, ), =, [, ], {, }, >, <, !, space, ;
+        static bool LooksLikeTabHint(string s) =>
+            s.IndexOfAny(new[] { '(', ')', '=', '[', ']', '{', '}', '>', '<', '!', ' ', ';' }) < 0;
+
         string expression;
-        if (nonFlagArgs.Count >= 2 && tabArg == null
-            && !nonFlagArgs[0].Contains("(") && !nonFlagArgs[0].Contains(".")
-            && !nonFlagArgs[0].Contains("=") && !nonFlagArgs[0].Contains("["))
+        if (nonFlagArgs.Count >= 2 && tabArg == null && LooksLikeTabHint(nonFlagArgs[0]))
         {
             tabArg = nonFlagArgs[0];
             expression = string.Join(" ", nonFlagArgs.Skip(1));
@@ -740,8 +745,35 @@ Options:
         }
 
         var cdpOrNull = ConnectCdpWithTab(effectiveArgs.ToArray());
-        if (cdpOrNull == null) return 1;
+        if (cdpOrNull == null)
+        {
+            // Tab-find: show available tabs when no match
+            Console.Error.WriteLine($"[WEB] Tab hint '{tabArg}' not found. Available tabs:");
+            var listPort = GetPort(args);
+            try
+            {
+                using var listCdp = new CdpClient();
+                listCdp.ConnectAsync(listPort).GetAwaiter().GetResult();
+                var listTabs = listCdp.ListTabsAsync(listPort).GetAwaiter().GetResult();
+                for (int i = 0; i < listTabs.Count; i++)
+                    Console.Error.WriteLine($"  [{i + 1}] {listTabs[i].Title[..Math.Min(listTabs[i].Title.Length, 60)]}  ({listTabs[i].Url[..Math.Min(listTabs[i].Url.Length, 60)]})");
+                Console.Error.WriteLine($"  Use --tab <hint> to target a specific tab.");
+            }
+            catch { }
+            return 1;
+        }
         using var cdp = cdpOrNull;
+
+        // Log which tab we connected to (especially helpful when no --tab was specified)
+        if (string.IsNullOrEmpty(tabArg))
+        {
+            try
+            {
+                var activeTitle = cdp.GetTitleAsync().GetAwaiter().GetResult();
+                Console.WriteLine($"[WEB] eval: connected to tab '{activeTitle}' (use --tab <hint> for a specific tab)");
+            }
+            catch { }
+        }
 
         // Auto-detect async expressions (async () => ...) and await the Promise
         bool isAsync = expression.TrimStart().StartsWith("(async") || expression.TrimStart().StartsWith("async");
