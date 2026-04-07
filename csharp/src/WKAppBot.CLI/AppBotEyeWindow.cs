@@ -75,7 +75,7 @@ internal sealed class AppBotEyeOverlay : Window
             Background = new SolidColorBrush(Color.FromArgb(0xDD, 0x1A, 0x1A, 0x2E)),
             BorderBrush = new SolidColorBrush(isElevated
                 ? Color.FromRgb(0xFF, 0x8C, 0x00)   // amber — admin Eye
-                : Color.FromRgb(0x4F, 0xC3, 0xF7)), // cyan — normal Eye
+                : Color.FromRgb(0x21, 0x96, 0xF3)), // blue — normal Eye
             BorderThickness = new Thickness(1.5),
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(0),
@@ -104,7 +104,7 @@ internal sealed class AppBotEyeOverlay : Window
         _titleText = new TextBlock
         {
             Text = "WK AppBot Eye",
-            Foreground = new SolidColorBrush(Color.FromRgb(0x4F, 0xC3, 0xF7)),
+            Foreground = new SolidColorBrush(Color.FromRgb(0x21, 0x96, 0xF3)),
             FontFamily = new FontFamily("Consolas"),
             FontSize = 11,
             FontWeight = FontWeights.Bold,
@@ -330,13 +330,13 @@ internal sealed class AppBotEyeOverlay : Window
         _chromeHwnd = hwnd;
     }
 
-    /// <summary>Dynamically update border color — amber when admin proxy is available, cyan otherwise.</summary>
+    /// <summary>Dynamically update border color — amber when admin proxy is available, blue otherwise.</summary>
     public void SetElevatedBorder(bool elevated)
     {
         if (_rootBorder == null) return;
         _rootBorder.BorderBrush = new SolidColorBrush(elevated
             ? Color.FromRgb(0xFF, 0x8C, 0x00)   // amber
-            : Color.FromRgb(0x4F, 0xC3, 0xF7)); // cyan
+            : Color.FromRgb(0x21, 0x96, 0xF3)); // blue
     }
 
     // -- Click image: restore Chrome window --
