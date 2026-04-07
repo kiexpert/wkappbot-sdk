@@ -67,10 +67,16 @@ check_help() {
 section() { echo; echo "── $1 ──"; }
 
 # =============================================================================
-section "--help flag (top-level commands)"
+section "global (no args / --help / -h)"
 # =============================================================================
 
+check_help "global (no args)"   "wkappbot"       0   # zero-arg: should print usage
 check_help "global --help"      "wkappbot"       0   --help
+check_help "global -h"          "wkappbot"       0   -h
+
+# =============================================================================
+section "--help flag (top-level commands)"
+# =============================================================================
 check_help "a11y --help"        "Actions:"       1   a11y    --help
 check_help "slack --help"       "send"           1   slack   --help
 check_help "ask --help"         "gemini"         1   ask     --help
