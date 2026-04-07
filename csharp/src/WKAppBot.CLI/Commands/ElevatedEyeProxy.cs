@@ -128,8 +128,7 @@ static class ElevatedEyeServer
                 pipe?.Dispose();
             }
 
-            if (!ct.IsCancellationRequested)
-                await Task.Delay(100, ct).ConfigureAwait(false);
+            // No delay between connections — next WaitForConnectionAsync starts immediately
         }
 
         Console.WriteLine("[EYE:PIPE] Eye pipe stopped");
@@ -223,19 +222,9 @@ static class ElevatedEyeClient
 {
     static int _nextId;
 
-    /// <summary>Check if elevated Eye proxy is running (try connecting).</summary>
+    /// <summary>Check if elevated Eye proxy pipe exists (without consuming a connection).</summary>
     public static bool IsAvailable()
-    {
-        try
-        {
-            // File.Exists on named pipe is unreliable — try actual connection
-            using var pipe = new NamedPipeClientStream(
-                ".", ElevatedEyeServer.PipeName, PipeDirection.InOut, PipeOptions.None);
-            pipe.Connect(100); // 100ms — if proxy is alive, pipe connects instantly
-            return true;
-        }
-        catch { return false; }
-    }
+        => File.Exists($@"\\.\pipe\{ElevatedEyeServer.PipeName}");
 
     /// <summary>Send a command to elevated Eye and get the result.</summary>
     public static async Task<EyeProxyResponse?> SendCommandAsync(
@@ -467,12 +456,13 @@ static class ElevationHelper
             var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "EYE-ELEVATED");
             if (proc == null) return false;
 
-            // Wait briefly for pipe to become available
-            for (int i = 0; i < 20; i++)
+            // Wait for pipe file to appear (proxy ready) — up to 10s
+            for (int i = 0; i < 40; i++)
             {
-                Thread.Sleep(500);
+                Thread.Sleep(250);
                 if (ElevatedEyeClient.IsAvailable())
                 {
+                    Thread.Sleep(50); // brief settle — server enters WaitForConnectionAsync
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine("[ELEVATION] Elevated Eye proxy is ready!");
                     Console.ResetColor();
