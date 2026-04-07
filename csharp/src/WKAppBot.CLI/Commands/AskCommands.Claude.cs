@@ -417,6 +417,7 @@ internal partial class Program
                     {
                         responseStarted = true;
                         askSession.MarkRunning();
+                        cdp.SetBotOverlayStreaming(true); // continuous pulse while streaming
                         Console.WriteLine($"[ASK] Response detected: {detectResult}");
                         chatLock.Release("first-byte");
                         break;
@@ -502,6 +503,7 @@ internal partial class Program
                         {
                             if (liveHeaderPrinted) Console.WriteLine();
                             Console.WriteLine($"[ASK] Flush idle 1s --early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                            cdp.SetBotOverlayStreaming(false);
                             askSession.MarkDone(text);
                             return (true, text);
                         }
@@ -510,6 +512,7 @@ internal partial class Program
                         {
                             if (liveHeaderPrinted) Console.WriteLine();
                             Console.WriteLine($"[ASK] Response complete ({len} chars, {sw.Elapsed.TotalSeconds:F0}s)");
+                            cdp.SetBotOverlayStreaming(false);
                             askSession.MarkDone(text);
                             return (true, text);
                         }
