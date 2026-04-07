@@ -142,7 +142,7 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"[AAR:CDP:FOCUS] Chrome stole focus during {action}! Restoring...");
             Console.ResetColor();
-            NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg
+            NativeMethods.ForceForegroundWindow(prevFg); // AttachThreadInput restore
             ActionApi.OnFocusStealer?.Invoke(chromeHwnd, $"ask-{action}");
         }
     }
@@ -205,7 +205,7 @@ internal partial class Program
         // Also stamp a generic "ask" marker ??EnsureCdpReadyAsync detects it ??forces yield popup next run
         // FocusStealer prop NOT stamped — SW_SHOWNOACTIVATE prevents repeat steals; avoid false-positive overlays
 
-        NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg
+        NativeMethods.ForceForegroundWindow(prevFg); // AttachThreadInput restore
 
         // ── Alert on MY window (prevFg) -- user sees exactly when/where Gemini stole focus
         try

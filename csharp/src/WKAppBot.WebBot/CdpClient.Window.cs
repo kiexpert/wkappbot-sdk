@@ -46,7 +46,7 @@ public sealed partial class CdpClient
             ShowWindow(hwnd, 9); // SW_RESTORE
             CancelMinimizeDump("restore-window");
             if (prevFg != IntPtr.Zero && prevFg != hwnd)
-                SetForegroundWindow(prevFg);
+                ForceForegroundWindow(prevFg); // AttachThreadInput -- SW_RESTORE briefly activates
         }
         else
         {
@@ -153,6 +153,32 @@ public sealed partial class CdpClient
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    /// <summary>Force foreground via AttachThreadInput — works even when we lost focus rights.</summary>
+    private static void ForceForegroundWindow(IntPtr hWnd)
+    {
+        BringWindowToTop(hWnd);
+        SetForegroundWindow(hWnd);
+        if (GetForegroundWindow() == hWnd) return;
+
+        var fgHwnd = GetForegroundWindow();
+        uint fgThread = GetWindowThreadProcessId(fgHwnd, out _);
+        uint ourThread = GetCurrentThreadId();
+        if (fgThread == ourThread) return;
+
+        AttachThreadInput(ourThread, fgThread, true);
+        try { BringWindowToTop(hWnd); SetForegroundWindow(hWnd); }
+        finally { AttachThreadInput(ourThread, fgThread, false); }
+    }
 
     [DllImport("user32.dll")]
     private static extern bool IsWindow(IntPtr hWnd);
