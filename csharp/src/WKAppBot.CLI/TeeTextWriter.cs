@@ -74,6 +74,9 @@ public sealed class TeeTextWriter : TextWriter
 
     public string LogPath => _logPath;
 
+    /// <summary>Set before Dispose() — if non-zero, a one-line error summary is appended to errors.jsonl.</summary>
+    public int ExitCode { get; set; } = 0;
+
     // ── Broken-pipe-safe console write helpers ──────────────────
 
     private void ConsoleWrite(char value)
@@ -240,6 +243,66 @@ public sealed class TeeTextWriter : TextWriter
         _moveToOldOnDispose = false; // prevent Dispose from moving
     }
 
+    // Noise tags to skip when building per-field last-value map
+    private static readonly System.Collections.Generic.HashSet<string> _noiseTags =
+        new(System.StringComparer.OrdinalIgnoreCase)
+        {
+            "LAUNCHER", "IOCP", "LOG", "CMD", "LAUNCH:CORE", "LAUNCH",
+            "FOCUS", "EYE", "SUGGEST:WARN", "LOG:CORE", "+0.0s", "+",
+        };
+
+    /// <summary>
+    /// Scan the log file and collect the last output line per [TAG],
+    /// then append a JSON record { ts, exit, cmd, log, fields:{TAG:lastLine} } to errors.jsonl.
+    /// </summary>
+    private static void TryAppendErrorRecord(string logPath, int exitCode)
+    {
+        try
+        {
+            // Collect last value per [TAG] — forward scan, later lines overwrite earlier ones
+            var fields = new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+            if (File.Exists(logPath))
+            {
+                foreach (var raw in File.ReadLines(logPath))
+                {
+                    var line = raw.Trim();
+                    if (line.Length < 3 || line[0] != '[') continue;
+                    var close = line.IndexOf(']');
+                    if (close < 2 || close > 30) continue;
+                    var tag = line[1..close];
+                    if (_noiseTags.Contains(tag)) continue;
+                    if (tag.StartsWith('+')) continue; // timestamp prefix lines
+                    var msg = line[(close + 1)..].TrimStart();
+                    if (string.IsNullOrEmpty(msg)) continue;
+                    fields[tag] = msg.Length > 200 ? msg[..200] : msg;
+                }
+            }
+
+            if (fields.Count == 0) return; // nothing interesting — skip
+
+            var logsDir = Path.GetDirectoryName(logPath);
+            // Step up from "old xxx/" subdirs to the parent logs/ dir
+            while (logsDir != null && Path.GetFileName(logsDir).StartsWith("old", StringComparison.OrdinalIgnoreCase))
+                logsDir = Path.GetDirectoryName(logsDir);
+            if (string.IsNullOrEmpty(logsDir)) return;
+
+            var errorsFile = Path.Combine(logsDir, "errors.jsonl");
+            var cmd = Environment.CommandLine;
+            if (cmd.Length > 300) cmd = cmd[..300];
+
+            var record = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                ts     = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                exit   = exitCode,
+                cmd,
+                log    = Path.GetFileName(logPath),
+                fields,
+            });
+            File.AppendAllText(errorsFile, record + Environment.NewLine, Encoding.UTF8);
+        }
+        catch { /* best-effort */ }
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -292,6 +355,10 @@ public sealed class TeeTextWriter : TextWriter
                 {
                     // Best-effort on normal exit only.
                 }
+
+                // Append one-line error summary to errors.jsonl (exit≠0 only)
+                if (ExitCode != 0)
+                    TryAppendErrorRecord(_logPath, ExitCode);
             }
         }
         base.Dispose(disposing);

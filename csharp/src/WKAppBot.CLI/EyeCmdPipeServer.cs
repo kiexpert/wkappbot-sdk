@@ -392,6 +392,7 @@ internal static class EyeCmdPipeServer
             Program.AutoRegisterBug($"[BUG-AUTO] Command \"{cmdForHelp}\" missing from CommandHelpMap — add --help entry for discoverability");
         }
 
+        tee.ExitCode = code;
         tee.Dispose(); // moves log to old/, updates tee.LogPath
         // "Log saved:" goes through pipeWriter directly (tee already disposed)
         pipeWriter.WriteLine($"Log saved: {tee.LogPath}");
