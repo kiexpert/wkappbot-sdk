@@ -14,7 +14,8 @@ internal partial class Program
     static bool IsEvidenceScript(string path)
     {
         var ext = Path.GetExtension(path).ToLowerInvariant();
-        return ext is ".sh" or ".ps1" or ".cmd" or ".bat";
+        var name = Path.GetFileNameWithoutExtension(path);
+        return (ext is ".sh" or ".ps1" or ".cmd" or ".bat") && !name.Contains(".bak");
     }
 
     /// <summary>
@@ -39,6 +40,11 @@ internal partial class Program
 
         Console.WriteLine(text.TrimStart('\n'));
         PrintRelatedSkills(command, sub);
+
+        // Auto-regression: run stored test scripts unless opted out
+        if (!restArgs.Any(a => a is "--no-regression"))
+            RunRegressionScripts(command, sub, autoMode: true);
+
         return true;
     }
 
@@ -51,28 +57,30 @@ internal partial class Program
     {
         if (!restArgs.Any(a => a is "--regression")) return false;
 
-        // subcommand: first non-flag arg
         var sub = restArgs.FirstOrDefault(a => !a.StartsWith('-'));
 
-        // ── Step 1: print --help ──────────────────────────────────────────────
         var key = sub != null ? $"{command} {sub}" : command;
         if (!CommandHelpMap.TryGetValue(key, out var helpText)
             && !CommandHelpMap.TryGetValue(command, out helpText))
-        {
             Console.WriteLine($"No --help entry for: {command}{(sub != null ? " " + sub : "")}");
-        }
         else
-        {
             Console.WriteLine(helpText.TrimStart('\n'));
-        }
 
-        // ── Step 2: find test scripts ─────────────────────────────────────────
+        RunRegressionScripts(command, sub, autoMode: false);
+        return true;
+    }
+
+    /// <summary>
+    /// Find and run all regression scripts for the given command/subcommand.
+    /// autoMode=true: from --help (silent if no scripts). false: from --regression.
+    /// </summary>
+    internal static (int passed, int failed) RunRegressionScripts(string command, string? sub, bool autoMode = false)
+    {
         var testsRoot = Path.Combine(DataDir, "experience", "tests");
         string[] scriptFiles;
 
         if (sub != null)
         {
-            // exact subcmd dir
             var subDir = Path.Combine(testsRoot, command, sub);
             scriptFiles = Directory.Exists(subDir)
                 ? Directory.GetFiles(subDir)
@@ -81,9 +89,21 @@ internal partial class Program
                     .ToArray()
                 : [];
         }
+        else if (autoMode)
+        {
+            // Auto-mode (from --help): prefer smoke/ subdir for fast tests; fall back to non-recursive root
+            var smokeDir = Path.Combine(testsRoot, command, "smoke");
+            var searchDir = Directory.Exists(smokeDir) ? smokeDir : Path.Combine(testsRoot, command);
+            scriptFiles = Directory.Exists(searchDir)
+                ? Directory.GetFiles(searchDir)  // non-recursive: root or smoke/ only
+                    .Where(f => IsEvidenceScript(f))
+                    .OrderBy(f => f)
+                    .ToArray()
+                : [];
+        }
         else
         {
-            // all scripts under command dir (recursive)
+            // Full regression (--regression): all scripts under command dir
             var cmdDir = Path.Combine(testsRoot, command);
             scriptFiles = Directory.Exists(cmdDir)
                 ? Directory.GetFiles(cmdDir, "*", SearchOption.AllDirectories)
@@ -95,22 +115,28 @@ internal partial class Program
 
         if (scriptFiles.Length == 0)
         {
-            Console.WriteLine();
-            Console.WriteLine($"[REGRESSION] No test scripts found for: {command}{(sub != null ? " " + sub : "")}");
-            Console.WriteLine($"  Expected: {Path.Combine(testsRoot, command, sub ?? "*")}/*.(sh|ps1|cmd)");
-            return true;
+            if (!autoMode)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"[REGRESSION] No test scripts found for: {command}{(sub != null ? " " + sub : "")}");
+                Console.WriteLine($"  Expected: {Path.Combine(testsRoot, command, sub ?? "*")}/*.(sh|ps1|cmd)");
+            }
+            return (0, 0);
         }
 
-        // ── Step 3: run each script ───────────────────────────────────────────
+        // Header: list scripts naturally so user knows what will run
+        var label = $"{command}{(sub != null ? " " + sub : "")}";
         Console.WriteLine();
-        Console.WriteLine($"[REGRESSION] {scriptFiles.Length} script(s) for {command}{(sub != null ? " " + sub : "")}");
-        Console.WriteLine(new string('-', 60));
+        Console.WriteLine("-- Regression: " + label + " (" + scriptFiles.Length + " script(s)) " + new string('-', Math.Max(0, 44 - label.Length)));
+        foreach (var s in scriptFiles)
+            Console.WriteLine("   " + Path.GetFileName(s));
+        Console.WriteLine();
 
         int passed = 0, failed = 0;
         var gitBash = @"C:\Program Files\Git\usr\bin\bash.exe";
         var bashExe = File.Exists(gitBash) ? gitBash : "bash";
 
-        // Convert Windows path to POSIX for bash (e.g. W:\path ??/w/path)
+        // Convert Windows path to POSIX for bash (e.g. W:\path \u2192 /w/path)
         static string ToPosix(string winPath) =>
             System.Text.RegularExpressions.Regex.Replace(
                 winPath.Replace('\\', '/'),
@@ -129,7 +155,7 @@ internal partial class Program
                     ".cmd" or ".bat" => "cmd.exe",
                     _ => throw new InvalidOperationException($"Unsupported regression script: {script}")
                 };
-                var args = ext switch
+                var scriptArgs = ext switch
                 {
                     ".sh" => $"\"{ToPosix(script)}\"",
                     ".ps1" => $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\"",
@@ -139,7 +165,7 @@ internal partial class Program
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = runner,
-                    Arguments = args,
+                    Arguments = scriptArgs,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -164,7 +190,6 @@ internal partial class Program
                     Console.Write("[FAIL] ");
                     Console.ResetColor();
                     Console.WriteLine($"{name} (exit={exit})");
-                    // show last few lines of output on failure
                     var combined = (stdout + stderr).Trim();
                     if (!string.IsNullOrEmpty(combined))
                     {
@@ -189,15 +214,15 @@ internal partial class Program
         if (failed == 0)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[REGRESSION] ALL PASS ({passed}/{passed})");
+            Console.WriteLine("ALL PASS (" + passed + "/" + passed + ")  OK");
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[REGRESSION] {failed} FAILED, {passed} passed ({passed + failed} total)");
+            Console.WriteLine("FAIL: " + failed + " failed, " + passed + " passed (" + (passed + failed) + " total)");
         }
         Console.ResetColor();
-        return true;
+        return (passed, failed);
     }
 
     // ── Help text per command (and command+subcommand) ──────────────────────────
@@ -453,6 +478,10 @@ internal partial class Program
             + "  Shows [PASS]/[FAIL] per script + summary line.\n"
             + "  Failure output: last 5 lines of stdout/stderr shown.\n"
             + "  Self-test: wkappbot help --regression\n\n"
+            + "--no-regression\n"
+            + "  Skip auto-regression when using --help.\n"
+            + "  wkappbot <cmd> --help --no-regression\n"
+            + "  (Auto-regression runs by default on --help)\n\n"
             + "Adding test scripts:\n"
             + "  Use suggest resolve with --i-completed-...-willkim-allowed-this-script <test.sh|test.ps1|test.cmd>\n"
             + "  Scripts auto-copied to experience/tests/{cmd}/{subcmd}/ on resolve.",

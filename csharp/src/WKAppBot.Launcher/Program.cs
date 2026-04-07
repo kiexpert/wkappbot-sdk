@@ -454,9 +454,10 @@ partial class Program
 
         // Fast-exit commands (help): watchdog reports exact step if process hangs >3s.
         // _lDiagStep is a static field so RunCore() can update it directly.
-        // --regression runs test scripts → needs more time, not a fast-exit
+        // --regression and --help (auto-regression) run test scripts → skip fast-exit unless opted out
         bool isFastExit = (cmd is "help" or "--help" or "-h")
-            && !forwardArgs.Any(a => a == "--regression");
+            && !forwardArgs.Any(a => a == "--regression")
+            && forwardArgs.Any(a => a == "--no-regression");  // fast only when tests explicitly skipped
         if (isFastExit)
         {
             _lDiagStep = "before-RunCore";
