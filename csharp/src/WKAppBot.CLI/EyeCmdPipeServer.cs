@@ -63,9 +63,10 @@ internal static class EyeCmdPipeServer
     /// <summary>
     /// Wait for all in-progress commands to finish.
     /// Call StopAccepting() first (or this will do it too).
-    /// Logs a warning every 9s; hard-caps at 5 minutes.
+    /// Logs a warning every 9s; hard-caps at timeoutSeconds (default 30s for hot-swap).
+    /// New Eye is already running — long drain just delays old Eye exit, not user experience.
     /// </summary>
-    public static void StopAcceptingAndWaitForDrain()
+    public static void StopAcceptingAndWaitForDrain(int timeoutSeconds = 30)
     {
         _acceptCts.Cancel(); // unblocks WaitForConnectionAsync in ServerLoop
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -78,7 +79,12 @@ internal static class EyeCmdPipeServer
                 Console.WriteLine($"[EYE:HOT-SWAP] waiting for {n} active pipe service(s)... ({warnAt:F0}s)");
                 warnAt += 9.0;
             }
-            if (sw.Elapsed.TotalMinutes >= 5) break; // 5 min hard cap
+            if (sw.Elapsed.TotalSeconds >= timeoutSeconds)
+            {
+                int n = Volatile.Read(ref _activeConnections);
+                Console.WriteLine($"[EYE:HOT-SWAP] drain timeout {timeoutSeconds}s — forcing exit with {n} connection(s) still active");
+                break;
+            }
             Thread.Sleep(200);
         }
     }
