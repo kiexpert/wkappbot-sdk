@@ -8,17 +8,17 @@
     "1. [PHILOSOPHY] Focusless-first: every CDP action should never need OS foreground. Recovery = safety net. Priority: (1) focusless design, (2) recovery as backstop.",
     "2. [MANDATORY] Restore trigger = end of each ask/CDP action only. Watchdog = monitor+notify only.",
     "3. [MANDATORY] ALL restore paths go through InputReadiness.Probe(SkipBlocker/Knowhow/Zoom=true, AutoApproveYield=true).",
-    "4. [FOCUSLESS PATTERN] Preferred: (0) Emulation.setFocusEmulationEnabled(true) -- CDP emulates tab focused WITHOUT OS foreground, no SW minimize needed. Fallback SW pattern: (a) check visibilityState=visible->skip, (b) SW_SHOWMINNOACTIVE(8), (c) WaitForWindowStateAsync('minimized', timeout=1000), (d) CDP call, (e) RestoreChromeNoActivate SW(4), (f) WaitForWindowStateAsync('normal', timeout=1000). DEGRADED: if (c) or (f) times out, skip SW step, proceed CDP-only. Ref: SwitchToTargetAsync, BringToFrontAsync.",
+    "4. [FOCUSLESS PATTERN] WARNING: Emulation.setFocusEmulationEnabled(true) is Blink-renderer only -- does NOT prevent OS SetForegroundWindow from Page.bringToFront (path: WebContents::Activate->BrowserFrameViewWin->SetForegroundWindow). Role: auxiliary only (satisfies page-internal JS focus events). SW_SHOWMINNOACTIVE(8) is still the primary OS-level prevention. Pattern: (a) visibilityState=visible->skip, (b) SW(8), (c) WaitForWindowStateAsync(minimized, 1000ms), (d) EmulateActiveTabAsync(), (e) CDP call, (f) RestoreChromeNoActivate SW(4), (g) WaitForWindowStateAsync(normal, 1000ms). Degraded: timeout on (c)/(g) -> proceed CDP-only. Chrome M119-121: setWebLifecycleState(active) may intermittently reset visibilityState to hidden. M122+ stable.",
     "5. [DEVICE INSERTION = SELF-REPORTING] Insert AutoBugReport at every theft detection point. OnFocusTheft classifies UNGUARDED vs RACE and files suggest automatically.",
-    "6. [SELF-IMPROVING LOOP] Bug detected -> suggest filed -> wkappbot ask triad (share skill content + ask for analysis) -> triad dialectic (thesis/antithesis/synthesis) -> code fix -> skill update -> suggest resolve with evidence script. Triad learns from skill history; skill accumulates triad insights. Loop repeats.",
+    "6. [SELF-IMPROVING LOOP] Bug detected -> suggest filed -> wkappbot ask triad (share skill + analysis) OR targeted single-AI (ask gemini/claude/gpt) for domain-specific questions -> triad dialectic -> code fix -> skill update -> suggest resolve with evidence. Single-AI useful for: Chrome internals (claude for Blink specifics), JS engine behavior, security model.",
     "7. [OPERATIONAL] Logs: runtime/cdp-focus-risk.jsonl, runtime/cdp-minimize-watchdog.jsonl. Periodic: wkappbot suggest list -> review CDP theft reports -> ask triad if unclear -> fix -> resolve.",
     "8. [INVESTIGATION] When theft: (a) which action, (b) CDP method, (c) IsFocusStealingMethod()?, (d) SW=8?, (e) WaitForWindowState not delay?, (f) OnFocusTheft restores?",
-    "9. [DONE] SW(6)->SW(8). BringToFrontAsync WaitForWindowStateAsync. OnFocusTheft ForceForeground+RestoreRetry+AutoBugReport. InputReadiness.Probe. AutoBugReport 5s timeout. EnsureWindowReady ForceForeground. AskGemini prevFg re-capture. DismissDialogAsync consent.",
-    "10. [TODO] GPT/Claude ask flows: same prevFgHint+StartFocusWatchdog pattern not yet applied (TODO-10).",
-    "11. [TODO -> SOLUTION] Runtime.evaluate JS .focus() bypass (TODO-11): use Page.addScriptToEvaluateOnNewDocument to monkey-patch HTMLElement.prototype.focus with window.__appbot_lock_focus flag. Set true before CDP input, false after. Also patch window.focus(). window.__appbot_lock_focus toggle via Runtime.evaluate.",
-    "12. [GAPS FROM TRIAD v1.16] (A) prevFg must be per-CDP-action scoped, not global -- re-capture before each action in GPT/Claude flows too. (B) WaitForWindowStateAsync timeout -> degraded CDP-only path (implemented in step 4). (C) Emulation.setFocusEmulationEnabled(true) preferred over SW pattern -- added to step 4. (D) Multi-tab concurrent CDP: prevFg collision in triad mode -- needs per-tab/per-run scoping. (E) IsFocusStealingMethod blacklist: Input.dispatchKeyEvent/MouseEvent can steal focus on some Chrome versions -- verify blacklist completeness. (F) Async layout reflow: page may steal focus after RestoreChromeNoActivate if AJAX/render completes post-restore. (G) SPA autofocus/IntersectionObserver: DOM visibility triggers .focus() -- blocked by TODO-11 solution. (H) OS Toast/Permission prompts: CDP window-state management cannot suppress OS-level focus -- accept+log only.",
-    "13. [TODO] Implement Emulation.setFocusEmulationEnabled(true/false) in EnsureCdpReadyAsync and BringToFrontAsync as primary focusless mechanism. Test: Chrome 112+.",
-    "14. [TODO] Scope prevFg per-CDP-run in GPT/Claude ask flows (Gap-D). Use AsyncLocal<IntPtr> or pass as parameter to avoid triad-mode collision."
+    "9. [DONE] SW(6)->SW(8). BringToFrontAsync WaitForWindowStateAsync. OnFocusTheft ForceForeground+RestoreRetry+AutoBugReport. InputReadiness.Probe. AutoBugReport 5s timeout. EnsureWindowReady ForceForeground. AskGemini prevFg re-capture. DismissDialogAsync consent. EmulateActiveTabAsync in EnsureCdpReadyAsync. InjectFocusLockScriptAsync+SetFocusLockAsync(true/false) around CDP input. Claude+GPT prevFg re-capture + StartFocusWatchdog.",
+    "10. [TODO] Scope prevFg per-CDP-run in triad parallel mode (Gap-D). Use AsyncLocal<IntPtr> or per-tab parameter to avoid collision when Gemini/GPT/Claude send concurrently.",
+    "11. [JS FOCUS-LOCK] InjectFocusLockScriptAsync() + SetFocusLockAsync(true/false). CRITICAL: do NOT hard-block all focus() -- contenteditable IME (Korean/Japanese) needs focus() for document.activeElement to stay valid during CDP Input.dispatchKeyEvent. Safe pattern: allow focus() only when document.activeElement is body/null (IME recovery case), block all others. window.focus() fully blocked when locked. runImmediately=true covers already-open sandbox tabs. Web Workers: no window/HTMLElement -> unaffected. Isolated Worlds (extensions): not covered.",
+    "12. [CONFIRMED BY TRIAD v1.17] (A) setFocusEmulationEnabled is Blink-only; Page.bringToFront always calls SetForegroundWindow regardless -- only solution is not calling bringToFront. (B) Hard focus-lock breaks Korean IME on contenteditable -- fixed to redirect pattern (IME recovery allowed). (C) runImmediately=true covers existing iframes; Web Workers immune. (D) Lifecycle events (window switch, dialog popup) = largest remaining attack surface. (E) ask-flow parity: not all CDP actions have uniform prevFg+watchdog coverage.",
+    "13. [TODO] Lifecycle event coverage: window-switch, dialog popup, SPA navigation can steal focus after RestoreChromeNoActivate completes. Need post-restore focus watchdog extension or async-reflow guard.",
+    "14. [TODO] Multi-tab prevFg collision in triad mode: AsyncLocal<IntPtr> scoping per concurrent ask-run."
   ],
   "tags": [
     "focus",
@@ -34,7 +34,8 @@
     "self-improving",
     "triad",
     "suggest",
-    "operational"
+    "operational",
+    "ime"
   ],
   "source_refs": [
     {
@@ -46,7 +47,7 @@
     {
       "file": "csharp/src/WKAppBot.WebBot/CdpClient.FocusRiskWatchdog.cs",
       "line": null,
-      "pattern": "IsFocusRiskExpression",
+      "pattern": "InjectFocusLockScriptAsync",
       "note": null
     },
     {
@@ -58,7 +59,7 @@
     {
       "file": "csharp/src/WKAppBot.WebBot/CdpClient.TabManagement.cs",
       "line": null,
-      "pattern": "SwitchToTargetAsync",
+      "pattern": "EmulateActiveTabAsync",
       "note": null
     },
     {
@@ -68,7 +69,7 @@
       "note": null
     },
     {
-      "file": "csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs",
+      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Focus.cs",
       "line": null,
       "pattern": "EnsureCdpReadyAsync",
       "note": null
@@ -76,6 +77,6 @@
   ],
   "author": "claude",
   "created": "2026-04-07T08:50:15.2810138Z",
-  "updated": "2026-04-07T09:52:00.0000000Z",
-  "version": "1.16"
+  "updated": "2026-04-07T19:02:00.0000000Z",
+  "version": "1.17"
 }
