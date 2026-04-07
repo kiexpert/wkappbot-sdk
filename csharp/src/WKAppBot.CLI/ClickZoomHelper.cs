@@ -56,7 +56,7 @@ internal sealed class ClickZoomHelper : IDisposable
                 bool controlGone = _controlHandle != IntPtr.Zero && !NativeMethods.IsWindow(_controlHandle);
                 if (targetGone || targetIconic || controlGone)
                 {
-                    Console.WriteLine($"[ZOOM] Auto-dispose: target {(targetGone ? "gone" : targetIconic ? "iconic" : "control gone")}");
+                    Console.Error.WriteLine($"[ZOOM] Auto-dispose: target {(targetGone ? "gone" : targetIconic ? "iconic" : "control gone")}");
                     Dispose();
                 }
             }
@@ -165,7 +165,7 @@ internal sealed class ClickZoomHelper : IDisposable
             int ctlCY = ctlRect.Top + ctlRect.Height / 2;
             int ovCX = zX + zW / 2;
             int ovCY = zY + zH / 2;
-            Console.Write($"[ZOOM:{modeName} ov@({zX},{zY} {zW}x{zH}) center=({ovCX},{ovCY}) ctl=({ctlCX},{ctlCY}) Δ=({ovCX - ctlCX},{ovCY - ctlCY})] ");
+            Console.Error.Write($"[ZOOM:{modeName} ov@({zX},{zY} {zW}x{zH}) center=({ovCX},{ovCY}) ctl=({ctlCX},{ctlCY}) Δ=({ovCX - ctlCX},{ovCY - ctlCY})] ");
 
             // Initial capture (Magnifier/Relay only)
             if (mode != ZoomMode.HighlightBox)
@@ -185,7 +185,7 @@ internal sealed class ClickZoomHelper : IDisposable
         }
         catch (Exception ex)
         {
-            Console.Write($"[ZOOM:ERR {ex.GetType().Name}] ");
+            Console.Error.Write($"[ZOOM:ERR {ex.GetType().Name}] ");
             return null;
         }
     }
@@ -228,7 +228,7 @@ internal sealed class ClickZoomHelper : IDisposable
                 if (capturePng != null) host.UpdateImage(capturePng);
                 host.UpdateStatus($"⬜ minimized — restoring...");
 
-                Console.Write($"[ZOOM:ICON taskbar@({r.Left},{r.Top} {r.Width}x{r.Height})] ");
+                Console.Error.Write($"[ZOOM:ICON taskbar@({r.Left},{r.Top} {r.Width}x{r.Height})] ");
                 return new ClickZoomHelper(host, hwnd, hwnd);
             }
 
@@ -245,13 +245,13 @@ internal sealed class ClickZoomHelper : IDisposable
                 host.Start(cx - 170, cy - 120, 316, 230, ZoomMode.Magnifier);
                 host.UpdateHeader($"[ZOOM:ICON] {source} \"{actionLabel}\"");
                 host.UpdateStatus($"⬜ minimized — restoring...");
-                Console.Write($"[ZOOM:ICON restore@({nr.Left},{nr.Top} {nr.Width}x{nr.Height})] ");
+                Console.Error.Write($"[ZOOM:ICON restore@({nr.Left},{nr.Top} {nr.Width}x{nr.Height})] ");
                 return new ClickZoomHelper(host, hwnd, hwnd);
             }
         }
         catch (Exception ex)
         {
-            Console.Write($"[ZOOM:ICON:ERR {ex.GetType().Name}] ");
+            Console.Error.Write($"[ZOOM:ICON:ERR {ex.GetType().Name}] ");
         }
         return null;
     }
@@ -407,7 +407,7 @@ internal sealed class ClickZoomHelper : IDisposable
             int srcCY = screenRect.Top + screenRect.Height / 2;
             int ovCX = zX + zW / 2;
             int ovCY = zY + zH / 2;
-            Console.Write($"[ZOOM:{modeName} ov@({zX},{zY} {zW}x{zH}) center=({ovCX},{ovCY}) src=({srcCX},{srcCY}) Δ=({ovCX - srcCX},{ovCY - srcCY})] ");
+            Console.Error.Write($"[ZOOM:{modeName} ov@({zX},{zY} {zW}x{zH}) center=({ovCX},{ovCY}) src=({srcCX},{srcCY}) Δ=({ovCX - srcCX},{ovCY - srcCY})] ");
 
             // Initial capture via form PrintWindow + crop
             if (mode != ZoomMode.HighlightBox && hFormOrParent != IntPtr.Zero)
@@ -422,7 +422,7 @@ internal sealed class ClickZoomHelper : IDisposable
         }
         catch (Exception ex)
         {
-            Console.Write($"[ZOOM:ERR {ex.GetType().Name}] ");
+            Console.Error.Write($"[ZOOM:ERR {ex.GetType().Name}] ");
             return null;
         }
     }
