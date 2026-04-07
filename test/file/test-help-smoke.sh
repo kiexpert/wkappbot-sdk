@@ -20,6 +20,11 @@ chk() {
     _pass "$label"
 }
 
+# Global entry points (no args, --help, -h)
+chk "global (no args)" "wkappbot"  # zero args
+chk "global --help"    "wkappbot"  --help
+chk "global -h"        "wkappbot"  -h
+
 # Core coverage: commands that had real bugs
 chk "a11y --help"      "Actions"   a11y    --help
 chk "ask --help"       "gemini"    ask     --help   # was: background-dispatched
