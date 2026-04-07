@@ -193,17 +193,15 @@ partial class Program
         ReadFileOv(hPipeOut, bufOut, (uint)bufOut.Length, out _, ref ovROut);
         ReadFileOv(hPipeErr, bufErr, (uint)bufErr.Length, out _, ref ovRErr);
 
-        var _stdout = Console.OpenStandardOutput();
+        var rawStdout = Console.OpenStandardOutput();
         var _stderr = Console.OpenStandardError();
-        // Stdout strategy: passthrough (UTF-8 console) or transcode (non-UTF-8 console)
-        // Decided once at startup → no per-write branch decision in hot loop
-        Action<byte[], int> writeStdout = _needsTranscode && _consoleEncoding != null
-            ? (buf, len) => {
-                var str = System.Text.Encoding.UTF8.GetString(buf, 0, len);
-                var transcoded = _consoleEncoding.GetBytes(str);
-                _stdout.Write(transcoded, 0, transcoded.Length); _stdout.Flush();
-              }
-            : (buf, len) => { _stdout.Write(buf, 0, len); _stdout.Flush(); };
+        // Stdout: wrap with TranscodeStream when terminal is non-UTF-8 (e.g. CP949 CMD).
+        // TranscodeStream uses a stateful Decoder — correctly handles multi-byte sequences
+        // split across IOCP read boundaries (unlike one-shot GetString/GetBytes).
+        Stream _stdout = _needsTranscode
+            ? new TranscodeStream(rawStdout, _consoleCodePage)
+            : rawStdout;
+        Action<byte[], int> writeStdout = (buf, len) => { _stdout.Write(buf, 0, len); _stdout.Flush(); };
         // Stderr strategy: passthrough (--stderr) or buffer-only (default)
         Action<byte[], int> writeStderr = showStderr
             ? (buf, len) => { _stderr.Write(buf, 0, len); _stderr.Flush(); }
