@@ -212,12 +212,16 @@ public sealed partial class CdpClient
             "if(!root.states)root.states={};" +
             "if(!root.trySend)root.trySend=function(selector){" +
                 // BUG-2: isSending guard prevents double-send during CDP round-trip delay
-                "var st=root.states[selector];if(st&&(st.locked||st.isSending))return st.isSending?'SENDING':'LOCKED';" +
+                // Auto-expire after 5s so a crash/timeout doesn't permanently deadlock the pump
+                "var st=root.states[selector];" +
+                "if(st&&st.isSending&&(Date.now()-st.sendTimestamp)>5000){st.isSending=false;}" + // 5s safety timeout
+                "if(st&&(st.locked||st.isSending))return st.isSending?'SENDING':'LOCKED';" +
                 "var el=document.querySelector(selector);if(!el)return 'NO_EDITOR';" +
                 "var txt=((el.value||el.innerText||el.textContent||'')).trim();if(!txt)return 'EMPTY';" +
                 // BUG-1: ProseMirror empty state = only <br class="ProseMirror-trailingBreak"> in single <p>
+                // IMPORTANT: check the childNode IS a br.ProseMirror-trailingBreak, not just any node (text node = real content)
                 "var pmBr=el.querySelector('br.ProseMirror-trailingBreak');" +
-                "if(pmBr){var pmPs=el.querySelectorAll('p');if(pmPs.length===1&&pmPs[0].childNodes.length<=1)return 'EMPTY';}" +
+                "if(pmBr){var pmPs=el.querySelectorAll('p');if(pmPs.length===1){var cn=pmPs[0].childNodes;if(cn.length===0||(cn.length===1&&cn[0].nodeName==='BR'))return 'EMPTY';}}" +
                 "try{el.focus();}catch(_e){}" +
                 "var form=el.closest('form');if(form&&typeof form.requestSubmit==='function'){" +
                     "try{form.requestSubmit();return 'FORM_SUBMIT';}catch(_e){}" +
@@ -233,11 +237,12 @@ public sealed partial class CdpClient
                 "}catch(_e){}" +
                 // ProseMirror and similar editors ignore JS KeyboardEvent -- signal C# to fire CDP Enter
                 // BUG-2: set isSending=true to block re-entry until C# confirms send (CheckPumpReadyAsync clears it)
-                "st.isSending=true;st.readyToSend=true;return 'CDP_SIGNAL';" +
+                "st.isSending=true;st.sendTimestamp=Date.now();st.readyToSend=true;return 'CDP_SIGNAL';" +
             "};" +
-            "var st=root.states[sel]||(root.states[sel]={interval:0,lastResult:'',locked:false,ticks:0,lastHash:0,isSending:false,readyToSend:false});" +
+            "var st=root.states[sel]||(root.states[sel]={interval:0,lastResult:'',locked:false,ticks:0,lastHash:null,isSending:false,sendTimestamp:0,readyToSend:false});" +
             // BUG-3: Always reset stability counters on re-arm so stale ticks don't cause premature trySend
-            "st.ticks=0;st.lastHash=0;" +
+            // Use null (not 0) as sentinel so hash 0 isn't accidentally treated as stable
+            "st.ticks=0;st.lastHash=null;" +
             // Simple hash function for content change detection
             "if(!root.hash)root.hash=function(s){var h=0;for(var i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0;return h;};" +
             // Start periodic tick if not already running (single setInterval per editor)
@@ -245,7 +250,7 @@ public sealed partial class CdpClient
                 "var cur=root.states[sel];if(!cur||cur.locked||cur.isSending)return;" +
                 "var el=document.querySelector(sel);if(!el)return;" +
                 "var txt=((el.value||el.innerText||el.textContent||'')).trim();" +
-                "if(!txt){cur.ticks=0;cur.lastHash=0;return;}" + // empty → reset
+                "if(!txt){cur.ticks=0;cur.lastHash=null;return;}" + // empty → reset
                 "var h=root.hash(txt);" +
                 "if(h!==cur.lastHash){cur.ticks=0;cur.lastHash=h;" +
                     "console.debug('[PUMP] content changed len='+txt.length+' sel='+sel);" +
@@ -255,7 +260,7 @@ public sealed partial class CdpClient
                 "if(cur.ticks>=2){" + // 2 ticks × 500ms = 1s of STABLE content
                     "cur.lastResult=root.trySend(sel);" +
                     "console.debug('[PUMP] trySend result='+cur.lastResult+' sel='+sel);" +
-                    "cur.ticks=0;cur.lastHash=0;" +
+                    "cur.ticks=0;cur.lastHash=null;" +
                 "}" +
             "}, 500);}" + // 500ms tick
             "return 'ARMED';" +
