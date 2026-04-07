@@ -54,6 +54,12 @@ internal partial class Program
     // stderr: diagnostic/processing info ([DIAG:find])
     static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth)
     {
+        // ── Header: target grap as title ────────────────────────────
+        string headerGrap = "";
+        try { headerGrap = GrapHelper.BuildGrapExpression(hwnd, root); } catch { }
+        if (!string.IsNullOrEmpty(headerGrap))
+            Console.WriteLine($"# {headerGrap}");
+
         // ── CURSOR ──────────────────────────────────────────────────
         Console.WriteLine("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
@@ -66,12 +72,24 @@ internal partial class Program
         {
             var curTag = GrapHelper.FormatNodeLabel(focInfo.ControlType, focInfo.AutomationId, focInfo.Name);
             Console.WriteLine($"  {curTag}");
-            foreach (var (pType, pName) in focInfo.ParentChain)
+
+            // Run-length encode consecutive identical unnamed types (e.g. <Group> x7)
+            var parents = focInfo.ParentChain.Where(p => !string.IsNullOrEmpty(p.type)).ToList();
+            int pi = 0;
+            while (pi < parents.Count)
             {
-                if (string.IsNullOrEmpty(pType)) continue;
+                var (pType, pName) = parents[pi];
+                int count = 1;
+                if (string.IsNullOrEmpty(pName))
+                    while (pi + count < parents.Count
+                           && parents[pi + count].type == pType
+                           && string.IsNullOrEmpty(parents[pi + count].name))
+                        count++;
                 var pTag = GrapHelper.FormatNodeLabel(pType, "", pName);
-                Console.WriteLine($"    ← {pTag}");
+                var suffix = count > 1 ? $" x{count}" : "";
+                Console.WriteLine($"    ← {pTag}{suffix}");
                 if (pType == "Dialog") cursorIsBlocking = true;
+                pi += count;
             }
         }
         else
@@ -90,10 +108,7 @@ internal partial class Program
         var targetTag = GrapHelper.FormatNodeLabel(targetType, targetAid, targetName, actions: patterns);
         Console.WriteLine($"  {targetTag}");
 
-        string targetGrap = "";
-        try { targetGrap = GrapHelper.BuildGrapExpression(hwnd, root); } catch { }
-        if (!string.IsNullOrEmpty(targetGrap))
-            Console.WriteLine($"  grap: {targetGrap}");
+        // grap already shown in header — skip duplicate
 
         try
         {
