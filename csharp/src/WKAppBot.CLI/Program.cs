@@ -1682,6 +1682,20 @@ internal partial class Program
         catch { }
     }
 
+    /// <summary>
+    /// Compact window grap for # TARGET / hack-hover lines — copy-paste ready.
+    /// Rules: hwnd+pid+proc always; browser→domain (no cls); old app→cls; no title/url.
+    /// </summary>
+    internal static string BuildCompactWinGrap(IntPtr hwnd)
+    {
+        var g = WindowFinder.BuildTargetJson5(hwnd);
+        g = System.Text.RegularExpressions.Regex.Replace(g, @",title:'[^']*'", "");
+        g = System.Text.RegularExpressions.Regex.Replace(g, @",url:'[^']*'", "");
+        if (g.Contains("domain:"))
+            g = System.Text.RegularExpressions.Regex.Replace(g, @",cls:'[^']*'", "");
+        return g;
+    }
+
     static string SanitizePathTokenForExp(string s)
     {
         if (string.IsNullOrWhiteSpace(s)) return "unknown";
