@@ -1003,11 +1003,12 @@ public static class WindowFinder
         catch { }
 
         var sb = new System.Text.StringBuilder();
-        sb.Append($"{{hwnd:0x{hWnd.ToInt64():X8},pid:{pid},title:'{title}'");
-        if (!string.IsNullOrEmpty(cls)) sb.Append($",cls:'{cls}'");
+        sb.Append($"{{hwnd:0x{hWnd.ToInt64():X8},pid:{pid}");
         if (!string.IsNullOrEmpty(proc)) sb.Append($",proc:'{proc}'");
-        if (cid != 0) sb.Append($",cid:{cid}");
         if (!string.IsNullOrEmpty(domain)) sb.Append($",domain:'{domain}'");
+        sb.Append($",title:'{title}'");
+        if (!string.IsNullOrEmpty(cls)) sb.Append($",cls:'{cls}'");
+        if (cid != 0) sb.Append($",cid:{cid}");
         if (!string.IsNullOrEmpty(url)) sb.Append($",url:'{url.Replace("'", "\\'")}'");
         sb.Append('}');
         return sb.ToString();
