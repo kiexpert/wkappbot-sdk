@@ -270,14 +270,9 @@ internal partial class Program
                     Console.ResetColor();
                     try
                     {
-                        var skillNudge = $"""
-                            💡 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!
-                            인수인계 전에 이번 세션 노하우 하나를 스킬로 기여하세요:
-
-                            wkappbot skill contribute --app <앱> --title "<제목>" --desc "<설명>" [--steps "s1|s2"] [--tags "t1,t2"]
-
-                            그 다음: wkappbot newchat "..."
-                            """;
+                        var skillNudge = $"💡 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!" +
+                            "인수인계 전에 이번 세션 노하우 하나를 스킬로 기여하세요:" +
+                            "wkappbot skill contribute --app <앱> --title \"<제목>\" --desc \"<설명>\" [--steps \"s1|s2\"] [--tags \"t1,t2\"]";
                         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, skillNudge]);
                         Console.WriteLine($"[EYE] 💡 [{cwdTag}] Skill nudge sent");
                     }
@@ -292,7 +287,7 @@ internal partial class Program
                     // 프창에도 긴급 경고 전송 (MCP subprocess에서 실행)
                     try
                     {
-                        var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요!\nwkappbot newchat 실행 필요";
+                        var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요! wkappbot newchat \"...\"을 실행하세요";
                         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, urgentNudge]);
                         Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Urgent nudge sent via MCP");
                     }
