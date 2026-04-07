@@ -2,20 +2,20 @@
   "id": "autoheal-userinput-protection",
   "app": "wkappbot-core",
   "title": "AutoHeal - User Input Protection: Focus Theft Detection \u0026 Auto-Recovery",
-  "desc": "Multi-layer system protecting user focus from CDP/Chrome theft during ask operations. Layers: (1) prevFgHint early capture before EnsureCdpConnection, (2) SW_SHOWMINNOACTIVE(8) not SW_MINIMIZE(6), (3) ForceForegroundWindow(AttachThreadInput) replacing silent-fail SetForegroundWindowRaw, (4) StartFocusWatchdog 200ms monitor-only during entire ask op, (5) RestoreFocusWithRetryAsync at each action boundary, (6) FocuslessWarningOverlay \u002B ActionApi.OnFocusStealer prop stamp. MANDATORY: all restore paths must go through InputReadiness pipeline -- standalone ForceForegroundWindow without InputReadiness is FORBIDDEN. LIVING DOCUMENT: update this skill as each focus-theft incident is investigated and resolved.",
+  "desc": "Multi-layer system protecting user focus from CDP/Chrome theft during ask operations. Layers: (1) prevFgHint early capture before EnsureCdpConnection, (2) SW_SHOWMINNOACTIVE(8) not SW_MINIMIZE(6), (3) ForceForegroundWindow(AttachThreadInput) replacing silent-fail SetForegroundWindowRaw, (4) StartFocusWatchdog 200ms monitor-only during entire ask op, (5) RestoreFocusWithRetryAsync at each action boundary, (6) FocuslessWarningOverlay \u002B ActionApi.OnFocusStealer prop stamp, (7) DismissDialogAsync auto-dismiss \uB3D9\uC758/agree after file-attach \u002B pre-send. MANDATORY: all restore paths through InputReadiness pipeline. LIVING DOCUMENT: update as each focus-theft incident is resolved.",
   "steps": [
     "0. [MANDATORY] ALL focus restore paths go through InputReadiness.Probe() -- OnProbeSuccess fires zoom\u002Bauto-hack. Standalone ForceForegroundWindow without InputReadiness FORBIDDEN (except RestoreFocusWithRetryAsync inner loop).",
-    "1. [MANDATORY] Restore trigger = end of each ask/CDP action only (insert/send/attach/wait-response). Watchdog = monitor\u002Bnotify only, no restore.",
+    "1. [MANDATORY] Restore trigger = end of each ask/CDP action only. Watchdog = monitor\u002Bnotify only, no restore.",
     "2. prevFgGemini = GetForegroundWindow() BEFORE EnsureCdpConnection",
     "3. EnsureCdpReadyAsync(prevFgHint) -- correct pre-switch prevFg",
     "4. StartFocusWatchdog 200ms -- detect\u002BFocuslessWarningOverlay only",
     "5. Action boundary restore: GuardCdpFocusTheft / LogRestoreFocus -\u003E InputReadiness.Probe() -\u003E RestoreFocusWithRetryAsync",
     "6. RestoreFocusWithRetryAsync: IME\u002Bcursor snapshot -\u003E ForceForegroundWindow loop -\u003E OnFocusStealer(AutoBugReport\u002Boverlay) -\u003E restore on success",
     "7. [DONE] AutoBugReport fires via ActionApi.OnFocusStealer",
-    "8. [TODO] FireAutoHeal on 5s restore timeout: AutoBugReport(unrecoverable) \u002B FireAutoHeal(focus-theft, chromeHwnd)",
-    "9. [TODO] EnsureCdpReadyAsync: replace manual substitute with CreateInputReadiness()\u002BProbe(AutoApproveYield:true)",
-    "10. [TODO] prevFg re-capture between phases (persona/attach/send)",
-    "11. [TODO] DismissDialogAsync: add \uB3D9\uC758 to button text match \u002B call before send (not only during response poll). Gemini file-attach consent popup blocks editor before send -- currently only dismissed during response polling (CdpClient.AiHelpers.cs:715)"
+    "8. [DONE] DismissDialogAsync: \uB3D9\uC758 added to button match; called after file-attach \u002B before insert. Gemini shows copyright consent after image upload -- dismiss at upload completion is the correct trigger point.",
+    "9. [TODO] FireAutoHeal on 5s restore timeout: AutoBugReport(unrecoverable) \u002B FireAutoHeal(focus-theft, chromeHwnd)",
+    "10. [TODO] EnsureCdpReadyAsync: replace manual substitute with CreateInputReadiness()\u002BProbe(AutoApproveYield:true)",
+    "11. [TODO] prevFg re-capture between phases (persona/attach/send)"
   ],
   "tags": [
     "focus",
@@ -95,13 +95,13 @@
     },
     {
       "file": "csharp/src/WKAppBot.WebBot/CdpClient.AiHelpers.cs",
-      "line": 715,
+      "line": 603,
       "pattern": "DismissDialogAsync",
       "note": null
     }
   ],
   "author": "claude",
   "created": "2026-04-07T08:50:15.2810138Z",
-  "updated": "2026-04-07T09:01:51.1067216Z",
-  "version": "1.5"
+  "updated": "2026-04-07T09:04:28.9766814Z",
+  "version": "1.6"
 }
