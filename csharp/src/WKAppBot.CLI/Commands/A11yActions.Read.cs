@@ -82,11 +82,11 @@ internal partial class Program
         catch { }
         sw.Stop();
 
-        // title as // comment — copy-paste safe (grap parser ignores // onwards)
-        var comments = new List<string>();
-        try { var t = root.Properties.Name.ValueOrDefault ?? ""; if (!string.IsNullOrEmpty(t)) comments.Add(t); } catch { }
-        var commentSuffix = comments.Count > 0 ? $"  // {string.Join(" | ", comments)}" : "";
-        Console.WriteLine($"# TARGET {fullGrap} [{verifyMark}] {sw.ElapsedMilliseconds}ms{commentSuffix}");
+        // title after the quoted grap — space-separated, no // (conflicts with Group// compression)
+        var meta = new List<string>();
+        try { var t = root.Properties.Name.ValueOrDefault ?? ""; if (!string.IsNullOrEmpty(t)) meta.Add(t); } catch { }
+        var metaSuffix = meta.Count > 0 ? $"  {string.Join(" | ", meta)}" : "";
+        Console.WriteLine($"# TARGET \"{fullGrap}\" [{verifyMark}] {sw.ElapsedMilliseconds}ms{metaSuffix}");
 
         // ── CURSOR ──────────────────────────────────────────────────
         Console.WriteLine("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
