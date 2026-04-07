@@ -264,8 +264,13 @@ internal partial class Program
                 using var chatLock = ChromeTabLock.Acquire("Claude");
                 if (chatLock == null) return (false, (string?)null);
 
+                // TODO-10: Re-capture prevFg after persona phase (persona may take 10-30s; user may have switched windows).
+                // Pattern mirrors Gemini: capture at phase 4 entry so restore target is fresh.
+                var prevFgClaude = NativeMethods.GetForegroundWindow();
+
                 // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
-                var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Claude");
+                var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Claude", prevFgHint: prevFgClaude);
+                using var focusWatchdog = StartFocusWatchdog(prevFg, cdp, "claude-send");
 
                 if (attachFiles?.Count > 0)
                     await AttachFilesViaCdp(cdp, attachFiles, editorSel, promptPump: AskAttachmentPump, pumpScope: "claude");

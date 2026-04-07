@@ -55,8 +55,12 @@ internal partial class Program
             " return els.length > 0 ? (els[els.length-1].textContent?.substring(0,80) ?? '') : ''; })()") ?? string.Empty;
         Console.WriteLine($"[ASK] Pre-send baseline: turns={prevTurns} tail=[{prevLastFingerprint[..Math.Min(50, prevLastFingerprint.Length)]}]");
 
+        // TODO-10: Capture prevFg just before input (after lock, after any tab-switch ops).
+        var prevFgGpt = NativeMethods.GetForegroundWindow();
+
         // CDP input readiness: blocker check, restore, zoom, and focus guard.
-        var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "ChatGPT");
+        var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "ChatGPT", prevFgHint: prevFgGpt);
+        using var focusWatchdog = StartFocusWatchdog(prevFg, cdp, "gpt-send");
 
         // File attachments happen before text send.
         if (attachFiles?.Count > 0)
