@@ -2,20 +2,20 @@
   "id": "autoheal-userinput-protection",
   "app": "wkappbot-core",
   "title": "AutoHeal - User Input Protection: Focus Theft Detection \u0026 Auto-Recovery",
-  "desc": "Multi-layer system protecting user focus from CDP/Chrome theft during ask operations. Layers: (1) prevFgHint early capture before EnsureCdpConnection, (2) SW_SHOWMINNOACTIVE(8) not SW_MINIMIZE(6), (3) ForceForegroundWindow(AttachThreadInput) replacing silent-fail SetForegroundWindowRaw, (4) StartFocusWatchdog 200ms background loop during entire ask op, (5) RestoreFocusWithRetryAsync retry loop (150ms / 5s timeout) per step, (6) FocuslessWarningOverlay \u002B ActionApi.OnFocusStealer prop stamp. AutoHeal partial: AutoBugReport (Slack) already fires via OnFocusStealer. FireAutoHeal NOT yet triggered. CRITICAL GAP: after 5s restore timeout, system gives up silently -- no Slack alert, no FireAutoHeal, user focus permanently lost.",
+  "desc": "Multi-layer system protecting user focus from CDP/Chrome theft during ask operations. Layers: (1) prevFgHint early capture before EnsureCdpConnection, (2) SW_SHOWMINNOACTIVE(8) not SW_MINIMIZE(6), (3) ForceForegroundWindow(AttachThreadInput) replacing silent-fail SetForegroundWindowRaw, (4) StartFocusWatchdog 200ms background loop during entire ask op, (5) RestoreFocusWithRetryAsync retry loop (150ms / 5s timeout) per step, (6) FocuslessWarningOverlay \u002B ActionApi.OnFocusStealer prop stamp. RESTORE TRIGGER RULE: focus restore fires at the end of each ask/CDP action boundary -- not mid-action, not on a timer. Watchdog monitors only; actual restore is synchronous at action completion. CRITICAL GAP: after 5s restore timeout, system gives up silently.",
   "steps": [
-    "0. [PRIORITY-1] On theft detected: IMMEDIATELY force-restore user latest focus -- ForceForegroundWindow must fire the instant theft is detected, not after overlay/logging overhead. Watchdog tick: move ForceForegroundWindow BEFORE notification logic.",
+    "0. [PRIORITY-1] RESTORE TRIGGER = end of each ask/CDP action. After every action (insert / send / file-attach / wait-response) completes: immediately call RestoreFocusWithRetryAsync before proceeding to next action. This is the ONLY sanctioned restore point -- do NOT restore mid-action or in watchdog tick.",
     "1. prevFgGemini = GetForegroundWindow() BEFORE EnsureCdpConnection (not after tab switch)",
     "2. EnsureCdpReadyAsync(prevFgHint) -- uses hint so EnsureCdp uses correct pre-switch prevFg",
-    "3. StartFocusWatchdog(prevFg, cdp) -- 200ms poll, Chrome-PID filter, ForceForegroundWindow per tick",
-    "4. GuardCdpFocusTheft after each insert step -- Task.Run RestoreFocusWithRetryAsync fire-and-forget",
-    "5. LogRestoreFocus at send/complete checkpoints -- delegates to RestoreFocusWithRetryAsync (fire-and-forget)",
-    "6. RestoreFocusWithRetryAsync: snapshot IME\u002Bcursor -\u003E IMMEDIATE ForceForegroundWindow -\u003E OnFocusStealer(AutoBugReport\u002Boverlay) -\u003E retry loop -\u003E restore IME\u002Bcursor",
-    "7. ForceForegroundWindow: BringWindowToTop \u002B SetForegroundWindow \u002B AttachThreadInput fallback",
-    "8. [DONE] AutoBugReport fires via ActionApi.OnFocusStealer inside step 6",
-    "9. [TODO-P2] FireAutoHeal on restore timeout: after 5s exhausted add AutoBugReport(unrecoverable) \u002B FireAutoHeal(focus-theft, chromeHwnd) for AI triad analysis \u002B Slack alert",
-    "10. [TODO-P3] InputReadiness.Probe() before ask input -- currently EnsureCdpReadyAsync is manual partial substitute; OnProbeSuccess event (auto-hack) never fires",
-    "11. [TODO-P4] prevFg re-capture between phases: persona inject / file attach / question send all use same initial snapshot"
+    "3. StartFocusWatchdog(prevFg, cdp) -- 200ms MONITOR ONLY: detect \u002B notify, do NOT restore (restore is step 0 responsibility)",
+    "4. After insert-text action ends: GuardCdpFocusTheft -\u003E RestoreFocusWithRetryAsync",
+    "5. After file-attach action ends: LogRestoreFocus -\u003E RestoreFocusWithRetryAsync",
+    "6. After send action ends: LogRestoreFocus -\u003E RestoreFocusWithRetryAsync",
+    "7. After wait-response action ends: LogRestoreFocus -\u003E RestoreFocusWithRetryAsync",
+    "8. RestoreFocusWithRetryAsync: snapshot IME\u002Bcursor -\u003E ForceForegroundWindow -\u003E OnFocusStealer(AutoBugReport\u002Boverlay) -\u003E retry loop -\u003E restore IME\u002Bcursor",
+    "9. [TODO-P2] FireAutoHeal on restore timeout: after 5s exhausted add AutoBugReport(unrecoverable) \u002B FireAutoHeal(focus-theft, chromeHwnd)",
+    "10. [TODO-P3] InputReadiness.Probe() before ask input",
+    "11. [TODO-P4] prevFg re-capture between phases"
   ],
   "tags": [
     "focus",
@@ -82,6 +82,6 @@
   ],
   "author": "claude",
   "created": "2026-04-07T08:50:15.2810138Z",
-  "updated": "2026-04-07T08:57:35.0567374Z",
-  "version": "1.2"
+  "updated": "2026-04-07T08:58:11.8367859Z",
+  "version": "1.3"
 }
