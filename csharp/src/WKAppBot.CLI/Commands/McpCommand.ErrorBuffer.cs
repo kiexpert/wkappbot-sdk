@@ -78,8 +78,8 @@ internal partial class Program
         }
 
         /// <summary>
-        /// Captures stderr with timestamps. On first error entry, immediately switches to
-        /// passthrough mode: flushes buffered entries + forwards all subsequent writes directly.
+        /// Captures stderr with timestamps. On first error-like message (error|fail|exception|오류|에러),
+        /// immediately switches to passthrough mode: flushes buffered entries + forwards all subsequent writes directly.
         /// </summary>
         sealed class ErrorCapture : TextWriter
         {
