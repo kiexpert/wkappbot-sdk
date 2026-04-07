@@ -460,7 +460,8 @@ internal partial class Program
         // Detected here (before TeeWriter) so TeeWriter can echo to stderr instead of stdout.
         GrepModeActive = Console.IsOutputRedirected
             && args.Length > 0 && args[0].ToLowerInvariant() == "logcat"
-            && !args.Any(a => a is "--past" or "--follow" or "-f" or "--timeout");
+            && !args.Any(a => a is "--past" or "--follow" or "-f" or "--timeout")
+            && !args.Any(a => a is "--help" or "-h");  // help output must reach stdout
 
         // Preserve original stdout for match output in grep-mode (TeeWriter replaces Console.Out below).
         OriginalStdout = Console.Out;
