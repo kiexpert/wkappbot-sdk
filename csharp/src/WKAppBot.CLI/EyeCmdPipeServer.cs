@@ -325,8 +325,14 @@ internal static class EyeCmdPipeServer
 
         // ── Long-running commands (ask/agent): dispatch as background task ──
         // Launcher gets immediate response; Core continues working with Slack streaming.
+        // Exception: --help/-h must run inline so help text reaches the caller immediately.
         var cmd0 = args.Length > 0 ? args[0].ToLowerInvariant() : "";
-        if (cmd0 is "ask" or "agent")
+        // Only background-dispatch ask/agent when there's a real AI target (gpt/gemini/claude/triad/all).
+        // No-args or help flags → run inline so usage text reaches the caller.
+        var aiTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "gpt", "gemini", "claude", "triad", "all" };
+        var hasAiTarget = args.Length > 1 && aiTargets.Contains(args[1]);
+        if (cmd0 is "ask" or "agent" && hasAiTarget && !args.Any(a => a is "--help" or "-h"))
         {
             pipeWriter.WriteLine($"[CMD] {string.Join(" ", args)} → dispatched to background");
             pipeWriter.WriteLine($"Log: {logFile}");
